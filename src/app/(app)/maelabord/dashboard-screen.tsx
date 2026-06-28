@@ -24,12 +24,57 @@ function Paired({ a, b }: { a: number[]; b: number[] }) {
   );
 }
 
-export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374" }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string }) {
-  const [onb, setOnb] = useState(true);
+type Onb = { show: boolean; hasLocation: boolean; hasStaff: boolean; hasSchedule: boolean; hasRevenue: boolean };
+
+export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb }) {
   const { t } = useLang();
+  const [chartSeg, setChartSeg] = useState("Vika");
   const ringP = Math.round(laborPct);
   const ringColor = laborPct <= 30 ? "var(--good)" : laborPct <= 33 ? "var(--warn)" : "var(--bad)";
   const pctLabel = laborPct.toFixed(1).replace(".", ",");
+
+  const steps = [
+    { label: "Fyrirtæki & staðir", href: "/stillingar?new=location", done: !!onboarding?.hasLocation },
+    { label: "Bæta við starfsfólki", href: "/starfsfolk?new=1", done: !!onboarding?.hasStaff },
+    { label: "Gera fyrsta vaktaplan", href: "/vaktaplan", done: !!onboarding?.hasSchedule },
+    { label: "Skrá veltu / tengja Inventra", href: "/stillingar?new=revenue", done: !!onboarding?.hasRevenue },
+  ];
+  const doneCount = steps.filter((s) => s.done).length;
+  const curIdx = steps.findIndex((s) => !s.done);
+  const Check = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12.5l4 4 10-10" /></svg>;
+
+  // New company → getting-started experience instead of the demo dashboard.
+  if (onboarding?.show) {
+    return (
+      <>
+        <PageHeader title="Mælaborð" subtitle={t("Velkomin í VAKTO")} />
+        <div className="onb">
+          <div className="ohd">
+            <div>
+              <h3>{t("Komdu þér af stað með VAKTO")}</h3>
+              <div className="osub">{doneCount} {t("af 4 skrefum kláruð — settu kerfið upp á nokkrum mínútum.")}</div>
+            </div>
+          </div>
+          <div className="obar"><i style={{ width: `${(doneCount / 4) * 100}%` }} /></div>
+          <div className="osteps">
+            {steps.map((s, i) => (
+              <Link href={s.href} key={s.label} className={`ostep ${s.done ? "done" : i === curIdx ? "cur" : ""}`} style={{ cursor: "pointer" }}>
+                <span className="n">{s.done ? <Check /> : i + 1}</span>
+                <span className="t">{t(s.label)}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="cb">
+            <p className="muted" style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}>
+              {t("Þegar þú hefur bætt við starfsfólki og birt vaktaplan birtast hér lifandi tölur — laun af tekjum, launakostnaður, frávik og yfirvinna.")}
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -48,36 +93,6 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
           </button>
         }
       />
-
-      {/* onboarding */}
-      {onb && (
-        <div className="onb">
-          <div className="ohd">
-            <div>
-              <h3>{t("Komdu þér af stað með VAKTO")}</h3>
-              <div className="osub">{t("3 af 5 skref kláruð — settu kerfið upp á nokkrum mínútum.")}</div>
-            </div>
-            <span className="ohide" onClick={() => setOnb(false)}>{t("Fela")}</span>
-          </div>
-          <div className="obar"><i style={{ width: "60%" }} /></div>
-          <div className="osteps">
-            {["Fyrirtæki & staðir", "Bæta við starfsfólki", "Setja launataxta"].map((s) => (
-              <div className="ostep done" key={s}>
-                <span className="n">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12.5l4 4 10-10" /></svg>
-                </span>
-                <span className="t">{t(s)}</span>
-              </div>
-            ))}
-            <div className="ostep cur" style={{ cursor: "pointer" }}>
-              <span className="n">4</span><span className="t">{t("Gera fyrsta vaktaplan")}</span>
-            </div>
-            <div className="ostep" style={{ cursor: "pointer" }}>
-              <span className="n">5</span><span className="t">{t("Tengja launakerfi")}</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* "Í gær" hero strip */}
       <div className="dhero">
@@ -126,9 +141,9 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
           <div className="ch">
             <div><div className="ct">{t("Launakostnaður — samanburður")}</div><div className="cs">{t("þetta tímabil vs fyrra")}</div></div>
             <div className="seg">
-              <button className="on" onClick={() => toast(t("Vika"))}>{t("Vika")}</button>
-              <button onClick={() => toast(t("Mánuður"))}>{t("Mánuður")}</button>
-              <button onClick={() => toast(t("Ár"))}>{t("Ár")}</button>
+              {["Vika", "Mánuður", "Ár"].map((s) => (
+                <button key={s} className={chartSeg === s ? "on" : ""} onClick={() => setChartSeg(s)}>{t(s)}</button>
+              ))}
             </div>
           </div>
           <div className="cb">

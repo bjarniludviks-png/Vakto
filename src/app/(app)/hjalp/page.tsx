@@ -1,5 +1,5 @@
-import { ComingSoon } from "@/components/app/coming-soon";
+import HelpScreen from "./help-screen";
 
-export default function UhjalpPage() {
-  return <ComingSoon title="Hjálp" subtitle="" />;
+export default function HjalpPage() {
+  return <HelpScreen />;
 }

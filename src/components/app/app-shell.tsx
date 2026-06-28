@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon, Logo } from "./icons";
@@ -37,6 +37,24 @@ export default function AppShell({
   const [roleModal, setRoleModal] = useState(false);
   // Owner can preview the app as another role (account menu → Skipta um hlutverk).
   const [role, setRoleState] = useState<Role>(account.role);
+  const [dark, setDark] = useState(false);
+
+  // Apply persisted theme on mount (avoids hydration mismatch).
+  useEffect(() => {
+    const isDark = localStorage.getItem("vakto-theme") === "dark";
+    if (isDark) {
+      document.documentElement.classList.add("dark");
+      requestAnimationFrame(() => setDark(true));
+    }
+  }, []);
+  function toggleTheme() {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle("dark", next);
+    try { localStorage.setItem("vakto-theme", next ? "dark" : "light"); } catch {}
+    setMenu(null);
+    toast(next ? t("Dökkt útlit virkt") : t("Ljóst útlit virkt"));
+  }
 
   const ident = role === account.role ? account : ROLE_IDENTITY[role];
   const { groups, foot } = visibleFor(role);
@@ -256,8 +274,8 @@ export default function AppShell({
                 <div className="mi" onClick={() => nav("/hjalp")}>
                   <Icon name="help" className="ei" />{t("acct:help")}
                 </div>
-                <div className="mi" onClick={() => { setMenu(null); toast(t("acct:dark") + " — væntanlegt"); }}>
-                  <Icon name="moon" className="ei" />{t("acct:dark")}
+                <div className="mi" onClick={toggleTheme}>
+                  <Icon name="moon" className="ei" />{dark ? t("Ljóst útlit") : t("acct:dark")}
                 </div>
                 <div className="sep" />
                 <div className="mi danger" onClick={signOut}>
