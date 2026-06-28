@@ -6,6 +6,7 @@ import { toast } from "@/components/app/toast";
 import { Stacked } from "@/components/app/charts";
 import { useLang } from "@/components/app/lang";
 import { PayslipModal, type PayslipData } from "@/components/app/payslip-modal";
+import { EmptyState } from "@/components/app/empty-state";
 import type { PayrollView } from "./payroll.server";
 import { runPayroll } from "./actions";
 
@@ -22,11 +23,24 @@ const MO = ["jan", "feb", "mar", "apr", "maí", "jún", "júl", "ágú", "sep", 
 const BASE = [4.8, 5.8, 3.9, 5.7, 5.6, 4.46, 4.7, 3.4, 6.7, 6.3, 5.2, 5.4];
 const PAY = BASE.map((b) => [b, b * 0.22, b * 0.2, b * 0.12, b * 0.08]);
 
-export default function PayrollScreen({ view }: { view: PayrollView }) {
+export default function PayrollScreen({ view, empty = false }: { view: PayrollView; empty?: boolean }) {
   const { t } = useLang();
   const [slip, setSlip] = useState<PayslipData | null>(null);
   const ROWS = view.rows;
   const T = view.totals;
+  if (empty) {
+    return (
+      <>
+        <PageHeader title="Launakeyrslur" subtitle="Launagreiðslur · 2026" />
+        <EmptyState
+          title="Engar launakeyrslur enn"
+          message="Bættu fyrst við starfsfólki með taxta og kjarasamningi. Þá getur þú keyrt launakeyrslu sem VAKTO reiknar sjálfkrafa og Payday sér um skil."
+          ctaLabel="Bæta við starfsfólki"
+          ctaHref="/starfsfolk?new=1"
+        />
+      </>
+    );
+  }
   return (
     <>
       <PageHeader

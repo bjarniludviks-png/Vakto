@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
+import { EmptyState } from "@/components/app/empty-state";
 import { nf, dec1 } from "@/lib/format";
 
 // Period factors relative to the weekly baseline (demo analytics scale by period).
@@ -42,10 +43,23 @@ const LIB = [
   ["Orlof & réttindi", "staða orlofs og tímabanka per starfsmann", "Excel", "M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5"],
 ];
 
-export default function ReportsScreen() {
+export default function ReportsScreen({ empty = false }: { empty?: boolean }) {
   const { t } = useLang();
   const [period, setPeriod] = useState<string>("Vika");
   const f = FACTOR[period];
+  if (empty) {
+    return (
+      <>
+        <PageHeader title="Skýrslur" subtitle="Greiningar og frammistaða" />
+        <EmptyState
+          title="Engar skýrslur enn"
+          message="Skýrslur byggja á vöktum, tímaskráningu og launakeyrslum. Bættu við starfsfólki og birtu vaktaplan — þá fyllast greiningarnar sjálfkrafa."
+          ctaLabel="Bæta við starfsfólki"
+          ctaHref="/starfsfolk?new=1"
+        />
+      </>
+    );
+  }
   return (
     <>
       <PageHeader

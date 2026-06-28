@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { Paired, Bars } from "@/components/app/charts";
 import { useLang } from "@/components/app/lang";
+import { EmptyState } from "@/components/app/empty-state";
 import { dec1 } from "@/lib/format";
 
 // Period factors relative to the monthly baseline (demo analytics scale by period).
@@ -30,10 +31,23 @@ const CMP: Row[] = [
 // color for change columns: green for good. Specific overrides per prototype.
 const goodChange = new Set(["Velta", "Framlegð", "Laun af tekjum", "Velta á launatíma", "Velta vs spá", "Unnið eftir áætlun"]);
 
-export default function PerformanceScreen() {
+export default function PerformanceScreen({ empty = false }: { empty?: boolean }) {
   const { t } = useLang();
   const [period, setPeriod] = useState<string>("Mánuður");
   const f = FACTOR[period];
+  if (empty) {
+    return (
+      <>
+        <PageHeader title="Frammistaða" subtitle="Þróun, framlegð og launasundurliðun" />
+        <EmptyState
+          title="Engin frammistöðugögn enn"
+          message="Þróun, framlegð og laun% birtast hér þegar þú ert komin/n með veltu og launakeyrslur. Byrjaðu á að bæta við starfsfólki og skrá veltu."
+          ctaLabel="Bæta við starfsfólki"
+          ctaHref="/starfsfolk?new=1"
+        />
+      </>
+    );
+  }
   return (
     <>
       <PageHeader

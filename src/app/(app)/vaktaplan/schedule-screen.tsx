@@ -85,8 +85,19 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
     grid.forEach((row) => row.forEach((s) => { if (s && s !== "off") h += SH[s].h; }));
     return h;
   }, [grid]);
-  const totalHrs = visHrs + BASE_HRS;
+  // Real (signed-in) companies start at 0 — BASE_HRS is only demo padding.
+  const liveCompany = !!initial;
+  const totalHrs = visHrs + (liveCompany ? 0 : BASE_HRS);
   const cost = totalHrs * COST_HR;
+
+  // Per-day hours + shift counts, computed from the actual grid.
+  const dayStats = DN.map((dn, c) => {
+    let h = 0, n = 0;
+    vis.forEach((r) => { const s = grid[r]?.[c]; if (s && s !== "off") { h += SH[s].h; n++; } });
+    return [c, dn, h, n] as [number, number, number, number];
+  });
+  const totDayHrs = dayStats.reduce((a, d) => a + d[2], 0);
+  const totDayShifts = dayStats.reduce((a, d) => a + d[3], 0);
   const mon = t("júní");
   const wklbl = wk === 0 ? `22.–28. ${mon}` : `${22 + wk * 7}.–${28 + wk * 7}. ${mon}`;
 
@@ -273,8 +284,8 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
       <div className="kpis">
         <div className="kpi"><div className="lab">{t(kpi.hl)}</div><div className="val">{kpi.hrs} <small>{t("klst")}</small></div></div>
         <div className="kpi"><div className="lab">{t("Launakostnaður")}</div><div className="val">{nf(kpi.hrs * COST_HR)} <small>kr</small></div></div>
-        <div className="kpi"><div className="lab">{t(kpi.sl)}</div><div className="val">{kpi.shifts}{kpi.open ? <small> · 2 {t("opnar")}</small> : null}</div></div>
-        <div className="kpi"><div className="lab">{t("Stöðugildi (FTE)")}</div><div className="val">8,4</div></div>
+        <div className="kpi"><div className="lab">{t(kpi.sl)}</div><div className="val">{kpi.shifts}{kpi.open && !liveCompany ? <small> · 2 {t("opnar")}</small> : null}</div></div>
+        <div className="kpi"><div className="lab">{t("Stöðugildi (FTE)")}</div><div className="val">{liveCompany ? (initial?.fte ?? "0,0") : "8,4"}</div></div>
       </div>
 
       {view === "Vika" && (
@@ -378,30 +389,25 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
         <div className="card">
           <div className="ch"><div className="ct"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 6 }}><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>{t("Tímar eftir dögum")}</div><div className="cs">{t("áætlað í planinu · þessi vika")}</div></div>
           <div className="cb">
-            {([
-              [0, 22, 46, 6, undefined],
-              [1, 23, 62, 8, "var(--warn)"],
-              [2, 24, 52, 6, undefined],
-              [3, 25, 54, 7, undefined],
-              [4, 26, 58, 7, undefined],
-              [5, 27, 52, 5, "var(--bad)"],
-              [6, 28, 44, 5, undefined],
-            ] as [number, number, number, number, string | undefined][]).map((r) => (
-              <div className="statline" key={r[1]}><span className="k">{t(DAYNAMES[r[0]])} {r[1]}.</span><span className="v" style={r[4] ? { color: r[4] } : undefined}>{r[2]} {t("klst")} · {r[3]} {t("á vakt")}</span></div>
+            {dayStats.map((r) => (
+              <div className="statline" key={r[1]}><span className="k">{t(DAYNAMES[r[0]])} {r[1]}.</span><span className="v">{r[2]} {t("klst")} · {r[3]} {t("á vakt")}</span></div>
             ))}
             <div className="statline" style={{ borderTop: "1px solid var(--line)", marginTop: 5, paddingTop: 8 }}>
-              <span className="k" style={{ fontWeight: 650, color: "var(--ink)" }}>{t("Samtals")}</span><span className="v" style={{ fontWeight: 700 }}>368 {t("klst")} · 34 {t("vaktir")}</span>
+              <span className="k" style={{ fontWeight: 650, color: "var(--ink)" }}>{t("Samtals")}</span><span className="v" style={{ fontWeight: 700 }}>{totDayHrs} {t("klst")} · {totDayShifts} {t("vaktir")}</span>
             </div>
-            <div className="ai" style={{ marginTop: 12 }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4Z" /></svg>
-              <div className="x">{t("Þriðjudagur er þyngstur (62 klst) en laugardagur undirmannaður um hádegi — færðu eina vakt af þriðjudegi á laugardag.")}</div>
-            </div>
+            {totDayHrs > 0 && !liveCompany && (
+              <div className="ai" style={{ marginTop: 12 }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4Z" /></svg>
+                <div className="x">{t("Þriðjudagur er þyngstur (62 klst) en laugardagur undirmannaður um hádegi — færðu eina vakt af þriðjudegi á laugardag.")}</div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
+      {(!liveCompany || requests.length > 0) && (
       <div className="card" style={{ marginTop: 16 }}>
-        <div className="ch"><div><div className="ct">{t("Beiðnir & opnar vaktir")}</div><div className="cs">{t("frá starfsfólki — samþykktu eða úthlutaðu")}</div></div><span className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{requests.length + 1} {t("ný")}</span></div>
+        <div className="ch"><div><div className="ct">{t("Beiðnir & opnar vaktir")}</div><div className="cs">{t("frá starfsfólki — samþykktu eða úthlutaðu")}</div></div><span className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{requests.length + (liveCompany ? 0 : 1)} {t("ný")}</span></div>
         <div className="cb att">
           {requests.map((r, i) => (
             <div className="it" key={r.id ?? i}>
@@ -417,9 +423,10 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
               {r.kind === "avail" && <span className="tag mut">{t("skráð")}</span>}
             </div>
           ))}
-          <div className="it"><div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg></div><div className="tx"><b>{t("Opin vakt: laugardag 12–20")}</b><span>{t("2 starfsmenn sóttu um — Ha Vu, Dalya")}</span></div><button className="btn sm" onClick={async () => { const res = await assignOpenShift({ employeeName: "Ha Vu", note: "laugardag 12–20" }); toast(res.ok ? "Úthlutað" : (res.error ?? "Villa")); }}>{t("Úthluta")}</button></div>
+          {!liveCompany && <div className="it"><div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg></div><div className="tx"><b>{t("Opin vakt: laugardag 12–20")}</b><span>{t("2 starfsmenn sóttu um — Ha Vu, Dalya")}</span></div><button className="btn sm" onClick={async () => { const res = await assignOpenShift({ employeeName: "Ha Vu", note: "laugardag 12–20" }); toast(res.ok ? "Úthlutað" : (res.error ?? "Villa")); }}>{t("Úthluta")}</button></div>}
         </div>
       </div>
+      )}
 
       {modal === "types" && <ShiftTypesModal types={types} setTypes={setTypes} onClose={() => setModal(null)} />}
       {modal === "addEmp" && <AddEmpModal pool={pool} onPick={pickEmp} onClose={() => setModal(null)} />}

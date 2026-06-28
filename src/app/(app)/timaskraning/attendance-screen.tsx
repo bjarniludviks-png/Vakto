@@ -4,6 +4,7 @@ import { useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
+import { EmptyState } from "@/components/app/empty-state";
 import { approveAllTimesheets, approveTimesheet, setClockOut } from "./actions";
 
 type TS = { date: string; pos: string; sch: string; act: string; pend: boolean; id?: string };
@@ -27,11 +28,25 @@ const pillStyle = (k: string) =>
       : k === "good" ? { background: "var(--good-soft)", color: "var(--good)" }
         : { background: "var(--line2)", color: "var(--ink3)" };
 
-export default function AttendanceScreen({ onShift = 5 }: { onShift?: number }) {
+export default function AttendanceScreen({ onShift = 5, empty = false }: { onShift?: number; empty?: boolean }) {
   const { t } = useLang();
   const [wk, setWk] = useState(0);
   const [cur, setCur] = useState<string | null>(null);
   const lbl = wk === 0 ? "22.–28. júní" : `${22 + wk * 7}.–${28 + wk * 7}. júní`;
+
+  if (empty) {
+    return (
+      <>
+        <PageHeader title="Tímaskráning" subtitle="Áætlað vs raun · þessi vika" />
+        <EmptyState
+          title="Engin tímaskráning enn"
+          message="Tímaskráning birtist hér um leið og starfsfólk byrjar að stimpla inn — gegnum appið eða Kiosk-skjáinn. Bættu fyrst við starfsfólki."
+          ctaLabel="Bæta við starfsfólki"
+          ctaHref="/starfsfolk?new=1"
+        />
+      </>
+    );
+  }
 
   return (
     <>

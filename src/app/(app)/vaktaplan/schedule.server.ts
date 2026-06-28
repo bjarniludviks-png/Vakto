@@ -3,10 +3,11 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees, } from "@/lib/employees.server";
 import { initials } from "@/lib/employees";
+import { dec1 } from "@/lib/format";
 
 export type Emp4 = [string, string, string, string]; // initials, first name, dept, color
 export type ShiftTypeView = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
-export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; types: ShiftTypeView[]; pool: Emp4[] };
+export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; types: ShiftTypeView[]; pool: Emp4[]; fte: string };
 
 const WEEK_DATES = [22, 23, 24, 25, 26, 27, 28].map((d) => `2026-06-${d}`);
 
@@ -69,7 +70,8 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
       }
     }
 
-    return { emp, grid, types, pool: [] };
+    const fte = dec1(employees.reduce((a, e) => a + e.employmentRatio, 0) / 100);
+    return { emp, grid, types, pool: [], fte };
   } catch {
     return null;
   }
