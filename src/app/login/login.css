@@ -1,0 +1,57 @@
+/* VAKTO login — ported VERBATIM from prototypes/vakto-login.html. */
+:root{
+  --ink:#1a1a1f; --ink2:#5f6470; --ink3:#9296a6; --line:#e6e6e9; --line2:#f3f3f5;
+  --brand:#e9700f; --brand-2:#f59331; --brand-deep:#cf5f0c; --brand-soft:#fdf1e6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"General Sans","Plus Jakarta Sans",ui-sans-serif,system-ui,-apple-system,sans-serif;color:var(--ink);
+  -webkit-font-smoothing:antialiased;letter-spacing:-.011em}
+.wrap{display:grid;grid-template-columns:1fr 1fr;min-height:100vh}
+
+/* left — form */
+.left{display:flex;align-items:center;justify-content:center;padding:40px 28px;background:#fff}
+.form{width:100%;max-width:380px}
+.brand{display:flex;align-items:center;gap:11px;margin-bottom:42px}
+.brand .m{display:flex;align-items:center;justify-content:center}
+.brand .m svg{width:30px;height:30px;display:block}
+.brand b{font-size:19px;font-weight:700;letter-spacing:.04em;color:var(--ink)}
+.form h1{font-size:30px;font-weight:700;letter-spacing:-.03em}
+.form .sub{font-size:14.5px;color:var(--ink2);margin-top:8px;margin-bottom:30px}
+.field{margin-bottom:18px}
+.field .lbl{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.field label{font-size:13.5px;font-weight:600}
+.field .forgot{font-size:13px;font-weight:600;color:var(--brand);cursor:pointer}
+.field input{width:100%;border:1px solid var(--line);border-radius:11px;padding:13px 15px;font:inherit;font-size:14.5px;background:#fff;transition:.12s}
+.field input::placeholder{color:var(--ink3)}
+.field input:focus{outline:2px solid var(--brand-soft);border-color:var(--brand)}
+.remember{display:flex;align-items:center;gap:9px;font-size:13.5px;color:var(--ink2);margin-bottom:22px;cursor:pointer}
+.remember input{width:17px;height:17px;accent-color:var(--brand)}
+.btn{width:100%;border:none;background:var(--brand);color:#fff;font:inherit;font-size:15px;font-weight:700;
+  padding:14px;border-radius:12px;cursor:pointer;box-shadow:0 6px 18px rgba(233,112,15,.3);transition:.12s}
+.btn:hover{background:var(--brand-deep)}
+.divider{display:flex;align-items:center;gap:14px;margin:24px 0;color:var(--ink3);font-size:12.5px;font-weight:500}
+.divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line)}
+.soc{width:100%;border:1px solid var(--line);background:#fff;border-radius:11px;padding:12px;font:inherit;font-size:14px;font-weight:600;
+  display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;margin-bottom:11px;color:var(--ink)}
+.soc:hover{background:var(--line2)}
+.soc .ic{width:22px;height:22px;border-radius:6px;background:var(--line2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:var(--ink2)}
+.soc .ic svg{width:14px;height:14px}
+.foot{text-align:center;font-size:13.5px;color:var(--ink2);margin-top:24px}
+.foot a{color:var(--brand);font-weight:700;text-decoration:none;cursor:pointer}
+
+/* right — hero panel */
+.right{background:linear-gradient(150deg,#e9700f 0%,#cf5f0c 55%,#b85109 100%);color:#fff;padding:56px;display:flex;flex-direction:column;position:relative;overflow:hidden}
+.right::after{content:"";position:absolute;right:-120px;top:-120px;width:420px;height:420px;border-radius:50%;background:rgba(255,255,255,.06)}
+.right .tag{font-size:13px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;opacity:.85;position:relative;z-index:1}
+.right .mid{margin-top:auto;margin-bottom:auto;position:relative;z-index:1}
+.right h2{font-size:42px;font-weight:700;letter-spacing:-.03em;line-height:1.12}
+.right .arr{color:#ffe2c6}
+.right .desc{font-size:16px;line-height:1.6;margin-top:22px;max-width:460px;color:#fdeede}
+.bullets{margin-top:30px;display:flex;flex-direction:column;gap:16px;max-width:480px}
+.bullet{display:flex;align-items:center;gap:13px;font-size:15.5px;font-weight:500}
+.bullet .ck{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.bullet .ck svg{width:15px;height:15px;stroke:#fff;stroke-width:2.4}
+.quote{font-size:14.5px;opacity:.85;position:relative;z-index:1;font-style:italic;margin-top:34px}
+
+@media(max-width:900px){.wrap{grid-template-columns:1fr}.right{display:none}}
+@media(max-width:480px){.left{padding:32px 22px}.form h1{font-size:26px}}

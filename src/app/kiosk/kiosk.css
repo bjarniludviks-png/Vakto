@@ -1,0 +1,68 @@
+/* VAKTO kiosk — ported VERBATIM from prototypes/vakto-kiosk.html. */
+:root{
+  --bg:#f4f4f6; --panel:#fff; --ink:#1a1a1f; --ink2:#5f6470; --ink3:#9296a6; --line:#e6e6e9; --line2:#f3f3f5;
+  --brand:#e9700f; --brand-2:#f59331; --brand-deep:#cf5f0c; --brand-soft:#fdf1e6;
+  --good:#1f9d6b; --good-soft:#e8f5ef; --bad:#d8483a;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"General Sans","Plus Jakarta Sans",ui-sans-serif,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);
+  -webkit-font-smoothing:antialiased;letter-spacing:-.011em;min-height:100vh}
+.top{display:flex;align-items:center;gap:13px;padding:20px 30px;background:var(--panel);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:11px}
+.brand .m{display:flex;align-items:center;justify-content:center}
+.brand .m svg{width:27px;height:27px;display:block}
+.brand b{font-size:17px;font-weight:700;letter-spacing:.04em;color:var(--ink)}
+.top .co{font-size:13px;color:var(--ink3);font-weight:600;border-left:1px solid var(--line);padding-left:13px}
+.top .sp{flex:1}
+.clock{text-align:right}
+.clock .t{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.clock .d{font-size:12px;color:var(--ink3)}
+
+.wrap{max-width:1100px;margin:0 auto;padding:38px 24px 60px;text-align:center}
+.wrap h1{font-size:26px;font-weight:700;letter-spacing:-.03em}
+.wrap .sub{font-size:14px;color:var(--ink2);margin-top:6px;margin-bottom:30px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:22px 12px;cursor:pointer;transition:.12s;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.tile:hover{border-color:var(--brand);transform:translateY(-2px);box-shadow:0 8px 20px rgba(20,22,28,.08)}
+.tile:active{transform:translateY(0)}
+.tile .av{width:62px;height:62px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:21px}
+.tile .nm{font-size:15px;font-weight:600;margin-top:13px}
+.tile .st{font-size:12px;font-weight:600;margin-top:7px;padding:3px 11px;border-radius:999px;display:inline-block}
+.st.in{background:var(--good-soft);color:var(--good)} .st.out{background:var(--line2);color:var(--ink3)}
+
+/* overlay */
+.ov{display:none;position:fixed;inset:0;z-index:50;align-items:center;justify-content:center;padding:24px;background:rgba(20,22,28,.45);backdrop-filter:blur(3px)}
+.ov.show{display:flex}
+.card{background:var(--panel);border-radius:24px;padding:34px 30px;text-align:center;max-width:380px;width:100%;box-shadow:0 24px 60px rgba(20,22,28,.3);animation:pop .18s ease}
+@keyframes pop{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:none}}
+.card .av{width:84px;height:84px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:30px}
+.card .nm{font-size:22px;font-weight:700;margin-top:16px;letter-spacing:-.02em}
+.card .cur{font-size:14px;color:var(--ink2);margin-top:6px}
+.card .big{width:100%;border:none;font:inherit;font-size:17px;font-weight:700;padding:16px;border-radius:14px;cursor:pointer;margin-top:24px;color:#fff}
+.big.cin{background:var(--good);box-shadow:0 8px 20px rgba(31,157,107,.3)}
+.big.cout{background:var(--bad);box-shadow:0 8px 20px rgba(216,72,58,.3)}
+.card .cancel{margin-top:12px;background:none;border:none;font:inherit;font-size:14px;font-weight:600;color:var(--ink3);cursor:pointer;padding:8px}
+.dots{display:flex;gap:15px;justify-content:center;margin:20px 0 4px}
+.dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--line);transition:.1s}
+.dot.f{background:var(--brand);border-color:var(--brand)}
+.dots.shake{animation:shk .5s}
+@keyframes shk{10%,90%{transform:translateX(-2px)}20%,80%{transform:translateX(4px)}30%,50%,70%{transform:translateX(-8px)}40%,60%{transform:translateX(8px)}}
+.pin-err{color:var(--bad);font-size:13px;font-weight:600;height:18px;margin-bottom:6px}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:6px}
+.pad button{font:inherit;font-size:22px;font-weight:600;padding:15px 0;border-radius:14px;border:1px solid var(--line);background:var(--panel);cursor:pointer;color:var(--ink)}
+.pad button:hover{background:var(--line2)} .pad button:active{background:var(--brand-soft);border-color:var(--brand)}
+.pad button.muted{font-size:14px;font-weight:600;color:var(--ink3)}
+.hint{font-size:11.5px;color:var(--ink3);margin-top:15px}.hint b{color:var(--brand)}
+
+/* success flash */
+.flash{display:none;position:fixed;inset:0;z-index:60;align-items:center;justify-content:center;background:rgba(20,22,28,.5);backdrop-filter:blur(3px)}
+.flash.show{display:flex}
+.flash .fc{background:var(--panel);border-radius:24px;padding:40px 38px;text-align:center;box-shadow:0 24px 60px rgba(20,22,28,.3);animation:pop .2s ease}
+.flash .ring{width:84px;height:84px;border-radius:50%;margin:0 auto 18px;display:flex;align-items:center;justify-content:center}
+.ring.in{background:var(--good-soft)} .ring.out{background:#fdecea}
+.flash .ring svg{width:42px;height:42px;stroke-width:2.6}
+.ring.in svg{stroke:var(--good)} .ring.out svg{stroke:var(--bad)}
+.flash .ft{font-size:21px;font-weight:700;letter-spacing:-.02em}
+.flash .fs{font-size:14px;color:var(--ink2);margin-top:6px}
+.foot{text-align:center;color:var(--ink3);font-size:12.5px;padding:18px;border-top:1px solid var(--line);background:var(--panel)}
+@media(max-width:560px){.grid{grid-template-columns:repeat(2,1fr)}.clock .t{font-size:18px}}
