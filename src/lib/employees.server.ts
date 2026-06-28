@@ -28,6 +28,11 @@ export async function getEmployees(): Promise<{ employees: Employee[]; live: boo
   if (!isSupabaseConfigured()) return { employees: DEMO_EMPLOYEES, live: false };
   try {
     const supabase = await createClient();
+    // Demo only before sign-in. Once authenticated, show that company's real
+    // data — even if empty (a newly created company starts with no employees).
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { employees: DEMO_EMPLOYEES, live: false };
+
     const { data, error } = await supabase
       .from("employees")
       .select(
@@ -35,11 +40,11 @@ export async function getEmployees(): Promise<{ employees: Employee[]; live: boo
       )
       .order("full_name");
 
-    if (error || !data || data.length === 0) {
+    if (error) {
       return { employees: DEMO_EMPLOYEES, live: false };
     }
 
-    const rows = data as unknown as Row[];
+    const rows = (data ?? []) as unknown as Row[];
     const employees: Employee[] = rows.map((r) => ({
       id: r.id,
       fullName: r.full_name,

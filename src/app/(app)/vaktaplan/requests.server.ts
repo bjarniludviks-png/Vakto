@@ -23,6 +23,9 @@ export async function getPendingRequests(): Promise<Requests> {
   if (!isSupabaseConfigured()) return { items: DEMO, live: false };
   try {
     const supabase = await createClient();
+    // Demo only before sign-in; a signed-in company shows its real (maybe empty) requests.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { items: DEMO, live: false };
     const [leave, swaps, avail] = await Promise.all([
       supabase.from("leave_requests")
         .select("id, type, from_date, to_date, employees(full_name)")
@@ -62,7 +65,6 @@ export async function getPendingRequests(): Promise<Requests> {
         detail: (r.reason as string) ?? "óframboð skráð",
       });
     }
-    if (!items.length) return { items: DEMO, live: false };
     return { items, live: true };
   } catch {
     return { items: DEMO, live: false };

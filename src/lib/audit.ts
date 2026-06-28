@@ -38,13 +38,16 @@ export async function getAuditLog(): Promise<{ entries: AuditEntry[]; live: bool
   if (!isSupabaseConfigured()) return { entries: DEMO, live: false };
   try {
     const supabase = await createClient();
+    // Demo only before sign-in; a signed-in company shows its real (maybe empty) log.
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { entries: DEMO, live: false };
     const { data, error } = await supabase
       .from("audit_log")
       .select("action, entity, detail, at")
       .order("at", { ascending: false })
       .limit(8);
-    if (error || !data?.length) return { entries: DEMO, live: false };
-    return { entries: data as AuditEntry[], live: true };
+    if (error) return { entries: DEMO, live: false };
+    return { entries: (data ?? []) as AuditEntry[], live: true };
   } catch {
     return { entries: DEMO, live: false };
   }

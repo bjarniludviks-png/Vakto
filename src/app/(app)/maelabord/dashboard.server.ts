@@ -20,8 +20,11 @@ const DEMO: DashboardView = { laborPct: 32.1, laborCostWeek: "1,40", hoursWeek: 
 export async function getDashboard(): Promise<DashboardView> {
   const metrics = await getLaborMetrics();
   const { employees, live } = await getEmployees();
-  if (!live || employees.length === 0) {
+  if (!live) {
     return { ...DEMO, laborPct: metrics.live ? metrics.laborPct : DEMO.laborPct, live: metrics.live };
+  }
+  if (employees.length === 0) {
+    return { laborPct: metrics.live ? metrics.laborPct : 0, laborCostWeek: "0", hoursWeek: "0", live: true };
   }
   const t = sumTotals(employees.map((e) => computeLine(e)));
   const weekCost = t.cost / WEEKS_PER_MONTH;

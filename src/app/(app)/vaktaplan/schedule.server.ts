@@ -26,7 +26,7 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
   if (!isSupabaseConfigured()) return null;
   try {
     const { employees, live } = await getEmployees();
-    if (!live || employees.length === 0) return null;
+    if (!live) return null;
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();

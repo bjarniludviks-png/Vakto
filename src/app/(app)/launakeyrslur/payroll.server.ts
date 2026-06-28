@@ -43,7 +43,7 @@ export async function getPayroll(): Promise<PayrollView> {
   if (!isSupabaseConfigured()) return DEMO;
   try {
     const { employees, live } = await getEmployees();
-    if (!live || employees.length === 0) return DEMO;
+    if (!live) return DEMO;
     const colorOf = (id: string) => employees.find((e) => e.id === id)?.avatarColor ?? "#5b50e6";
 
     const supabase = await createClient();
