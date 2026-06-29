@@ -241,6 +241,46 @@ export type UpdateEmployeeInput = {
   payType?: string;
 };
 
+/** Deactivate (or reactivate) an employee — keeps all history. */
+export async function setEmployeeStatus(id: string, active: boolean): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  if (id.startsWith("e") && id.length <= 3) return { ok: true, demo: true }; // demo row id
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.from("employees").update({ status: active ? "active" : "inactive" }).eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    const { data: { user } } = await supabase.auth.getUser();
+    const company = await companyId(supabase);
+    if (company) await logAudit(supabase, company, user?.id ?? null, {
+      action: "employee.status", entity: "employee", entityId: id, detail: active ? "Starfsmaður virkjaður" : "Starfsmaður óvirkjaður",
+    });
+    revalidatePath("/starfsfolk");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Permanently delete an employee and all their records (cascades). */
+export async function deleteEmployee(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  if (id.startsWith("e") && id.length <= 3) return { ok: true, demo: true }; // demo row id
+  try {
+    const supabase = await createClient();
+    const company = await companyId(supabase);
+    const { error } = await supabase.from("employees").delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    const { data: { user } } = await supabase.auth.getUser();
+    if (company) await logAudit(supabase, company, user?.id ?? null, {
+      action: "employee.delete", entity: "employee", entityId: id, detail: "Starfsmanni eytt",
+    });
+    revalidatePath("/starfsfolk");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 export async function updateEmployee(id: string, input: UpdateEmployeeInput): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   if (id.startsWith("e") && id.length <= 3) return { ok: true, demo: true }; // demo row id

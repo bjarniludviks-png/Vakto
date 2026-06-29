@@ -7,7 +7,7 @@ import { toast } from "@/components/app/toast";
 import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees } from "./actions";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, setEmployeeStatus, deleteEmployee } from "./actions";
 
 /** Best-effort document type from a filename (for the documents table). */
 function detectDocType(name: string): string {
@@ -137,6 +137,28 @@ export default function EmployeesScreen({
     setSaving(false);
     setCurrent(null);
     toast(res.demo ? "Vistað (demo — tengdu Supabase)" : "Vistað");
+    router.refresh();
+  }
+
+  async function toggleActive() {
+    if (!current) return;
+    const active = current.status === "inactive"; // currently inactive → activate
+    setSaving(true);
+    const res = await setEmployeeStatus(current.id, active);
+    setSaving(false);
+    setCurrent(null);
+    toast(res.ok ? (active ? "Starfsmaður virkjaður" : "Starfsmaður óvirkjaður") : (res.error ?? "Villa"));
+    router.refresh();
+  }
+
+  async function removeCurrent() {
+    if (!current) return;
+    if (!window.confirm(`Eyða ${current.fullName}? Þetta er endanlegt og fjarlægir allar vaktir, stimplanir og sögu viðkomandi. Til að halda sögu skaltu frekar óvirkja.`)) return;
+    setSaving(true);
+    const res = await deleteEmployee(current.id);
+    setSaving(false);
+    setCurrent(null);
+    toast(res.ok ? "Starfsmanni eytt" : (res.error ?? "Villa"));
     router.refresh();
   }
 
@@ -290,9 +312,13 @@ export default function EmployeesScreen({
             </div>
             <form className="mb" onSubmit={saveCurrent}>
               <ProfileTabBody e={current} tab={tab} />
-              <div style={{ display: "flex", gap: 9, marginTop: 18 }}>
-                <button className="btn" type="submit" disabled={saving}>{saving ? "Vista…" : "Vista"}</button>
-                <button className="btn ghost" type="button" onClick={() => setCurrent(null)}>Loka</button>
+              <div style={{ display: "flex", gap: 9, marginTop: 18, flexWrap: "wrap" }}>
+                <button className="btn" type="submit" disabled={saving}>{saving ? t("Vista…") : t("Vista")}</button>
+                <button className="btn ghost" type="button" disabled={saving} onClick={toggleActive}>{current.status === "inactive" ? t("Virkja") : t("Óvirkja")}</button>
+                <button className="btn ghost" type="button" onClick={() => setCurrent(null)}>{t("Loka")}</button>
+                <button className="btn ghost" type="button" disabled={saving} style={{ marginLeft: "auto", color: "var(--bad)" }} onClick={removeCurrent}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>{t("Eyða")}
+                </button>
               </div>
             </form>
           </div>
