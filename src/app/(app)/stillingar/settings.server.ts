@@ -7,7 +7,7 @@ import { nf } from "@/lib/format";
 export type LocationRow = { name: string; staff: number; timezone: string };
 export type PositionRow = { name: string; staff: number; baseRate: string };
 export type UserRow = { name: string; initials: string; role: string; email: string };
-export type SettingsData = { locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; live: boolean };
+export type SettingsData = { locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; companyId: string | null; live: boolean };
 
 const DEMO: SettingsData = {
   locations: [
@@ -23,6 +23,7 @@ const DEMO: SettingsData = {
     { name: "Bjarni L.", initials: "BL", role: "owner", email: "Eigandi — fullur aðgangur" },
     { name: "Jón", initials: "JÓ", role: "manager", email: "Rekstrarstjóri — vaktir, laun, skýrslur" },
   ],
+  companyId: null,
   live: false,
 };
 
@@ -67,6 +68,7 @@ export async function getSettingsData(): Promise<SettingsData> {
         role: (u.role as string) ?? "employee",
         email: (u.email as string) ?? "",
       })),
+      companyId: company,
       live: true,
     };
   } catch {

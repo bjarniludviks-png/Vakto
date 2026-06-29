@@ -13,7 +13,12 @@ import { dec1 } from "@/lib/format";
 type SettingsModal = "location" | "position" | "invite" | "revenue" | null;
 
 const ROLE_LABEL: Record<string, string> = { owner: "Eigandi", manager: "Stjórnandi", employee: "role:employee", contractor: "Verktaki" };
-const DEMO_SETTINGS: SettingsData = { locations: [], positions: [], users: [], live: false };
+const DEMO_SETTINGS: SettingsData = { locations: [], positions: [], users: [], companyId: null, live: false };
+
+function copyKioskLink(companyId: string | null) {
+  const url = `${window.location.origin}/kiosk${companyId ? `?company=${companyId}` : ""}`;
+  navigator.clipboard?.writeText(url).then(() => toast("Kiosk-slóð afrituð"), () => toast(url));
+}
 
 const AUDIT_ICON: Record<string, string> = {
   "employee.create": "M12 5v14M5 12h14",
@@ -65,6 +70,7 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
             <div className="it"><div className="ic good">P</div><div className="tx"><b>Payday</b><span>{t("launakeyrsla & skil")}</span></div><span className="tag good">{t("tengt")}</span></div>
             <div className="it rowlink" onClick={syncInventra}><div className="ic info">IN</div><div className="tx"><b>INVENTRA</b><span>{t("velta í rauntíma — laun vs velta · smelltu til að sækja veltu")}</span></div><span className="tag good">{t("tengt")}</span></div>
             <div className="it rowlink" onClick={() => setModal("revenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div><div className="tx"><b>{t("Skrá veltu handvirkt")}</b><span>{t("án Inventra — sláðu inn veltu til að sjá laun vs velta")}</span></div><span className="tag info">{t("slá inn")}</span></div>
+            <div className="it rowlink" onClick={() => copyKioskLink(data.companyId)}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><rect x="4" y="3" width="16" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg></div><div className="tx"><b>{t("Kiosk-stimpilklukka")}</b><span>{t("opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð")}</span></div><span className="tag info">{t("afrita slóð")}</span></div>
             <div className="it"><div className="ic mut" style={{ background: "var(--line2)" }}>P</div><div className="tx"><b>{t("POS / sölukerfi")}</b><span>Dótturkassi, Salt, Verifone</span></div><span className="tag mut">{t("tengja")}</span></div>
           </div>
         </div>

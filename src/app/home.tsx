@@ -34,6 +34,7 @@ export default function Home() {
   const [lang, setLang] = useState<Lang>("is");
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   const [auth, setAuth] = useState<null | "login" | "signup">(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const t = I18N[lang];
   const toApp = () => router.push("/maelabord");
 
@@ -56,7 +57,22 @@ export default function Home() {
             <a className="btn btn-gho" href="/login">{t.nav_login}</a>
             <a className="btn btn-pri" href="#" onClick={(e) => { e.preventDefault(); setAuth("signup"); }}>{t.nav_try}</a>
           </div>
+          <button className="nav-burger" aria-label="Valmynd" onClick={() => setMenuOpen((o) => !o)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              {menuOpen ? <path d="M6 6l12 12M18 6L6 18" /> : <path d="M4 7h16M4 12h16M4 17h16" />}
+            </svg>
+          </button>
         </div>
+        {menuOpen && (
+          <div className="nav-mobile">
+            <a href="#eiginleikar" onClick={() => setMenuOpen(false)}>{t.nav_features}</a>
+            <a href="#ferli" onClick={() => setMenuOpen(false)}>{t.nav_how}</a>
+            <a href="#tengingar" onClick={() => setMenuOpen(false)}>{t.nav_integrations}</a>
+            <a href="#verd" onClick={() => setMenuOpen(false)}>{t.nav_pricing}</a>
+            <a className="btn btn-gho" href="/login">{t.nav_login}</a>
+            <a className="btn btn-pri" href="#" onClick={(e) => { e.preventDefault(); setMenuOpen(false); setAuth("signup"); }}>{t.nav_try}</a>
+          </div>
+        )}
       </nav>
 
       <header className="hero">
