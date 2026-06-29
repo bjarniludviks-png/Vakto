@@ -128,6 +128,68 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
   }
 }
 
+export type ImportRow = { fullName: string; kennitala?: string; email?: string; phone?: string; hireDate?: string; active?: boolean };
+export type ImportResult = { ok: boolean; demo?: boolean; inserted?: number; skipped?: number; error?: string };
+
+/** Bulk-import employees (e.g. from a Payday Excel export). Chunked for large teams. */
+export async function importEmployees(rows: ImportRow[]): Promise<ImportResult> {
+  const valid = rows.filter((r) => r.fullName?.trim());
+  const skipped = rows.length - valid.length;
+  if (valid.length === 0) return { ok: false, error: "Engir gildir starfsmenn í skránni" };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true, inserted: valid.length, skipped };
+  try {
+    const supabase = await createClient();
+    const company = await companyId(supabase);
+    if (!company) return { ok: false, error: "Fyrirtæki fannst ekki" };
+
+    // Skip kennitölur that already exist (avoid duplicates on re-import).
+    const kts = valid.map((r) => r.kennitala?.replace(/\D/g, "")).filter(Boolean) as string[];
+    const existing = new Set<string>();
+    if (kts.length) {
+      const { data } = await supabase.from("employees").select("kennitala").eq("company_id", company);
+      for (const e of data ?? []) {
+        const k = (e.kennitala as string | null)?.replace(/\D/g, "");
+        if (k) existing.add(k);
+      }
+    }
+
+    const toInsert = valid
+      .filter((r) => { const k = r.kennitala?.replace(/\D/g, ""); return !k || !existing.has(k); })
+      .map((r) => ({
+        company_id: company,
+        full_name: r.fullName.trim(),
+        kennitala: r.kennitala?.trim() || null,
+        email: r.email?.trim() || null,
+        phone: r.phone?.trim() || null,
+        hire_date: r.hireDate || null,
+        pay_type: "hourly" as const,
+        rate: 2900,
+        employment_ratio: 100,
+        union_agreement: "Efling",
+        role: "employee",
+        status: r.active === false ? "inactive" : "active",
+      }));
+
+    const dupSkipped = valid.length - toInsert.length;
+    let inserted = 0;
+    for (let i = 0; i < toInsert.length; i += 100) {
+      const chunk = toInsert.slice(i, i + 100);
+      const { error } = await supabase.from("employees").insert(chunk);
+      if (error) return { ok: false, error: error.message, inserted };
+      inserted += chunk.length;
+    }
+
+    const { data: { user } } = await supabase.auth.getUser();
+    await logAudit(supabase, company, user?.id ?? null, {
+      action: "employee.import", entity: "employee", detail: `Flutti inn ${inserted} starfsmenn úr skrá`,
+    });
+    revalidatePath("/starfsfolk");
+    return { ok: true, inserted, skipped: skipped + dupSkipped };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 export type UploadDocResult = { ok: boolean; demo?: boolean; path?: string; error?: string };
 
 /** Upload an employee document (data URL) to the documents bucket + create a row. */

@@ -140,6 +140,8 @@ export const DICT: Dict = {
   "emp:footer": { is: "Smelltu á starfsmann til að uppfæra taxta, álög og samninga, eða til að hlaða inn tilbúnum kjarasamningi.", en: "Select an employee to manage pay structures and union configurations, or instantly apply a standard contract template." },
   "emp:demo": { is: " · (Prófunargögn — Tengdu gagnagrunn til að virkja rauntölur)", en: " · (Demo environment data — Connect live backend database for accurate figures)" },
   "emp:shows": { is: "Sýnir", en: "Showing" },
+  "Flytja inn (Excel)": { is: "Flytja inn (Excel)", en: "Import (Excel)" },
+  "Flyt inn…": { is: "Flyt inn…", en: "Importing…" },
 
   // shared words
   "klst": { is: "klst", en: "hrs" },

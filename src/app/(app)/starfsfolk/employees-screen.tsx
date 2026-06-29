@@ -7,7 +7,7 @@ import { toast } from "@/components/app/toast";
 import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
-import { createEmployee, updateEmployee, uploadDocument } from "./actions";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees } from "./actions";
 
 /** Best-effort document type from a filename (for the documents table). */
 function detectDocType(name: string): string {
@@ -73,6 +73,57 @@ export default function EmployeesScreen({
   const [tab, setTab] = useState<ProfileTab>("Laun");
   const [showNew, setShowNew] = useState(!!openNew);
   const [saving, setSaving] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef<HTMLInputElement>(null);
+
+  async function onImportFile(file: File | null | undefined) {
+    if (!file) return;
+    setImporting(true);
+    try {
+      const readXlsx = (await import("read-excel-file")).default;
+      const out = (await readXlsx(file)) as unknown;
+      // Browser build returns rows[][]; guard for the sheet-wrapped shape too.
+      const wrapped = out as { data?: unknown[][] }[];
+      const grid: unknown[][] = Array.isArray(wrapped?.[0]?.data) ? wrapped[0].data : (out as unknown[][]);
+      const header = (grid[0] ?? []).map((c) => String(c ?? "").trim().toLowerCase());
+      const col = (...names: string[]) => header.findIndex((h) => names.some((n) => h.includes(n)));
+      const ci = {
+        name: col("nafn", "name"),
+        kt: col("kennitala", "ssn"),
+        phone: col("sími", "simi", "phone"),
+        email: col("tölvupóst", "tolvupost", "netfang", "email"),
+        hire: col("ráðning", "radning", "hire"),
+        active: col("virk", "active"),
+      };
+      if (ci.name < 0) { toast("Fann ekki 'Nafn' dálk í skránni"); setImporting(false); return; }
+      const val = (row: unknown[], i: number) => (i >= 0 && row[i] != null ? String(row[i]).trim() : "");
+      const rows = grid.slice(1)
+        .filter((r) => val(r, ci.name))
+        .map((r) => {
+          const a = val(r, ci.active).toLowerCase();
+          return {
+            fullName: val(r, ci.name),
+            kennitala: val(r, ci.kt) || undefined,
+            phone: val(r, ci.phone) || undefined,
+            email: val(r, ci.email) || undefined,
+            hireDate: ci.hire >= 0 && r[ci.hire] instanceof Date ? (r[ci.hire] as Date).toISOString().slice(0, 10) : (val(r, ci.hire) || undefined),
+            active: a ? !["nei", "no", "false", "óvirkur", "ovirkur"].includes(a) : true,
+          };
+        });
+      if (!rows.length) { toast("Engir starfsmenn í skránni"); setImporting(false); return; }
+      const res = await importEmployees(rows);
+      if (!res.ok) { toast(res.error ?? "Innflutningur tókst ekki"); }
+      else toast(res.demo
+        ? `${res.inserted} starfsmenn lesnir (demo — tengdu Supabase)`
+        : `${res.inserted} starfsmenn fluttir inn${res.skipped ? ` · ${res.skipped} sleppt` : ""}`);
+      router.refresh();
+    } catch {
+      toast("Gat ekki lesið skrána — er hún á Excel (.xlsx) formi?");
+    } finally {
+      setImporting(false);
+      if (importRef.current) importRef.current.value = "";
+    }
+  }
 
   async function saveCurrent(ev: React.FormEvent<HTMLFormElement>) {
     ev.preventDefault();
@@ -105,9 +156,16 @@ export default function EmployeesScreen({
         title="Starfsfólk"
         subtitle={`${count} ${t("emp:subtitle")} · ${num1(fte)} ${t("emp:fteword")}`}
         actions={
-          <button className="btn sm" onClick={() => setShowNew(true)}>
-            {t("emp:new")}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <input ref={importRef} type="file" accept=".xlsx,.xls" hidden onChange={(e) => onImportFile(e.target.files?.[0])} />
+            <button className="btn ghost sm" disabled={importing} onClick={() => importRef.current?.click()}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 16V4m0 0L7 9m5-5l5 5M5 20h14" /></svg>
+              {importing ? t("Flyt inn…") : t("Flytja inn (Excel)")}
+            </button>
+            <button className="btn sm" onClick={() => setShowNew(true)}>
+              {t("emp:new")}
+            </button>
+          </div>
         }
       />
 
