@@ -50,6 +50,10 @@ const INIT_TYPES: ShiftType[] = [
 ];
 const DAYS = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
 const DN = [22, 23, 24, 25, 26, 27, 28];
+const WEEK_MON = new Date(2026, 5, 22); // base Monday (22 June 2026)
+const TODAY_ISO = "2026-06-24"; // demo "today" — highlighted only when in view
+const MONTHS_IS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
+const fmtISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const DAYNAMES = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
 const deptOf = (d: string) => (d === "Eldhús" ? "Eldhús" : d === "Sal" ? "Sal" : "Stjórnun");
 
@@ -90,16 +94,25 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
   const totalHrs = visHrs + (liveCompany ? 0 : BASE_HRS);
   const cost = totalHrs * COST_HR;
 
+  // Actual dates for the viewed week — shift the base Monday by wk weeks.
+  const weekDays = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => { const d = new Date(WEEK_MON); d.setDate(d.getDate() + wk * 7 + i); return d; }),
+    [wk],
+  );
+  const todayCol = weekDays.findIndex((d) => fmtISO(d) === TODAY_ISO);
+  const d0 = weekDays[0], d6 = weekDays[6];
+  const wklbl = d0.getMonth() === d6.getMonth()
+    ? `${d0.getDate()}.–${d6.getDate()}. ${MONTHS_IS[d0.getMonth()]}`
+    : `${d0.getDate()}. ${MONTHS_IS[d0.getMonth()].slice(0, 3)} – ${d6.getDate()}. ${MONTHS_IS[d6.getMonth()].slice(0, 3)}`;
+
   // Per-day hours + shift counts, computed from the actual grid.
-  const dayStats = DN.map((dn, c) => {
+  const dayStats = weekDays.map((dd, c) => {
     let h = 0, n = 0;
     vis.forEach((r) => { const s = grid[r]?.[c]; if (s && s !== "off") { h += SH[s].h; n++; } });
-    return [c, dn, h, n] as [number, number, number, number];
+    return [c, dd.getDate(), h, n] as [number, number, number, number];
   });
   const totDayHrs = dayStats.reduce((a, d) => a + d[2], 0);
   const totDayShifts = dayStats.reduce((a, d) => a + d[3], 0);
-  const mon = t("júní");
-  const wklbl = wk === 0 ? `22.–28. ${mon}` : `${22 + wk * 7}.–${28 + wk * 7}. ${mon}`;
 
   // KPI tölur fylgja sýninni (vika / dagur / mánuður).
   const dayIdx = Math.max(0, DN.indexOf(selDay));
@@ -138,7 +151,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
           const [a, b] = o.l.split("–");
           out.push({
             employeeName: e[1],
-            date: `2026-06-${String(DN[c]).padStart(2, "0")}`,
+            date: fmtISO(weekDays[c]),
             startTime: `${a.padStart(2, "0")}:00`,
             endTime: `${b.padStart(2, "0")}:00`,
             shiftTypeName: o.s || "Dagvakt",
@@ -296,7 +309,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
                 <tr>
                   <th>{t("Starfsmaður")}</th>
                   {DAYS.map((d, i) => (
-                    <th key={d} className={i === 2 ? "tod" : ""}>{t(d)}<span className="dn">{DN[i]}</span></th>
+                    <th key={d} className={i === todayCol ? "tod" : ""}>{t(d)}<span className="dn">{weekDays[i].getDate()}</span></th>
                   ))}
                 </tr>
               </thead>
@@ -314,7 +327,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
                       {grid[r].map((s, c) => (
                         <td
                           key={c}
-                          className={c === 2 ? "tod" : ""}
+                          className={c === todayCol ? "tod" : ""}
                           onDragOver={(ev) => { ev.preventDefault(); ev.currentTarget.classList.add("cellh"); }}
                           onDragLeave={(ev) => ev.currentTarget.classList.remove("cellh")}
                           onDrop={(ev) => { ev.preventDefault(); ev.currentTarget.classList.remove("cellh"); dropOn(r, c); }}
@@ -337,7 +350,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
                   {Array.from({ length: 7 }, (_, c) => {
                     let n = 0;
                     vis.forEach((r) => { const s = grid[r][c]; if (s && s !== "off") n += SH[s].h; });
-                    return <td key={c} className={c === 2 ? "tod" : ""}>{n}</td>;
+                    return <td key={c} className={c === todayCol ? "tod" : ""}>{n}</td>;
                   })}
                 </tr>
                 <tr className="addrow">
