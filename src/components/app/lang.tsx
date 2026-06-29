@@ -41,6 +41,8 @@ export const DICT: Dict = {
   "Dökkt útlit virkt": { is: "Dökkt útlit virkt", en: "Dark mode on" },
   "Ljóst útlit virkt": { is: "Ljóst útlit virkt", en: "Light mode on" },
   "Velkomin í VAKTO": { is: "Velkomin í VAKTO", en: "Welcome to VAKTO" },
+  "Rauntölur úr þínum gögnum": { is: "Rauntölur úr þínum gögnum", en: "Live numbers from your data" },
+  "Nánari greiningar — gröf, frávik og samanburður — birtast eftir því sem vaktir, stimplanir og velta safnast. Sjá Tímaskráning, Skýrslur og Frammistöðu.": { is: "Nánari greiningar — gröf, frávik og samanburður — birtast eftir því sem vaktir, stimplanir og velta safnast. Sjá Tímaskráning, Skýrslur og Frammistöðu.", en: "Deeper analytics — charts, variance and comparisons — appear as shifts, punches and revenue accumulate. See Time tracking, Reports and Performance." },
   "Engin tímaskráning enn": { is: "Engin tímaskráning enn", en: "No time records yet" },
   "Tímaskráning birtist hér um leið og starfsfólk byrjar að stimpla inn — gegnum appið eða Kiosk-skjáinn. Bættu fyrst við starfsfólki.": { is: "Tímaskráning birtist hér um leið og starfsfólk byrjar að stimpla inn — gegnum appið eða Kiosk-skjáinn. Bættu fyrst við starfsfólki.", en: "Time records appear here as soon as staff start clocking in — via the app or the Kiosk screen. Add staff first." },
   "Engar skýrslur enn": { is: "Engar skýrslur enn", en: "No reports yet" },

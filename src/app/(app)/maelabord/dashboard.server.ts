@@ -59,7 +59,7 @@ export async function getDashboard(): Promise<DashboardView> {
 
   const tot = sumTotals(employees.map((e) => computeLine(e)));
   return {
-    laborPct: metrics.laborPct,
+    laborPct: metrics.live ? metrics.laborPct : 0,
     laborCostWeek: dec1(Math.round((tot.cost / WEEKS_PER_MONTH) / 100000) / 10),
     hoursWeek: nf(Math.round(tot.hours / WEEKS_PER_MONTH)),
     live: true,

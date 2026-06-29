@@ -26,7 +26,7 @@ function Paired({ a, b }: { a: number[]; b: number[] }) {
 
 type Onb = { show: boolean; hasLocation: boolean; hasStaff: boolean; hasSchedule: boolean; hasRevenue: boolean };
 
-export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb }) {
+export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding, live = false }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean }) {
   const { t } = useLang();
   const [chartSeg, setChartSeg] = useState("Vika");
   const [hideOnb, setHideOnb] = useState(false);
@@ -78,6 +78,38 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
           <div className="cb">
             <p className="muted" style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}>
               {t("Þegar þú hefur bætt við starfsfólki og birt vaktaplan birtast hér lifandi tölur — laun af tekjum, launakostnaður, frávik og yfirvinna.")}
+            </p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  // Live company (signed in): real KPIs only — no demo charts/alerts.
+  if (live) {
+    const lpColor = laborPct === 0 ? "var(--ink3)" : laborPct <= 30 ? "var(--good)" : laborPct <= 33 ? "var(--warn)" : "var(--bad)";
+    return (
+      <>
+        <PageHeader title="Mælaborð" subtitle={t("Rauntölur úr þínum gögnum")} />
+        <div className="kpis">
+          <div className="kpi flex">
+            <div className="ring" style={{ ["--p" as string]: laborPct === 0 ? 0 : ringP, ["--c" as string]: lpColor }}>
+              <div className="in" style={{ color: lpColor }}>{laborPct === 0 ? "—" : ringP + "%"}</div>
+            </div>
+            <div>
+              <div className="lab">{t("Laun af tekjum")}</div>
+              <div className="val" style={{ fontSize: 22 }}>{laborPct === 0 ? "—" : <>{pctLabel}<small>%</small></>}</div>
+              <Link href="/stillingar?new=revenue" className="muted" style={{ fontSize: 11.5, fontWeight: 600, color: "var(--brand)", textDecoration: "none", display: "inline-block", marginTop: 2 }}>{t("Skrá veltu")}</Link>
+            </div>
+          </div>
+          <div className="kpi"><div className="lab">{t("Launakostnaður (vika)")}</div><div className="val">{laborCostWeek} <small>m kr</small></div></div>
+          <div className="kpi"><div className="lab">{t("Unnir tímar (vika)")}</div><div className="val">{hoursWeek} <small>{t("klst")}</small></div></div>
+          <div className="kpi"><div className="lab">{t("Yfirvinna (vika)")}</div><div className="val">0 <small>{t("klst")}</small></div></div>
+        </div>
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="cb">
+            <p className="muted" style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}>
+              {t("Nánari greiningar — gröf, frávik og samanburður — birtast eftir því sem vaktir, stimplanir og velta safnast. Sjá Tímaskráning, Skýrslur og Frammistöðu.")}
             </p>
           </div>
         </div>

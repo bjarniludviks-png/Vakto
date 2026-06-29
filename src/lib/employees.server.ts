@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { DEMO_EMPLOYEES, type Employee } from "@/lib/employees";
@@ -29,8 +30,9 @@ export async function getCompanyData(): Promise<{ empty: boolean; live: boolean;
   return { empty: live && employees.length === 0, live, count: employees.length };
 }
 
-/** Fetch employees from Supabase; fall back to demo data if not connected. */
-export async function getEmployees(): Promise<{ employees: Employee[]; live: boolean }> {
+/** Fetch employees from Supabase; fall back to demo data if not connected.
+ * Wrapped in React cache() so repeated calls within one request are deduped. */
+export const getEmployees = cache(async (): Promise<{ employees: Employee[]; live: boolean }> => {
   if (!isSupabaseConfigured()) return { employees: DEMO_EMPLOYEES, live: false };
   try {
     const supabase = await createClient();
@@ -74,4 +76,4 @@ export async function getEmployees(): Promise<{ employees: Employee[]; live: boo
   } catch {
     return { employees: DEMO_EMPLOYEES, live: false };
   }
-}
+});

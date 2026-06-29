@@ -471,3 +471,7 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
   .tacct{padding:0 6px 0 4px;height:40px;gap:5px}
   .tacct-n{display:none}
 }
+
+/* loading skeleton */
+.sk-line{background:linear-gradient(90deg,var(--line2) 25%,var(--line) 37%,var(--line2) 63%);background-size:400% 100%;border-radius:7px;animation:sk 1.2s ease-in-out infinite}
+@keyframes sk{0%{background-position:100% 0}100%{background-position:-100% 0}}

@@ -1,12 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginForm() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -26,8 +24,9 @@ export default function LoginForm() {
         setError(error.message);
         return;
       }
-      router.push("/maelabord");
-      router.refresh();
+      // Full navigation (not client transition) so the app shell loads with its
+      // route-scoped CSS + fresh session — avoids the "needs a refresh" flash.
+      window.location.assign("/maelabord");
     } catch {
       setError("Tókst ekki að tengjast — er Supabase stillt í .env.local?");
     } finally {
