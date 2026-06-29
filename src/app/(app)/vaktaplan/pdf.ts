@@ -71,7 +71,7 @@ function drawFooter(doc: jsPDF, pageNum: number, pageCount: number) {
   doc.setFillColor(...ORANGE);
   [6, 9, 12].forEach((h, i) => doc.roundedRect(bx + i * 5, by - h, 3.2, h, 1, 1, "F"));
   // wordmark + tagline
-  doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...ORANGE);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...INK);
   const wmX = bx + 21;
   doc.text("VAKTO", wmX, by - 1);
   const wmW = doc.getTextWidth("VAKTO");
