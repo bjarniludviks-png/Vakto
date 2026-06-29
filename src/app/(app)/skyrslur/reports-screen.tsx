@@ -5,12 +5,28 @@ import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { EmptyState } from "@/components/app/empty-state";
+import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { nf, dec1 } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
+import { fetchAttendance } from "../timaskraning/actions";
+
+const MONTHS_IS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ágú.", "sep.", "okt.", "nóv.", "des."];
+const pad = (n: number) => String(n).padStart(2, "0");
+const isoOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const niceISO = (s: string) => { const [y, m, d] = s.split("-").map(Number); return `${d}. ${MONTHS_IS[m - 1]} ${y}`; };
+function rangeFor(period: Period): { from: string; to: string } {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  if (period === "Dagur") return { from: isoOf(t), to: isoOf(t) };
+  if (period === "Mánuður") return { from: isoOf(new Date(t.getFullYear(), t.getMonth(), 1)), to: isoOf(new Date(t.getFullYear(), t.getMonth() + 1, 0)) };
+  const mon = new Date(t); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
+  const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+  return { from: isoOf(mon), to: isoOf(sun) };
+}
 
 // Period factors relative to the weekly baseline (demo analytics scale by period).
-const PERIODS = ["Dagur", "Vika", "Mánuður", "Ársfj.", "Ár"] as const;
+const PERIODS: Period[] = ["Dagur", "Vika", "Mánuður", "Ársfj.", "Ár", "Sérsniðið"];
 const FACTOR: Record<string, number> = { "Dagur": 1 / 5, "Vika": 1, "Mánuður": 4.33, "Ársfj.": 13, "Ár": 52 };
+const daysBetween = (a: string, b: string) => a && b ? Math.max(1, Math.round((Date.parse(b) - Date.parse(a)) / 86400000) + 1) : 7;
 
 /** Scale an Icelandic-formatted number string by a factor, preserving sign + decimals. */
 function sc(s: string, f: number): string {
@@ -46,8 +62,18 @@ const LIB = [
 
 export default function ReportsScreen({ empty = false, live = false, rows = [] }: { empty?: boolean; live?: boolean; rows?: AttRow[] }) {
   const { t } = useLang();
-  const [period, setPeriod] = useState<string>("Vika");
-  const f = FACTOR[period];
+  const [period, setPeriod] = useState<Period>("Vika");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [search, setSearch] = useState("");
+  const [deptF, setDeptF] = useState("all");
+  const [compare, setCompare] = useState("prev");
+  const f = period === "Sérsniðið" ? daysBetween(from, to) / 7 : FACTOR[period];
+  const cmpCol = compare === "year" ? "Í fyrra" : compare === "none" ? "—" : "Fyrri tímabil";
+  const cmpBadge = compare === "none" ? "Án samanburðar" : compare === "year" ? `${t("vs í fyrra")}` : `${t("vs fyrri")} ${period === "Sérsniðið" ? t("tímabil") : t(period)}`;
+  const matchName = (n: string) => !search || n.toLowerCase().includes(search.toLowerCase());
+  const shownPVA = PVA.filter((r) => (deptF === "all" || r.d === deptF) && matchName(r.n));
+  const shownBANK = BANK.filter((r) => matchName(r.n));
   if (empty) {
     return (
       <>
@@ -61,47 +87,8 @@ export default function ReportsScreen({ empty = false, live = false, rows = [] }
       </>
     );
   }
-  // Live company: real planned vs actual + time-bank from shifts/punches.
-  if (live) {
-    const planned = rows.reduce((a, r) => a + r.planned, 0);
-    const actual = rows.reduce((a, r) => a + r.actual, 0);
-    return (
-      <>
-        <PageHeader title="Skýrslur" subtitle="Greiningar og frammistaða" />
-        <div className="card" style={{ marginTop: 20 }}>
-          <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{t("áætlað á móti klukknuðum tímum — þessi vika")}</div></div></div>
-          <div className="cb tbl" style={{ paddingTop: 8 }}>
-            <table>
-              <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th></tr></thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.name}</span></td>
-                    <td>{r.dept}</td><td className="r">{dec1(r.planned)}</td><td className="r">{dec1(r.actual)}</td>
-                    <td className="r" style={{ color: r.deviation > 0 ? "var(--warn)" : r.deviation < 0 ? "var(--bad)" : undefined }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>
-                  </tr>
-                ))}
-                <tr className="foot"><td style={{ textAlign: "left" }}>{t("Samtals")} · {rows.length} {t("starfsm.")}</td><td></td><td className="r">{dec1(planned)}</td><td className="r">{dec1(actual)}</td><td className="r">{actual >= planned ? "+" : ""}{dec1(actual - planned)}</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="ch"><div><div className="ct">{t("Tímabanki starfsfólks")}</div><div className="cs">{t("uppsafnað +/− vs vinnuskylda")}</div></div></div>
-          <div className="cb tbl" style={{ paddingTop: 8 }}>
-            <table>
-              <thead><tr><th>{t("th:Starfsm.")}</th><th className="r">{t("Vinnuskylda")}</th><th className="r">{t("Unnið")}</th><th className="r">{t("Staða banka")}</th></tr></thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}><td>{r.name}</td><td className="r">{r.required}</td><td className="r">{dec1(r.actual)}</td><td className="r" style={{ color: r.actual - r.required > 0 ? "var(--good)" : r.actual - r.required < 0 ? "var(--warn)" : undefined }}>{r.actual - r.required >= 0 ? "+" : ""}{dec1(r.actual - r.required)}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </>
-    );
-  }
+  // Live company: real planned vs actual + time-bank, with period/range/search.
+  if (live) return <LiveReports initial={rows} />;
   return (
     <>
       <PageHeader
@@ -115,13 +102,14 @@ export default function ReportsScreen({ empty = false, live = false, rows = [] }
         }
       />
 
-      <div className="stoolbar">
-        <div className="seg">{PERIODS.map((p) => <button key={p} className={period === p ? "on" : ""} onClick={() => setPeriod(p)}>{t(p)}</button>)}</div>
-        <div className="srchbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.4-3.4" /></svg><input placeholder={t("Leita að starfsmanni")} /></div>
-        <select className="badge" style={{ border: "1px solid var(--line)", padding: "7px 11px" }}><option>{t("Allar deildir")}</option><option>Eldhús</option><option>Sal</option></select>
-        <div className="sp" style={{ flex: 1 }} />
-        <span className="badge" style={{ background: "var(--brand-soft)", color: "var(--brand)" }}>{t("vs fyrri")} {t(period)}</span>
-      </div>
+      <FilterBar
+        periods={PERIODS} period={period} onPeriod={setPeriod}
+        from={from} to={to} onRange={(a, b) => { setFrom(a); setTo(b); }}
+        search={search} onSearch={setSearch}
+        filters={[{ value: deptF, onChange: setDeptF, options: [{ value: "all", label: "Allar deildir" }, { value: "Eldhús", label: "Eldhús" }, { value: "Sal", label: "Sal" }] }]}
+        compare={compare} onCompare={setCompare}
+        rangeLabel={cmpBadge}
+      />
 
       <div className="kpis">
         <div className="kpi"><div className="lab">{t("Velta á starfsmann")}</div><div className="val">{sc("358", f)} <small>þ kr</small></div><div className="d up">▲ 3,2%</div></div>
@@ -134,17 +122,18 @@ export default function ReportsScreen({ empty = false, live = false, rows = [] }
         <div className="ch"><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{t("áætlað á móti klukknuðum tímum — þessi vika vs fyrri vika")}</div></div>
         <div className="cb tbl" style={{ paddingTop: 8 }}>
           <table>
-            <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th><th className="r">{t("Fyrri vika")}</th><th className="r">{t("Raun kostn.")}</th></tr></thead>
+            <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th>{compare !== "none" && <th className="r">{t(cmpCol)}</th>}<th className="r">{t("Raun kostn.")}</th></tr></thead>
             <tbody>
-              {PVA.map((r) => (
+              {shownPVA.map((r) => (
                 <tr key={r.n}>
                   <td>{r.n}</td><td>{r.d}</td><td className="r">{sc(r.pl, f)}</td><td className="r">{sc(r.ac, f)}</td>
                   <td className="r" style={r.frC ? { color: r.frC } : undefined}>{sc(r.fr, f)}</td>
-                  <td className={`r${r.pwC ? "" : " muted"}`} style={r.pwC ? { color: r.pwC } : undefined}>{sc(r.pw, f)}</td>
+                  {compare !== "none" && <td className={`r${r.pwC ? "" : " muted"}`} style={r.pwC ? { color: r.pwC } : undefined}>{sc(r.pw, f)}</td>}
                   <td className="r">{sc(r.cost, f)}</td>
                 </tr>
               ))}
-              <tr className="foot"><td style={{ textAlign: "left" }}>{t("Samtals")} · 12 {t("starfsm.")}</td><td></td><td className="r">{sc("368,0", f)}</td><td className="r">{sc("374,6", f)}</td><td className="r">{sc("+6,6", f)}</td><td className="r">{sc("+5,1", f)}</td><td className="r">{sc("1.401.900", f)}</td></tr>
+              {!shownPVA.length && <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 18 }}>{t("Enginn starfsmaður fannst")}</td></tr>}
+              {shownPVA.length > 0 && <tr className="foot"><td style={{ textAlign: "left" }}>{t("Samtals")} · {shownPVA.length} {t("starfsm.")}</td><td></td><td className="r">{sc("368,0", f)}</td><td className="r">{sc("374,6", f)}</td><td className="r">{sc("+6,6", f)}</td>{compare !== "none" && <td className="r">{sc("+5,1", f)}</td>}<td className="r">{sc("1.401.900", f)}</td></tr>}
             </tbody>
           </table>
         </div>
@@ -157,9 +146,10 @@ export default function ReportsScreen({ empty = false, live = false, rows = [] }
             <table>
               <thead><tr><th>{t("th:Starfsm.")}</th><th className="r">{t("Vinnuskylda")}</th><th className="r">{t("Unnið")}</th><th className="r">{t("Staða banka")}</th></tr></thead>
               <tbody>
-                {BANK.map((r) => (
+                {shownBANK.map((r) => (
                   <tr key={r.n}><td>{r.n}</td><td className="r">{sc(r.req, f)}</td><td className="r">{sc(r.w, f)}</td><td className={`r${r.c ? "" : " muted"}`} style={r.c ? { color: r.c } : undefined}>{sc(r.b, f)}</td></tr>
                 ))}
+                {!shownBANK.length && <tr><td colSpan={4} className="muted" style={{ textAlign: "center", padding: 18 }}>{t("Enginn starfsmaður fannst")}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -179,6 +169,81 @@ export default function ReportsScreen({ empty = false, live = false, rows = [] }
               </div>
             ))}
           </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function LiveReports({ initial }: { initial: AttRow[] }) {
+  const { t } = useLang();
+  const [period, setPeriod] = useState<Period>("Vika");
+  const init0 = rangeFor("Vika");
+  const [from, setFrom] = useState(init0.from);
+  const [to, setTo] = useState(init0.to);
+  const [search, setSearch] = useState("");
+  const [deptF, setDeptF] = useState("all");
+  const [data, setData] = useState<AttRow[]>(initial);
+  const [loading, setLoading] = useState(false);
+
+  function load(f: string, tt: string) {
+    setLoading(true);
+    fetchAttendance(f, tt).then((res) => { if (res.ok) setData(res.rows); }).finally(() => setLoading(false));
+  }
+  function changePeriod(p: Period) {
+    setPeriod(p);
+    if (p !== "Sérsniðið") { const r = rangeFor(p); setFrom(r.from); setTo(r.to); load(r.from, r.to); }
+  }
+  function changeRange(f: string, tt: string) { setFrom(f); setTo(tt); if (f && tt && f <= tt) load(f, tt); }
+
+  const depts = ["all", ...Array.from(new Set(data.map((r) => r.dept).filter((d) => d && d !== "—")))];
+  const shown = data.filter((r) => (deptF === "all" || r.dept === deptF) && (!search || r.name.toLowerCase().includes(search.toLowerCase())));
+  const planned = shown.reduce((a, r) => a + r.planned, 0);
+  const actual = shown.reduce((a, r) => a + r.actual, 0);
+
+  return (
+    <>
+      <PageHeader title="Skýrslur" subtitle="Greiningar og frammistaða" actions={
+        <button className="btn ghost sm" onClick={() => toast("Skýrsla sótt í CSV")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Sækja CSV")}</button>
+      } />
+      <FilterBar
+        periods={["Dagur", "Vika", "Mánuður", "Sérsniðið"]}
+        period={period} onPeriod={changePeriod}
+        from={from} to={to} onRange={changeRange}
+        search={search} onSearch={setSearch}
+        filters={[{ value: deptF, onChange: setDeptF, options: depts.map((d) => ({ value: d, label: d === "all" ? "Allar deildir" : d })) }]}
+        rangeLabel={`${niceISO(from)} – ${niceISO(to)}`}
+      />
+      <div className="card" style={{ marginTop: 20 }}>
+        <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)}</div></div></div>
+        <div className="cb tbl" style={{ paddingTop: 8, opacity: loading ? 0.5 : 1 }}>
+          <table>
+            <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th></tr></thead>
+            <tbody>
+              {shown.length ? shown.map((r) => (
+                <tr key={r.id}>
+                  <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.name}</span></td>
+                  <td>{r.dept}</td><td className="r">{dec1(r.planned)}</td><td className="r">{dec1(r.actual)}</td>
+                  <td className="r" style={{ color: r.deviation > 0 ? "var(--warn)" : r.deviation < 0 ? "var(--bad)" : undefined }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>
+                </tr>
+              )) : <tr><td colSpan={5} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
+              {shown.length > 0 && <tr className="foot"><td style={{ textAlign: "left" }}>{t("Samtals")} · {shown.length} {t("starfsm.")}</td><td></td><td className="r">{dec1(planned)}</td><td className="r">{dec1(actual)}</td><td className="r">{actual >= planned ? "+" : ""}{dec1(actual - planned)}</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="ch"><div><div className="ct">{t("Tímabanki starfsfólks")}</div><div className="cs">{t("uppsafnað +/− vs vinnuskylda")}</div></div></div>
+        <div className="cb tbl" style={{ paddingTop: 8, opacity: loading ? 0.5 : 1 }}>
+          <table>
+            <thead><tr><th>{t("th:Starfsm.")}</th><th className="r">{t("Vinnuskylda")}</th><th className="r">{t("Unnið")}</th><th className="r">{t("Staða banka")}</th></tr></thead>
+            <tbody>
+              {shown.map((r) => (
+                <tr key={r.id}><td>{r.name}</td><td className="r">{r.required}</td><td className="r">{dec1(r.actual)}</td><td className="r" style={{ color: r.actual - r.required > 0 ? "var(--good)" : r.actual - r.required < 0 ? "var(--warn)" : undefined }}>{r.actual - r.required >= 0 ? "+" : ""}{dec1(r.actual - r.required)}</td></tr>
+              ))}
+              {!shown.length && <tr><td colSpan={4} className="muted" style={{ textAlign: "center", padding: 18 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
+            </tbody>
+          </table>
         </div>
       </div>
     </>

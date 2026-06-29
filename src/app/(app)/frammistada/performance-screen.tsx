@@ -6,15 +6,17 @@ import { toast } from "@/components/app/toast";
 import { Paired, Bars } from "@/components/app/charts";
 import { useLang } from "@/components/app/lang";
 import { EmptyState } from "@/components/app/empty-state";
+import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
 import type { PerfView } from "@/lib/analytics.server";
 
 // Period factors relative to the monthly baseline (demo analytics scale by period).
-const PERIODS = ["Vika", "Mánuður", "Ársfj.", "Ár"] as const;
+const PERIODS: Period[] = ["Vika", "Mánuður", "Ársfj.", "Ár", "Sérsniðið"];
 const FACTOR: Record<string, number> = { "Vika": 1 / 4.33, "Mánuður": 1, "Ársfj.": 3, "Ár": 12 };
+const daysBetween = (a: string, b: string) => a && b ? Math.max(1, Math.round((Date.parse(b) - Date.parse(a)) / 86400000) + 1) : 30;
 const CMP_LABEL: Record<string, string> = {
   "Vika": "Vika 26 vs vika 25", "Mánuður": "Júní 2026 vs maí 2026",
-  "Ársfj.": "2. ársfj. vs 1. ársfj.", "Ár": "2026 vs 2025",
+  "Ársfj.": "2. ársfj. vs 1. ársfj.", "Ár": "2026 vs 2025", "Sérsniðið": "Sérsniðið tímabil",
 };
 
 type Row = [string, string, string, string, string, string, boolean?];
@@ -34,8 +36,13 @@ const goodChange = new Set(["Velta", "Framlegð", "Laun af tekjum", "Velta á la
 
 export default function PerformanceScreen({ empty = false, live = false, perf }: { empty?: boolean; live?: boolean; perf?: PerfView }) {
   const { t } = useLang();
-  const [period, setPeriod] = useState<string>("Mánuður");
-  const f = FACTOR[period];
+  const [period, setPeriod] = useState<Period>("Mánuður");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [locF, setLocF] = useState("all");
+  const [compare, setCompare] = useState("prev");
+  const f = period === "Sérsniðið" ? daysBetween(from, to) / 30 : FACTOR[period];
+  const cmpBadge = compare === "none" ? "Án samanburðar" : compare === "year" ? "vs í fyrra" : CMP_LABEL[period];
   if (empty) {
     return (
       <>
@@ -87,12 +94,13 @@ export default function PerformanceScreen({ empty = false, live = false, perf }:
         }
       />
 
-      <div className="stoolbar">
-        <div className="seg">{PERIODS.map((p) => <button key={p} className={period === p ? "on" : ""} onClick={() => setPeriod(p)}>{t(p)}</button>)}</div>
-        <select className="badge" style={{ border: "1px solid var(--line)", padding: "7px 11px" }}><option>{t("Allir staðir")}</option><option>Reykjavík Asian</option><option>Hotel Umi</option></select>
-        <div className="sp" style={{ flex: 1 }} />
-        <span className="badge" style={{ background: "var(--brand-soft)", color: "var(--brand)" }}>{t(CMP_LABEL[period])}</span>
-      </div>
+      <FilterBar
+        periods={PERIODS} period={period} onPeriod={setPeriod}
+        from={from} to={to} onRange={(a, b) => { setFrom(a); setTo(b); }}
+        filters={[{ value: locF, onChange: setLocF, options: [{ value: "all", label: "Allir staðir" }, { value: "Reykjavík Asian", label: "Reykjavík Asian" }, { value: "Hotel Umi", label: "Hotel Umi" }] }]}
+        compare={compare} onCompare={setCompare}
+        rangeLabel={t(cmpBadge)}
+      />
 
       <div className="kpis">
         <div className="kpi"><div className="lab">{t("Velta")}</div><div className="val">{dec1(18.6 * f)} <small>m kr</small></div><div className="d up">▲ 6,2% <span className="muted" style={{ fontWeight: 500 }}>{t("vs")} {t(period)}</span></div></div>
@@ -145,9 +153,9 @@ export default function PerformanceScreen({ empty = false, live = false, perf }:
           <table>
             <thead><tr><th>{t("Staður")}</th><th className="r">{t("Velta")}</th><th className="r">{t("Launakostn.")}</th><th className="r">{t("Laun%")}</th><th className="r">{t("Framlegð")}</th><th className="r">{t("Laun% vs maí")}</th></tr></thead>
             <tbody>
-              <tr><td><b>Reykjavík Asian</b></td><td className="r">14,1 m</td><td className="r">5,52 m</td><td className="r" style={{ color: "var(--warn)" }}>39,1%</td><td className="r">8,6 m</td><td className="r" style={{ color: "var(--good)" }}>−1,0 stig</td></tr>
-              <tr><td><b>Hotel Umi</b></td><td className="r">4,5 m</td><td className="r">1,87 m</td><td className="r" style={{ color: "var(--bad)" }}>41,6%</td><td className="r">2,6 m</td><td className="r" style={{ color: "var(--bad)" }}>+0,8 stig</td></tr>
-              <tr className="foot"><td style={{ textAlign: "left" }}>{t("Samtals")}</td><td className="r">18,6 m</td><td className="r">7,39 m</td><td className="r">39,7%</td><td className="r">11,2 m</td><td className="r" style={{ color: "var(--good)" }}>−1,2 stig</td></tr>
+              {(locF === "all" || locF === "Reykjavík Asian") && <tr><td><b>Reykjavík Asian</b></td><td className="r">14,1 m</td><td className="r">5,52 m</td><td className="r" style={{ color: "var(--warn)" }}>39,1%</td><td className="r">8,6 m</td><td className="r" style={{ color: "var(--good)" }}>−1,0 stig</td></tr>}
+              {(locF === "all" || locF === "Hotel Umi") && <tr><td><b>Hotel Umi</b></td><td className="r">4,5 m</td><td className="r">1,87 m</td><td className="r" style={{ color: "var(--bad)" }}>41,6%</td><td className="r">2,6 m</td><td className="r" style={{ color: "var(--bad)" }}>+0,8 stig</td></tr>}
+              {locF === "all" && <tr className="foot"><td style={{ textAlign: "left" }}>{t("Samtals")}</td><td className="r">18,6 m</td><td className="r">7,39 m</td><td className="r">39,7%</td><td className="r">11,2 m</td><td className="r" style={{ color: "var(--good)" }}>−1,2 stig</td></tr>}
             </tbody>
           </table>
         </div>
