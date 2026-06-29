@@ -24,6 +24,11 @@ function Paired({ a, b }: { a: number[]; b: number[] }) {
   );
 }
 
+function EmptyBody({ msg }: { msg: string }) {
+  const { t } = useLang();
+  return <div className="cb"><div className="muted" style={{ fontSize: 13, lineHeight: 1.6, padding: "22px 6px", textAlign: "center" }}>{t(msg)}</div></div>;
+}
+
 type Onb = { show: boolean; hasLocation: boolean; hasStaff: boolean; hasSchedule: boolean; hasRevenue: boolean };
 
 export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding, live = false }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean }) {
@@ -51,46 +56,68 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
   const curIdx = steps.findIndex((s) => !s.done);
   const Check = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12.5l4 4 10-10" /></svg>;
 
-  // New company → getting-started experience instead of the demo dashboard.
-  if (onboarding?.show && !hideOnb) {
-    return (
-      <>
-        <PageHeader title="Mælaborð" subtitle={t("Velkomin í VAKTO")} />
-        <div className="onb">
-          <div className="ohd">
-            <div>
-              <h3>{t("Komdu þér af stað með VAKTO")}</h3>
-              <div className="osub">{doneCount} {t("af 4 skrefum kláruð — settu kerfið upp á nokkrum mínútum.")}</div>
-            </div>
-            <span className="ohide" onClick={hideOnboarding} style={{ cursor: "pointer" }}>{t("Fela")}</span>
-          </div>
-          <div className="obar"><i style={{ width: `${(doneCount / 4) * 100}%` }} /></div>
-          <div className="osteps">
-            {steps.map((s, i) => (
-              <Link href={s.href} key={s.label} className={`ostep ${s.done ? "done" : i === curIdx ? "cur" : ""}`} style={{ cursor: "pointer" }}>
-                <span className="n">{s.done ? <Check /> : i + 1}</span>
-                <span className="t">{t(s.label)}</span>
-              </Link>
-            ))}
-          </div>
-        </div>
-        <div className="card" style={{ marginTop: 20 }}>
-          <div className="cb">
-            <p className="muted" style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}>
-              {t("Þegar þú hefur bætt við starfsfólki og birt vaktaplan birtast hér lifandi tölur — laun af tekjum, launakostnaður, frávik og yfirvinna.")}
-            </p>
-          </div>
-        </div>
-      </>
-    );
-  }
-
-  // Live company (signed in): real KPIs only — no demo charts/alerts.
+  // Live company (signed in): the standard dashboard layout, always — filled
+  // with real numbers where we have them, clean empty-states where we don't.
   if (live) {
     const lpColor = laborPct === 0 ? "var(--ink3)" : laborPct <= 30 ? "var(--good)" : laborPct <= 33 ? "var(--warn)" : "var(--bad)";
     return (
       <>
-        <PageHeader title="Mælaborð" subtitle={t("Rauntölur úr þínum gögnum")} />
+        <PageHeader
+          title="Mælaborð"
+          subtitle={t("Rauntölur úr þínum gögnum")}
+          actions={
+            <button className="btn ghost sm" onClick={() => toast("Sérsníða mælaborð — dragðu til spjöld og veldu hvað þú sérð")}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h11M4 12h7M4 18h13M17 4v4M13 10v4M19 16v4" /></svg>{t("Sérsníða")}
+            </button>
+          }
+        />
+
+        {onboarding?.show && !hideOnb && (
+          <div className="onb">
+            <div className="ohd">
+              <div>
+                <h3>{t("Komdu þér af stað með VAKTO")}</h3>
+                <div className="osub">{doneCount} {t("af 4 skrefum kláruð — settu kerfið upp á nokkrum mínútum.")}</div>
+              </div>
+              <span className="ohide" onClick={hideOnboarding} style={{ cursor: "pointer" }}>{t("Fela")}</span>
+            </div>
+            <div className="obar"><i style={{ width: `${(doneCount / 4) * 100}%` }} /></div>
+            <div className="osteps">
+              {steps.map((s, i) => (
+                <Link href={s.href} key={s.label} className={`ostep ${s.done ? "done" : i === curIdx ? "cur" : ""}`} style={{ cursor: "pointer" }}>
+                  <span className="n">{s.done ? <Check /> : i + 1}</span>
+                  <span className="t">{t(s.label)}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* this-week hero strip */}
+        <div className="dhero">
+          <div className="dhero-head">
+            <span className="dhero-badge">{t("Þessi vika")}</span>
+            <span className="dhero-sub">{t("Rauntölur uppfærast eftir því sem stimplað er inn og út.")}</span>
+          </div>
+          <div className="dhero-body">
+            <div className="dflow">
+              <div className="fs"><div className="l">{t("Áætlaðir tímar")}</div><div className="v">{hoursWeek}</div></div>
+              <span className="ar">→</span>
+              <div className="fs"><div className="l">{t("Raun tímar")}</div><div className="v">—</div></div>
+              <span className="ar">→</span>
+              <div className="fs"><div className="l">{t("Frávik")}</div><div className="v">—</div></div>
+              <span className="ar">→</span>
+              <div className="fs"><div className="l">{t("Yfirvinna")}</div><div className="v">0 <small style={{ fontSize: 14, color: "var(--ink3)", fontWeight: 600 }}>{t("klst")}</small></div></div>
+            </div>
+            <div className="dhero-right">
+              <div className="l">{t("Launakostnaður vikunnar")}</div>
+              <div className="big">{laborCostWeek} m.kr.</div>
+              <div className="s2">{laborPct > 0 ? `${t("Laun af tekjum")} ${pctLabel}%` : t("Skráðu veltu til að sjá laun%")}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* headline KPIs (real) */}
         <div className="kpis">
           <div className="kpi flex">
             <div className="ring" style={{ ["--p" as string]: laborPct === 0 ? 0 : ringP, ["--c" as string]: lpColor }}>
@@ -106,12 +133,32 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
           <div className="kpi"><div className="lab">{t("Unnir tímar (vika)")}</div><div className="val">{hoursWeek} <small>{t("klst")}</small></div></div>
           <div className="kpi"><div className="lab">{t("Yfirvinna (vika)")}</div><div className="val">0 <small>{t("klst")}</small></div></div>
         </div>
-        <div className="card" style={{ marginTop: 20 }}>
-          <div className="cb">
-            <p className="muted" style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}>
-              {t("Nánari greiningar — gröf, frávik og samanburður — birtast eftir því sem vaktir, stimplanir og velta safnast. Sjá Tímaskráning, Skýrslur og Frammistöðu.")}
-            </p>
+
+        {/* comparison charts — empty until history accrues */}
+        <div className="grid2">
+          <div className="card">
+            <div className="ch">
+              <div><div className="ct">{t("Launakostnaður — samanburður")}</div><div className="cs">{t("þetta tímabil vs fyrra")}</div></div>
+              <div className="seg">{["Vika", "Mánuður", "Ár"].map((s) => <button key={s} className={chartSeg === s ? "on" : ""} onClick={() => setChartSeg(s)}>{t(s)}</button>)}</div>
+            </div>
+            <EmptyBody msg="Samanburðargröf birtast þegar fleiri tímabil safnast." />
           </div>
+          <div className="card">
+            <div className="ch"><div><div className="ct">{t("Vinnum við eftir plani?")}</div><div className="cs">{t("raun tímar vs áætlun · þessi vika")}</div></div></div>
+            <EmptyBody msg="Frávik birtast þegar starfsfólk stimplar inn og út." />
+          </div>
+        </div>
+
+        {/* needs attention — empty when nothing flagged */}
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="ch"><div className="ct">{t("Þarf athygli")}</div></div>
+          <EmptyBody msg="Engin atriði krefjast athygli núna." />
+        </div>
+
+        {/* monthly overview */}
+        <div className="sec">{t("Mánaðaryfirlit")}</div>
+        <div className="card">
+          <EmptyBody msg="Mánaðarsamanburður birtist þegar fleiri tímabil og launakeyrslur safnast." />
         </div>
       </>
     );
