@@ -6,7 +6,12 @@ import { getLaborMetrics } from "@/lib/revenue.server";
 import { computeLine, totals as sumTotals } from "@/lib/payroll";
 import { initials } from "@/lib/employees";
 
-const WEEK_FROM = "2026-06-22", WEEK_TO = "2026-06-28";
+const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function currentWeek(): { from: string; to: string } {
+  const mon = new Date(); mon.setHours(0, 0, 0, 0); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
+  const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+  return { from: isoOf(mon), to: isoOf(sun) };
+}
 
 export type AttRow = {
   id: string; name: string; av: string; c: string; dept: string;
@@ -24,12 +29,16 @@ function hoursBetween(start?: string | null, end?: string | null): number {
   return h;
 }
 
-/** Per-employee planned (shifts) vs actual (punches) hours for the week. */
-export async function getWeekAttendance(): Promise<WeekAttendance> {
+/** Per-employee planned (shifts) vs actual (punches) hours for a date range
+ * (defaults to the current week). */
+export async function getWeekAttendance(fromISO?: string, toISO?: string): Promise<WeekAttendance> {
   if (!isSupabaseConfigured()) return { rows: [], live: false };
   try {
     const { employees, live } = await getEmployees();
     if (!live) return { rows: [], live: false };
+
+    const wk = currentWeek();
+    const from = fromISO || wk.from, to = toISO || wk.to;
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -41,9 +50,9 @@ export async function getWeekAttendance(): Promise<WeekAttendance> {
 
     const [{ data: shifts }, { data: punches }] = await Promise.all([
       supabase.from("shifts").select("employee_id, start_time, end_time")
-        .eq("company_id", company).gte("date", WEEK_FROM).lte("date", WEEK_TO),
+        .eq("company_id", company).gte("date", from).lte("date", to),
       supabase.from("punches").select("employee_id, clock_in, clock_out")
-        .eq("company_id", company).gte("clock_in", WEEK_FROM),
+        .eq("company_id", company).gte("clock_in", from).lte("clock_in", to + "T23:59:59"),
     ]);
 
     const planned = new Map<string, number>();

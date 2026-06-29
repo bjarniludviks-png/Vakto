@@ -5,9 +5,23 @@ import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { EmptyState } from "@/components/app/empty-state";
+import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
-import { approveAllTimesheets, approveTimesheet, setClockOut } from "./actions";
+import { approveAllTimesheets, approveTimesheet, setClockOut, fetchAttendance } from "./actions";
+
+const MONTHS_IS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ágú.", "sep.", "okt.", "nóv.", "des."];
+const pad = (n: number) => String(n).padStart(2, "0");
+const isoOf = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const niceISO = (s: string) => { const [y, m, d] = s.split("-").map(Number); return `${d}. ${MONTHS_IS[m - 1]} ${y}`; };
+function rangeFor(period: Period): { from: string; to: string } {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  if (period === "Dagur") return { from: isoOf(t), to: isoOf(t) };
+  if (period === "Mánuður") return { from: isoOf(new Date(t.getFullYear(), t.getMonth(), 1)), to: isoOf(new Date(t.getFullYear(), t.getMonth() + 1, 0)) };
+  const mon = new Date(t); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
+  const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+  return { from: isoOf(mon), to: isoOf(sun) };
+}
 
 type TS = { date: string; pos: string; sch: string; act: string; pend: boolean; id?: string };
 const TSDATA: Record<string, TS> = {
@@ -50,41 +64,10 @@ export default function AttendanceScreen({ onShift = 5, empty = false, live = fa
     );
   }
 
-  // Live company: real planned (shifts) vs actual (punches) per employee.
+  // Live company: real planned (shifts) vs actual (punches) per employee,
+  // with period / custom-range / search / department filtering.
   if (live) {
-    const planned = rows.reduce((a, r) => a + r.planned, 0);
-    const actual = rows.reduce((a, r) => a + r.actual, 0);
-    return (
-      <>
-        <PageHeader title="Tímaskráning" subtitle="Áætlað vs raun · þessi vika" />
-        <div className="kpis">
-          <div className="kpi"><div className="lab">{t("Á vakt núna")}</div><div className="val">{onShift}</div></div>
-          <div className="kpi"><div className="lab">{t("Áætl. klst")}</div><div className="val">{dec1(planned)} <small>{t("klst")}</small></div></div>
-          <div className="kpi"><div className="lab">{t("Raun klst")}</div><div className="val">{dec1(actual)} <small>{t("klst")}</small></div></div>
-          <div className="kpi"><div className="lab">{t("Frávik")}</div><div className="val" style={{ color: actual > planned ? "var(--warn)" : "var(--good)" }}>{actual >= planned ? "+" : ""}{dec1(actual - planned)} <small>{t("klst")}</small></div></div>
-        </div>
-        <div className="card" style={{ marginTop: 20 }}>
-          <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{t("áætlað á móti klukknuðum tímum — þessi vika")}</div></div></div>
-          <div className="cb tbl" style={{ paddingTop: 8 }}>
-            <table>
-              <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th><th>{t("Staða")}</th></tr></thead>
-              <tbody>
-                {rows.map((r) => (
-                  <tr key={r.id}>
-                    <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.name}</span></td>
-                    <td>{r.dept}</td>
-                    <td className="r">{dec1(r.planned)}</td>
-                    <td className="r">{dec1(r.actual)}</td>
-                    <td className="r" style={{ color: r.deviation > 0 ? "var(--warn)" : r.deviation < 0 ? "var(--bad)" : undefined }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>
-                    <td>{r.actual === 0 && r.planned === 0 ? <span className="pill" style={{ background: "var(--line2)", color: "var(--ink3)" }}>{t("engin gögn")}</span> : r.actual === 0 ? <span className="pill" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Vantar stimplun")}</span> : <span className="pill" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Á áætlun")}</span>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </>
-    );
+    return <LiveAttendance onShift={onShift} initial={rows} />;
   }
 
   return (
@@ -157,6 +140,76 @@ export default function AttendanceScreen({ onShift = 5, empty = false, live = fa
       </div>
 
       {cur && <TimesheetModal name={cur} ts={TSDATA[cur]} onClose={() => setCur(null)} />}
+    </>
+  );
+}
+
+function LiveAttendance({ onShift, initial }: { onShift: number; initial: AttRow[] }) {
+  const { t } = useLang();
+  const [period, setPeriod] = useState<Period>("Vika");
+  const init0 = rangeFor("Vika");
+  const [from, setFrom] = useState(init0.from);
+  const [to, setTo] = useState(init0.to);
+  const [search, setSearch] = useState("");
+  const [deptF, setDeptF] = useState("all");
+  const [data, setData] = useState<AttRow[]>(initial);
+  const [loading, setLoading] = useState(false);
+
+  function load(f: string, tt: string) {
+    setLoading(true);
+    fetchAttendance(f, tt).then((res) => { if (res.ok) setData(res.rows); }).finally(() => setLoading(false));
+  }
+  function changePeriod(p: Period) {
+    setPeriod(p);
+    if (p !== "Sérsniðið") { const r = rangeFor(p); setFrom(r.from); setTo(r.to); load(r.from, r.to); }
+  }
+  function changeRange(f: string, tt: string) { setFrom(f); setTo(tt); if (f && tt && f <= tt) load(f, tt); }
+
+  const depts = ["all", ...Array.from(new Set(data.map((r) => r.dept).filter((d) => d && d !== "—")))];
+  const shown = data.filter((r) => (deptF === "all" || r.dept === deptF) && (!search || r.name.toLowerCase().includes(search.toLowerCase())));
+  const planned = shown.reduce((a, r) => a + r.planned, 0);
+  const actual = shown.reduce((a, r) => a + r.actual, 0);
+  const missing = shown.filter((r) => r.planned > 0 && r.actual === 0).length;
+
+  return (
+    <>
+      <PageHeader title="Tímaskráning" subtitle="Áætlað vs raun-tímar" actions={
+        <button className="btn ghost sm" onClick={() => toast("Tímaskráning sótt í CSV")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Sækja CSV")}</button>
+      } />
+      <FilterBar
+        periods={["Dagur", "Vika", "Mánuður", "Sérsniðið"]}
+        period={period} onPeriod={changePeriod}
+        from={from} to={to} onRange={changeRange}
+        search={search} onSearch={setSearch}
+        filters={[{ value: deptF, onChange: setDeptF, options: depts.map((d) => ({ value: d, label: d === "all" ? "Allar deildir" : d })) }]}
+        rangeLabel={`${niceISO(from)} – ${niceISO(to)}`}
+      />
+      <div className="kpis">
+        <div className="kpi"><div className="lab">{t("Á vakt núna")}</div><div className="val">{onShift}</div></div>
+        <div className="kpi"><div className="lab">{t("Áætl. klst")}</div><div className="val">{dec1(planned)} <small>{t("klst")}</small></div></div>
+        <div className="kpi"><div className="lab">{t("Raun klst")}</div><div className="val">{dec1(actual)} <small>{t("klst")}</small></div></div>
+        <div className="kpi"><div className="lab">{t("Frávik")}</div><div className="val" style={{ color: actual > planned ? "var(--warn)" : "var(--good)" }}>{actual >= planned ? "+" : ""}{dec1(actual - planned)} <small>{t("klst")}</small></div></div>
+      </div>
+      <div className="card" style={{ marginTop: 20 }}>
+        <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)}{missing ? ` · ${missing} ${t("vantar stimplun")}` : ""}</div></div></div>
+        <div className="cb tbl" style={{ paddingTop: 8, opacity: loading ? 0.5 : 1 }}>
+          <table>
+            <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th><th>{t("Staða")}</th></tr></thead>
+            <tbody>
+              {shown.length ? shown.map((r) => (
+                <tr key={r.id}>
+                  <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.name}</span></td>
+                  <td>{r.dept}</td>
+                  <td className="r">{dec1(r.planned)}</td>
+                  <td className="r">{dec1(r.actual)}</td>
+                  <td className="r" style={{ color: r.deviation > 0 ? "var(--warn)" : r.deviation < 0 ? "var(--bad)" : undefined }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>
+                  <td>{r.actual === 0 && r.planned === 0 ? <span className="pill" style={{ background: "var(--line2)", color: "var(--ink3)" }}>{t("engin gögn")}</span> : r.actual === 0 ? <span className="pill" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Vantar stimplun")}</span> : <span className="pill" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Á áætlun")}</span>}</td>
+                </tr>
+              )) : <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </>
   );
 }

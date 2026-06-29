@@ -4,8 +4,15 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
+import { getWeekAttendance, type AttRow } from "@/lib/analytics.server";
 
 export type ApproveResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
+
+/** Re-fetch attendance rows for a custom date range (client filter bar). */
+export async function fetchAttendance(fromISO: string, toISO: string): Promise<{ ok: boolean; rows: AttRow[] }> {
+  const res = await getWeekAttendance(fromISO, toISO);
+  return { ok: res.live, rows: res.rows };
+}
 
 async function companyOf(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: { user } } = await supabase.auth.getUser();
