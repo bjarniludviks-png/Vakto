@@ -1,5 +1,6 @@
 // Client-side PDF generation for the schedule (day / week / month views).
 // jsPDF + autotable are imported lazily so they never hit the server bundle.
+import type { jsPDF } from "jspdf";
 import { dec1 } from "@/lib/format";
 
 export type PdfShift = { first: string; full: string; dept: string; time: string; hours: number };
@@ -46,9 +47,38 @@ export async function buildSchedulePdf(opts: PdfInput): Promise<string> {
   else if (opts.view === "Vika") weekTable(doc, autoTable, opts, startY);
   else monthTable(doc, autoTable, opts, startY);
 
+  // Branded footer on every page.
+  const pages = (doc as { getNumberOfPages: () => number }).getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    (doc as { setPage: (n: number) => void }).setPage(i);
+    drawFooter(doc, i, pages);
+  }
+
   const fname = `vaktaplan-${fileSafe(opts.company)}-${fileSafe(opts.subtitle)}.pdf`;
   doc.save(fname);
   return fname;
+}
+
+// Branded footer: VAKTO mark + wordmark + tagline, with a page counter.
+function drawFooter(doc: jsPDF, pageNum: number, pageCount: number) {
+  const W = doc.internal.pageSize.getWidth();
+  const H = doc.internal.pageSize.getHeight();
+  const by = H - 24; // baseline
+  doc.setDrawColor(228, 228, 232); doc.setLineWidth(0.7);
+  doc.line(40, by - 13, W - 40, by - 13);
+  // ascending-bars logo mark
+  const bx = 40;
+  doc.setFillColor(...ORANGE);
+  [6, 9, 12].forEach((h, i) => doc.roundedRect(bx + i * 5, by - h, 3.2, h, 1, 1, "F"));
+  // wordmark + tagline
+  doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...ORANGE);
+  const wmX = bx + 21;
+  doc.text("VAKTO", wmX, by - 1);
+  const wmW = doc.getTextWidth("VAKTO");
+  doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...MUT);
+  doc.text("Vaktaskipulag & launakostnaður · vakto.is", wmX + wmW + 9, by - 1);
+  // page counter
+  if (pageCount > 1) doc.text(`${pageNum} / ${pageCount}`, W - 40, by - 1, { align: "right" });
 }
 
 type AutoTable = (doc: unknown, opts: Record<string, unknown>) => void;
@@ -62,6 +92,7 @@ function dayTable(doc: unknown, autoTable: AutoTable, o: PdfInput, startY: numbe
   const total = rows.reduce((a, r) => a + r.hours, 0);
   autoTable(doc, {
     startY,
+    margin: { bottom: 46 },
     head: [["Starfsmaður", "Deild", "Tími", "Klst"]],
     body: rows.length
       ? rows.map((r) => [r.full, r.dept || "—", r.time, dec1(r.hours)])
@@ -92,6 +123,7 @@ function weekTable(doc: unknown, autoTable: AutoTable, o: PdfInput, startY: numb
 
   autoTable(doc, {
     startY,
+    margin: { bottom: 46 },
     head: [["Starfsmaður", ...o.dayLabels, "Klst"]],
     body: emps.length
       ? emps.map((e) => [e.full, ...o.dates.map((iso) => e.cells[iso] ?? "·"), dec1(e.total)])
@@ -132,6 +164,7 @@ function monthTable(doc: unknown, autoTable: AutoTable, o: PdfInput, startY: num
 
   autoTable(doc, {
     startY,
+    margin: { bottom: 46 },
     head: [o.weekdayLabels],
     body,
     theme: "grid",
