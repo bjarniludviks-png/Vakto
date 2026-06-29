@@ -33,20 +33,27 @@ export default function AppShell({
   const [menu, setMenu] = useState<null | "lang" | "new" | "notif" | "acct">(null);
   const [pos, setPos] = useState<MenuPos>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [cookie, setCookie] = useState(true);
+  const [cookie, setCookie] = useState(false);
   const [roleModal, setRoleModal] = useState(false);
   // Owner can preview the app as another role (account menu → Skipta um hlutverk).
   const [role, setRoleState] = useState<Role>(account.role);
   const [dark, setDark] = useState(false);
 
-  // Apply persisted theme on mount (avoids hydration mismatch).
+  // Apply persisted theme + cookie choice on mount (avoids hydration mismatch).
   useEffect(() => {
     const isDark = localStorage.getItem("vakto-theme") === "dark";
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-      requestAnimationFrame(() => setDark(true));
-    }
+    if (isDark) document.documentElement.classList.add("dark");
+    const cookieSet = localStorage.getItem("vakto-cookie");
+    requestAnimationFrame(() => {
+      if (isDark) setDark(true);
+      if (!cookieSet) setCookie(true);
+    });
   }, []);
+  function dismissCookie(allow: boolean) {
+    setCookie(false);
+    try { localStorage.setItem("vakto-cookie", allow ? "all" : "deny"); } catch {}
+    toast(allow ? t("cookie:allow") : t("cookie:deny"));
+  }
   function toggleTheme() {
     const next = !dark;
     setDark(next);
@@ -179,7 +186,7 @@ export default function AppShell({
                 onClick={(e) => openMenu(e, "new")}
               >
                 <Icon name="plus" strokeWidth={2.2} />
-                {t("create")}
+                <span className="tnew-label">{t("create")}</span>
                 <Icon name="chevron" className="chev" strokeWidth={2} />
               </button>
               <button
@@ -188,7 +195,6 @@ export default function AppShell({
                 onClick={(e) => openMenu(e, "notif")}
               >
                 <Icon name="bell" />
-                <span className="tdot" />
               </button>
               <button className="tacct" onClick={(e) => openMenu(e, "acct")}>
                 <span className="tav">{ident.initials}</span>
@@ -237,19 +243,9 @@ export default function AppShell({
             {menu === "notif" && (
               <>
                 <div className="mhd"><b>{t("notifications")}</b></div>
-                <div className="ni" onClick={() => nav("/timaskraning")}>
-                  <span className="dt" style={{ background: "var(--bad)" }} />
-                  <div><b>Yfirvinnu-áhætta: Ómar</b><span>18 klst yfir starfshlutfalli · +24.500 kr</span></div>
+                <div style={{ padding: "18px 14px", textAlign: "center", color: "var(--ink3)", fontSize: 13 }}>
+                  {t("Engar nýjar tilkynningar")}
                 </div>
-                <div className="ni" onClick={() => nav("/maelabord")}>
-                  <span className="dt" style={{ background: "var(--warn)" }} />
-                  <div><b>Launa% yfir markmiði</b><span>32,4% vs 30% í dag</span></div>
-                </div>
-                <div className="ni" onClick={() => nav("/timaskraning")}>
-                  <span className="dt" style={{ background: "var(--good)" }} />
-                  <div><b>Vantar útstimplun: Mína</b><span>Vakto stakk upp á 16:00</span></div>
-                </div>
-                <div className="seeall" onClick={() => nav("/timaskraning")}>{t("seeall")}</div>
               </>
             )}
             {menu === "acct" && (
@@ -273,6 +269,9 @@ export default function AppShell({
                 </div>
                 <div className="mi" onClick={() => nav("/hjalp")}>
                   <Icon name="help" className="ei" />{t("acct:help")}
+                </div>
+                <div className="mi" onClick={() => { setLang(lang === "is" ? "en" : "is"); setMenu(null); }}>
+                  <Icon name="globe" className="ei" />{lang === "is" ? "English" : "Íslenska"}
                 </div>
                 <div className="mi" onClick={toggleTheme}>
                   <Icon name="moon" className="ei" />{dark ? t("Ljóst útlit") : t("acct:dark")}
@@ -325,13 +324,13 @@ export default function AppShell({
           <div className="crow">
             <button
               className="allow"
-              onClick={() => { setCookie(false); toast(t("cookie:allow")); }}
+              onClick={() => dismissCookie(true)}
             >
               {t("cookie:allow")}
             </button>
             <button
               className="deny"
-              onClick={() => { setCookie(false); toast(t("cookie:deny")); }}
+              onClick={() => dismissCookie(false)}
             >
               {t("cookie:deny")}
             </button>

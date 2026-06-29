@@ -54,6 +54,7 @@ export const DICT: Dict = {
   "Á áætlun": { is: "Á áætlun", en: "On plan" },
   "Skráðu veltu (eða tengdu Inventra) til að sjá laun af tekjum og framlegð. Launakostnaður reiknast af starfsfólki og kjarasamningum.": { is: "Skráðu veltu (eða tengdu Inventra) til að sjá laun af tekjum og framlegð. Launakostnaður reiknast af starfsfólki og kjarasamningum.", en: "Record revenue (or connect Inventra) to see labor % of revenue and margin. Labor cost is computed from staff and union rules." },
   "Söguleg þróun og samanburður tímabila birtist eftir því sem fleiri launatímabil og veltutölur safnast.": { is: "Söguleg þróun og samanburður tímabila birtist eftir því sem fleiri launatímabil og veltutölur safnast.", en: "Historical trends and period comparisons appear as more payroll periods and revenue figures accumulate." },
+  "Engar nýjar tilkynningar": { is: "Engar nýjar tilkynningar", en: "No new notifications" },
   "Kiosk-stimpilklukka": { is: "Kiosk-stimpilklukka", en: "Kiosk time clock" },
   "opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð": { is: "opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð", en: "open on a tablet — PIN = last 4 of kennitala · click to copy link" },
   "afrita slóð": { is: "afrita slóð", en: "copy link" },

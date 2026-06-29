@@ -50,7 +50,8 @@ export async function getDashboard(): Promise<DashboardView> {
   } catch { /* keep defaults */ }
 
   const hasStaff = employees.length > 0;
-  const onboarding: Onboarding = { show: !hasStaff, hasLocation, hasStaff, hasSchedule, hasRevenue };
+  const allDone = hasLocation && hasStaff && hasSchedule && hasRevenue;
+  const onboarding: Onboarding = { show: !allDone, hasLocation, hasStaff, hasSchedule, hasRevenue };
 
   if (!hasStaff) {
     return { laborPct: metrics.live ? metrics.laborPct : 0, laborCostWeek: "0", hoursWeek: "0", live: true, onboarding };

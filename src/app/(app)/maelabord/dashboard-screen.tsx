@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
@@ -29,6 +29,14 @@ type Onb = { show: boolean; hasLocation: boolean; hasStaff: boolean; hasSchedule
 export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb }) {
   const { t } = useLang();
   const [chartSeg, setChartSeg] = useState("Vika");
+  const [hideOnb, setHideOnb] = useState(false);
+  useEffect(() => {
+    if (localStorage.getItem("vakto-onb-hidden") === "1") requestAnimationFrame(() => setHideOnb(true));
+  }, []);
+  function hideOnboarding() {
+    setHideOnb(true);
+    try { localStorage.setItem("vakto-onb-hidden", "1"); } catch {}
+  }
   const ringP = Math.round(laborPct);
   const ringColor = laborPct <= 30 ? "var(--good)" : laborPct <= 33 ? "var(--warn)" : "var(--bad)";
   const pctLabel = laborPct.toFixed(1).replace(".", ",");
@@ -44,7 +52,7 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
   const Check = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12.5l4 4 10-10" /></svg>;
 
   // New company → getting-started experience instead of the demo dashboard.
-  if (onboarding?.show) {
+  if (onboarding?.show && !hideOnb) {
     return (
       <>
         <PageHeader title="Mælaborð" subtitle={t("Velkomin í VAKTO")} />
@@ -54,6 +62,7 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
               <h3>{t("Komdu þér af stað með VAKTO")}</h3>
               <div className="osub">{doneCount} {t("af 4 skrefum kláruð — settu kerfið upp á nokkrum mínútum.")}</div>
             </div>
+            <span className="ohide" onClick={hideOnboarding} style={{ cursor: "pointer" }}>{t("Fela")}</span>
           </div>
           <div className="obar"><i style={{ width: `${(doneCount / 4) * 100}%` }} /></div>
           <div className="osteps">

@@ -457,8 +457,17 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 .backdrop{display:none}
 @media(max-width:1024px){.kpis{grid-template-columns:repeat(2,1fr)}.grid2,.grid2b,.grid3{grid-template-columns:1fr}.chat{grid-template-columns:1fr}.clist{display:none}}
 @media(max-width:760px){
-  .side{position:fixed;left:0;top:0;transform:translateX(-100%);transition:.25s;box-shadow:0 0 40px rgba(0,0,0,.2)}
+  .side{position:fixed;left:0;top:0;height:100dvh;transform:translateX(-100%);transition:.25s;box-shadow:0 0 40px rgba(0,0,0,.2)}
   .side.open{transform:none}
+  .navfoot{padding-bottom:calc(16px + env(safe-area-inset-bottom))}
   .backdrop.show{display:block;position:fixed;inset:0;background:rgba(20,22,28,.4);z-index:35}
-  .menu-btn{display:flex}.tbar{padding:0 14px}.tsearch{display:none}.wrap{padding-left:18px;padding-right:18px}.ph .h1{font-size:22px}.kpis{grid-template-columns:1fr}
+  .menu-btn{display:flex}.tbar{padding:0 12px;gap:8px}.tsearch{display:none}.wrap{padding-left:18px;padding-right:18px}.ph .h1{font-size:22px}.kpis{grid-template-columns:1fr}
+  /* compact header buttons on mobile */
+  .tactions{gap:7px}
+  .tnew-label,.tnew .chev{display:none}
+  .btn.sm.tnew{padding:0;width:40px;height:40px;justify-content:center}
+  .tnew svg{width:18px;height:18px}
+  .ticon{width:40px;height:40px}
+  .tacct{padding:0 6px 0 4px;height:40px;gap:5px}
+  .tacct-n{display:none}
 }
