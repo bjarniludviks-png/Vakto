@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
+import { getEmployees } from "@/lib/employees.server";
 
 export type ShiftInput = {
   employeeName: string; // first name as shown in the grid
@@ -67,6 +68,48 @@ export async function publishSchedule(shifts: ShiftInput[]): Promise<PublishResu
 }
 
 export type DecisionResult = { ok: boolean; demo?: boolean; error?: string };
+
+function weekCodeForStart(start: string | null): string {
+  const h = parseInt((start ?? "").slice(0, 2), 10);
+  if (h === 7) return "M";
+  if (h === 11) return "Mi";
+  if (h === 14) return "E";
+  if (h === 16) return "L";
+  return "D";
+}
+
+/** Load the grid (employee × 7 days) for a specific week, aligned to the
+ * full_name-ordered employee list (same order the screen renders). */
+export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][] }> {
+  if (!isSupabaseConfigured()) return { ok: false, grid: [] };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, grid: [] };
+    const { employees, live } = await getEmployees();
+    if (!live) return { ok: false, grid: [] };
+
+    const [y, m, d] = fromISO.split("-").map(Number);
+    const dates = Array.from({ length: 7 }, (_, i) => {
+      const dt = new Date(y, m - 1, d + i);
+      return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+    });
+    const { data: shifts } = await supabase
+      .from("shifts").select("employee_id, date, start_time")
+      .eq("company_id", ctx.company).in("date", dates);
+
+    const idIndex = new Map(employees.map((e, i) => [e.id, i]));
+    const grid: string[][] = employees.map(() => Array(7).fill("off"));
+    for (const s of shifts ?? []) {
+      const r = idIndex.get(s.employee_id as string);
+      const c = dates.indexOf(s.date as string);
+      if (r !== undefined && c >= 0) grid[r][c] = weekCodeForStart(s.start_time as string);
+    }
+    return { ok: true, grid };
+  } catch {
+    return { ok: false, grid: [] };
+  }
+}
 
 /** Save a single shift (from the shift-edit modal). */
 export async function saveShift(input: Omit<ShiftInput, "date"> & { date?: string }): Promise<DecisionResult> {

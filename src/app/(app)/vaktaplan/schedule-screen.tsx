@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { nf } from "@/lib/format";
-import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, type ShiftInput } from "./actions";
+import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, getWeekShifts, type ShiftInput } from "./actions";
 import type { ReqItem } from "./requests.server";
 import type { ScheduleInitial } from "./schedule.server";
 
@@ -100,6 +100,22 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
     [wk],
   );
   const todayCol = weekDays.findIndex((d) => fmtISO(d) === TODAY_ISO);
+
+  // Live companies: load that week's published shifts from the DB when the
+  // week changes. The base week (wk 0) is already in `initial` from SSR, so we
+  // skip the first run and keep the server-rendered grid to avoid a flash.
+  const firstWeekRun = useRef(true);
+  useEffect(() => {
+    if (!liveCompany) return;
+    if (firstWeekRun.current) { firstWeekRun.current = false; return; }
+    const mon = new Date(WEEK_MON); mon.setDate(mon.getDate() + wk * 7);
+    let cancelled = false;
+    getWeekShifts(fmtISO(mon)).then((res) => {
+      if (!cancelled && res?.ok) setGrid(res.grid);
+    });
+    return () => { cancelled = true; };
+  }, [wk, liveCompany]);
+
   const d0 = weekDays[0], d6 = weekDays[6];
   const wklbl = d0.getMonth() === d6.getMonth()
     ? `${d0.getDate()}.–${d6.getDate()}. ${MONTHS_IS[d0.getMonth()]}`
