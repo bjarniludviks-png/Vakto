@@ -138,6 +138,35 @@ export async function addPosition(input: { name: string; baseRate?: string }): P
   }
 }
 
+/** Save (confirm) a pay rule's premium % for the company. */
+export async function savePayRule(
+  input: { code: string; label: string; kind: string; pct: string; confirmed: boolean },
+): Promise<SettingsResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const pct = Number(input.pct.replace(",", ".").replace(/[^\d.]/g, ""));
+    const { error } = await supabase.from("pay_rules").upsert({
+      company_id: ctx.company,
+      code: input.code,
+      label: input.label,
+      kind: input.kind,
+      pct: Number.isFinite(pct) ? pct : 0,
+      confirmed: input.confirmed,
+    }, { onConflict: "company_id,code" });
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "payrule.save", entity: "pay_rule", detail: `Launaregla staðfest — ${input.label} ${pct}%`,
+    });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 const INVITE_ROLE: Record<string, string> = {
   Starfsmaður: "employee", Vaktstjóri: "manager", Stjórnandi: "owner", Verktaki: "contractor",
 };

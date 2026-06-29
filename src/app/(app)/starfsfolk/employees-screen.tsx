@@ -481,6 +481,7 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
       bankAccount: g("bankAccount"), role: g("role") ?? "Starfsmaður", position: g("position"),
       department: g("department"), location: g("location"), hireDate: g("hireDate"),
       employmentRatio: g("employmentRatio"), payType: g("payType"), rate: g("rate"), union: g("union"),
+      monthlyHours: g("monthlyHours"),
     });
     if (!res.ok) { setBusy(false); setError(res.error ?? "Tókst ekki að stofna"); return; }
     // Persist any staged documents now that the employee exists.
@@ -535,7 +536,7 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
           </div>
           <div className="emp-row2">
             <div className="emp-fld"><label>Starfshlutfall</label><input name="employmentRatio" placeholder="100%" /></div>
-            <div className="emp-fld"><label>Æskilegir tímar/viku</label><input name="weeklyHours" placeholder="40" /></div>
+            <div className="emp-fld"><label>Æskilegir tímar á mánuði</label><input name="monthlyHours" placeholder="173" /></div>
           </div>
 
           <Sec>Laun</Sec>

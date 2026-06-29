@@ -20,6 +20,8 @@ Eða keyrðu hverja fyrir sig í þessari röð:
 5. `migrations/0005_requests.sql` — vaktaskipti + framboð + sjálfsafgreiðsla starfsmanna (RLS)
 6. `migrations/0006_storage.sql` — Storage-fötur fyrir skjöl (`documents`, lokað) og
    prófílmyndir (`avatars`, opið). Kveiktu á **Storage** í Supabase áður en þú keyrir hana.
+7. `migrations/0007_payrules.sql` — `employees.monthly_hours` + `pay_rules` tafla (kjarasamninga
+   álag/yfirvinna). **Nauðsynlegt fyrir nýtt-starfsmann form og launareglur.**
 
 > Seinna er hægt að nota Supabase CLI (`supabase db push`) þegar Docker er uppsett.
 

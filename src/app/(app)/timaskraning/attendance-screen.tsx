@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { EmptyState } from "@/components/app/empty-state";
+import { dec1 } from "@/lib/format";
+import type { AttRow } from "@/lib/analytics.server";
 import { approveAllTimesheets, approveTimesheet, setClockOut } from "./actions";
 
 type TS = { date: string; pos: string; sch: string; act: string; pend: boolean; id?: string };
@@ -28,7 +30,7 @@ const pillStyle = (k: string) =>
       : k === "good" ? { background: "var(--good-soft)", color: "var(--good)" }
         : { background: "var(--line2)", color: "var(--ink3)" };
 
-export default function AttendanceScreen({ onShift = 5, empty = false }: { onShift?: number; empty?: boolean }) {
+export default function AttendanceScreen({ onShift = 5, empty = false, live = false, rows = [] }: { onShift?: number; empty?: boolean; live?: boolean; rows?: AttRow[] }) {
   const { t } = useLang();
   const [wk, setWk] = useState(0);
   const [cur, setCur] = useState<string | null>(null);
@@ -44,6 +46,43 @@ export default function AttendanceScreen({ onShift = 5, empty = false }: { onShi
           ctaLabel="Bæta við starfsfólki"
           ctaHref="/starfsfolk?new=1"
         />
+      </>
+    );
+  }
+
+  // Live company: real planned (shifts) vs actual (punches) per employee.
+  if (live) {
+    const planned = rows.reduce((a, r) => a + r.planned, 0);
+    const actual = rows.reduce((a, r) => a + r.actual, 0);
+    return (
+      <>
+        <PageHeader title="Tímaskráning" subtitle="Áætlað vs raun · þessi vika" />
+        <div className="kpis">
+          <div className="kpi"><div className="lab">{t("Á vakt núna")}</div><div className="val">{onShift}</div></div>
+          <div className="kpi"><div className="lab">{t("Áætl. klst")}</div><div className="val">{dec1(planned)} <small>{t("klst")}</small></div></div>
+          <div className="kpi"><div className="lab">{t("Raun klst")}</div><div className="val">{dec1(actual)} <small>{t("klst")}</small></div></div>
+          <div className="kpi"><div className="lab">{t("Frávik")}</div><div className="val" style={{ color: actual > planned ? "var(--warn)" : "var(--good)" }}>{actual >= planned ? "+" : ""}{dec1(actual - planned)} <small>{t("klst")}</small></div></div>
+        </div>
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{t("áætlað á móti klukknuðum tímum — þessi vika")}</div></div></div>
+          <div className="cb tbl" style={{ paddingTop: 8 }}>
+            <table>
+              <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th><th>{t("Staða")}</th></tr></thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id}>
+                    <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.name}</span></td>
+                    <td>{r.dept}</td>
+                    <td className="r">{dec1(r.planned)}</td>
+                    <td className="r">{dec1(r.actual)}</td>
+                    <td className="r" style={{ color: r.deviation > 0 ? "var(--warn)" : r.deviation < 0 ? "var(--bad)" : undefined }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>
+                    <td>{r.actual === 0 && r.planned === 0 ? <span className="pill" style={{ background: "var(--line2)", color: "var(--ink3)" }}>{t("engin gögn")}</span> : r.actual === 0 ? <span className="pill" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Vantar stimplun")}</span> : <span className="pill" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Á áætlun")}</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </>
     );
   }

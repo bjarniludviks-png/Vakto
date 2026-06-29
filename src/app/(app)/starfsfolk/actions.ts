@@ -20,6 +20,7 @@ export type NewEmployeeInput = {
   payType?: string; // "Tímakaup" | "Mánaðarlaun"
   rate?: string;
   union?: string;
+  monthlyHours?: string;
 };
 
 export type ActionResult = { ok: boolean; demo?: boolean; error?: string; id?: string };
@@ -110,6 +111,7 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
       rate: num(input.rate, 2900),
       employment_ratio: num(input.employmentRatio, 100),
       union_agreement: input.union || "Efling",
+      monthly_hours: input.monthlyHours ? num(input.monthlyHours, 0) || null : null,
       hire_date: input.hireDate || null,
       status: "active",
     }).select("id").maybeSingle();

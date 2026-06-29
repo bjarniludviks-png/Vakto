@@ -4,9 +4,11 @@ import { useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { syncInventraRevenue, addLocation, addPosition, inviteUser, addRevenue } from "./actions";
+import { syncInventraRevenue, addLocation, addPosition, inviteUser, addRevenue, savePayRule } from "./actions";
 import type { AuditEntry } from "@/lib/audit";
 import type { SettingsData } from "./settings.server";
+import { type PayRule } from "@/lib/payrules";
+import { dec1 } from "@/lib/format";
 
 type SettingsModal = "location" | "position" | "invite" | "revenue" | null;
 
@@ -34,9 +36,10 @@ const Pin = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z" /><circle cx="12" cy="9" r="2.5" /></svg>
 );
 
-export default function SettingsScreen({ audit = [], initialModal = null, data = DEMO_SETTINGS }: { audit?: AuditEntry[]; initialModal?: SettingsModal; data?: SettingsData }) {
+export default function SettingsScreen({ audit = [], initialModal = null, data = DEMO_SETTINGS, payRules = [] }: { audit?: AuditEntry[]; initialModal?: SettingsModal; data?: SettingsData; payRules?: PayRule[] }) {
   const { t } = useLang();
   const [modal, setModal] = useState<SettingsModal>(initialModal);
+  const [editRule, setEditRule] = useState<PayRule | null>(null);
   return (
     <>
       <PageHeader title="Stillingar" subtitle="Reglur, kjarasamningar og tengingar" />
@@ -64,6 +67,25 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
             <div className="it rowlink" onClick={() => setModal("revenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div><div className="tx"><b>{t("Skrá veltu handvirkt")}</b><span>{t("án Inventra — sláðu inn veltu til að sjá laun vs velta")}</span></div><span className="tag info">{t("slá inn")}</span></div>
             <div className="it"><div className="ic mut" style={{ background: "var(--line2)" }}>P</div><div className="tx"><b>{t("POS / sölukerfi")}</b><span>Dótturkassi, Salt, Verifone</span></div><span className="tag mut">{t("tengja")}</span></div>
           </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="ch">
+          <div><div className="ct">{t("Launareglur kjarasamninga")}</div><div className="cs">{t("álag, yfirvinna og stórhátíðardagar — smelltu til að staðfesta")}</div></div>
+          {payRules.every((r) => r.confirmed) && payRules.length > 0
+            ? <span className="badge" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("staðfest")}</span>
+            : <span className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("óstaðfest")}</span>}
+        </div>
+        <div className="cb att">
+          {payRules.map((r) => (
+            <div className="it rowlink" key={r.code} onClick={() => setEditRule(r)}>
+              <div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div>
+              <div className="tx"><b>{t(r.label)}</b><span>{r.pct > 0 ? `+${dec1(r.pct)}%` : t("grunntaxti")}{r.kind === "overtime" ? " · " + t("yfirvinna") : r.kind === "holiday" ? " · " + t("stórhátíð") : ""}</span></div>
+              <span className={`tag ${r.confirmed ? "good" : "mut"}`} style={r.confirmed ? undefined : { background: "var(--warn-soft)", color: "var(--warn)" }}>{r.confirmed ? t("staðfest") : t("óstaðfest")}</span>
+            </div>
+          ))}
+          <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("⚠️ Prósenturnar eru staðlað sniðmát — staðfestu hverja gegn raunverulegum kjarasamningi (Efling/VR) áður en þær eru notaðar á laun.")}</p>
         </div>
       </div>
 
@@ -148,6 +170,7 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
       </div>
 
       {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} />}
+      {editRule && <PayRuleModal rule={editRule} onClose={() => setEditRule(null)} />}
     </>
   );
 }
@@ -212,6 +235,40 @@ function SettingsFormModal({ modal, onClose }: { modal: Exclude<SettingsModal, n
           </>}
           {error && <p style={{ color: "var(--bad)", fontSize: 12.5, marginTop: 8 }}>{error}</p>}
           <div style={{ display: "flex", gap: 9, marginTop: 18 }}>
+            <button className="btn" disabled={busy} onClick={submit}>{t("Vista")}</button>
+            <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PayRuleModal({ rule, onClose }: { rule: PayRule; onClose: () => void }) {
+  const { t } = useLang();
+  const [pct, setPct] = useState(String(rule.pct).replace(".", ","));
+  const [confirmed, setConfirmed] = useState(rule.confirmed);
+  const [busy, setBusy] = useState(false);
+  async function submit() {
+    setBusy(true);
+    const res = await savePayRule({ code: rule.code, label: rule.label, kind: rule.kind, pct, confirmed });
+    setBusy(false);
+    onClose();
+    toast(res.ok ? (res.demo ? "Vistað (demo)" : "Launaregla vistuð") : "Tókst ekki");
+  }
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal">
+        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t(rule.label)}</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="mb">
+          <div className="field"><label>{t("Álag / yfirvinna (%)")}</label><input value={pct} onChange={(e) => setPct(e.target.value)} placeholder="33" autoFocus /></div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, margin: "4px 0 2px", cursor: "pointer" }}>
+            <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
+            {t("Ég staðfesti að þetta stemmir við kjarasamninginn")}
+          </label>
+          <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t("Berðu saman við réttan samning (Efling/VR/SGS) áður en þú staðfestir.")}</p>
+          <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
             <button className="btn" disabled={busy} onClick={submit}>{t("Vista")}</button>
             <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
           </div>

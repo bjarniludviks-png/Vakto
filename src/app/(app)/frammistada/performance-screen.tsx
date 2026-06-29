@@ -7,6 +7,7 @@ import { Paired, Bars } from "@/components/app/charts";
 import { useLang } from "@/components/app/lang";
 import { EmptyState } from "@/components/app/empty-state";
 import { dec1 } from "@/lib/format";
+import type { PerfView } from "@/lib/analytics.server";
 
 // Period factors relative to the monthly baseline (demo analytics scale by period).
 const PERIODS = ["Vika", "Mánuður", "Ársfj.", "Ár"] as const;
@@ -31,7 +32,7 @@ const CMP: Row[] = [
 // color for change columns: green for good. Specific overrides per prototype.
 const goodChange = new Set(["Velta", "Framlegð", "Laun af tekjum", "Velta á launatíma", "Velta vs spá", "Unnið eftir áætlun"]);
 
-export default function PerformanceScreen({ empty = false }: { empty?: boolean }) {
+export default function PerformanceScreen({ empty = false, live = false, perf }: { empty?: boolean; live?: boolean; perf?: PerfView }) {
   const { t } = useLang();
   const [period, setPeriod] = useState<string>("Mánuður");
   const f = FACTOR[period];
@@ -45,6 +46,31 @@ export default function PerformanceScreen({ empty = false }: { empty?: boolean }
           ctaLabel="Bæta við starfsfólki"
           ctaHref="/starfsfolk?new=1"
         />
+      </>
+    );
+  }
+  // Live company: real headline KPIs from revenue + computed labor cost.
+  if (live && perf) {
+    const lp = perf.laborPct;
+    const lpColor = lp === 0 ? "var(--ink3)" : lp <= 30 ? "var(--good)" : lp <= 33 ? "var(--warn)" : "var(--bad)";
+    return (
+      <>
+        <PageHeader title="Frammistaða" subtitle="Þróun, framlegð og launasundurliðun" />
+        <div className="kpis">
+          <div className="kpi"><div className="lab">{t("Velta")}</div><div className="val">{perf.revenueM} <small>m kr</small></div></div>
+          <div className="kpi"><div className="lab">{t("Launakostnaður (byrði)")}</div><div className="val">{perf.laborCostM} <small>m kr</small></div></div>
+          <div className="kpi"><div className="lab">{t("Laun af tekjum")}</div><div className="val" style={{ color: lpColor }}>{lp > 0 ? dec1(lp) + "%" : "—"}</div></div>
+          <div className="kpi"><div className="lab">{t("Framlegð")}</div><div className="val">{perf.marginM} <small>m kr</small></div></div>
+        </div>
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="cb">
+            <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.6, margin: 0 }}>
+              {perf.laborPct === 0
+                ? t("Skráðu veltu (eða tengdu Inventra) til að sjá laun af tekjum og framlegð. Launakostnaður reiknast af starfsfólki og kjarasamningum.")
+                : t("Söguleg þróun og samanburður tímabila birtist eftir því sem fleiri launatímabil og veltutölur safnast.")}
+            </p>
+          </div>
+        </div>
       </>
     );
   }
