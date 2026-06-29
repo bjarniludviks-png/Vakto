@@ -4,8 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { nf } from "@/lib/format";
-import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, getWeekShifts, type ShiftInput } from "./actions";
+import { nf, dec1 } from "@/lib/format";
+import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, type ShiftInput } from "./actions";
+import { buildSchedulePdf, type PdfShift } from "./pdf";
 import type { ReqItem } from "./requests.server";
 import type { ScheduleInitial } from "./schedule.server";
 
@@ -49,11 +50,23 @@ const INIT_TYPES: ShiftType[] = [
   { nm: "Helgarvakt", t: "12:00–20:00", prem: "+45% helgarálag", bg: "#fde9e6", bd: "#f8d2cb", fg: "#c0392b" },
 ];
 const DAYS = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
-const DN = [22, 23, 24, 25, 26, 27, 28];
-const WEEK_MON = new Date(2026, 5, 22); // base Monday (22 June 2026)
 const TODAY_ISO = "2026-06-24"; // demo "today" — highlighted only when in view
 const MONTHS_IS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
 const fmtISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const hrsBetween = (a: string, b: string) => {
+  const [h1, m1] = a.split(":").map(Number), [h2, m2] = b.split(":").map(Number);
+  let d = (h2 * 60 + m2) - (h1 * 60 + m1);
+  if (d < 0) d += 1440;
+  return Math.round((d / 60) * 100) / 100;
+};
+const codeForStart = (start: string) => {
+  const h = parseInt((start ?? "").slice(0, 2), 10);
+  if (h === 7) return "M";
+  if (h === 11) return "Mi";
+  if (h === 14) return "E";
+  if (h === 16) return "L";
+  return "D";
+};
 const DAYNAMES = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
 const deptOf = (d: string) => (d === "Eldhús" ? "Eldhús" : d === "Sal" ? "Sal" : "Stjórnun");
 
@@ -66,12 +79,14 @@ const REQ_ICON: Record<ReqItem["kind"], React.ReactNode> = {
 export default function ScheduleScreen({ requests = [], initial = null }: { requests?: ReqItem[]; initial?: ScheduleInitial | null }) {
   const [emp, setEmp] = useState<Emp[]>(initial?.emp ?? INIT_EMP);
   const [grid, setGrid] = useState<string[][]>(initial?.grid ?? INIT_GRID);
+  const [cellTimes, setCellTimes] = useState<Record<string, { start: string; end: string }>>(initial?.times ?? {});
   const [pool, setPool] = useState<Emp[]>(initial?.pool ?? INIT_POOL);
   const [types, setTypes] = useState<ShiftType[]>(initial?.types?.length ? initial.types : INIT_TYPES);
   const [dept, setDept] = useState("all");
   const [view, setView] = useState<"Vika" | "Dagur" | "Mánuður">("Vika");
-  const [wk, setWk] = useState(0);
-  const [selDay, setSelDay] = useState(24);
+  const [cur, setCur] = useState(() => new Date(2026, 5, 24)); // anchor day
+  const [sel, setSel] = useState<{ r: number; c: number }>({ r: 0, c: 0 });
+  const [monthShifts, setMonthShifts] = useState<Record<string, { first: string; start: string; end: string }[]>>({});
   const [drag, setDrag] = useState<{ r: number; c: number } | null>(null);
   const [clip, setClip] = useState<string | null>(null);
   const [modal, setModal] = useState<null | "types" | "addEmp" | "shift" | "ai" | "aiResult">(null);
@@ -84,63 +99,110 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
     () => emp.map((_, r) => r).filter((r) => dept === "all" || deptOf(emp[r][2]) === dept),
     [emp, dept],
   );
-  const visHrs = useMemo(() => {
-    let h = 0;
-    grid.forEach((row) => row.forEach((s) => { if (s && s !== "off") h += SH[s].h; }));
-    return h;
-  }, [grid]);
   // Real (signed-in) companies start at 0 — BASE_HRS is only demo padding.
   const liveCompany = !!initial;
+
+  // Per-cell real times (override the coarse SH label/hours when present).
+  const ckey = (r: number, c: number) => `${r}:${c}`;
+  const timeOf = (r: number, c: number) => cellTimes[ckey(r, c)];
+  const cellLabel = (r: number, c: number, code: string) => {
+    const tt = cellTimes[ckey(r, c)];
+    return tt ? `${tt.start.slice(0, 2)}–${tt.end.slice(0, 2)}` : SH[code].l;
+  };
+  const cellHrs = (r: number, c: number, code: string) => {
+    const tt = cellTimes[ckey(r, c)];
+    return tt ? hrsBetween(tt.start, tt.end) : (SH[code]?.h ?? 0);
+  };
+
+  const visHrs = useMemo(() => {
+    let h = 0;
+    grid.forEach((row, r) => row.forEach((s, c) => { if (s && s !== "off") h += cellHrs(r, c, s); }));
+    return h;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grid, cellTimes]);
   const totalHrs = visHrs + (liveCompany ? 0 : BASE_HRS);
   const cost = totalHrs * COST_HR;
 
-  // Actual dates for the viewed week — shift the base Monday by wk weeks.
-  const weekDays = useMemo(
-    () => Array.from({ length: 7 }, (_, i) => { const d = new Date(WEEK_MON); d.setDate(d.getDate() + wk * 7 + i); return d; }),
-    [wk],
-  );
+  // Monday of the anchor day's week → the 7 visible week dates.
+  const mondayOf = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+  const weekDays = useMemo(() => {
+    const mon = mondayOf(cur);
+    return Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(d.getDate() + i); return d; });
+  }, [cur]);
+  const weekMonISO = fmtISO(weekDays[0]);
+  const curCol = (cur.getDay() + 6) % 7; // selected day's column within the week
   const todayCol = weekDays.findIndex((d) => fmtISO(d) === TODAY_ISO);
 
-  // Live companies: load that week's published shifts from the DB when the
-  // week changes. The base week (wk 0) is already in `initial` from SSR, so we
-  // skip the first run and keep the server-rendered grid to avoid a flash.
+  // Period navigation follows the active view (day / week / month).
+  function shiftPeriod(dir: number) {
+    setCur((c) => {
+      const d = new Date(c);
+      if (view === "Dagur") d.setDate(d.getDate() + dir);
+      else if (view === "Mánuður") d.setMonth(d.getMonth() + dir);
+      else d.setDate(d.getDate() + dir * 7);
+      return d;
+    });
+  }
+  const resetLabel = view === "Dagur" ? "Í dag" : view === "Mánuður" ? "Þessi mánuður" : "Þessi vika";
+
+  // Live companies: load the visible week's shifts from the DB when the week
+  // changes. The base week is already in `initial` (SSR), so skip first run.
   const firstWeekRun = useRef(true);
   useEffect(() => {
     if (!liveCompany) return;
     if (firstWeekRun.current) { firstWeekRun.current = false; return; }
-    const mon = new Date(WEEK_MON); mon.setDate(mon.getDate() + wk * 7);
     let cancelled = false;
-    getWeekShifts(fmtISO(mon)).then((res) => {
-      if (!cancelled && res?.ok) setGrid(res.grid);
+    getWeekShifts(weekMonISO).then((res) => {
+      if (!cancelled && res?.ok) { setGrid(res.grid); setCellTimes(res.times ?? {}); }
     });
     return () => { cancelled = true; };
-  }, [wk, liveCompany]);
+  }, [weekMonISO, liveCompany]);
+
+  // Live companies: load the whole month when in month view.
+  useEffect(() => {
+    if (!liveCompany || view !== "Mánuður") return;
+    const y = cur.getFullYear(), m = cur.getMonth();
+    const from = fmtISO(new Date(y, m, 1)), to = fmtISO(new Date(y, m + 1, 0));
+    let cancelled = false;
+    getShiftsInRange(from, to).then((res) => {
+      if (cancelled || !res.ok) return;
+      const map: Record<string, { first: string; start: string; end: string }[]> = {};
+      for (const row of res.rows) (map[row.date] ??= []).push({ first: row.first, start: row.start, end: row.end });
+      setMonthShifts(map);
+    });
+    return () => { cancelled = true; };
+  }, [liveCompany, view, cur]);
 
   const d0 = weekDays[0], d6 = weekDays[6];
   const wklbl = d0.getMonth() === d6.getMonth()
     ? `${d0.getDate()}.–${d6.getDate()}. ${MONTHS_IS[d0.getMonth()]}`
     : `${d0.getDate()}. ${MONTHS_IS[d0.getMonth()].slice(0, 3)} – ${d6.getDate()}. ${MONTHS_IS[d6.getMonth()].slice(0, 3)}`;
+  const periodLabel = view === "Dagur"
+    ? `${t(DAYNAMES[curCol])} ${cur.getDate()}. ${t(MONTHS_IS[cur.getMonth()])} ${cur.getFullYear()}`
+    : view === "Mánuður"
+      ? `${t(MONTHS_IS[cur.getMonth()])} ${cur.getFullYear()}`
+      : wklbl;
 
   // Per-day hours + shift counts, computed from the actual grid.
   const dayStats = weekDays.map((dd, c) => {
     let h = 0, n = 0;
-    vis.forEach((r) => { const s = grid[r]?.[c]; if (s && s !== "off") { h += SH[s].h; n++; } });
+    vis.forEach((r) => { const s = grid[r]?.[c]; if (s && s !== "off") { h += cellHrs(r, c, s); n++; } });
     return [c, dd.getDate(), h, n] as [number, number, number, number];
   });
   const totDayHrs = dayStats.reduce((a, d) => a + d[2], 0);
   const totDayShifts = dayStats.reduce((a, d) => a + d[3], 0);
 
   // KPI tölur fylgja sýninni (vika / dagur / mánuður).
-  const dayIdx = Math.max(0, DN.indexOf(selDay));
   const dayHrs = useMemo(() => {
-    let h = 0; vis.forEach((r) => { const s = grid[r]?.[dayIdx]; if (s && s !== "off") h += SH[s].h; }); return h;
-  }, [vis, grid, dayIdx]);
+    let h = 0; vis.forEach((r) => { const s = grid[r]?.[curCol]; if (s && s !== "off") h += cellHrs(r, curCol, s); }); return h;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vis, grid, cellTimes, curCol]);
   const weekShifts = useMemo(() => {
     let n = 0; vis.forEach((r) => grid[r]?.forEach((s) => { if (s && s !== "off") n++; })); return n;
   }, [vis, grid]);
   const dayShiftCount = useMemo(() => {
-    let n = 0; vis.forEach((r) => { const s = grid[r]?.[dayIdx]; if (s && s !== "off") n++; }); return n;
-  }, [vis, grid, dayIdx]);
+    let n = 0; vis.forEach((r) => { const s = grid[r]?.[curCol]; if (s && s !== "off") n++; }); return n;
+  }, [vis, grid, curCol]);
   const kpi = view === "Dagur"
     ? { hl: "Tímar dagsins", hrs: dayHrs, sl: "Vaktir í dag", shifts: dayShiftCount, open: false }
     : view === "Mánuður"
@@ -164,12 +226,13 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
       grid[r]?.forEach((code, c) => {
         if (code && code !== "off") {
           const o = SH[code];
+          const tt = timeOf(r, c);
           const [a, b] = o.l.split("–");
           out.push({
             employeeName: e[1],
             date: fmtISO(weekDays[c]),
-            startTime: `${a.padStart(2, "0")}:00`,
-            endTime: `${b.padStart(2, "0")}:00`,
+            startTime: tt ? tt.start : `${a.padStart(2, "0")}:00`,
+            endTime: tt ? tt.end : `${b.padStart(2, "0")}:00`,
             shiftTypeName: o.s || "Dagvakt",
           });
         }
@@ -214,6 +277,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
 
   function dropOn(tr: number, tc: number) {
     if (!drag) return;
+    const from = ckey(drag.r, drag.c), to = ckey(tr, tc);
     setGrid((g) => {
       const ng = g.map((row) => [...row]);
       const tmp = ng[drag.r][drag.c];
@@ -221,6 +285,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
       ng[tr][tc] = tmp;
       return ng;
     });
+    setCellTimes((m) => { const n = { ...m }; const a = n[from], b = n[to]; if (b) n[from] = b; else delete n[from]; if (a) n[to] = a; else delete n[to]; return n; });
     setDrag(null);
   }
   function cellClick(r: number, c: number) {
@@ -229,13 +294,46 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
       toast("Vakt límd");
       return;
     }
+    setSel({ r, c });
     setModal("shift");
+  }
+  function openNewShift() {
+    setSel({ r: vis[0] ?? 0, c: view === "Vika" ? (todayCol >= 0 ? todayCol : 0) : curCol });
+    setModal("shift");
+  }
+  function saveCell(r: number, c: number, start: string, end: string, typeName: string) {
+    setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = codeForStart(start); return ng; });
+    setCellTimes((m) => ({ ...m, [ckey(r, c)]: { start, end } }));
+    setModal(null);
+    if (liveCompany) {
+      saveShift({ employeeName: emp[r][1], date: fmtISO(weekDays[c]), startTime: start, endTime: end, shiftTypeName: typeName })
+        .then((res) => toast(res.ok ? "Vakt vistuð" : (res.error ?? "Villa")));
+    } else toast("Vakt vistuð (demo)");
+  }
+  function delCell(r: number, c: number) {
+    setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = "off"; return ng; });
+    setCellTimes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
+    setModal(null);
+    if (liveCompany) {
+      deleteShift({ employeeName: emp[r][1], dateISO: fmtISO(weekDays[c]) })
+        .then((res) => toast(res.ok ? "Vakt eydd" : (res.error ?? "Villa")));
+    } else toast("Vakt eydd (demo)");
   }
   function removeEmpRow(r: number) {
     const nm = emp[r][1];
     setPool((p) => [...p, emp[r]]);
     setEmp((e) => e.filter((_, i) => i !== r));
     setGrid((g) => g.filter((_, i) => i !== r));
+    // Reindex per-cell times after the removed row.
+    setCellTimes((m) => {
+      const n: Record<string, { start: string; end: string }> = {};
+      Object.entries(m).forEach(([k, v]) => {
+        const [rr, cc] = k.split(":").map(Number);
+        if (rr === r) return;
+        n[`${rr > r ? rr - 1 : rr}:${cc}`] = v;
+      });
+      return n;
+    });
     toast(nm + " fjarlægð(ur) af plani");
   }
   function pickEmp(i: number) {
@@ -246,30 +344,87 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
     setModal(null);
     toast(p[1] + " bætt á plan");
   }
-  function dayShifts(d: number) {
-    const wd = (d - 1) % 7;
+  // Shifts on a given week column (for Day view).
+  function colShifts(c: number) {
     const out: { i: string; n: string; c: string; dep: string; l: string; h: number; type: string; start: number }[] = [];
     emp.forEach((e, r) => {
-      const s = grid[r]?.[wd];
+      const s = grid[r]?.[c];
       if (s && s !== "off") {
-        const o = SH[s];
-        out.push({ i: e[0], n: e[1], c: e[3], dep: e[2], l: o.l, h: o.h, type: o.c, start: parseInt(o.l) });
+        const tt = timeOf(r, c);
+        out.push({ i: e[0], n: e[1], c: e[3], dep: e[2], l: cellLabel(r, c, s), h: cellHrs(r, c, s), type: SH[s].c, start: tt ? parseInt(tt.start) : parseInt(SH[s].l) });
       }
     });
     return out.sort((a, b) => a.start - b.start);
+  }
+  // Blocks for a month-calendar day (live → real month data; demo → week pattern).
+  function monthBlocks(iso: string, wd: number) {
+    if (liveCompany) {
+      return (monthShifts[iso] ?? []).slice().sort((a, b) => a.start.localeCompare(b.start))
+        .map((s) => ({ i: s.first.slice(0, 2).toUpperCase(), l: `${s.start.slice(0, 2)}–${s.end.slice(0, 2)}`, type: SH[codeForStart(s.start)].c }));
+    }
+    const out: { i: string; l: string; type: string }[] = [];
+    vis.forEach((r) => { const s = grid[r]?.[wd]; if (s && s !== "off") out.push({ i: emp[r][0], l: cellLabel(r, wd, s), type: SH[s].c }); });
+    return out;
+  }
+
+  async function exportPdf() {
+    toast("Bý til PDF…");
+    let dates: string[] = [], dayLabels: string[] = [], subtitle = "";
+    if (view === "Dagur") { dates = [fmtISO(cur)]; dayLabels = [periodLabel]; subtitle = periodLabel; }
+    else if (view === "Vika") {
+      dates = weekDays.map(fmtISO);
+      dayLabels = weekDays.map((d, i) => `${t(DAYS[i])} ${d.getDate()}.${d.getMonth() + 1}`);
+      subtitle = `${t("Vika")} ${wklbl} ${weekDays[0].getFullYear()}`;
+    } else {
+      const y = cur.getFullYear(), m = cur.getMonth(), n = new Date(y, m + 1, 0).getDate();
+      dates = Array.from({ length: n }, (_, i) => fmtISO(new Date(y, m, i + 1)));
+      subtitle = `${t(MONTHS_IS[m])} ${y}`;
+    }
+
+    const byDate: Record<string, PdfShift[]> = {};
+    if (liveCompany) {
+      const res = await getShiftsInRange(dates[0], dates[dates.length - 1]);
+      if (res.ok) for (const row of res.rows) {
+        (byDate[row.date] ??= []).push({ first: row.first, full: row.name, dept: row.dept, time: `${row.start}–${row.end}`, hours: hrsBetween(row.start, row.end) });
+      }
+    } else {
+      const pushCell = (iso: string, r: number, c: number) => {
+        const code = grid[r]?.[c];
+        if (!code || code === "off") return;
+        const tt = timeOf(r, c);
+        const [a, b] = SH[code].l.split("–");
+        const time = tt ? `${tt.start}–${tt.end}` : `${a}:00–${b}:00`;
+        (byDate[iso] ??= []).push({ first: emp[r][1], full: emp[r][1], dept: emp[r][2], time, hours: cellHrs(r, c, code) });
+      };
+      if (view === "Vika") weekDays.forEach((d, c) => vis.forEach((r) => pushCell(fmtISO(d), r, c)));
+      else if (view === "Dagur") vis.forEach((r) => pushCell(fmtISO(cur), r, curCol));
+      else dates.forEach((iso) => { const wd = (new Date(iso + "T00:00:00").getDay() + 6) % 7; vis.forEach((r) => pushCell(iso, r, wd)); });
+    }
+
+    const now = new Date();
+    const generated = `${t("Búið til")} ${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
+    try {
+      await buildSchedulePdf({
+        view, company: initial?.company ?? "VAKTO — Vaktaplan", title: t("Vaktaplan"),
+        subtitle, generated, dates, dayLabels, byDate,
+        weekdayLabels: DAYS.map((d) => t(d)), monthName: subtitle,
+      });
+      toast("PDF tilbúið");
+    } catch {
+      toast("Tókst ekki að búa til PDF");
+    }
   }
 
   return (
     <>
       <PageHeader
         title="Vaktaplan"
-        subtitle="Vika 22.–28. júní 2026"
         actions={
           <>
-            <button className="btn ghost sm">
+            <button className="btn ghost sm" onClick={exportPdf}>
               <svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 6 }}>
-                <rect x="8" y="8" width="12" height="12" rx="2" /><path d="M4 16V5a1 1 0 0 1 1-1h11" />
-              </svg>{t("Afrita viku")}
+                <path d="M14 3v5h5" /><path d="M7 3h7l5 5v11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" /><path d="M9.5 13.5h1a1.2 1.2 0 0 1 0 2.4h-1V13.5Zm0 4.5v-2.1M14 13.5v4.5h.8a1.5 1.5 0 0 0 1.5-1.5v-1.5a1.5 1.5 0 0 0-1.5-1.5H14Z" />
+              </svg>{t("Sækja PDF")}
             </button>
             <button className="btn sm" style={{ marginLeft: 8 }} onClick={publish}>{t("Birta plan")}</button>
           </>
@@ -278,11 +433,11 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
 
       <div className="stoolbar">
         <div className="wk">
-          <button onClick={() => setWk((w) => w - 1)}>‹</button>
-          <span className="lbl">{wklbl}</span>
-          <button onClick={() => setWk((w) => w + 1)}>›</button>
+          <button onClick={() => shiftPeriod(-1)}>‹</button>
+          <span className="lbl">{periodLabel}</span>
+          <button onClick={() => shiftPeriod(1)}>›</button>
         </div>
-        <button className="btn ghost sm" onClick={() => setWk(0)}>{t("Þessi vika")}</button>
+        <button className="btn ghost sm" onClick={() => setCur(new Date(2026, 5, 24))}>{t(resetLabel)}</button>
         <div className="seg" style={{ marginLeft: 4 }}>
           {(["Vika", "Dagur", "Mánuður"] as const).map((v) => (
             <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{t(v)}</button>
@@ -298,7 +453,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
         <button className="btn sm" onClick={() => setModal("ai")}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4Z" /></svg>{t("Biðja AI")}
         </button>
-        <button className="btn ghost sm" onClick={() => setModal("shift")}>
+        <button className="btn ghost sm" onClick={openNewShift}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 5v14M5 12h14" /></svg>{t("Vakt")}
         </button>
       </div>
@@ -311,8 +466,8 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
       )}
 
       <div className="kpis">
-        <div className="kpi"><div className="lab">{t(kpi.hl)}</div><div className="val">{kpi.hrs} <small>{t("klst")}</small></div></div>
-        <div className="kpi"><div className="lab">{t("Launakostnaður")}</div><div className="val">{nf(kpi.hrs * COST_HR)} <small>kr</small></div></div>
+        <div className="kpi"><div className="lab">{t(kpi.hl)}</div><div className="val">{dec1(kpi.hrs)} <small>{t("klst")}</small></div></div>
+        <div className="kpi"><div className="lab">{t("Launakostnaður")}</div><div className="val">{nf(Math.round(kpi.hrs * COST_HR))} <small>kr</small></div></div>
         <div className="kpi"><div className="lab">{t(kpi.sl)}</div><div className="val">{kpi.shifts}{kpi.open && !liveCompany ? <small> · 2 {t("opnar")}</small> : null}</div></div>
         <div className="kpi"><div className="lab">{t("Stöðugildi (FTE)")}</div><div className="val">{liveCompany ? (initial?.fte ?? "0,0") : "8,4"}</div></div>
       </div>
@@ -354,7 +509,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
                             onDragStart={() => setDrag({ r, c })}
                             onClick={() => cellClick(r, c)}
                           >
-                            {s === "off" ? t("Frí") : <>{SH[s].l}<small>{SH[s].s ? t("sh:" + SH[s].s) :" "}</small></>}
+                            {s === "off" ? t("Frí") : <>{cellLabel(r, c, s)}<small>{SH[s].s ? t("sh:" + SH[s].s) :" "}</small></>}
                           </div>
                         </td>
                       ))}
@@ -365,8 +520,8 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
                   <td style={{ textAlign: "left" }}>{t("Klst þann dag")}</td>
                   {Array.from({ length: 7 }, (_, c) => {
                     let n = 0;
-                    vis.forEach((r) => { const s = grid[r][c]; if (s && s !== "off") n += SH[s].h; });
-                    return <td key={c} className={c === todayCol ? "tod" : ""}>{n}</td>;
+                    vis.forEach((r) => { const s = grid[r][c]; if (s && s !== "off") n += cellHrs(r, c, s); });
+                    return <td key={c} className={c === todayCol ? "tod" : ""}>{dec1(n)}</td>;
                   })}
                 </tr>
                 <tr className="addrow">
@@ -396,8 +551,8 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
         </div>
       )}
 
-      {view === "Dagur" && <DayView day={selDay} rows={dayShifts(selDay)} onAdd={() => setModal("shift")} />}
-      {view === "Mánuður" && <MonthView dayShifts={dayShifts} onOpenDay={(d) => { setSelDay(d); setView("Dagur"); }} />}
+      {view === "Dagur" && <DayView day={cur} col={curCol} rows={colShifts(curCol)} onAdd={openNewShift} />}
+      {view === "Mánuður" && <MonthView monthDate={cur} blocks={monthBlocks} onOpenDay={(d) => { setCur(d); setView("Dagur"); }} />}
 
       <div className="grid2b">
         <div className="card">
@@ -419,10 +574,10 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
           <div className="ch"><div className="ct"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 6 }}><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>{t("Tímar eftir dögum")}</div><div className="cs">{t("áætlað í planinu · þessi vika")}</div></div>
           <div className="cb">
             {dayStats.map((r) => (
-              <div className="statline" key={r[1]}><span className="k">{t(DAYNAMES[r[0]])} {r[1]}.</span><span className="v">{r[2]} {t("klst")} · {r[3]} {t("á vakt")}</span></div>
+              <div className="statline" key={r[1]}><span className="k">{t(DAYNAMES[r[0]])} {r[1]}.</span><span className="v">{dec1(r[2])} {t("klst")} · {r[3]} {t("á vakt")}</span></div>
             ))}
             <div className="statline" style={{ borderTop: "1px solid var(--line)", marginTop: 5, paddingTop: 8 }}>
-              <span className="k" style={{ fontWeight: 650, color: "var(--ink)" }}>{t("Samtals")}</span><span className="v" style={{ fontWeight: 700 }}>{totDayHrs} {t("klst")} · {totDayShifts} {t("vaktir")}</span>
+              <span className="k" style={{ fontWeight: 650, color: "var(--ink)" }}>{t("Samtals")}</span><span className="v" style={{ fontWeight: 700 }}>{dec1(totDayHrs)} {t("klst")} · {totDayShifts} {t("vaktir")}</span>
             </div>
             {totDayHrs > 0 && !liveCompany && (
               <div className="ai" style={{ marginTop: 12 }}>
@@ -459,34 +614,35 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
 
       {modal === "types" && <ShiftTypesModal types={types} setTypes={setTypes} onClose={() => setModal(null)} />}
       {modal === "addEmp" && <AddEmpModal pool={pool} onPick={pickEmp} onClose={() => setModal(null)} />}
-      {modal === "shift" && <ShiftEditModal types={types} onClose={() => setModal(null)} onCopy={() => { setClip("D"); setModal(null); toast("Vakt afrituð — smelltu á reiti til að líma"); }} onTypes={() => setModal("types")} />}
+      {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { setClip("D"); setModal(null); toast("Vakt afrituð — smelltu á reiti til að líma"); }} onTypes={() => setModal("types")} />}
       {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} />}
       {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={async () => { setModal(null); await publish(); }} />}
     </>
   );
 }
 
-function DayView({ day, rows, onAdd }: { day: number; rows: ReturnType<ScheduleDayShifts>; onAdd: () => void }) {
+type DayRow = { i: string; n: string; c: string; dep: string; l: string; h: number; type: string; start: number };
+
+function DayView({ day, col, rows, onAdd }: { day: Date; col: number; rows: DayRow[]; onAdd: () => void }) {
   const { t } = useLang();
-  const wd = (day - 1) % 7;
   const tot = rows.reduce((a, x) => a + x.h, 0);
   return (
     <div style={{ marginTop: 16 }}>
       <div className="kpis">
         <div className="kpi"><div className="lab">{t("Á vakt")}</div><div className="val">{rows.length}</div></div>
-        <div className="kpi"><div className="lab">{t("Tímar dagsins")}</div><div className="val">{tot} <small>{t("klst")}</small></div></div>
-        <div className="kpi"><div className="lab">{t("Kostnaður dagsins")}</div><div className="val">{nf(tot * COST_HR)} <small>kr</small></div></div>
+        <div className="kpi"><div className="lab">{t("Tímar dagsins")}</div><div className="val">{dec1(tot)} <small>{t("klst")}</small></div></div>
+        <div className="kpi"><div className="lab">{t("Kostnaður dagsins")}</div><div className="val">{nf(Math.round(tot * COST_HR))} <small>kr</small></div></div>
         <div className="kpi"><div className="lab">{t("Mönnunarþörf")}</div><div className="val">{rows.length} <small>/ 6</small></div></div>
       </div>
       <div className="card" style={{ marginTop: 16 }}>
-        <div className="ch"><div><div className="ct">{t(DAYNAMES[wd])} {day}. {t("júní")}</div><div className="cs">{t("smelltu á vakt til að færa eða breyta")}</div></div><button className="btn sm" onClick={onAdd}>{t("+ Bæta við vakt")}</button></div>
+        <div className="ch"><div><div className="ct">{t(DAYNAMES[col])} {day.getDate()}. {t(MONTHS_IS[day.getMonth()])}</div><div className="cs">{t("smelltu á vakt til að færa eða breyta")}</div></div><button className="btn sm" onClick={onAdd}>{t("+ Bæta við vakt")}</button></div>
         <div className="cb att">
           {rows.length ? rows.map((x, i) => (
             <div className="it rowlink" key={i} onClick={onAdd}>
               <span className="avt" style={{ background: x.c, width: 32, height: 32 }}>{x.i}</span>
               <div className="tx"><b>{x.n}</b><span>{t(x.dep)}</span></div>
               <span style={{ fontWeight: 650, fontVariantNumeric: "tabular-nums", marginLeft: "auto" }}>{x.l}</span>
-              <span className="tag mut" style={{ marginLeft: 12 }}>{x.h} {t("klst")}</span>
+              <span className="tag mut" style={{ marginLeft: 12 }}>{dec1(x.h)} {t("klst")}</span>
             </div>
           )) : <div className="muted" style={{ padding: 16, textAlign: "center" }}>{t("Engar vaktir þennan dag.")}</div>}
         </div>
@@ -495,33 +651,37 @@ function DayView({ day, rows, onAdd }: { day: number; rows: ReturnType<ScheduleD
   );
 }
 
-type ScheduleDayShifts = () => { i: string; n: string; c: string; dep: string; l: string; h: number; type: string; start: number }[];
-
-function MonthView({ dayShifts, onOpenDay }: { dayShifts: (d: number) => ReturnType<ScheduleDayShifts>; onOpenDay: (d: number) => void }) {
+function MonthView({ monthDate, blocks, onOpenDay }: { monthDate: Date; blocks: (iso: string, wd: number) => { i: string; l: string; type: string }[]; onOpenDay: (d: Date) => void }) {
   const { t } = useLang();
   const hd = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
+  const y = monthDate.getFullYear(), m = monthDate.getMonth();
+  const days = new Date(y, m + 1, 0).getDate();
+  const lead = (new Date(y, m, 1).getDay() + 6) % 7;
   return (
     <div style={{ marginTop: 16 }}>
       <div className="card">
-        <div className="ch"><div><div className="ct">{t("Júní 2026")}</div><div className="cs">{t("smelltu á dag til að opna · á vakt til að breyta")}</div></div><span className="badge">{t("Heild:")} 4,30 m kr {t("velta")} · 32,1% {t("laun")}</span></div>
+        <div className="ch"><div><div className="ct">{t(MONTHS_IS[m])} {y}</div><div className="cs">{t("smelltu á dag til að opna · á vakt til að breyta")}</div></div></div>
         <div className="cb">
           <div className="mcal">
             {hd.map((h) => <div className="hd" key={h}>{t(h)}</div>)}
-            {Array.from({ length: 30 }, (_, k) => k + 1).map((d) => {
-              const wd = (d - 1) % 7, we = wd >= 5, tod = d === 24, sh = dayShifts(d);
+            {Array.from({ length: lead }, (_, i) => <div className="cell empty" key={`l${i}`} />)}
+            {Array.from({ length: days }, (_, k) => k + 1).map((d) => {
+              const date = new Date(y, m, d);
+              const wd = (date.getDay() + 6) % 7, we = wd >= 5;
+              const tod = fmtISO(date) === TODAY_ISO;
+              const sh = blocks(fmtISO(date), wd);
               return (
-                <div key={d} className={`cell mcell ${we ? "we" : ""} ${tod ? "tod" : ""}`} onClick={() => onOpenDay(d)}>
+                <div key={d} className={`cell mcell ${we ? "we" : ""} ${tod ? "tod" : ""}`} onClick={() => onOpenDay(date)}>
                   <div className="dd">{d}</div>
                   <div className="mblocks">
                     {sh.slice(0, 3).map((x, i) => (
-                      <div key={i} className={`mblock ${x.type}`} onClick={(e) => { e.stopPropagation(); onOpenDay(d); }}>{x.i} {x.l}</div>
+                      <div key={i} className={`mblock ${x.type}`} onClick={(e) => { e.stopPropagation(); onOpenDay(date); }}>{x.i} {x.l}</div>
                     ))}
                     {sh.length > 3 && <div className="mmore">+{sh.length - 3} {t("fleiri")}</div>}
                   </div>
                 </div>
               );
             })}
-            {Array.from({ length: 5 }, (_, i) => <div className="cell empty" key={`e${i}`} />)}
           </div>
         </div>
       </div>
@@ -595,33 +755,46 @@ function AddEmpModal({ pool, onPick, onClose }: { pool: Emp[]; onPick: (i: numbe
   );
 }
 
-function ShiftEditModal({ types, onClose, onCopy, onTypes }: { types: ShiftType[]; onClose: () => void; onCopy: () => void; onTypes: () => void }) {
+function ShiftEditModal({
+  types, emp, weekDays, sel, gridCode, timeOf, onSave, onDelete, onClose, onCopy, onTypes,
+}: {
+  types: ShiftType[]; emp: Emp[]; weekDays: Date[]; sel: { r: number; c: number };
+  gridCode: (r: number, c: number) => string;
+  timeOf: (r: number, c: number) => { start: string; end: string } | undefined;
+  onSave: (r: number, c: number, start: string, end: string, typeName: string) => void;
+  onDelete: (r: number, c: number) => void;
+  onClose: () => void; onCopy: () => void; onTypes: () => void;
+}) {
   const { t: tr } = useLang();
-  const [who, setWho] = useState("Mína");
+  const [ri, setRi] = useState(sel.r < emp.length ? sel.r : 0);
+  const [ci, setCi] = useState(sel.c);
+  const tt0 = timeOf(sel.r, sel.c);
   const [type, setType] = useState(types[0]?.nm ?? "Dagvakt");
-  const [start, setStart] = useState("08:00");
-  const [end, setEnd] = useState("16:00");
-  const [busy, setBusy] = useState(false);
-  async function save() {
-    setBusy(true);
-    const res = await saveShift({ employeeName: who, shiftTypeName: type, startTime: start, endTime: end });
-    setBusy(false);
-    onClose();
-    toast(res.ok ? "Vakt vistuð" : (res.error ?? "Tókst ekki"));
-  }
+  const [start, setStart] = useState(tt0?.start ?? "08:00");
+  const [end, setEnd] = useState(tt0?.end ?? "16:00");
+  const filled = gridCode(ri, ci) !== "off";
+  const DNAMES = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
   return (
-    <Modal onClose={onClose} title={tr("Ný vakt")}>
-      <div className="field"><label>{tr("Starfsmaður")}</label><select value={who} onChange={(e) => setWho(e.target.value)}>{["Mína", "Bach", "Phong", "Ómar", "Ha Vu", "Jón"].map((n) => <option key={n}>{n}</option>)}</select></div>
-      <div className="field"><label>{tr("Vaktategund")}</label><select value={type} onChange={(e) => setType(e.target.value)}>{types.map((t) => <option key={t.nm} value={t.nm}>{tr(t.nm)} · {t.t}</option>)}<option value="Sérsniðin vakt">{tr("Sérsniðin vakt")}</option></select></div>
+    <Modal onClose={onClose} title={filled ? tr("Breyta vakt") : tr("Ný vakt")}>
+      <div style={{ display: "flex", gap: 10 }}>
+        <div className="field" style={{ flex: 1.4 }}><label>{tr("Starfsmaður")}</label>
+          <select value={ri} onChange={(e) => setRi(Number(e.target.value))}>{emp.map((x, i) => <option key={i} value={i}>{x[1]}</option>)}</select>
+        </div>
+        <div className="field" style={{ flex: 1 }}><label>{tr("Dagur")}</label>
+          <select value={ci} onChange={(e) => setCi(Number(e.target.value))}>{weekDays.map((d, i) => <option key={i} value={i}>{tr(DNAMES[i]).slice(0, 3)} {d.getDate()}.{d.getMonth() + 1}</option>)}</select>
+        </div>
+      </div>
+      <div className="field"><label>{tr("Vaktategund")}</label><select value={type} onChange={(e) => { setType(e.target.value); const ty = types.find((t) => t.nm === e.target.value); if (ty) { const [a, b] = ty.t.split("–"); if (a && b) { setStart(a.trim().slice(0, 5)); setEnd(b.trim().slice(0, 5)); } } }}>{types.map((t) => <option key={t.nm} value={t.nm}>{tr(t.nm)} · {t.t}</option>)}<option value="Sérsniðin vakt">{tr("Sérsniðin vakt")}</option></select></div>
       <div style={{ display: "flex", gap: 10 }}>
         <div className="field" style={{ flex: 1 }}><label>{tr("Upphaf")}</label><input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></div>
         <div className="field" style={{ flex: 1 }}><label>{tr("Lok")}</label><input type="time" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
       </div>
       <p className="muted" style={{ fontSize: 11.5, margin: "-6px 0 8px" }}>{tr("Veldu tilbúna vaktategund eða stilltu tíma sjálf/ur. Vantar tegund?")} <a onClick={() => { onClose(); onTypes(); }} style={{ color: "var(--brand)", fontWeight: 600, cursor: "pointer" }}>{tr("Búa til vaktategund")}</a></p>
-      <div className="field"><label>{tr("Staða / dagur")}</label><select><option>{tr("Kokkur")}</option><option>{tr("Þjónn / Sal")}</option><option>{tr("Bílstjóri")}</option></select></div>
-      <p className="muted" style={{ fontSize: 12, marginBottom: 4 }}>{tr("Þú getur fært vaktina á annan dag eða starfsmann hér — eða dregið hana til í vikusýn.")}</p>
       <div style={{ display: "flex", gap: 9, marginTop: 8, flexWrap: "wrap" }}>
-        <button className="btn" disabled={busy} onClick={save}>{tr("Vista")}</button>
+        <button className="btn" onClick={() => { if (start >= end) { toast("Lok verða að vera eftir upphaf"); return; } onSave(ri, ci, start, end, type); }}>{tr("Vista")}</button>
+        {filled && <button className="btn ghost" style={{ color: "var(--bad)", borderColor: "var(--bad-soft, #f3c7c0)" }} onClick={() => onDelete(ri, ci)}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>{tr("Eyða vakt")}
+        </button>}
         <button className="btn ghost" onClick={onCopy}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M4 16V5a1 1 0 0 1 1-1h11" /></svg>{tr("Afrita")}</button>
         <button className="btn ghost" onClick={onClose}>{tr("Loka")}</button>
       </div>

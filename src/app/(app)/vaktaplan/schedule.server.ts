@@ -7,7 +7,7 @@ import { dec1 } from "@/lib/format";
 
 export type Emp4 = [string, string, string, string]; // initials, first name, dept, color
 export type ShiftTypeView = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
-export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; types: ShiftTypeView[]; pool: Emp4[]; fte: string };
+export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string };
 
 const WEEK_DATES = [22, 23, 24, 25, 26, 27, 28].map((d) => `2026-06-${d}`);
 
@@ -59,19 +59,29 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
     // published shifts for the demo week → grid[empIndex][dayIndex]
     const idById = new Map(employees.map((e, i) => [e.id, i]));
     const grid: string[][] = employees.map(() => Array(7).fill("off"));
+    const times: Record<string, { start: string; end: string }> = {};
     if (company) {
       const { data: shifts } = await supabase
-        .from("shifts").select("employee_id, date, start_time")
+        .from("shifts").select("employee_id, date, start_time, end_time")
         .eq("company_id", company).in("date", WEEK_DATES);
       for (const s of shifts ?? []) {
         const r = idById.get(s.employee_id as string);
         const c = WEEK_DATES.indexOf(s.date as string);
-        if (r !== undefined && c >= 0) grid[r][c] = codeForStart(s.start_time as string);
+        if (r !== undefined && c >= 0) {
+          grid[r][c] = codeForStart(s.start_time as string);
+          times[`${r}:${c}`] = { start: ((s.start_time as string) ?? "").slice(0, 5), end: ((s.end_time as string) ?? "").slice(0, 5) };
+        }
       }
     }
 
+    let companyName = "Vaktaplan";
+    if (company) {
+      const { data: co } = await supabase.from("companies").select("name").eq("id", company).maybeSingle();
+      if (co?.name) companyName = co.name as string;
+    }
+
     const fte = dec1(employees.reduce((a, e) => a + e.employmentRatio, 0) / 100);
-    return { emp, grid, types, pool: [], fte };
+    return { emp, grid, times, types, pool: [], fte, company: companyName };
   } catch {
     return null;
   }
