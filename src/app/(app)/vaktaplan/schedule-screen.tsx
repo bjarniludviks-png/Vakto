@@ -50,9 +50,10 @@ const INIT_TYPES: ShiftType[] = [
   { nm: "Helgarvakt", t: "12:00–20:00", prem: "+45% helgarálag", bg: "#fde9e6", bd: "#f8d2cb", fg: "#c0392b" },
 ];
 const DAYS = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
-const TODAY_ISO = "2026-06-24"; // demo "today" — highlighted only when in view
+const DEMO_TODAY = "2026-06-24"; // fallback "today" for the logged-out demo
 const MONTHS_IS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
 const fmtISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const parseISO = (s: string) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
 const hrsBetween = (a: string, b: string) => {
   const [h1, m1] = a.split(":").map(Number), [h2, m2] = b.split(":").map(Number);
   let d = (h2 * 60 + m2) - (h1 * 60 + m1);
@@ -84,7 +85,8 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
   const [types, setTypes] = useState<ShiftType[]>(initial?.types?.length ? initial.types : INIT_TYPES);
   const [dept, setDept] = useState("all");
   const [view, setView] = useState<"Vika" | "Dagur" | "Mánuður">("Vika");
-  const [cur, setCur] = useState(() => new Date(2026, 5, 24)); // anchor day
+  const todayISO = initial?.todayISO ?? DEMO_TODAY;
+  const [cur, setCur] = useState(() => parseISO(initial?.todayISO ?? DEMO_TODAY)); // anchor day
   const [sel, setSel] = useState<{ r: number; c: number }>({ r: 0, c: 0 });
   const [monthShifts, setMonthShifts] = useState<Record<string, { first: string; start: string; end: string }[]>>({});
   const [drag, setDrag] = useState<{ r: number; c: number } | null>(null);
@@ -131,7 +133,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
   }, [cur]);
   const weekMonISO = fmtISO(weekDays[0]);
   const curCol = (cur.getDay() + 6) % 7; // selected day's column within the week
-  const todayCol = weekDays.findIndex((d) => fmtISO(d) === TODAY_ISO);
+  const todayCol = weekDays.findIndex((d) => fmtISO(d) === todayISO);
 
   // Period navigation follows the active view (day / week / month).
   function shiftPeriod(dir: number) {
@@ -437,7 +439,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
           <span className="lbl">{periodLabel}</span>
           <button onClick={() => shiftPeriod(1)}>›</button>
         </div>
-        <button className="btn ghost sm" onClick={() => setCur(new Date(2026, 5, 24))}>{t(resetLabel)}</button>
+        <button className="btn ghost sm" onClick={() => setCur(parseISO(todayISO))}>{t(resetLabel)}</button>
         <div className="seg" style={{ marginLeft: 4 }}>
           {(["Vika", "Dagur", "Mánuður"] as const).map((v) => (
             <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{t(v)}</button>
@@ -552,7 +554,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
       )}
 
       {view === "Dagur" && <DayView day={cur} col={curCol} rows={colShifts(curCol)} onAdd={openNewShift} />}
-      {view === "Mánuður" && <MonthView monthDate={cur} blocks={monthBlocks} onOpenDay={(d) => { setCur(d); setView("Dagur"); }} />}
+      {view === "Mánuður" && <MonthView monthDate={cur} todayISO={todayISO} blocks={monthBlocks} onOpenDay={(d) => { setCur(d); setView("Dagur"); }} />}
 
       <div className="grid2b">
         <div className="card">
@@ -651,7 +653,7 @@ function DayView({ day, col, rows, onAdd }: { day: Date; col: number; rows: DayR
   );
 }
 
-function MonthView({ monthDate, blocks, onOpenDay }: { monthDate: Date; blocks: (iso: string, wd: number) => { i: string; l: string; type: string }[]; onOpenDay: (d: Date) => void }) {
+function MonthView({ monthDate, todayISO, blocks, onOpenDay }: { monthDate: Date; todayISO: string; blocks: (iso: string, wd: number) => { i: string; l: string; type: string }[]; onOpenDay: (d: Date) => void }) {
   const { t } = useLang();
   const hd = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
   const y = monthDate.getFullYear(), m = monthDate.getMonth();
@@ -668,7 +670,7 @@ function MonthView({ monthDate, blocks, onOpenDay }: { monthDate: Date; blocks: 
             {Array.from({ length: days }, (_, k) => k + 1).map((d) => {
               const date = new Date(y, m, d);
               const wd = (date.getDay() + 6) % 7, we = wd >= 5;
-              const tod = fmtISO(date) === TODAY_ISO;
+              const tod = fmtISO(date) === todayISO;
               const sh = blocks(fmtISO(date), wd);
               return (
                 <div key={d} className={`cell mcell ${we ? "we" : ""} ${tod ? "tod" : ""}`} onClick={() => onOpenDay(date)}>

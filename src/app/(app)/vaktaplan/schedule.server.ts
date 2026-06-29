@@ -7,9 +7,14 @@ import { dec1 } from "@/lib/format";
 
 export type Emp4 = [string, string, string, string]; // initials, first name, dept, color
 export type ShiftTypeView = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
-export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string };
+export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string; todayISO: string };
 
-const WEEK_DATES = [22, 23, 24, 25, 26, 27, 28].map((d) => `2026-06-${d}`);
+const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+// 7 ISO dates for the (Mon-start) week containing `ref`.
+function weekDatesOf(ref: Date): string[] {
+  const mon = new Date(ref); mon.setHours(0, 0, 0, 0); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
+  return Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(d.getDate() + i); return isoOf(d); });
+}
 
 // Map a shift start hour to the grid's shift code (keys must exist in SH).
 function codeForStart(start: string | null): string {
@@ -28,6 +33,10 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
   try {
     const { employees, live } = await getEmployees();
     if (!live) return null;
+
+    const today = new Date();
+    const todayISO = isoOf(today);
+    const WEEK_DATES = weekDatesOf(today);
 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -81,7 +90,7 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
     }
 
     const fte = dec1(employees.reduce((a, e) => a + e.employmentRatio, 0) / 100);
-    return { emp, grid, times, types, pool: [], fte, company: companyName };
+    return { emp, grid, times, types, pool: [], fte, company: companyName, todayISO };
   } catch {
     return null;
   }
