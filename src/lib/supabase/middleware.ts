@@ -51,6 +51,7 @@ export async function updateSession(request: NextRequest) {
     pathname === "/manifest.webmanifest" ||
     pathname.startsWith("/apple-icon") ||
     pathname.startsWith("/icon") ||
+    pathname.startsWith("/api/splash") ||
     pathname === "/favicon.ico";
 
   if (!user && !isPublic) {
