@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 
-export const dynamic = "force-static";
+// Read ?w & ?h per request (must stay dynamic so searchParams resolve).
+export const dynamic = "force-dynamic";
 
 // Branded iOS launch image — VAKTO logo on brand orange, sized per device.
 export async function GET(request: Request) {
