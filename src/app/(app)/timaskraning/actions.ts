@@ -131,6 +131,99 @@ export async function adjustPunch(punchId: string, clockInHHMM?: string, clockOu
   }
 }
 
+export type PunchRow = { punchId: string; date: string; in: string; out: string | null; hours: number; source: string; approved: boolean; open: boolean };
+
+const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+
+/** All punches for one employee in a date range (per-employee detail view). */
+export async function getEmployeePunches(employeeId: string, fromISO: string, toISO: string): Promise<{ ok: boolean; name: string; rows: PunchRow[]; needsMigration: boolean }> {
+  if (!isSupabaseConfigured()) return { ok: false, name: "", rows: [], needsMigration: false };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, name: "", rows: [], needsMigration: false };
+    const { data: emp } = await supabase.from("employees").select("full_name").eq("id", employeeId).maybeSingle();
+    const name = (emp?.full_name as string)?.split(/\s+/)[0] ?? "";
+    const from = fromISO, to = toISO + "T23:59:59";
+
+    let needsMigration = false;
+    let punches: Record<string, unknown>[] | null = null;
+    const withApproved = await supabase.from("punches")
+      .select("id, clock_in, clock_out, source, approved")
+      .eq("company_id", ctx.company).eq("employee_id", employeeId)
+      .gte("clock_in", from).lte("clock_in", to).order("clock_in", { ascending: false });
+    if (withApproved.error) {
+      needsMigration = true;
+      const fallback = await supabase.from("punches")
+        .select("id, clock_in, clock_out, source")
+        .eq("company_id", ctx.company).eq("employee_id", employeeId)
+        .gte("clock_in", from).lte("clock_in", to).order("clock_in", { ascending: false });
+      punches = fallback.data;
+    } else {
+      punches = withApproved.data;
+    }
+
+    const rows: PunchRow[] = (punches ?? []).map((p) => {
+      const ci = p.clock_in as string;
+      const co = p.clock_out as string | null;
+      const hours = co ? Math.round(((new Date(co).getTime() - new Date(ci).getTime()) / 3600000) * 100) / 100 : 0;
+      return {
+        punchId: p.id as string, date: ci.slice(0, 10), in: hhmm(ci), out: co ? hhmm(co) : null,
+        hours, source: (p.source as string) ?? "web", approved: !!p.approved, open: !co,
+      };
+    });
+    return { ok: true, name, rows, needsMigration };
+  } catch {
+    return { ok: false, name: "", rows: [], needsMigration: false };
+  }
+}
+
+/** Approve / unapprove a single punch. */
+export async function setPunchApproved(punchId: string, approved: boolean): Promise<ApproveResult> {
+  if (!isSupabaseConfigured() || !punchId) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("punches")
+      .update({ approved, approved_by: approved ? ctx.userId : null, approved_at: approved ? new Date().toISOString() : null })
+      .eq("id", punchId).eq("company_id", ctx.company);
+    if (error) return { ok: false, error: "Keyrðu migration 0008 í Supabase til að virkja samþykki." };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: approved ? "punch.approve" : "punch.unapprove", entity: "punch", entityId: punchId,
+      detail: approved ? "Vakt samþykkt" : "Samþykki afturkallað",
+    });
+    revalidatePath("/timaskraning");
+    return { ok: true, count: 1 };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Approve all closed punches for an employee in a range. */
+export async function approveEmployeePunches(employeeId: string, fromISO: string, toISO: string): Promise<ApproveResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data, error } = await supabase.from("punches")
+      .update({ approved: true, approved_by: ctx.userId, approved_at: new Date().toISOString() })
+      .eq("company_id", ctx.company).eq("employee_id", employeeId)
+      .gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59")
+      .not("clock_out", "is", null).select("id");
+    if (error) return { ok: false, error: "Keyrðu migration 0008 í Supabase til að virkja samþykki." };
+    const count = data?.length ?? 0;
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "punch.approve_range", entity: "punch", detail: `Vaktir samþykktar — ${count}`,
+    });
+    revalidatePath("/timaskraning");
+    return { ok: true, count };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /** Manager approves all pending timesheets for the company. */
 export async function approveAllTimesheets(): Promise<ApproveResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };

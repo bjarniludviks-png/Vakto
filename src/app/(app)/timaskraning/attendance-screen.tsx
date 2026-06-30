@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
@@ -10,7 +10,7 @@ import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
 import type { OnNowRow, RosterRow } from "./attendance.server";
-import { approveAllTimesheets, approveTimesheet, setClockOut, fetchAttendance, managerClockIn, adjustPunch } from "./actions";
+import { approveAllTimesheets, approveTimesheet, setClockOut, fetchAttendance, managerClockIn, adjustPunch, getEmployeePunches, setPunchApproved, approveEmployeePunches, type PunchRow } from "./actions";
 
 const MONTHS_IS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ágú.", "sep.", "okt.", "nóv.", "des."];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -161,6 +161,7 @@ function LiveAttendance({ onShift, initial, onNow, roster }: { onShift: number; 
   const [loading, setLoading] = useState(false);
   const [clockInOpen, setClockInOpen] = useState(false);
   const [editPunch, setEditPunch] = useState<OnNowRow | null>(null);
+  const [detail, setDetail] = useState<{ id: string; name: string } | null>(null);
 
   async function doClockOut(row: OnNowRow) {
     const res = await adjustPunch(row.punchId, undefined, nowHHMM());
@@ -215,8 +216,8 @@ function LiveAttendance({ onShift, initial, onNow, roster }: { onShift: number; 
         <div className="cb att">
           {onNow.length ? onNow.map((r) => (
             <div className="it" key={r.punchId}>
-              <span className="avt" style={{ background: r.c, width: 34, height: 34 }}>{r.av}</span>
-              <div className="tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : ""}</span></div>
+              <span className="avt" style={{ background: r.c, width: 34, height: 34, cursor: "pointer" }} onClick={() => setDetail({ id: r.employeeId, name: r.name })}>{r.av}</span>
+              <div className="tx" style={{ cursor: "pointer" }} onClick={() => setDetail({ id: r.employeeId, name: r.name })}><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : ""}</span></div>
               <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)", marginLeft: "auto" }}>{t("á vakt")}</span>
               <button className="btn ghost sm" style={{ marginLeft: 10 }} onClick={() => setEditPunch(r)}>{t("Leiðrétta")}</button>
               <button className="btn sm" style={{ marginLeft: 8 }} onClick={() => doClockOut(r)}>{t("tk:clockout")}</button>
@@ -232,7 +233,7 @@ function LiveAttendance({ onShift, initial, onNow, roster }: { onShift: number; 
             <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th><th>{t("Staða")}</th></tr></thead>
             <tbody>
               {shown.length ? shown.map((r) => (
-                <tr key={r.id}>
+                <tr key={r.id} className="rowlink" onClick={() => setDetail({ id: r.id, name: r.name })}>
                   <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.name}</span></td>
                   <td>{r.dept}</td>
                   <td className="r">{dec1(r.planned)}</td>
@@ -248,7 +249,77 @@ function LiveAttendance({ onShift, initial, onNow, roster }: { onShift: number; 
 
       {clockInOpen && <ClockInModal roster={roster} onClose={() => setClockInOpen(false)} onDone={() => { setClockInOpen(false); router.refresh(); }} />}
       {editPunch && <AdjustPunchModal row={editPunch} onClose={() => setEditPunch(null)} onDone={() => { setEditPunch(null); router.refresh(); }} />}
+      {detail && <EmployeePunchesModal employeeId={detail.id} name={detail.name} from={from} to={to} onClose={() => setDetail(null)} onChanged={() => router.refresh()} />}
     </>
+  );
+}
+
+function EmployeePunchesModal({ employeeId, name, from, to, onClose, onChanged }: { employeeId: string; name: string; from: string; to: string; onClose: () => void; onChanged: () => void }) {
+  const { t } = useLang();
+  const [rows, setRows] = useState<PunchRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [needsMig, setNeedsMig] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getEmployeePunches(employeeId, from, to).then((r) => {
+      if (cancelled) return;
+      setRows(r.rows); setNeedsMig(r.needsMigration);
+    }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [employeeId, from, to]);
+
+  function refresh() {
+    getEmployeePunches(employeeId, from, to).then((r) => { setRows(r.rows); setNeedsMig(r.needsMigration); });
+    onChanged();
+  }
+  async function toggle(p: PunchRow) {
+    const res = await setPunchApproved(p.punchId, !p.approved);
+    if (res.ok) refresh(); else toast(res.error ?? "Villa");
+  }
+  async function approveAll() {
+    const res = await approveEmployeePunches(employeeId, from, to);
+    toast(res.ok ? `${res.count} ${t("vaktir samþykktar")}` : (res.error ?? "Villa"));
+    if (res.ok) refresh();
+  }
+
+  const total = rows.reduce((a, r) => a + r.hours, 0);
+  const pending = rows.filter((r) => !r.approved && !r.open).length;
+
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal" style={{ maxWidth: 640 }}>
+        <div className="mh">
+          <div><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Tímaskráningar")} · {name}</div><div className="muted" style={{ fontSize: 12 }}>{niceISO(from)} – {niceISO(to)} · {dec1(total)} {t("klst")}{pending ? ` · ${pending} ${t("bíða samþykkis")}` : ""}</div></div>
+          <button className="x" onClick={onClose}>✕</button>
+        </div>
+        <div className="mb">
+          {needsMig && <div className="ai" style={{ margin: "0 0 12px" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg><div className="x">{t("Keyrðu migration 0008 í Supabase til að virkja samþykki.")}</div></div>}
+          {pending > 0 && <div style={{ marginBottom: 12 }}><button className="btn sm" onClick={approveAll}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Samþykkja allar")}</button></div>}
+          <div className="tbl">
+            <table>
+              <thead><tr><th>{t("Dagsetning")}</th><th>{t("Innstimplun")}</th><th>{t("Útstimplun")}</th><th className="r">{t("Klst")}</th><th>{t("Staða")}</th><th></th></tr></thead>
+              <tbody>
+                {loading ? <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Hleð…")}</td></tr>
+                  : rows.length ? rows.map((p) => (
+                    <tr key={p.punchId}>
+                      <td>{niceISO(p.date)}</td>
+                      <td>{p.in}</td>
+                      <td className={p.out ? "" : "muted"}>{p.out ?? t("opin")}</td>
+                      <td className="r">{p.open ? "—" : dec1(p.hours)}</td>
+                      <td>{p.open ? <span className="pill" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span> : p.approved ? <span className="pill" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Samþykkt")}</span> : <span className="pill" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Bíður")}</span>}</td>
+                      <td>{!p.open && (p.approved
+                        ? <button className="btn ghost sm" onClick={() => toggle(p)}>{t("Afturkalla")}</button>
+                        : <button className="btn sm" onClick={() => toggle(p)}>{t("Samþykkja")}</button>)}</td>
+                    </tr>
+                  )) : <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engar skráningar á þessu tímabili.")}</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 

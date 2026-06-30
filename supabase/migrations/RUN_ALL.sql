@@ -658,3 +658,9 @@ create policy pay_rules_write on pay_rules for all
   using (company_id = public.auth_company_id() and public.is_manager())
   with check (company_id = public.auth_company_id() and public.is_manager());
 
+
+-- ===== 0008 — punch approval =====
+alter table punches add column if not exists approved boolean not null default false;
+alter table punches add column if not exists approved_by uuid references auth.users(id) on delete set null;
+alter table punches add column if not exists approved_at timestamptz;
+create index if not exists punches_approved_idx on punches (company_id, approved);
