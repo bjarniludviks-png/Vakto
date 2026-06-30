@@ -48,6 +48,19 @@ export const RULE_FIELDS: { key: keyof RuleSet; label: string; hint: string }[] 
 
 export const CUSTOM_UNION = "Eigin reglur";
 
+// ---- custom (build-your-own) rules: thresholds + user-defined premium bands ----
+// A band = "this weekday + time window → this % premium" (e.g. Sun 00:00–24:00 +45%,
+// or 18:00–23:00 +33% weekdays). days: 0=Sun … 6=Sat. from/to "HH:MM" (to may wrap
+// past midnight). Bands stack on top of the base RuleSet — the highest % wins.
+export type Band = { label: string; days: number[]; from: string; to: string; pct: number };
+export type CustomRules = RuleSet & {
+  otWeekly?: number;  // klst/viku áður en yfirvinna tekur við (default 40)
+  otMonthly?: number; // klst/mánuði áður en yfirvinna tekur við (0/ósett = óvirkt)
+  bands?: Band[];
+};
+export const DEFAULT_OT_WEEKLY = 40;
+export const DEFAULT_MONTHLY_HOURS = 173.33;
+
 // ⚠️ UNCONFIRMED placeholders — verify against each agreement before real pay.
 export const UNION_PRESETS: Record<string, RuleSet> = {
   "Efling": { eve: 33, weekend: 45, overtime: 90, holiday: 90, night: 45 },
@@ -57,8 +70,9 @@ export const UNION_PRESETS: Record<string, RuleSet> = {
 };
 export const ZERO_RULESET: RuleSet = { eve: 0, weekend: 0, overtime: 0, holiday: 0, night: 0 };
 
-/** Effective rule set: union preset, or the employee's custom set. */
-export function resolveRuleSet(union: string | null | undefined, custom?: Partial<RuleSet> | null): RuleSet {
+/** Effective rule set: union preset, or the employee's custom set (incl. custom
+ * overtime thresholds + premium bands when "Eigin reglur" is selected). */
+export function resolveRuleSet(union: string | null | undefined, custom?: Partial<CustomRules> | null): CustomRules {
   if (union === CUSTOM_UNION) return { ...ZERO_RULESET, ...(custom ?? {}) };
   return UNION_PRESETS[union ?? ""] ?? UNION_PRESETS["Efling"];
 }

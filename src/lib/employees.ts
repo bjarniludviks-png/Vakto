@@ -1,4 +1,6 @@
 // Pure types + helpers — safe to import from Client Components.
+import type { CustomRules } from "@/lib/payrules";
+
 export type Employee = {
   id: string;
   fullName: string;
@@ -17,7 +19,7 @@ export type Employee = {
   phone: string | null;
   bankAccount: string | null;
   role: string;
-  payRule?: { eve: number; weekend: number; overtime: number; holiday: number; night: number } | null;
+  payRule?: CustomRules | null;
   permissions?: { clock: boolean; shifts: boolean; pay: boolean; requests: boolean; card: boolean; chat: boolean } | null;
   benefits?: { name: string; type: "fixed" | "perkm"; amount: number }[] | null;
 };

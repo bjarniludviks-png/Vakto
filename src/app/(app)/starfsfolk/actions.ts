@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
+import type { CustomRules } from "@/lib/payrules";
 
 export type NewEmployeeInput = {
   fullName: string;
@@ -239,7 +240,7 @@ export type UpdateEmployeeInput = {
   employmentRatio?: string;
   union?: string;
   payType?: string;
-  payRule?: { eve: number; weekend: number; overtime: number; holiday: number; night: number } | null;
+  payRule?: CustomRules | null;
   permissions?: Record<string, boolean> | null;
   benefits?: { name: string; type: string; amount: number }[] | null;
 };
@@ -258,13 +259,13 @@ export async function getEmployeeExtras(id: string): Promise<{ permissions: Reco
 }
 
 /** Tolerant read of an employee's custom pay-rule set (null before 0013). */
-export async function getEmployeePayRule(id: string): Promise<{ eve: number; weekend: number; overtime: number; holiday: number; night: number } | null> {
+export async function getEmployeePayRule(id: string): Promise<CustomRules | null> {
   if (!isSupabaseConfigured()) return null;
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.from("employees").select("pay_rule").eq("id", id).maybeSingle();
     if (error) return null;
-    return (data?.pay_rule as { eve: number; weekend: number; overtime: number; holiday: number; night: number }) ?? null;
+    return (data?.pay_rule as CustomRules) ?? null;
   } catch {
     return null;
   }

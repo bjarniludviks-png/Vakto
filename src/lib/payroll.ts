@@ -1,7 +1,7 @@
 // Icelandic payroll calc (brief §9) — pure, deterministic. Used by the payroll
 // run (persistence), the Payday/Excel export, and the labor% metric.
 import type { Employee } from "@/lib/employees";
-import type { RuleSet } from "@/lib/payrules";
+import type { RuleSet, CustomRules, Band } from "@/lib/payrules";
 
 export const PERSONAL_ALLOWANCE = 68691; // persónuafsláttur kr/mán
 export const BURDEN = 0.302; // launatengd gjöld ~30,2%
@@ -95,13 +95,33 @@ function premiumPct(dt: Date, holiday: boolean, r: RuleSet): number {
   return 0; // dagvinna
 }
 
+/** Highest matching custom-band premium for a moment (0 if none match). */
+function bandPct(dt: Date, bands: Band[]): number {
+  const mins = dt.getHours() * 60 + dt.getMinutes();
+  const wd = dt.getDay();
+  let best = 0;
+  for (const b of bands) {
+    if (!b.days?.includes(wd)) continue;
+    const [fh, fm] = b.from.split(":").map(Number);
+    const [th, tm] = b.to.split(":").map(Number);
+    const from = fh * 60 + (fm || 0);
+    const to = th * 60 + (tm || 0);
+    const inRange = from <= to ? mins >= from && mins < to : mins >= from || mins < to; // wrap past midnight
+    if (inRange && b.pct > best) best = b.pct;
+  }
+  return best;
+}
+
 /** Payroll line from punches with per-shift premiums applied (evening/weekend/
  * night/holiday) + weekly overtime. Monthly staff keep their salary. */
-export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clockOut: string }[], rules: RuleSet, uppbot = 0): PayLine {
+export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clockOut: string }[], rules: CustomRules, uppbot = 0): PayLine {
   if (e.payType === "monthly") {
     return finalize(e, Math.round(MONTHLY_HOURS * (e.employmentRatio / 100)), e.rate, uppbot);
   }
-  let hours = 0, gross = 0;
+  const otWeekly = rules.otWeekly && rules.otWeekly > 0 ? rules.otWeekly : OT_WEEKLY;
+  const otMonthly = rules.otMonthly && rules.otMonthly > 0 ? rules.otMonthly : Infinity;
+  const bands = rules.bands ?? [];
+  let hours = 0, gross = 0, monthAcc = 0;
   const weekHrs = new Map<string, number>();
   const sorted = punches.slice().sort((a, b) => a.clockIn.localeCompare(b.clockIn));
   for (const p of sorted) {
@@ -112,10 +132,11 @@ export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clock
       const wk = mondayKey(dt);
       const acc = weekHrs.get(wk) ?? 0;
       const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-      let pct = premiumPct(dt, STORHATID.has(iso), rules);
-      if (acc >= OT_WEEKLY) pct = Math.max(pct, rules.overtime); // yfirvinna
+      let pct = Math.max(premiumPct(dt, STORHATID.has(iso), rules), bandPct(dt, bands));
+      if (acc >= otWeekly || monthAcc >= otMonthly) pct = Math.max(pct, rules.overtime); // yfirvinna (viku/mánuði)
       gross += e.rate * STEP * (1 + pct / 100);
       hours += STEP;
+      monthAcc += STEP;
       weekHrs.set(wk, acc + STEP);
       t += STEP * 3600000;
     }

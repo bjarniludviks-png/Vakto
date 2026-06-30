@@ -7,8 +7,8 @@ import { toast } from "@/components/app/toast";
 import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, setEmployeeStatus, deleteEmployee, getEmployeePayRule, getEmployeeExtras } from "./actions";
-import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, type RuleSet } from "@/lib/payrules";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras } from "./actions";
+import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 
 /** Best-effort document type from a filename (for the documents table). */
@@ -48,8 +48,8 @@ function statusBadge(e: Employee) {
   return { cls: "good", bg: "var(--good-soft)", fg: "var(--good)", labelKey: "emp:active" };
 }
 
-const PROFILE_TABS = ["Laun", "Vinna", "Frí", "Skjöl", "Persónulegt"] as const;
-type ProfileTab = (typeof PROFILE_TABS)[number];
+export const PROFILE_TABS = ["Laun", "Vinna", "Frí", "Skjöl", "Persónulegt"] as const;
+export type ProfileTab = (typeof PROFILE_TABS)[number];
 
 export default function EmployeesScreen({
   employees,
@@ -62,10 +62,7 @@ export default function EmployeesScreen({
 }) {
   const router = useRouter();
   const { t } = useLang();
-  const [current, setCurrent] = useState<Employee | null>(null);
-  const [tab, setTab] = useState<ProfileTab>("Laun");
   const [showNew, setShowNew] = useState(!!openNew);
-  const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
 
@@ -118,59 +115,13 @@ export default function EmployeesScreen({
     }
   }
 
-  async function saveCurrent(ev: React.FormEvent<HTMLFormElement>) {
-    ev.preventDefault();
-    if (!current) return;
-    const fd = new FormData(ev.currentTarget);
-    const g = (k: string) => (fd.get(k) as string)?.trim() || undefined;
-    setSaving(true);
-    const union = g("union");
-    const num = (k: string) => Math.max(0, Number(fd.get(k)) || 0);
-    const payRule = union === CUSTOM_UNION
-      ? { eve: num("rule_eve"), weekend: num("rule_weekend"), overtime: num("rule_overtime"), holiday: num("rule_holiday"), night: num("rule_night") }
-      : undefined;
-    const permissions = fd.get("permform")
-      ? Object.fromEntries(PERM_FIELDS.map((f) => [f.key, fd.has(`perm_${f.key}`)]))
-      : undefined;
-    const res = await updateEmployee(current.id, {
-      rate: g("rate"), employmentRatio: g("employmentRatio"), union, payType: g("payType"), payRule, permissions,
-    });
-    setSaving(false);
-    setCurrent(null);
-    toast(res.demo ? "Vistað (demo — tengdu Supabase)" : "Vistað");
-    router.refresh();
-  }
-
-  async function toggleActive() {
-    if (!current) return;
-    const active = current.status === "inactive"; // currently inactive → activate
-    setSaving(true);
-    const res = await setEmployeeStatus(current.id, active);
-    setSaving(false);
-    setCurrent(null);
-    toast(res.ok ? (active ? "Starfsmaður virkjaður" : "Starfsmaður óvirkjaður") : (res.error ?? "Villa"));
-    router.refresh();
-  }
-
-  async function removeCurrent() {
-    if (!current) return;
-    if (!window.confirm(`Eyða ${current.fullName}? Þetta er endanlegt og fjarlægir allar vaktir, stimplanir og sögu viðkomandi. Til að halda sögu skaltu frekar óvirkja.`)) return;
-    setSaving(true);
-    const res = await deleteEmployee(current.id);
-    setSaving(false);
-    setCurrent(null);
-    toast(res.ok ? "Starfsmanni eytt" : (res.error ?? "Villa"));
-    router.refresh();
-  }
-
   const count = employees.length;
   const fte = employees.reduce((a, e) => a + e.employmentRatio, 0) / 100;
   const overRatio = employees.filter((e) => e.employmentRatio > 100).length;
   const onLeave = employees.filter((e) => e.status === "on_leave").length;
 
   function openEmp(e: Employee) {
-    setCurrent(e);
-    setTab("Laun");
+    router.push(`/starfsfolk/${e.id}`);
   }
 
   return (
@@ -287,45 +238,6 @@ export default function EmployeesScreen({
         </div>
       </div>
 
-      {/* ---------- profile modal ---------- */}
-      {current && (
-        <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && setCurrent(null)}>
-          <div className="mbg" onClick={() => setCurrent(null)} />
-          <div className="modal">
-            <div className="mh">
-              <span className="avt" style={{ background: current.avatarColor, width: 38, height: 38, fontSize: 14 }}>
-                {initials(current.fullName)}
-              </span>
-              <div>
-                <div style={{ fontSize: 17, fontWeight: 700 }}>{current.fullName}</div>
-                <div className="muted" style={{ fontSize: 12.5 }}>
-                  {[current.department, current.title].filter(Boolean).join(" · ")}
-                </div>
-              </div>
-              <button className="x" onClick={() => setCurrent(null)}>✕</button>
-            </div>
-            <div style={{ display: "flex", gap: 2, padding: "0 16px", borderBottom: "1px solid var(--line)", overflowX: "auto" }}>
-              {PROFILE_TABS.map((t) => (
-                <button key={t} className={`etab${t === tab ? " on" : ""}`} onClick={() => setTab(t)}>
-                  {t}
-                </button>
-              ))}
-            </div>
-            <form className="mb" onSubmit={saveCurrent}>
-              <ProfileTabBody e={current} tab={tab} />
-              <div style={{ display: "flex", gap: 9, marginTop: 18, flexWrap: "wrap" }}>
-                <button className="btn" type="submit" disabled={saving}>{saving ? t("Vista…") : t("Vista")}</button>
-                <button className="btn ghost" type="button" disabled={saving} onClick={toggleActive}>{current.status === "inactive" ? t("Virkja") : t("Óvirkja")}</button>
-                <button className="btn ghost" type="button" onClick={() => setCurrent(null)}>{t("Loka")}</button>
-                <button className="btn ghost" type="button" disabled={saving} style={{ marginLeft: "auto", color: "var(--bad)" }} onClick={removeCurrent}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>{t("Eyða")}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* ---------- new employee modal ---------- */}
       {showNew && <NewEmployeeModal onClose={() => setShowNew(false)} />}
     </>
@@ -354,6 +266,11 @@ const FLD: React.CSSProperties = {
   background: "#fff",
 };
 
+// Weekday chips for the custom-band editor (Mon-first; value = JS getDay()).
+const WEEKDAYS_IS: [number, string][] = [[1, "Má"], [2, "Þr"], [3, "Mi"], [4, "Fi"], [5, "Fö"], [6, "La"], [0, "Su"]];
+const daysLabel = (days: number[]) =>
+  WEEKDAYS_IS.filter(([d]) => days.includes(d)).map(([, l]) => l).join(", ") || "—";
+
 function LaunTab({ e }: { e: Employee }) {
   const { t } = useLang();
   const pay = payrollPreview(e);
@@ -362,6 +279,22 @@ function LaunTab({ e }: { e: Employee }) {
   const custom = union === CUSTOM_UNION;
   const [rules, setRules] = useState<RuleSet>(resolveRuleSet(CUSTOM_UNION, e.payRule));
   const shown = custom ? rules : (UNION_PRESETS[union] ?? UNION_PRESETS["Efling"]);
+  // Custom overtime thresholds + user-defined premium bands (0 = off for monthly).
+  const [otWeekly, setOtWeekly] = useState<number>(e.payRule?.otWeekly ?? DEFAULT_OT_WEEKLY);
+  const [otMonthly, setOtMonthly] = useState<number>(e.payRule?.otMonthly ?? 0);
+  const [bands, setBands] = useState<Band[]>(e.payRule?.bands ?? []);
+  // New-band draft.
+  const [nbDays, setNbDays] = useState<number[]>([]);
+  const [nbFrom, setNbFrom] = useState("18:00");
+  const [nbTo, setNbTo] = useState("23:00");
+  const [nbPct, setNbPct] = useState("33");
+  const [nbLabel, setNbLabel] = useState("");
+  function addBand() {
+    if (!nbDays.length) { toast("Veldu a.m.k. einn dag"); return; }
+    const pct = Math.max(0, Number(nbPct) || 0);
+    setBands((b) => [...b, { label: nbLabel.trim() || `${nbFrom}–${nbTo}`, days: [...nbDays].sort((x, y) => x - y), from: nbFrom, to: nbTo, pct }]);
+    setNbDays([]); setNbLabel("");
+  }
   const [benefits, setBenefits] = useState<Benefit[]>(e.benefits ?? []);
   const [bName, setBName] = useState(BENEFIT_PRESETS[0].name);
   const [bType, setBType] = useState<"fixed" | "perkm">(BENEFIT_PRESETS[0].type);
@@ -376,7 +309,9 @@ function LaunTab({ e }: { e: Employee }) {
   }
 
   useEffect(() => {
-    if (e.union === CUSTOM_UNION) getEmployeePayRule(e.id).then((r) => { if (r) setRules(r); });
+    if (e.union === CUSTOM_UNION) getEmployeePayRule(e.id).then((r) => {
+      if (r) { setRules(r); setOtWeekly(r.otWeekly ?? DEFAULT_OT_WEEKLY); setOtMonthly(r.otMonthly ?? 0); setBands(r.bands ?? []); }
+    });
     getEmployeeExtras(e.id).then((x) => { if (x.benefits) setBenefits(x.benefits as Benefit[]); });
   }, [e.id, e.union]);
 
@@ -433,6 +368,57 @@ function LaunTab({ e }: { e: Employee }) {
         {custom ? "Sérsniðnar reglur — gilda fyrir alþjóðamarkað eða sérsamninga." : "Reglur koma sjálfkrafa úr kjarasamningi. Veldu „Eigin reglur\" til að breyta. (Hlutföll óstaðfest — yfirfarið gegn samningi.)"}
       </p>
 
+      {/* The full custom rule object is submitted with the main form (parsed in save). */}
+      {custom && <input type="hidden" name="payRuleJson" value={JSON.stringify({ ...rules, otWeekly, otMonthly, bands })} readOnly />}
+
+      {custom && (<>
+        <Sec>{t("Yfirvinna tekur við")}</Sec>
+        <div className="statline">
+          <span className="k">{t("Eftir klst/viku")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("t.d. 40")}</span></span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <input type="number" min={0} value={otWeekly} onChange={(ev) => setOtWeekly(Math.max(0, Number(ev.target.value) || 0))} style={{ ...FLD, width: 72, textAlign: "right" }} />
+            <span className="muted">{t("klst")}</span>
+          </span>
+        </div>
+        <div className="statline">
+          <span className="k">{t("Eftir klst/mánuði")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("0 = óvirkt, t.d. 173,3")}</span></span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <input type="number" min={0} step="0.1" value={otMonthly} onChange={(ev) => setOtMonthly(Math.max(0, Number(ev.target.value) || 0))} placeholder={String(DEFAULT_MONTHLY_HOURS)} style={{ ...FLD, width: 84, textAlign: "right" }} />
+            <span className="muted">{t("klst")}</span>
+          </span>
+        </div>
+        <p className="muted" style={{ fontSize: 11.5, margin: "6px 0 0" }}>{t("Þegar unnar stundir fara yfir mörkin reiknast yfirvinnu-% (að ofan).")}</p>
+
+        <Sec>{t("Sérálög á tímabili")}</Sec>
+        {bands.length === 0 && <p className="muted" style={{ fontSize: 12, margin: "2px 0 6px" }}>{t("Engin sérálög — bættu við t.d. „kvöld 18–23 +33%\" eða „sunnudagar +45%\".")}</p>}
+        {bands.map((b, i) => (
+          <div className="statline" key={i}>
+            <span className="k">{b.label} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {daysLabel(b.days)} {b.from}–{b.to}</span></span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+              <b>+{b.pct}%</b>
+              <a style={{ color: "var(--bad)", fontSize: 12, cursor: "pointer" }} onClick={() => setBands(bands.filter((_, j) => j !== i))}>{t("Eyða")}</a>
+            </span>
+          </div>
+        ))}
+        <div style={{ display: "flex", gap: 5, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+          {WEEKDAYS_IS.map(([d, l]) => (
+            <button type="button" key={d} onClick={() => setNbDays((x) => x.includes(d) ? x.filter((y) => y !== d) : [...x, d])}
+              style={{ ...FLD, padding: "5px 8px", cursor: "pointer", fontWeight: 600, background: nbDays.includes(d) ? "var(--brand)" : "#fff", color: nbDays.includes(d) ? "#fff" : "var(--ink2)", borderColor: nbDays.includes(d) ? "var(--brand)" : "var(--line)" }}>{l}</button>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
+          <input value={nbLabel} onChange={(ev) => setNbLabel(ev.target.value)} placeholder={t("Heiti (valfrjálst)")} style={{ ...FLD, flex: 1, minWidth: 110 }} />
+          <input type="time" value={nbFrom} onChange={(ev) => setNbFrom(ev.target.value)} style={FLD} />
+          <span className="muted">–</span>
+          <input type="time" value={nbTo} onChange={(ev) => setNbTo(ev.target.value)} style={FLD} />
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+            <input type="number" min={0} value={nbPct} onChange={(ev) => setNbPct(ev.target.value)} style={{ ...FLD, width: 60, textAlign: "right" }} /><span className="muted">%</span>
+          </span>
+          <button type="button" className="btn ghost sm" onClick={addBand}>{t("Bæta við")}</button>
+        </div>
+        <p className="muted" style={{ fontSize: 11.5, margin: "6px 0 0" }}>{t("Sérálög leggjast ofan á grunnreglurnar — hæsta % gildir á hverri stundu. Mundu að ýta á Vista.")}</p>
+      </>)}
+
       <Sec>{t("Desember- & orlofsuppbót")} · {custom ? t("eigin samningur") : t("úr kjarasamningi")}</Sec>
       {(() => {
         const upp = resolveUppbot(union);
@@ -478,7 +464,7 @@ function LaunTab({ e }: { e: Employee }) {
   );
 }
 
-function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
+export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
 
   if (tab === "Laun") return <LaunTab e={e} />;
   if (tab === "Vinna") {
