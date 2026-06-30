@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { computeLine, type PayLine } from "@/lib/payroll";
+import { computeLine, computeLineHours, type PayLine } from "@/lib/payroll";
 import { DEMO_EMPLOYEES, type Employee } from "@/lib/employees";
 
 function csvCell(v: string | number): string {
@@ -8,7 +8,13 @@ function csvCell(v: string | number): string {
   return /[;"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
-async function getLines(): Promise<{ lines: PayLine[]; kt: Record<string, string>; live: boolean }> {
+const toEmp = (e: Record<string, unknown>): Employee => ({
+  id: e.id as string, fullName: e.full_name as string,
+  payType: (e.pay_type as Employee["payType"]) ?? "hourly",
+  rate: Number(e.rate), employmentRatio: Number(e.employment_ratio),
+} as Employee);
+
+async function getLines(from?: string, to?: string): Promise<{ lines: PayLine[]; kt: Record<string, string>; live: boolean }> {
   if (!isSupabaseConfigured()) {
     const kt: Record<string, string> = {};
     DEMO_EMPLOYEES.forEach((e) => { if (e.kennitala) kt[e.id] = e.kennitala; });
@@ -30,14 +36,32 @@ async function getLines(): Promise<{ lines: PayLine[]; kt: Record<string, string
       return { lines: DEMO_EMPLOYEES.map(computeLine), kt, live: false };
     }
     const kt: Record<string, string> = {};
-    const lines = emps.map((e) => {
-      if (e.kennitala) kt[e.id as string] = e.kennitala as string;
-      return computeLine({
-        id: e.id as string, fullName: e.full_name as string,
-        payType: (e.pay_type as Employee["payType"]) ?? "hourly",
-        rate: Number(e.rate), employmentRatio: Number(e.employment_ratio),
-      });
-    });
+    emps.forEach((e) => { if (e.kennitala) kt[e.id as string] = e.kennitala as string; });
+
+    // With a period: export approved worked hours. Without: contracted baseline.
+    if (from && to && company) {
+      let punches: { employee_id: string; clock_in: string; clock_out: string }[] = [];
+      const approved = await supabase.from("punches").select("employee_id, clock_in, clock_out")
+        .eq("company_id", company).eq("approved", true).not("clock_out", "is", null)
+        .gte("clock_in", from).lte("clock_in", to + "T23:59:59");
+      if (approved.error) {
+        const all = await supabase.from("punches").select("employee_id, clock_in, clock_out")
+          .eq("company_id", company).not("clock_out", "is", null)
+          .gte("clock_in", from).lte("clock_in", to + "T23:59:59");
+        punches = (all.data ?? []) as typeof punches;
+      } else punches = (approved.data ?? []) as typeof punches;
+      const worked = new Map<string, number>();
+      for (const p of punches) {
+        const h = (new Date(p.clock_out).getTime() - new Date(p.clock_in).getTime()) / 3600000;
+        if (h > 0) worked.set(p.employee_id, (worked.get(p.employee_id) ?? 0) + h);
+      }
+      const lines = emps
+        .filter((e) => (worked.get(e.id as string) ?? 0) > 0 || e.pay_type === "monthly")
+        .map((e) => computeLineHours(toEmp(e), worked.get(e.id as string) ?? 0));
+      return { lines, kt, live: true };
+    }
+
+    const lines = emps.map((e) => computeLine(toEmp(e)));
     return { lines, kt, live: true };
   } catch {
     return { lines: DEMO_EMPLOYEES.map(computeLine), kt: {}, live: false };
@@ -45,8 +69,11 @@ async function getLines(): Promise<{ lines: PayLine[]; kt: Record<string, string
 }
 
 export async function GET(request: Request) {
-  const format = new URL(request.url).searchParams.get("format") === "excel" ? "excel" : "payday";
-  const { lines, kt } = await getLines();
+  const url = new URL(request.url);
+  const format = url.searchParams.get("format") === "excel" ? "excel" : "payday";
+  const from = url.searchParams.get("from") ?? undefined;
+  const to = url.searchParams.get("to") ?? undefined;
+  const { lines, kt } = await getLines(from, to);
 
   let header: string[];
   let rows: (string | number)[][];

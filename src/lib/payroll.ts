@@ -24,17 +24,9 @@ export type PayLine = {
   cost: number; // employer cost incl. burden
 };
 
-export function computeLine(e: Pick<Employee, "id" | "fullName" | "payType" | "rate" | "employmentRatio">): PayLine {
-  const ratio = e.employmentRatio / 100;
-  let hours: number;
-  let gross: number;
-  if (e.payType === "monthly") {
-    hours = Math.round(MONTHLY_HOURS * ratio);
-    gross = e.rate;
-  } else {
-    hours = Math.round(MONTHLY_HOURS * ratio);
-    gross = hours * e.rate * 1.18; // dagvinna + álög uplift
-  }
+type EmpPick = Pick<Employee, "id" | "fullName" | "payType" | "rate" | "employmentRatio">;
+
+function finalize(e: EmpPick, hours: number, gross: number): PayLine {
   const dayPay = Math.round(gross * 0.78);
   const premiums = Math.round(gross * 0.15);
   const overtime = Math.round(gross - dayPay - premiums);
@@ -45,6 +37,21 @@ export function computeLine(e: Pick<Employee, "id" | "fullName" | "payType" | "r
   const net = Math.round(gross - pension - union - withholding);
   const cost = Math.round(gross * (1 + BURDEN));
   return { employeeId: e.id, name: e.fullName, hours, gross: Math.round(gross), dayPay, premiums, overtime, withholding, pension, union, net, cost };
+}
+
+/** Contracted-hours payroll line (monthly baseline). */
+export function computeLine(e: EmpPick): PayLine {
+  const hours = Math.round(MONTHLY_HOURS * (e.employmentRatio / 100));
+  const gross = e.payType === "monthly" ? e.rate : hours * e.rate * 1.18;
+  return finalize(e, hours, gross);
+}
+
+/** Payroll line from actual worked hours (from approved punches in a period).
+ * Hourly: gross = worked × rate × uplift. Monthly: full monthly salary. */
+export function computeLineHours(e: EmpPick, workedHours: number): PayLine {
+  const hours = Math.round(workedHours * 10) / 10;
+  const gross = e.payType === "monthly" ? e.rate : Math.round(workedHours * e.rate * 1.18);
+  return finalize(e, hours, gross);
 }
 
 export type PayrollTotals = { hours: number; gross: number; withholding: number; pension: number; union: number; net: number; cost: number };

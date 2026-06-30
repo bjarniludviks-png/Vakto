@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { Stacked } from "@/components/app/charts";
@@ -8,26 +8,55 @@ import { useLang } from "@/components/app/lang";
 import { PayslipModal, type PayslipData } from "@/components/app/payslip-modal";
 import { EmptyState } from "@/components/app/empty-state";
 import type { PayrollView } from "./payroll.server";
-import { runPayroll } from "./actions";
-
-function download(format: "payday" | "excel") {
-  window.location.href = `/api/payroll/export?format=${format}`;
-}
-async function keyra() {
-  const res = await runPayroll();
-  if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
-  toast(res.demo ? `Launakeyrsla keyrð (demo — ${res.count} starfsm.)` : `Launakeyrsla keyrð & vistuð — ${res.count} starfsmenn`);
-}
+import { runPayroll, getPayrollPeriod, type PeriodPayroll } from "./actions";
 
 const MO = ["jan", "feb", "mar", "apr", "maí", "jún", "júl", "ágú", "sep", "okt", "nóv", "des"];
 const BASE = [4.8, 5.8, 3.9, 5.7, 5.6, 4.46, 4.7, 3.4, 6.7, 6.3, 5.2, 5.4];
 const PAY = BASE.map((b) => [b, b * 0.22, b * 0.2, b * 0.12, b * 0.08]);
 
+const PRESETS: { k: string; label: string }[] = [
+  { k: "this", label: "Þessi mánuður" }, { k: "last", label: "Síðasti mánuður" }, { k: "custom", label: "Sérsniðið" },
+];
+const isoD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function payRange(k: string, cf: string, ct: string): { from: string; to: string } {
+  const t = new Date();
+  if (k === "last") return { from: isoD(new Date(t.getFullYear(), t.getMonth() - 1, 1)), to: isoD(new Date(t.getFullYear(), t.getMonth(), 0)) };
+  if (k === "custom") return { from: cf, to: ct };
+  return { from: isoD(new Date(t.getFullYear(), t.getMonth(), 1)), to: isoD(new Date(t.getFullYear(), t.getMonth() + 1, 0)) };
+}
+
 export default function PayrollScreen({ view, empty = false }: { view: PayrollView; empty?: boolean }) {
   const { t } = useLang();
   const [slip, setSlip] = useState<PayslipData | null>(null);
-  const ROWS = view.rows;
-  const T = view.totals;
+  const [period, setPeriod] = useState("this");
+  const thisMonth = payRange("this", "", "");
+  const [cf, setCf] = useState(thisMonth.from);
+  const [ct, setCt] = useState(thisMonth.to);
+  const [pp, setPp] = useState<PeriodPayroll | null>(null);
+
+  const range = payRange(period, cf, ct);
+  useEffect(() => {
+    if (!view.live) return;
+    if (period === "custom" && (!cf || !ct || cf > ct)) return;
+    let cancelled = false;
+    getPayrollPeriod(range.from, range.to).then((r) => { if (!cancelled && r.live) setPp(r); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [period, cf, ct, view.live]);
+
+  const usePp = view.live && pp;
+  const ROWS = usePp ? pp.rows : view.rows;
+  const T = usePp ? pp.totals : view.totals;
+  const periodLabel = usePp ? pp.periodLabel : "21. maí – 20. júní 2026";
+  const qs = `?format=$F&from=${range.from}&to=${range.to}`;
+  function download(format: "payday" | "excel") {
+    window.location.href = `/api/payroll/export${qs.replace("$F", format)}`;
+  }
+  async function keyra() {
+    const res = await runPayroll(view.live ? range.from : undefined, view.live ? range.to : undefined);
+    if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
+    toast(res.demo ? `Launakeyrsla keyrð (demo — ${res.count} starfsm.)` : `Launakeyrsla keyrð & vistuð — ${res.count} starfsmenn`);
+  }
   if (empty) {
     return (
       <>
@@ -49,10 +78,22 @@ export default function PayrollScreen({ view, empty = false }: { view: PayrollVi
         actions={<button className="btn ghost sm" onClick={() => download("payday")}>{t("↗ Flytja í Payday")}</button>}
       />
 
+      <div className="pchips">
+        {PRESETS.map((p) => (
+          <button key={p.k} className={`pchip${period === p.k ? " on" : ""}`} onClick={() => setPeriod(p.k)}>{t(p.label)}</button>
+        ))}
+      </div>
+      {period === "custom" && (
+        <div className="stoolbar" style={{ marginBottom: 14 }}>
+          <div className="field" style={{ margin: 0 }}><label style={{ fontSize: 11 }}>{t("Frá")}</label><input type="date" value={cf} onChange={(e) => setCf(e.target.value)} style={{ padding: "6px 9px" }} /></div>
+          <div className="field" style={{ margin: 0 }}><label style={{ fontSize: 11 }}>{t("Til")}</label><input type="date" value={ct} onChange={(e) => setCt(e.target.value)} style={{ padding: "6px 9px" }} /></div>
+        </div>
+      )}
+
       <div className="dhero" style={{ marginBottom: 20 }}>
         <div className="dhero-head">
-          <span className="dhero-badge">{t("Launatímabil · 21. maí – 20. júní 2026")}</span>
-          <span className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Drög — bíður samþykkis")}</span>
+          <span className="dhero-badge">{t("Launatímabil")} · {periodLabel}</span>
+          <span className="badge" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Samþykktir tímar")}</span>
         </div>
         <div className="dhero-body">
           <div className="dflow">
@@ -69,21 +110,25 @@ export default function PayrollScreen({ view, empty = false }: { view: PayrollVi
         </div>
       </div>
 
+      {usePp && pp.needsMigration && (
+        <div className="ai" style={{ marginBottom: 16 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg><div className="x">{t("Keyrðu migration 0008 — núna teljast allir lokaðir tímar, ekki bara samþykktir.")}</div></div>
+      )}
+
       <div className="kpis">
-        <div className="kpi"><div className="lab">{t("Útborgað (júní)")}</div><div className="val">{T.netM} <small>m kr</small></div></div>
+        <div className="kpi"><div className="lab">{t("Útborgað")}</div><div className="val">{T.netM} <small>m kr</small></div></div>
         <div className="kpi"><div className="lab">{t("Heildarkostnaður")}</div><div className="val">{T.costM} <small>m kr</small></div><div className="d mut">+30,2% {t("byrði")}</div></div>
         <div className="kpi"><div className="lab">{t("Staðgreiðsla")}</div><div className="val">{T.withholdingM} <small>m kr</small></div></div>
         <div className="kpi"><div className="lab">{t("Tryggingagjald")}</div><div className="val">0,40 <small>m kr</small></div></div>
       </div>
 
       <div className="card" style={{ marginTop: 20 }}>
-        <div className="ch"><div><div className="ct">{t("Launakeyrsla — sundurliðun per starfsmann")}</div><div className="cs">{t("21. maí – 20. júní 2026 · smelltu á starfsmann fyrir launaseðil")}</div></div><button className="btn ghost sm" onClick={() => download("excel")}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Allir seðlar")}</button></div>
+        <div className="ch"><div><div className="ct">{t("Launakeyrsla — sundurliðun per starfsmann")}</div><div className="cs">{periodLabel} · {t("aðeins samþykktir tímar")}</div></div><button className="btn ghost sm" onClick={() => download("excel")}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Allir seðlar")}</button></div>
         <div className="cb tbl" style={{ paddingTop: 8 }}>
           <table>
             <thead><tr><th>{t("Starfsmaður")}</th><th className="r">{t("Tímar")}</th><th className="r">{t("Brúttó")}</th><th className="r">{t("Staðgreiðsla")}</th><th className="r">{t("Lífeyrir+félag")}</th><th className="r">{t("Útborgað")}</th></tr></thead>
             <tbody>
-              {ROWS.map((r) => (
-                <tr className="rowlink" key={r.n} onClick={() => setSlip({ name: r.n, period: "21. maí – 20. júní 2026", hours: r.h, gross: r.g, withholding: r.w.replace("−", ""), pension: r.p.replace("−", ""), net: r.net })}>
+              {ROWS.length ? ROWS.map((r) => (
+                <tr className="rowlink" key={r.n} onClick={() => setSlip({ name: r.n, period: periodLabel, hours: r.h, gross: r.g, withholding: r.w.replace("−", ""), pension: r.p.replace("−", ""), net: r.net })}>
                   <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.n}</span></td>
                   <td className="r">{r.h}</td>
                   <td className="r">{r.g}</td>
@@ -91,11 +136,13 @@ export default function PayrollScreen({ view, empty = false }: { view: PayrollVi
                   <td className="r muted">{r.p}</td>
                   <td className="r" style={{ color: "var(--good)" }}>{r.net}</td>
                 </tr>
-              ))}
+              )) : <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 26 }}>{t("Engir samþykktir tímar á þessu tímabili — samþykktu vaktir í Tímaskráningu.")}</td></tr>}
+              {ROWS.length > 0 && (
               <tr className="foot">
                 <td style={{ textAlign: "left" }}>{t("Samtals")} · {T.count} {t("starfsm.")}</td>
                 <td className="r">{T.hours}</td><td className="r">{T.gross}</td><td className="r">{T.withholding}</td><td className="r">{T.pensionUnion}</td><td className="r">{T.net}</td>
               </tr>
+              )}
             </tbody>
           </table>
         </div>
