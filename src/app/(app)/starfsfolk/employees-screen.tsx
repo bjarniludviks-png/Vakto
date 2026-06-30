@@ -9,7 +9,7 @@ import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { createEmployee, updateEmployee, uploadDocument, importEmployees, setEmployeeStatus, deleteEmployee, getEmployeePayRule, getEmployeeExtras } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, type RuleSet } from "@/lib/payrules";
-import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, type Benefit } from "@/lib/permissions";
+import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 
 /** Best-effort document type from a filename (for the documents table). */
 function detectDocType(name: string): string {
@@ -363,9 +363,17 @@ function LaunTab({ e }: { e: Employee }) {
   const [rules, setRules] = useState<RuleSet>(resolveRuleSet(CUSTOM_UNION, e.payRule));
   const shown = custom ? rules : (UNION_PRESETS[union] ?? UNION_PRESETS["Efling"]);
   const [benefits, setBenefits] = useState<Benefit[]>(e.benefits ?? []);
-  const [bName, setBName] = useState(BENEFIT_PRESETS[0]);
-  const [bType, setBType] = useState<"fixed" | "perkm">("fixed");
+  const [bName, setBName] = useState(BENEFIT_PRESETS[0].name);
+  const [bType, setBType] = useState<"fixed" | "perkm">(BENEFIT_PRESETS[0].type);
+  const [bTax, setBTax] = useState<boolean>(BENEFIT_PRESETS[0].taxable);
   const [bAmt, setBAmt] = useState("");
+
+  // Picking a known preset auto-fills its type + tax status (still editable).
+  function pickBenefit(name: string) {
+    setBName(name);
+    const p = benefitPreset(name);
+    if (p) { setBType(p.type); setBTax(p.taxable); }
+  }
 
   useEffect(() => {
     if (e.union === CUSTOM_UNION) getEmployeePayRule(e.id).then((r) => { if (r) setRules(r); });
@@ -376,7 +384,7 @@ function LaunTab({ e }: { e: Employee }) {
   function addBenefit() {
     const amt = Math.max(0, Math.round(Number(bAmt) || 0));
     if (!bName.trim() || !amt) { toast("Sláðu inn heiti og upphæð"); return; }
-    saveBenefits([...benefits, { name: bName.trim(), type: bType, amount: amt }]); setBAmt("");
+    saveBenefits([...benefits, { name: bName.trim(), type: bType, amount: amt, taxable: bTax }]); setBAmt("");
   }
 
   return (
@@ -426,9 +434,13 @@ function LaunTab({ e }: { e: Employee }) {
       </p>
 
       <Sec>Hlunnindi & styrkir</Sec>
+      {benefits.length === 0 && <p className="muted" style={{ fontSize: 12, margin: "2px 0 6px" }}>{t("Engin hlunnindi skráð — bættu við einu eða fleiri hér að neðan.")}</p>}
       {benefits.map((b, i) => (
         <div className="statline" key={i}>
-          <span className="k">{b.name}</span>
+          <span className="k">
+            {b.name}
+            {!isTaxable(b) && <span className="muted" style={{ fontWeight: 400, fontSize: 11, marginLeft: 6 }}>· {t("undanþegið staðgr.")}</span>}
+          </span>
           <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
             <b>{nf(b.amount)} {b.type === "perkm" ? "kr/km" : "kr/mán"}</b>
             <a style={{ color: "var(--bad)", fontSize: 12, cursor: "pointer" }} onClick={() => saveBenefits(benefits.filter((_, j) => j !== i))}>{t("Eyða")}</a>
@@ -436,9 +448,10 @@ function LaunTab({ e }: { e: Employee }) {
         </div>
       ))}
       <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
-        <input list="benefit-presets" value={bName} onChange={(e2) => setBName(e2.target.value)} placeholder={t("Heiti")} style={{ ...FLD, flex: 1, minWidth: 120 }} />
-        <datalist id="benefit-presets">{BENEFIT_PRESETS.map((p) => <option key={p} value={p} />)}</datalist>
+        <input list="benefit-presets" value={bName} onChange={(e2) => pickBenefit(e2.target.value)} placeholder={t("Heiti")} style={{ ...FLD, flex: 1, minWidth: 120 }} />
+        <datalist id="benefit-presets">{BENEFIT_NAMES.map((p) => <option key={p} value={p} />)}</datalist>
         <select value={bType} onChange={(e2) => setBType(e2.target.value as "fixed" | "perkm")} style={FLD}><option value="fixed">{t("Fast (kr/mán)")}</option><option value="perkm">{t("Per km")}</option></select>
+        <select value={bTax ? "1" : "0"} onChange={(e2) => setBTax(e2.target.value === "1")} style={FLD} title={t("Staðgreiðsla")}><option value="1">{t("Staðgr.skylt")}</option><option value="0">{t("Undanþegið")}</option></select>
         <input type="number" min={0} value={bAmt} onChange={(e2) => setBAmt(e2.target.value)} placeholder={t("Upphæð")} style={{ ...FLD, width: 100, textAlign: "right" }} />
         <button type="button" className="btn ghost sm" onClick={addBenefit}>{t("Bæta við")}</button>
       </div>
