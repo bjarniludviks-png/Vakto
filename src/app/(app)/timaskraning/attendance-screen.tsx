@@ -10,7 +10,7 @@ import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
 import type { OnNowRow, RosterRow } from "./attendance.server";
-import { approveAllTimesheets, approveTimesheet, setClockOut, fetchAttendance, managerClockIn, adjustPunch, getEmployeePunches, setPunchApproved, approveEmployeePunches, type PunchRow } from "./actions";
+import { approveAllTimesheets, approveTimesheet, setClockOut, fetchAttendance, managerClockIn, adjustPunch, getEmployeePunches, setPunchApproved, approveEmployeePunches, decideCorrection, type PunchRow, type CorrectionRow } from "./actions";
 
 const MONTHS_IS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ágú.", "sep.", "okt.", "nóv.", "des."];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -46,7 +46,7 @@ const pillStyle = (k: string) =>
       : k === "good" ? { background: "var(--good-soft)", color: "var(--good)" }
         : { background: "var(--line2)", color: "var(--ink3)" };
 
-export default function AttendanceScreen({ onShift = 5, empty = false, live = false, rows = [], onNow = [], roster = [] }: { onShift?: number; empty?: boolean; live?: boolean; rows?: AttRow[]; onNow?: OnNowRow[]; roster?: RosterRow[] }) {
+export default function AttendanceScreen({ onShift = 5, empty = false, live = false, rows = [], onNow = [], roster = [], corrections = [] }: { onShift?: number; empty?: boolean; live?: boolean; rows?: AttRow[]; onNow?: OnNowRow[]; roster?: RosterRow[]; corrections?: CorrectionRow[] }) {
   const { t } = useLang();
   const [wk, setWk] = useState(0);
   const [cur, setCur] = useState<string | null>(null);
@@ -69,7 +69,7 @@ export default function AttendanceScreen({ onShift = 5, empty = false, live = fa
   // Live company: real planned (shifts) vs actual (punches) per employee,
   // with period / custom-range / search / department filtering.
   if (live) {
-    return <LiveAttendance onShift={onShift} initial={rows} onNow={onNow} roster={roster} />;
+    return <LiveAttendance onShift={onShift} initial={rows} onNow={onNow} roster={roster} corrections={corrections} />;
   }
 
   return (
@@ -148,9 +148,14 @@ export default function AttendanceScreen({ onShift = 5, empty = false, live = fa
 
 function nowHHMM() { const d = new Date(); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
 
-function LiveAttendance({ onShift, initial, onNow, roster }: { onShift: number; initial: AttRow[]; onNow: OnNowRow[]; roster: RosterRow[] }) {
+function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onShift: number; initial: AttRow[]; onNow: OnNowRow[]; roster: RosterRow[]; corrections: CorrectionRow[] }) {
   const { t } = useLang();
   const router = useRouter();
+  async function decideCorr(id: string, approve: boolean) {
+    const res = await decideCorrection(id, approve);
+    toast(res.ok ? (approve ? "Leiðrétting samþykkt" : "Hafnað") : (res.error ?? "Villa"));
+    router.refresh();
+  }
   const [period, setPeriod] = useState<Period>("Vika");
   const init0 = rangeFor("Vika");
   const [from, setFrom] = useState(init0.from);
@@ -227,6 +232,24 @@ function LiveAttendance({ onShift, initial, onNow, roster }: { onShift: number; 
           )) : <div className="muted" style={{ padding: 16, textAlign: "center" }}>{t("Enginn skráður inn núna.")}</div>}
         </div>
       </div>
+
+      {corrections.length > 0 && (
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="ch"><div><div className="ct">{t("Leiðréttingabeiðnir")}</div><div className="cs">{t("frá starfsfólki — samþykktu eða hafnaðu")}</div></div><span className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{corrections.length} {t("ný")}</span></div>
+          <div className="cb att">
+            {corrections.map((c) => (
+              <div className="it" key={c.id}>
+                <div className="ic warn"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></div>
+                <div className="tx"><b>{c.name} · {niceISO(c.date)}</b><span>{c.requestedIn ? `${t("inn")} ${c.requestedIn}` : ""}{c.requestedOut ? ` · ${t("út")} ${c.requestedOut}` : ""}{c.reason ? ` — ${c.reason}` : ""}</span></div>
+                <div className="itact">
+                  <button className="btn sm" onClick={() => decideCorr(c.id, true)}>{t("Samþykkja")}</button>
+                  <button className="btn ghost sm" onClick={() => decideCorr(c.id, false)}>{t("Hafna")}</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card" style={{ marginTop: 20 }}>
         <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)}{missing ? ` · ${missing} ${t("vantar stimplun")}` : ""}</div></div></div>

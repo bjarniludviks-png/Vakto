@@ -224,6 +224,77 @@ export async function approveEmployeePunches(employeeId: string, fromISO: string
   }
 }
 
+export type CorrectionRow = { id: string; name: string; date: string; requestedIn: string | null; requestedOut: string | null; reason: string; punchId: string | null };
+
+/** Pending employee correction requests for managers. */
+export async function getCorrections(): Promise<{ ok: boolean; rows: CorrectionRow[] }> {
+  if (!isSupabaseConfigured()) return { ok: false, rows: [] };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, rows: [] };
+    const res = await supabase
+      .from("punch_corrections")
+      .select("id, date, requested_in, requested_out, reason, punch_id, employees(full_name)")
+      .eq("company_id", ctx.company).eq("status", "pending").order("created_at", { ascending: false });
+    if (res.error) return { ok: false, rows: [] };
+    const rows: CorrectionRow[] = (res.data ?? []).map((c) => {
+      const emp = (Array.isArray(c.employees) ? c.employees[0] : c.employees) as { full_name?: string } | null;
+      return {
+        id: c.id as string, name: (emp?.full_name ?? "?").split(/\s+/)[0],
+        date: c.date as string,
+        requestedIn: (c.requested_in as string)?.slice(0, 5) ?? null,
+        requestedOut: (c.requested_out as string)?.slice(0, 5) ?? null,
+        reason: (c.reason as string) ?? "", punchId: (c.punch_id as string) ?? null,
+      };
+    });
+    return { ok: true, rows };
+  } catch {
+    return { ok: false, rows: [] };
+  }
+}
+
+/** Manager approves (applies) or rejects an employee correction request. */
+export async function decideCorrection(id: string, approve: boolean): Promise<ApproveResult> {
+  if (!isSupabaseConfigured() || !id) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data: c } = await supabase
+      .from("punch_corrections").select("id, employee_id, punch_id, date, requested_in, requested_out")
+      .eq("id", id).eq("company_id", ctx.company).maybeSingle();
+    if (!c) return { ok: false, error: "Beiðni fannst ekki" };
+
+    if (approve) {
+      const day = c.date as string;
+      const ri = c.requested_in as string | null, ro = c.requested_out as string | null;
+      if (c.punch_id) {
+        const patch: Record<string, string | null> = {};
+        if (ri) patch.clock_in = `${day}T${ri.slice(0, 5)}:00`;
+        if (ro) patch.clock_out = `${day}T${ro.slice(0, 5)}:00`;
+        if (Object.keys(patch).length) await supabase.from("punches").update(patch).eq("id", c.punch_id).eq("company_id", ctx.company);
+      } else if (ri) {
+        await supabase.from("punches").insert({
+          company_id: ctx.company, employee_id: c.employee_id,
+          clock_in: `${day}T${ri.slice(0, 5)}:00`, clock_out: ro ? `${day}T${ro.slice(0, 5)}:00` : null, source: "web",
+        });
+      }
+    }
+    const { error } = await supabase.from("punch_corrections")
+      .update({ status: approve ? "approved" : "rejected" }).eq("id", id).eq("company_id", ctx.company);
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: approve ? "correction.approve" : "correction.reject", entity: "punch_correction", entityId: id,
+      detail: approve ? "Leiðrétting samþykkt" : "Leiðréttingu hafnað",
+    });
+    revalidatePath("/timaskraning"); revalidatePath("/maelabord");
+    return { ok: true, count: 1 };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /** Manager approves all pending timesheets for the company. */
 export async function approveAllTimesheets(): Promise<ApproveResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };

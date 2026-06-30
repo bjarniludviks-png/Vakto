@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, type LeaveType } from "./actions";
+import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, type LeaveType, type MyPunchRow } from "./actions";
+import { dec1 } from "@/lib/format";
 import { PayslipModal } from "@/components/app/payslip-modal";
 import { StaffCardModal, type StaffCardData } from "@/components/app/staff-card";
 import type { StaffCard } from "@/lib/mycard.server";
@@ -166,7 +167,93 @@ function MyShifts({ onReq }: { onReq: (k: ReqKind) => void }) {
         <div className="mr"><span>{t("Tímar mánaðar (til þessa)")}</span><b>142,5 {t("klst")}</b></div>
         <div className="mr"><span>{t("Næsta útborgun")}</span><b>1. júlí</b></div>
       </div>
+      <MyHours />
       <QuickActions onReq={onReq} />
+    </div>
+  );
+}
+
+const MONTHS_IS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ágú.", "sep.", "okt.", "nóv.", "des."];
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const isoOf = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const niceISO = (s: string) => { const [y, m, d] = s.split("-").map(Number); return `${d}. ${MONTHS_IS[m - 1]} ${y}`; };
+
+function MyHours() {
+  const { t } = useLang();
+  const [rows, setRows] = useState<MyPunchRow[]>([]);
+  const [live, setLive] = useState(false);
+  const [corr, setCorr] = useState<{ punchId?: string; date: string } | null>(null);
+
+  function load() {
+    const now = new Date();
+    const from = isoOf(new Date(now.getFullYear(), now.getMonth(), 1));
+    const to = isoOf(new Date(now.getFullYear(), now.getMonth() + 1, 0));
+    getMyPunches(from, to).then((r) => { if (r.ok) { setRows(r.rows); setLive(true); } });
+  }
+  useEffect(load, []);
+  const total = rows.reduce((a, r) => a + r.hours, 0);
+
+  return (
+    <div className="mini" style={{ gridColumn: "1 / -1" }}>
+      <div className="mh" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span>{t("Mínir unnir tímar · þessi mánuður")}</span>
+        <button className="btn ghost sm" onClick={() => setCorr({ date: isoOf(new Date()) })}>{t("Óska eftir leiðréttingu")}</button>
+      </div>
+      {live ? (rows.length ? (
+        <>
+          {rows.map((p) => (
+            <div className="mr" key={p.punchId} style={{ alignItems: "center" }}>
+              <span>{niceISO(p.date)} · {p.in}–{p.out ?? t("opin")}</span>
+              <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <b>{p.open ? "—" : `${dec1(p.hours)} ${t("klst")}`}</b>
+                <a style={{ color: "var(--brand)", fontWeight: 600, fontSize: 12, cursor: "pointer" }} onClick={() => setCorr({ punchId: p.punchId, date: p.date })}>{t("Leiðrétta")}</a>
+              </span>
+            </div>
+          ))}
+          <div className="mr" style={{ borderTop: "1px solid var(--line2)", marginTop: 4, paddingTop: 8 }}><span style={{ fontWeight: 650 }}>{t("Samtals")}</span><b>{dec1(total)} {t("klst")}</b></div>
+        </>
+      ) : <div className="muted" style={{ fontSize: 12.5, padding: "8px 0" }}>{t("Engar stimplanir í þessum mánuði enn.")}</div>)
+        : <div className="muted" style={{ fontSize: 12.5, padding: "8px 0" }}>{t("Stimplanir birtast hér þegar þú stimplar inn/út.")}</div>}
+      {corr && <CorrectionModal init={corr} onClose={() => setCorr(null)} onDone={() => { setCorr(null); load(); }} />}
+    </div>
+  );
+}
+
+function CorrectionModal({ init, onClose, onDone }: { init: { punchId?: string; date: string }; onClose: () => void; onDone: () => void }) {
+  const { t } = useLang();
+  const [date, setDate] = useState(init.date);
+  const [cin, setCin] = useState("");
+  const [cout, setCout] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function send() {
+    if (!reason.trim()) { toast("Skrifaðu stutta skýringu"); return; }
+    setBusy(true);
+    const res = await requestCorrection({ punchId: init.punchId, date, requestedIn: cin || undefined, requestedOut: cout || undefined, reason });
+    setBusy(false);
+    if (res.ok) { toast(res.demo ? "Beiðni skráð (demo)" : "Leiðréttingabeiðni send"); onDone(); } else toast(res.error ?? "Villa");
+  }
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal">
+        <div className="mh">
+          <div><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Óska eftir leiðréttingu")}</div><div className="muted" style={{ fontSize: 12 }}>{t("t.d. gleymdi að stimpla inn eða út")}</div></div>
+          <button className="x" onClick={onClose}>✕</button>
+        </div>
+        <div className="mb">
+          <div className="field"><label>{t("Dagsetning")}</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <div className="field" style={{ flex: 1 }}><label>{t("Réttur tími inn")}</label><input type="time" value={cin} onChange={(e) => setCin(e.target.value)} /></div>
+            <div className="field" style={{ flex: 1 }}><label>{t("Réttur tími út")}</label><input type="time" value={cout} onChange={(e) => setCout(e.target.value)} /></div>
+          </div>
+          <div className="field"><label>{t("Skýring")}</label><textarea className="lf-ta" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("t.d. gleymdi að stimpla út kl. 16")} /></div>
+          <div style={{ display: "flex", gap: 9, marginTop: 6 }}>
+            <button className="btn" disabled={busy} onClick={send}>{t("Senda beiðni")}</button>
+            <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

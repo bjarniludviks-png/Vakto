@@ -21,6 +21,59 @@ async function currentEmployee(supabase: Awaited<ReturnType<typeof createClient>
   return { userId: user.id, empId: emp.id as string, company: emp.company_id as string };
 }
 
+export type MyPunchRow = { punchId: string; date: string; in: string; out: string | null; hours: number; source: string; open: boolean };
+
+const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+
+/** The signed-in employee's own punches in a date range. */
+export async function getMyPunches(fromISO: string, toISO: string): Promise<{ ok: boolean; rows: MyPunchRow[] }> {
+  if (!isSupabaseConfigured()) return { ok: false, rows: [] };
+  try {
+    const supabase = await createClient();
+    const ctx = await currentEmployee(supabase);
+    if ("error" in ctx) return { ok: false, rows: [] };
+    const { data } = await supabase
+      .from("punches").select("id, clock_in, clock_out, source")
+      .eq("company_id", ctx.company).eq("employee_id", ctx.empId)
+      .gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59")
+      .order("clock_in", { ascending: false });
+    const rows: MyPunchRow[] = (data ?? []).map((p) => {
+      const ci = p.clock_in as string, co = p.clock_out as string | null;
+      return {
+        punchId: p.id as string, date: ci.slice(0, 10), in: hhmm(ci), out: co ? hhmm(co) : null,
+        hours: co ? Math.round(((new Date(co).getTime() - new Date(ci).getTime()) / 3600000) * 100) / 100 : 0,
+        source: (p.source as string) ?? "app", open: !co,
+      };
+    });
+    return { ok: true, rows };
+  } catch {
+    return { ok: false, rows: [] };
+  }
+}
+
+/** Employee requests a correction to a punch (forgot to clock in/out, wrong time). */
+export async function requestCorrection(input: { punchId?: string; date: string; requestedIn?: string; requestedOut?: string; reason: string }): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await currentEmployee(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("punch_corrections").insert({
+      company_id: ctx.company, employee_id: ctx.empId, punch_id: input.punchId ?? null,
+      date: input.date, requested_in: input.requestedIn || null, requested_out: input.requestedOut || null,
+      reason: input.reason, status: "pending",
+    });
+    if (error) return { ok: false, error: "Keyrðu migration 0010 í Supabase til að virkja leiðréttingabeiðnir." };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "correction.request", entity: "punch_correction", detail: `Leiðréttingabeiðni — ${input.date}${input.reason ? ` (${input.reason})` : ""}`,
+    });
+    revalidatePath("/timaskraning");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /** Clock the currently signed-in employee in or out (source: app). */
 export async function myPunch(into: boolean): Promise<PunchResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
