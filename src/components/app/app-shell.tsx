@@ -38,17 +38,23 @@ export default function AppShell({
   // Owner can preview the app as another role (account menu → Skipta um hlutverk).
   const [role, setRoleState] = useState<Role>(account.role);
   const [dark, setDark] = useState(false);
+  const [railed, setRailed] = useState(false);
 
   // Apply persisted theme + cookie choice on mount (avoids hydration mismatch).
   useEffect(() => {
     const isDark = localStorage.getItem("vakto-theme") === "dark";
     if (isDark) document.documentElement.classList.add("dark");
     const cookieSet = localStorage.getItem("vakto-cookie");
+    const rail = localStorage.getItem("vakto-rail") === "1";
     requestAnimationFrame(() => {
       if (isDark) setDark(true);
       if (!cookieSet) setCookie(true);
+      if (rail) setRailed(true);
     });
   }, []);
+  function toggleRail() {
+    setRailed((r) => { try { localStorage.setItem("vakto-rail", r ? "0" : "1"); } catch {} return !r; });
+  }
   function dismissCookie(allow: boolean) {
     setCookie(false);
     try { localStorage.setItem("vakto-cookie", allow ? "all" : "deny"); } catch {}
@@ -113,7 +119,7 @@ export default function AppShell({
         className={`backdrop${navOpen ? " show" : ""}`}
         onClick={() => setNavOpen(false)}
       />
-      <div className="app">
+      <div className={`app${railed ? " railed" : ""}`}>
         {/* ---------- sidebar ---------- */}
         <aside className={`side${navOpen ? " open" : ""}`}>
           <div className="brand">
@@ -121,6 +127,9 @@ export default function AppShell({
               <Logo size={26} />
             </div>
             <b>VAKTO</b>
+            <button className="railtog" onClick={toggleRail} title={railed ? "Sýna hliðarstiku" : "Fela hliðarstiku"} aria-label="toggle sidebar">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 6l-6 6 6 6M21 6l-6 6 6 6" /></svg>
+            </button>
           </div>
           <nav className="nav">
             {groups.map((g) => (
@@ -133,16 +142,17 @@ export default function AppShell({
                 >
                   {t("grp:" + g.title)}
                 </div>
-                {!collapsed[g.title] &&
+                {(railed || !collapsed[g.title]) &&
                   g.items.map((it) => (
                     <Link
                       key={it.slug}
                       href={it.href}
                       className={active(it.href) ? "on" : ""}
+                      title={t("nav:" + it.slug)}
                       onClick={() => setNavOpen(false)}
                     >
                       <Icon name={it.icon} />
-                      {t("nav:" + it.slug)}
+                      <span className="nlbl">{t("nav:" + it.slug)}</span>
                     </Link>
                   ))}
               </div>
@@ -154,10 +164,11 @@ export default function AppShell({
                 key={it.slug}
                 href={it.href}
                 className={active(it.href) ? "on" : ""}
+                title={t("nav:" + it.slug)}
                 onClick={() => setNavOpen(false)}
               >
                 <Icon name={it.icon} />
-                {t("nav:" + it.slug)}
+                <span className="nlbl">{t("nav:" + it.slug)}</span>
               </Link>
             ))}
           </div>
@@ -305,7 +316,7 @@ export default function AppShell({
         </div>
       </div>
       <button
-        className="fab"
+        className={`fab${pathname.startsWith("/spjall") ? " fab-up" : ""}`}
         title="Aðstoð"
         onClick={() => setChatOpen((o) => !o)}
       >

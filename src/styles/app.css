@@ -158,6 +158,8 @@ body.kioskmode .fab{display:none}
 /* floating support chat bubble */
 .fab{position:fixed;right:26px;bottom:26px;width:58px;height:58px;border-radius:50%;background:var(--brand);box-shadow:0 10px 26px rgba(233,112,15,.42);display:flex;align-items:center;justify-content:center;z-index:45;cursor:pointer;transition:.15s}
 .fab:hover{background:var(--brand-deep);transform:translateY(-2px)}
+.fab.fab-up{bottom:90px}
+@media(max-width:760px){.fab.fab-up{bottom:86px;right:16px}}
 .fab svg{width:25px;height:25px;stroke:#fff;stroke-width:2}
 .fab .fdot{position:absolute;top:2px;right:2px;width:15px;height:15px;border-radius:50%;background:var(--bad);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;border:2px solid var(--panel)}
 .cw{position:fixed;right:26px;bottom:96px;width:340px;max-width:calc(100vw - 40px);background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 60px rgba(20,22,28,.22);z-index:46;display:none;overflow:hidden}
@@ -526,3 +528,23 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 /* full-bleed chat — fills the content area edge to edge, fixed */
 .msgr.full{position:fixed;top:66px;left:250px;right:0;bottom:0;height:auto;min-height:0;margin:0;border:0;border-radius:0;box-shadow:none;z-index:20}
 @media(max-width:760px){.msgr.full{left:0}}
+
+/* ---- collapsible sidebar (icon rail) ---- */
+.railtog{margin-left:auto;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--ink3);flex-shrink:0}
+.railtog svg{width:16px;height:16px;transition:transform .15s}
+.railtog:hover{background:var(--line2);color:var(--ink)}
+@media(max-width:760px){.railtog{display:none}}
+@media(min-width:761px){
+  .app.railed .side{width:64px}
+  .app.railed .brand{flex-direction:column;padding:16px 0 10px;gap:8px}
+  .app.railed .brand b{display:none}
+  .app.railed .railtog{margin:0}
+  .app.railed .railtog svg{transform:rotate(180deg)}
+  .app.railed .nav{padding:6px 8px}
+  .app.railed .nav .grp{display:none}
+  .app.railed .nav a,.app.railed .navfoot a{justify-content:center;padding:11px 0;gap:0}
+  .app.railed .nlbl{display:none}
+  .app.railed .nav a .ct{display:none}
+  .app.railed .navfoot{padding:8px 8px 16px}
+  .app.railed .msgr.full{left:64px}
+}
