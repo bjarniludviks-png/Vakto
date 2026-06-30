@@ -218,9 +218,11 @@ function LiveAttendance({ onShift, initial, onNow, roster }: { onShift: number; 
             <div className="it" key={r.punchId}>
               <span className="avt" style={{ background: r.c, width: 34, height: 34, cursor: "pointer" }} onClick={() => setDetail({ id: r.employeeId, name: r.name })}>{r.av}</span>
               <div className="tx" style={{ cursor: "pointer" }} onClick={() => setDetail({ id: r.employeeId, name: r.name })}><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : ""}</span></div>
-              <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)", marginLeft: "auto" }}>{t("á vakt")}</span>
-              <button className="btn ghost sm" style={{ marginLeft: 10 }} onClick={() => setEditPunch(r)}>{t("Leiðrétta")}</button>
-              <button className="btn sm" style={{ marginLeft: 8 }} onClick={() => doClockOut(r)}>{t("tk:clockout")}</button>
+              <div className="itact">
+                <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>
+                <button className="btn ghost sm" onClick={() => setEditPunch(r)}>{t("Leiðrétta")}</button>
+                <button className="btn sm" onClick={() => doClockOut(r)}>{t("tk:clockout")}</button>
+              </div>
             </div>
           )) : <div className="muted" style={{ padding: 16, textAlign: "center" }}>{t("Enginn skráður inn núna.")}</div>}
         </div>
@@ -296,26 +298,25 @@ function EmployeePunchesModal({ employeeId, name, from, to, onClose, onChanged }
         </div>
         <div className="mb">
           {needsMig && <div className="ai" style={{ margin: "0 0 12px" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg><div className="x">{t("Keyrðu migration 0008 í Supabase til að virkja samþykki.")}</div></div>}
-          {pending > 0 && <div style={{ marginBottom: 12 }}><button className="btn sm" onClick={approveAll}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Samþykkja allar")}</button></div>}
-          <div className="tbl">
-            <table>
-              <thead><tr><th>{t("Dagsetning")}</th><th>{t("Innstimplun")}</th><th>{t("Útstimplun")}</th><th className="r">{t("Klst")}</th><th>{t("Staða")}</th><th></th></tr></thead>
-              <tbody>
-                {loading ? <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Hleð…")}</td></tr>
-                  : rows.length ? rows.map((p) => (
-                    <tr key={p.punchId}>
-                      <td>{niceISO(p.date)}</td>
-                      <td>{p.in}</td>
-                      <td className={p.out ? "" : "muted"}>{p.out ?? t("opin")}</td>
-                      <td className="r">{p.open ? "—" : dec1(p.hours)}</td>
-                      <td>{p.open ? <span className="pill" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span> : p.approved ? <span className="pill" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Samþykkt")}</span> : <span className="pill" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Bíður")}</span>}</td>
-                      <td>{!p.open && (p.approved
-                        ? <button className="btn ghost sm" onClick={() => toggle(p)}>{t("Afturkalla")}</button>
-                        : <button className="btn sm" onClick={() => toggle(p)}>{t("Samþykkja")}</button>)}</td>
-                    </tr>
-                  )) : <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engar skráningar á þessu tímabili.")}</td></tr>}
-              </tbody>
-            </table>
+          {pending > 0 && <div style={{ marginBottom: 6 }}><button className="btn sm" onClick={approveAll}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Samþykkja allar")}</button></div>}
+          <div className="att" style={{ maxHeight: "52vh", overflowY: "auto" }}>
+            {loading ? <div className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Hleð…")}</div>
+              : rows.length ? rows.map((p) => (
+                <div className="it" key={p.punchId}>
+                  <div className="tx">
+                    <b>{niceISO(p.date)}</b>
+                    <span>{p.in} – {p.out ?? t("opin")}{p.open ? "" : ` · ${dec1(p.hours)} ${t("klst")}`}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>
+                  </div>
+                  <div className="itact">
+                    {p.open ? <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>
+                      : p.approved ? <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Samþykkt")}</span>
+                        : <span className="tag" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Bíður")}</span>}
+                    {!p.open && (p.approved
+                      ? <button className="btn ghost sm" onClick={() => toggle(p)}>{t("Afturkalla")}</button>
+                      : <button className="btn sm" onClick={() => toggle(p)}>{t("Samþykkja")}</button>)}
+                  </div>
+                </div>
+              )) : <div className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engar skráningar á þessu tímabili.")}</div>}
           </div>
         </div>
       </div>
