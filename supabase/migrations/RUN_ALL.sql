@@ -744,3 +744,20 @@ drop policy if exists chat_read on storage.objects;
 create policy chat_read on storage.objects for select using (bucket_id = 'chat');
 drop policy if exists chat_write on storage.objects;
 create policy chat_write on storage.objects for insert to authenticated with check (bucket_id = 'chat');
+
+-- ===== 0015 — chat RLS recursion fix =====
+create or replace function public.is_channel_member(cid uuid) returns boolean language sql security definer stable set search_path = public as
+$$ select exists (select 1 from channel_members m where m.channel_id = cid and m.user_id = auth.uid()) $$;
+create or replace function public.channel_company(cid uuid) returns uuid language sql security definer stable set search_path = public as
+$$ select company_id from channels where id = cid $$;
+create or replace function public.channel_visible(cid uuid) returns boolean language sql security definer stable set search_path = public as
+$$ select exists (select 1 from channels c where c.id = cid and c.company_id = public.auth_company_id() and (c.kind = 'general' or c.created_by = auth.uid() or exists (select 1 from channel_members m where m.channel_id = cid and m.user_id = auth.uid()))) $$;
+drop policy if exists channels_read on channels;
+create policy channels_read on channels for select using (company_id = public.auth_company_id() and (kind = 'general' or created_by = auth.uid() or public.is_channel_member(id)));
+drop policy if exists channel_members_rw on channel_members;
+drop policy if exists channel_members_read on channel_members;
+drop policy if exists channel_members_write on channel_members;
+create policy channel_members_read on channel_members for select using (public.channel_company(channel_id) = public.auth_company_id());
+create policy channel_members_write on channel_members for all using (public.channel_company(channel_id) = public.auth_company_id()) with check (public.channel_company(channel_id) = public.auth_company_id());
+drop policy if exists messages_read on messages;
+create policy messages_read on messages for select using (company_id = public.auth_company_id() and public.channel_visible(channel_id));
