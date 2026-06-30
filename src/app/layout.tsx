@@ -35,6 +35,9 @@ export default function RootLayout({
   return (
     <html lang="is">
       <head>
+        {/* Legacy iOS flag — required for standalone + startup images (Next only
+            emits the newer mobile-web-app-capable). */}
+        <meta name="apple-mobile-web-app-capable" content="yes" />
         {splash.map(([pw, ph, r]) => (
           <link
             key={`${pw}x${ph}`}
