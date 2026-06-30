@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { computeLineHours, totals as sumTotals, type PayLine } from "@/lib/payroll";
+import { computeFromPunches, totals as sumTotals, type PayLine } from "@/lib/payroll";
+import { resolveRuleSet } from "@/lib/payrules";
 import { getEmployees } from "@/lib/employees.server";
 import { initials } from "@/lib/employees";
 import { nf, dec1 } from "@/lib/format";
@@ -47,19 +48,21 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
     punches = (approved.data ?? []) as typeof punches;
   }
 
-  const worked = new Map<string, number>();
+  // Punches grouped per employee (for per-shift premium calc).
+  const byEmp = new Map<string, { clockIn: string; clockOut: string }[]>();
   for (const p of punches) {
-    const h = (new Date(p.clock_out).getTime() - new Date(p.clock_in).getTime()) / 3600000;
-    if (h > 0) worked.set(p.employee_id, (worked.get(p.employee_id) ?? 0) + h);
+    if (!byEmp.has(p.employee_id)) byEmp.set(p.employee_id, []);
+    byEmp.get(p.employee_id)!.push({ clockIn: p.clock_in, clockOut: p.clock_out });
   }
-  const contracted = (ratio: number) => Math.round(173.33 * (ratio / 100));
+
+  // Per-employee custom pay-rule overrides (tolerant — null before migration 0013).
+  const ruleMap = new Map<string, { eve: number; weekend: number; overtime: number; holiday: number; night: number } | null>();
+  const pr = await supabase.from("employees").select("id, pay_rule").eq("company_id", company);
+  if (!pr.error) for (const r of pr.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never) ?? null);
+
   const lines = employees
-    .filter((e) => (worked.get(e.id) ?? 0) > 0 || e.payType === "monthly")
-    .map((e) => {
-      const w = worked.get(e.id) ?? 0;
-      const h = e.payType === "monthly" && w === 0 ? contracted(e.employmentRatio) : w;
-      return computeLineHours(e, h);
-    });
+    .filter((e) => (byEmp.get(e.id)?.length ?? 0) > 0 || e.payType === "monthly")
+    .map((e) => computeFromPunches(e, byEmp.get(e.id) ?? [], resolveRuleSet(e.union, ruleMap.get(e.id))));
   return { lines, needsMigration };
 }
 

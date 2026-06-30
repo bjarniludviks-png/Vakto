@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { computeLine, computeLineHours, type PayLine } from "@/lib/payroll";
+import { computeLine, computeFromPunches, type PayLine } from "@/lib/payroll";
+import { resolveRuleSet } from "@/lib/payrules";
 import { DEMO_EMPLOYEES, type Employee } from "@/lib/employees";
 
 function csvCell(v: string | number): string {
@@ -28,7 +29,7 @@ async function getLines(from?: string, to?: string): Promise<{ lines: PayLine[];
       : { data: null };
     const company = profile?.company_id as string | undefined;
     const { data: emps } = company
-      ? await supabase.from("employees").select("id, full_name, kennitala, pay_type, rate, employment_ratio").eq("company_id", company)
+      ? await supabase.from("employees").select("id, full_name, kennitala, pay_type, rate, employment_ratio, union_agreement").eq("company_id", company)
       : { data: null };
     if (!emps?.length) {
       const kt: Record<string, string> = {};
@@ -50,14 +51,17 @@ async function getLines(from?: string, to?: string): Promise<{ lines: PayLine[];
           .gte("clock_in", from).lte("clock_in", to + "T23:59:59");
         punches = (all.data ?? []) as typeof punches;
       } else punches = (approved.data ?? []) as typeof punches;
-      const worked = new Map<string, number>();
+      const byEmp = new Map<string, { clockIn: string; clockOut: string }[]>();
       for (const p of punches) {
-        const h = (new Date(p.clock_out).getTime() - new Date(p.clock_in).getTime()) / 3600000;
-        if (h > 0) worked.set(p.employee_id, (worked.get(p.employee_id) ?? 0) + h);
+        if (!byEmp.has(p.employee_id)) byEmp.set(p.employee_id, []);
+        byEmp.get(p.employee_id)!.push({ clockIn: p.clock_in, clockOut: p.clock_out });
       }
+      const ruleMap = new Map<string, never>();
+      const pr = await supabase.from("employees").select("id, pay_rule").eq("company_id", company);
+      if (!pr.error) for (const r of pr.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never));
       const lines = emps
-        .filter((e) => (worked.get(e.id as string) ?? 0) > 0 || e.pay_type === "monthly")
-        .map((e) => computeLineHours(toEmp(e), worked.get(e.id as string) ?? 0));
+        .filter((e) => (byEmp.get(e.id as string)?.length ?? 0) > 0 || e.pay_type === "monthly")
+        .map((e) => computeFromPunches(toEmp(e), byEmp.get(e.id as string) ?? [], resolveRuleSet(e.union_agreement as string, ruleMap.get(e.id as string))));
       return { lines, kt, live: true };
     }
 
