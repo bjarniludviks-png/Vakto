@@ -62,3 +62,23 @@ export function resolveRuleSet(union: string | null | undefined, custom?: Partia
   if (union === CUSTOM_UNION) return { ...ZERO_RULESET, ...(custom ?? {}) };
   return UNION_PRESETS[union ?? ""] ?? UNION_PRESETS["Efling"];
 }
+
+// ---------- desember- & orlofsuppbót (kjarasamningsbundnar árlegar greiðslur) ----------
+// kr/ár fyrir 100% starfshlutfall, fullt orlofs-/almanaksár. Hlutfallað eftir
+// starfshlutfalli (og starfstíma). Orlofsuppbót greiðist 1. júní, desemberuppbót
+// 1. desember. ⚠️ ÓSTAÐFEST — yfirfarið gegn samningi hvers árs áður en greitt er.
+export type UppbotSet = { orlof: number; desember: number };
+
+export const UNION_UPPBOT: Record<string, UppbotSet> = {
+  "Efling": { orlof: 60000, desember: 112000 },
+  "Efling – veitingar/SGS": { orlof: 60000, desember: 112000 },
+  "VR": { orlof: 56000, desember: 103000 },
+  "Matvís": { orlof: 60000, desember: 112000 },
+};
+export const ZERO_UPPBOT: UppbotSet = { orlof: 0, desember: 0 };
+
+/** Uppbót amounts for an employee's agreement (custom = company can override). */
+export function resolveUppbot(union: string | null | undefined, custom?: Partial<UppbotSet> | null): UppbotSet {
+  if (union === CUSTOM_UNION) return { ...ZERO_UPPBOT, ...(custom ?? {}) };
+  return UNION_UPPBOT[union ?? ""] ?? UNION_UPPBOT["Efling"];
+}

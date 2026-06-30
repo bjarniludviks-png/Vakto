@@ -18,6 +18,7 @@ export type PayLine = {
   dayPay: number;
   premiums: number;
   overtime: number;
+  uppbot: number; // desember-/orlofsuppbót this period (0 outside June/December)
   withholding: number;
   pension: number;
   union: number;
@@ -27,32 +28,49 @@ export type PayLine = {
 
 type EmpPick = Pick<Employee, "id" | "fullName" | "payType" | "rate" | "employmentRatio">;
 
-function finalize(e: EmpPick, hours: number, gross: number): PayLine {
-  const dayPay = Math.round(gross * 0.78);
-  const premiums = Math.round(gross * 0.15);
-  const overtime = Math.round(gross - dayPay - premiums);
+// baseGross = pay from worked/contracted hours. uppbot is added on top (taxable +
+// pension-bearing) and tracked separately so it shows as its own launaliður.
+function finalize(e: EmpPick, hours: number, baseGross: number, uppbot = 0): PayLine {
+  const dayPay = Math.round(baseGross * 0.78);
+  const premiums = Math.round(baseGross * 0.15);
+  const overtime = Math.round(baseGross - dayPay - premiums);
+  const gross = Math.round(baseGross) + Math.round(uppbot);
   const pension = Math.round(gross * PENSION_RATE);
   const union = Math.round(gross * UNION_RATE);
   const taxable = gross - pension;
   const withholding = Math.max(0, Math.round(taxable * WITHHOLDING_RATE - PERSONAL_ALLOWANCE));
   const net = Math.round(gross - pension - union - withholding);
   const cost = Math.round(gross * (1 + BURDEN));
-  return { employeeId: e.id, name: e.fullName, hours, gross: Math.round(gross), dayPay, premiums, overtime, withholding, pension, union, net, cost };
+  return { employeeId: e.id, name: e.fullName, hours, gross, dayPay, premiums, overtime, uppbot: Math.round(uppbot), withholding, pension, union, net, cost };
 }
 
 /** Contracted-hours payroll line (monthly baseline). */
-export function computeLine(e: EmpPick): PayLine {
+export function computeLine(e: EmpPick, uppbot = 0): PayLine {
   const hours = Math.round(MONTHLY_HOURS * (e.employmentRatio / 100));
   const gross = e.payType === "monthly" ? e.rate : hours * e.rate * 1.18;
-  return finalize(e, hours, gross);
+  return finalize(e, hours, gross, uppbot);
 }
 
 /** Payroll line from actual worked hours (from approved punches in a period).
  * Hourly: gross = worked × rate × uplift. Monthly: full monthly salary. */
-export function computeLineHours(e: EmpPick, workedHours: number): PayLine {
+export function computeLineHours(e: EmpPick, workedHours: number, uppbot = 0): PayLine {
   const hours = Math.round(workedHours * 10) / 10;
   const gross = e.payType === "monthly" ? e.rate : Math.round(workedHours * e.rate * 1.18);
-  return finalize(e, hours, gross);
+  return finalize(e, hours, gross, uppbot);
+}
+
+// ---------- desember- & orlofsuppbót ----------
+/** Prorated uppbót. annual = kr/ár @100%, ratio = starfshlutfall %, monthsServed = months in the qualifying period (0–12). */
+export function computeUppbot(annual: number, employmentRatio: number, monthsServed = 12): number {
+  const r = Math.max(0, Math.min(1, employmentRatio / 100));
+  const m = Math.max(0, Math.min(12, monthsServed));
+  return Math.round(annual * r * (m / 12));
+}
+/** Which uppbót (if any) a payroll month pays. orlof → June, desember → December. */
+export function uppbotForMonth(month1to12: number): "orlof" | "desember" | null {
+  if (month1to12 === 6) return "orlof";
+  if (month1to12 === 12) return "desember";
+  return null;
 }
 
 // ⚠️ Icelandic stórhátíðardagar 2026 — UNCONFIRMED placeholders, verify before real pay.
@@ -79,9 +97,9 @@ function premiumPct(dt: Date, holiday: boolean, r: RuleSet): number {
 
 /** Payroll line from punches with per-shift premiums applied (evening/weekend/
  * night/holiday) + weekly overtime. Monthly staff keep their salary. */
-export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clockOut: string }[], rules: RuleSet): PayLine {
+export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clockOut: string }[], rules: RuleSet, uppbot = 0): PayLine {
   if (e.payType === "monthly") {
-    return finalize(e, Math.round(MONTHLY_HOURS * (e.employmentRatio / 100)), e.rate);
+    return finalize(e, Math.round(MONTHLY_HOURS * (e.employmentRatio / 100)), e.rate, uppbot);
   }
   let hours = 0, gross = 0;
   const weekHrs = new Map<string, number>();
@@ -102,7 +120,7 @@ export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clock
       t += STEP * 3600000;
     }
   }
-  return finalize(e, Math.round(hours * 10) / 10, Math.round(gross));
+  return finalize(e, Math.round(hours * 10) / 10, Math.round(gross), uppbot);
 }
 
 export type PayrollTotals = { hours: number; gross: number; withholding: number; pension: number; union: number; net: number; cost: number };

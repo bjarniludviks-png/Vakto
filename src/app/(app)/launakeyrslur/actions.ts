@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { computeFromPunches, totals as sumTotals, type PayLine } from "@/lib/payroll";
-import { resolveRuleSet } from "@/lib/payrules";
+import { computeFromPunches, computeUppbot, uppbotForMonth, totals as sumTotals, type PayLine } from "@/lib/payroll";
+import { resolveRuleSet, resolveUppbot } from "@/lib/payrules";
 import { getEmployees } from "@/lib/employees.server";
 import { initials } from "@/lib/employees";
 import { nf, dec1 } from "@/lib/format";
@@ -60,9 +60,16 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
   const pr = await supabase.from("employees").select("id, pay_rule").eq("company_id", company);
   if (!pr.error) for (const r of pr.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never) ?? null);
 
+  // Desember-/orlofsuppbót: paid automatically in the June / December run,
+  // prorated by starfshlutfall (per the employee's kjarasamningur).
+  const uppKind = uppbotForMonth(Number(from.slice(5, 7)));
+
   const lines = employees
     .filter((e) => (byEmp.get(e.id)?.length ?? 0) > 0 || e.payType === "monthly")
-    .map((e) => computeFromPunches(e, byEmp.get(e.id) ?? [], resolveRuleSet(e.union, ruleMap.get(e.id))));
+    .map((e) => {
+      const ub = uppKind ? computeUppbot(resolveUppbot(e.union)[uppKind], e.employmentRatio) : 0;
+      return computeFromPunches(e, byEmp.get(e.id) ?? [], resolveRuleSet(e.union, ruleMap.get(e.id)), ub);
+    });
   return { lines, needsMigration };
 }
 
@@ -118,13 +125,18 @@ export async function runPayroll(from?: string, to?: string): Promise<RunResult>
       .select("id").single();
     if (runErr || !run) return { ok: false, error: runErr?.message ?? "Tókst ekki að stofna keyrslu" };
 
-    const { error: linesErr } = await supabase.from("payroll_lines").insert(
-      lines.map((l) => ({
-        run_id: run.id, employee_id: l.employeeId, hours: l.hours, gross: l.gross,
-        day_pay: l.dayPay, premiums: l.premiums, overtime: l.overtime,
-        withholding: l.withholding, pension: l.pension, union_fee: l.union, net: l.net,
-      })),
-    );
+    const baseRow = (l: PayLine) => ({
+      run_id: run.id, employee_id: l.employeeId, hours: l.hours, gross: l.gross,
+      day_pay: l.dayPay, premiums: l.premiums, overtime: l.overtime,
+      withholding: l.withholding, pension: l.pension, union_fee: l.union, net: l.net,
+    });
+    // Try with the uppbot column (migration 0017); retry without if not yet run.
+    let linesErr = (await supabase.from("payroll_lines").insert(
+      lines.map((l) => ({ ...baseRow(l), uppbot: l.uppbot })),
+    )).error;
+    if (linesErr) {
+      linesErr = (await supabase.from("payroll_lines").insert(lines.map(baseRow))).error;
+    }
     if (linesErr) return { ok: false, error: linesErr.message };
 
     await logAudit(supabase, company, ctx.userId, {

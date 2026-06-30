@@ -8,7 +8,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { createEmployee, updateEmployee, uploadDocument, importEmployees, setEmployeeStatus, deleteEmployee, getEmployeePayRule, getEmployeeExtras } from "./actions";
-import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, type RuleSet } from "@/lib/payrules";
+import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, type RuleSet } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 
 /** Best-effort document type from a filename (for the documents table). */
@@ -432,6 +432,19 @@ function LaunTab({ e }: { e: Employee }) {
       <p className="muted" style={{ fontSize: 11.5, margin: "6px 0 0" }}>
         {custom ? "Sérsniðnar reglur — gilda fyrir alþjóðamarkað eða sérsamninga." : "Reglur koma sjálfkrafa úr kjarasamningi. Veldu „Eigin reglur\" til að breyta. (Hlutföll óstaðfest — yfirfarið gegn samningi.)"}
       </p>
+
+      <Sec>{t("Desember- & orlofsuppbót")} · {custom ? t("eigin samningur") : t("úr kjarasamningi")}</Sec>
+      {(() => {
+        const upp = resolveUppbot(union);
+        const r = e.employmentRatio / 100;
+        return (<>
+          <div className="statline"><span className="k">{t("Orlofsuppbót")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("greidd 1. júní")}</span></span><b>{nf(upp.orlof)} kr/ár</b></div>
+          <div className="statline"><span className="k">{t("Desemberuppbót")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("greidd 1. desember")}</span></span><b>{nf(upp.desember)} kr/ár</b></div>
+          <p className="muted" style={{ fontSize: 11.5, margin: "6px 0 0" }}>
+            {t("Hlutfallað eftir starfshlutfalli")} ({e.employmentRatio}%) → ~{nf(Math.round(upp.orlof * r))} / {nf(Math.round(upp.desember * r))} kr. {t("Greiðist sjálfkrafa í launakeyrslu réttan mánuð. (Upphæðir óstaðfestar — yfirfarið gegn samningi.)")}
+          </p>
+        </>);
+      })()}
 
       <Sec>Hlunnindi & styrkir</Sec>
       {benefits.length === 0 && <p className="muted" style={{ fontSize: 12, margin: "2px 0 6px" }}>{t("Engin hlunnindi skráð — bættu við einu eða fleiri hér að neðan.")}</p>}

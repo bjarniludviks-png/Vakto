@@ -765,3 +765,6 @@ create policy messages_read on messages for select using (company_id = public.au
 -- ===== 0016 — permissions + benefits =====
 alter table employees add column if not exists permissions jsonb;
 alter table employees add column if not exists benefits jsonb;
+
+-- ===== 0017 — desember-/orlofsuppbót line on payroll =====
+alter table payroll_lines add column if not exists uppbot numeric not null default 0;

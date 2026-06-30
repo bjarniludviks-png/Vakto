@@ -82,11 +82,11 @@ export async function GET(request: Request) {
   let header: string[];
   let rows: (string | number)[][];
   if (format === "payday") {
-    header = ["Kennitala", "Nafn", "Tímar", "Brúttó", "Lífeyrir", "Félagsgjald", "Staðgreiðsla", "Útborgað"];
-    rows = lines.map((l) => [kt[l.employeeId] ?? "", l.name, l.hours, l.gross, l.pension, l.union, l.withholding, l.net]);
+    header = ["Kennitala", "Nafn", "Tímar", "Uppbót", "Brúttó", "Lífeyrir", "Félagsgjald", "Staðgreiðsla", "Útborgað"];
+    rows = lines.map((l) => [kt[l.employeeId] ?? "", l.name, l.hours, l.uppbot, l.gross, l.pension, l.union, l.withholding, l.net]);
   } else {
-    header = ["Nafn", "Tímar", "Dagvinna", "Álög", "Yfirvinna", "Brúttó", "Staðgreiðsla", "Lífeyrir", "Félagsgjald", "Útborgað", "Kostnaður m. byrði"];
-    rows = lines.map((l) => [l.name, l.hours, l.dayPay, l.premiums, l.overtime, l.gross, l.withholding, l.pension, l.union, l.net, l.cost]);
+    header = ["Nafn", "Tímar", "Dagvinna", "Álög", "Yfirvinna", "Uppbót", "Brúttó", "Staðgreiðsla", "Lífeyrir", "Félagsgjald", "Útborgað", "Kostnaður m. byrði"];
+    rows = lines.map((l) => [l.name, l.hours, l.dayPay, l.premiums, l.overtime, l.uppbot, l.gross, l.withholding, l.pension, l.union, l.net, l.cost]);
   }
 
   const csv =
