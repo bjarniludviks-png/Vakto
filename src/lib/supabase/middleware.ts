@@ -46,7 +46,12 @@ export async function updateSession(request: NextRequest) {
   const isPublic =
     pathname === "/" ||
     pathname.startsWith("/login") ||
-    pathname.startsWith("/kiosk");
+    pathname.startsWith("/kiosk") ||
+    // PWA / icon assets must be reachable without auth (home-screen install).
+    pathname === "/manifest.webmanifest" ||
+    pathname.startsWith("/apple-icon") ||
+    pathname.startsWith("/icon") ||
+    pathname === "/favicon.ico";
 
   if (!user && !isPublic) {
     const loginUrl = request.nextUrl.clone();
