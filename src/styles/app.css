@@ -428,6 +428,8 @@ table.sgrid{min-width:840px;width:100%}
 .clist .ci .tx span{font-size:11.5px;color:var(--ink3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
 .cmain{display:flex;flex-direction:column;min-width:0}
 .cmain .chd{padding:13px 16px;border-bottom:1px solid var(--line);font-weight:650;font-size:14px;display:flex;align-items:center;gap:10px}
+.chsel{display:none;margin-left:auto;border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:13px;background:var(--panel)}
+@media(max-width:1024px){.chsel{display:inline-block}}
 .cmsgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:var(--bg)}
 .bub{max-width:70%;padding:9px 13px;border-radius:14px;font-size:13px;line-height:1.45}
 .bub.them{background:#fff;border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}

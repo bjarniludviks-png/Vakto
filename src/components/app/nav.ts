@@ -40,7 +40,7 @@ export const NAV_GROUPS: NavGroup[] = [
     title: "Starfsmaður",
     items: [
       { slug: "employeeapp", href: "/mitt-svaedi", label: "Starfsmannaapp", roles: ["employee", "contractor"], icon: "phone" },
-      { slug: "chat", href: "/spjall", label: "Spjall", roles: ["employee", "contractor"], icon: "chat" },
+      { slug: "chat", href: "/spjall", label: "Spjall", roles: ALL, icon: "chat" },
     ],
   },
 ];
