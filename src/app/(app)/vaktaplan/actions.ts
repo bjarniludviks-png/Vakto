@@ -155,6 +155,26 @@ export async function saveShift(input: Omit<ShiftInput, "date"> & { date?: strin
   }
 }
 
+/** Set the weekly staffing need (7 numbers, Mon..Sun). */
+export async function setStaffingTargets(targets: number[]): Promise<DecisionResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const clean = Array.from({ length: 7 }, (_, i) => Math.max(0, Math.round(Number(targets[i]) || 0)));
+    const { error } = await supabase.from("companies").update({ staffing_targets: clean }).eq("id", ctx.company);
+    if (error) return { ok: false, error: "Keyrðu migration 0011 í Supabase til að vista mönnunarþörf." };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "staffing.set", entity: "company", detail: `Mönnunarþörf uppfærð — ${clean.join("/")}`,
+    });
+    revalidatePath("/vaktaplan");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /** Delete a single set shift (one employee, one day). */
 export async function deleteShift(input: { employeeName: string; dateISO: string }): Promise<DecisionResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };

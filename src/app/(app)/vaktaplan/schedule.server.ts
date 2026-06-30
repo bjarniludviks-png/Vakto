@@ -7,7 +7,7 @@ import { dec1 } from "@/lib/format";
 
 export type Emp4 = [string, string, string, string]; // initials, first name, dept, color
 export type ShiftTypeView = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
-export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string; todayISO: string };
+export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string; todayISO: string; targets: number[] };
 
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 // 7 ISO dates for the (Mon-start) week containing `ref`.
@@ -84,13 +84,16 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
     }
 
     let companyName = "Vaktaplan";
+    let targets: number[] = [];
     if (company) {
       const { data: co } = await supabase.from("companies").select("name").eq("id", company).maybeSingle();
       if (co?.name) companyName = co.name as string;
+      const { data: st } = await supabase.from("companies").select("staffing_targets").eq("id", company).maybeSingle();
+      if (Array.isArray(st?.staffing_targets)) targets = (st!.staffing_targets as number[]).slice(0, 7);
     }
 
     const fte = dec1(employees.reduce((a, e) => a + e.employmentRatio, 0) / 100);
-    return { emp, grid, times, types, pool: [], fte, company: companyName, todayISO };
+    return { emp, grid, times, types, pool: [], fte, company: companyName, todayISO, targets };
   } catch {
     return null;
   }

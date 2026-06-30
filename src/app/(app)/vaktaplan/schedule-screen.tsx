@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { nf, dec1 } from "@/lib/format";
-import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, type ShiftInput } from "./actions";
+import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, type ShiftInput } from "./actions";
 import { buildSchedulePdf, type PdfShift } from "./pdf";
 import type { ReqItem } from "./requests.server";
 import type { ScheduleInitial } from "./schedule.server";
@@ -91,7 +91,8 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
   const [monthShifts, setMonthShifts] = useState<Record<string, { first: string; start: string; end: string }[]>>({});
   const [drag, setDrag] = useState<{ r: number; c: number } | null>(null);
   const [clip, setClip] = useState<string | null>(null);
-  const [modal, setModal] = useState<null | "types" | "addEmp" | "shift" | "ai" | "aiResult">(null);
+  const [modal, setModal] = useState<null | "types" | "addEmp" | "shift" | "ai" | "aiResult" | "staff">(null);
+  const [targets, setTargets] = useState<number[]>(initial?.targets?.length ? initial.targets : []);
   const [aiQuery, setAiQuery] = useState("");
   const [aiProposal, setAiProposal] = useState<AiProposal | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -573,11 +574,21 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
           </div>
         </div>
         <div className="card">
-          <div className="ch"><div className="ct"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 6 }}><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>{t("Tímar eftir dögum")}</div><div className="cs">{t("áætlað í planinu · þessi vika")}</div></div>
+          <div className="ch"><div><div className="ct"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 6 }}><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>{t("Mönnun & þörf")}</div><div className="cs">{t("á vakt á móti mönnunarþörf · þessi vika")}</div></div><button className="btn ghost sm" onClick={() => setModal("staff")}>{t("Stilla þörf")}</button></div>
           <div className="cb">
-            {dayStats.map((r) => (
-              <div className="statline" key={r[1]}><span className="k">{t(DAYNAMES[r[0]])} {r[1]}.</span><span className="v">{dec1(r[2])} {t("klst")} · {r[3]} {t("á vakt")}</span></div>
-            ))}
+            {dayStats.map((r) => {
+              const need = targets[r[0]] ?? 0;
+              const short = need > 0 && r[3] < need;
+              return (
+                <div className="statline" key={r[1]}>
+                  <span className="k">{t(DAYNAMES[r[0]])} {r[1]}.</span>
+                  <span className="v">
+                    <span style={{ color: short ? "var(--bad)" : need > 0 ? "var(--good)" : undefined, fontWeight: short ? 700 : 600 }}>{r[3]}{need > 0 ? `/${need}` : ""}</span> {t("á vakt")}
+                    {short ? <span className="tag" style={{ background: "var(--bad-soft)", color: "var(--bad)", marginLeft: 8 }}>{t("vantar")} {need - r[3]}</span> : null}
+                  </span>
+                </div>
+              );
+            })}
             <div className="statline" style={{ borderTop: "1px solid var(--line)", marginTop: 5, paddingTop: 8 }}>
               <span className="k" style={{ fontWeight: 650, color: "var(--ink)" }}>{t("Samtals")}</span><span className="v" style={{ fontWeight: 700 }}>{dec1(totDayHrs)} {t("klst")} · {totDayShifts} {t("vaktir")}</span>
             </div>
@@ -614,6 +625,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
       </div>
       )}
 
+      {modal === "staff" && <StaffNeedModal targets={targets} onClose={() => setModal(null)} onSave={(ts) => { setTargets(ts); setModal(null); setStaffingTargets(ts).then((r) => toast(r.ok ? "Mönnunarþörf vistuð" : (r.error ?? "Villa"))); }} />}
       {modal === "types" && <ShiftTypesModal types={types} setTypes={setTypes} onClose={() => setModal(null)} />}
       {modal === "addEmp" && <AddEmpModal pool={pool} onPick={pickEmp} onClose={() => setModal(null)} />}
       {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { setClip("D"); setModal(null); toast("Vakt afrituð — smelltu á reiti til að líma"); }} onTypes={() => setModal("types")} />}
@@ -752,6 +764,29 @@ function AddEmpModal({ pool, onPick, onClose }: { pool: Emp[]; onPick: (i: numbe
             <span className="tag info" style={{ marginLeft: "auto" }}>{tr("+ bæta")}</span>
           </div>
         ))}
+      </div>
+    </Modal>
+  );
+}
+
+function StaffNeedModal({ targets, onClose, onSave }: { targets: number[]; onClose: () => void; onSave: (t: number[]) => void }) {
+  const { t } = useLang();
+  const DAYS_FULL = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
+  const [vals, setVals] = useState<number[]>(Array.from({ length: 7 }, (_, i) => targets[i] ?? 0));
+  return (
+    <Modal onClose={onClose} title={t("Mönnunarþörf á viku")}>
+      <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>{t("Hversu marga þarf á vakt hvern dag? VAKTO sýnir vöntun í planinu.")}</p>
+      <div style={{ display: "grid", gap: 8 }}>
+        {DAYS_FULL.map((d, i) => (
+          <div key={d} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+            <label style={{ fontSize: 13.5 }}>{t(d)}</label>
+            <input type="number" min={0} value={vals[i]} onChange={(e) => setVals((v) => v.map((x, j) => j === i ? Math.max(0, Number(e.target.value) || 0) : x))} style={{ width: 90, padding: "7px 10px", textAlign: "right" }} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
+        <button className="btn" onClick={() => onSave(vals)}>{t("Vista")}</button>
+        <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
       </div>
     </Modal>
   );

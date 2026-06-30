@@ -685,3 +685,6 @@ drop policy if exists punch_corrections_ins on punch_corrections;
 create policy punch_corrections_ins on punch_corrections for insert with check (company_id = public.auth_company_id() and (public.is_manager() or employee_id = public.auth_employee_id()));
 drop policy if exists punch_corrections_upd on punch_corrections;
 create policy punch_corrections_upd on punch_corrections for update using (company_id = public.auth_company_id() and public.is_manager()) with check (company_id = public.auth_company_id() and public.is_manager());
+
+-- ===== 0011 — staffing need =====
+alter table companies add column if not exists staffing_targets jsonb;
