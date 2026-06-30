@@ -30,8 +30,9 @@ function EmptyBody({ msg }: { msg: string }) {
 }
 
 type Onb = { show: boolean; hasLocation: boolean; hasStaff: boolean; hasSchedule: boolean; hasRevenue: boolean };
+type OnNow = { punchId: string; name: string; av: string; c: string; dept: string; in: string };
 
-export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding, live = false }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean }) {
+export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding, live = false, onNow = [] }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean; onNow?: OnNow[] }) {
   const { t } = useLang();
   const [chartSeg, setChartSeg] = useState("Vika");
   const [hideOnb, setHideOnb] = useState(false);
@@ -144,8 +145,18 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
             <EmptyBody msg="Samanburðargröf birtast þegar fleiri tímabil safnast." />
           </div>
           <div className="card">
-            <div className="ch"><div><div className="ct">{t("Vinnum við eftir plani?")}</div><div className="cs">{t("raun tímar vs áætlun · þessi vika")}</div></div></div>
-            <EmptyBody msg="Frávik birtast þegar starfsfólk stimplar inn og út." />
+            <div className="ch"><div><div className="ct">{t("Á vakt núna")}</div><div className="cs">{t("skráðir inn í rauntíma")}</div></div><Link href="/timaskraning" className="badge" style={{ background: "var(--good-soft)", color: "var(--good)", textDecoration: "none" }}>{onNow.length} {t("á vakt")}</Link></div>
+            {onNow.length ? (
+              <div className="cb att">
+                {onNow.map((r) => (
+                  <div className="it" key={r.punchId}>
+                    <span className="avt" style={{ background: r.c, width: 32, height: 32 }}>{r.av}</span>
+                    <div className="tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}</span></div>
+                    <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)", marginLeft: "auto" }}>{t("á vakt")}</span>
+                  </div>
+                ))}
+              </div>
+            ) : <EmptyBody msg="Enginn skráður inn núna." />}
           </div>
         </div>
 

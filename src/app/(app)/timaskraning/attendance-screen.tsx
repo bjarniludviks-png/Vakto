@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
@@ -8,7 +9,8 @@ import { EmptyState } from "@/components/app/empty-state";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
-import { approveAllTimesheets, approveTimesheet, setClockOut, fetchAttendance } from "./actions";
+import type { OnNowRow, RosterRow } from "./attendance.server";
+import { approveAllTimesheets, approveTimesheet, setClockOut, fetchAttendance, managerClockIn, adjustPunch } from "./actions";
 
 const MONTHS_IS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ágú.", "sep.", "okt.", "nóv.", "des."];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -44,7 +46,7 @@ const pillStyle = (k: string) =>
       : k === "good" ? { background: "var(--good-soft)", color: "var(--good)" }
         : { background: "var(--line2)", color: "var(--ink3)" };
 
-export default function AttendanceScreen({ onShift = 5, empty = false, live = false, rows = [] }: { onShift?: number; empty?: boolean; live?: boolean; rows?: AttRow[] }) {
+export default function AttendanceScreen({ onShift = 5, empty = false, live = false, rows = [], onNow = [], roster = [] }: { onShift?: number; empty?: boolean; live?: boolean; rows?: AttRow[]; onNow?: OnNowRow[]; roster?: RosterRow[] }) {
   const { t } = useLang();
   const [wk, setWk] = useState(0);
   const [cur, setCur] = useState<string | null>(null);
@@ -67,7 +69,7 @@ export default function AttendanceScreen({ onShift = 5, empty = false, live = fa
   // Live company: real planned (shifts) vs actual (punches) per employee,
   // with period / custom-range / search / department filtering.
   if (live) {
-    return <LiveAttendance onShift={onShift} initial={rows} />;
+    return <LiveAttendance onShift={onShift} initial={rows} onNow={onNow} roster={roster} />;
   }
 
   return (
@@ -144,8 +146,11 @@ export default function AttendanceScreen({ onShift = 5, empty = false, live = fa
   );
 }
 
-function LiveAttendance({ onShift, initial }: { onShift: number; initial: AttRow[] }) {
+function nowHHMM() { const d = new Date(); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
+
+function LiveAttendance({ onShift, initial, onNow, roster }: { onShift: number; initial: AttRow[]; onNow: OnNowRow[]; roster: RosterRow[] }) {
   const { t } = useLang();
+  const router = useRouter();
   const [period, setPeriod] = useState<Period>("Vika");
   const init0 = rangeFor("Vika");
   const [from, setFrom] = useState(init0.from);
@@ -154,6 +159,14 @@ function LiveAttendance({ onShift, initial }: { onShift: number; initial: AttRow
   const [deptF, setDeptF] = useState("all");
   const [data, setData] = useState<AttRow[]>(initial);
   const [loading, setLoading] = useState(false);
+  const [clockInOpen, setClockInOpen] = useState(false);
+  const [editPunch, setEditPunch] = useState<OnNowRow | null>(null);
+
+  async function doClockOut(row: OnNowRow) {
+    const res = await adjustPunch(row.punchId, undefined, nowHHMM());
+    toast(res.ok ? `${row.name} stimplað(ur) út` : (res.error ?? "Villa"));
+    router.refresh();
+  }
 
   function load(f: string, tt: string) {
     setLoading(true);
@@ -190,6 +203,28 @@ function LiveAttendance({ onShift, initial }: { onShift: number; initial: AttRow
         <div className="kpi"><div className="lab">{t("Raun klst")}</div><div className="val">{dec1(actual)} <small>{t("klst")}</small></div></div>
         <div className="kpi"><div className="lab">{t("Frávik")}</div><div className="val" style={{ color: actual > planned ? "var(--warn)" : "var(--good)" }}>{actual >= planned ? "+" : ""}{dec1(actual - planned)} <small>{t("klst")}</small></div></div>
       </div>
+
+      {/* Who is clocked in right now */}
+      <div className="card" style={{ marginTop: 20 }}>
+        <div className="ch">
+          <div><div className="ct">{t("Á vakt núna")}</div><div className="cs">{t("skráðir inn — leiðréttu tíma eða stimplaðu út")}</div></div>
+          <button className="btn sm" onClick={() => setClockInOpen(true)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>{t("Stimpla inn starfsmann")}
+          </button>
+        </div>
+        <div className="cb att">
+          {onNow.length ? onNow.map((r) => (
+            <div className="it" key={r.punchId}>
+              <span className="avt" style={{ background: r.c, width: 34, height: 34 }}>{r.av}</span>
+              <div className="tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : ""}</span></div>
+              <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)", marginLeft: "auto" }}>{t("á vakt")}</span>
+              <button className="btn ghost sm" style={{ marginLeft: 10 }} onClick={() => setEditPunch(r)}>{t("Leiðrétta")}</button>
+              <button className="btn sm" style={{ marginLeft: 8 }} onClick={() => doClockOut(r)}>{t("tk:clockout")}</button>
+            </div>
+          )) : <div className="muted" style={{ padding: 16, textAlign: "center" }}>{t("Enginn skráður inn núna.")}</div>}
+        </div>
+      </div>
+
       <div className="card" style={{ marginTop: 20 }}>
         <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)}{missing ? ` · ${missing} ${t("vantar stimplun")}` : ""}</div></div></div>
         <div className="cb tbl" style={{ paddingTop: 8, opacity: loading ? 0.5 : 1 }}>
@@ -210,7 +245,83 @@ function LiveAttendance({ onShift, initial }: { onShift: number; initial: AttRow
           </table>
         </div>
       </div>
+
+      {clockInOpen && <ClockInModal roster={roster} onClose={() => setClockInOpen(false)} onDone={() => { setClockInOpen(false); router.refresh(); }} />}
+      {editPunch && <AdjustPunchModal row={editPunch} onClose={() => setEditPunch(null)} onDone={() => { setEditPunch(null); router.refresh(); }} />}
     </>
+  );
+}
+
+function ClockInModal({ roster, onClose, onDone }: { roster: RosterRow[]; onClose: () => void; onDone: () => void }) {
+  const { t } = useLang();
+  const [eid, setEid] = useState(roster[0]?.id ?? "");
+  const [time, setTime] = useState(nowHHMM());
+  const [busy, setBusy] = useState(false);
+  async function go() {
+    if (!eid) { toast("Veldu starfsmann"); return; }
+    setBusy(true);
+    const res = await managerClockIn(eid, time);
+    setBusy(false);
+    if (res.ok) { toast("Stimplað inn"); onDone(); } else toast(res.error ?? "Villa");
+  }
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal">
+        <div className="mh">
+          <div><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Stimpla inn starfsmann")}</div><div className="muted" style={{ fontSize: 12 }}>{t("fyrir einhvern sem gleymdi að skrá sig inn")}</div></div>
+          <button className="x" onClick={onClose}>✕</button>
+        </div>
+        <div className="mb">
+          <div className="field"><label>{t("Starfsmaður")}</label>
+            <select value={eid} onChange={(e) => setEid(e.target.value)}>
+              {roster.length ? roster.map((r) => <option key={r.id} value={r.id}>{r.name} · {r.dept}</option>) : <option value="">{t("Allir eru þegar skráðir inn")}</option>}
+            </select>
+          </div>
+          <div className="field"><label>{t("Tími innstimplunar")}</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+          <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
+            <button className="btn" disabled={busy || !eid} onClick={go}>{t("tk:clockin")}</button>
+            <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdjustPunchModal({ row, onClose, onDone }: { row: OnNowRow; onClose: () => void; onDone: () => void }) {
+  const { t } = useLang();
+  const [cin, setCin] = useState(row.in);
+  const [cout, setCout] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    setBusy(true);
+    const res = await adjustPunch(row.punchId, cin, cout || undefined);
+    setBusy(false);
+    if (res.ok) { toast("Tími leiðréttur"); onDone(); } else toast(res.error ?? "Villa");
+  }
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal">
+        <div className="mh">
+          <span className="avt" style={{ background: row.c, width: 34, height: 34 }}>{row.av}</span>
+          <div><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Leiðrétta tíma")} · {row.name}</div><div className="muted" style={{ fontSize: 12 }}>{t("breyttu inn- eða útstimplun")}</div></div>
+          <button className="x" onClick={onClose}>✕</button>
+        </div>
+        <div className="mb">
+          <div style={{ display: "flex", gap: 10 }}>
+            <div className="field" style={{ flex: 1 }}><label>{t("Innstimplun")}</label><input type="time" value={cin} onChange={(e) => setCin(e.target.value)} /></div>
+            <div className="field" style={{ flex: 1 }}><label>{t("Útstimplun")}</label><input type="time" value={cout} onChange={(e) => setCout(e.target.value)} /></div>
+          </div>
+          <p className="muted" style={{ fontSize: 11.5, margin: "-4px 0 8px" }}>{t("Skildu útstimplun eftir auða til að halda vaktinni opinni.")}</p>
+          <div style={{ display: "flex", gap: 9, marginTop: 8 }}>
+            <button className="btn" disabled={busy} onClick={save}>{t("Vista")}</button>
+            <button className="btn ghost" onClick={onClose}>{t("Loka")}</button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
