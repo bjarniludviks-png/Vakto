@@ -89,8 +89,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
 
   return (
     <>
-      <PageHeader title="Spjall" subtitle="Innra spjall fyrirtækisins" />
-      <div className={`msgr${active ? " thread-open" : ""}`}>
+      <div className={`msgr full${active ? " thread-open" : ""}`}>
         {/* conversation list */}
         <div className="msgr-list">
           <div className="msgr-head" style={{ gap: 8 }}>
