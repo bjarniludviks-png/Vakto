@@ -239,7 +239,21 @@ export type UpdateEmployeeInput = {
   employmentRatio?: string;
   union?: string;
   payType?: string;
+  payRule?: { eve: number; weekend: number; overtime: number; holiday: number; night: number } | null;
 };
+
+/** Tolerant read of an employee's custom pay-rule set (null before 0013). */
+export async function getEmployeePayRule(id: string): Promise<{ eve: number; weekend: number; overtime: number; holiday: number; night: number } | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("employees").select("pay_rule").eq("id", id).maybeSingle();
+    if (error) return null;
+    return (data?.pay_rule as { eve: number; weekend: number; overtime: number; holiday: number; night: number }) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** Deactivate (or reactivate) an employee — keeps all history. */
 export async function setEmployeeStatus(id: string, active: boolean): Promise<ActionResult> {
@@ -291,10 +305,16 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
     if (input.employmentRatio) patch.employment_ratio = num(input.employmentRatio, 100);
     if (input.union) patch.union_agreement = input.union;
     if (input.payType) patch.pay_type = input.payType === "Mánaðarlaun" ? "monthly" : "hourly";
-    if (Object.keys(patch).length === 0) return { ok: true };
 
-    const { error } = await supabase.from("employees").update(patch).eq("id", id);
-    if (error) return { ok: false, error: error.message };
+    if (Object.keys(patch).length) {
+      const { error } = await supabase.from("employees").update(patch).eq("id", id);
+      if (error) return { ok: false, error: error.message };
+    }
+    // Custom pay-rule set — best-effort (ignored before migration 0013).
+    if (input.payRule !== undefined) {
+      await supabase.from("employees").update({ pay_rule: input.payRule }).eq("id", id);
+    }
+    if (Object.keys(patch).length === 0 && input.payRule === undefined) return { ok: true };
 
     const { data: { user } } = await supabase.auth.getUser();
     const company = await companyId(supabase);

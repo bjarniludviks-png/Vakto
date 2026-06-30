@@ -721,3 +721,6 @@ drop policy if exists messages_ins on messages;
 create policy messages_ins on messages for insert with check (company_id = public.auth_company_id() and sender_id = auth.uid());
 drop policy if exists channel_members_rw on channel_members;
 create policy channel_members_rw on channel_members for all using (exists (select 1 from channels c where c.id = channel_id and c.company_id = public.auth_company_id())) with check (exists (select 1 from channels c where c.id = channel_id and c.company_id = public.auth_company_id()));
+
+-- ===== 0013 — employee custom pay-rule =====
+alter table employees add column if not exists pay_rule jsonb;

@@ -17,6 +17,7 @@ export type Employee = {
   phone: string | null;
   bankAccount: string | null;
   role: string;
+  payRule?: { eve: number; weekend: number; overtime: number; holiday: number; night: number } | null;
 };
 
 /** Avatar initials = first two letters of the first name (matches the

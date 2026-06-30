@@ -1,13 +1,14 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, setEmployeeStatus, deleteEmployee } from "./actions";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, setEmployeeStatus, deleteEmployee, getEmployeePayRule } from "./actions";
+import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, type RuleSet } from "@/lib/payrules";
 
 /** Best-effort document type from a filename (for the documents table). */
 function detectDocType(name: string): string {
@@ -37,15 +38,6 @@ function payrollPreview(e: Employee) {
   return { gross, net, cost };
 }
 
-function premiumRules(e: Employee): [string, string][] {
-  if (e.payType === "monthly")
-    return [["Fast", "Mánaðarlaun + hlunnindi skv. samningi"]];
-  return [
-    ["+33%", "Morgun — virka daga fyrir 07:00"],
-    ["+45%", "Helgi — laugardag & sunnudag"],
-    ["+90%", "Yfirvinna — yfir 43 klst/viku"],
-  ];
-}
 
 function statusBadge(e: Employee) {
   if (e.employmentRatio > 120)
@@ -131,8 +123,13 @@ export default function EmployeesScreen({
     const fd = new FormData(ev.currentTarget);
     const g = (k: string) => (fd.get(k) as string)?.trim() || undefined;
     setSaving(true);
+    const union = g("union");
+    const num = (k: string) => Math.max(0, Number(fd.get(k)) || 0);
+    const payRule = union === CUSTOM_UNION
+      ? { eve: num("rule_eve"), weekend: num("rule_weekend"), overtime: num("rule_overtime"), holiday: num("rule_holiday"), night: num("rule_night") }
+      : undefined;
     const res = await updateEmployee(current.id, {
-      rate: g("rate"), employmentRatio: g("employmentRatio"), union: g("union"), payType: g("payType"),
+      rate: g("rate"), employmentRatio: g("employmentRatio"), union, payType: g("payType"), payRule,
     });
     setSaving(false);
     setCurrent(null);
@@ -353,53 +350,75 @@ const FLD: React.CSSProperties = {
   background: "#fff",
 };
 
-function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
+function LaunTab({ e }: { e: Employee }) {
   const pay = payrollPreview(e);
   const rateLabel = e.payType === "monthly" ? `${nf(e.rate)} kr/mán` : `${nf(e.rate)} kr/klst`;
+  const [union, setUnion] = useState<string>(e.union ?? "Efling");
+  const custom = union === CUSTOM_UNION;
+  const [rules, setRules] = useState<RuleSet>(resolveRuleSet(CUSTOM_UNION, e.payRule));
+  const shown = custom ? rules : (UNION_PRESETS[union] ?? UNION_PRESETS["Efling"]);
 
-  if (tab === "Laun") {
-    return (
-      <>
-        <Sec first>Launasnið</Sec>
-        <div className="statline">
-          <span className="k">Tegund</span>
-          <select name="payType" style={FLD} defaultValue={e.payType === "monthly" ? "Mánaðarlaun" : "Tímakaup"}>
-            <option>Tímakaup</option>
-            <option>Mánaðarlaun</option>
-          </select>
+  useEffect(() => {
+    if (e.union === CUSTOM_UNION) getEmployeePayRule(e.id).then((r) => { if (r) setRules(r); });
+  }, [e.id, e.union]);
+
+  return (
+    <>
+      <Sec first>Launasnið</Sec>
+      <div className="statline">
+        <span className="k">Tegund</span>
+        <select name="payType" style={FLD} defaultValue={e.payType === "monthly" ? "Mánaðarlaun" : "Tímakaup"}>
+          <option>Tímakaup</option><option>Mánaðarlaun</option>
+        </select>
+      </div>
+      <div className="statline">
+        <span className="k">Taxti</span>
+        <input name="rate" defaultValue={rateLabel} style={{ ...FLD, width: 150, textAlign: "right" }} />
+      </div>
+      <div className="statline">
+        <span className="k">Starfshlutfall</span>
+        <input name="employmentRatio" defaultValue={`${e.employmentRatio}%`} style={{ ...FLD, width: 80, textAlign: "right" }} />
+      </div>
+      <div className="statline">
+        <span className="k">Kjarasamningur</span>
+        <select name="union" value={union} onChange={(ev) => setUnion(ev.target.value)} style={{ ...FLD, width: 190 }}>
+          {Object.keys(UNION_PRESETS).map((u) => <option key={u}>{u}</option>)}
+          <option>{CUSTOM_UNION}</option>
+        </select>
+      </div>
+
+      <Sec>Álög & yfirvinna {custom ? "· sérsniðnar reglur" : "· úr kjarasamningi"}</Sec>
+      {RULE_FIELDS.map((f) => (
+        <div className="statline" key={f.key}>
+          <span className="k">{f.label} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {f.hint}</span></span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <input
+              name={`rule_${f.key}`}
+              type="number" min={0}
+              value={shown[f.key]}
+              readOnly={!custom}
+              onChange={custom ? (ev) => setRules((r) => ({ ...r, [f.key]: Math.max(0, Number(ev.target.value) || 0) })) : undefined}
+              style={{ ...FLD, width: 72, textAlign: "right", background: custom ? undefined : "var(--line2)" }}
+            />
+            <span className="muted">%</span>
+          </span>
         </div>
-        <div className="statline">
-          <span className="k">Taxti</span>
-          <input name="rate" defaultValue={rateLabel} style={{ ...FLD, width: 150, textAlign: "right" }} />
-        </div>
-        <div className="statline">
-          <span className="k">Starfshlutfall</span>
-          <input name="employmentRatio" defaultValue={`${e.employmentRatio}%`} style={{ ...FLD, width: 80, textAlign: "right" }} />
-        </div>
-        <div className="statline">
-          <span className="k">Kjarasamningur</span>
-          <select name="union" style={{ ...FLD, width: 175 }} defaultValue={e.union ?? "Efling"}>
-            <option>Efling</option>
-            <option>Efling – veitingar/SGS</option>
-            <option>VR</option>
-            <option>Matvís</option>
-            <option>Eigin reglur</option>
-          </select>
-        </div>
-        <Sec>Álög & yfirvinna</Sec>
-        {premiumRules(e).map((r, i) => (
-          <div className="statline" key={i}>
-            <span className="k" style={{ fontWeight: 650, color: "var(--brand)" }}>{r[0]}</span>
-            <span className="v" style={{ fontWeight: 400, color: "var(--ink2)" }}>{r[1]}</span>
-          </div>
-        ))}
-        <Sec>Reiknaður mánaðarkostnaður</Sec>
-        <Stat k="Brúttólaun" v={kr(pay.gross)} />
-        <Stat k="Útborgað (áætl.)" v={kr(pay.net)} vColor="var(--good)" />
-        <Stat k="Kostnaður þinn (m. byrði)" v={kr(pay.cost)} strong />
-      </>
-    );
-  }
+      ))}
+      <p className="muted" style={{ fontSize: 11.5, margin: "6px 0 0" }}>
+        {custom ? "Sérsniðnar reglur — gilda fyrir alþjóðamarkað eða sérsamninga." : "Reglur koma sjálfkrafa úr kjarasamningi. Veldu „Eigin reglur\" til að breyta. (Hlutföll óstaðfest — yfirfarið gegn samningi.)"}
+      </p>
+
+      <Sec>Reiknaður mánaðarkostnaður</Sec>
+      <Stat k="Brúttólaun" v={kr(pay.gross)} />
+      <Stat k="Útborgað (áætl.)" v={kr(pay.net)} vColor="var(--good)" />
+      <Stat k="Kostnaður þinn (m. byrði)" v={kr(pay.cost)} strong />
+    </>
+  );
+}
+
+function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
+
+  if (tab === "Laun") return <LaunTab e={e} />;
   if (tab === "Vinna") {
     return (
       <>

@@ -34,3 +34,31 @@ export function mergeRules(overrides: Partial<PayRule>[]): PayRule[] {
 export function allConfirmed(rules: PayRule[]): boolean {
   return rules.every((r) => r.confirmed);
 }
+
+// ---------- per-employee rule sets (union preset or custom) ----------
+export type RuleSet = { eve: number; weekend: number; overtime: number; holiday: number; night: number };
+
+export const RULE_FIELDS: { key: keyof RuleSet; label: string; hint: string }[] = [
+  { key: "eve", label: "Kvöld-/morgunálag", hint: "t.d. fyrir 08:00 og eftir 17:00" },
+  { key: "weekend", label: "Helgarálag", hint: "laugardaga & sunnudaga" },
+  { key: "overtime", label: "Yfirvinna", hint: "yfir umsaminni vinnuviku" },
+  { key: "holiday", label: "Stórhátíðarálag", hint: "stórhátíðardagar" },
+  { key: "night", label: "Næturálag", hint: "yfir nóttina" },
+];
+
+export const CUSTOM_UNION = "Eigin reglur";
+
+// ⚠️ UNCONFIRMED placeholders — verify against each agreement before real pay.
+export const UNION_PRESETS: Record<string, RuleSet> = {
+  "Efling": { eve: 33, weekend: 45, overtime: 90, holiday: 90, night: 45 },
+  "Efling – veitingar/SGS": { eve: 33, weekend: 45, overtime: 90, holiday: 90, night: 55 },
+  "VR": { eve: 33, weekend: 45, overtime: 80, holiday: 90, night: 40 },
+  "Matvís": { eve: 33, weekend: 45, overtime: 95, holiday: 100, night: 50 },
+};
+export const ZERO_RULESET: RuleSet = { eve: 0, weekend: 0, overtime: 0, holiday: 0, night: 0 };
+
+/** Effective rule set: union preset, or the employee's custom set. */
+export function resolveRuleSet(union: string | null | undefined, custom?: Partial<RuleSet> | null): RuleSet {
+  if (union === CUSTOM_UNION) return { ...ZERO_RULESET, ...(custom ?? {}) };
+  return UNION_PRESETS[union ?? ""] ?? UNION_PRESETS["Efling"];
+}
