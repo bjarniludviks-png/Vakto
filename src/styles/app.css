@@ -492,3 +492,33 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 /* loading skeleton */
 .sk-line{background:linear-gradient(90deg,var(--line2) 25%,var(--line) 37%,var(--line2) 63%);background-size:400% 100%;border-radius:7px;animation:sk 1.2s ease-in-out infinite}
 @keyframes sk{0%{background-position:100% 0}100%{background-position:-100% 0}}
+
+/* ---- Messenger-style chat ---- */
+.msgr{display:flex;height:calc(100dvh - 150px);min-height:460px;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--panel);box-shadow:var(--shadow-card);margin-top:8px}
+.msgr-list{width:308px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
+.msgr-thread{flex:1;display:flex;flex-direction:column;min-width:0}
+.msgr-head{padding:11px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;font-weight:650;font-size:14.5px}
+.msgr-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:7px;background:var(--bg)}
+.msgr-input{border-top:1px solid var(--line);padding:9px 11px;display:flex;align-items:center;gap:6px}
+.msgr-input .txt{flex:1;border:1px solid var(--line);border-radius:999px;padding:9px 15px;font-size:14px;outline:none;background:var(--panel)}
+.conv{display:flex;gap:11px;padding:10px 13px;cursor:pointer;align-items:center}
+.conv:hover{background:var(--line2)} .conv.on{background:var(--brand-soft)}
+.conv .tx{min-width:0;flex:1} .conv .tx b{font-size:13.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .conv .tx span{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.mbub{max-width:74%;padding:8px 12px;border-radius:15px;font-size:13.5px;line-height:1.42;word-break:break-word}
+.mbub.them{background:var(--panel);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
+.mbub.me{background:var(--brand);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.mbub img{max-width:240px;border-radius:11px;display:block}
+.mbub .who{font-size:11px;font-weight:700;display:block;margin-bottom:2px;color:var(--brand)}
+.mbub .tm{font-size:10px;opacity:.65;display:block;text-align:right;margin-top:3px}
+.iconbtn{width:36px;height:36px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink2);flex-shrink:0}
+.iconbtn:hover{background:var(--line2)}
+.emojibar{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line2)}
+.emojibar button{font-size:21px;background:none;border:none;cursor:pointer;padding:2px;line-height:1}
+.mob-back{display:none}
+@media(max-width:900px){
+  .msgr{height:calc(100dvh - 130px)}
+  .msgr-list{width:100%}
+  .msgr.thread-open .msgr-list{display:none}
+  .msgr:not(.thread-open) .msgr-thread{display:none}
+  .mob-back{display:flex}
+}

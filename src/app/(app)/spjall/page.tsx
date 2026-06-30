@@ -1,7 +1,7 @@
 import ChatScreen from "./chat-screen";
-import { listChannels } from "./actions";
+import { listConversations } from "./actions";
 
 export default async function SpjallPage() {
-  const { ok, channels } = await listChannels();
-  return <ChatScreen channels={channels} live={ok} />;
+  const initial = await listConversations();
+  return <ChatScreen initial={initial} />;
 }
