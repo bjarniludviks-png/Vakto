@@ -9,6 +9,7 @@ import { dec1 } from "@/lib/format";
 import { PayslipModal } from "@/components/app/payslip-modal";
 import { StaffCardModal, type StaffCardData } from "@/components/app/staff-card";
 import type { StaffCard } from "@/lib/mycard.server";
+import { resolvePerms, type Perms } from "@/lib/permissions";
 
 type ReqKind = "leave" | "avail" | "swap" | "pickup";
 const TABS = [
@@ -21,6 +22,7 @@ export default function EmployeeScreen({ card }: { card?: StaffCard }) {
   const [photo, setPhoto] = useState<string | null>(null);
   const [req, setReq] = useState<ReqKind | null>(null);
   const [showCard, setShowCard] = useState(false);
+  const perms = card?.perms ?? resolvePerms();
   const cardData: StaffCardData = card
     ? { name: card.name, role: card.role, company: card.company, photoUrl: photo ?? card.photoUrl, idCode: card.idCode, initials: card.initials, color: card.color, employeeKt: card.employeeKt, companyKt: card.companyKt }
     : { name: "Mína Huong", role: "Vaktstjóri", company: "Kaffi Krónan", photoUrl: photo, idCode: "demo", initials: "MÍ", color: "#5b50e6", employeeKt: "010190-2389", companyKt: "550101-2210" };
@@ -32,20 +34,20 @@ export default function EmployeeScreen({ card }: { card?: StaffCard }) {
         <div className="emp-head">
           <PhotoAvatar photo={photo} setPhoto={setPhoto} big={false} />
           <div style={{ flex: 1 }}><div className="emp-nm">{card?.name ?? "Mína Huong"}</div><div className="emp-meta">{card ? `${t(card.role)} · ${card.company}` : t("emp:meta")}</div></div>
-          <button className="btn ghost sm" onClick={() => setShowCard(true)}>
+          {perms.card && <button className="btn ghost sm" onClick={() => setShowCard(true)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8" cy="11" r="2" /><path d="M14 9h4M14 13h4M5 16h7" /></svg>{t("Skírteini")}
-          </button>
+          </button>}
         </div>
 
         <div className="emp-tabs">
-          {TABS.map(([id, label]) => (
+          {TABS.filter(([id]) => (id !== "pay" || perms.pay) && (id !== "sh" || perms.shifts)).map(([id, label]) => (
             <button key={id} className={`etab2${tab === id ? " on" : ""}`} onClick={() => setTab(id)}>{t(label)}</button>
           ))}
         </div>
 
-        {tab === "ov" && <Overview onReq={setReq} />}
-        {tab === "sh" && <MyShifts onReq={setReq} />}
-        {tab === "pay" && <Pay />}
+        {tab === "ov" && <Overview onReq={setReq} perms={perms} />}
+        {tab === "sh" && perms.shifts && <MyShifts onReq={setReq} perms={perms} />}
+        {tab === "pay" && perms.pay && <Pay />}
         {tab === "ri" && <Rights />}
         {tab === "pr" && <Profile photo={photo} setPhoto={setPhoto} />}
       </div>
@@ -123,11 +125,11 @@ function QuickActions({ onReq }: { onReq: (k: ReqKind) => void }) {
   );
 }
 
-function Overview({ onReq }: { onReq: (k: ReqKind) => void }) {
+function Overview({ onReq, perms }: { onReq: (k: ReqKind) => void; perms: Perms }) {
   const { t } = useLang();
   return (
     <div className="emp-pane on">
-      <PunchCard />
+      {perms.clock && <PunchCard />}
       <div className="mini">
         <div className="mh">{t("Næsta vakt")}</div>
         <div className="mr"><span>Í dag · Mið 24. júní</span><b>08:00–16:00</b></div>
@@ -142,12 +144,12 @@ function Overview({ onReq }: { onReq: (k: ReqKind) => void }) {
           </label>
         ))}
       </div>
-      <QuickActions onReq={onReq} />
+      {perms.requests && <QuickActions onReq={onReq} />}
     </div>
   );
 }
 
-function MyShifts({ onReq }: { onReq: (k: ReqKind) => void }) {
+function MyShifts({ onReq, perms }: { onReq: (k: ReqKind) => void; perms: Perms }) {
   const { t } = useLang();
   return (
     <div className="emp-pane on">
@@ -167,8 +169,8 @@ function MyShifts({ onReq }: { onReq: (k: ReqKind) => void }) {
         <div className="mr"><span>{t("Tímar mánaðar (til þessa)")}</span><b>142,5 {t("klst")}</b></div>
         <div className="mr"><span>{t("Næsta útborgun")}</span><b>1. júlí</b></div>
       </div>
-      <MyHours />
-      <QuickActions onReq={onReq} />
+      <MyHours canRequest={perms.requests} />
+      {perms.requests && <QuickActions onReq={onReq} />}
     </div>
   );
 }
@@ -178,7 +180,7 @@ const pad2 = (n: number) => String(n).padStart(2, "0");
 const isoOf = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 const niceISO = (s: string) => { const [y, m, d] = s.split("-").map(Number); return `${d}. ${MONTHS_IS[m - 1]} ${y}`; };
 
-function MyHours() {
+function MyHours({ canRequest }: { canRequest: boolean }) {
   const { t } = useLang();
   const [rows, setRows] = useState<MyPunchRow[]>([]);
   const [live, setLive] = useState(false);
@@ -197,7 +199,7 @@ function MyHours() {
     <div className="mini" style={{ gridColumn: "1 / -1" }}>
       <div className="mh" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span>{t("Mínir unnir tímar · þessi mánuður")}</span>
-        <button className="btn ghost sm" onClick={() => setCorr({ date: isoOf(new Date()) })}>{t("Óska eftir leiðréttingu")}</button>
+        {canRequest && <button className="btn ghost sm" onClick={() => setCorr({ date: isoOf(new Date()) })}>{t("Óska eftir leiðréttingu")}</button>}
       </div>
       {live ? (rows.length ? (
         <>
@@ -206,7 +208,7 @@ function MyHours() {
               <span>{niceISO(p.date)} · {p.in}–{p.out ?? t("opin")}</span>
               <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <b>{p.open ? "—" : `${dec1(p.hours)} ${t("klst")}`}</b>
-                <a style={{ color: "var(--brand)", fontWeight: 600, fontSize: 12, cursor: "pointer" }} onClick={() => setCorr({ punchId: p.punchId, date: p.date })}>{t("Leiðrétta")}</a>
+                {canRequest && <a style={{ color: "var(--brand)", fontWeight: 600, fontSize: 12, cursor: "pointer" }} onClick={() => setCorr({ punchId: p.punchId, date: p.date })}>{t("Leiðrétta")}</a>}
               </span>
             </div>
           ))}

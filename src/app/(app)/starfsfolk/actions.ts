@@ -240,7 +240,22 @@ export type UpdateEmployeeInput = {
   union?: string;
   payType?: string;
   payRule?: { eve: number; weekend: number; overtime: number; holiday: number; night: number } | null;
+  permissions?: Record<string, boolean> | null;
+  benefits?: { name: string; type: string; amount: number }[] | null;
 };
+
+/** Tolerant read of an employee's benefits (null before 0016). */
+export async function getEmployeeExtras(id: string): Promise<{ permissions: Record<string, boolean> | null; benefits: { name: string; type: string; amount: number }[] | null }> {
+  if (!isSupabaseConfigured()) return { permissions: null, benefits: null };
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("employees").select("permissions, benefits").eq("id", id).maybeSingle();
+    if (error) return { permissions: null, benefits: null };
+    return { permissions: (data?.permissions as never) ?? null, benefits: (data?.benefits as never) ?? null };
+  } catch {
+    return { permissions: null, benefits: null };
+  }
+}
 
 /** Tolerant read of an employee's custom pay-rule set (null before 0013). */
 export async function getEmployeePayRule(id: string): Promise<{ eve: number; weekend: number; overtime: number; holiday: number; night: number } | null> {
@@ -314,7 +329,10 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
     if (input.payRule !== undefined) {
       await supabase.from("employees").update({ pay_rule: input.payRule }).eq("id", id);
     }
-    if (Object.keys(patch).length === 0 && input.payRule === undefined) return { ok: true };
+    // Permissions + benefits — best-effort (ignored before migration 0016).
+    if (input.permissions !== undefined) await supabase.from("employees").update({ permissions: input.permissions }).eq("id", id);
+    if (input.benefits !== undefined) await supabase.from("employees").update({ benefits: input.benefits }).eq("id", id);
+    if (!Object.keys(patch).length && input.payRule === undefined && input.permissions === undefined && input.benefits === undefined) return { ok: true };
 
     const { data: { user } } = await supabase.auth.getUser();
     const company = await companyId(supabase);

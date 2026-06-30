@@ -18,6 +18,8 @@ export type Employee = {
   bankAccount: string | null;
   role: string;
   payRule?: { eve: number; weekend: number; overtime: number; holiday: number; night: number } | null;
+  permissions?: { clock: boolean; shifts: boolean; pay: boolean; requests: boolean; card: boolean; chat: boolean } | null;
+  benefits?: { name: string; type: "fixed" | "perkm"; amount: number }[] | null;
 };
 
 /** Avatar initials = first two letters of the first name (matches the

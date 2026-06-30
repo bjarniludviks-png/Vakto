@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { initials } from "@/lib/employees";
+import { resolvePerms, type Perms } from "@/lib/permissions";
 
 export type StaffCard = {
   name: string;
@@ -13,13 +14,14 @@ export type StaffCard = {
   color: string;
   employeeKt: string | null; // kennitala starfsmanns
   companyKt: string | null;  // kennitala fyrirtækis
+  perms: Perms;
   live: boolean;
 };
 
 const DEMO: StaffCard = {
   name: "Mína Huong", role: "Vaktstjóri", company: "Kaffi Krónan",
   photoUrl: null, idCode: "demo", initials: "MÍ", color: "#5b50e6",
-  employeeKt: "010190-2389", companyKt: "550101-2210", live: false,
+  employeeKt: "010190-2389", companyKt: "550101-2210", perms: resolvePerms(), live: false,
 };
 
 const ROLE_IS: Record<string, string> = {
@@ -49,6 +51,12 @@ export async function getMyCard(): Promise<StaffCard> {
       const { data: co } = await supabase.from("companies").select("kennitala").eq("id", profile.company_id).maybeSingle();
       companyKt = (co?.kennitala as string) ?? null;
     }
+    // Permissions (tolerant — column added in migration 0016).
+    let perms = resolvePerms();
+    if (emp?.id) {
+      const { data: pm } = await supabase.from("employees").select("permissions").eq("id", emp.id).maybeSingle();
+      perms = resolvePerms(pm?.permissions as Partial<Perms> | null);
+    }
 
     const name = (emp?.full_name as string)
       ?? (profile?.full_name as string)
@@ -66,6 +74,7 @@ export async function getMyCard(): Promise<StaffCard> {
       color: (emp?.avatar_color as string) ?? "#e9700f",
       employeeKt: (emp?.kennitala as string) ?? null,
       companyKt,
+      perms,
       live: true,
     };
   } catch {

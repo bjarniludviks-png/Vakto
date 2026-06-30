@@ -761,3 +761,7 @@ create policy channel_members_read on channel_members for select using (public.c
 create policy channel_members_write on channel_members for all using (public.channel_company(channel_id) = public.auth_company_id()) with check (public.channel_company(channel_id) = public.auth_company_id());
 drop policy if exists messages_read on messages;
 create policy messages_read on messages for select using (company_id = public.auth_company_id() and public.channel_visible(channel_id));
+
+-- ===== 0016 — permissions + benefits =====
+alter table employees add column if not exists permissions jsonb;
+alter table employees add column if not exists benefits jsonb;

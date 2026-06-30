@@ -7,8 +7,9 @@ import { toast } from "@/components/app/toast";
 import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, setEmployeeStatus, deleteEmployee, getEmployeePayRule } from "./actions";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, setEmployeeStatus, deleteEmployee, getEmployeePayRule, getEmployeeExtras } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, type RuleSet } from "@/lib/payrules";
+import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, type Benefit } from "@/lib/permissions";
 
 /** Best-effort document type from a filename (for the documents table). */
 function detectDocType(name: string): string {
@@ -128,8 +129,11 @@ export default function EmployeesScreen({
     const payRule = union === CUSTOM_UNION
       ? { eve: num("rule_eve"), weekend: num("rule_weekend"), overtime: num("rule_overtime"), holiday: num("rule_holiday"), night: num("rule_night") }
       : undefined;
+    const permissions = fd.get("permform")
+      ? Object.fromEntries(PERM_FIELDS.map((f) => [f.key, fd.has(`perm_${f.key}`)]))
+      : undefined;
     const res = await updateEmployee(current.id, {
-      rate: g("rate"), employmentRatio: g("employmentRatio"), union, payType: g("payType"), payRule,
+      rate: g("rate"), employmentRatio: g("employmentRatio"), union, payType: g("payType"), payRule, permissions,
     });
     setSaving(false);
     setCurrent(null);
@@ -351,16 +355,29 @@ const FLD: React.CSSProperties = {
 };
 
 function LaunTab({ e }: { e: Employee }) {
+  const { t } = useLang();
   const pay = payrollPreview(e);
   const rateLabel = e.payType === "monthly" ? `${nf(e.rate)} kr/mán` : `${nf(e.rate)} kr/klst`;
   const [union, setUnion] = useState<string>(e.union ?? "Efling");
   const custom = union === CUSTOM_UNION;
   const [rules, setRules] = useState<RuleSet>(resolveRuleSet(CUSTOM_UNION, e.payRule));
   const shown = custom ? rules : (UNION_PRESETS[union] ?? UNION_PRESETS["Efling"]);
+  const [benefits, setBenefits] = useState<Benefit[]>(e.benefits ?? []);
+  const [bName, setBName] = useState(BENEFIT_PRESETS[0]);
+  const [bType, setBType] = useState<"fixed" | "perkm">("fixed");
+  const [bAmt, setBAmt] = useState("");
 
   useEffect(() => {
     if (e.union === CUSTOM_UNION) getEmployeePayRule(e.id).then((r) => { if (r) setRules(r); });
+    getEmployeeExtras(e.id).then((x) => { if (x.benefits) setBenefits(x.benefits as Benefit[]); });
   }, [e.id, e.union]);
+
+  function saveBenefits(list: Benefit[]) { setBenefits(list); updateEmployee(e.id, { benefits: list }).then((r) => toast(r.ok ? "Hlunnindi vistuð" : (r.error ?? "Villa"))); }
+  function addBenefit() {
+    const amt = Math.max(0, Math.round(Number(bAmt) || 0));
+    if (!bName.trim() || !amt) { toast("Sláðu inn heiti og upphæð"); return; }
+    saveBenefits([...benefits, { name: bName.trim(), type: bType, amount: amt }]); setBAmt("");
+  }
 
   return (
     <>
@@ -407,6 +424,25 @@ function LaunTab({ e }: { e: Employee }) {
       <p className="muted" style={{ fontSize: 11.5, margin: "6px 0 0" }}>
         {custom ? "Sérsniðnar reglur — gilda fyrir alþjóðamarkað eða sérsamninga." : "Reglur koma sjálfkrafa úr kjarasamningi. Veldu „Eigin reglur\" til að breyta. (Hlutföll óstaðfest — yfirfarið gegn samningi.)"}
       </p>
+
+      <Sec>Hlunnindi & styrkir</Sec>
+      {benefits.map((b, i) => (
+        <div className="statline" key={i}>
+          <span className="k">{b.name}</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+            <b>{nf(b.amount)} {b.type === "perkm" ? "kr/km" : "kr/mán"}</b>
+            <a style={{ color: "var(--bad)", fontSize: 12, cursor: "pointer" }} onClick={() => saveBenefits(benefits.filter((_, j) => j !== i))}>{t("Eyða")}</a>
+          </span>
+        </div>
+      ))}
+      <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
+        <input list="benefit-presets" value={bName} onChange={(e2) => setBName(e2.target.value)} placeholder={t("Heiti")} style={{ ...FLD, flex: 1, minWidth: 120 }} />
+        <datalist id="benefit-presets">{BENEFIT_PRESETS.map((p) => <option key={p} value={p} />)}</datalist>
+        <select value={bType} onChange={(e2) => setBType(e2.target.value as "fixed" | "perkm")} style={FLD}><option value="fixed">{t("Fast (kr/mán)")}</option><option value="perkm">{t("Per km")}</option></select>
+        <input type="number" min={0} value={bAmt} onChange={(e2) => setBAmt(e2.target.value)} placeholder={t("Upphæð")} style={{ ...FLD, width: 100, textAlign: "right" }} />
+        <button type="button" className="btn ghost sm" onClick={addBenefit}>{t("Bæta við")}</button>
+      </div>
+      <p className="muted" style={{ fontSize: 11.5, margin: "6px 0 0" }}>{t("Föst hlunnindi bætast við laun. Per-km (t.d. ökutækjastyrkur) reiknast af skráðum km.")}</p>
 
       <Sec>Reiknaður mánaðarkostnaður</Sec>
       <Stat k="Brúttólaun" v={kr(pay.gross)} />
@@ -461,6 +497,15 @@ function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
             <option>Bjarni (eigandi)</option>
           </select>
         </div>
+
+        <Sec>Aðgangur að Mitt svæði</Sec>
+        <input type="hidden" name="permform" value="1" />
+        {(() => { const perms = resolvePerms(e.permissions); return PERM_FIELDS.map((f) => (
+          <label className="statline" key={f.key} style={{ cursor: "pointer" }}>
+            <span className="k">{f.label} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {f.hint}</span></span>
+            <input type="checkbox" name={`perm_${f.key}`} defaultChecked={perms[f.key]} style={{ width: 18, height: 18, accentColor: "var(--brand)" }} />
+          </label>
+        )); })()}
       </>
     );
   }
