@@ -11,12 +11,15 @@ export type StaffCard = {
   idCode: string;
   initials: string;
   color: string;
+  employeeKt: string | null; // kennitala starfsmanns
+  companyKt: string | null;  // kennitala fyrirtækis
   live: boolean;
 };
 
 const DEMO: StaffCard = {
   name: "Mína Huong", role: "Vaktstjóri", company: "Kaffi Krónan",
-  photoUrl: null, idCode: "demo", initials: "MÍ", color: "#5b50e6", live: false,
+  photoUrl: null, idCode: "demo", initials: "MÍ", color: "#5b50e6",
+  employeeKt: "010190-2389", companyKt: "550101-2210", live: false,
 };
 
 const ROLE_IS: Record<string, string> = {
@@ -37,8 +40,15 @@ export async function getMyCard(): Promise<StaffCard> {
 
     const { data: emp } = await supabase
       .from("employees")
-      .select("id, full_name, title, avatar_color, photo_url, positions(name)")
+      .select("id, full_name, title, avatar_color, photo_url, kennitala, positions(name)")
       .eq("user_id", user.id).maybeSingle();
+
+    // Company kennitala (tolerant — column added in migration 0009).
+    let companyKt: string | null = null;
+    if (profile?.company_id) {
+      const { data: co } = await supabase.from("companies").select("kennitala").eq("id", profile.company_id).maybeSingle();
+      companyKt = (co?.kennitala as string) ?? null;
+    }
 
     const name = (emp?.full_name as string)
       ?? (profile?.full_name as string)
@@ -54,6 +64,8 @@ export async function getMyCard(): Promise<StaffCard> {
       idCode: (emp?.id as string) ?? user.id,
       initials: initials(name),
       color: (emp?.avatar_color as string) ?? "#e9700f",
+      employeeKt: (emp?.kennitala as string) ?? null,
+      companyKt,
       live: true,
     };
   } catch {

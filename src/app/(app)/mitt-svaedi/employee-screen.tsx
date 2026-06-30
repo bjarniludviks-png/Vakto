@@ -21,8 +21,8 @@ export default function EmployeeScreen({ card }: { card?: StaffCard }) {
   const [req, setReq] = useState<ReqKind | null>(null);
   const [showCard, setShowCard] = useState(false);
   const cardData: StaffCardData = card
-    ? { name: card.name, role: card.role, company: card.company, photoUrl: photo ?? card.photoUrl, idCode: card.idCode, initials: card.initials, color: card.color }
-    : { name: "Mína Huong", role: "Vaktstjóri", company: "Kaffi Krónan", photoUrl: photo, idCode: "demo", initials: "MÍ", color: "#5b50e6" };
+    ? { name: card.name, role: card.role, company: card.company, photoUrl: photo ?? card.photoUrl, idCode: card.idCode, initials: card.initials, color: card.color, employeeKt: card.employeeKt, companyKt: card.companyKt }
+    : { name: "Mína Huong", role: "Vaktstjóri", company: "Kaffi Krónan", photoUrl: photo, idCode: "demo", initials: "MÍ", color: "#5b50e6", employeeKt: "010190-2389", companyKt: "550101-2210" };
 
   return (
     <>

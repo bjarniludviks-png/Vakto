@@ -664,3 +664,6 @@ alter table punches add column if not exists approved boolean not null default f
 alter table punches add column if not exists approved_by uuid references auth.users(id) on delete set null;
 alter table punches add column if not exists approved_at timestamptz;
 create index if not exists punches_approved_idx on punches (company_id, approved);
+
+-- ===== 0009 — company kennitala =====
+alter table companies add column if not exists kennitala text;

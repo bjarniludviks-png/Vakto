@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
-  I18N, FEAT, FLOW, PRICE, FAQ, AUTH, PUNIT, POP, PCTA, CUSTOM, FREE, type Lang,
+  I18N, FEAT, FLOW, PRICE, FAQ, AUTH, PUNIT, POP, PCTA, CUSTOM, FREE, SOON, type Lang,
 } from "./home-data";
 
 function LogoSvg({ w = 26 }: { w?: number }) {
@@ -168,11 +168,14 @@ export default function Home() {
           {PRICE[lang].map((p, i) => {
             const plain = p.price === CUSTOM[lang] || p.price === FREE[lang];
             return (
-              <div className={`plan${p.pop ? " pop" : ""}`} key={i}>
+              <div className={`plan${p.pop ? " pop" : ""}${p.soon ? " soon" : ""}`} key={i}>
                 {p.pop && <span className="eyebrow" style={{ alignSelf: "flex-start", marginBottom: 10 }}>{POP[lang]}</span>}
+                {p.soon && <span className="eyebrow" style={{ alignSelf: "flex-start", marginBottom: 10, background: "var(--line2, #eef0f4)", color: "var(--ink2, #5b6472)" }}>{SOON[lang]}</span>}
                 <div className="pn">{p.name}</div>
                 <div className="pd">{p.desc}</div>
-                {plain ? (
+                {p.soon ? (
+                  <div className="amt" style={{ color: "var(--ink3, #8a93a3)" }}>{SOON[lang]}</div>
+                ) : plain ? (
                   <div className="amt">{p.price}</div>
                 ) : (
                   <div className="amt">{p.price} <small>{PUNIT[lang]}</small></div>
@@ -182,7 +185,11 @@ export default function Home() {
                     <li key={j}><Chk />{x}</li>
                   ))}
                 </ul>
-                <a className={`btn ${p.pop ? "btn-pri" : "btn-gho"}`} style={{ marginTop: "auto", justifyContent: "center" }} href="#" onClick={(e) => { e.preventDefault(); setAuth("signup"); }}>{PCTA[lang]}</a>
+                {p.soon ? (
+                  <span className="btn btn-gho" style={{ marginTop: "auto", justifyContent: "center", opacity: .55, cursor: "default" }}>{SOON[lang]}</span>
+                ) : (
+                  <a className={`btn ${p.pop ? "btn-pri" : "btn-gho"}`} style={{ marginTop: "auto", justifyContent: "center" }} href="#" onClick={(e) => { e.preventDefault(); setAuth("signup"); }}>{PCTA[lang]}</a>
+                )}
               </div>
             );
           })}

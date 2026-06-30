@@ -8,7 +8,17 @@ import { toast } from "./toast";
 export type StaffCardData = {
   name: string; role: string; company: string;
   photoUrl: string | null; idCode: string; initials: string; color: string;
+  employeeKt?: string | null; companyKt?: string | null;
 };
+
+function DetailRow({ k, v }: { k: string; v: string }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5 }}>
+      <span style={{ color: "var(--ink3)" }}>{k}</span>
+      <span style={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{v}</span>
+    </div>
+  );
+}
 
 export function StaffCardModal({ card, onClose }: { card: StaffCardData; onClose: () => void }) {
   const { t } = useLang();
@@ -74,6 +84,17 @@ export function StaffCardModal({ card, onClose }: { card: StaffCardData; onClose
             ? <img src={qr} alt="QR" style={{ width: 168, height: 168 }} />
             : <div style={{ width: 168, height: 168, background: "var(--line2)", borderRadius: 12 }} />}
           <div className="muted" style={{ fontSize: 11.5, marginTop: 6 }}>{t("Sýndu kóðann við innstimplun eða auðkenningu")}</div>
+        </div>
+
+        {/* legal details — for those not adding to Apple/Google Wallet */}
+        <div style={{ padding: "0 20px 16px" }}>
+          <div style={{ borderTop: "1px solid var(--line2)", paddingTop: 12, display: "grid", gap: 7 }}>
+            {card.employeeKt && <DetailRow k={t("Kennitala")} v={card.employeeKt} />}
+            <DetailRow k={t("Fyrirtæki")} v={card.company} />
+            {card.companyKt && <DetailRow k={t("Kt. fyrirtækis")} v={card.companyKt} />}
+            <DetailRow k={t("Staða")} v={t(card.role)} />
+            <DetailRow k={t("Skírteinisnr.")} v={card.idCode.slice(0, 8).toUpperCase()} />
+          </div>
         </div>
 
         {/* wallet buttons */}

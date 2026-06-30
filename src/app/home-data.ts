@@ -3,11 +3,11 @@ export type Lang = "is" | "en";
 
 export const I18N = {
   is: {
-    nav_features: "Eiginleikar", nav_how: "Hvernig það virkar", nav_integrations: "Tengingar", nav_pricing: "Verð", nav_login: "Innskráning", nav_try: "Prófa frítt",
+    nav_features: "Eiginleikar", nav_how: "Hvernig það virkar", nav_integrations: "Tengingar", nav_pricing: "Verð", nav_login: "Innskráning", nav_try: "Byrja",
     hero_badge: "Vinnuafls-arðsemi fyrir íslensk fyrirtæki",
     hero_title: 'Lægri launakostnaður — <span class="g">án undirmönnunar</span>.',
     hero_sub: "VAKTO sjálfvirknivæðir vaktaplön, reiknar laun samkvæmt íslenskum kjarasamningum og sýnir launahlutfallið í rauntíma — áður en mánuðurinn er úti.",
-    hero_cta1: "Prófa ókeypis", hero_cta2: "Bóka kynningu", hero_note: "Engin kreditkortakrafa · Uppsetning á einum degi · Frítt fyrir lítil teymi",
+    hero_cta1: "Byrja núna", hero_cta2: "Bóka kynningu", hero_note: "14 daga prufa · Uppsetning samdægurs · Hættu hvenær sem er",
     m_dashboard: "Mælaborð", m_schedule: "Vaktaplan", m_time: "Tímaskráning", m_pay: "Launakeyrslur", m_perf: "Frammistaða",
     m_planned: "Áætlaðir tímar", m_actual: "Rauntímar", m_laborcost: "Launakostn.", m_laborpct: "Laun%",
     m_revtoday: "Velta í dag", m_laborpct2: "Launahlutfall", m_target: "markmið 30%", m_cost: "Launakostnaður", m_staffing: "Mönnun núna",
@@ -15,9 +15,9 @@ export const I18N = {
     feat_eyebrow: "Eiginleikar", feat_title: "Allt sem þú þarft til að stýra vinnuafli", feat_sub: "Frá vaktaplani til launakeyrslu — eitt öflugt og fallegt kerfi fyrir alla.",
     flow_title: "Vaktaplan → Mæting → Laun → Arðsemi", flow_sub: "Heildaryfirlit yfir reksturinn — frá skipulagi til launaseðils.",
     int_title: "Óaðfinnanleg tenging við núverandi kerfi", int_sub: "Launakerfi, bókhald og sölukerfi (POS) — allt á einum stað.",
-    verd_title: "Einfalt og gagnsætt verðmódel", verd_sub: "Greiðið aðeins per starfsmann. Frítt fyrir lítil teymi. Engin faldar greiðslur.",
+    verd_title: "Einfalt og gagnsætt verðmódel", verd_sub: "Greitt per starfsmann á mánuði. Engar faldar greiðslur, engin binding.",
     faq_title: "Algengar spurningar",
-    cta_title: "Sjáðu launahlutfallið í rauntíma — strax.", cta_sub: "Bókaðu 20 mínútna kynningu og við sýnum þér hversu mikið VAKTO getur sparað þér í launakostnað.", cta_btn1: "Bóka kynningu", cta_btn2: "Prófa frítt",
+    cta_title: "Sjáðu launahlutfallið í rauntíma — strax.", cta_sub: "Bókaðu 20 mínútna kynningu og við sýnum þér hversu mikið VAKTO getur sparað þér í launakostnað.", cta_btn1: "Bóka kynningu", cta_btn2: "Byrja núna",
     foot_about: "Hámarkaðu arðsemi vinnuaflsins. Vaktaplön, mætingarstjórnun, launavinnsla og rekstrargreining á einum stað.",
     foot_product: "Vara", foot_company: "Fyrirtæki", foot_legal: "Lögfræði",
     foot_about_link: "Um okkur", foot_blog: "Blogg", foot_contact: "Hafa samband", foot_privacy: "Persónuvernd", foot_terms: "Skilmálar", foot_cookies: "Vafrakökur",
@@ -25,11 +25,11 @@ export const I18N = {
     a_back: "Til baka á vefinn", a_name: "Nafn", a_company: "Fyrirtæki", a_email: "Netfang", a_pw: "Lykilorð", a_or: "eða", a_google: "Halda áfram með Google", a_microsoft: "Halda áfram með Microsoft", a_eid: "Rafræn skilríki", a_panel_eyebrow: "VINNUAFLS-ARÐSEMI FYRIR FYRIRTÆKI", a_panel_t: "Vaktaplan, mæting, laun og arðsemi.", a_panel_s: "VAKTO smíðar vaktaplanið, reiknar launin og sýnir raunverulega framlegð í rauntíma.", a_f1: "Launakostnaður sem % af veltu í rauntíma", a_f2: "Íslensk launalógík — kjarasamningar & staðgreiðsla", a_f3: "Vaktaplan, stimpilklukka og app á einum stað", a_panel_quote: "„VAKTO lækkaði launahlutfallið okkar um 4% á tveimur mánuðum.\"",
   },
   en: {
-    nav_features: "Features", nav_how: "How it works", nav_integrations: "Integrations", nav_pricing: "Pricing", nav_login: "Log in", nav_try: "Try free",
+    nav_features: "Features", nav_how: "How it works", nav_integrations: "Integrations", nav_pricing: "Pricing", nav_login: "Log in", nav_try: "Get started",
     hero_badge: "Workforce profitability for smart businesses",
     hero_title: 'Lower labor costs — <span class="g">without understaffing</span>.',
     hero_sub: "VAKTO automates scheduling, processes payroll using Icelandic union rules, and tracks labor cost against revenue in real time — before month-end.",
-    hero_cta1: "Get started free", hero_cta2: "Book a demo", hero_note: "No credit card required · 24-hour setup · Free for small teams",
+    hero_cta1: "Get started", hero_cta2: "Book a demo", hero_note: "14-day trial · Same-day setup · Cancel anytime",
     m_dashboard: "Dashboard", m_schedule: "Schedule", m_time: "Time tracking", m_pay: "Payroll", m_perf: "Performance",
     m_planned: "Planned hours", m_actual: "Actual hours", m_laborcost: "Labor cost", m_laborpct: "Labor%",
     m_revtoday: "Revenue today", m_laborpct2: "Labor ratio", m_target: "target 30%", m_cost: "Labor cost", m_staffing: "Staffing now",
@@ -37,9 +37,9 @@ export const I18N = {
     feat_eyebrow: "Features", feat_title: "Everything you need to run your workforce", feat_sub: "From smart scheduling to automated payroll — one unified platform for your team.",
     flow_title: "Schedule → Attendance → Pay → Profit", flow_sub: "The complete operations cycle — from planning to payslip.",
     int_title: "Connects with the tools you already use", int_sub: "Seamlessly integrates with your payroll, accounting, and POS systems.",
-    verd_title: "Predictable pricing that scales with you", verd_sub: "Priced per employee. Free for small teams. Absolutely no hidden fees.",
+    verd_title: "Predictable pricing that scales with you", verd_sub: "Priced per employee per month. No hidden fees, no lock-in.",
     faq_title: "Frequently asked questions",
-    cta_title: "See labor as a percentage of revenue — instantly.", cta_sub: "Book a 20-minute demo and see exactly how much VAKTO can shave off your labor costs.", cta_btn1: "Book a demo", cta_btn2: "Try free",
+    cta_title: "See labor as a percentage of revenue — instantly.", cta_sub: "Book a 20-minute demo and see exactly how much VAKTO can shave off your labor costs.", cta_btn1: "Book a demo", cta_btn2: "Get started",
     foot_about: "Maximize workforce profitability. Schedule, attendance, payroll, and real-time business intelligence in one place.",
     foot_product: "Product", foot_company: "Company", foot_legal: "Legal",
     foot_about_link: "About us", foot_blog: "Blog", foot_contact: "Contact us", foot_privacy: "Privacy policy", foot_terms: "Terms of service", foot_cookies: "Cookie settings",
@@ -72,21 +72,22 @@ export const FLOW: Record<Lang, [string, string][]> = {
   en: [["Schedule", "Build the schedule with smart AI recommendations and publish instantly."], ["Attendance", "Staff clock in/out; actual vs. planned data updates in real time."], ["Pay", "Union rules and premiums compile automatically; export straight to Payday."], ["Profit", "Track labor as a % of revenue dynamically and compare business periods."]],
 };
 
-export type Plan = { name: string; price: string; desc: string; features: string[]; pop: boolean };
+export type Plan = { name: string; price: string; desc: string; features: string[]; pop: boolean; soon?: boolean };
 export const PRICE: Record<Lang, Plan[]> = {
   is: [
-    { name: "Frítt", price: "0", desc: "Lítil teymi", features: ["Allt að 5 starfsmenn", "Vaktaplan & dagatal", "Stimpilklukka & app", "Grunnskýrslur"], pop: false },
-    { name: "Pro", price: "990", desc: "Vinsælasta lausnin", features: ["Ótakmarkaður starfsmannafjöldi", "AI-drifið vaktaplan", "Íslenskir kjarasamningar", "Launahlutfall í rauntíma", "Sjálfvirk launakeyrsla & tengingar"], pop: true },
-    { name: "Verk", price: "1.290", desc: "Verktakar & iðnaður", features: ["Allt innifalið í Pro", "GPS-verkskráning", "Útselt vs. kostnaður", "Snjallreikningagerð"], pop: false },
-    { name: "Enterprise", price: "Sérsniðið", desc: "Keðjur & stærri fyrirtæki", features: ["Flóknar samningatengingar", "SSO & öryggisúttektir", "Sérlausnir & opið API", "Sérstakur tengiliður"], pop: false },
+    { name: "Grunn", price: "990", desc: "Til að byrja", features: ["Ótakmarkaður starfsmannafjöldi", "Vaktaplan & dagatal", "Stimpilklukka, app & Kiosk", "Starfsmannaskírteini í síma", "Grunnskýrslur"], pop: false },
+    { name: "Mið", price: "1.390", desc: "Vinsælasta lausnin", features: ["Allt í Grunn, og:", "AI-drifið vaktaplan", "Íslenskir kjarasamningar", "Launahlutfall í rauntíma", "Sjálfvirk launakeyrsla — Payday & DK", "Samanburður & frammistaða"], pop: true },
+    { name: "Verktaki", price: "", desc: "Verktakar & iðnaður", features: ["GPS-verkskráning", "Útselt vs. kostnaður", "Snjallreikningagerð"], pop: false, soon: true },
+    { name: "Enterprise", price: "Sérsniðið", desc: "Keðjur & stærri fyrirtæki", features: ["Margar starfsstöðvar", "SSO & öryggisúttektir", "Opið API & sérlausnir", "Sérstakur tengiliður"], pop: false },
   ],
   en: [
-    { name: "Free", price: "0", desc: "For micro teams", features: ["Up to 5 employees", "Schedule & calendar", "Time clock & mobile app", "Basic reporting"], pop: false },
-    { name: "Pro", price: "990", desc: "For most businesses", features: ["Unlimited employees", "AI scheduling engine", "Icelandic union automation", "Real-time labor % tracking", "Payroll exports & integrations"], pop: true },
-    { name: "Work", price: "1,290", desc: "Contractors & trade", features: ["Everything in Pro", "GPS job & site tracking", "Billable hours vs. cost", "Instant invoicing"], pop: false },
-    { name: "Enterprise", price: "Custom", desc: "Chains & large operations", features: ["Complex union configurations", "SSO & advanced audit logs", "Custom workflows & API access", "Dedicated account manager"], pop: false },
+    { name: "Basic", price: "990", desc: "To get started", features: ["Unlimited employees", "Schedule & calendar", "Time clock, app & Kiosk", "Staff ID card in the wallet", "Basic reporting"], pop: false },
+    { name: "Plus", price: "1,390", desc: "For most businesses", features: ["Everything in Basic, plus:", "AI scheduling engine", "Icelandic union automation", "Real-time labor % tracking", "Automated payroll — Payday & DK", "Benchmarks & performance"], pop: true },
+    { name: "Contractor", price: "", desc: "Contractors & trade", features: ["GPS job & site tracking", "Billable hours vs. cost", "Instant invoicing"], pop: false, soon: true },
+    { name: "Enterprise", price: "Custom", desc: "Chains & large operations", features: ["Multi-location", "SSO & advanced audit logs", "Open API & custom workflows", "Dedicated account manager"], pop: false },
   ],
 };
+export const SOON: Record<Lang, string> = { is: "Væntanlegt", en: "Coming soon" };
 
 export const PUNIT: Record<Lang, string> = { is: "kr./notanda á mán", en: "ISK/user/mo" };
 export const POP: Record<Lang, string> = { is: "Vinsælast", en: "Popular" };
