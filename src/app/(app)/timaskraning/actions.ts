@@ -103,6 +103,25 @@ export async function managerClockIn(employeeId: string, timeHHMM?: string): Pro
   }
 }
 
+/** Manager deletes a punch entirely. */
+export async function deletePunch(punchId: string): Promise<ApproveResult> {
+  if (!isSupabaseConfigured() || !punchId) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("punches").delete().eq("id", punchId).eq("company_id", ctx.company);
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "punch.delete", entity: "punch", entityId: punchId, detail: "Stimplun eydd",
+    });
+    revalidatePath("/timaskraning"); revalidatePath("/maelabord");
+    return { ok: true, count: 1 };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /** Manager adjusts a punch's clock-in and/or clock-out time (same day). */
 export async function adjustPunch(punchId: string, clockInHHMM?: string, clockOutHHMM?: string): Promise<ApproveResult> {
   if (!isSupabaseConfigured() || !punchId) return { ok: true, demo: true };

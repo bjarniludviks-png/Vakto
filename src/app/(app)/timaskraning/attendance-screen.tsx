@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
@@ -317,6 +318,7 @@ function EmployeePunchesModal({ employeeId, name, from, to, onClose, onChanged }
       <div className="modal" style={{ maxWidth: 640 }}>
         <div className="mh">
           <div><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Tímaskráningar")} · {name}</div><div className="muted" style={{ fontSize: 12 }}>{niceISO(from)} – {niceISO(to)} · {dec1(total)} {t("klst")}{pending ? ` · ${pending} ${t("bíða samþykkis")}` : ""}</div></div>
+          <Link href={`/timaskraning/${employeeId}`} className="btn ghost sm" style={{ marginLeft: "auto", marginRight: 8 }} onClick={onClose}>{t("Opna á heilli síðu")} →</Link>
           <button className="x" onClick={onClose}>✕</button>
         </div>
         <div className="mb">
