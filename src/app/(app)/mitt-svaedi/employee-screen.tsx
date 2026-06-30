@@ -6,17 +6,23 @@ import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, type LeaveType } from "./actions";
 import { PayslipModal } from "@/components/app/payslip-modal";
+import { StaffCardModal, type StaffCardData } from "@/components/app/staff-card";
+import type { StaffCard } from "@/lib/mycard.server";
 
 type ReqKind = "leave" | "avail" | "swap" | "pickup";
 const TABS = [
   ["ov", "Yfirlit"], ["sh", "Mínar vaktir"], ["pay", "Laun"], ["ri", "Réttindi"], ["pr", "Prófíll"],
 ] as const;
 
-export default function EmployeeScreen() {
+export default function EmployeeScreen({ card }: { card?: StaffCard }) {
   const { t } = useLang();
   const [tab, setTab] = useState<string>("ov");
   const [photo, setPhoto] = useState<string | null>(null);
   const [req, setReq] = useState<ReqKind | null>(null);
+  const [showCard, setShowCard] = useState(false);
+  const cardData: StaffCardData = card
+    ? { name: card.name, role: card.role, company: card.company, photoUrl: photo ?? card.photoUrl, idCode: card.idCode, initials: card.initials, color: card.color }
+    : { name: "Mína Huong", role: "Vaktstjóri", company: "Kaffi Krónan", photoUrl: photo, idCode: "demo", initials: "MÍ", color: "#5b50e6" };
 
   return (
     <>
@@ -24,7 +30,10 @@ export default function EmployeeScreen() {
       <div className="emparea">
         <div className="emp-head">
           <PhotoAvatar photo={photo} setPhoto={setPhoto} big={false} />
-          <div><div className="emp-nm">Mína Huong</div><div className="emp-meta">{t("emp:meta")}</div></div>
+          <div style={{ flex: 1 }}><div className="emp-nm">{card?.name ?? "Mína Huong"}</div><div className="emp-meta">{card ? `${t(card.role)} · ${card.company}` : t("emp:meta")}</div></div>
+          <button className="btn ghost sm" onClick={() => setShowCard(true)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8" cy="11" r="2" /><path d="M14 9h4M14 13h4M5 16h7" /></svg>{t("Skírteini")}
+          </button>
         </div>
 
         <div className="emp-tabs">
@@ -41,6 +50,7 @@ export default function EmployeeScreen() {
       </div>
 
       {req && <ReqModal kind={req} onClose={() => setReq(null)} />}
+      {showCard && <StaffCardModal card={cardData} onClose={() => setShowCard(false)} />}
     </>
   );
 }
