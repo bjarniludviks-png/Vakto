@@ -57,7 +57,7 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
 
   return (
     <>
-      <PageHeader title={`${t("Tímaskráning")} · ${name}`} subtitle={`${niceISO(from)} – ${niceISO(to)}`} actions={
+      <PageHeader title={name ? `${name} · ${t("Tímaskráning")}` : t("Tímaskráning")} subtitle={`${niceISO(from)} – ${niceISO(to)}`} actions={
         <Link href="/timaskraning" className="btn ghost sm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><path d="M15 18l-6-6 6-6" /></svg>{t("Til baka")}</Link>
       } />
       <FilterBar

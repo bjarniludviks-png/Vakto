@@ -162,7 +162,7 @@ export async function getEmployeePunches(employeeId: string, fromISO: string, to
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return { ok: false, name: "", rows: [], needsMigration: false };
     const { data: emp } = await supabase.from("employees").select("full_name").eq("id", employeeId).maybeSingle();
-    const name = (emp?.full_name as string)?.split(/\s+/)[0] ?? "";
+    const name = (emp?.full_name as string) ?? "";
     const from = fromISO, to = toISO + "T23:59:59";
 
     let needsMigration = false;
