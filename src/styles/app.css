@@ -145,7 +145,16 @@ body.kioskmode .fab{display:none}
 .cmpfoot{display:flex;gap:26px;margin-top:13px;border-top:1px solid var(--line2);padding-top:13px}
 .cmpfoot .l{font-size:11px;color:var(--ink3);margin-bottom:3px}
 .cmpfoot .v{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
-@media(max-width:760px){.dflow .fs .v{font-size:21px}.dhero-right{text-align:left}.dhero-right .big{font-size:25px}}
+.pchips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.pchip{font-size:13px;font-weight:600;color:var(--ink2);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer;transition:.12s}
+.pchip:hover{border-color:var(--ink3)}
+.pchip.on{background:var(--brand);border-color:var(--brand);color:#fff}
+@media(max-width:760px){
+  .dflow .fs .v{font-size:21px}.dhero-right{text-align:left}.dhero-right .big{font-size:25px}
+  .dhero-body{gap:16px}
+  .dflow{width:100%;display:grid;grid-template-columns:1fr 1fr;gap:16px 12px}
+  .dflow .ar{display:none}
+}
 /* floating support chat bubble */
 .fab{position:fixed;right:26px;bottom:26px;width:58px;height:58px;border-radius:50%;background:var(--brand);box-shadow:0 10px 26px rgba(233,112,15,.42);display:flex;align-items:center;justify-content:center;z-index:45;cursor:pointer;transition:.15s}
 .fab:hover{background:var(--brand-deep);transform:translateY(-2px)}

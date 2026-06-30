@@ -5,6 +5,8 @@ import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
+import { dec1 } from "@/lib/format";
+import { getDashboardPeriod, type PeriodData } from "./actions";
 
 // Paired bars (this period vs previous) — mirrors paired() in the prototype.
 function Paired({ a, b }: { a: number[]; b: number[] }) {
@@ -32,13 +34,38 @@ function EmptyBody({ msg }: { msg: string }) {
 type Onb = { show: boolean; hasLocation: boolean; hasStaff: boolean; hasSchedule: boolean; hasRevenue: boolean };
 type OnNow = { punchId: string; name: string; av: string; c: string; dept: string; in: string };
 
+const PRESETS: { k: string; label: string }[] = [
+  { k: "idag", label: "Í dag" }, { k: "igaer", label: "Í gær" },
+  { k: "7d", label: "7 dagar" }, { k: "30d", label: "30 dagar" }, { k: "vika", label: "db:vika" },
+];
+const isoD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function presetRange(k: string): { from: string; to: string } {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  if (k === "idag") return { from: isoD(t), to: isoD(t) };
+  if (k === "igaer") { const y = new Date(t); y.setDate(y.getDate() - 1); return { from: isoD(y), to: isoD(y) }; }
+  if (k === "7d") { const s = new Date(t); s.setDate(s.getDate() - 6); return { from: isoD(s), to: isoD(t) }; }
+  if (k === "30d") { const s = new Date(t); s.setDate(s.getDate() - 29); return { from: isoD(s), to: isoD(t) }; }
+  const mon = new Date(t); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
+  const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
+  return { from: isoD(mon), to: isoD(sun) };
+}
+
 export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding, live = false, onNow = [] }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean; onNow?: OnNow[] }) {
   const { t } = useLang();
   const [chartSeg, setChartSeg] = useState("Vika");
   const [hideOnb, setHideOnb] = useState(false);
+  const [period, setPeriod] = useState("vika");
+  const [pd, setPd] = useState<PeriodData | null>(null);
   useEffect(() => {
     if (localStorage.getItem("vakto-onb-hidden") === "1") requestAnimationFrame(() => setHideOnb(true));
   }, []);
+  useEffect(() => {
+    if (!live) return;
+    const { from, to } = presetRange(period);
+    let cancelled = false;
+    getDashboardPeriod(from, to).then((r) => { if (!cancelled && r.ok) setPd(r); });
+    return () => { cancelled = true; };
+  }, [period, live]);
   function hideOnboarding() {
     setHideOnb(true);
     try { localStorage.setItem("vakto-onb-hidden", "1"); } catch {}
@@ -60,7 +87,14 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
   // Live company (signed in): the standard dashboard layout, always — filled
   // with real numbers where we have them, clean empty-states where we don't.
   if (live) {
-    const lpColor = laborPct === 0 ? "var(--ink3)" : laborPct <= 30 ? "var(--good)" : laborPct <= 33 ? "var(--warn)" : "var(--bad)";
+    const lp = pd?.ok ? pd.laborPct : laborPct;
+    const lpColor = lp === 0 ? "var(--ink3)" : lp <= 30 ? "var(--good)" : lp <= 33 ? "var(--warn)" : "var(--bad)";
+    const plannedH = pd?.ok ? dec1(pd.planned) : hoursWeek;
+    const actualH = pd?.ok ? dec1(pd.actual) : "—";
+    const deviationH = pd?.ok ? `${pd.deviation >= 0 ? "+" : ""}${dec1(pd.deviation)}` : "—";
+    const dvColor = pd?.ok && pd.deviation !== 0 ? (pd.deviation > 0 ? "var(--warn)" : "var(--bad)") : "";
+    const overtimeH = pd?.ok ? dec1(pd.overtime) : "0";
+    const costM = pd?.ok ? pd.costM : laborCostWeek;
     return (
       <>
         <PageHeader
@@ -94,45 +128,52 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
           </div>
         )}
 
-        {/* this-week hero strip */}
+        {/* period presets */}
+        <div className="pchips">
+          {PRESETS.map((p) => (
+            <button key={p.k} className={`pchip${period === p.k ? " on" : ""}`} onClick={() => setPeriod(p.k)}>{t(p.label)}</button>
+          ))}
+        </div>
+
+        {/* hero strip — figures follow the selected period */}
         <div className="dhero">
           <div className="dhero-head">
-            <span className="dhero-badge">{t("Þessi vika")}</span>
+            <span className="dhero-badge">{t(PRESETS.find((p) => p.k === period)?.label ?? "Þessi vika")}</span>
             <span className="dhero-sub">{t("Rauntölur uppfærast eftir því sem stimplað er inn og út.")}</span>
           </div>
           <div className="dhero-body">
             <div className="dflow">
-              <div className="fs"><div className="l">{t("Áætlaðir tímar")}</div><div className="v">{hoursWeek}</div></div>
+              <div className="fs"><div className="l">{t("Áætlaðir tímar")}</div><div className="v">{plannedH}</div></div>
               <span className="ar">→</span>
-              <div className="fs"><div className="l">{t("Raun tímar")}</div><div className="v">—</div></div>
+              <div className="fs"><div className="l">{t("Raun tímar")}</div><div className="v">{actualH}</div></div>
               <span className="ar">→</span>
-              <div className="fs"><div className="l">{t("Frávik")}</div><div className="v">—</div></div>
+              <div className="fs"><div className="l">{t("Frávik")}</div><div className="v" style={dvColor ? { color: dvColor } : undefined}>{deviationH}</div></div>
               <span className="ar">→</span>
-              <div className="fs"><div className="l">{t("Yfirvinna")}</div><div className="v">0 <small style={{ fontSize: 14, color: "var(--ink3)", fontWeight: 600 }}>{t("klst")}</small></div></div>
+              <div className="fs"><div className="l">{t("Yfirvinna")}</div><div className="v">{overtimeH} <small style={{ fontSize: 14, color: "var(--ink3)", fontWeight: 600 }}>{t("klst")}</small></div></div>
             </div>
             <div className="dhero-right">
-              <div className="l">{t("Launakostnaður vikunnar")}</div>
-              <div className="big">{laborCostWeek} m.kr.</div>
-              <div className="s2">{laborPct > 0 ? `${t("Laun af tekjum")} ${pctLabel}%` : t("Skráðu veltu til að sjá laun%")}</div>
+              <div className="l">{t("Launakostnaður")}</div>
+              <div className="big">{costM} m.kr.</div>
+              <div className="s2">{lp > 0 ? `${t("Laun af tekjum")} ${dec1(lp)}%` : t("Skráðu veltu til að sjá laun%")}</div>
             </div>
           </div>
         </div>
 
-        {/* headline KPIs (real) */}
+        {/* headline KPIs (real, period-aware) */}
         <div className="kpis">
           <div className="kpi flex">
-            <div className="ring" style={{ ["--p" as string]: laborPct === 0 ? 0 : ringP, ["--c" as string]: lpColor }}>
-              <div className="in" style={{ color: lpColor }}>{laborPct === 0 ? "—" : ringP + "%"}</div>
+            <div className="ring" style={{ ["--p" as string]: lp === 0 ? 0 : Math.round(lp), ["--c" as string]: lpColor }}>
+              <div className="in" style={{ color: lpColor }}>{lp === 0 ? "—" : Math.round(lp) + "%"}</div>
             </div>
             <div>
               <div className="lab">{t("Laun af tekjum")}</div>
-              <div className="val" style={{ fontSize: 22 }}>{laborPct === 0 ? "—" : <>{pctLabel}<small>%</small></>}</div>
+              <div className="val" style={{ fontSize: 22 }}>{lp === 0 ? "—" : <>{dec1(lp)}<small>%</small></>}</div>
               <Link href="/stillingar?new=revenue" className="muted" style={{ fontSize: 11.5, fontWeight: 600, color: "var(--brand)", textDecoration: "none", display: "inline-block", marginTop: 2 }}>{t("Skrá veltu")}</Link>
             </div>
           </div>
-          <div className="kpi"><div className="lab">{t("Launakostnaður (vika)")}</div><div className="val">{laborCostWeek} <small>m kr</small></div></div>
-          <div className="kpi"><div className="lab">{t("Unnir tímar (vika)")}</div><div className="val">{hoursWeek} <small>{t("klst")}</small></div></div>
-          <div className="kpi"><div className="lab">{t("Yfirvinna (vika)")}</div><div className="val">0 <small>{t("klst")}</small></div></div>
+          <div className="kpi"><div className="lab">{t("Launakostnaður")}</div><div className="val">{costM} <small>m kr</small></div></div>
+          <div className="kpi"><div className="lab">{t("Raun tímar")}</div><div className="val">{actualH} <small>{t("klst")}</small></div></div>
+          <div className="kpi"><div className="lab">{t("Yfirvinna")}</div><div className="val">{overtimeH} <small>{t("klst")}</small></div></div>
         </div>
 
         {/* comparison charts — empty until history accrues */}
