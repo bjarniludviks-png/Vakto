@@ -8,7 +8,8 @@ import { EmptyState } from "@/components/app/empty-state";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { nf, dec1 } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
-import { fetchAttendance } from "../timaskraning/actions";
+import { fetchAttendance, getTimeReport } from "../timaskraning/actions";
+import { exportTimeReportXlsx, exportTimeReportPdf } from "@/lib/export-report";
 
 const MONTHS_IS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ágú.", "sep.", "okt.", "nóv.", "des."];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -68,6 +69,20 @@ export default function ReportsScreen({ empty = false, live = false, rows = [] }
   const [search, setSearch] = useState("");
   const [deptF, setDeptF] = useState("all");
   const [compare, setCompare] = useState("prev");
+  const [exporting, setExporting] = useState(false);
+  async function doExport(kind: "xlsx" | "pdf") {
+    const range = period === "Sérsniðið" && from && to ? { from, to } : rangeFor(period);
+    setExporting(true);
+    const rep = await getTimeReport(range.from, range.to);
+    setExporting(false);
+    if (!rep.ok) { toast("Tókst ekki að sækja gögn"); return; }
+    if (!rep.rows.length) { toast("Engar tímafærslur á tímabilinu"); return; }
+    try {
+      if (kind === "xlsx") await exportTimeReportXlsx(rep.rows, rep.company || "VAKTO", range.from, range.to);
+      else await exportTimeReportPdf(rep.rows, rep.company || "VAKTO", range.from, range.to);
+      toast(rep.needsMigration ? "Skýrsla sótt (staða óviss — keyrðu migration 0008)" : (kind === "xlsx" ? "Excel-skýrsla sótt" : "PDF-skýrsla sótt"));
+    } catch { toast("Villa við útflutning"); }
+  }
   const f = period === "Sérsniðið" ? daysBetween(from, to) / 7 : FACTOR[period];
   const cmpCol = compare === "year" ? "Í fyrra" : compare === "none" ? "—" : "Fyrri tímabil";
   const cmpBadge = compare === "none" ? "Án samanburðar" : compare === "year" ? `${t("vs í fyrra")}` : `${t("vs fyrri")} ${period === "Sérsniðið" ? t("tímabil") : t(period)}`;
@@ -96,8 +111,8 @@ export default function ReportsScreen({ empty = false, live = false, rows = [] }
         subtitle="Greiningar og frammistaða"
         actions={
           <>
-            <button className="btn ghost sm" onClick={() => toast("Flyt út í Excel")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
-            <button className="btn ghost sm" style={{ marginLeft: 8 }} onClick={() => toast("Sæki PDF-skýrslu")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
+            <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
+            <button className="btn ghost sm" style={{ marginLeft: 8 }} disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
           </>
         }
       />
@@ -195,6 +210,19 @@ function LiveReports({ initial }: { initial: AttRow[] }) {
     if (p !== "Sérsniðið") { const r = rangeFor(p); setFrom(r.from); setTo(r.to); load(r.from, r.to); }
   }
   function changeRange(f: string, tt: string) { setFrom(f); setTo(tt); if (f && tt && f <= tt) load(f, tt); }
+  const [exporting, setExporting] = useState(false);
+  async function doExport(kind: "xlsx" | "pdf") {
+    setExporting(true);
+    const rep = await getTimeReport(from, to);
+    setExporting(false);
+    if (!rep.ok) { toast("Tókst ekki að sækja gögn"); return; }
+    if (!rep.rows.length) { toast("Engar tímafærslur á tímabilinu"); return; }
+    try {
+      if (kind === "xlsx") await exportTimeReportXlsx(rep.rows, rep.company || "VAKTO", from, to);
+      else await exportTimeReportPdf(rep.rows, rep.company || "VAKTO", from, to);
+      toast(rep.needsMigration ? "Skýrsla sótt (staða óviss — keyrðu migration 0008)" : (kind === "xlsx" ? "Excel-skýrsla sótt" : "PDF-skýrsla sótt"));
+    } catch { toast("Villa við útflutning"); }
+  }
 
   const depts = ["all", ...Array.from(new Set(data.map((r) => r.dept).filter((d) => d && d !== "—")))];
   const shown = data.filter((r) => (deptF === "all" || r.dept === deptF) && (!search || r.name.toLowerCase().includes(search.toLowerCase())));
@@ -204,7 +232,10 @@ function LiveReports({ initial }: { initial: AttRow[] }) {
   return (
     <>
       <PageHeader title="Skýrslur" subtitle="Greiningar og frammistaða" actions={
-        <button className="btn ghost sm" onClick={() => toast("Skýrsla sótt í CSV")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Sækja CSV")}</button>
+        <>
+          <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
+          <button className="btn ghost sm" style={{ marginLeft: 8 }} disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
+        </>
       } />
       <FilterBar
         periods={["Dagur", "Vika", "Mánuður", "Sérsniðið"]}

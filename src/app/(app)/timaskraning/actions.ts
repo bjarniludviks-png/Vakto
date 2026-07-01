@@ -197,6 +197,55 @@ export async function getEmployeePunches(employeeId: string, fromISO: string, to
   }
 }
 
+export type TimeReportRow = { name: string; date: string; in: string; out: string | null; hours: number; approved: boolean };
+
+const DEMO_TIME_REPORT: TimeReportRow[] = [
+  { name: "Mína Huong", date: "2026-06-29", in: "08:00", out: "16:12", hours: 8.2, approved: true },
+  { name: "Mína Huong", date: "2026-06-30", in: "08:03", out: "17:30", hours: 9.45, approved: false },
+  { name: "Bach Luu", date: "2026-06-29", in: "12:00", out: "20:00", hours: 8, approved: true },
+  { name: "Bach Luu", date: "2026-06-30", in: "12:05", out: "18:40", hours: 6.58, approved: false },
+  { name: "Phong Ha", date: "2026-06-30", in: "07:56", out: null, hours: 0, approved: false },
+];
+
+/** Company-wide punch report for a date range — one row per punch, with the
+ * approval status, for Excel/PDF export. Demo fallback when unconfigured. */
+export async function getTimeReport(fromISO: string, toISO: string): Promise<{ ok: boolean; rows: TimeReportRow[]; company: string; demo?: boolean; needsMigration?: boolean }> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true, rows: DEMO_TIME_REPORT, company: "Kaffi Krónan" };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, rows: [], company: "" };
+    const from = fromISO, to = toISO + "T23:59:59";
+    const { data: comp } = await supabase.from("companies").select("name").eq("id", ctx.company).maybeSingle();
+
+    let needsMigration = false;
+    let punches: Record<string, unknown>[] | null = null;
+    const withApproved = await supabase.from("punches")
+      .select("clock_in, clock_out, approved, employees(full_name)")
+      .eq("company_id", ctx.company).gte("clock_in", from).lte("clock_in", to)
+      .order("clock_in", { ascending: true });
+    if (withApproved.error) {
+      needsMigration = true;
+      const fb = await supabase.from("punches")
+        .select("clock_in, clock_out, employees(full_name)")
+        .eq("company_id", ctx.company).gte("clock_in", from).lte("clock_in", to)
+        .order("clock_in", { ascending: true });
+      punches = fb.data;
+    } else punches = withApproved.data;
+
+    const rows: TimeReportRow[] = (punches ?? []).map((p) => {
+      const ci = p.clock_in as string;
+      const co = p.clock_out as string | null;
+      const emp = (Array.isArray(p.employees) ? p.employees[0] : p.employees) as { full_name?: string } | null;
+      const hours = co ? Math.round(((new Date(co).getTime() - new Date(ci).getTime()) / 3600000) * 100) / 100 : 0;
+      return { name: emp?.full_name ?? "—", date: ci.slice(0, 10), in: hhmm(ci), out: co ? hhmm(co) : null, hours, approved: !!p.approved };
+    }).sort((a, b) => a.name.localeCompare(b.name) || a.date.localeCompare(b.date));
+    return { ok: true, rows, company: (comp?.name as string) ?? "", needsMigration };
+  } catch {
+    return { ok: false, rows: [], company: "" };
+  }
+}
+
 /** Approve / unapprove a single punch. */
 export async function setPunchApproved(punchId: string, approved: boolean): Promise<ApproveResult> {
   if (!isSupabaseConfigured() || !punchId) return { ok: true, demo: true };
