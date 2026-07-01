@@ -111,12 +111,39 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
   const [customTo, setCustomTo] = useState("");
   const [pd, setPd] = useState<PeriodData | null>(null);
   const [nowMs, setNowMs] = useState(0);
+  const [editMode, setEditMode] = useState(false);
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  function toggleHidden(id: string) {
+    setHidden((prev) => {
+      const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id);
+      try { localStorage.setItem("vakto-dash-hidden", JSON.stringify([...n])); } catch { /* ignore */ }
+      return n;
+    });
+  }
+  // Widget wrapper: hidden cards vanish unless we're editing (then ghosted + a
+  // toggle to show/hide). The "Sérsníða" button flips editMode.
+  const Widget = ({ id, children }: { id: string; children: React.ReactNode }) => {
+    if (!editMode && hidden.has(id)) return null;
+    const off = editMode && hidden.has(id);
+    return (
+      <div style={{ position: "relative", opacity: off ? 0.4 : 1, transition: "opacity .12s" }}>
+        {editMode && (
+          <button onClick={() => toggleHidden(id)} title={hidden.has(id) ? t("Sýna") : t("Fela")}
+            style={{ position: "absolute", top: 10, right: 10, zIndex: 6, width: 26, height: 26, borderRadius: 7, border: "1px solid var(--line)", background: "var(--panel)", color: hidden.has(id) ? "var(--brand)" : "var(--bad)", cursor: "pointer", fontSize: 14, fontWeight: 700, lineHeight: 1, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "var(--shadow)" }}>
+            {hidden.has(id) ? "+" : "✕"}
+          </button>
+        )}
+        {children}
+      </div>
+    );
+  };
   useEffect(() => {
     if (localStorage.getItem("vakto-onb-hidden") === "1") requestAnimationFrame(() => setHideOnb(true));
     // Restore the last-selected period + custom range (persists across navigation).
     const sp = localStorage.getItem("vakto-dash-period"); if (sp) setPeriod(sp);
     const sf = localStorage.getItem("vakto-dash-from"); if (sf) setCustomFrom(sf);
     const st = localStorage.getItem("vakto-dash-to"); if (st) setCustomTo(st);
+    try { const h = JSON.parse(localStorage.getItem("vakto-dash-hidden") || "[]"); if (Array.isArray(h)) setHidden(new Set(h)); } catch { /* ignore */ }
     setNowMs(Date.now());
     const id = setInterval(() => setNowMs(Date.now()), 60000); // live "on shift" duration
     return () => clearInterval(id);
@@ -184,8 +211,8 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
           title="Mælaborð"
           subtitle={t("Rauntölur úr þínum gögnum")}
           actions={
-            <button className="btn ghost sm" onClick={() => toast("Sérsníða mælaborð — dragðu til spjöld og veldu hvað þú sérð")}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h11M4 12h7M4 18h13M17 4v4M13 10v4M19 16v4" /></svg>{t("Sérsníða")}
+            <button className={`btn ${editMode ? "" : "ghost "}sm`} onClick={() => setEditMode((v) => !v)}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h11M4 12h7M4 18h13M17 4v4M13 10v4M19 16v4" /></svg>{editMode ? t("Búið") : t("Sérsníða")}
             </button>
           }
         />
@@ -208,6 +235,12 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
                 </Link>
               ))}
             </div>
+          </div>
+        )}
+
+        {editMode && (
+          <div style={{ background: "var(--brand-soft)", border: "1px solid var(--brand-2)", color: "var(--brand-deep)", borderRadius: 10, padding: "9px 13px", margin: "0 0 14px", fontSize: 12.5, fontWeight: 500 }}>
+            {t("Smelltu á ✕ til að fela spjald sem þú vilt ekki sjá, + til að sýna aftur. Vistast sjálfkrafa — smelltu „Búið\" þegar þú ert klár/klár.")}
           </div>
         )}
 
@@ -275,15 +308,15 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
 
         {/* comparison charts — empty until history accrues */}
         <div className="grid2">
-          <div className="card">
+          <Widget id="chart"><div className="card">
             <div className="ch">
               <div><div className="ct">{t("Áætlað vs raun (tímar)")}</div><div className="cs">{t("farðu með músina yfir fyrir tölur")}</div></div>
             </div>
             {series.some((s) => s.planned > 0 || s.actual > 0)
               ? <PlannedActual series={series} t={t} />
               : <EmptyBody msg="Birtist þegar vaktir eru birtar og stimplað er inn." />}
-          </div>
-          <div className="card">
+          </div></Widget>
+          <Widget id="onnow"><div className="card">
             <div className="ch"><div><div className="ct">{t("Á vakt núna")}</div><div className="cs">{t("skráðir inn í rauntíma")}</div></div><Link href="/timaskraning" className="badge" style={{ background: "var(--good-soft)", color: "var(--good)", textDecoration: "none" }}>{onNow.length} {t("á vakt")}</Link></div>
             {onNow.length ? (
               <div className="cb att">
@@ -296,11 +329,11 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
                 ))}
               </div>
             ) : <EmptyBody msg="Enginn skráður inn núna." />}
-          </div>
+          </div></Widget>
         </div>
 
         {/* not clocked in — scheduled today but no punch (late / forgot / upcoming) */}
-        <div className="card" style={{ marginTop: 20 }}>
+        <Widget id="missing"><div className="card" style={{ marginTop: 20 }}>
           <div className="ch">
             <div><div className="ct">{t("Ekki mætt af plani")}</div><div className="cs">{t("á plani í dag en ekki stimplaðir inn")}</div></div>
             {missing.length > 0 && <Link href="/timaskraning" className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)", textDecoration: "none" }}>{missing.filter((m) => m.late).length} {t("seinir")}</Link>}
@@ -318,10 +351,10 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
               ))}
             </div>
           ) : <EmptyBody msg="Allir á plani hafa mætt." />}
-        </div>
+        </div></Widget>
 
         {/* within vs over plan — who stays inside their hours, who runs over */}
-        <div className="card" style={{ marginTop: 20 }}>
+        <Widget id="overplan"><div className="card" style={{ marginTop: 20 }}>
           <div className="ch">
             <div><div className="ct">{t("Innan vs yfir áætlun")}</div><div className="cs">{t("raun tímar borið saman við plan á tímabilinu")}</div></div>
             {staff.length > 0 && <span className="badge" style={{ background: overCount ? "var(--bad-soft)" : "var(--good-soft)", color: overCount ? "var(--bad)" : "var(--good)" }}>{overCount} {t("yfir áætlun")}</span>}
@@ -343,13 +376,15 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
               </table>
             </div>
           ) : <EmptyBody msg="Birtist þegar vaktir og stimplanir safnast." />}
-        </div>
+        </div></Widget>
 
         {/* monthly overview */}
-        <div className="sec">{t("Mánaðaryfirlit")}</div>
-        <div className="card">
-          <EmptyBody msg="Mánaðarsamanburður birtist þegar fleiri tímabil og launakeyrslur safnast." />
-        </div>
+        <Widget id="monthly">
+          <div className="sec">{t("Mánaðaryfirlit")}</div>
+          <div className="card">
+            <EmptyBody msg="Mánaðarsamanburður birtist þegar fleiri tímabil og launakeyrslur safnast." />
+          </div>
+        </Widget>
       </>
     );
   }
