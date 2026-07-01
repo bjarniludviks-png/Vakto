@@ -223,6 +223,7 @@ export const DICT: Dict = {
   "Álagstímar": { is: "Álagstímar", en: "Premium hours" },
   "Áætlað vs raun (tímar)": { is: "Áætlað vs raun (tímar)", en: "Planned vs actual (hours)" },
   "farðu með músina yfir fyrir tölur": { is: "farðu með músina yfir fyrir tölur", en: "hover for exact numbers" },
+  "síðustu 7 dagar · farðu með músina yfir fyrir tölur": { is: "síðustu 7 dagar · farðu með músina yfir fyrir tölur", en: "last 7 days · hover for exact numbers" },
   "Birtist þegar vaktir eru birtar og stimplað er inn.": { is: "Birtist þegar vaktir eru birtar og stimplað er inn.", en: "Appears once shifts are published and clock-ins land." },
   "Innan vs yfir áætlun": { is: "Innan vs yfir áætlun", en: "Within vs over plan" },
   "raun tímar borið saman við plan á tímabilinu": { is: "raun tímar borið saman við plan á tímabilinu", en: "actual hours vs plan for the period" },

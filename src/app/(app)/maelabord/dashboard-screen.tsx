@@ -111,6 +111,7 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [pd, setPd] = useState<PeriodData | null>(null);
+  const [weekSeries, setWeekSeries] = useState<PeriodData["series"]>([]); // chart is always last 7 days
   const [nowMs, setNowMs] = useState(0);
   const [editMode, setEditMode] = useState(false);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
@@ -165,6 +166,14 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
     getDashboardPeriod(from, to).then((r) => { if (!cancelled && r.ok) setPd(r); });
     return () => { cancelled = true; };
   }, [period, live, customFrom, customTo]);
+  // Trend chart is fixed to the last 7 days regardless of the period selector.
+  useEffect(() => {
+    if (!live) return;
+    const { from, to } = presetRange("7d");
+    let cancelled = false;
+    getDashboardPeriod(from, to).then((r) => { if (!cancelled && r.ok) setWeekSeries(r.series); });
+    return () => { cancelled = true; };
+  }, [live]);
   function hideOnboarding() {
     setHideOnb(true);
     try { localStorage.setItem("vakto-onb-hidden", "1"); } catch {}
@@ -203,7 +212,6 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
     const costPerHourStr = pd?.ok ? krCompact(pd.costPerHour) : "—";
     const revenueStr = pd?.ok && pd.revenue > 0 ? krCompact(pd.revenue) : "";
     const sourceLabel = pd?.ok ? (pd.revenueSource === "inventra" ? t("tengt Inventra") : pd.revenueSource === "manual" ? t("handvirkt") : pd.revenueSource === "mixed" ? t("blandað") : pd.revenueSource === "estimated" ? t("áætluð") : "") : "";
-    const series = pd?.ok ? pd.series : [];
     const staff = pd?.ok ? pd.staff : [];
     const overCount = staff.filter((s) => s.over).length;
     return (
@@ -311,10 +319,10 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
         <div className="grid2">
           <Widget id="chart"><div className="card">
             <div className="ch">
-              <div><div className="ct">{t("Áætlað vs raun (tímar)")}</div><div className="cs">{t("farðu með músina yfir fyrir tölur")}</div></div>
+              <div><div className="ct">{t("Áætlað vs raun (tímar)")}</div><div className="cs">{t("síðustu 7 dagar · farðu með músina yfir fyrir tölur")}</div></div>
             </div>
-            {series.some((s) => s.planned > 0 || s.actual > 0)
-              ? <PlannedActual series={series} t={t} />
+            {weekSeries.some((s) => s.planned > 0 || s.actual > 0)
+              ? <PlannedActual series={weekSeries} t={t} />
               : <EmptyBody msg="Birtist þegar vaktir eru birtar og stimplað er inn." />}
           </div></Widget>
           <Widget id="onnow"><div className="card">
