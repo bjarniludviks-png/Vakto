@@ -9,6 +9,7 @@ import { TimeField } from "@/components/app/fields";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
 import { getEmployeePunches, adjustPunch, deletePunch, setPunchApproved, approveEmployeePunches, type PunchRow } from "../actions";
+import { exportTimeReportXlsx, exportTimeReportPdf } from "@/lib/export-report";
 
 const MONTHS_IS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ágú.", "sep.", "okt.", "nóv.", "des."];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -51,6 +52,18 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
     const res = await setPunchApproved(p.punchId, !p.approved);
     if (res.ok) reload(); else toast(res.error ?? "Villa");
   }
+  const [exporting, setExporting] = useState(false);
+  async function doExport(kind: "xlsx" | "pdf") {
+    if (!rows.length) { toast("Engar skráningar á tímabilinu"); return; }
+    setExporting(true);
+    // Reuse the shared time-report export; the employee name is the report title.
+    const data = rows.map((r) => ({ name, date: r.date, in: r.in, out: r.out, hours: r.hours, approved: r.approved }));
+    try {
+      if (kind === "xlsx") await exportTimeReportXlsx(data, name || "VAKTO", from, to);
+      else await exportTimeReportPdf(data, name || "VAKTO", from, to);
+      toast(kind === "xlsx" ? "Excel-skýrsla sótt" : "PDF-skýrsla sótt");
+    } catch { toast("Villa við útflutning"); } finally { setExporting(false); }
+  }
 
   const total = rows.reduce((a, r) => a + r.hours, 0);
   const pending = rows.filter((r) => !r.approved && !r.open).length;
@@ -59,7 +72,11 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
   return (
     <>
       <PageHeader title={name ? `${name} · ${t("Tímaskráning")}` : t("Tímaskráning")} subtitle={`${niceISO(from)} – ${niceISO(to)}`} actions={
-        <Link href="/timaskraning" className="btn ghost sm"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><path d="M15 18l-6-6 6-6" /></svg>{t("Til baka")}</Link>
+        <>
+          <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
+          <button className="btn ghost sm" style={{ marginLeft: 8 }} disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
+          <Link href="/timaskraning" className="btn ghost sm" style={{ marginLeft: 8 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><path d="M15 18l-6-6 6-6" /></svg>{t("Til baka")}</Link>
+        </>
       } />
       <FilterBar
         periods={["Dagur", "Vika", "Mánuður", "Ár", "Sérsniðið"]}
