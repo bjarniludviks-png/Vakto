@@ -6,6 +6,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
+import { TimeField } from "@/components/app/fields";
 import { EmptyState } from "@/components/app/empty-state";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
@@ -375,7 +376,7 @@ function ClockInModal({ roster, onClose, onDone }: { roster: RosterRow[]; onClos
               {roster.length ? roster.map((r) => <option key={r.id} value={r.id}>{r.name} · {r.dept}</option>) : <option value="">{t("Allir eru þegar skráðir inn")}</option>}
             </select>
           </div>
-          <div className="field"><label>{t("Tími innstimplunar")}</label><input type="time" value={time} onChange={(e) => setTime(e.target.value)} /></div>
+          <div className="field"><label>{t("Tími innstimplunar")}</label><TimeField value={time} onChange={setTime} style={{ width: "100%" }} /></div>
           <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
             <button className="btn" disabled={busy || !eid} onClick={go}>{t("tk:clockin")}</button>
             <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
@@ -408,8 +409,8 @@ function AdjustPunchModal({ row, onClose, onDone }: { row: OnNowRow; onClose: ()
         </div>
         <div className="mb">
           <div style={{ display: "flex", gap: 10 }}>
-            <div className="field" style={{ flex: 1 }}><label>{t("Innstimplun")}</label><input type="time" value={cin} onChange={(e) => setCin(e.target.value)} /></div>
-            <div className="field" style={{ flex: 1 }}><label>{t("Útstimplun")}</label><input type="time" value={cout} onChange={(e) => setCout(e.target.value)} /></div>
+            <div className="field" style={{ flex: 1 }}><label>{t("Innstimplun")}</label><TimeField value={cin} onChange={setCin} style={{ width: "100%" }} /></div>
+            <div className="field" style={{ flex: 1 }}><label>{t("Útstimplun")}</label><TimeField value={cout} onChange={setCout} style={{ width: "100%" }} /></div>
           </div>
           <p className="muted" style={{ fontSize: 11.5, margin: "-4px 0 8px" }}>{t("Skildu útstimplun eftir auða til að halda vaktinni opinni.")}</p>
           <div style={{ display: "flex", gap: 9, marginTop: 8 }}>

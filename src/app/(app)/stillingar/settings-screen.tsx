@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { DateField } from "@/components/app/fields";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
@@ -248,7 +249,7 @@ function SettingsFormModal({ modal, onClose }: { modal: Exclude<SettingsModal, n
           {modal === "revenue" && <>
             <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>{t("Sláðu inn veltu dagsins (eða tímabils) til að reikna laun% án Inventra.")}</p>
             <div className="field"><label>{t("Velta (kr)")}</label><input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="612.000" autoFocus /></div>
-            <div className="field"><label>{t("Dagsetning")}</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+            <div className="field"><label>{t("Dagsetning")}</label><DateField value={date} onChange={setDate} /></div>
           </>}
           {modal === "avgrevenue" && <>
             <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>{t("Sláðu inn dæmigerða veltu fyrir hvern vikudag. Kerfið áætlar laun% út frá þessu þegar engin rauntala er skráð. Raunvelta tekur alltaf fram yfir.")}</p>

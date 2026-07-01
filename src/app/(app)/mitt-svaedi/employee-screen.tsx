@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
+import { TimeField, DateField } from "@/components/app/fields";
 import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, type LeaveType, type MyPunchRow } from "./actions";
 import { dec1 } from "@/lib/format";
 import { PayslipModal } from "@/components/app/payslip-modal";
@@ -244,10 +245,10 @@ function CorrectionModal({ init, onClose, onDone }: { init: { punchId?: string; 
           <button className="x" onClick={onClose}>✕</button>
         </div>
         <div className="mb">
-          <div className="field"><label>{t("Dagsetning")}</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+          <div className="field"><label>{t("Dagsetning")}</label><DateField value={date} onChange={setDate} /></div>
           <div style={{ display: "flex", gap: 10 }}>
-            <div className="field" style={{ flex: 1 }}><label>{t("Réttur tími inn")}</label><input type="time" value={cin} onChange={(e) => setCin(e.target.value)} /></div>
-            <div className="field" style={{ flex: 1 }}><label>{t("Réttur tími út")}</label><input type="time" value={cout} onChange={(e) => setCout(e.target.value)} /></div>
+            <div className="field" style={{ flex: 1 }}><label>{t("Réttur tími inn")}</label><TimeField value={cin} onChange={setCin} style={{ width: "100%" }} /></div>
+            <div className="field" style={{ flex: 1 }}><label>{t("Réttur tími út")}</label><TimeField value={cout} onChange={setCout} style={{ width: "100%" }} /></div>
           </div>
           <div className="field"><label>{t("Skýring")}</label><textarea className="lf-ta" rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("t.d. gleymdi að stimpla út kl. 16")} /></div>
           <div style={{ display: "flex", gap: 9, marginTop: 6 }}>
@@ -397,8 +398,8 @@ function ReqModal({ kind, onClose }: { kind: ReqKind; onClose: () => void }) {
   let body: React.ReactNode;
   if (kind === "leave") {
     body = <>
-      <div className="field"><label>{t("Frá")}</label><input type="date" value={leaveFrom} onChange={(e) => setLeaveFrom(e.target.value)} /></div>
-      <div className="field"><label>{t("Til")}</label><input type="date" value={leaveTo} onChange={(e) => setLeaveTo(e.target.value)} /></div>
+      <div className="field"><label>{t("Frá")}</label><DateField value={leaveFrom} onChange={setLeaveFrom} /></div>
+      <div className="field"><label>{t("Til")}</label><DateField value={leaveTo} onChange={setLeaveTo} min={leaveFrom || undefined} /></div>
       <div className="field"><label>{t("Tegund")}</label>
         <select value={leaveType} onChange={(e) => setLeaveType(e.target.value as LeaveType)}>
           <option value="orlof">{t("Orlof")}</option><option value="olaunad">{t("Frí (ólaunað)")}</option><option value="veikindi">{t("Veikindi")}</option>

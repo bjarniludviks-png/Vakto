@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { dec1, krCompact } from "@/lib/format";
+import { DateField } from "@/components/app/fields";
 import { getDashboardPeriod, type PeriodData } from "./actions";
 
 // Paired demo bars (this period vs previous) — used only in the demo/preview state.
@@ -252,9 +253,9 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
           <button className={`pchip${period === "custom" ? " on" : ""}`} onClick={() => setPeriod("custom")}>{t("Sérsnið")}</button>
           {period === "custom" && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: 4 }}>
-              <input type="date" value={customFrom} max={customTo || undefined} onChange={(e) => setCustomFrom(e.target.value)} style={{ border: "1px solid var(--line)", borderRadius: 7, padding: "5px 8px", font: "inherit", fontSize: 13, background: "#fff" }} />
+              <DateField value={customFrom} max={customTo || undefined} onChange={setCustomFrom} />
               <span className="muted">–</span>
-              <input type="date" value={customTo} min={customFrom || undefined} onChange={(e) => setCustomTo(e.target.value)} style={{ border: "1px solid var(--line)", borderRadius: 7, padding: "5px 8px", font: "inherit", fontSize: 13, background: "#fff" }} />
+              <DateField value={customTo} min={customFrom || undefined} onChange={setCustomTo} />
             </span>
           )}
         </div>

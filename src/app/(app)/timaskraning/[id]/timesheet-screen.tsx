@@ -5,6 +5,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
+import { TimeField } from "@/components/app/fields";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
 import { getEmployeePunches, adjustPunch, deletePunch, setPunchApproved, approveEmployeePunches, type PunchRow } from "../actions";
@@ -135,8 +136,8 @@ function PunchEditModal({ row, onClose, onDone }: { row: PunchRow; onClose: () =
         </div>
         <div className="mb">
           <div style={{ display: "flex", gap: 10 }}>
-            <div className="field" style={{ flex: 1 }}><label>{t("Innstimplun")}</label><input type="time" value={cin} onChange={(e) => setCin(e.target.value)} /></div>
-            <div className="field" style={{ flex: 1 }}><label>{t("Útstimplun")}</label><input type="time" value={cout} onChange={(e) => setCout(e.target.value)} /></div>
+            <div className="field" style={{ flex: 1 }}><label>{t("Innstimplun")}</label><TimeField value={cin} onChange={setCin} style={{ width: "100%" }} /></div>
+            <div className="field" style={{ flex: 1 }}><label>{t("Útstimplun")}</label><TimeField value={cout} onChange={setCout} style={{ width: "100%" }} /></div>
           </div>
           <p className="muted" style={{ fontSize: 11.5, margin: "-4px 0 8px" }}>{t("Skildu útstimplun eftir auða til að halda vaktinni opinni.")}</p>
           <div style={{ display: "flex", gap: 9, marginTop: 8, flexWrap: "wrap" }}>

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { nf, dec1 } from "@/lib/format";
+import { TimeField } from "@/components/app/fields";
 import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, type ShiftInput } from "./actions";
 import { buildSchedulePdf, type PdfShift } from "./pdf";
 import type { ReqItem } from "./requests.server";
@@ -731,8 +732,8 @@ function ShiftTypesModal({ types, setTypes, onClose }: { types: ShiftType[]; set
         <div style={{ fontSize: 13.5, fontWeight: 650, marginBottom: 12 }}>{tr("Búa til nýja vaktategund")}</div>
         <div className="field"><label>{tr("Heiti")}</label><input value={nm} onChange={(e) => setNm(e.target.value)} placeholder={tr("t.d. Næturvakt")} /></div>
         <div style={{ display: "flex", gap: 10 }}>
-          <div className="field" style={{ flex: 1 }}><label>{tr("Upphaf")}</label><input type="time" value={s} onChange={(e) => setS(e.target.value)} /></div>
-          <div className="field" style={{ flex: 1 }}><label>{tr("Lok")}</label><input type="time" value={e} onChange={(ev) => setE(ev.target.value)} /></div>
+          <div className="field" style={{ flex: 1 }}><label>{tr("Upphaf")}</label><TimeField value={s} onChange={setS} style={{ width: "100%" }} /></div>
+          <div className="field" style={{ flex: 1 }}><label>{tr("Lok")}</label><TimeField value={e} onChange={setE} style={{ width: "100%" }} /></div>
         </div>
         <div style={{ display: "flex", gap: 10 }}>
           <div className="field" style={{ flex: 1.4 }}><label>{tr("Álag")}</label>
@@ -823,8 +824,8 @@ function ShiftEditModal({
       </div>
       <div className="field"><label>{tr("Vaktategund")}</label><select value={type} onChange={(e) => { setType(e.target.value); const ty = types.find((t) => t.nm === e.target.value); if (ty) { const [a, b] = ty.t.split("–"); if (a && b) { setStart(a.trim().slice(0, 5)); setEnd(b.trim().slice(0, 5)); } } }}>{types.map((t) => <option key={t.nm} value={t.nm}>{tr(t.nm)} · {t.t}</option>)}<option value="Sérsniðin vakt">{tr("Sérsniðin vakt")}</option></select></div>
       <div style={{ display: "flex", gap: 10 }}>
-        <div className="field" style={{ flex: 1 }}><label>{tr("Upphaf")}</label><input type="time" value={start} onChange={(e) => setStart(e.target.value)} /></div>
-        <div className="field" style={{ flex: 1 }}><label>{tr("Lok")}</label><input type="time" value={end} onChange={(e) => setEnd(e.target.value)} /></div>
+        <div className="field" style={{ flex: 1 }}><label>{tr("Upphaf")}</label><TimeField value={start} onChange={setStart} style={{ width: "100%" }} /></div>
+        <div className="field" style={{ flex: 1 }}><label>{tr("Lok")}</label><TimeField value={end} onChange={setEnd} style={{ width: "100%" }} /></div>
       </div>
       <p className="muted" style={{ fontSize: 11.5, margin: "-6px 0 8px" }}>{tr("Veldu tilbúna vaktategund eða stilltu tíma sjálf/ur. Vantar tegund?")} <a onClick={() => { onClose(); onTypes(); }} style={{ color: "var(--brand)", fontWeight: 600, cursor: "pointer" }}>{tr("Búa til vaktategund")}</a></p>
       <div style={{ display: "flex", gap: 9, marginTop: 8, flexWrap: "wrap" }}>

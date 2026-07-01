@@ -10,6 +10,7 @@ import { useLang } from "@/components/app/lang";
 import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
+import { TimeField, DateField } from "@/components/app/fields";
 
 /** Best-effort document type from a filename (for the documents table). */
 function detectDocType(name: string): string {
@@ -408,9 +409,9 @@ function LaunTab({ e }: { e: Employee }) {
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
           <input value={nbLabel} onChange={(ev) => setNbLabel(ev.target.value)} placeholder={t("Heiti (valfrjálst)")} style={{ ...FLD, flex: 1, minWidth: 110 }} />
-          <input type="time" value={nbFrom} onChange={(ev) => setNbFrom(ev.target.value)} style={FLD} />
+          <TimeField value={nbFrom} onChange={setNbFrom} />
           <span className="muted">–</span>
-          <input type="time" value={nbTo} onChange={(ev) => setNbTo(ev.target.value)} style={FLD} />
+          <TimeField value={nbTo} onChange={setNbTo} />
           <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
             <input type="number" min={0} value={nbPct} onChange={(ev) => setNbPct(ev.target.value)} style={{ ...FLD, width: 60, textAlign: "right" }} /><span className="muted">%</span>
           </span>
@@ -496,7 +497,7 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
         </div>
         <div className="statline">
           <span className="k">Ráðningardagur</span>
-          <input type="date" defaultValue="2025-10-08" style={FLD} />
+          <DateField defaultValue="2025-10-08" />
         </div>
         <div className="statline">
           <span className="k">Æskilegir tímar/viku</span>
@@ -692,7 +693,7 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
           </div>
           <div className="emp-row2">
             <div className="emp-fld"><label>Staðsetning</label><select name="location"><option>Reykjavík Asian</option><option>Hotel Umi</option></select></div>
-            <div className="emp-fld"><label>Ráðningardagur</label><input type="date" name="hireDate" defaultValue="2026-06-23" /></div>
+            <div className="emp-fld"><label>Ráðningardagur</label><DateField name="hireDate" defaultValue="2026-06-23" style={{ width: "100%" }} /></div>
           </div>
           <div className="emp-row2">
             <div className="emp-fld"><label>Starfshlutfall</label><input name="employmentRatio" placeholder="100%" /></div>
