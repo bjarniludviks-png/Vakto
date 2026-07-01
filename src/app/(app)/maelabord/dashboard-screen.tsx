@@ -174,7 +174,7 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
     const leviesStr = pd?.ok ? krCompact(pd.levies) : "—";
     const costPerHourStr = pd?.ok ? krCompact(pd.costPerHour) : "—";
     const revenueStr = pd?.ok && pd.revenue > 0 ? krCompact(pd.revenue) : "";
-    const sourceLabel = pd?.ok ? (pd.revenueSource === "inventra" ? t("tengt Inventra") : pd.revenueSource === "manual" ? t("handvirkt") : pd.revenueSource === "mixed" ? t("blandað") : "") : "";
+    const sourceLabel = pd?.ok ? (pd.revenueSource === "inventra" ? t("tengt Inventra") : pd.revenueSource === "manual" ? t("handvirkt") : pd.revenueSource === "mixed" ? t("blandað") : pd.revenueSource === "estimated" ? t("áætluð") : "") : "";
     const series = pd?.ok ? pd.series : [];
     const staff = pd?.ok ? pd.staff : [];
     const overCount = staff.filter((s) => s.over).length;

@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { syncInventraRevenue, addLocation, addPosition, inviteUser, addRevenue, savePayRule } from "./actions";
+import { syncInventraRevenue, addLocation, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue } from "./actions";
 import type { AuditEntry } from "@/lib/audit";
 import type { SettingsData } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { dec1 } from "@/lib/format";
 
-type SettingsModal = "location" | "position" | "invite" | "revenue" | null;
+type SettingsModal = "location" | "position" | "invite" | "revenue" | "avgrevenue" | null;
+
+// Mon-first weekday chips; value = JS getDay() (0=Sun … 6=Sat).
+const WEEKDAYS: [number, string][] = [[1, "Mánudagur"], [2, "Þriðjudagur"], [3, "Miðvikudagur"], [4, "Fimmtudagur"], [5, "Föstudagur"], [6, "Laugardagur"], [0, "Sunnudagur"]];
 
 const ROLE_LABEL: Record<string, string> = { owner: "Eigandi", manager: "Stjórnandi", employee: "role:employee", contractor: "Verktaki" };
 const DEMO_SETTINGS: SettingsData = { locations: [], positions: [], users: [], companyId: null, live: false };
@@ -70,6 +73,7 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
             <div className="it"><div className="ic good">P</div><div className="tx"><b>Payday</b><span>{t("launakeyrsla & skil")}</span></div><span className="tag good">{t("tengt")}</span></div>
             <div className="it rowlink" onClick={syncInventra}><div className="ic info">IN</div><div className="tx"><b>INVENTRA</b><span>{t("velta í rauntíma — laun vs velta · smelltu til að sækja veltu")}</span></div><span className="tag good">{t("tengt")}</span></div>
             <div className="it rowlink" onClick={() => setModal("revenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div><div className="tx"><b>{t("Skrá veltu handvirkt")}</b><span>{t("án Inventra — sláðu inn veltu til að sjá laun vs velta")}</span></div><span className="tag info">{t("slá inn")}</span></div>
+            <div className="it rowlink" onClick={() => setModal("avgrevenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M3 3v18h18M7 15l4-4 3 3 5-6" /></svg></div><div className="tx"><b>{t("Meðalvelta per vikudag")}</b><span>{t("áætluð velta per vikudag — laun% án tengingar")}</span></div><span className="tag info">{t("slá inn")}</span></div>
             <div className="it rowlink" onClick={() => copyKioskLink(data.companyId)}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><rect x="4" y="3" width="16" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg></div><div className="tx"><b>{t("Kiosk-stimpilklukka")}</b><span>{t("opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð")}</span></div><span className="tag info">{t("afrita slóð")}</span></div>
             <div className="it"><div className="ic mut" style={{ background: "var(--line2)" }}>P</div><div className="tx"><b>{t("POS / sölukerfi")}</b><span>Dótturkassi, Salt, Verifone</span></div><span className="tag mut">{t("tengja")}</span></div>
           </div>
@@ -192,9 +196,15 @@ function SettingsFormModal({ modal, onClose }: { modal: Exclude<SettingsModal, n
   const [role, setRole] = useState("Starfsmaður");
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [week, setWeek] = useState<string[]>(["", "", "", "", "", "", ""]); // by getDay 0..6
+
+  useEffect(() => {
+    if (modal !== "avgrevenue") return;
+    getWeekdayRevenue().then((wr) => { if (wr) setWeek(Array.from({ length: 7 }, (_, d) => (wr[String(d)] ? String(wr[String(d)]) : ""))); });
+  }, [modal]);
 
   const titles: Record<Exclude<SettingsModal, null>, string> = {
-    location: "Bæta við stað", position: "Ný staða", invite: "Bjóða notanda", revenue: "Skrá veltu handvirkt",
+    location: "Bæta við stað", position: "Ný staða", invite: "Bjóða notanda", revenue: "Skrá veltu handvirkt", avgrevenue: "Meðalvelta per vikudag",
   };
 
   async function submit() {
@@ -204,11 +214,12 @@ function SettingsFormModal({ modal, onClose }: { modal: Exclude<SettingsModal, n
     else if (modal === "position") res = await addPosition({ name, baseRate: rate });
     else if (modal === "invite") res = await inviteUser({ email, role });
     else if (modal === "revenue") res = await addRevenue({ amount, date });
+    else if (modal === "avgrevenue") res = await setWeekdayRevenue(Object.fromEntries(week.map((v, d) => [String(d), Number((v || "0").replace(/[^\d]/g, "")) || 0])));
     setBusy(false);
     if (!res.ok) { setError(res.error ?? "Tókst ekki"); return; }
     onClose();
     const ok: Record<Exclude<SettingsModal, null>, string> = {
-      location: "Staður bætt við", position: "Staða stofnuð", invite: "Boð sent", revenue: "Velta skráð — laun% uppfært",
+      location: "Staður bætt við", position: "Staða stofnuð", invite: "Boð sent", revenue: "Velta skráð — laun% uppfært", avgrevenue: "Meðalvelta vistuð — laun% uppfært",
     };
     toast(res.demo ? `${ok[modal]} (demo — tengdu Supabase)` : ok[modal]);
   }
@@ -238,6 +249,15 @@ function SettingsFormModal({ modal, onClose }: { modal: Exclude<SettingsModal, n
             <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>{t("Sláðu inn veltu dagsins (eða tímabils) til að reikna laun% án Inventra.")}</p>
             <div className="field"><label>{t("Velta (kr)")}</label><input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="612.000" autoFocus /></div>
             <div className="field"><label>{t("Dagsetning")}</label><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></div>
+          </>}
+          {modal === "avgrevenue" && <>
+            <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>{t("Sláðu inn dæmigerða veltu fyrir hvern vikudag. Kerfið áætlar laun% út frá þessu þegar engin rauntala er skráð. Raunvelta tekur alltaf fram yfir.")}</p>
+            {WEEKDAYS.map(([d, label]) => (
+              <div className="field" key={d} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <label style={{ flex: 1, margin: 0 }}>{t(label)}</label>
+                <input value={week[d]} onChange={(e) => setWeek((w) => { const n = [...w]; n[d] = e.target.value; return n; })} placeholder="0" style={{ width: 130, textAlign: "right" }} />
+              </div>
+            ))}
           </>}
           {error && <p style={{ color: "var(--bad)", fontSize: 12.5, marginTop: 8 }}>{error}</p>}
           <div style={{ display: "flex", gap: 9, marginTop: 18 }}>

@@ -10,6 +10,6 @@ export default async function StillingarPage({
 }) {
   const [{ entries }, data, { rules }] = await Promise.all([getAuditLog(), getSettingsData(), getPayRules()]);
   const sp = await searchParams;
-  const initial = (["location", "position", "invite", "revenue"] as const).find((m) => m === sp.new) ?? null;
+  const initial = (["location", "position", "invite", "revenue", "avgrevenue"] as const).find((m) => m === sp.new) ?? null;
   return <SettingsScreen audit={entries} initialModal={initial} data={data} payRules={rules} />;
 }

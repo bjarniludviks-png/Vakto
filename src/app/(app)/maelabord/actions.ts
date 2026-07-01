@@ -24,7 +24,7 @@ export type PeriodData = {
   laborPct: number;
   hasRevenue: boolean;
   revenue: number;         // total velta over the period (kr)
-  revenueSource: "inventra" | "manual" | "mixed" | "none";
+  revenueSource: "inventra" | "manual" | "mixed" | "estimated" | "none";
   levies: number;          // launatengd/opinber gjöld portion of cost (kr)
   costPerHour: number;     // avg employer cost per worked hour (kr)
   series: SeriesPoint[];
@@ -143,6 +143,16 @@ export async function getDashboardPeriod(fromISO: string, toISO: string): Promis
       revenue = (rev ?? []).reduce((a, r) => a + Number(r.amount ?? 0), 0);
       const srcs = new Set((rev ?? []).map((r) => (String(r.source ?? "manual") === "inventra" ? "inventra" : "manual")));
       revenueSource = srcs.size === 0 ? "none" : srcs.size > 1 ? "mixed" : (srcs.has("inventra") ? "inventra" : "manual");
+    }
+    // No real revenue for the period → estimate from the company's per-weekday averages.
+    if (revenue === 0) {
+      const { data: comp } = await supabase.from("companies").select("weekday_revenue").eq("id", company).maybeSingle();
+      const wr = comp?.weekday_revenue as Record<string, number> | null | undefined;
+      if (wr) {
+        let est = 0;
+        for (const d of days) est += Number(wr[String(new Date(d + "T00:00:00").getDay())] ?? 0);
+        if (est > 0) { revenue = est; revenueSource = "estimated"; }
+      }
     }
     return {
       ok: true,

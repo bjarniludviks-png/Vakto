@@ -94,6 +94,43 @@ export async function addRevenue(
   }
 }
 
+/** Read the company's average revenue per weekday (0=Sun … 6=Sat), or null. */
+export async function getWeekdayRevenue(): Promise<Record<string, number> | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return null;
+    const { data, error } = await supabase.from("companies").select("weekday_revenue").eq("id", ctx.company).maybeSingle();
+    if (error) return null;
+    return (data?.weekday_revenue as Record<string, number>) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Save average revenue per weekday (used to estimate laun% without a POS link).
+ * map keys "0".."6" (0=Sun … 6=Sat) → kr. Needs migration 0018. */
+export async function setWeekdayRevenue(map: Record<string, number>): Promise<SettingsResult> {
+  const clean: Record<string, number> = {};
+  for (let d = 0; d < 7; d++) clean[String(d)] = Math.max(0, Math.round(Number(map[String(d)]) || 0));
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("companies").update({ weekday_revenue: clean }).eq("id", ctx.company);
+    if (error) return { ok: false, error: error.message.includes("weekday_revenue") ? "Keyrðu migration 0018" : error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "revenue.weekday", entity: "company", detail: "Meðalvelta per vikudag uppfærð",
+    });
+    revalidatePath("/maelabord");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /** Add a location (staður) to the company. */
 export async function addLocation(input: { name: string }): Promise<SettingsResult> {
   if (!input.name?.trim()) return { ok: false, error: "Nafn vantar" };

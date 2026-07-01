@@ -768,3 +768,6 @@ alter table employees add column if not exists benefits jsonb;
 
 -- ===== 0017 — desember-/orlofsuppbót line on payroll =====
 alter table payroll_lines add column if not exists uppbot numeric not null default 0;
+
+-- ===== 0018 — average revenue per weekday (laun% estimation) =====
+alter table companies add column if not exists weekday_revenue jsonb;
