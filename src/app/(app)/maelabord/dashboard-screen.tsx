@@ -8,7 +8,7 @@ import { useLang } from "@/components/app/lang";
 import { dec1 } from "@/lib/format";
 import { getDashboardPeriod, type PeriodData } from "./actions";
 
-// Paired bars (this period vs previous) — mirrors paired() in the prototype.
+// Paired demo bars (this period vs previous) — used only in the demo/preview state.
 function Paired({ a, b }: { a: number[]; b: number[] }) {
   const max = Math.max(...a, ...b) * 1.1;
   return (
@@ -22,6 +22,34 @@ function Paired({ a, b }: { a: number[]; b: number[] }) {
           <small>V{i + 1}</small>
         </div>
       ))}
+    </div>
+  );
+}
+
+// Planned vs actual hours per day — hover a bar for the exact numbers.
+function PlannedActual({ series, t }: { series: { label: string; planned: number; actual: number }[]; t: (s: string) => string }) {
+  const max = Math.max(1, ...series.map((s) => Math.max(s.planned, s.actual))) * 1.12;
+  return (
+    <div className="cb">
+      <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--ink2)", margin: "0 2px 10px" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><i style={{ width: 10, height: 10, borderRadius: 3, background: "var(--teal)" }} />{t("Áætlað")}</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><i style={{ width: 10, height: 10, borderRadius: 3, background: "var(--brand)" }} />{t("Raun")}</span>
+      </div>
+      <div className="sbars" style={{ height: 180 }}>
+        {series.map((s, i) => {
+          const dev = Math.round((s.actual - s.planned) * 10) / 10;
+          const tip = `${s.label} · ${t("Áætlað")} ${dec1(s.planned)} · ${t("Raun")} ${dec1(s.actual)} (${dev >= 0 ? "+" : ""}${dec1(dev)})`;
+          return (
+            <div className="col" key={i} title={tip}>
+              <div style={{ display: "flex", gap: 3, alignItems: "flex-end", height: "100%", width: "100%", justifyContent: "center", cursor: "default" }}>
+                <div style={{ width: "34%", height: `${Math.round((s.planned / max) * 100)}%`, background: "var(--teal)", borderRadius: "5px 5px 2px 2px", minHeight: s.planned > 0 ? 2 : 0 }} />
+                <div style={{ width: "34%", height: `${Math.round((s.actual / max) * 100)}%`, background: s.actual > s.planned + 0.05 ? "var(--bad)" : "var(--brand)", borderRadius: "5px 5px 2px 2px", minHeight: s.actual > 0 ? 2 : 0 }} />
+              </div>
+              <small>{s.label}</small>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -93,9 +121,14 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
     const plannedH = pd?.ok ? dec1(pd.planned) : hoursWeek;
     const actualH = pd?.ok ? dec1(pd.actual) : "—";
     const deviationH = pd?.ok ? `${pd.deviation >= 0 ? "+" : ""}${dec1(pd.deviation)}` : "—";
-    const dvColor = pd?.ok && pd.deviation !== 0 ? (pd.deviation > 0 ? "var(--warn)" : "var(--bad)") : "";
+    const dvColor = pd?.ok && pd.deviation !== 0 ? (pd.deviation > 0 ? "var(--bad)" : "var(--good)") : "";
     const overtimeH = pd?.ok ? dec1(pd.overtime) : "0";
+    const premiumH = pd?.ok ? dec1(pd.premium) : "0";
     const costM = pd?.ok ? pd.costM : laborCostWeek;
+    const plannedCostM = pd?.ok ? pd.plannedCostM : "—";
+    const series = pd?.ok ? pd.series : [];
+    const staff = pd?.ok ? pd.staff : [];
+    const overCount = staff.filter((s) => s.over).length;
     return (
       <>
         <PageHeader
@@ -155,7 +188,7 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
             <div className="dhero-right">
               <div className="l">{t("Launakostnaður")}</div>
               <div className="big">{costM} m.kr.</div>
-              <div className="s2">{lp > 0 ? `${t("Laun af tekjum")} ${dec1(lp)}%` : t("Skráðu veltu til að sjá laun%")}</div>
+              <div className="s2">{t("Áætlað v. plan")} {plannedCostM} m.kr.{lp > 0 ? ` · ${t("Laun af tekjum")} ${dec1(lp)}%` : ""}</div>
             </div>
           </div>
         </div>
@@ -174,17 +207,20 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
           </div>
           <div className="kpi"><div className="lab">{t("Launakostnaður")}</div><div className="val">{costM} <small>m kr</small></div></div>
           <div className="kpi"><div className="lab">{t("Raun tímar")}</div><div className="val">{actualH} <small>{t("klst")}</small></div></div>
-          <div className="kpi"><div className="lab">{t("Yfirvinna")}</div><div className="val">{overtimeH} <small>{t("klst")}</small></div></div>
+          <div className="kpi"><div className="lab">{t("Frávik frá plani")}</div><div className="val" style={dvColor ? { color: dvColor } : undefined}>{deviationH} <small>{t("klst")}</small></div></div>
+          <div className="kpi"><div className="lab">{t("Yfirvinna")}</div><div className="val" style={pd?.ok && pd.overtime > 0 ? { color: "var(--bad)" } : undefined}>{overtimeH} <small>{t("klst")}</small></div></div>
+          <div className="kpi"><div className="lab">{t("Álagstímar")}</div><div className="val">{premiumH} <small>{t("klst")}</small></div></div>
         </div>
 
         {/* comparison charts — empty until history accrues */}
         <div className="grid2">
           <div className="card">
             <div className="ch">
-              <div><div className="ct">{t("Launakostnaður — samanburður")}</div><div className="cs">{t("þetta tímabil vs fyrra")}</div></div>
-              <div className="seg">{["Vika", "Mánuður", "Ár"].map((s) => <button key={s} className={chartSeg === s ? "on" : ""} onClick={() => setChartSeg(s)}>{t(s)}</button>)}</div>
+              <div><div className="ct">{t("Áætlað vs raun (tímar)")}</div><div className="cs">{t("farðu með músina yfir fyrir tölur")}</div></div>
             </div>
-            <EmptyBody msg="Samanburðargröf birtast þegar fleiri tímabil safnast." />
+            {series.some((s) => s.planned > 0 || s.actual > 0)
+              ? <PlannedActual series={series} t={t} />
+              : <EmptyBody msg="Birtist þegar vaktir eru birtar og stimplað er inn." />}
           </div>
           <div className="card">
             <div className="ch"><div><div className="ct">{t("Á vakt núna")}</div><div className="cs">{t("skráðir inn í rauntíma")}</div></div><Link href="/timaskraning" className="badge" style={{ background: "var(--good-soft)", color: "var(--good)", textDecoration: "none" }}>{onNow.length} {t("á vakt")}</Link></div>
@@ -221,6 +257,31 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
               ))}
             </div>
           ) : <EmptyBody msg="Allir á plani hafa mætt." />}
+        </div>
+
+        {/* within vs over plan — who stays inside their hours, who runs over */}
+        <div className="card" style={{ marginTop: 20 }}>
+          <div className="ch">
+            <div><div className="ct">{t("Innan vs yfir áætlun")}</div><div className="cs">{t("raun tímar borið saman við plan á tímabilinu")}</div></div>
+            {staff.length > 0 && <span className="badge" style={{ background: overCount ? "var(--bad-soft)" : "var(--good-soft)", color: overCount ? "var(--bad)" : "var(--good)" }}>{overCount} {t("yfir áætlun")}</span>}
+          </div>
+          {staff.length ? (
+            <div className="cb tbl" style={{ paddingTop: 8 }}>
+              <table>
+                <thead><tr><th>{t("Starfsmaður")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th></tr></thead>
+                <tbody>
+                  {staff.map((s, i) => (
+                    <tr key={i}>
+                      <td><span className="who"><span className="avt" style={{ background: s.c }}>{s.av}</span><span>{s.name}<small>{t(s.dept)}</small></span></span></td>
+                      <td className="r">{dec1(s.planned)}</td>
+                      <td className="r">{dec1(s.actual)}</td>
+                      <td className="r" style={{ color: s.deviation > 0.05 ? "var(--bad)" : s.deviation < -0.05 ? "var(--good)" : undefined }}>{s.deviation > 0 ? "+" : ""}{dec1(s.deviation)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <EmptyBody msg="Birtist þegar vaktir og stimplanir safnast." />}
         </div>
 
         {/* monthly overview */}

@@ -144,6 +144,35 @@ export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clock
   return finalize(e, Math.round(hours * 10) / 10, Math.round(gross), uppbot);
 }
 
+/** Operational classification of worked hours (from punches) by the employee's
+ * rule set — for the dashboard. total = all worked hours; overtime = hours beyond
+ * the weekly/monthly threshold (correctly, NOT just actual−planned); premium =
+ * hours that land in a premium window (evening/weekend/night/holiday/custom band). */
+export function classifyHours(punches: { clockIn: string; clockOut: string }[], rules: CustomRules): { total: number; overtime: number; premium: number } {
+  const otWeekly = rules.otWeekly && rules.otWeekly > 0 ? rules.otWeekly : OT_WEEKLY;
+  const otMonthly = rules.otMonthly && rules.otMonthly > 0 ? rules.otMonthly : Infinity;
+  const bands = rules.bands ?? [];
+  let total = 0, overtime = 0, premium = 0, monthAcc = 0;
+  const weekHrs = new Map<string, number>();
+  const sorted = punches.slice().sort((a, b) => a.clockIn.localeCompare(b.clockIn));
+  for (const p of sorted) {
+    if (!p.clockOut) continue;
+    const end = new Date(p.clockOut).getTime();
+    let t = new Date(p.clockIn).getTime();
+    while (t < end) {
+      const dt = new Date(t);
+      const wk = mondayKey(dt);
+      const acc = weekHrs.get(wk) ?? 0;
+      const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+      if (Math.max(premiumPct(dt, STORHATID.has(iso), rules), bandPct(dt, bands)) > 0) premium += STEP;
+      if (acc >= otWeekly || monthAcc >= otMonthly) overtime += STEP;
+      total += STEP; monthAcc += STEP; weekHrs.set(wk, acc + STEP);
+      t += STEP * 3600000;
+    }
+  }
+  return { total: Math.round(total * 10) / 10, overtime: Math.round(overtime * 10) / 10, premium: Math.round(premium * 10) / 10 };
+}
+
 export type PayrollTotals = { hours: number; gross: number; withholding: number; pension: number; union: number; net: number; cost: number };
 
 export function totals(lines: PayLine[]): PayrollTotals {

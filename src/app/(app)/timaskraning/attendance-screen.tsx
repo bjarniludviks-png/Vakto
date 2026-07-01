@@ -208,7 +208,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
         <div className="kpi"><div className="lab">{t("Á vakt núna")}</div><div className="val">{onShift}</div></div>
         <div className="kpi"><div className="lab">{t("Áætl. klst")}</div><div className="val">{dec1(planned)} <small>{t("klst")}</small></div></div>
         <div className="kpi"><div className="lab">{t("Raun klst")}</div><div className="val">{dec1(actual)} <small>{t("klst")}</small></div></div>
-        <div className="kpi"><div className="lab">{t("Frávik")}</div><div className="val" style={{ color: actual > planned ? "var(--warn)" : "var(--good)" }}>{actual >= planned ? "+" : ""}{dec1(actual - planned)} <small>{t("klst")}</small></div></div>
+        <div className="kpi"><div className="lab">{t("Frávik")}</div><div className="val" style={{ color: actual > planned ? "var(--bad)" : actual < planned ? "var(--good)" : undefined }}>{actual >= planned ? "+" : ""}{dec1(actual - planned)} <small>{t("klst")}</small></div></div>
       </div>
 
       {/* Who is clocked in right now */}
@@ -264,7 +264,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
                   <td>{r.dept}</td>
                   <td className="r">{dec1(r.planned)}</td>
                   <td className="r">{dec1(r.actual)}</td>
-                  <td className="r" style={{ color: r.deviation > 0 ? "var(--warn)" : r.deviation < 0 ? "var(--bad)" : undefined }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>
+                  <td className="r" style={{ color: r.deviation > 0 ? "var(--bad)" : r.deviation < 0 ? "var(--good)" : undefined }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>
                   <td>{r.actual === 0 && r.planned === 0 ? <span className="pill" style={{ background: "var(--line2)", color: "var(--ink3)" }}>{t("engin gögn")}</span> : r.actual === 0 ? <span className="pill" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Vantar stimplun")}</span> : <span className="pill" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Á áætlun")}</span>}</td>
                 </tr>
               )) : <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
