@@ -113,10 +113,21 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
   const [nowMs, setNowMs] = useState(0);
   useEffect(() => {
     if (localStorage.getItem("vakto-onb-hidden") === "1") requestAnimationFrame(() => setHideOnb(true));
+    // Restore the last-selected period + custom range (persists across navigation).
+    const sp = localStorage.getItem("vakto-dash-period"); if (sp) setPeriod(sp);
+    const sf = localStorage.getItem("vakto-dash-from"); if (sf) setCustomFrom(sf);
+    const st = localStorage.getItem("vakto-dash-to"); if (st) setCustomTo(st);
     setNowMs(Date.now());
     const id = setInterval(() => setNowMs(Date.now()), 60000); // live "on shift" duration
     return () => clearInterval(id);
   }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("vakto-dash-period", period);
+      localStorage.setItem("vakto-dash-from", customFrom);
+      localStorage.setItem("vakto-dash-to", customTo);
+    } catch { /* ignore */ }
+  }, [period, customFrom, customTo]);
   useEffect(() => {
     if (!live) return;
     let from: string, to: string;
@@ -160,6 +171,10 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
     const deviationCostStr = pd?.ok ? `${pd.deviationCost >= 0 ? "+" : ""}${krCompact(pd.deviationCost)}` : "—";
     const overtimePayStr = pd?.ok ? krCompact(pd.overtimePay) : "—";
     const premiumPayStr = pd?.ok ? krCompact(pd.premiumPay) : "—";
+    const leviesStr = pd?.ok ? krCompact(pd.levies) : "—";
+    const costPerHourStr = pd?.ok ? krCompact(pd.costPerHour) : "—";
+    const revenueStr = pd?.ok && pd.revenue > 0 ? krCompact(pd.revenue) : "";
+    const sourceLabel = pd?.ok ? (pd.revenueSource === "inventra" ? t("tengt Inventra") : pd.revenueSource === "manual" ? t("handvirkt") : pd.revenueSource === "mixed" ? t("blandað") : "") : "";
     const series = pd?.ok ? pd.series : [];
     const staff = pd?.ok ? pd.staff : [];
     const overCount = staff.filter((s) => s.over).length;
@@ -214,7 +229,7 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
         {/* hero strip — figures follow the selected period */}
         <div className="dhero">
           <div className="dhero-head">
-            <span className="dhero-badge">{t(PRESETS.find((p) => p.k === period)?.label ?? "Þessi vika")}</span>
+            <span className="dhero-badge">{period === "custom" ? (customFrom && customTo ? `${customFrom} – ${customTo}` : t("Sérsnið")) : t(PRESETS.find((p) => p.k === period)?.label ?? "Þessi vika")}</span>
             <span className="dhero-sub">{t("Rauntölur uppfærast eftir því sem stimplað er inn og út.")}</span>
           </div>
           <div className="dhero-body">
@@ -244,7 +259,9 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
             <div>
               <div className="lab">{t("Laun af tekjum")}</div>
               <div className="val" style={{ fontSize: 22 }}>{lp === 0 ? "—" : <>{dec1(lp)}<small>%</small></>}</div>
-              <Link href="/stillingar?new=revenue" className="muted" style={{ fontSize: 11.5, fontWeight: 600, color: "var(--brand)", textDecoration: "none", display: "inline-block", marginTop: 2 }}>{t("Skrá veltu")}</Link>
+              {revenueStr
+                ? <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{t("Velta")} {revenueStr} · {sourceLabel} · <Link href="/stillingar?new=revenue" style={{ color: "var(--brand)", fontWeight: 600, textDecoration: "none" }}>{t("breyta")}</Link></div>
+                : <Link href="/stillingar?new=revenue" className="muted" style={{ fontSize: 11.5, fontWeight: 600, color: "var(--brand)", textDecoration: "none", display: "inline-block", marginTop: 2 }}>{t("Skrá veltu")}</Link>}
             </div>
           </div>
           <div className="kpi"><div className="lab">{t("Launakostnaður")}</div><div className="val">{costStr}</div></div>
@@ -252,6 +269,8 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
           <div className="kpi"><div className="lab">{t("Frávik frá plani")}</div><div className="val" style={dvColor ? { color: dvColor } : undefined}>{deviationH} <small>{t("klst")}</small></div></div>
           <div className="kpi"><div className="lab">{t("Yfirvinna")}</div><div className="val" style={pd?.ok && pd.overtime > 0 ? { color: "var(--bad)" } : undefined}>{overtimeH} <small>{t("klst")}</small></div><div className="muted" style={{ fontSize: 11.5, fontWeight: 600, marginTop: 2 }}>{overtimePayStr}</div></div>
           <div className="kpi"><div className="lab">{t("Álagstímar")}</div><div className="val">{premiumH} <small>{t("klst")}</small></div><div className="muted" style={{ fontSize: 11.5, fontWeight: 600, marginTop: 2 }}>{premiumPayStr}</div></div>
+          <div className="kpi"><div className="lab">{t("Launatengd gjöld")}</div><div className="val">{leviesStr}</div><div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{t("tryggingagjald, lífeyrir o.fl.")}</div></div>
+          <div className="kpi"><div className="lab">{t("Kostnaður á klst")}</div><div className="val">{costPerHourStr}</div><div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{t("meðaltal m. byrði")}</div></div>
         </div>
 
         {/* comparison charts — empty until history accrues */}

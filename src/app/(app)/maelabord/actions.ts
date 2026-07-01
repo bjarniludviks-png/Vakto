@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees } from "@/lib/employees.server";
-import { computeLine, classifyPay } from "@/lib/payroll";
+import { computeLine, classifyPay, BURDEN } from "@/lib/payroll";
 import { resolveRuleSet } from "@/lib/payrules";
 import { initials } from "@/lib/employees";
 
@@ -23,11 +23,15 @@ export type PeriodData = {
   premiumPay: number;    // extra kr from premiums (álag)
   laborPct: number;
   hasRevenue: boolean;
+  revenue: number;         // total velta over the period (kr)
+  revenueSource: "inventra" | "manual" | "mixed" | "none";
+  levies: number;          // launatengd/opinber gjöld portion of cost (kr)
+  costPerHour: number;     // avg employer cost per worked hour (kr)
   series: SeriesPoint[];
   staff: StaffRow[];
 };
 
-const EMPTY: PeriodData = { ok: false, planned: 0, actual: 0, overtime: 0, premium: 0, deviation: 0, cost: 0, plannedCost: 0, deviationCost: 0, overtimePay: 0, premiumPay: 0, laborPct: 0, hasRevenue: false, series: [], staff: [] };
+const EMPTY: PeriodData = { ok: false, planned: 0, actual: 0, overtime: 0, premium: 0, deviation: 0, cost: 0, plannedCost: 0, deviationCost: 0, overtimePay: 0, premiumPay: 0, laborPct: 0, hasRevenue: false, revenue: 0, revenueSource: "none", levies: 0, costPerHour: 0, series: [], staff: [] };
 
 function shiftHours(start?: string | null, end?: string | null): number {
   if (!start || !end) return 0;
@@ -130,12 +134,15 @@ export async function getDashboardPeriod(fromISO: string, toISO: string): Promis
     });
 
     let revenue = 0;
+    let revenueSource: PeriodData["revenueSource"] = "none";
     const { data: locs } = await supabase.from("locations").select("id").eq("company_id", company);
     const locIds = (locs ?? []).map((l) => l.id as string);
     if (locIds.length) {
-      const { data: rev } = await supabase.from("revenue").select("amount")
+      const { data: rev } = await supabase.from("revenue").select("amount, source")
         .in("location_id", locIds).gte("date", fromISO).lte("date", toISO);
       revenue = (rev ?? []).reduce((a, r) => a + Number(r.amount ?? 0), 0);
+      const srcs = new Set((rev ?? []).map((r) => (String(r.source ?? "manual") === "inventra" ? "inventra" : "manual")));
+      revenueSource = srcs.size === 0 ? "none" : srcs.size > 1 ? "mixed" : (srcs.has("inventra") ? "inventra" : "manual");
     }
     return {
       ok: true,
@@ -151,6 +158,10 @@ export async function getDashboardPeriod(fromISO: string, toISO: string): Promis
       premiumPay: Math.round(premiumPay),
       laborPct: revenue > 0 ? Math.round((cost / revenue) * 1000) / 10 : 0,
       hasRevenue: revenue > 0,
+      revenue: Math.round(revenue),
+      revenueSource,
+      levies: Math.round(cost * (BURDEN / (1 + BURDEN))),
+      costPerHour: actual > 0 ? Math.round(cost / actual) : 0,
       series,
       staff,
     };
