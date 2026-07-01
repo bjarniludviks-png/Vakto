@@ -13,9 +13,14 @@ import type { StaffCard } from "@/lib/mycard.server";
 import { resolvePerms, type Perms } from "@/lib/permissions";
 
 type ReqKind = "leave" | "avail" | "swap" | "pickup";
-const TABS = [
-  ["ov", "Yfirlit"], ["sh", "Mínar vaktir"], ["pay", "Laun"], ["ri", "Réttindi"], ["pr", "Prófíll"],
-] as const;
+const IC = (d: string) => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">{d.split("|").map((p, i) => <path key={i} d={p} />)}</svg>;
+const NAV: [string, string, React.ReactNode][] = [
+  ["ov", "Yfirlit", IC("M3 12l9-9 9 9|M5 10v10h14V10")],
+  ["sh", "Mínar vaktir", IC("M8 2v4M16 2v4|M3 9h18|M3 5h18v16H3z")],
+  ["pay", "Laun", IC("M12 1v22|M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6")],
+  ["ri", "Réttindi", IC("M12 2l7 4v6c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6z")],
+  ["pr", "Prófíll", IC("M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8|M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7")],
+];
 
 export default function EmployeeScreen({ card }: { card?: StaffCard }) {
   const { t } = useLang();
@@ -31,26 +36,29 @@ export default function EmployeeScreen({ card }: { card?: StaffCard }) {
   return (
     <>
       <PageHeader title="Mitt svæði" subtitle="Vaktir, laun, réttindi og prófíll" />
-      <div className="emparea">
-        <div className="emp-head">
-          <PhotoAvatar photo={photo} setPhoto={setPhoto} big={false} />
-          <div style={{ flex: 1 }}><div className="emp-nm">{card?.name ?? "Mína Huong"}</div><div className="emp-meta">{card ? `${t(card.role)} · ${card.company}` : t("emp:meta")}</div></div>
-          {perms.card && <button className="btn ghost sm" onClick={() => setShowCard(true)}>
+      <div className="emp-layout">
+        <aside className="emp-side">
+          <div className="emp-side-head">
+            <PhotoAvatar photo={photo} setPhoto={setPhoto} big={false} />
+            <div style={{ flex: 1, minWidth: 0 }}><div className="emp-nm">{card?.name ?? "Mína Huong"}</div><div className="emp-meta">{card ? `${t(card.role)} · ${card.company}` : t("emp:meta")}</div></div>
+          </div>
+          {perms.card && <button className="btn ghost sm" style={{ width: "100%", justifyContent: "center" }} onClick={() => setShowCard(true)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8" cy="11" r="2" /><path d="M14 9h4M14 13h4M5 16h7" /></svg>{t("Skírteini")}
           </button>}
-        </div>
+          <nav className="emp-nav">
+            {NAV.filter(([id]) => (id !== "pay" || perms.pay) && (id !== "sh" || perms.shifts)).map(([id, label, icon]) => (
+              <button key={id} className={`emp-navi${tab === id ? " on" : ""}`} onClick={() => setTab(id)}>{icon}<span>{t(label)}</span></button>
+            ))}
+          </nav>
+        </aside>
 
-        <div className="emp-tabs">
-          {TABS.filter(([id]) => (id !== "pay" || perms.pay) && (id !== "sh" || perms.shifts)).map(([id, label]) => (
-            <button key={id} className={`etab2${tab === id ? " on" : ""}`} onClick={() => setTab(id)}>{t(label)}</button>
-          ))}
-        </div>
-
-        {tab === "ov" && <Overview onReq={setReq} perms={perms} />}
-        {tab === "sh" && perms.shifts && <MyShifts onReq={setReq} perms={perms} />}
-        {tab === "pay" && perms.pay && <Pay />}
-        {tab === "ri" && <Rights />}
-        {tab === "pr" && <Profile photo={photo} setPhoto={setPhoto} />}
+        <main className="emp-main">
+          {tab === "ov" && <Overview onReq={setReq} perms={perms} />}
+          {tab === "sh" && perms.shifts && <MyShifts onReq={setReq} perms={perms} />}
+          {tab === "pay" && perms.pay && <Pay />}
+          {tab === "ri" && <Rights />}
+          {tab === "pr" && <Profile photo={photo} setPhoto={setPhoto} />}
+        </main>
       </div>
 
       {req && <ReqModal kind={req} onClose={() => setReq(null)} />}
