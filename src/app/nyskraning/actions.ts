@@ -1,0 +1,38 @@
+"use server";
+
+import { createAdminClient } from "@/lib/supabase/admin";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
+
+export type SignupResult = { ok: boolean; demo?: boolean; error?: string };
+
+/** Self-service owner signup: create the auth user, a company, and link the
+ * public.users row as owner. Uses the service-role client (RLS would block a
+ * brand-new user from creating a company). Demo fallback when unconfigured. */
+export async function createOwnerAccount(input: { fullName: string; companyName: string; email: string; password: string }): Promise<SignupResult> {
+  const fullName = input.fullName?.trim();
+  const companyName = input.companyName?.trim();
+  const email = input.email?.trim().toLowerCase();
+  if (!fullName || !companyName || !email || !input.password) return { ok: false, error: "Fylltu út alla reiti" };
+  if (input.password.length < 8) return { ok: false, error: "Lykilorð þarf að vera a.m.k. 8 stafir" };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const admin = createAdminClient();
+    const { data: created, error: cErr } = await admin.auth.admin.createUser({
+      email, password: input.password, email_confirm: true,
+      user_metadata: { full_name: fullName, role: "owner" },
+    });
+    if (cErr || !created.user) {
+      const m = cErr?.message ?? "Tókst ekki að stofna aðgang";
+      return { ok: false, error: /already|registered|exists/i.test(m) ? "Netfang er þegar skráð — skráðu þig inn" : m };
+    }
+    const userId = created.user.id;
+    const { data: comp, error: coErr } = await admin.from("companies").insert({ name: companyName }).select("id").single();
+    if (coErr || !comp) return { ok: false, error: coErr?.message ?? "Tókst ekki að stofna fyrirtæki" };
+    // The auth trigger may have created the users row; upsert to be safe.
+    const { error: uErr } = await admin.from("users").upsert({ id: userId, email, company_id: comp.id, role: "owner", full_name: fullName });
+    if (uErr) return { ok: false, error: uErr.message };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
