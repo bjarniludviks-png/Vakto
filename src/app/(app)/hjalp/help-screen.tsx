@@ -135,6 +135,11 @@ export default function HelpScreen() {
         <aside className="emp-side">
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={lang === "en" ? "Search help…" : "Leita í hjálp…"}
             style={{ width: "100%", border: "1px solid var(--line)", borderRadius: 9, padding: "8px 11px", font: "inherit", fontSize: 13, background: "var(--panel)", color: "var(--ink)" }} />
+          <select className="emp-navsel" value={active} onChange={(e) => setActive(e.target.value)}>
+            {GUIDES.map((guide) => (
+              <option key={guide.id} value={guide.id}>{tx(lang, guide.title)}</option>
+            ))}
+          </select>
           <nav className="emp-nav">
             {list.map((guide) => (
               <button key={guide.id} className={`emp-navi${guide.id === active ? " on" : ""}`} onClick={() => setActive(guide.id)}>{guide.icon}<span>{tx(lang, guide.title)}</span></button>
