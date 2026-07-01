@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees } from "@/lib/employees.server";
-import { computeLine, classifyHours } from "@/lib/payroll";
+import { computeLine, classifyPay } from "@/lib/payroll";
 import { resolveRuleSet } from "@/lib/payrules";
 import { initials } from "@/lib/employees";
 
@@ -13,18 +13,21 @@ export type PeriodData = {
   ok: boolean;
   planned: number;
   actual: number;
-  overtime: number;   // REAL overtime (over the weekly/monthly threshold)
-  premium: number;    // álagstímar (evening/weekend/night/holiday/band hours)
-  deviation: number;  // actual − planned
-  costM: string;      // actual-based labor cost, m kr, 1 dp
-  plannedCostM: string; // cost implied by the PLAN, m kr, 1 dp
+  overtime: number;      // REAL overtime hours (over the weekly/monthly threshold)
+  premium: number;       // álagstímar (evening/weekend/night/holiday/band hours)
+  deviation: number;     // actual − planned (hours)
+  cost: number;          // actual-based labor cost (kr, incl. burden)
+  plannedCost: number;   // cost implied by the PLAN (kr)
+  deviationCost: number; // cost − plannedCost (what the deviation costs, kr)
+  overtimePay: number;   // extra kr from overtime
+  premiumPay: number;    // extra kr from premiums (álag)
   laborPct: number;
   hasRevenue: boolean;
   series: SeriesPoint[];
   staff: StaffRow[];
 };
 
-const EMPTY: PeriodData = { ok: false, planned: 0, actual: 0, overtime: 0, premium: 0, deviation: 0, costM: "0", plannedCostM: "0", laborPct: 0, hasRevenue: false, series: [], staff: [] };
+const EMPTY: PeriodData = { ok: false, planned: 0, actual: 0, overtime: 0, premium: 0, deviation: 0, cost: 0, plannedCost: 0, deviationCost: 0, overtimePay: 0, premiumPay: 0, laborPct: 0, hasRevenue: false, series: [], staff: [] };
 
 function shiftHours(start?: string | null, end?: string | null): number {
   if (!start || !end) return 0;
@@ -100,13 +103,14 @@ export async function getDashboardPeriod(fromISO: string, toISO: string): Promis
     const eff = new Map<string, number>();
     for (const e of employees) { const l = computeLine(e); eff.set(e.id, l.hours > 0 ? l.cost / l.hours : 0); }
 
-    let planned = 0, actual = 0, overtime = 0, premium = 0, cost = 0, plannedCost = 0;
+    let planned = 0, actual = 0, overtime = 0, premium = 0, cost = 0, plannedCost = 0, overtimePay = 0, premiumPay = 0;
     const staff: StaffRow[] = [];
     for (const e of employees) {
       const pl = plannedMap.get(e.id) ?? 0, ac = actualMap.get(e.id) ?? 0;
       const rules = resolveRuleSet(e.union, ruleMap.get(e.id) as never);
-      const cls = classifyHours(byEmp.get(e.id) ?? [], rules);
+      const cls = classifyPay(e.rate, e.payType === "hourly", byEmp.get(e.id) ?? [], rules);
       planned += pl; actual += ac; overtime += cls.overtime; premium += cls.premium;
+      overtimePay += cls.overtimePay; premiumPay += cls.premiumPay;
       cost += ac * (eff.get(e.id) ?? 0);
       plannedCost += pl * (eff.get(e.id) ?? 0);
       if (pl > 0 || ac > 0) staff.push({
@@ -133,7 +137,6 @@ export async function getDashboardPeriod(fromISO: string, toISO: string): Promis
         .in("location_id", locIds).gte("date", fromISO).lte("date", toISO);
       revenue = (rev ?? []).reduce((a, r) => a + Number(r.amount ?? 0), 0);
     }
-    const m = (n: number) => (Math.round(n / 100000) / 10).toFixed(1).replace(".", ",");
     return {
       ok: true,
       planned: Math.round(planned * 10) / 10,
@@ -141,8 +144,11 @@ export async function getDashboardPeriod(fromISO: string, toISO: string): Promis
       overtime: Math.round(overtime * 10) / 10,
       premium: Math.round(premium * 10) / 10,
       deviation: Math.round((actual - planned) * 10) / 10,
-      costM: m(cost),
-      plannedCostM: m(plannedCost),
+      cost: Math.round(cost),
+      plannedCost: Math.round(plannedCost),
+      deviationCost: Math.round(cost - plannedCost),
+      overtimePay: Math.round(overtimePay),
+      premiumPay: Math.round(premiumPay),
       laborPct: revenue > 0 ? Math.round((cost / revenue) * 1000) / 10 : 0,
       hasRevenue: revenue > 0,
       series,

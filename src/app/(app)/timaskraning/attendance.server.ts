@@ -6,7 +6,7 @@ import { initials } from "@/lib/employees";
 
 export type Attendance = { onShift: number; live: boolean };
 
-export type OnNowRow = { punchId: string; employeeId: string; name: string; av: string; c: string; dept: string; in: string; source: string };
+export type OnNowRow = { punchId: string; employeeId: string; name: string; av: string; c: string; dept: string; in: string; since: string; source: string };
 export type RosterRow = { id: string; name: string; av: string; c: string; dept: string };
 // Scheduled today but not clocked in — late (past start) or still upcoming.
 export type MissingRow = { employeeId: string; name: string; av: string; c: string; dept: string; start: string; late: boolean; mins: number };
@@ -50,7 +50,7 @@ export async function getWhoIsOn(): Promise<{ rows: OnNowRow[]; missing: Missing
       return {
         punchId: p.id as string, employeeId: p.employee_id as string,
         name: m?.name ?? "?", av: m?.av ?? "?", c: m?.c ?? "#888", dept: m?.dept ?? "—",
-        in: hhmm(ci), source: (p.source as string) ?? "web",
+        in: hhmm(ci), since: p.clock_in as string, source: (p.source as string) ?? "web",
       };
     });
     const onIds = new Set(rows.map((r) => r.employeeId));

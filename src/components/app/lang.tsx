@@ -203,6 +203,8 @@ export const DICT: Dict = {
   "Engin hlunnindi skráð — bættu við einu eða fleiri hér að neðan.": { is: "Engin hlunnindi skráð — bættu við einu eða fleiri hér að neðan.", en: "No benefits yet — add one or more below." },
   "Áætlað": { is: "Áætlað", en: "Planned" },
   "Áætlað v. plan": { is: "Áætlað v. plan", en: "Plan est." },
+  "Sérsnið": { is: "Sérsnið", en: "Custom" },
+  "frávik": { is: "frávik", en: "deviation" },
   "Frávik frá plani": { is: "Frávik frá plani", en: "Deviation from plan" },
   "Álagstímar": { is: "Álagstímar", en: "Premium hours" },
   "Áætlað vs raun (tímar)": { is: "Áætlað vs raun (tímar)", en: "Planned vs actual (hours)" },

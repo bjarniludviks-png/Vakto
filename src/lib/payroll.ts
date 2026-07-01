@@ -144,15 +144,18 @@ export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clock
   return finalize(e, Math.round(hours * 10) / 10, Math.round(gross), uppbot);
 }
 
-/** Operational classification of worked hours (from punches) by the employee's
- * rule set — for the dashboard. total = all worked hours; overtime = hours beyond
- * the weekly/monthly threshold (correctly, NOT just actual−planned); premium =
- * hours that land in a premium window (evening/weekend/night/holiday/custom band). */
-export function classifyHours(punches: { clockIn: string; clockOut: string }[], rules: CustomRules): { total: number; overtime: number; premium: number } {
+/** Operational classification of worked hours + their extra cost (from punches)
+ * by the employee's rule set — for the dashboard. hours: total/overtime/premium
+ * where overtime = hours beyond the weekly/monthly threshold (correctly, NOT just
+ * actual−planned) and premium = hours in a premium window. overtimePay/premiumPay
+ * = the EXTRA kr (above base, incl. employer burden) those hours cost — hourly
+ * staff only (monthly salary isn't hour-priced). */
+export function classifyPay(rate: number, hourly: boolean, punches: { clockIn: string; clockOut: string }[], rules: CustomRules): { total: number; overtime: number; premium: number; overtimePay: number; premiumPay: number } {
   const otWeekly = rules.otWeekly && rules.otWeekly > 0 ? rules.otWeekly : OT_WEEKLY;
   const otMonthly = rules.otMonthly && rules.otMonthly > 0 ? rules.otMonthly : Infinity;
+  const otPct = rules.overtime ?? 0;
   const bands = rules.bands ?? [];
-  let total = 0, overtime = 0, premium = 0, monthAcc = 0;
+  let total = 0, overtime = 0, premium = 0, overtimePay = 0, premiumPay = 0, monthAcc = 0;
   const weekHrs = new Map<string, number>();
   const sorted = punches.slice().sort((a, b) => a.clockIn.localeCompare(b.clockIn));
   for (const p of sorted) {
@@ -164,13 +167,21 @@ export function classifyHours(punches: { clockIn: string; clockOut: string }[], 
       const wk = mondayKey(dt);
       const acc = weekHrs.get(wk) ?? 0;
       const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-      if (Math.max(premiumPct(dt, STORHATID.has(iso), rules), bandPct(dt, bands)) > 0) premium += STEP;
-      if (acc >= otWeekly || monthAcc >= otMonthly) overtime += STEP;
+      const prem = Math.max(premiumPct(dt, STORHATID.has(iso), rules), bandPct(dt, bands));
+      const otActive = acc >= otWeekly || monthAcc >= otMonthly;
+      if (prem > 0) premium += STEP;
+      if (otActive) overtime += STEP;
+      if (hourly) {
+        const effPct = otActive ? Math.max(prem, otPct) : prem; // engine pays the higher
+        const extra = rate * STEP * (effPct / 100) * (1 + BURDEN);
+        if (otActive && otPct >= prem) overtimePay += extra; else premiumPay += extra;
+      }
       total += STEP; monthAcc += STEP; weekHrs.set(wk, acc + STEP);
       t += STEP * 3600000;
     }
   }
-  return { total: Math.round(total * 10) / 10, overtime: Math.round(overtime * 10) / 10, premium: Math.round(premium * 10) / 10 };
+  const r1 = (n: number) => Math.round(n * 10) / 10;
+  return { total: r1(total), overtime: r1(overtime), premium: r1(premium), overtimePay: Math.round(overtimePay), premiumPay: Math.round(premiumPay) };
 }
 
 export type PayrollTotals = { hours: number; gross: number; withholding: number; pension: number; union: number; net: number; cost: number };

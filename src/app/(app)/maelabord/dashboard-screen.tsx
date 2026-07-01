@@ -5,7 +5,7 @@ import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { dec1 } from "@/lib/format";
+import { dec1, krCompact } from "@/lib/format";
 import { getDashboardPeriod, type PeriodData } from "./actions";
 
 // Paired demo bars (this period vs previous) — used only in the demo/preview state.
@@ -26,32 +26,55 @@ function Paired({ a, b }: { a: number[]; b: number[] }) {
   );
 }
 
-// Planned vs actual hours per day — hover a bar for the exact numbers.
+// Planned vs actual hours — line chart. Hover a point for the exact numbers.
 function PlannedActual({ series, t }: { series: { label: string; planned: number; actual: number }[]; t: (s: string) => string }) {
+  const W = 640, H = 200, padL = 30, padR = 12, padT = 14, padB = 26;
+  const n = series.length;
   const max = Math.max(1, ...series.map((s) => Math.max(s.planned, s.actual))) * 1.12;
+  const x = (i: number) => n <= 1 ? (padL + (W - padL - padR) / 2) : padL + (i * (W - padL - padR)) / (n - 1);
+  const y = (v: number) => padT + (1 - v / max) * (H - padT - padB);
+  const path = (key: "planned" | "actual") => series.map((s, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(s[key]).toFixed(1)}`).join(" ");
+  // y gridlines (0, mid, max-ish)
+  const ticks = [0, Math.round(max / 2), Math.round(max * 0.9)];
+  const labelStep = Math.ceil(n / 8);
   return (
     <div className="cb">
-      <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--ink2)", margin: "0 2px 10px" }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><i style={{ width: 10, height: 10, borderRadius: 3, background: "var(--teal)" }} />{t("Áætlað")}</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><i style={{ width: 10, height: 10, borderRadius: 3, background: "var(--brand)" }} />{t("Raun")}</span>
+      <div style={{ display: "flex", gap: 16, fontSize: 12, color: "var(--ink2)", margin: "0 2px 8px" }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><i style={{ width: 12, height: 3, borderRadius: 2, background: "var(--teal)" }} />{t("Áætlað")}</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><i style={{ width: 12, height: 3, borderRadius: 2, background: "var(--brand)" }} />{t("Raun")}</span>
       </div>
-      <div className="sbars" style={{ height: 180 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={200} preserveAspectRatio="none" style={{ overflow: "visible" }}>
+        {ticks.map((tk, i) => (
+          <g key={i}>
+            <line x1={padL} x2={W - padR} y1={y(tk)} y2={y(tk)} stroke="var(--line2)" strokeWidth={1} />
+            <text x={0} y={y(tk) + 3} fontSize={10} fill="var(--ink3)">{dec1(tk)}</text>
+          </g>
+        ))}
+        <path d={path("planned")} fill="none" stroke="var(--teal)" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+        <path d={path("actual")} fill="none" stroke="var(--brand)" strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
         {series.map((s, i) => {
           const dev = Math.round((s.actual - s.planned) * 10) / 10;
           const tip = `${s.label} · ${t("Áætlað")} ${dec1(s.planned)} · ${t("Raun")} ${dec1(s.actual)} (${dev >= 0 ? "+" : ""}${dec1(dev)})`;
           return (
-            <div className="col" key={i} title={tip}>
-              <div style={{ display: "flex", gap: 3, alignItems: "flex-end", height: "100%", width: "100%", justifyContent: "center", cursor: "default" }}>
-                <div style={{ width: "34%", height: `${Math.round((s.planned / max) * 100)}%`, background: "var(--teal)", borderRadius: "5px 5px 2px 2px", minHeight: s.planned > 0 ? 2 : 0 }} />
-                <div style={{ width: "34%", height: `${Math.round((s.actual / max) * 100)}%`, background: s.actual > s.planned + 0.05 ? "var(--bad)" : "var(--brand)", borderRadius: "5px 5px 2px 2px", minHeight: s.actual > 0 ? 2 : 0 }} />
-              </div>
-              <small>{s.label}</small>
-            </div>
+            <g key={i}>
+              <circle cx={x(i)} cy={y(s.planned)} r={3} fill="var(--teal)" />
+              <circle cx={x(i)} cy={y(s.actual)} r={3} fill={s.actual > s.planned + 0.05 ? "var(--bad)" : "var(--brand)"} />
+              {/* wide invisible hit area for the tooltip */}
+              <rect x={x(i) - 12} y={padT} width={24} height={H - padT - padB} fill="transparent"><title>{tip}</title></rect>
+              {(i % labelStep === 0 || i === n - 1) && <text x={x(i)} y={H - 8} fontSize={10} fill="var(--ink3)" textAnchor="middle">{s.label}</text>}
+            </g>
           );
         })}
-      </div>
+      </svg>
     </div>
   );
+}
+
+/** "3 klst 12 mín" style duration between an ISO start and now (ms). */
+function durSince(iso: string, nowMs: number): string {
+  const mins = Math.max(0, Math.floor((nowMs - new Date(iso).getTime()) / 60000));
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return h > 0 ? `${h} klst ${m} mín` : `${m} mín`;
 }
 
 function EmptyBody({ msg }: { msg: string }) {
@@ -60,7 +83,7 @@ function EmptyBody({ msg }: { msg: string }) {
 }
 
 type Onb = { show: boolean; hasLocation: boolean; hasStaff: boolean; hasSchedule: boolean; hasRevenue: boolean };
-type OnNow = { punchId: string; name: string; av: string; c: string; dept: string; in: string };
+type OnNow = { punchId: string; name: string; av: string; c: string; dept: string; in: string; since: string };
 type Missing = { employeeId: string; name: string; av: string; c: string; dept: string; start: string; late: boolean; mins: number };
 
 const PRESETS: { k: string; label: string }[] = [
@@ -84,17 +107,25 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
   const [chartSeg, setChartSeg] = useState("Vika");
   const [hideOnb, setHideOnb] = useState(false);
   const [period, setPeriod] = useState("vika");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
   const [pd, setPd] = useState<PeriodData | null>(null);
+  const [nowMs, setNowMs] = useState(0);
   useEffect(() => {
     if (localStorage.getItem("vakto-onb-hidden") === "1") requestAnimationFrame(() => setHideOnb(true));
+    setNowMs(Date.now());
+    const id = setInterval(() => setNowMs(Date.now()), 60000); // live "on shift" duration
+    return () => clearInterval(id);
   }, []);
   useEffect(() => {
     if (!live) return;
-    const { from, to } = presetRange(period);
+    let from: string, to: string;
+    if (period === "custom") { if (!customFrom || !customTo) return; from = customFrom; to = customTo; }
+    else ({ from, to } = presetRange(period));
     let cancelled = false;
     getDashboardPeriod(from, to).then((r) => { if (!cancelled && r.ok) setPd(r); });
     return () => { cancelled = true; };
-  }, [period, live]);
+  }, [period, live, customFrom, customTo]);
   function hideOnboarding() {
     setHideOnb(true);
     try { localStorage.setItem("vakto-onb-hidden", "1"); } catch {}
@@ -124,8 +155,11 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
     const dvColor = pd?.ok && pd.deviation !== 0 ? (pd.deviation > 0 ? "var(--bad)" : "var(--good)") : "";
     const overtimeH = pd?.ok ? dec1(pd.overtime) : "0";
     const premiumH = pd?.ok ? dec1(pd.premium) : "0";
-    const costM = pd?.ok ? pd.costM : laborCostWeek;
-    const plannedCostM = pd?.ok ? pd.plannedCostM : "—";
+    const costStr = pd?.ok ? krCompact(pd.cost) : `${laborCostWeek} m.kr.`;
+    const plannedCostStr = pd?.ok ? krCompact(pd.plannedCost) : "—";
+    const deviationCostStr = pd?.ok ? `${pd.deviationCost >= 0 ? "+" : ""}${krCompact(pd.deviationCost)}` : "—";
+    const overtimePayStr = pd?.ok ? krCompact(pd.overtimePay) : "—";
+    const premiumPayStr = pd?.ok ? krCompact(pd.premiumPay) : "—";
     const series = pd?.ok ? pd.series : [];
     const staff = pd?.ok ? pd.staff : [];
     const overCount = staff.filter((s) => s.over).length;
@@ -162,11 +196,19 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
           </div>
         )}
 
-        {/* period presets */}
-        <div className="pchips">
+        {/* period presets + custom range */}
+        <div className="pchips" style={{ alignItems: "center", flexWrap: "wrap" }}>
           {PRESETS.map((p) => (
             <button key={p.k} className={`pchip${period === p.k ? " on" : ""}`} onClick={() => setPeriod(p.k)}>{t(p.label)}</button>
           ))}
+          <button className={`pchip${period === "custom" ? " on" : ""}`} onClick={() => setPeriod("custom")}>{t("Sérsnið")}</button>
+          {period === "custom" && (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: 4 }}>
+              <input type="date" value={customFrom} max={customTo || undefined} onChange={(e) => setCustomFrom(e.target.value)} style={{ border: "1px solid var(--line)", borderRadius: 7, padding: "5px 8px", font: "inherit", fontSize: 13, background: "#fff" }} />
+              <span className="muted">–</span>
+              <input type="date" value={customTo} min={customFrom || undefined} onChange={(e) => setCustomTo(e.target.value)} style={{ border: "1px solid var(--line)", borderRadius: 7, padding: "5px 8px", font: "inherit", fontSize: 13, background: "#fff" }} />
+            </span>
+          )}
         </div>
 
         {/* hero strip — figures follow the selected period */}
@@ -187,8 +229,8 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
             </div>
             <div className="dhero-right">
               <div className="l">{t("Launakostnaður")}</div>
-              <div className="big">{costM} m.kr.</div>
-              <div className="s2">{t("Áætlað v. plan")} {plannedCostM} m.kr.{lp > 0 ? ` · ${t("Laun af tekjum")} ${dec1(lp)}%` : ""}</div>
+              <div className="big">{costStr}</div>
+              <div className="s2">{t("Áætlað v. plan")} {plannedCostStr} · {t("frávik")} <span style={dvColor ? { color: dvColor } : undefined}>{deviationCostStr}</span>{lp > 0 ? ` · ${t("Laun af tekjum")} ${dec1(lp)}%` : ""}</div>
             </div>
           </div>
         </div>
@@ -205,11 +247,11 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
               <Link href="/stillingar?new=revenue" className="muted" style={{ fontSize: 11.5, fontWeight: 600, color: "var(--brand)", textDecoration: "none", display: "inline-block", marginTop: 2 }}>{t("Skrá veltu")}</Link>
             </div>
           </div>
-          <div className="kpi"><div className="lab">{t("Launakostnaður")}</div><div className="val">{costM} <small>m kr</small></div></div>
+          <div className="kpi"><div className="lab">{t("Launakostnaður")}</div><div className="val">{costStr}</div></div>
           <div className="kpi"><div className="lab">{t("Raun tímar")}</div><div className="val">{actualH} <small>{t("klst")}</small></div></div>
           <div className="kpi"><div className="lab">{t("Frávik frá plani")}</div><div className="val" style={dvColor ? { color: dvColor } : undefined}>{deviationH} <small>{t("klst")}</small></div></div>
-          <div className="kpi"><div className="lab">{t("Yfirvinna")}</div><div className="val" style={pd?.ok && pd.overtime > 0 ? { color: "var(--bad)" } : undefined}>{overtimeH} <small>{t("klst")}</small></div></div>
-          <div className="kpi"><div className="lab">{t("Álagstímar")}</div><div className="val">{premiumH} <small>{t("klst")}</small></div></div>
+          <div className="kpi"><div className="lab">{t("Yfirvinna")}</div><div className="val" style={pd?.ok && pd.overtime > 0 ? { color: "var(--bad)" } : undefined}>{overtimeH} <small>{t("klst")}</small></div><div className="muted" style={{ fontSize: 11.5, fontWeight: 600, marginTop: 2 }}>{overtimePayStr}</div></div>
+          <div className="kpi"><div className="lab">{t("Álagstímar")}</div><div className="val">{premiumH} <small>{t("klst")}</small></div><div className="muted" style={{ fontSize: 11.5, fontWeight: 600, marginTop: 2 }}>{premiumPayStr}</div></div>
         </div>
 
         {/* comparison charts — empty until history accrues */}
@@ -230,7 +272,7 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
                   <div className="it" key={r.punchId}>
                     <span className="avt" style={{ background: r.c, width: 32, height: 32 }}>{r.av}</span>
                     <div className="tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}</span></div>
-                    <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)", marginLeft: "auto" }}>{t("á vakt")}</span>
+                    <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)", marginLeft: "auto" }}>{nowMs ? durSince(r.since, nowMs) : t("á vakt")}</span>
                   </div>
                 ))}
               </div>

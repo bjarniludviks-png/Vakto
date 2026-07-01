@@ -19,3 +19,13 @@ export function kr(n: number): string {
 export function dec1(n: number): string {
   return n.toFixed(1).replace(".", ",");
 }
+
+/** Adaptive currency for KPIs: ≥1 m → "1,4 m.kr.", ≥1 þús → "740 þ.kr.",
+ * else "820 kr". Keeps single-day figures readable (not "0,1 m.kr."). */
+export function krCompact(n: number): string {
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 1_000_000) return `${sign}${dec1(abs / 1_000_000)} m.kr.`;
+  if (abs >= 1_000) return `${sign}${nf(abs / 1_000)} þ.kr.`;
+  return `${sign}${nf(abs)} kr`;
+}
