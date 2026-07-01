@@ -33,6 +33,7 @@ function EmptyBody({ msg }: { msg: string }) {
 
 type Onb = { show: boolean; hasLocation: boolean; hasStaff: boolean; hasSchedule: boolean; hasRevenue: boolean };
 type OnNow = { punchId: string; name: string; av: string; c: string; dept: string; in: string };
+type Missing = { employeeId: string; name: string; av: string; c: string; dept: string; start: string; late: boolean; mins: number };
 
 const PRESETS: { k: string; label: string }[] = [
   { k: "idag", label: "Í dag" }, { k: "igaer", label: "Í gær" },
@@ -50,7 +51,7 @@ function presetRange(k: string): { from: string; to: string } {
   return { from: isoD(mon), to: isoD(sun) };
 }
 
-export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding, live = false, onNow = [] }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean; onNow?: OnNow[] }) {
+export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding, live = false, onNow = [], missing = [] }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean; onNow?: OnNow[]; missing?: Missing[] }) {
   const { t } = useLang();
   const [chartSeg, setChartSeg] = useState("Vika");
   const [hideOnb, setHideOnb] = useState(false);
@@ -201,10 +202,25 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
           </div>
         </div>
 
-        {/* needs attention — empty when nothing flagged */}
+        {/* not clocked in — scheduled today but no punch (late / forgot / upcoming) */}
         <div className="card" style={{ marginTop: 20 }}>
-          <div className="ch"><div className="ct">{t("Þarf athygli")}</div></div>
-          <EmptyBody msg="Engin atriði krefjast athygli núna." />
+          <div className="ch">
+            <div><div className="ct">{t("Ekki mætt af plani")}</div><div className="cs">{t("á plani í dag en ekki stimplaðir inn")}</div></div>
+            {missing.length > 0 && <Link href="/timaskraning" className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)", textDecoration: "none" }}>{missing.filter((m) => m.late).length} {t("seinir")}</Link>}
+          </div>
+          {missing.length ? (
+            <div className="cb att">
+              {missing.map((m) => (
+                <div className="it" key={m.employeeId}>
+                  <span className="avt" style={{ background: m.c, width: 32, height: 32 }}>{m.av}</span>
+                  <div className="tx"><b>{m.name}</b><span>{t(m.dept)} · {t("á plani")} {m.start}</span></div>
+                  {m.late
+                    ? <span className="tag" style={{ background: "var(--bad-soft)", color: "var(--bad)", marginLeft: "auto" }}>{m.mins >= 60 ? `${Math.floor(m.mins / 60)} klst ${m.mins % 60} mín` : `${m.mins} mín`} {t("of seint")}</span>
+                    : <span className="tag" style={{ background: "var(--line2)", color: "var(--ink2)", marginLeft: "auto" }}>{t("væntanleg/ur")}</span>}
+                </div>
+              ))}
+            </div>
+          ) : <EmptyBody msg="Allir á plani hafa mætt." />}
         </div>
 
         {/* monthly overview */}
