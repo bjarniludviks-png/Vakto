@@ -6,6 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
 import { nf } from "@/lib/format";
+import { emailConfigured, sendInviteEmail } from "@/lib/email";
 
 export type SyncResult = { ok: boolean; demo?: boolean; amount?: number; error?: string };
 export type SettingsResult = { ok: boolean; demo?: boolean; error?: string };
@@ -219,14 +220,25 @@ export async function inviteUser(input: { email: string; role: string }): Promis
     const role = INVITE_ROLE[Object.keys(INVITE_ROLE).find((k) => input.role.startsWith(k)) ?? "Starfsmaður"] ?? "employee";
 
     const admin = createAdminClient();
-    const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(input.email.trim(), {
-      data: { role, company_id: ctx.company },
-    });
-    if (error) return { ok: false, error: error.message };
-    // Link the auto-provisioned users row to this company.
-    if (invited?.user?.id) {
-      await admin.from("users").update({ company_id: ctx.company, role }).eq("id", invited.user.id);
+    const emailAddr = input.email.trim();
+    const { data: comp } = await admin.from("companies").select("name").eq("id", ctx.company).maybeSingle();
+    const companyName = (comp?.name as string) ?? "VAKTO";
+
+    let userId: string | undefined;
+    if (emailConfigured()) {
+      // Branded VAKTO invite via Resend (generateLink doesn't send its own email).
+      const { data: gen, error } = await admin.auth.admin.generateLink({ type: "invite", email: emailAddr, options: { data: { role, company_id: ctx.company } } });
+      if (error) return { ok: false, error: error.message };
+      userId = gen?.user?.id;
+      const link = gen?.properties?.action_link;
+      if (link) await sendInviteEmail(emailAddr, companyName, input.role, link);
+    } else {
+      // Supabase sends its default invite email.
+      const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(emailAddr, { data: { role, company_id: ctx.company } });
+      if (error) return { ok: false, error: error.message };
+      userId = invited?.user?.id;
     }
+    if (userId) await admin.from("users").update({ company_id: ctx.company, role }).eq("id", userId);
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "user.invite", entity: "user", detail: `Notanda boðið — ${input.email.trim()} (${role})`,
     });

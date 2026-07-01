@@ -2,6 +2,8 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { provisionCompanyForUser } from "@/lib/provision";
+import { sendWelcomeEmail } from "@/lib/email";
 
 export type SignupResult = { ok: boolean; demo?: boolean; error?: string };
 
@@ -26,11 +28,9 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
       return { ok: false, error: /already|registered|exists/i.test(m) ? "Netfang er þegar skráð — skráðu þig inn" : m };
     }
     const userId = created.user.id;
-    const { data: comp, error: coErr } = await admin.from("companies").insert({ name: companyName }).select("id").single();
-    if (coErr || !comp) return { ok: false, error: coErr?.message ?? "Tókst ekki að stofna fyrirtæki" };
-    // The auth trigger may have created the users row; upsert to be safe.
-    const { error: uErr } = await admin.from("users").upsert({ id: userId, email, company_id: comp.id, role: "owner", full_name: fullName });
-    if (uErr) return { ok: false, error: uErr.message };
+    const prov = await provisionCompanyForUser(userId, email, fullName, companyName);
+    if (!prov.ok) return { ok: false, error: prov.error };
+    await sendWelcomeEmail(email, fullName, companyName); // no-op until Resend is configured
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };

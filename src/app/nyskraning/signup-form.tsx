@@ -54,7 +54,7 @@ export default function SignupForm({ initialPlan = "mid" }: { initialPlan?: stri
     setError(null);
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}/maelabord` } });
+      const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}/auth/callback?next=/maelabord` } });
       if (error) setError(error.message);
     } catch {
       setError("Innskráning með þessari þjónustu er ekki stillt enn.");

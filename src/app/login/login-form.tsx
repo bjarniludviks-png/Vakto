@@ -40,7 +40,7 @@ export default function LoginForm() {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
-        options: { redirectTo: `${window.location.origin}/maelabord` },
+        options: { redirectTo: `${window.location.origin}/auth/callback?next=/maelabord` },
       });
       if (error) setError(error.message);
     } catch {

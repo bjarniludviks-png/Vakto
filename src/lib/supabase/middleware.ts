@@ -47,6 +47,7 @@ export async function updateSession(request: NextRequest) {
     pathname === "/" ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/nyskraning") ||
+    pathname.startsWith("/auth/") ||
     pathname.startsWith("/kiosk") ||
     // PWA / icon assets must be reachable without auth (home-screen install).
     pathname === "/manifest.webmanifest" ||
