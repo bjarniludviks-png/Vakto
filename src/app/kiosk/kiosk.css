@@ -14,6 +14,9 @@ body{font-family:"General Sans","Plus Jakarta Sans",ui-sans-serif,system-ui,-app
 .brand b{font-size:17px;font-weight:700;letter-spacing:.04em;color:var(--ink)}
 .top .co{font-size:13px;color:var(--ink3);font-weight:600;border-left:1px solid var(--line);padding-left:13px}
 .top .sp{flex:1}
+.klang{display:inline-flex;gap:2px;background:var(--line2);border-radius:9px;padding:3px}
+.klang button{border:none;background:none;color:var(--ink2);font-size:12px;font-weight:700;padding:5px 10px;border-radius:7px;cursor:pointer;letter-spacing:.03em}
+.klang button.on{background:var(--brand);color:#fff}
 .clock{text-align:right}
 .clock .t{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
 .clock .d{font-size:12px;color:var(--ink3)}
