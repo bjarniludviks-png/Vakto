@@ -65,10 +65,10 @@ export async function exportTimeReportPdf(rows: TimeReportRow[], company: string
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
     const by = ph - 10;
-    doc.setFillColor(233, 112, 15);
-    doc.rect(14, by - 3.5, 2, 3.5, "F");
-    doc.rect(16.6, by - 5.5, 2, 5.5, "F");
-    doc.rect(19.2, by - 7.5, 2, 7.5, "F");
+    // Three ascending bars in the brand shades (matches the app logo).
+    doc.setFillColor(245, 147, 49); doc.rect(14, by - 3.5, 2, 3.5, "F");   // --brand-2
+    doc.setFillColor(233, 112, 15); doc.rect(16.6, by - 5.5, 2, 5.5, "F"); // --brand
+    doc.setFillColor(207, 95, 12); doc.rect(19.2, by - 7.5, 2, 7.5, "F");  // --brand-deep
     doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(233, 112, 15);
     doc.text("VAKTO", 23, by);
     doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
