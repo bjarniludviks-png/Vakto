@@ -221,7 +221,30 @@ html.dark {
 /* Surfaces that hardcode white in app.css — re-tint for dark. */
 html.dark .dhero { background: linear-gradient(105deg, var(--panel) 55%, #2a1b0f 100%); }
 html.dark .seg { background: var(--line2); }
-html.dark input, html.dark select, html.dark textarea { background: var(--panel); color: var(--ink); }
+/* !important so inline background:#fff on fields (FLD, date pickers, …) can't
+   punch a white hole in dark mode. */
+html.dark input, html.dark select, html.dark textarea {
+  background: var(--panel) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+/* Native date/time pickers follow color-scheme (icon + popup invert in dark). */
+:root { color-scheme: light; }
+html.dark { color-scheme: dark; }
+
+/* More app.css surfaces that hardcode light backgrounds — re-tint for dark. */
+html.dark .ring .in { background: var(--panel); }
+html.dark .sgrid td.tod { background: var(--brand-soft); }
+html.dark .sgrid td.nm,
+html.dark .foot td,
+html.dark .addrow td,
+html.dark .sgrid th:first-child { background: var(--panel); }
+html.dark .mcal .cell.we { background: var(--line2); }
+html.dark .ai .go,
+html.dark .srchbox:focus-within { background: var(--panel); }
+/* colourful shift chips: darken the pastels so they read on the dark grid */
+html.dark .shift.day { background: #23264a; color: #c7ccff; border-color: #33386a; }
+html.dark .shift.eve { background: #3a2a12; color: #f0c58a; border-color: #55401d; }
 
 @layer base {
   * {
