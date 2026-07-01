@@ -288,8 +288,15 @@ th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.03em;text-tran
 td{padding:11px 14px;border-bottom:1px solid var(--line2);vertical-align:middle}
 tr:last-child td{border-bottom:none}
 th.r,td.r{text-align:right;font-variant-numeric:tabular-nums}
-.tbl{overflow-x:auto}
+.tbl{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .avt{width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;color:#fff;flex-shrink:0}
+/* Mobile: let the page header stack + wide tables scroll instead of squish. */
+@media(max-width:640px){
+  .ph{flex-direction:column;align-items:stretch;gap:12px}
+  .ph .phact{flex-wrap:wrap}
+  .ph .phact>.btn{flex:1 1 auto;justify-content:center}
+  .tbl table{min-width:560px}
+}
 .who{display:flex;align-items:center;gap:10px}
 .who small{display:block;color:var(--ink3);font-weight:400;font-size:11px}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px}
