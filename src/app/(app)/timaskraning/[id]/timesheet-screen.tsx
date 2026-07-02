@@ -114,7 +114,7 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
             <div className="it" key={p.punchId}>
               <div className="tx">
                 <b>{niceISO(p.date)}</b>
-                <span>{p.in} – {p.out ?? t("opin")}{p.open ? ` · ${openElapsed(p)} ${t("á vakt")}` : ` · ${dec1(p.hours)} ${t("klst")}`}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>
+                <span>{p.in} – {p.out ?? t("opin")}{p.open ? ` · ${openElapsed(p)}` : ` · ${dec1(p.hours)} ${t("klst")}`}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>
               </div>
               <div className="itact">
                 {p.open ? <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>
