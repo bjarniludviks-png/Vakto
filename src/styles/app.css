@@ -65,7 +65,7 @@ body.emp .navfoot .f-settings{display:none}
 .wrap{padding:28px 40px 72px;max-width:1300px}
 /* global topbar (Inventra-style) */
 .tbar{height:66px;background:var(--panel);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:11px;padding:0 26px;position:sticky;top:0;z-index:30}
-.tsearch{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:9px;background:var(--line2);border:1px solid var(--line);border-radius:11px;padding:0 14px;height:42px;width:440px;max-width:38vw}
+.tsearch{display:flex;align-items:center;gap:9px;background:var(--line2);border:1px solid var(--line);border-radius:11px;padding:0 14px;height:42px;flex:1 1 200px;max-width:440px;min-width:0}
 .tsearch svg{width:17px;height:17px;color:var(--ink3);flex-shrink:0}
 .tsearch input{border:none;background:none;outline:none;font:inherit;font-size:14px;width:100%;color:var(--ink)}
 .tactions{margin-left:auto;display:flex;align-items:center;gap:11px}
@@ -79,7 +79,9 @@ body.emp .navfoot .f-settings{display:none}
 .tacct{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-radius:11px;padding:4px 11px 4px 4px;height:42px}
 .tacct:hover{background:var(--line2)}
 .tav{width:30px;height:30px;border-radius:50%;background:var(--brand-soft);color:var(--brand);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center}
-.tacct-n{font-size:13px;font-weight:600}
+.tacct-n{font-size:13px;font-weight:600;white-space:nowrap}
+/* Medium screens: drop the create label + company name so the topbar never crowds. */
+@media(max-width:960px){.tnew-label,.tnew .chev{display:none}.tacct-n{display:none}}
 .tacct svg{width:14px;height:14px;color:var(--ink3)}
 /* in-content page header */
 .ph{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:24px}
