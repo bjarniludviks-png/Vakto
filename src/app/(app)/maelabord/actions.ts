@@ -103,9 +103,16 @@ export async function getDashboardPeriod(fromISO: string, toISO: string): Promis
       if (!byEmp.has(eid)) byEmp.set(eid, []);
       byEmp.get(eid)!.push({ clockIn: ci, clockOut: co });
     }
-    // Effective hourly cost (incl. employer burden) per employee.
+    // Effective hourly cost + full monthly cost (incl. employer burden) per employee.
     const eff = new Map<string, number>();
-    for (const e of employees) { const l = computeLine(e); eff.set(e.id, l.hours > 0 ? l.cost / l.hours : 0); }
+    const monthlyCost = new Map<string, number>();
+    for (const e of employees) { const l = computeLine(e); eff.set(e.id, l.hours > 0 ? l.cost / l.hours : 0); monthlyCost.set(e.id, l.cost); }
+    // Monthly-salaried staff cost a fixed salary regardless of punches — allocate a
+    // daily average across the period (avg 30.44 days/month) so they're counted in
+    // labor%, even if they don't clock in.
+    const days = dateRange(fromISO, toISO);
+    const rangeDays = Math.max(1, days.length);
+    const monthShare = rangeDays / 30.44;
 
     let planned = 0, actual = 0, overtime = 0, premium = 0, cost = 0, plannedCost = 0, overtimePay = 0, premiumPay = 0;
     const staff: StaffRow[] = [];
@@ -115,8 +122,14 @@ export async function getDashboardPeriod(fromISO: string, toISO: string): Promis
       const cls = classifyPay(e.rate, e.payType === "hourly", byEmp.get(e.id) ?? [], rules);
       planned += pl; actual += ac; overtime += cls.overtime; premium += cls.premium;
       overtimePay += cls.overtimePay; premiumPay += cls.premiumPay;
-      cost += ac * (eff.get(e.id) ?? 0);
-      plannedCost += pl * (eff.get(e.id) ?? 0);
+      if (e.payType === "monthly") {
+        // Fixed salary, prorated to the period — same for planned & actual.
+        const share = (monthlyCost.get(e.id) ?? 0) * monthShare;
+        cost += share; plannedCost += share;
+      } else {
+        cost += ac * (eff.get(e.id) ?? 0);
+        plannedCost += pl * (eff.get(e.id) ?? 0);
+      }
       if (pl > 0 || ac > 0) staff.push({
         name: e.fullName.split(/\s+/)[0], av: initials(e.fullName), c: e.avatarColor, dept: e.department ?? "—",
         planned: Math.round(pl * 10) / 10, actual: Math.round(ac * 10) / 10,
@@ -127,7 +140,6 @@ export async function getDashboardPeriod(fromISO: string, toISO: string): Promis
     staff.sort((a, b) => b.deviation - a.deviation);
 
     // Per-day planned vs actual series (compact d.m labels).
-    const days = dateRange(fromISO, toISO);
     const series: SeriesPoint[] = days.map((d) => {
       const [, mo, da] = d.split("-");
       return { label: `${Number(da)}.${Number(mo)}`, planned: Math.round((dayPlanned.get(d) ?? 0) * 10) / 10, actual: Math.round((dayActual.get(d) ?? 0) * 10) / 10 };
