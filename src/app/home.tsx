@@ -55,7 +55,7 @@ export default function Home() {
               <button className={lang === "en" ? "on" : ""} onClick={() => setLang("en")}>EN</button>
             </div>
             <a className="btn btn-gho" href="/login">{t.nav_login}</a>
-            <a className="btn btn-pri" href="#" onClick={(e) => { e.preventDefault(); setAuth("signup"); }}>{t.nav_try}</a>
+            <a className="btn btn-pri" href="/nyskraning">{t.nav_try}</a>
           </div>
           <button className="nav-burger" aria-label="Valmynd" onClick={() => setMenuOpen((o) => !o)}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -70,7 +70,7 @@ export default function Home() {
             <a href="#tengingar" onClick={() => setMenuOpen(false)}>{t.nav_integrations}</a>
             <a href="#verd" onClick={() => setMenuOpen(false)}>{t.nav_pricing}</a>
             <a className="btn btn-gho" href="/login">{t.nav_login}</a>
-            <a className="btn btn-pri" href="#" onClick={(e) => { e.preventDefault(); setMenuOpen(false); setAuth("signup"); }}>{t.nav_try}</a>
+            <a className="btn btn-pri" href="/nyskraning" onClick={() => setMenuOpen(false)}>{t.nav_try}</a>
           </div>
         )}
       </nav>
@@ -81,7 +81,7 @@ export default function Home() {
           <h1 dangerouslySetInnerHTML={{ __html: t.hero_title }} />
           <p className="sub">{t.hero_sub}</p>
           <div className="hero-cta">
-            <a className="btn btn-pri btn-lg" href="#" onClick={(e) => { e.preventDefault(); setAuth("signup"); }}>{t.hero_cta1}</a>
+            <a className="btn btn-pri btn-lg" href="/nyskraning">{t.hero_cta1}</a>
             <a className="btn btn-gho btn-lg" href="#">{t.hero_cta2}</a>
           </div>
           <p className="hero-note">{t.hero_note}</p>
@@ -231,7 +231,7 @@ export default function Home() {
                 {p.soon ? (
                   <span className="btn btn-gho" style={{ marginTop: "auto", justifyContent: "center", opacity: .55, cursor: "default" }}>{SOON[lang]}</span>
                 ) : (
-                  <a className={`btn ${p.pop ? "btn-pri" : "btn-gho"}`} style={{ marginTop: "auto", justifyContent: "center" }} href="#" onClick={(e) => { e.preventDefault(); setAuth("signup"); }}>{PCTA[lang]}</a>
+                  <a className={`btn ${p.pop ? "btn-pri" : "btn-gho"}`} style={{ marginTop: "auto", justifyContent: "center" }} href="/nyskraning">{PCTA[lang]}</a>
                 )}
               </div>
             );
@@ -256,7 +256,7 @@ export default function Home() {
         <p>{t.cta_sub}</p>
         <div className="hero-cta" style={{ marginTop: 28 }}>
           <a className="btn btn-lg" style={{ background: "#fff", color: "var(--green)" }} href="#">{t.cta_btn1}</a>
-          <a className="btn btn-lg" style={{ background: "rgba(255,255,255,.16)", color: "#fff", borderColor: "rgba(255,255,255,.32)" }} href="#" onClick={(e) => { e.preventDefault(); setAuth("signup"); }}>{t.cta_btn2}</a>
+          <a className="btn btn-lg" style={{ background: "rgba(255,255,255,.16)", color: "#fff", borderColor: "rgba(255,255,255,.32)" }} href="/nyskraning">{t.cta_btn2}</a>
         </div>
       </div></section>
 
