@@ -487,6 +487,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
                   {DAYS.map((d, i) => (
                     <th key={d} className={i === todayCol ? "tod" : ""}>{t(d)}<span className="dn">{weekDays[i].getDate()}</span></th>
                   ))}
+                  <th className="r rowsum">Σ {t("klst")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -518,6 +519,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
                           </div>
                         </td>
                       ))}
+                      <td className="r rowsum">{dec1(grid[r].reduce((a, s, c) => (s && s !== "off" ? a + cellHrs(r, c, s) : a), 0))}</td>
                     </tr>
                   );
                 })}
@@ -528,9 +530,10 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
                     vis.forEach((r) => { const s = grid[r][c]; if (s && s !== "off") n += cellHrs(r, c, s); });
                     return <td key={c} className={c === todayCol ? "tod" : ""}>{dec1(n)}</td>;
                   })}
+                  <td className="r rowsum">{dec1(vis.reduce((a, r) => a + grid[r].reduce((b, s, c) => (s && s !== "off" ? b + cellHrs(r, c, s) : b), 0), 0))}</td>
                 </tr>
                 <tr className="addrow">
-                  <td colSpan={8}>
+                  <td colSpan={9}>
                     <button className="addemp" onClick={() => (pool.length ? setModal("addEmp") : toast("Allt starfsfólk er þegar á plani"))}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>{t("Bæta starfsmanni á plan")}
                     </button>
