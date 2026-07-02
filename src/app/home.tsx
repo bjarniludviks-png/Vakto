@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
-  I18N, FEAT, FLOW, PRICE, FAQ, AUTH, PUNIT, POP, PCTA, CUSTOM, FREE, SOON, type Lang,
+  I18N, FEAT, FLOW, PRICE, FAQ, PUNIT, POP, PCTA, CUSTOM, FREE, SOON, type Lang,
 } from "./home-data";
 
 function LogoSvg({ w = 26 }: { w?: number }) {
@@ -30,13 +29,10 @@ const FeatIcon = () => (
 );
 
 export default function Home() {
-  const router = useRouter();
   const [lang, setLang] = useState<Lang>("is");
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
-  const [auth, setAuth] = useState<null | "login" | "signup">(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const t = I18N[lang];
-  const toApp = () => router.push("/maelabord");
 
   return (
     <>
@@ -284,71 +280,6 @@ export default function Home() {
         <div className="foot-bot"><span>© 2026 VAKTO ehf.</span><span>{t.foot_made}</span></div>
       </div></footer>
 
-      {auth && <AuthView mode={auth} lang={lang} onClose={() => setAuth(null)} onSwitch={(m) => setAuth(m)} onSubmit={toApp} />}
     </>
-  );
-}
-
-function AuthView({ mode, lang, onClose, onSwitch, onSubmit }: {
-  mode: "login" | "signup"; lang: Lang; onClose: () => void; onSwitch: (m: "login" | "signup") => void; onSubmit: () => void;
-}) {
-  const t = I18N[lang];
-  const a = AUTH[lang][mode];
-  const sg = mode === "signup";
-  const inputStyle: React.CSSProperties = { width: "100%", height: 46, padding: "0 14px", border: "1px solid var(--line)", borderRadius: 12, fontFamily: "var(--font)", fontSize: 14, outline: "none" };
-  const lblStyle: React.CSSProperties = { fontSize: 13, fontWeight: 600, display: "block", marginBottom: 6 };
-  const ssoStyle: React.CSSProperties = { width: "100%", height: 44, border: "1px solid var(--line)", borderRadius: 12, background: "#fff", fontFamily: "var(--font)", fontSize: 14, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 };
-  const sbStyle: React.CSSProperties = { width: 20, height: 20, borderRadius: 6, background: "#f3f3f5", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 700, color: "#74747e" };
-
-  return (
-    <div className="authview" style={{ position: "fixed", inset: 0, zIndex: 100, background: "#fff", display: "block" }}>
-      <div style={{ height: "100%", display: "flex" }}>
-        <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", padding: "28px 24px" }}>
-          <div style={{ width: "100%", maxWidth: 392 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 26 }}>
-              <div className="logo" style={{ fontSize: 18 }}><LogoSvg w={24} />VAKTO</div>
-              <a href="#" onClick={(e) => { e.preventDefault(); onClose(); }} style={{ fontSize: 13, color: "var(--muted)" }}>{t.a_back}</a>
-            </div>
-            <h1 style={{ fontSize: 26, fontWeight: 700 }}>{a.title}</h1>
-            <p style={{ color: "var(--muted)", marginTop: 8 }}>{a.sub}</p>
-            <div style={{ marginTop: 24, display: "flex", flexDirection: "column", gap: 14 }}>
-              {sg && <div><label style={lblStyle}>{t.a_name}</label><input style={inputStyle} /></div>}
-              {sg && <div><label style={lblStyle}>{t.a_company}</label><input style={inputStyle} /></div>}
-              <div><label style={lblStyle}>{t.a_email}</label><input placeholder="netfang@fyrirtaeki.is" style={inputStyle} /></div>
-              <div><label style={lblStyle}>{t.a_pw}</label><input type="password" placeholder="********" style={inputStyle} /></div>
-              <button className="btn btn-pri" style={{ justifyContent: "center", height: 48, fontSize: 15 }} onClick={onSubmit}>{a.submit}</button>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "22px 0" }}>
-              <div style={{ flex: 1, height: 1, background: "var(--line)" }} /><span style={{ fontSize: 12, color: "var(--muted2)" }}>{t.a_or}</span><div style={{ flex: 1, height: 1, background: "var(--line)" }} />
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <button style={ssoStyle} onClick={onSubmit}><span style={sbStyle}>G</span><span>{t.a_google}</span></button>
-              <button style={ssoStyle} onClick={onSubmit}><span style={sbStyle}>M</span><span>{t.a_microsoft}</span></button>
-              <button style={ssoStyle} onClick={onSubmit}><span style={sbStyle}>e</span><span>{t.a_eid}</span></button>
-            </div>
-            <div style={{ textAlign: "center", marginTop: 24, fontSize: 13.5, color: "var(--muted)" }}>
-              <span>{a.switchq}</span>{" "}
-              <span onClick={() => onSwitch(mode === "login" ? "signup" : "login")} style={{ color: "var(--green)", fontWeight: 600, cursor: "pointer" }}>{a.switcha}</span>
-            </div>
-          </div>
-        </div>
-        <div className="authpanel" style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-between", padding: 56, color: "#fff", background: "linear-gradient(150deg,#e9700f 0%,#cf5f0c 60%,#b85109 100%)" }}>
-          <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: ".04em", opacity: 0.85 }}>{t.a_panel_eyebrow}</div>
-          <div>
-            <div style={{ fontSize: 32, fontWeight: 700, lineHeight: 1.1 }}>{t.a_panel_t}</div>
-            <p style={{ color: "rgba(255,255,255,.8)", fontSize: 15, marginTop: 14, maxWidth: 360 }}>{t.a_panel_s}</p>
-            <div style={{ marginTop: 26, display: "flex", flexDirection: "column", gap: 12, fontSize: 14.5 }}>
-              {[t.a_f1, t.a_f2, t.a_f3].map((f, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ width: 20, height: 20, borderRadius: "50%", background: "rgba(255,255,255,.2)", display: "grid", placeItems: "center", fontSize: 12 }}>+</span>
-                  <span>{f}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div style={{ color: "rgba(255,255,255,.65)", fontSize: 13 }}>{t.a_panel_quote}</div>
-        </div>
-      </div>
-    </div>
   );
 }
