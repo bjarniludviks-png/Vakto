@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
+import { notifyEmployee } from "@/lib/push";
 import { getEmployees } from "@/lib/employees.server";
 
 export type ShiftInput = {
@@ -266,9 +267,16 @@ export async function updateLeaveRequest(id: string, approved: boolean): Promise
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const status = approved ? "approved" : "rejected";
-    const { error } = await supabase
-      .from("leave_requests").update({ status }).eq("id", id).eq("company_id", ctx.company);
+    const { data: updated, error } = await supabase
+      .from("leave_requests").update({ status }).eq("id", id).eq("company_id", ctx.company)
+      .select("employee_id").maybeSingle();
     if (error) return { ok: false, error: error.message };
+    // Notify the employee (best-effort; no-op until VAPID + a subscription exist).
+    void notifyEmployee(updated?.employee_id as string | undefined, {
+      title: approved ? "Frí samþykkt" : "Frí hafnað",
+      body: approved ? "Frí-beiðnin þín var samþykkt." : "Frí-beiðninni þinni var hafnað.",
+      url: "/mitt-svaedi",
+    });
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "leave.decide", entity: "leave_request", entityId: id,
       detail: approved ? "Frí-beiðni samþykkt" : "Frí-beiðni hafnað",

@@ -11,6 +11,7 @@ import { PayslipModal } from "@/components/app/payslip-modal";
 import { StaffCardModal, type StaffCardData } from "@/components/app/staff-card";
 import type { StaffCard } from "@/lib/mycard.server";
 import { resolvePerms, type Perms } from "@/lib/permissions";
+import PushToggle from "@/components/app/push-toggle";
 
 type ReqKind = "leave" | "avail" | "swap" | "pickup";
 const IC = (d: string) => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">{d.split("|").map((p, i) => <path key={i} d={p} />)}</svg>;
@@ -45,6 +46,7 @@ export default function EmployeeScreen({ card }: { card?: StaffCard }) {
           {perms.card && <button className="btn ghost sm" style={{ width: "100%", justifyContent: "center" }} onClick={() => setShowCard(true)}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8" cy="11" r="2" /><path d="M14 9h4M14 13h4M5 16h7" /></svg>{t("Skírteini")}
           </button>}
+          <div style={{ display: "flex", justifyContent: "center" }}><PushToggle /></div>
           <select className="emp-navsel" value={tab} onChange={(e) => setTab(e.target.value)}>
             {NAV.filter(([id]) => (id !== "pay" || perms.pay) && (id !== "sh" || perms.shifts)).map(([id, label]) => (
               <option key={id} value={id}>{t(label)}</option>
