@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
@@ -10,6 +10,7 @@ import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
 import { getEmployeePunches, adjustPunch, deletePunch, setPunchApproved, approveEmployeePunches, type PunchRow } from "../actions";
 import { exportTimeReportXlsx, exportTimeReportPdf } from "@/lib/export-report";
+import { AsyncButton } from "@/components/app/async-button";
 
 const MONTHS_IS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ágú.", "sep.", "okt.", "nóv.", "des."];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -32,6 +33,15 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
   const [mig, setMig] = useState(needsMigration);
   const [loading, setLoading] = useState(false);
   const [edit, setEdit] = useState<PunchRow | null>(null);
+  const [nowMs, setNowMs] = useState(0);
+  useEffect(() => { setNowMs(Date.now()); const id = setInterval(() => setNowMs(Date.now()), 30000); return () => clearInterval(id); }, []);
+  // Live elapsed for an open (on-shift) punch, from its clock-in.
+  function openElapsed(p: PunchRow): string {
+    const start = new Date(`${p.date}T${p.in}`).getTime();
+    const mins = Math.max(0, Math.floor(((nowMs || Date.now()) - start) / 60000));
+    const h = Math.floor(mins / 60), m = mins % 60;
+    return h > 0 ? `${h} klst ${m} mín` : `${m} mín`;
+  }
 
   function reload(fr = from, tt = to) {
     setLoading(true);
@@ -97,14 +107,14 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
       <div className="card" style={{ marginTop: 16 }}>
         <div className="ch">
           <div><div className="ct">{t("Allar skráningar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)}</div></div>
-          {pending > 0 && <button className="btn sm" onClick={approveAll}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Samþykkja allar")}</button>}
+          {pending > 0 && <AsyncButton className="btn sm" onClick={approveAll}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Samþykkja allar")}</AsyncButton>}
         </div>
         <div className="cb att" style={{ opacity: loading ? 0.5 : 1 }}>
           {rows.length ? rows.map((p) => (
             <div className="it" key={p.punchId}>
               <div className="tx">
                 <b>{niceISO(p.date)}</b>
-                <span>{p.in} – {p.out ?? t("opin")}{p.open ? "" : ` · ${dec1(p.hours)} ${t("klst")}`}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>
+                <span>{p.in} – {p.out ?? t("opin")}{p.open ? ` · ${openElapsed(p)} ${t("á vakt")}` : ` · ${dec1(p.hours)} ${t("klst")}`}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>
               </div>
               <div className="itact">
                 {p.open ? <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>
@@ -112,8 +122,8 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
                     : <span className="tag" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Bíður")}</span>}
                 <button className="btn ghost sm" onClick={() => setEdit(p)}>{t("Leiðrétta")}</button>
                 {!p.open && (p.approved
-                  ? <button className="btn ghost sm" onClick={() => toggle(p)}>{t("Afturkalla")}</button>
-                  : <button className="btn sm" onClick={() => toggle(p)}>{t("Samþykkja")}</button>)}
+                  ? <AsyncButton className="btn ghost sm" onClick={() => toggle(p)}>{t("Afturkalla")}</AsyncButton>
+                  : <AsyncButton className="btn sm" onClick={() => toggle(p)}>{t("Samþykkja")}</AsyncButton>)}
               </div>
             </div>
           )) : <div className="muted" style={{ textAlign: "center", padding: 30 }}>{t("Engar skráningar á þessu tímabili.")}</div>}

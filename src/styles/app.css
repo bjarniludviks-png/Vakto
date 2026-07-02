@@ -582,3 +582,11 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
   .app.railed .navfoot{padding:8px 8px 16px}
   .app.railed .msgr.full{left:64px}
 }
+
+/* loading — route spinner + inline button spinner */
+.route-loading{display:flex;align-items:center;justify-content:center;min-height:55vh}
+.spin{display:inline-block;width:34px;height:34px;border:3px solid var(--line);border-top-color:var(--brand);border-radius:50%;animation:vspin .7s linear infinite}
+button .spin{width:14px;height:14px;border-width:2px;border-color:currentColor;border-top-color:transparent;margin-right:6px;vertical-align:-2px}
+@keyframes vspin{to{transform:rotate(360deg)}}
+.btn[disabled],button[disabled]{opacity:.65;cursor:default}
+.is-busy svg{display:none}

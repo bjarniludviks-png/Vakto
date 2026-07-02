@@ -12,6 +12,7 @@ import { StaffCardModal, type StaffCardData } from "@/components/app/staff-card"
 import type { StaffCard } from "@/lib/mycard.server";
 import { resolvePerms, type Perms } from "@/lib/permissions";
 import PushToggle from "@/components/app/push-toggle";
+import { AsyncButton } from "@/components/app/async-button";
 
 type ReqKind = "leave" | "avail" | "swap" | "pickup";
 const IC = (d: string) => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">{d.split("|").map((p, i) => <path key={i} d={p} />)}</svg>;
@@ -115,16 +116,18 @@ function PunchCard() {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [on]);
-  function toggle() {
-    void myPunch(!on);
-    if (!on) startRef.current = Date.now();
-    setOn((o) => !o);
+  async function toggle() {
+    const next = !on;
+    await myPunch(next);
+    if (next) startRef.current = Date.now();
+    setOn(next);
+    toast(next ? t("Stimplað inn") : t("Stimplað út"));
   }
   return (
     <div className={`punch${on ? "" : " out"}`}>
       <div className="st">{on ? t("Á vakt síðan 08:02") : t("Ekki á vakt")}</div>
       <div className="big">{elapsed}</div>
-      <button onClick={toggle}>{on ? t("Stimpla út") : t("Stimpla inn")}</button>
+      <AsyncButton className="" onClick={toggle}>{on ? t("Stimpla út") : t("Stimpla inn")}</AsyncButton>
     </div>
   );
 }

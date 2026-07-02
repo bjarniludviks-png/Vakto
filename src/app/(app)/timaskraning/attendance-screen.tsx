@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { AsyncButton } from "@/components/app/async-button";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
@@ -223,12 +224,12 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
         <div className="cb att">
           {onNow.length ? onNow.map((r) => (
             <div className="it" key={r.punchId}>
-              <span className="avt" style={{ background: r.c, width: 34, height: 34, cursor: "pointer" }} onClick={() => setDetail({ id: r.employeeId, name: r.name })}>{r.av}</span>
-              <div className="tx" style={{ cursor: "pointer" }} onClick={() => setDetail({ id: r.employeeId, name: r.name })}><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : ""}</span></div>
+              <span className="avt" style={{ background: r.c, width: 34, height: 34, cursor: "pointer" }} onClick={() => router.push(`/timaskraning/${r.employeeId}`)}>{r.av}</span>
+              <div className="tx" style={{ cursor: "pointer" }} onClick={() => router.push(`/timaskraning/${r.employeeId}`)}><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : ""}</span></div>
               <div className="itact">
                 <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>
                 <button className="btn ghost sm" onClick={() => setEditPunch(r)}>{t("Leiðrétta")}</button>
-                <button className="btn sm" onClick={() => doClockOut(r)}>{t("tk:clockout")}</button>
+                <AsyncButton className="btn sm" onClick={() => doClockOut(r)}>{t("tk:clockout")}</AsyncButton>
               </div>
             </div>
           )) : <div className="muted" style={{ padding: 16, textAlign: "center" }}>{t("Enginn skráður inn núna.")}</div>}
@@ -244,8 +245,8 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
                 <div className="ic warn"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></div>
                 <div className="tx"><b>{c.name} · {niceISO(c.date)}</b><span>{c.requestedIn ? `${t("inn")} ${c.requestedIn}` : ""}{c.requestedOut ? ` · ${t("út")} ${c.requestedOut}` : ""}{c.reason ? ` — ${c.reason}` : ""}</span></div>
                 <div className="itact">
-                  <button className="btn sm" onClick={() => decideCorr(c.id, true)}>{t("Samþykkja")}</button>
-                  <button className="btn ghost sm" onClick={() => decideCorr(c.id, false)}>{t("Hafna")}</button>
+                  <AsyncButton className="btn sm" onClick={() => decideCorr(c.id, true)}>{t("Samþykkja")}</AsyncButton>
+                  <AsyncButton className="btn ghost sm" onClick={() => decideCorr(c.id, false)}>{t("Hafna")}</AsyncButton>
                 </div>
               </div>
             ))}
@@ -260,7 +261,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
             <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th><th>{t("Staða")}</th></tr></thead>
             <tbody>
               {shown.length ? shown.map((r) => (
-                <tr key={r.id} className="rowlink" onClick={() => setDetail({ id: r.id, name: r.name })}>
+                <tr key={r.id} className="rowlink" onClick={() => router.push(`/timaskraning/${r.id}`)}>
                   <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.name}</span></td>
                   <td>{r.dept}</td>
                   <td className="r">{dec1(r.planned)}</td>
