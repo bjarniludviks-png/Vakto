@@ -118,6 +118,26 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
     const tt = cellTimes[ckey(r, c)];
     return tt ? hrsBetween(tt.start, tt.end) : (SH[code]?.h ?? 0);
   };
+  // [startHour, endHour] for a cell (real times, else the SH label like "07–15").
+  const cellSpan = (r: number, c: number, code: string): [number, number] | null => {
+    const tt = cellTimes[ckey(r, c)];
+    if (tt) { const [sh, sm] = tt.start.split(":").map(Number); const [eh, em] = tt.end.split(":").map(Number); let s = sh + (sm || 0) / 60, e = eh + (em || 0) / 60; if (e <= s) e += 24; return [s, e]; }
+    const m = (SH[code]?.l ?? "").match(/(\d{1,2})\D+(\d{1,2})/);
+    if (m) { let s = +m[1], e = +m[2]; if (e <= s) e += 24; return [s, e]; }
+    return null;
+  };
+  // Premium hours in a cell (outside 08–17 on weekdays, or any weekend hour) —
+  // matches the payroll engine's premium windows, for a planning estimate.
+  const cellPremiumHrs = (r: number, c: number, code: string): number => {
+    const span = cellSpan(r, c, code); if (!span) return 0;
+    const wd = weekDays[c]?.getDay() ?? 1;
+    let prem = 0;
+    for (let x = span[0]; x < span[1]; x += 0.25) {
+      const hod = ((x % 24) + 24) % 24;
+      if (wd === 0 || wd === 6 || hod < 8 || hod >= 17) prem += 0.25;
+    }
+    return prem;
+  };
 
   const visHrs = useMemo(() => {
     let h = 0;
@@ -208,6 +228,26 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
   const dayShiftCount = useMemo(() => {
     let n = 0; vis.forEach((r) => { const s = grid[r]?.[curCol]; if (s && s !== "off") n++; }); return n;
   }, [vis, grid, curCol]);
+  // Estimated premium (álag) + overtime hours from the planned grid.
+  const est = useMemo(() => {
+    let premium = 0; const rowHrs: number[] = [];
+    vis.forEach((r) => {
+      let rh = 0;
+      grid[r]?.forEach((s, c) => { if (s && s !== "off") { rh += cellHrs(r, c, s); premium += cellPremiumHrs(r, c, s); } });
+      rowHrs.push(rh);
+    });
+    const overtime = rowHrs.reduce((a, h) => a + Math.max(0, h - 40), 0); // weekly > 40 klst
+    return { premium: Math.round(premium * 10) / 10, overtime: Math.round(overtime * 10) / 10 };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vis, grid, cellTimes]);
+  const dayPremium = useMemo(() => {
+    let p = 0; vis.forEach((r) => { const s = grid[r]?.[curCol]; if (s && s !== "off") p += cellPremiumHrs(r, curCol, s); }); return Math.round(p * 10) / 10;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vis, grid, cellTimes, curCol]);
+  const estHrs = view === "Dagur" ? { premium: dayPremium, overtime: 0 }
+    : view === "Mánuður" ? { premium: Math.round(est.premium * 4.33), overtime: Math.round(est.overtime * 4.33) }
+      : est;
+
   const kpi = view === "Dagur"
     ? { hl: "Tímar dagsins", hrs: dayHrs, sl: "Vaktir í dag", shifts: dayShiftCount, open: false }
     : view === "Mánuður"
@@ -472,7 +512,9 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
 
       <div className="kpis">
         <div className="kpi"><div className="lab">{t(kpi.hl)}</div><div className="val">{dec1(kpi.hrs)} <small>{t("klst")}</small></div></div>
-        <div className="kpi"><div className="lab">{t("Launakostnaður")}</div><div className="val">{nf(Math.round(kpi.hrs * COST_HR))} <small>kr</small></div></div>
+        <div className="kpi"><div className="lab">{t("Áætl. launakostnaður")}</div><div className="val">{nf(Math.round(kpi.hrs * COST_HR))} <small>kr</small></div></div>
+        <div className="kpi"><div className="lab">{t("Áætl. álagstímar")}</div><div className="val">{dec1(estHrs.premium)} <small>{t("klst")}</small></div></div>
+        <div className="kpi"><div className="lab">{t("Áætl. yfirvinna")}</div><div className="val" style={estHrs.overtime > 0 ? { color: "var(--bad)" } : undefined}>{dec1(estHrs.overtime)} <small>{t("klst")}</small></div></div>
         <div className="kpi"><div className="lab">{t(kpi.sl)}</div><div className="val">{kpi.shifts}{kpi.open && !liveCompany ? <small> · 2 {t("opnar")}</small> : null}</div></div>
         <div className="kpi"><div className="lab">{t("Stöðugildi (FTE)")}</div><div className="val">{liveCompany ? (initial?.fte ?? "0,0") : "8,4"}</div></div>
       </div>
