@@ -9,6 +9,7 @@ import { getEmployees } from "@/lib/employees.server";
 import { initials } from "@/lib/employees";
 import { nf, dec1 } from "@/lib/format";
 import { logAudit } from "@/lib/audit";
+import { notifyEmployee } from "@/lib/push";
 import type { PayrollView } from "./payroll.server";
 
 export type RunResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
@@ -143,6 +144,9 @@ export async function runPayroll(from?: string, to?: string): Promise<RunResult>
       action: "payroll.run", entity: "payroll_run", entityId: run.id as string,
       detail: `Launakeyrsla keyrð (${start}–${end}) — ${lines.length} starfsmenn`,
     });
+    for (const l of lines) {
+      void notifyEmployee(l.employeeId, { title: "Launaseðill tilbúinn", body: "Launakeyrsla er tilbúin — skoðaðu launaseðilinn þinn.", url: "/mitt-svaedi", tag: "payroll" });
+    }
     revalidatePath("/launakeyrslur");
     return { ok: true, count: lines.length };
   } catch (e) {

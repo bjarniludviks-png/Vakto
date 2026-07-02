@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
+import { notifyManagers } from "@/lib/push";
 
 export type PunchResult = { ok: boolean; demo?: boolean; error?: string };
 export type ActionResult = { ok: boolean; demo?: boolean; error?: string };
@@ -64,6 +65,7 @@ export async function requestCorrection(input: { punchId?: string; date: string;
       reason: input.reason, status: "pending",
     });
     if (error) return { ok: false, error: "Keyrðu migration 0010 í Supabase til að virkja leiðréttingabeiðnir." };
+    void notifyManagers(ctx.company, { title: "Leiðréttingabeiðni", body: "Starfsmaður bað um leiðréttingu á tíma.", url: "/timaskraning", tag: "requests" });
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "correction.request", entity: "punch_correction", detail: `Leiðréttingabeiðni — ${input.date}${input.reason ? ` (${input.reason})` : ""}`,
     });
@@ -138,6 +140,7 @@ export async function submitLeaveRequest(
       status: "pending",
     });
     if (error) return { ok: false, error: error.message };
+    void notifyManagers(me.company, { title: "Ný frí-beiðni", body: "Starfsmaður sótti um frí — samþykktu eða hafnaðu.", url: "/vaktaplan", tag: "requests" });
     await logAudit(supabase, me.company, me.userId, {
       action: "leave.request", entity: "leave_request",
       detail: `Frí-beiðni skráð — ${input.type} ${input.fromDate}–${input.toDate}`,
@@ -174,6 +177,7 @@ export async function requestShiftSwap(
       status: "pending",
     });
     if (error) return { ok: false, error: error.message };
+    void notifyManagers(me.company, { title: "Beiðni um vaktaskipti", body: "Starfsmaður óskaði eftir vaktaskiptum.", url: "/vaktaplan", tag: "requests" });
     await logAudit(supabase, me.company, me.userId, {
       action: "swap.request", entity: "shift_swap", detail: `Vaktaskipti óskað — ${input.note}`,
     });

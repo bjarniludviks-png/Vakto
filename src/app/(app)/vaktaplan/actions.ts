@@ -61,6 +61,10 @@ export async function publishSchedule(shifts: ShiftInput[]): Promise<PublishResu
     await logAudit(supabase, company, user.id, {
       action: "schedule.publish", entity: "shifts", detail: `Vaktaplan birt — ${rows.length} vaktir`,
     });
+    // Notify each scheduled employee (best-effort).
+    for (const eid of [...new Set(rows.map((r) => r.employee_id).filter(Boolean))] as string[]) {
+      void notifyEmployee(eid, { title: "Nýtt vaktaplan", body: "Vaktaplanið þitt hefur verið uppfært.", url: "/mitt-svaedi", tag: "schedule" });
+    }
     revalidatePath("/vaktaplan");
     return { ok: true, count: rows.length };
   } catch (e) {
@@ -295,9 +299,11 @@ export async function approveShiftSwap(id: string): Promise<DecisionResult> {
     const supabase = await createClient();
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    const { error } = await supabase
-      .from("shift_swaps").update({ status: "approved" }).eq("id", id).eq("company_id", ctx.company);
+    const { data: swap, error } = await supabase
+      .from("shift_swaps").update({ status: "approved" }).eq("id", id).eq("company_id", ctx.company)
+      .select("employee_id").maybeSingle();
     if (error) return { ok: false, error: error.message };
+    void notifyEmployee(swap?.employee_id as string | undefined, { title: "Vaktaskipti samþykkt", body: "Beiðni þín um vaktaskipti var samþykkt.", url: "/mitt-svaedi" });
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "swap.approve", entity: "shift_swap", entityId: id, detail: "Vaktaskipti samþykkt",
     });

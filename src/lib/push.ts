@@ -15,6 +15,16 @@ export function pushConfigured(): boolean { return !!(PUB && PRIV); }
 
 export type PushPayload = { title: string; body: string; url?: string; tag?: string };
 
+/** Notify all owners/managers of a company (e.g. a new employee request). */
+export async function notifyManagers(companyId: string | null | undefined, payload: PushPayload): Promise<void> {
+  if (!companyId) return;
+  try {
+    const admin = createAdminClient();
+    const { data } = await admin.from("users").select("id").eq("company_id", companyId).in("role", ["owner", "manager"]);
+    for (const u of data ?? []) await sendPushToUser(u.id as string, payload);
+  } catch { /* best-effort */ }
+}
+
 /** Send a push to the auth user linked to an employee (employees.user_id). */
 export async function notifyEmployee(employeeId: string | null | undefined, payload: PushPayload): Promise<void> {
   if (!employeeId) return;
