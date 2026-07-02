@@ -235,6 +235,42 @@ export async function uploadDocument(
   }
 }
 
+export type DocRow = { id: string; name: string; type: string | null; path: string; created: string };
+
+/** List an employee's documents (metadata only — files stay in the private bucket). */
+export async function getDocuments(employeeId: string): Promise<{ live: boolean; rows: DocRow[] }> {
+  if (!isSupabaseConfigured() || (employeeId.startsWith("e") && employeeId.length <= 3)) return { live: false, rows: [] };
+  try {
+    const supabase = await createClient();
+    const company = await companyId(supabase);
+    if (!company) return { live: false, rows: [] };
+    const { data, error } = await supabase.from("documents")
+      .select("id, name, type, url, created_at")
+      .eq("company_id", company).eq("employee_id", employeeId)
+      .order("created_at", { ascending: false });
+    if (error) return { live: false, rows: [] };
+    return { live: true, rows: (data ?? []).map((d) => ({ id: d.id as string, name: d.name as string, type: (d.type as string) ?? null, path: d.url as string, created: (d.created_at as string) ?? "" })) };
+  } catch {
+    return { live: false, rows: [] };
+  }
+}
+
+/** Short-lived signed URL to view/download a private document (60s). */
+export async function getDocumentSignedUrl(path: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
+  try {
+    const supabase = await createClient();
+    const company = await companyId(supabase);
+    // Path is company-scoped (company/employee/file); ensure it belongs to this company.
+    if (!company || !path.startsWith(`${company}/`)) return { ok: false, error: "Óheimilt" };
+    const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, 60);
+    if (error || !data?.signedUrl) return { ok: false, error: error?.message ?? "Villa" };
+    return { ok: true, url: data.signedUrl };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 export type UpdateEmployeeInput = {
   rate?: string;
   employmentRatio?: string;

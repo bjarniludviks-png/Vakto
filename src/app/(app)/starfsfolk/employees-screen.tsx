@@ -7,7 +7,7 @@ import { toast } from "@/components/app/toast";
 import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras } from "./actions";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getDocuments, getDocumentSignedUrl } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField } from "@/components/app/fields";
@@ -554,12 +554,23 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
   );
 }
 
+const DEMO_DOCS: { name: string; meta: string; path?: string }[] = [
+  { name: "Ráðningarsamningur.pdf", meta: "undirritað 8.10.2025" },
+  { name: "Skattkort_2026.pdf", meta: "PDF · 88 KB" },
+  { name: "Matvælanámskeið.pdf", meta: "gildir til 2027" },
+];
+function docDate(iso: string): string { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`; }
+
 function DocsTab({ employeeId }: { employeeId: string }) {
-  const [docs, setDocs] = useState<{ name: string; meta: string }[]>([
-    { name: "Ráðningarsamningur.pdf", meta: "undirritað 8.10.2025" },
-    { name: "Skattkort_2026.pdf", meta: "PDF · 88 KB" },
-    { name: "Matvælanámskeið.pdf", meta: "gildir til 2027" },
-  ]);
+  const { t } = useLang();
+  const [docs, setDocs] = useState<{ name: string; meta: string; path?: string }[]>(DEMO_DOCS);
+  const [live, setLive] = useState(false);
+  const [opening, setOpening] = useState(false);
+  async function load() {
+    const r = await getDocuments(employeeId);
+    if (r.live) { setLive(true); setDocs(r.rows.map((d) => ({ name: d.name, meta: docDate(d.created), path: d.path }))); }
+  }
+  useEffect(() => { load(); }, [employeeId]); // eslint-disable-line react-hooks/exhaustive-deps
   function readAsDataUrl(f: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const r = new FileReader();
@@ -571,7 +582,7 @@ function DocsTab({ employeeId }: { employeeId: string }) {
   async function onFiles(files: FileList | null) {
     if (!files) return;
     const list = [...files];
-    setDocs((d) => [...d, ...list.map((f) => ({ name: f.name, meta: `${Math.max(1, Math.round(f.size / 1024))} KB` }))]);
+    if (!live) setDocs((d) => [...d, ...list.map((f) => ({ name: f.name, meta: `${Math.max(1, Math.round(f.size / 1024))} KB` }))]);
     let okCount = 0;
     for (const f of list) {
       const dataUrl = await readAsDataUrl(f);
@@ -579,19 +590,28 @@ function DocsTab({ employeeId }: { employeeId: string }) {
       if (res.ok) okCount++;
     }
     toast(okCount > 1 ? "Skjöl hlaðin upp" : "Skjal hlaðið upp");
+    if (live || okCount) load();
+  }
+  async function openDoc(path?: string) {
+    if (!path) { toast("Skjal opnast þegar Supabase er tengt"); return; }
+    setOpening(true);
+    const r = await getDocumentSignedUrl(path);
+    setOpening(false);
+    if (r.ok && r.url) window.open(r.url, "_blank", "noopener"); else toast(r.error ?? "Villa");
   }
   return (
     <>
       <Sec first>Skjöl starfsmanns</Sec>
+      {docs.length === 0 && <p className="muted" style={{ fontSize: 12.5, margin: "0 0 8px" }}>{t("Engin skjöl enn — hladdu upp hér að neðan.")}</p>}
       <div className="docs">
         {docs.map((d, i) => (
-          <div className="docrow" key={i}>
+          <div className={`docrow${d.path ? " rowlink" : ""}`} key={i} onClick={() => d.path && openDoc(d.path)} title={d.path ? t("Opna skjal") : undefined} style={{ opacity: opening ? 0.6 : 1 }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
               <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
               <path d="M14 3v6h6" />
             </svg>
             <span>{d.name}</span>
-            <span className="dl">{d.meta}</span>
+            <span className="dl">{d.meta}{d.path ? " · " + t("opna") : ""}</span>
           </div>
         ))}
       </div>
