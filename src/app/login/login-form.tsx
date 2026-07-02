@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
@@ -9,6 +9,12 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("error") === "oauth") {
+      setError("Innskráning með þjónustunni tókst ekki. Reyndu aftur eða notaðu netfang.");
+    }
+  }, []);
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
