@@ -2,6 +2,7 @@
 
 import { useLang } from "./lang";
 import { toast } from "./toast";
+import { exportPayslipPdf } from "@/lib/export-report";
 
 export type PayslipData = {
   name: string;
@@ -43,7 +44,10 @@ export function PayslipModal({ data, onClose }: { data: PayslipData; onClose: ()
           <div className="hr" />
           <Row label={t("Útborgað")} v={`${data.net} kr`} strong />
           <div style={{ display: "flex", gap: 9, marginTop: 18 }}>
-            <button className="btn" onClick={() => toast(t("Sæki launaseðil (PDF)"))}>
+            <button className="btn" onClick={async () => {
+              try { await exportPayslipPdf({ name: data.name, period: data.period, hours: data.hours, gross: data.gross, withholding: data.withholding, pension: data.pension, net: data.net }); }
+              catch { toast(t("Villa við útflutning")); }
+            }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Sækja PDF")}
             </button>
             <button className="btn ghost" onClick={onClose}>{t("Loka")}</button>

@@ -58,7 +58,12 @@ export async function exportTimeReportPdf(rows: TimeReportRow[], company: string
   doc.setFontSize(10); doc.setTextColor(30);
   doc.text(`Samtals: ${dec1(t.total)} klst   ·   Samþykktar: ${dec1(t.approved)} klst   ·   Óafgreiddar: ${dec1(t.pending)} klst (${t.pendingCount})`, 14, y);
 
-  // VAKTO logo footer on every page (three ascending bars + wordmark).
+  logoFooter(doc);
+  doc.save(`vakto-timaskyrsla-${from}_${to}.pdf`);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function logoFooter(doc: any) {
   const pages = doc.getNumberOfPages();
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
@@ -74,5 +79,37 @@ export async function exportTimeReportPdf(rows: TimeReportRow[], company: string
     doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
     doc.text("vakto.is", pw - 14, by, { align: "right" });
   }
-  doc.save(`vakto-timaskyrsla-${from}_${to}.pdf`);
+}
+
+export type PayslipExport = { name: string; period: string; company?: string; hours: string; gross: string; withholding: string; pension: string; net: string };
+
+/** Branded single-employee payslip (launaseðill) PDF. */
+export async function exportPayslipPdf(d: PayslipExport) {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+  const doc = new jsPDF();
+  doc.setFontSize(15); doc.setTextColor(20); doc.text(`Launaseðill — ${d.name}`, 14, 18);
+  doc.setFontSize(10); doc.setTextColor(120);
+  doc.text(`${d.company ? d.company + " · " : ""}${d.period}`, 14, 25);
+  autoTable(doc, {
+    startY: 32,
+    theme: "plain",
+    styles: { fontSize: 11, cellPadding: 3 },
+    columnStyles: { 0: { textColor: [95, 100, 112] }, 1: { halign: "right", fontStyle: "bold" } },
+    body: [
+      ["Tímar", `${d.hours} klst`],
+      ["Brúttólaun", `${d.gross} kr`],
+      ["Staðgreiðsla", `-${d.withholding} kr`],
+      ["Lífeyrir + félagsgjald", `-${d.pension} kr`],
+    ],
+  });
+  // @ts-expect-error autotable augments the doc at runtime
+  const y = (doc.lastAutoTable?.finalY ?? 60) + 4;
+  doc.setDrawColor(230); doc.line(14, y, 196, y);
+  doc.setFontSize(13); doc.setTextColor(20); doc.setFont("helvetica", "bold");
+  doc.text("Útborgað", 14, y + 11);
+  doc.setTextColor(30, 150, 80);
+  doc.text(`${d.net} kr`, 196, y + 11, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  logoFooter(doc);
+  doc.save(`vakto-launasedill-${d.name.replace(/\s+/g, "-")}.pdf`);
 }
