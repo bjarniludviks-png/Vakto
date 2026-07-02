@@ -119,7 +119,7 @@ export default function AttendanceScreen({ onShift = 5, empty = false, live = fa
         <div className="ch">
           <div><div className="ct">{t("Tímaskráning vikunnar")}</div><div className="cs">{t("smelltu á röð til að skoða og samþykkja")}</div></div>
           <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-            <button className="btn ghost sm" onClick={async () => { const res = await approveAllTimesheets(); toast(res.ok ? "Allar tímaskráningar samþykktar" : (res.error ?? "Villa")); }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Samþykkja allt")}</button>
+            <AsyncButton className="btn ghost sm" onClick={async () => { const res = await approveAllTimesheets(); toast(res.ok ? "Allar tímaskráningar samþykktar" : (res.error ?? "Villa")); }}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Samþykkja allt")}</AsyncButton>
             <span className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("3 bíða samþykkis")}</span>
           </div>
         </div>
@@ -444,8 +444,8 @@ function TimesheetModal({ name, ts, onClose }: { name: string; ts: TS; onClose: 
           <div className="statline"><span className="k">Raun</span><span className="v">{ts.act}</span></div>
           <div style={{ display: "flex", gap: 9, marginTop: 18 }}>
             {ts.pend
-              ? <button className="btn" style={{ background: "var(--good)" }} onClick={async () => { const res = await approveTimesheet(ts.id ?? ""); onClose(); toast(res.ok ? "Tímaskráning samþykkt" : (res.error ?? "Villa")); }}>✓ Samþykkja</button>
-              : <button className="btn" onClick={async () => { const res = await setClockOut({ employeeName: name, time: "16:00" }); onClose(); toast(res.ok ? "Útstimplun sett á 16:00" : (res.error ?? "Villa")); }}>Setja útstimplun á 16:00</button>}
+              ? <AsyncButton className="btn" style={{ background: "var(--good)" }} onClick={async () => { const res = await approveTimesheet(ts.id ?? ""); onClose(); toast(res.ok ? "Tímaskráning samþykkt" : (res.error ?? "Villa")); }}>✓ Samþykkja</AsyncButton>
+              : <AsyncButton className="btn" onClick={async () => { const res = await setClockOut({ employeeName: name, time: "16:00" }); onClose(); toast(res.ok ? "Útstimplun sett á 16:00" : (res.error ?? "Villa")); }}>Setja útstimplun á 16:00</AsyncButton>}
             <button className="btn ghost" onClick={onClose}>Loka</button>
           </div>
         </div>

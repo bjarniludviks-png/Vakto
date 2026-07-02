@@ -6,6 +6,7 @@ import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { nf, dec1 } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
+import { AsyncButton } from "@/components/app/async-button";
 import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, type ShiftInput } from "./actions";
 import { buildSchedulePdf, type PdfShift } from "./pdf";
 import type { ReqItem } from "./requests.server";
@@ -621,7 +622,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
               {r.kind === "avail" && <span className="tag mut">{t("skráð")}</span>}
             </div>
           ))}
-          {!liveCompany && <div className="it"><div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg></div><div className="tx"><b>{t("Opin vakt: laugardag 12–20")}</b><span>{t("2 starfsmenn sóttu um — Ha Vu, Dalya")}</span></div><button className="btn sm" onClick={async () => { const res = await assignOpenShift({ employeeName: "Ha Vu", note: "laugardag 12–20" }); toast(res.ok ? "Úthlutað" : (res.error ?? "Villa")); }}>{t("Úthluta")}</button></div>}
+          {!liveCompany && <div className="it"><div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg></div><div className="tx"><b>{t("Opin vakt: laugardag 12–20")}</b><span>{t("2 starfsmenn sóttu um — Ha Vu, Dalya")}</span></div><AsyncButton className="btn sm" onClick={async () => { const res = await assignOpenShift({ employeeName: "Ha Vu", note: "laugardag 12–20" }); toast(res.ok ? "Úthlutað" : (res.error ?? "Villa")); }}>{t("Úthluta")}</AsyncButton></div>}
         </div>
       </div>
       )}
