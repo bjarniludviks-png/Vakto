@@ -1,12 +1,22 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+const DESC = "Vinnuafls-arðsemi fyrir íslensk fyrirtæki. Vaktaplan, mæting, laun og arðsemi á einum stað — sjáðu laun sem hlutfall af veltu í rauntíma.";
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is"),
   title: "VAKTO — Vaktaplan, mæting, laun og arðsemi á einum stað",
-  description:
-    "Vinnuafls-arðsemi fyrir íslensk fyrirtæki. Vaktaplan, mæting, laun og arðsemi á einum stað.",
+  description: DESC,
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "VAKTO", statusBarStyle: "default" },
+  openGraph: {
+    type: "website",
+    siteName: "VAKTO",
+    title: "VAKTO — Vaktaplan, mæting, laun og arðsemi",
+    description: DESC,
+    locale: "is_IS",
+    url: "/",
+  },
+  twitter: { card: "summary_large_image", title: "VAKTO", description: DESC },
 };
 
 export const viewport: Viewport = {

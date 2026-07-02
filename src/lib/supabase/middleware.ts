@@ -53,6 +53,8 @@ export async function updateSession(request: NextRequest) {
     pathname === "/manifest.webmanifest" ||
     pathname.startsWith("/apple-icon") ||
     pathname.startsWith("/icon") ||
+    pathname.startsWith("/opengraph-image") ||
+    pathname.startsWith("/twitter-image") ||
     pathname.startsWith("/api/splash") ||
     pathname === "/favicon.ico";
 
