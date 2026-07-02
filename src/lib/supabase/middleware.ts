@@ -56,6 +56,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/opengraph-image") ||
     pathname.startsWith("/twitter-image") ||
     pathname.startsWith("/api/splash") ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml" ||
     pathname === "/favicon.ico";
 
   if (!user && !isPublic) {
