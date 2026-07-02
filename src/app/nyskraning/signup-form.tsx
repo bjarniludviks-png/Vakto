@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { createOwnerAccount } from "./actions";
+import { createOwnerAccount, setCompanyPlan } from "./actions";
 
 const PLANS = [
   { id: "grunn", name: "Grunn", price: "990", per: "á starfsmann / mán", blurb: "Vaktaplan, stimpilklukka, mæting" },
@@ -61,9 +61,11 @@ export default function SignupForm({ initialPlan = "mid" }: { initialPlan?: stri
     }
   }
 
-  function finish(e: React.FormEvent) {
+  async function finish(e: React.FormEvent) {
     e.preventDefault();
     // Teya is not connected yet — card details are collected but not charged.
+    // Record the chosen plan + start the 14-day trial, then enter the app.
+    await setCompanyPlan(plan);
     window.location.assign("/maelabord");
   }
 

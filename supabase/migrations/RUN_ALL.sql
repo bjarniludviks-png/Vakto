@@ -787,3 +787,7 @@ alter table push_subscriptions enable row level security;
 drop policy if exists push_own on push_subscriptions;
 create policy push_own on push_subscriptions for all
   using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- ===== 0020 — company subscription plan + trial =====
+alter table companies add column if not exists plan text;
+alter table companies add column if not exists trial_ends_at timestamptz;

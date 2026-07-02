@@ -7,6 +7,25 @@ import { sendWelcomeEmail } from "@/lib/email";
 
 export type SignupResult = { ok: boolean; demo?: boolean; error?: string };
 
+/** Record the chosen plan + start a 14-day trial on the signed-in user's company.
+ * Tolerant of migration 0020 not being run yet (best-effort). */
+export async function setCompanyPlan(plan: string): Promise<{ ok: boolean }> {
+  if (!isSupabaseConfigured()) return { ok: true };
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false };
+    const { data: profile } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
+    if (!profile?.company_id) return { ok: false };
+    const trialEnds = new Date(Date.now() + 14 * 86400000).toISOString();
+    await supabase.from("companies").update({ plan, trial_ends_at: trialEnds }).eq("id", profile.company_id);
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
 /** Self-service owner signup: create the auth user, a company, and link the
  * public.users row as owner. Uses the service-role client (RLS would block a
  * brand-new user from creating a company). Demo fallback when unconfigured. */
