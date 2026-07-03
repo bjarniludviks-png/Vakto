@@ -15,7 +15,7 @@ function Paired({ a, b }: { a: number[]; b: number[] }) {
   return (
     <div className="sbars" id="dcompare" style={{ height: 180 }}>
       {a.map((v, i) => (
-        <div className="col" key={i}>
+        <div className="col" key={i} title={`V${i + 1} · ${dec1(v)} / ${dec1(b[i])} m`}>
           <div style={{ display: "flex", gap: 3, alignItems: "flex-end", height: "100%", width: "100%", justifyContent: "center" }}>
             <div style={{ width: "32%", height: `${Math.round((v / max) * 100)}%`, background: "var(--teal)", borderRadius: "5px 5px 2px 2px" }} />
             <div style={{ width: "32%", height: `${Math.round((b[i] / max) * 100)}%`, background: "var(--brand)", borderRadius: "5px 5px 2px 2px" }} />

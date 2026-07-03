@@ -10,7 +10,7 @@ export function Bars({ vals, t, height = 170 }: { vals: number[]; t: number; hei
         const h = Math.round((v / max) * 100);
         const c = v <= t ? "var(--good)" : v <= t + 3 ? "var(--warn)" : "var(--bad)";
         return (
-          <div className="b" key={i}>
+          <div className="b" key={i} title={`V${i + 1}: ${comma(v)}%`}>
             <span className="pc">{comma(v)}%</span>
             <div className="c" style={{ height: `${h}%`, background: c }} />
             <small>V{i + 1}</small>
@@ -59,7 +59,7 @@ export function Paired({ a, b, height = 180 }: { a: number[]; b: number[]; heigh
   return (
     <div className="sbars" style={{ height }}>
       {a.map((v, i) => (
-        <div className="col" key={i}>
+        <div className="col" key={i} title={`V${i + 1} · ${comma(+v.toFixed(2))} / ${comma(+b[i].toFixed(2))}`}>
           <div style={{ display: "flex", gap: 3, alignItems: "flex-end", height: "100%", width: "100%", justifyContent: "center" }}>
             <div style={{ width: "32%", height: `${Math.round((v / max) * 100)}%`, background: "var(--teal)", borderRadius: "5px 5px 2px 2px" }} />
             <div style={{ width: "32%", height: `${Math.round((b[i] / max) * 100)}%`, background: "var(--brand)", borderRadius: "5px 5px 2px 2px" }} />

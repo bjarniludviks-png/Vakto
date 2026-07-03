@@ -117,8 +117,8 @@ export default function AppShell({
     } catch {
       /* ignore when not configured */
     }
-    router.push("/login");
-    router.refresh();
+    // Full navigation to the marketing homepage (clears the app shell + session).
+    window.location.assign("/");
   }
 
   const active = (href: string) =>

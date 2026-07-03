@@ -391,6 +391,11 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
   }
   function removeEmpRow(r: number) {
     const nm = emp[r][1];
+    // Persist: delete the employee's shifts for the visible week so they don't
+    // reappear on refresh (live companies only).
+    if (liveCompany) {
+      weekDays.forEach((d, c) => { if (grid[r]?.[c] && grid[r][c] !== "off") void deleteShift({ employeeName: nm, dateISO: fmtISO(d) }); });
+    }
     setPool((p) => [...p, emp[r]]);
     setEmp((e) => e.filter((_, i) => i !== r));
     setGrid((g) => g.filter((_, i) => i !== r));
