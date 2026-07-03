@@ -6,6 +6,28 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export type CompanyOption = { id: string; name: string; role: string; active: boolean };
+export type SearchEmp = { id: string; name: string; dept: string };
+
+/** Lightweight employee list for the topbar search (company-scoped). Demo list
+ * when unconfigured so search still works in preview. */
+export async function listEmployeesForSearch(): Promise<SearchEmp[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return [];
+    const { data: me } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
+    if (!me?.company_id) return [];
+    const { data } = await supabase.from("employees")
+      .select("id, full_name, departments(name)").eq("company_id", me.company_id).order("full_name");
+    return (data ?? []).map((e) => {
+      const d = (Array.isArray(e.departments) ? e.departments[0] : e.departments) as { name?: string } | null;
+      return { id: e.id as string, name: e.full_name as string, dept: d?.name ?? "" };
+    });
+  } catch {
+    return [];
+  }
+}
 
 /** All companies the signed-in user belongs to (for the switcher). Tolerant of
  * migration 0023 not being run — returns just the active company then. */

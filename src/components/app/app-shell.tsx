@@ -9,6 +9,7 @@ import { visibleFor, type Role } from "./nav";
 import { useLang } from "./lang";
 import { createClient } from "@/lib/supabase/client";
 import { getMyCompanies, switchCompany, type CompanyOption } from "@/app/(app)/company-actions";
+import { TopSearch } from "./top-search";
 
 export type Account = {
   initials: string;
@@ -192,7 +193,7 @@ export default function AppShell({
             <button className="menu-btn" onClick={() => setNavOpen(true)}>
               <Icon name="menu" />
             </button>
-            <div style={{ flex: 1 }} />
+            <TopSearch role={role} />
             <div className="tactions">
               <button
                 className="ticon"
@@ -274,14 +275,10 @@ export default function AppShell({
                   <b>{ident.name}</b>
                   <span>{ident.company} · {t("role:" + role)}</span>
                 </div>
-                {companies.length > 1 && (
-                  <>
-                    <div className="sep" />
-                    <div className="mi" onClick={() => { setMenu(null); setPicker(true); }}>
-                      <Icon name="building" className="ei" />{t("Skipta um félag")}
-                    </div>
-                  </>
-                )}
+                <div className="sep" />
+                <div className="mi" onClick={() => { setMenu(null); setPicker(true); }}>
+                  <Icon name="building" className="ei" />{companies.length > 1 ? t("Skipta um félag") : t("Mín félög")}
+                </div>
                 <div className="sep" />
                 <div className="mi" onClick={() => { setMenu(null); setRoleModal(true); }}>
                   <Icon name="swap" className="ei" />{t("acct:role")}
