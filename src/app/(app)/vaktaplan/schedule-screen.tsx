@@ -183,6 +183,23 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
     return () => { cancelled = true; };
   }, [weekMonISO, liveCompany]);
 
+  // Copy the previous week's plan into the current week (review, then publish).
+  async function copyLastWeek() {
+    const prevMon = new Date(mondayOf(cur)); prevMon.setDate(prevMon.getDate() - 7);
+    const prevISO = fmtISO(prevMon);
+    if (liveCompany) {
+      const res = await getWeekShifts(prevISO);
+      if (res?.ok && res.grid.some((row) => row.some((s) => s && s !== "off"))) {
+        setGrid(res.grid); setCellTimes(res.times ?? {});
+        toast(t("Síðasta vika afrituð — yfirfarðu og birtu"));
+      } else toast(t("Engar vaktir í síðustu viku til að afrita"));
+    } else {
+      // Demo: just clone the current visible grid as an illustrative copy.
+      setGrid((g) => g.map((row) => [...row]));
+      toast(t("Síðasta vika afrituð — yfirfarðu og birtu"));
+    }
+  }
+
   // Live companies: load the whole month when in month view.
   useEffect(() => {
     if (!liveCompany || view !== "Mánuður") return;
@@ -495,6 +512,11 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
           <option value="Stjórnun">Stjórnun</option>
         </select>
         <div className="sp" style={{ flex: 1 }} />
+        {view === "Vika" && (
+          <button className="btn ghost sm" onClick={copyLastWeek}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>{t("Afrita síðustu viku")}
+          </button>
+        )}
         <button className="btn sm" onClick={() => setModal("ai")}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4Z" /></svg>{t("Biðja AI")}
         </button>
