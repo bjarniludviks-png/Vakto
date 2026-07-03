@@ -6,8 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { createOwnerAccount, setCompanyPlan } from "./actions";
 
 const PLANS = [
-  { id: "grunn", name: "Grunn", price: "990", per: "á starfsmann / mán", blurb: "Vaktaplan, stimpilklukka, mæting" },
-  { id: "mid", name: "Mið", price: "1.390", per: "á starfsmann / mán", blurb: "Allt í Grunn + laun, skýrslur, laun%" },
+  { id: "vakto", name: "VAKTO", price: "29.990", per: "kr/mán · VSK innifalið", blurb: "Allt innifalið — 10 notendur, +990 kr per notanda umfram" },
 ];
 
 const Bars = () => (
@@ -18,13 +17,13 @@ const Bars = () => (
   </svg></div>
 );
 
-export default function SignupForm({ initialPlan = "mid" }: { initialPlan?: string }) {
+export default function SignupForm({ initialPlan = "vakto" }: { initialPlan?: string }) {
   const [step, setStep] = useState<"account" | "card">("account");
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [plan, setPlan] = useState(initialPlan === "grunn" ? "grunn" : "mid");
+  const [plan, setPlan] = useState(initialPlan || "vakto");
   const [country, setCountry] = useState<"IS" | "OTHER">("IS");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -74,7 +73,7 @@ export default function SignupForm({ initialPlan = "mid" }: { initialPlan?: stri
   const fmtExp = (v: string) => { const d = v.replace(/\D/g, "").slice(0, 4); return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d; };
 
   if (step === "card") {
-    const p = PLANS.find((x) => x.id === plan)!;
+    const p = PLANS.find((x) => x.id === plan) ?? PLANS[0];
     return (
       <form className="form" onSubmit={finish}>
         <div className="brand"><Bars /><b>VAKTO</b></div>

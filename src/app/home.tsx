@@ -217,7 +217,7 @@ export default function Home() {
                 ) : plain ? (
                   <div className="amt">{p.price}</div>
                 ) : (
-                  <div className="amt">{p.price} <small>{PUNIT[lang]}</small></div>
+                  <div className="amt">{p.price} <small>{p.unit ?? PUNIT[lang]}</small></div>
                 )}
                 <ul>
                   {p.features.map((x, j) => (

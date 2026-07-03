@@ -9,7 +9,7 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
   return (
     <div className="wrap">
       <div className="left">
-        <SignupForm initialPlan={sp.plan ?? "mid"} />
+        <SignupForm initialPlan={sp.plan ?? "vakto"} />
       </div>
       <div className="right">
         <div className="tag">Vinnuafls-arðsemi fyrir fyrirtæki</div>

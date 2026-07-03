@@ -4,15 +4,15 @@ export type Lang = "is" | "en";
 export const I18N = {
   is: {
     nav_features: "Eiginleikar", nav_how: "Hvernig það virkar", nav_integrations: "Tengingar", nav_pricing: "Verð", nav_login: "Innskráning", nav_try: "Byrja",
-    hero_badge: "Vinnuafls-arðsemi fyrir íslensk fyrirtæki",
-    hero_title: 'Lægri launakostnaður — <span class="g">án undirmönnunar</span>.',
-    hero_sub: "VAKTO sjálfvirknivæðir vaktaplön, reiknar laun samkvæmt íslenskum kjarasamningum og sýnir launahlutfallið í rauntíma — áður en mánuðurinn er úti.",
+    hero_badge: "Vöktun, tímaskráning & vinnuafls-arðsemi á einum stað",
+    hero_title: 'Einfaldasta vakta- og tímaskráningarkerfið — <span class="g">sem allir elska</span>.',
+    hero_sub: "Geggjað einfalt vaktaplan og tímaskráning, mælaborð með launahlutfalli í rauntíma tengt sölukerfinu, mannaflagreining, starfsmannaapp með skírteini, bein tenging við bókhaldið, greiningar, skýrslur og spjall. Fyrir stjórnendur, vaktstjóra og starfsfólk.",
     hero_cta1: "Byrja núna", hero_cta2: "Bóka kynningu", hero_note: "14 daga prufa · Uppsetning samdægurs · Hættu hvenær sem er",
     m_dashboard: "Mælaborð", m_schedule: "Vaktaplan", m_time: "Tímaskráning", m_pay: "Launakeyrslur", m_perf: "Frammistaða",
     m_planned: "Áætlaðir tímar", m_actual: "Rauntímar", m_laborcost: "Launakostn.", m_laborpct: "Laun%",
     m_revtoday: "Velta í dag", m_laborpct2: "Launahlutfall", m_target: "markmið 30%", m_cost: "Launakostnaður", m_staffing: "Mönnun núna",
     trust_label: "Hannað sérstaklega fyrir veitingageirann, verslanir, verktaka og keðjur",
-    feat_eyebrow: "Eiginleikar", feat_title: "Allt sem þú þarft til að stýra vinnuafli", feat_sub: "Frá vaktaplani til launakeyrslu — eitt öflugt og fallegt kerfi fyrir alla.",
+    feat_eyebrow: "Eiginleikar", feat_title: "Besta kerfið fyrir stjórnendur, vaktstjóra og starfsfólk", feat_sub: "Frá vaktaplani til launakeyrslu — eitt öflugt, einfalt og fallegt kerfi sem allir elska.",
     show_eyebrow: "VAKTO í verki", show_title: "Sjáðu kerfið í verki", show_sub: "Frá rauntíma launahlutfalli til AI-vaktaplans, starfsmannaskírteinis og innra spjalls — allt á einum stað.",
     show1_t: "Launahlutfall í rauntíma", show1_s: "Sjáðu laun sem % af veltu áður en mánuðurinn er úti — litakóðað eftir markmiði.",
     show2_t: "AI-vaktaplan á sekúndum", show2_s: "Lýstu markmiði og VAKTO raðar vöktum, lágmarkar yfirvinnu og heldur mönnun réttri.",
@@ -20,7 +20,7 @@ export const I18N = {
     show4_t: "Innra spjall fyrirtækis", show4_s: "Rásir og grúppur fyrir allt teymið — ekkert sér-spjallforrit.",
     flow_title: "Vaktaplan → Mæting → Laun → Arðsemi", flow_sub: "Heildaryfirlit yfir reksturinn — frá skipulagi til launaseðils.",
     int_title: "Óaðfinnanleg tenging við núverandi kerfi", int_sub: "Launakerfi, bókhald og sölukerfi (POS) — allt á einum stað.",
-    verd_title: "Einfalt og gagnsætt verðmódel", verd_sub: "Greitt per starfsmann á mánuði. Engar faldar greiðslur, engin binding.",
+    verd_title: "Eitt fast verð — allt innifalið", verd_sub: "29.990 kr á mánuði með VSK, 10 notendur innifaldir og 990 kr fyrir hvern til viðbótar. Engar faldar greiðslur, engin binding.",
     faq_title: "Algengar spurningar",
     cta_title: "Sjáðu launahlutfallið í rauntíma — strax.", cta_sub: "Bókaðu 20 mínútna kynningu og við sýnum þér hversu mikið VAKTO getur sparað þér í launakostnað.", cta_btn1: "Bóka kynningu", cta_btn2: "Byrja núna",
     foot_about: "Hámarkaðu arðsemi vinnuaflsins. Vaktaplön, mætingarstjórnun, launavinnsla og rekstrargreining á einum stað.",
@@ -31,15 +31,15 @@ export const I18N = {
   },
   en: {
     nav_features: "Features", nav_how: "How it works", nav_integrations: "Integrations", nav_pricing: "Pricing", nav_login: "Log in", nav_try: "Get started",
-    hero_badge: "Workforce profitability for smart businesses",
-    hero_title: 'Lower labor costs — <span class="g">without understaffing</span>.',
-    hero_sub: "VAKTO automates scheduling, processes payroll using Icelandic union rules, and tracks labor cost against revenue in real time — before month-end.",
+    hero_badge: "Scheduling, time tracking & workforce profitability in one",
+    hero_title: 'The simplest scheduling & time-tracking system — <span class="g">everyone loves it</span>.',
+    hero_sub: "Effortless scheduling and time tracking, a dashboard with real-time labor % linked to your POS, staffing insights, an employee app with a digital ID card, direct accounting integration, analytics, reports and chat. For managers, supervisors and staff.",
     hero_cta1: "Get started", hero_cta2: "Book a demo", hero_note: "14-day trial · Same-day setup · Cancel anytime",
     m_dashboard: "Dashboard", m_schedule: "Schedule", m_time: "Time tracking", m_pay: "Payroll", m_perf: "Performance",
     m_planned: "Planned hours", m_actual: "Actual hours", m_laborcost: "Labor cost", m_laborpct: "Labor%",
     m_revtoday: "Revenue today", m_laborpct2: "Labor ratio", m_target: "target 30%", m_cost: "Labor cost", m_staffing: "Staffing now",
     trust_label: "Built specifically for restaurants, retail, contractors, and chains",
-    feat_eyebrow: "Features", feat_title: "Everything you need to run your workforce", feat_sub: "From smart scheduling to automated payroll — one unified platform for your team.",
+    feat_eyebrow: "Features", feat_title: "The best system for managers, supervisors and staff", feat_sub: "From scheduling to payroll — one powerful, simple and beautiful platform everyone loves.",
     show_eyebrow: "VAKTO in action", show_title: "See the platform in action", show_sub: "From real-time labor % to AI scheduling, staff ID cards and built-in team chat — all in one place.",
     show1_t: "Real-time labor %", show1_s: "See labor as a % of revenue before month-end — color-coded against your target.",
     show2_t: "AI scheduling in seconds", show2_s: "Describe your goal and VAKTO builds the roster, cuts overtime and keeps staffing right.",
@@ -47,7 +47,7 @@ export const I18N = {
     show4_t: "Built-in team chat", show4_s: "Channels and groups for the whole team — no separate chat app.",
     flow_title: "Schedule → Attendance → Pay → Profit", flow_sub: "The complete operations cycle — from planning to payslip.",
     int_title: "Connects with the tools you already use", int_sub: "Seamlessly integrates with your payroll, accounting, and POS systems.",
-    verd_title: "Predictable pricing that scales with you", verd_sub: "Priced per employee per month. No hidden fees, no lock-in.",
+    verd_title: "One flat price — everything included", verd_sub: "29,990 ISK/month incl. VAT, 10 users included and 990 ISK for each additional. No hidden fees, no lock-in.",
     faq_title: "Frequently asked questions",
     cta_title: "See labor as a percentage of revenue — instantly.", cta_sub: "Book a 20-minute demo and see exactly how much VAKTO can shave off your labor costs.", cta_btn1: "Book a demo", cta_btn2: "Get started",
     foot_about: "Maximize workforce profitability. Schedule, attendance, payroll, and real-time business intelligence in one place.",
@@ -60,20 +60,20 @@ export const I18N = {
 
 export const FEAT: Record<Lang, [string, string][]> = {
   is: [
-    ["Snjallvaktaplan (AI)", "Dag-, viku- og mánaðarsýn. Gervigreind stendur vaktina og hámarkar mönnun út frá veltuspá með einum smelli."],
-    ["Stimpilklukka & snertiskjár", "Innistimplun með PIN, ljósmynd eða GPS. Rauntímamæting sem skilar sér beint í samþykktar tímaskýrslur."],
-    ["Launahlutfall í rauntíma", "Sjáðu launakostnað á móti veltu jafnóðum með litakóðun — sérstaða VAKTO sem enginn annar býður upp á."],
-    ["Sjálfvirk íslensk launalógík", "Kjarasamningar, vaktaálög, staðgreiðsla, tryggingagjald og orlofsreikningur — allt uppfært per starfsmann."],
-    ["Öflugt starfsmannaapp", "Vaktir, rafrænir launaseðlar, tímabanki, vaktaskipti og leyfisbeiðnir — beint í vasann."],
-    ["Sérsniðin aðgangsstýring", "Ólík hlutverk fyrir eigendur, stjórnendur og starfsfólk. Fullkominn verktaka-aðgangur líka í boði."],
+    ["Einfalt vaktaplan", "Dag-, viku- og mánaðarsýn. Dragðu vaktir, afritaðu heila viku og birtu með einum smelli. Gervigreind stingur upp á mönnun."],
+    ["Tímaskráning & Kiosk", "Stimplun með PIN, ljósmynd eða GPS í appinu eða á sameiginlegri spjaldtölvu. Rauntímamæting beint í samþykktar tímaskýrslur."],
+    ["Launahlutfall í rauntíma", "Tengdu sölukerfið (Inventra, Dineout, SalesCloud) og sjáðu launakostnað á móti veltu jafnóðum — sérstaða VAKTO."],
+    ["Mannaflagreining", "Sjáðu nákvæmlega hvaða daga þú ert of- eða undirmönnuð og hvenær borgar sig að hafa fleiri eða færri á vakt."],
+    ["Starfsmannaapp + skírteini", "Starfsfólk sér vaktir og tíma, sendir beiðnir, stimplar sig og fær sitt eigið stafræna starfsmannaskírteini í símann."],
+    ["Bókhald, greiningar & spjall", "Bein tenging við bókhaldið (Payday, DK) fyrir launakeyrslu, öflug greiningartól, skýrslur og innra spjall — allt á einum stað."],
   ],
   en: [
-    ["AI-powered scheduling", "Day, week, and month views. AI suggests optimal staffing based on revenue and demand — drag-and-drop, publish in clicks."],
-    ["Time clock & kiosk", "Clock in/out via PIN, photo, or GPS tracking. Live attendance monitoring with instant manager approval for payroll."],
-    ["Labor as % of revenue", "Monitor labor cost against sales in real time with visual alerts — the VAKTO signature advantage."],
-    ["Full Icelandic compliance", "Union agreements, shift premiums, withholding tax, insurance levy, pension, and holiday pay — automated per employee."],
-    ["Intuitive employee app", "Shifts, digital payslips, time banks, shift swaps, availability, and time-off requests — all on their phone."],
-    ["Granular role permissions", "Tailored access levels for owners, managers, and employees. Specialized contractor access included."],
+    ["Effortless scheduling", "Day, week, and month views. Drag shifts, copy a whole week, and publish in one click. AI suggests optimal staffing."],
+    ["Time tracking & Kiosk", "Clock in via PIN, photo, or GPS — in the app or on a shared tablet. Live attendance straight into approved timesheets."],
+    ["Real-time labor %", "Connect your POS (Inventra, Dineout, SalesCloud) and watch labor cost against revenue live — the VAKTO advantage."],
+    ["Staffing insights", "See exactly which days you're over- or under-staffed and when it pays to have more or fewer people on shift."],
+    ["Employee app + ID card", "Staff see shifts and hours, send requests, clock in, and get their own digital staff ID card in their phone."],
+    ["Accounting, analytics & chat", "Direct accounting integration (Payday, DK) for payroll, powerful analytics, reports, and built-in chat — all in one place."],
   ],
 };
 
@@ -82,19 +82,33 @@ export const FLOW: Record<Lang, [string, string][]> = {
   en: [["Schedule", "Build the schedule with smart AI recommendations and publish instantly."], ["Attendance", "Staff clock in/out; actual vs. planned data updates in real time."], ["Pay", "Union rules and premiums compile automatically; export straight to Payday."], ["Profit", "Track labor as a % of revenue dynamically and compare business periods."]],
 };
 
-export type Plan = { name: string; price: string; desc: string; features: string[]; pop: boolean; soon?: boolean };
+export type Plan = { name: string; price: string; desc: string; unit?: string; features: string[]; pop: boolean; soon?: boolean };
 export const PRICE: Record<Lang, Plan[]> = {
   is: [
-    { name: "Grunn", price: "990", desc: "Til að byrja", features: ["Ótakmarkaður starfsmannafjöldi", "Vaktaplan & dagatal", "Stimpilklukka, app & Kiosk", "Starfsmannaskírteini í síma", "Grunnskýrslur"], pop: false },
-    { name: "Mið", price: "1.390", desc: "Vinsælasta lausnin", features: ["Allt í Grunn, og:", "AI-drifið vaktaplan", "Íslenskir kjarasamningar", "Launahlutfall í rauntíma", "Sjálfvirk launakeyrsla — Payday & DK", "Samanburður & frammistaða"], pop: true },
-    { name: "Verktaki", price: "", desc: "Verktakar & iðnaður", features: ["GPS-verkskráning", "Útselt vs. kostnaður", "Snjallreikningagerð"], pop: false, soon: true },
-    { name: "Enterprise", price: "Sérsniðið", desc: "Keðjur & stærri fyrirtæki", features: ["Margar starfsstöðvar", "SSO & öryggisúttektir", "Opið API & sérlausnir", "Sérstakur tengiliður"], pop: false },
+    { name: "VAKTO", price: "29.990", unit: "kr/mán · VSK innifalið", desc: "Allt innifalið — 10 notendur", features: [
+      "10 notendur innifaldir",
+      "+990 kr per notanda umfram",
+      "Vaktaplan, tímaskráning & Kiosk",
+      "Mælaborð með laun% í rauntíma",
+      "Starfsmannaapp + stafrænt skírteini",
+      "Spjall, skýrslur & greiningar",
+      "Tenging við bókhald (Payday, DK)",
+      "Engin binding — hættu hvenær sem er",
+    ], pop: true },
+    { name: "Enterprise", price: "Sérsniðið", desc: "Keðjur & mörg félög", features: ["Margar starfsstöðvar & félög", "Flakk milli félaga", "SSO & öryggisúttektir", "Opið API & sérlausnir", "Sérstakur tengiliður"], pop: false },
   ],
   en: [
-    { name: "Basic", price: "990", desc: "To get started", features: ["Unlimited employees", "Schedule & calendar", "Time clock, app & Kiosk", "Staff ID card in the wallet", "Basic reporting"], pop: false },
-    { name: "Plus", price: "1,390", desc: "For most businesses", features: ["Everything in Basic, plus:", "AI scheduling engine", "Icelandic union automation", "Real-time labor % tracking", "Automated payroll — Payday & DK", "Benchmarks & performance"], pop: true },
-    { name: "Contractor", price: "", desc: "Contractors & trade", features: ["GPS job & site tracking", "Billable hours vs. cost", "Instant invoicing"], pop: false, soon: true },
-    { name: "Enterprise", price: "Custom", desc: "Chains & large operations", features: ["Multi-location", "SSO & advanced audit logs", "Open API & custom workflows", "Dedicated account manager"], pop: false },
+    { name: "VAKTO", price: "29,990", unit: "ISK/mo · VAT included", desc: "Everything included — 10 users", features: [
+      "10 users included",
+      "+990 ISK per extra user",
+      "Scheduling, time tracking & Kiosk",
+      "Dashboard with real-time labor %",
+      "Employee app + digital ID card",
+      "Chat, reports & analytics",
+      "Accounting integration (Payday, DK)",
+      "No lock-in — cancel anytime",
+    ], pop: true },
+    { name: "Enterprise", price: "Custom", desc: "Chains & multiple companies", features: ["Multi-location & companies", "Switch between companies", "SSO & advanced audit logs", "Open API & custom workflows", "Dedicated account manager"], pop: false },
   ],
 };
 export const SOON: Record<Lang, string> = { is: "Væntanlegt", en: "Coming soon" };
