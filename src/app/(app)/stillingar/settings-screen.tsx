@@ -50,6 +50,8 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
   const { t } = useLang();
   const [modal, setModal] = useState<SettingsModal>(initialModal);
   const [editRule, setEditRule] = useState<PayRule | null>(null);
+  const [posName, setPosName] = useState<string | null>(null);
+  function posConnect(name: string) { setPosName(name === "POS" ? "" : name); }
   return (
     <>
       <PageHeader title="Stillingar" subtitle="Reglur, kjarasamningar og tengingar" />
@@ -73,12 +75,14 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
           <div className="ch"><div className="ct">{t("Tengingar")}</div></div>
           <div className="cb att">
             <div className="it"><div className="ic good">P</div><div className="tx"><b>Payday</b><span>{t("launakeyrsla & skil")}</span></div><span className="tag good">{t("tengt")}</span></div>
-            <div className="it rowlink" onClick={syncInventra}><div className="ic info">IN</div><div className="tx"><b>INVENTRA</b><span>{t("velta í rauntíma — laun vs velta · smelltu til að sækja veltu")}</span></div><span className="tag good">{t("tengt")}</span></div>
+            <div className="it rowlink" onClick={syncInventra}><div className="ic info">IN</div><div className="tx"><b>INVENTRA</b><span>{t("framleiðsluvelta í rauntíma · smelltu til að sækja veltu")}</span></div><span className="tag good">{t("tengt")}</span></div>
+            <div className="it rowlink" onClick={() => posConnect("Dineout")}><div className="ic info">DO</div><div className="tx"><b>Dineout</b><span>{t("söluvelta veitingastaða í rauntíma")}</span></div><span className="tag info">{t("tengja")}</span></div>
+            <div className="it rowlink" onClick={() => posConnect("SalesCloud")}><div className="ic info">SC</div><div className="tx"><b>SalesCloud</b><span>{t("söluvelta úr POS í rauntíma")}</span></div><span className="tag info">{t("tengja")}</span></div>
             <div className="it rowlink" onClick={() => setModal("revenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div><div className="tx"><b>{t("Skrá veltu handvirkt")}</b><span>{t("án Inventra — sláðu inn veltu til að sjá laun vs velta")}</span></div><span className="tag info">{t("slá inn")}</span></div>
             <div className="it rowlink" onClick={() => setModal("avgrevenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M3 3v18h18M7 15l4-4 3 3 5-6" /></svg></div><div className="tx"><b>{t("Meðalvelta per vikudag")}</b><span>{t("áætluð velta per vikudag — laun% án tengingar")}</span></div><span className="tag info">{t("slá inn")}</span></div>
             <div className="it"><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" /></svg></div><div className="tx"><b>{t("Push-tilkynningar")}</b><span>{t("vaktir, beiðnir og samþykki beint í símann")}</span></div><PushToggle /></div>
             <div className="it rowlink" onClick={() => copyKioskLink(data.companyId)}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><rect x="4" y="3" width="16" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg></div><div className="tx"><b>{t("Kiosk-stimpilklukka")}</b><span>{t("opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð")}</span></div><span className="tag info">{t("afrita slóð")}</span></div>
-            <div className="it"><div className="ic mut" style={{ background: "var(--line2)" }}>P</div><div className="tx"><b>{t("POS / sölukerfi")}</b><span>Dótturkassi, Salt, Verifone</span></div><span className="tag mut">{t("tengja")}</span></div>
+            <div className="it rowlink" onClick={() => posConnect("POS")}><div className="ic mut" style={{ background: "var(--line2)" }}>P</div><div className="tx"><b>{t("Fleiri sölukerfi")}</b><span>Dótturkassi, Salt, Verifone{t(" o.fl.")}</span></div><span className="tag mut">{t("tengja")}</span></div>
           </div>
         </div>
       </div>
@@ -184,6 +188,7 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
 
       {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} />}
       {editRule && <PayRuleModal rule={editRule} onClose={() => setEditRule(null)} />}
+      {posName !== null && <PosConnectModal name={posName} onClose={() => setPosName(null)} />}
     </>
   );
 }
@@ -300,6 +305,43 @@ function PayRuleModal({ rule, onClose }: { rule: PayRule; onClose: () => void })
           <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
             <button className="btn" disabled={busy} onClick={submit}>{t("Vista")}</button>
             <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** POS / sales-system connection request. Real sync needs each provider's API key,
+ * so this captures interest + explains sales vs production revenue. */
+function PosConnectModal({ name, onClose }: { name: string; onClose: () => void }) {
+  const { t } = useLang();
+  const [busy, setBusy] = useState(false);
+  const title = name || t("Sölukerfi");
+  async function request() {
+    setBusy(true);
+    await new Promise((r) => setTimeout(r, 300));
+    setBusy(false);
+    onClose();
+    toast(t("Takk! Við höfum samband um tengingu."));
+  }
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal">
+        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Tengja")} {title}</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="mb">
+          <p className="muted" style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>
+            {t("VAKTO les veltu í rauntíma úr sölukerfinu þínu og reiknar launahlutfall jafnóðum. Veldu hvað þú vilt fylgjast með:")}
+          </p>
+          <div className="att" style={{ marginBottom: 12 }}>
+            <div className="it"><div className="ic good">$</div><div className="tx"><b>{t("Söluvelta")}</b><span>{t("t.d. Dineout, SalesCloud, POS — sala til viðskiptavina")}</span></div></div>
+            <div className="it"><div className="ic info">IN</div><div className="tx"><b>{t("Framleiðsluvelta")}</b><span>{t("t.d. Inventra — framleitt/afgreitt magn")}</span></div></div>
+          </div>
+          <p className="muted" style={{ fontSize: 12, lineHeight: 1.55 }}>{t("Tengingin krefst aðgangs frá þjónustuaðilanum. Sláðu inn áhuga og við setjum hana upp með þér.")}</p>
+          <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
+            <button className="btn" disabled={busy} onClick={request}>{busy ? t("Sendi…") : t("Óska eftir tengingu")}</button>
+            <button className="btn ghost" onClick={onClose}>{t("Loka")}</button>
           </div>
         </div>
       </div>
