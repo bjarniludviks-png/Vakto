@@ -10,6 +10,8 @@ import { nf, dec1 } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
 import { fetchAttendance, getTimeReport } from "../timaskraning/actions";
 import { exportTimeReportXlsx, exportTimeReportPdf } from "@/lib/export-report";
+import { TimeBankCard } from "./timebank-card";
+import type { TimeBank } from "./timebank.server";
 
 const MONTHS_IS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ágú.", "sep.", "okt.", "nóv.", "des."];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -61,7 +63,7 @@ const LIB = [
   ["Orlof & réttindi", "staða orlofs og tímabanka per starfsmann", "Excel", "M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5"],
 ];
 
-export default function ReportsScreen({ empty = false, live = false, rows = [] }: { empty?: boolean; live?: boolean; rows?: AttRow[] }) {
+export default function ReportsScreen({ empty = false, live = false, rows = [], timebank }: { empty?: boolean; live?: boolean; rows?: AttRow[]; timebank?: TimeBank }) {
   const { t } = useLang();
   const [period, setPeriod] = useState<Period>("Vika");
   const [from, setFrom] = useState("");
@@ -103,7 +105,7 @@ export default function ReportsScreen({ empty = false, live = false, rows = [] }
     );
   }
   // Live company: real planned vs actual + time-bank, with period/range/search.
-  if (live) return <LiveReports initial={rows} />;
+  if (live) return <LiveReports initial={rows} timebank={timebank} />;
   return (
     <>
       <PageHeader
@@ -190,7 +192,7 @@ export default function ReportsScreen({ empty = false, live = false, rows = [] }
   );
 }
 
-function LiveReports({ initial }: { initial: AttRow[] }) {
+function LiveReports({ initial, timebank }: { initial: AttRow[]; timebank?: TimeBank }) {
   const { t } = useLang();
   const [period, setPeriod] = useState<Period>("Vika");
   const init0 = rangeFor("Vika");
@@ -263,20 +265,7 @@ function LiveReports({ initial }: { initial: AttRow[] }) {
           </table>
         </div>
       </div>
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="ch"><div><div className="ct">{t("Tímabanki starfsfólks")}</div><div className="cs">{t("uppsafnað +/− vs vinnuskylda")}</div></div></div>
-        <div className="cb tbl" style={{ paddingTop: 8, opacity: loading ? 0.5 : 1 }}>
-          <table>
-            <thead><tr><th>{t("th:Starfsm.")}</th><th className="r">{t("Vinnuskylda")}</th><th className="r">{t("Unnið")}</th><th className="r">{t("Staða banka")}</th></tr></thead>
-            <tbody>
-              {shown.map((r) => (
-                <tr key={r.id}><td>{r.name}</td><td className="r">{r.required}</td><td className="r">{dec1(r.actual)}</td><td className="r" style={{ color: r.actual - r.required > 0 ? "var(--good)" : r.actual - r.required < 0 ? "var(--warn)" : undefined }}>{r.actual - r.required >= 0 ? "+" : ""}{dec1(r.actual - r.required)}</td></tr>
-              ))}
-              {!shown.length && <tr><td colSpan={4} className="muted" style={{ textAlign: "center", padding: 18 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {timebank && <TimeBankCard rows={timebank.rows} live={timebank.live} monthLabels={timebank.monthLabels} />}
     </>
   );
 }

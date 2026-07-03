@@ -210,6 +210,8 @@ export const DICT: Dict = {
   "Áætluð upphæð fyrir unna tíma á tímabilinu. Formlegur launaseðill kemur frá Payday.": { is: "Áætluð upphæð fyrir unna tíma á tímabilinu. Formlegur launaseðill kemur frá Payday.", en: "Estimated amount for hours worked in the period. The formal payslip comes from Payday." },
   "Skipta um félag": { is: "Skipta um félag", en: "Switch company" },
   "Velja félag": { is: "Velja félag", en: "Select company" },
+  "Jákvæð staða = unnið umfram vinnuskyldu (starfsmaður á inni). Neikvæð = undir skyldu (fyrirtæki á inni tíma). Uppsafnað yfir mánuðina sem gögn ná til.": { is: "Jákvæð staða = unnið umfram vinnuskyldu (starfsmaður á inni). Neikvæð = undir skyldu (fyrirtæki á inni tíma). Uppsafnað yfir mánuðina sem gögn ná til.", en: "Positive = worked over contract (owed to the employee). Negative = under contract (company has hours banked). Accumulated over the months with data." },
+  "Engin gögn enn.": { is: "Engin gögn enn.", en: "No data yet." },
   "Ekkert fannst.": { is: "Ekkert fannst.", en: "No matches." },
   "Launareglur": { is: "Launareglur", en: "Pay rules" },
   "Notendur": { is: "Notendur", en: "Users" },
