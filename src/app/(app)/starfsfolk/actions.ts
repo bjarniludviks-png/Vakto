@@ -279,7 +279,21 @@ export type UpdateEmployeeInput = {
   payRule?: CustomRules | null;
   permissions?: Record<string, boolean> | null;
   benefits?: { name: string; type: string; amount: number }[] | null;
+  orlof?: { mode: string; pct: number } | null;
 };
+
+/** Tolerant read of an employee's orlof (vacation) settings (null before 0021). */
+export async function getEmployeeOrlof(id: string): Promise<{ mode: string; pct: number } | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("employees").select("orlof").eq("id", id).maybeSingle();
+    if (error) return null;
+    return (data?.orlof as { mode: string; pct: number }) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** Tolerant read of an employee's benefits (null before 0016). */
 export async function getEmployeeExtras(id: string): Promise<{ permissions: Record<string, boolean> | null; benefits: { name: string; type: string; amount: number }[] | null }> {
@@ -369,7 +383,8 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
     // Permissions + benefits — best-effort (ignored before migration 0016).
     if (input.permissions !== undefined) await supabase.from("employees").update({ permissions: input.permissions }).eq("id", id);
     if (input.benefits !== undefined) await supabase.from("employees").update({ benefits: input.benefits }).eq("id", id);
-    if (!Object.keys(patch).length && input.payRule === undefined && input.permissions === undefined && input.benefits === undefined) return { ok: true };
+    if (input.orlof !== undefined) await supabase.from("employees").update({ orlof: input.orlof }).eq("id", id);
+    if (!Object.keys(patch).length && input.payRule === undefined && input.permissions === undefined && input.benefits === undefined && input.orlof === undefined) return { ok: true };
 
     const { data: { user } } = await supabase.auth.getUser();
     const company = await companyId(supabase);

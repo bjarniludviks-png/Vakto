@@ -91,6 +91,22 @@ export const UNION_UPPBOT: Record<string, UppbotSet> = {
 };
 export const ZERO_UPPBOT: UppbotSet = { orlof: 0, desember: 0 };
 
+// ---------- orlof (vacation) handling — mirrors Payday's options ----------
+// How the employee's accrued vacation pay is treated each payroll run.
+export type OrlofMode = "accrue_amount" | "accrue_hours" | "accrue_days" | "pay_out" | "to_bank";
+export type OrlofSet = { mode: OrlofMode; pct: number }; // pct = orlofsprósenta (e.g. 10.17)
+export const DEFAULT_ORLOF: OrlofSet = { mode: "accrue_amount", pct: 10.17 };
+export const ORLOF_MODES: { key: OrlofMode; label: string }[] = [
+  { key: "accrue_amount", label: "Uppsöfnuð upphæð" },
+  { key: "accrue_hours", label: "Uppsafnaðir tímar" },
+  { key: "accrue_days", label: "Uppsafnaðir dagar" },
+  { key: "pay_out", label: "Greitt út jafnóðum" },
+  { key: "to_bank", label: "Lagt inn á orlofsreikning" },
+];
+export function resolveOrlof(o?: Partial<OrlofSet> | null): OrlofSet {
+  return { ...DEFAULT_ORLOF, ...(o ?? {}) };
+}
+
 /** Uppbót amounts for an employee's agreement (custom = company can override). */
 export function resolveUppbot(union: string | null | undefined, custom?: Partial<UppbotSet> | null): UppbotSet {
   if (union === CUSTOM_UNION) return { ...ZERO_UPPBOT, ...(custom ?? {}) };

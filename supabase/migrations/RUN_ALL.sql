@@ -791,3 +791,6 @@ create policy push_own on push_subscriptions for all
 -- ===== 0020 — company subscription plan + trial =====
 alter table companies add column if not exists plan text;
 alter table companies add column if not exists trial_ends_at timestamptz;
+
+-- ===== 0021 — per-employee orlof (vacation) handling =====
+alter table employees add column if not exists orlof jsonb;

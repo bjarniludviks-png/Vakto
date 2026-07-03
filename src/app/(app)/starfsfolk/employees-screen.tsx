@@ -7,8 +7,8 @@ import { toast } from "@/components/app/toast";
 import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getDocuments, getDocumentSignedUrl } from "./actions";
-import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, type RuleSet, type Band } from "@/lib/payrules";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getDocuments, getDocumentSignedUrl } from "./actions";
+import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField } from "@/components/app/fields";
 
@@ -316,6 +316,17 @@ function LaunTab({ e }: { e: Employee }) {
     getEmployeeExtras(e.id).then((x) => { if (x.benefits) setBenefits(x.benefits as Benefit[]); });
   }, [e.id, e.union]);
 
+  // Orlof (vacation) handling — accrue vs pay out, + orlofsprósenta.
+  const [orlofMode, setOrlofMode] = useState<string>(DEFAULT_ORLOF.mode);
+  const [orlofPct, setOrlofPct] = useState<number>(DEFAULT_ORLOF.pct);
+  useEffect(() => {
+    getEmployeeOrlof(e.id).then((o) => { if (o) { setOrlofMode(o.mode); setOrlofPct(o.pct); } });
+  }, [e.id]);
+  function saveOrlof(mode: string, pct: number) {
+    setOrlofMode(mode); setOrlofPct(pct);
+    updateEmployee(e.id, { orlof: { mode, pct } }).then((r) => toast(r.ok ? "Orlofsstillingar vistaðar" : (r.error ?? "Villa")));
+  }
+
   function saveBenefits(list: Benefit[]) { setBenefits(list); updateEmployee(e.id, { benefits: list }).then((r) => toast(r.ok ? "Hlunnindi vistuð" : (r.error ?? "Villa"))); }
   function addBenefit() {
     const amt = Math.max(0, Math.round(Number(bAmt) || 0));
@@ -432,6 +443,26 @@ function LaunTab({ e }: { e: Employee }) {
           </p>
         </>);
       })()}
+
+      <Sec>{t("Orlof")}</Sec>
+      <div className="statline">
+        <span className="k">{t("Orlofsprósenta")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("t.d. 10,17%")}</span></span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <input type="number" min={0} step="0.01" value={orlofPct} onChange={(ev) => saveOrlof(orlofMode, Math.max(0, Number(ev.target.value) || 0))} style={{ ...FLD, width: 80, textAlign: "right" }} />
+          <span className="muted">%</span>
+        </span>
+      </div>
+      <div className="statline">
+        <span className="k">{t("Meðhöndlun")}</span>
+        <select value={orlofMode} onChange={(ev) => saveOrlof(ev.target.value, orlofPct)} style={{ ...FLD, width: 220 }}>
+          {ORLOF_MODES.map((m) => <option key={m.key} value={m.key}>{t(m.label)}</option>)}
+        </select>
+      </div>
+      <p className="muted" style={{ fontSize: 11.5, margin: "6px 0 0" }}>
+        {orlofMode === "pay_out" ? t("Orlof greiðist út jafnóðum með hverjum launum.")
+          : orlofMode === "to_bank" ? t("Orlof leggst inn á orlofsreikning starfsmanns.")
+            : t("Orlof safnast upp og birtist á launaseðli sem inneign.")}
+      </p>
 
       <Sec>Hlunnindi & styrkir</Sec>
       {benefits.length === 0 && <p className="muted" style={{ fontSize: 12, margin: "2px 0 6px" }}>{t("Engin hlunnindi skráð — bættu við einu eða fleiri hér að neðan.")}</p>}
