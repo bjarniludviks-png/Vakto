@@ -11,6 +11,7 @@ import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmp
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField } from "@/components/app/fields";
+import { useCountry } from "@/components/app/country";
 
 /** Best-effort document type from a filename (for the documents table). */
 function detectDocType(name: string): string {
@@ -274,9 +275,11 @@ const daysLabel = (days: number[]) =>
 
 function LaunTab({ e }: { e: Employee }) {
   const { t } = useLang();
+  const { isIS } = useCountry();
   const pay = payrollPreview(e);
   const rateLabel = e.payType === "monthly" ? `${nf(e.rate)} kr/mán` : `${nf(e.rate)} kr/klst`;
-  const [union, setUnion] = useState<string>(e.union ?? "Efling");
+  // International companies always use the standardized rule engine (custom rules).
+  const [union, setUnion] = useState<string>(isIS ? (e.union ?? "Efling") : CUSTOM_UNION);
   const custom = union === CUSTOM_UNION;
   const [rules, setRules] = useState<RuleSet>(resolveRuleSet(CUSTOM_UNION, e.payRule));
   const shown = custom ? rules : (UNION_PRESETS[union] ?? UNION_PRESETS["Efling"]);
@@ -351,13 +354,18 @@ function LaunTab({ e }: { e: Employee }) {
         <span className="k">Starfshlutfall</span>
         <input name="employmentRatio" defaultValue={`${e.employmentRatio}%`} style={{ ...FLD, width: 80, textAlign: "right" }} />
       </div>
-      <div className="statline">
-        <span className="k">Kjarasamningur</span>
-        <select name="union" value={union} onChange={(ev) => setUnion(ev.target.value)} style={{ ...FLD, width: 190 }}>
-          {Object.keys(UNION_PRESETS).map((u) => <option key={u}>{u}</option>)}
-          <option>{CUSTOM_UNION}</option>
-        </select>
-      </div>
+      {isIS ? (
+        <div className="statline">
+          <span className="k">Kjarasamningur</span>
+          <select name="union" value={union} onChange={(ev) => setUnion(ev.target.value)} style={{ ...FLD, width: 190 }}>
+            {Object.keys(UNION_PRESETS).map((u) => <option key={u}>{u}</option>)}
+            <option>{CUSTOM_UNION}</option>
+          </select>
+        </div>
+      ) : (
+        // International mode: no union presets — always the standardized rule engine.
+        <input type="hidden" name="union" value={CUSTOM_UNION} />
+      )}
 
       <Sec>Álög & yfirvinna {custom ? "· sérsniðnar reglur" : "· úr kjarasamningi"}</Sec>
       {RULE_FIELDS.map((f) => (
@@ -431,7 +439,7 @@ function LaunTab({ e }: { e: Employee }) {
         <p className="muted" style={{ fontSize: 11.5, margin: "6px 0 0" }}>{t("Sérálög leggjast ofan á grunnreglurnar — hæsta % gildir á hverri stundu. Mundu að ýta á Vista.")}</p>
       </>)}
 
-      <Sec>{t("Desember- & orlofsuppbót")} · {custom ? t("eigin samningur") : t("úr kjarasamningi")}</Sec>
+      {isIS && <><Sec>{t("Desember- & orlofsuppbót")} · {custom ? t("eigin samningur") : t("úr kjarasamningi")}</Sec>
       {(() => {
         const upp = resolveUppbot(union);
         const r = e.employmentRatio / 100;
@@ -442,7 +450,7 @@ function LaunTab({ e }: { e: Employee }) {
             {t("Hlutfallað eftir starfshlutfalli")} ({e.employmentRatio}%) → ~{nf(Math.round(upp.orlof * r))} / {nf(Math.round(upp.desember * r))} kr. {t("Greiðist sjálfkrafa í launakeyrslu réttan mánuð. (Upphæðir óstaðfestar — yfirfarið gegn samningi.)")}
           </p>
         </>);
-      })()}
+      })()}</>}
 
       <Sec>{t("Orlof")}</Sec>
       <div className="statline">

@@ -1,6 +1,7 @@
 import "@/styles/app.css";
 import AppShell, { type Account } from "@/components/app/app-shell";
 import { LangProvider } from "@/components/app/lang";
+import { CountryProvider } from "@/components/app/country";
 import type { Role } from "@/components/app/nav";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -20,32 +21,40 @@ const DEMO: Account = {
   role: "owner",
 };
 
-async function getAccount(): Promise<Account> {
-  if (!isSupabaseConfigured()) return DEMO;
+async function getAccount(): Promise<Account & { country: string }> {
+  if (!isSupabaseConfigured()) return { ...DEMO, country: "IS" };
   try {
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return DEMO;
+    if (!user) return { ...DEMO, country: "IS" };
 
-    const { data: profile } = await supabase
+    // country column added in migration 0022 — fall back to name-only if absent.
+    let profile = (await supabase
       .from("users")
-      .select("full_name, role, company_id, companies(name)")
+      .select("full_name, role, company_id, companies(name, country)")
       .eq("id", user.id)
-      .maybeSingle();
+      .maybeSingle()).data as { full_name?: string; role?: string; companies?: { name?: string; country?: string } | null } | null;
+    if (!profile) {
+      profile = (await supabase
+        .from("users")
+        .select("full_name, role, company_id, companies(name)")
+        .eq("id", user.id)
+        .maybeSingle()).data as typeof profile;
+    }
 
     const name = profile?.full_name || user.email || "Notandi";
-    const company =
-      (profile?.companies as { name?: string } | null)?.name ?? "VAKTO";
+    const comp = profile?.companies as { name?: string; country?: string } | null;
     return {
       initials: initials(name),
       name,
-      company,
+      company: comp?.name ?? "VAKTO",
       role: (profile?.role as Role) ?? "owner",
+      country: comp?.country ?? "IS",
     };
   } catch {
-    return DEMO;
+    return { ...DEMO, country: "IS" };
   }
 }
 
@@ -54,10 +63,12 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const account = await getAccount();
+  const { country, ...account } = await getAccount();
   return (
     <LangProvider>
-      <AppShell account={account}>{children}</AppShell>
+      <CountryProvider value={country}>
+        <AppShell account={account}>{children}</AppShell>
+      </CountryProvider>
     </LangProvider>
   );
 }

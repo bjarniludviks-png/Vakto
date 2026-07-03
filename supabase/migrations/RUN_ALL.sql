@@ -794,3 +794,6 @@ alter table companies add column if not exists trial_ends_at timestamptz;
 
 -- ===== 0021 — per-employee orlof (vacation) handling =====
 alter table employees add column if not exists orlof jsonb;
+
+-- ===== 0022 — company country (gates Icelandic-specific modules) =====
+alter table companies add column if not exists country text default 'IS';

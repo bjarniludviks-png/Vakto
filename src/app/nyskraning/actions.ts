@@ -29,7 +29,7 @@ export async function setCompanyPlan(plan: string): Promise<{ ok: boolean }> {
 /** Self-service owner signup: create the auth user, a company, and link the
  * public.users row as owner. Uses the service-role client (RLS would block a
  * brand-new user from creating a company). Demo fallback when unconfigured. */
-export async function createOwnerAccount(input: { fullName: string; companyName: string; email: string; password: string }): Promise<SignupResult> {
+export async function createOwnerAccount(input: { fullName: string; companyName: string; email: string; password: string; country?: string }): Promise<SignupResult> {
   const fullName = input.fullName?.trim();
   const companyName = input.companyName?.trim();
   const email = input.email?.trim().toLowerCase();
@@ -47,7 +47,7 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
       return { ok: false, error: /already|registered|exists/i.test(m) ? "Netfang er þegar skráð — skráðu þig inn" : m };
     }
     const userId = created.user.id;
-    const prov = await provisionCompanyForUser(userId, email, fullName, companyName);
+    const prov = await provisionCompanyForUser(userId, email, fullName, companyName, input.country);
     if (!prov.ok) return { ok: false, error: prov.error };
     await sendWelcomeEmail(email, fullName, companyName); // no-op until Resend is configured
     return { ok: true };

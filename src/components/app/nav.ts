@@ -37,9 +37,10 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    title: "Starfsmaður",
+    title: "Mitt",
     items: [
-      { slug: "employeeapp", href: "/mitt-svaedi", label: "Starfsmannaapp", roles: ["employee", "contractor"], icon: "phone" },
+      // Owners and managers work shifts too, so everyone has Mitt svæði.
+      { slug: "employeeapp", href: "/mitt-svaedi", label: "Mitt svæði", roles: ALL, icon: "phone" },
       { slug: "chat", href: "/spjall", label: "Spjall", roles: ALL, icon: "chat" },
     ],
   },
