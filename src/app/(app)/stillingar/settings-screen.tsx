@@ -52,10 +52,30 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
   const [editRule, setEditRule] = useState<PayRule | null>(null);
   const [posName, setPosName] = useState<string | null>(null);
   function posConnect(name: string) { setPosName(name === "POS" ? "" : name); }
+  const [section, setSection] = useState<string>("fyrirtaeki");
+  const SECTIONS: [string, string][] = [
+    ["fyrirtaeki", "Fyrirtæki"], ["tengingar", "Tengingar"], ["launareglur", "Launareglur"],
+    ["notendur", "Notendur"], ["askrift", "Áskrift"], ["adgerdaskra", "Aðgerðaskrá"],
+  ];
   return (
     <>
-      <PageHeader title="Stillingar" subtitle="Reglur, kjarasamningar og tengingar" />
+      <PageHeader title="Stillingar" subtitle="Fyrirtæki, tengingar, notendur og áskrift" />
+      <div className="emp-layout">
+        <aside className="emp-side">
+          <select className="emp-navsel" value={section} onChange={(e) => setSection(e.target.value)}>
+            {SECTIONS.map(([id, label]) => <option key={id} value={id}>{t(label)}</option>)}
+          </select>
+          <nav className="emp-nav">
+            {SECTIONS.map(([id, label]) => (
+              <button key={id} className={`emp-navi${section === id ? " on" : ""}`} onClick={() => setSection(id)}>
+                <span style={{ width: 17, textAlign: "center", flexShrink: 0, color: "var(--ink3)" }}>{label.charAt(0)}</span><span>{t(label)}</span>
+              </button>
+            ))}
+          </nav>
+        </aside>
+        <main className="emp-main" style={{ maxWidth: 900 }}>
 
+      {section === "fyrirtaeki" && <>
       <div className="grid2b">
         <div className="card">
           <div className="ch"><div className="ct">{t("Land & launareglur")}</div></div>
@@ -71,6 +91,10 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
             <div className="statline"><span className="k">{t("Launatímabil")}</span><span className="v">21. → 20.</span></div>
           </div>
         </div>
+      </div>
+      </>}
+
+      {section === "tengingar" && (
         <div className="card">
           <div className="ch"><div className="ct">{t("Tengingar")}</div></div>
           <div className="cb att">
@@ -85,9 +109,10 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
             <div className="it rowlink" onClick={() => posConnect("POS")}><div className="ic mut" style={{ background: "var(--line2)" }}>P</div><div className="tx"><b>{t("Fleiri sölukerfi")}</b><span>Dótturkassi, Salt, Verifone{t(" o.fl.")}</span></div><span className="tag mut">{t("tengja")}</span></div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="card" style={{ marginTop: 16 }}>
+      {section === "launareglur" && (
+      <div className="card">
         <div className="ch">
           <div><div className="ct">{t("Launareglur kjarasamninga")}</div><div className="cs">{t("álag, yfirvinna og stórhátíðardagar — smelltu til að staðfesta")}</div></div>
           {payRules.every((r) => r.confirmed) && payRules.length > 0
@@ -105,8 +130,10 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
           <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("⚠️ Prósenturnar eru staðlað sniðmát — staðfestu hverja gegn raunverulegum kjarasamningi (Efling/VR) áður en þær eru notaðar á laun.")}</p>
         </div>
       </div>
+      )}
 
-      <div className="grid2b">
+      {section === "fyrirtaeki" && <>
+      <div className="grid2b" style={{ marginTop: 16 }}>
         <div className="card">
           <div className="ch"><div className="ct">{t("Staðir")}</div><button className="btn sm" onClick={() => setModal("location")}>{t("+ Bæta við stað")}</button></div>
           <div className="cb att">
@@ -133,7 +160,10 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
+      </>}
+
+      {section === "notendur" && (
+      <div className="card">
         <div className="ch"><div className="ct">{t("Notendur & aðgangur")}</div><button className="btn sm" onClick={() => setModal("invite")}>{t("+ Bjóða notanda")}</button></div>
         <div className="cb att">
           {data.users.map((u, i) => (
@@ -145,13 +175,15 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
           ))}
         </div>
       </div>
+      )}
 
-      <div className="card owner-only" style={{ marginTop: 16 }}>
-        <div className="ch"><div><div className="ct">{t("Áskrift & greiðslur")}</div><div className="cs">{t("Vakto Business · mánaðarlega")}</div></div><span className="badge" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("virk")}</span></div>
+      {section === "askrift" && (
+      <div className="card owner-only">
+        <div className="ch"><div><div className="ct">{t("Áskrift & greiðslur")}</div><div className="cs">{t("VAKTO · mánaðarlega")}</div></div><span className="badge" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("virk")}</span></div>
         <div className="cb">
-          <div className="statline"><span className="k">{t("Fjöldi notenda")}</span><span className="v">14</span></div>
-          <div className="statline"><span className="k">{t("Verð á notanda")}</span><span className="v">590 kr/mán</span></div>
-          <div className="statline"><span className="k" style={{ fontWeight: 650, color: "var(--ink)" }}>{t("Samtals")}</span><span className="v" style={{ fontSize: 15 }}>8.260 kr/mán</span></div>
+          <div className="statline"><span className="k">{t("Mánaðargjald")}</span><span className="v">29.990 kr {t("m/VSK")}</span></div>
+          <div className="statline"><span className="k">{t("Notendur innifaldir")}</span><span className="v">10</span></div>
+          <div className="statline"><span className="k">{t("Umfram notendur")}</span><span className="v">990 kr/{t("notanda")}</span></div>
           <div className="statline"><span className="k">{t("Næsta greiðsla")}</span><span className="v">13. júlí 2026</span></div>
           <div className="hr" />
           <div className="statline"><span className="k">{t("Greiðslumáti")}</span><span className="v" style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: "#1a1f71", fontSize: 12, letterSpacing: ".5px" }}>VISA</span> •••• 1817 · 04/28</span></div>
@@ -159,11 +191,13 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
             <button className="btn ghost sm" onClick={() => toast("Opna kortastillingar")}>{t("Uppfæra kort")}</button>
             <button className="btn ghost sm" onClick={() => toast("Sæki reikninga")}>{t("Reikningar")}</button>
           </div>
-          <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>{t("Verð aðlagast sjálfkrafa þegar notendum fjölgar eða fækkar (per-notanda). Lítil teymi (≤5 starfsmenn) ókeypis.")}</p>
+          <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>{t("Fast mánaðarverð með VSK, 10 notendur innifaldir og 990 kr fyrir hvern til viðbótar. Engin binding.")}</p>
         </div>
       </div>
+      )}
 
-      <div className="card owner-only" style={{ marginTop: 16 }}>
+      {section === "adgerdaskra" && (
+      <div className="card owner-only">
         <div className="ch"><div><div className="ct">{t("audit:title")}</div><div className="cs">{t("audit:sub")}</div></div><span className="badge">{audit.length}</span></div>
         <div className="cb att">
           {audit.length === 0 ? (
@@ -184,6 +218,10 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
             ))
           )}
         </div>
+      </div>
+      )}
+
+        </main>
       </div>
 
       {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} />}
