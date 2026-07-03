@@ -208,6 +208,8 @@ export const DICT: Dict = {
   "Álagstímar (kvöld/helgi)": { is: "Álagstímar (kvöld/helgi)", en: "Premium hours (evening/weekend)" },
   "Samtals unnið": { is: "Samtals unnið", en: "Total worked" },
   "Áætluð upphæð fyrir unna tíma á tímabilinu. Formlegur launaseðill kemur frá Payday.": { is: "Áætluð upphæð fyrir unna tíma á tímabilinu. Formlegur launaseðill kemur frá Payday.", en: "Estimated amount for hours worked in the period. The formal payslip comes from Payday." },
+  "Skipta um félag": { is: "Skipta um félag", en: "Switch company" },
+  "Skipt um félag": { is: "Skipt um félag", en: "Company switched" },
   "Afrita síðustu viku": { is: "Afrita síðustu viku", en: "Copy last week" },
   "Vakt afrituð — smelltu á reiti til að líma": { is: "Vakt afrituð — smelltu á reiti til að líma", en: "Shift copied — click cells to paste" },
   "Vakt límd": { is: "Vakt límd", en: "Shift pasted" },

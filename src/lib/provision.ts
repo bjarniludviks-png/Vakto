@@ -19,6 +19,8 @@ export async function provisionCompanyForUser(userId: string, email: string, ful
     if (!comp) return { ok: false, error: "Tókst ekki að stofna fyrirtæki" };
     const { error: uErr } = await admin.from("users").upsert({ id: userId, email, company_id: comp.id, role: "owner", full_name: fullName });
     if (uErr) return { ok: false, error: uErr.message };
+    // Record the membership (migration 0023) — best-effort so signup never breaks.
+    await admin.from("company_members").upsert({ user_id: userId, company_id: comp.id, role: "owner" });
     return { ok: true, companyId: comp.id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };

@@ -238,7 +238,11 @@ export async function inviteUser(input: { email: string; role: string }): Promis
       if (error) return { ok: false, error: error.message };
       userId = invited?.user?.id;
     }
-    if (userId) await admin.from("users").update({ company_id: ctx.company, role }).eq("id", userId);
+    if (userId) {
+      await admin.from("users").update({ company_id: ctx.company, role }).eq("id", userId);
+      // Record membership so the invited user can switch to this company (0023).
+      await admin.from("company_members").upsert({ user_id: userId, company_id: ctx.company, role });
+    }
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "user.invite", entity: "user", detail: `Notanda boðið — ${input.email.trim()} (${role})`,
     });

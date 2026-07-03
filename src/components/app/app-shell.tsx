@@ -8,6 +8,7 @@ import { ToastHost, toast } from "./toast";
 import { visibleFor, type Role } from "./nav";
 import { useLang } from "./lang";
 import { createClient } from "@/lib/supabase/client";
+import { getMyCompanies, switchCompany, type CompanyOption } from "@/app/(app)/company-actions";
 
 export type Account = {
   initials: string;
@@ -31,6 +32,16 @@ export default function AppShell({
   const [navOpen, setNavOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [menu, setMenu] = useState<null | "lang" | "new" | "notif" | "acct">(null);
+  const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  useEffect(() => {
+    if (menu === "acct" && companies.length === 0) getMyCompanies().then(setCompanies);
+  }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function pickCompany(id: string) {
+    setMenu(null);
+    const res = await switchCompany(id);
+    if (res.ok) { toast(t("Skipt um félag")); window.location.assign("/maelabord"); }
+    else toast(res.error ?? "Villa");
+  }
   const [pos, setPos] = useState<MenuPos>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [cookie, setCookie] = useState(false);
@@ -265,6 +276,19 @@ export default function AppShell({
                   <b>{ident.name}</b>
                   <span>{ident.company} · {t("role:" + role)}</span>
                 </div>
+                {companies.length > 1 && (
+                  <>
+                    <div className="sep" />
+                    <div style={{ padding: "2px 12px 4px", fontSize: 11, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--ink3)" }}>{t("Skipta um félag")}</div>
+                    {companies.map((c) => (
+                      <div className="mi" key={c.id} onClick={() => !c.active && pickCompany(c.id)} style={c.active ? { color: "var(--brand)", fontWeight: 600 } : undefined}>
+                        <Icon name="building" className="ei" />
+                        <span style={{ flex: 1 }}>{c.name}</span>
+                        {c.active && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M5 12.5l4 4 10-10" /></svg>}
+                      </div>
+                    ))}
+                  </>
+                )}
                 <div className="sep" />
                 <div className="mi" onClick={() => { setMenu(null); setRoleModal(true); }}>
                   <Icon name="swap" className="ei" />{t("acct:role")}

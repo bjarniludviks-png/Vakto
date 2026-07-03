@@ -797,3 +797,19 @@ alter table employees add column if not exists orlof jsonb;
 
 -- ===== 0022 — company country (gates Icelandic-specific modules) =====
 alter table companies add column if not exists country text default 'IS';
+
+-- ===== 0023 — multi-company memberships (switch between companies) =====
+create table if not exists company_members (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  company_id uuid not null references companies(id) on delete cascade,
+  role user_role not null default 'employee',
+  created_at timestamptz not null default now(),
+  primary key (user_id, company_id)
+);
+create index if not exists company_members_user on company_members(user_id);
+alter table company_members enable row level security;
+drop policy if exists company_members_own on company_members;
+create policy company_members_own on company_members for select using (user_id = auth.uid());
+insert into company_members (user_id, company_id, role)
+  select id, company_id, role from public.users where company_id is not null
+  on conflict (user_id, company_id) do nothing;
