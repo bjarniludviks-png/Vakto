@@ -7,7 +7,6 @@ import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
 import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, type LeaveType, type MyPunchRow } from "./actions";
 import { dec1 } from "@/lib/format";
-import { PayslipModal } from "@/components/app/payslip-modal";
 import { StaffCardModal, type StaffCardData } from "@/components/app/staff-card";
 import type { StaffCard } from "@/lib/mycard.server";
 import { resolvePerms, type Perms } from "@/lib/permissions";
@@ -279,31 +278,20 @@ function CorrectionModal({ init, onClose, onDone }: { init: { punchId?: string; 
   );
 }
 
+// Simplified "Mín launamál" — worked hours + the amount earned for them. The formal
+// payslip (and payment history) comes from Payday, so we don't duplicate it here.
 function Pay() {
   const { t } = useLang();
-  const [slip, setSlip] = useState(false);
   return (
     <div className="emp-pane on">
       <div className="mini">
-        <div className="mh">{t("Laun — júní 2026 (áætlað)")}</div>
-        <div className="mr"><span>{t("Unnir tímar")}</span><b>142,5 {t("klst")}</b></div>
-        <div className="mr"><span>{t("Dagvinna")}</span><b>413.250 kr</b></div>
-        <div className="mr"><span>{t("Álög (kvöld/helgi)")}</span><b>167.400 kr</b></div>
-        <div className="mr"><span>{t("Yfirvinna")}</span><b>70.350 kr</b></div>
-        <div className="mr" style={{ borderTop: "1px solid var(--line)", marginTop: 3, paddingTop: 7 }}><span>{t("Brúttó laun")}</span><b>651.000 kr</b></div>
-        <div className="mr"><span className="muted">{t("Staðgreiðsla")}</span><b className="muted">−142.300 kr</b></div>
-        <div className="mr"><span className="muted">{t("Lífeyrir 4% + félag 1%")}</span><b className="muted">−32.550 kr</b></div>
-        <div className="mr"><span className="muted">{t("Persónuafsláttur")}</span><b className="muted">+68.691 kr</b></div>
-        <div className="mr" style={{ borderTop: "1px solid var(--line)", marginTop: 3, paddingTop: 7 }}><span style={{ fontWeight: 650 }}>{t("Áætlað útborgað")}</span><b style={{ color: "var(--good)", fontSize: 15 }}>468.150 kr</b></div>
+        <div className="mh">{t("Unnir tímar — þessi mánuður")}</div>
+        <div className="mr"><span>{t("Dagvinna")}</span><b>118,0 {t("klst")} · 342.200 kr</b></div>
+        <div className="mr"><span>{t("Álagstímar (kvöld/helgi)")}</span><b>18,5 {t("klst")} · 78.400 kr</b></div>
+        <div className="mr"><span>{t("Yfirvinna")}</span><b>6,0 {t("klst")} · 30.400 kr</b></div>
+        <div className="mr" style={{ borderTop: "1px solid var(--line)", marginTop: 3, paddingTop: 7 }}><span style={{ fontWeight: 650 }}>{t("Samtals unnið")}</span><b style={{ fontSize: 15 }}>142,5 {t("klst")} · 451.000 kr</b></div>
       </div>
-      <div className="mini">
-        <div className="mh">{t("Fyrri mánuðir (útborgað)")}</div>
-        <div className="mr"><span>Maí 2026</span><b>451.300 kr</b></div>
-        <div className="mr"><span>Apríl 2026</span><b>442.900 kr</b></div>
-        <div className="mr"><span>Mars 2026</span><b>438.100 kr</b></div>
-      </div>
-      <button className="btn ghost sm" style={{ width: "100%", justifyContent: "center" }} onClick={() => setSlip(true)}>{t("Sækja launaseðil (PDF)")}</button>
-      {slip && <PayslipModal onClose={() => setSlip(false)} data={{ name: "Mína Huong", period: "21. maí – 20. júní 2026", hours: "171,0", gross: "651.000", withholding: "142.300", pension: "32.550", net: "468.150" }} />}
+      <p className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>{t("Áætluð upphæð fyrir unna tíma á tímabilinu. Formlegur launaseðill kemur frá Payday.")}</p>
     </div>
   );
 }
