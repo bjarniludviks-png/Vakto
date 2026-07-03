@@ -192,10 +192,7 @@ export default function AppShell({
             <button className="menu-btn" onClick={() => setNavOpen(true)}>
               <Icon name="menu" />
             </button>
-            <div className="tsearch">
-              <Icon name="search" />
-              <input placeholder={t("search")} />
-            </div>
+            <div style={{ flex: 1 }} />
             <div className="tactions">
               <button
                 className="ticon"

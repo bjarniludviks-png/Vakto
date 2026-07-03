@@ -37,35 +37,32 @@ export default function EmployeeScreen({ card }: { card?: StaffCard }) {
   return (
     <>
       <PageHeader title="Mitt svæði" subtitle="Vaktir, laun, réttindi og prófíll" />
-      <div className="emp-layout">
-        <aside className="emp-side">
-          <div className="emp-side-head">
-            <PhotoAvatar photo={photo} setPhoto={setPhoto} big={false} />
-            <div style={{ flex: 1, minWidth: 0 }}><div className="emp-nm">{card?.name ?? "Mína Huong"}</div><div className="emp-meta">{card ? `${t(card.role)} · ${card.company}` : t("emp:meta")}</div></div>
-          </div>
-          {perms.card && <button className="btn ghost sm" style={{ width: "100%", justifyContent: "center" }} onClick={() => setShowCard(true)}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8" cy="11" r="2" /><path d="M14 9h4M14 13h4M5 16h7" /></svg>{t("Skírteini")}
-          </button>}
-          <div style={{ display: "flex", justifyContent: "center" }}><PushToggle /></div>
-          <select className="emp-navsel" value={tab} onChange={(e) => setTab(e.target.value)}>
-            {NAV.filter(([id]) => (id !== "pay" || perms.pay) && (id !== "sh" || perms.shifts)).map(([id, label]) => (
-              <option key={id} value={id}>{t(label)}</option>
-            ))}
-          </select>
-          <nav className="emp-nav">
-            {NAV.filter(([id]) => (id !== "pay" || perms.pay) && (id !== "sh" || perms.shifts)).map(([id, label, icon]) => (
-              <button key={id} className={`emp-navi${tab === id ? " on" : ""}`} onClick={() => setTab(id)}>{icon}<span>{t(label)}</span></button>
-            ))}
-          </nav>
-        </aside>
 
-        <main className="emp-main">
-          {tab === "ov" && <Overview onReq={setReq} perms={perms} />}
-          {tab === "sh" && perms.shifts && <MyShifts onReq={setReq} perms={perms} />}
-          {tab === "pay" && perms.pay && <Pay />}
-          {tab === "ri" && <Rights />}
-          {tab === "pr" && <Profile photo={photo} setPhoto={setPhoto} />}
-        </main>
+      <div className="card" style={{ marginBottom: 18 }}>
+        <div className="cb" style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <PhotoAvatar photo={photo} setPhoto={setPhoto} big={false} />
+          <div style={{ flex: 1, minWidth: 0 }}><div className="emp-nm">{card?.name ?? "Mína Huong"}</div><div className="emp-meta">{card ? `${t(card.role)} · ${card.company}` : t("emp:meta")}</div></div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <PushToggle />
+            {perms.card && <button className="btn ghost sm" onClick={() => setShowCard(true)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8" cy="11" r="2" /><path d="M14 9h4M14 13h4M5 16h7" /></svg>{t("Skírteini")}
+            </button>}
+          </div>
+        </div>
+      </div>
+
+      <div className="settabs">
+        {NAV.filter(([id]) => (id !== "pay" || perms.pay) && (id !== "sh" || perms.shifts)).map(([id, label]) => (
+          <button key={id} className={`etab2${tab === id ? " on" : ""}`} onClick={() => setTab(id)}>{t(label)}</button>
+        ))}
+      </div>
+
+      <div>
+        {tab === "ov" && <Overview onReq={setReq} perms={perms} />}
+        {tab === "sh" && perms.shifts && <MyShifts onReq={setReq} perms={perms} />}
+        {tab === "pay" && perms.pay && <Pay />}
+        {tab === "ri" && <Rights />}
+        {tab === "pr" && <Profile photo={photo} setPhoto={setPhoto} />}
       </div>
 
       {req && <ReqModal kind={req} onClose={() => setReq(null)} />}
