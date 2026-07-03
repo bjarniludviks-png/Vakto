@@ -9,6 +9,8 @@ import { EmptyState } from "@/components/app/empty-state";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
 import type { PerfView } from "@/lib/analytics.server";
+import { StaffingCard } from "./staffing-card";
+import type { StaffingPattern } from "./staffing.server";
 
 // Period factors relative to the monthly baseline (demo analytics scale by period).
 const PERIODS: Period[] = ["Vika", "Mánuður", "Ársfj.", "Ár", "Sérsniðið"];
@@ -34,7 +36,7 @@ const CMP: Row[] = [
 // color for change columns: green for good. Specific overrides per prototype.
 const goodChange = new Set(["Velta", "Framlegð", "Laun af tekjum", "Velta á launatíma", "Velta vs spá", "Unnið eftir áætlun"]);
 
-export default function PerformanceScreen({ empty = false, live = false, perf }: { empty?: boolean; live?: boolean; perf?: PerfView }) {
+export default function PerformanceScreen({ empty = false, live = false, perf, staffing }: { empty?: boolean; live?: boolean; perf?: PerfView; staffing?: StaffingPattern }) {
   const { t } = useLang();
   const [period, setPeriod] = useState<Period>("Mánuður");
   const [from, setFrom] = useState("");
@@ -78,6 +80,7 @@ export default function PerformanceScreen({ empty = false, live = false, perf }:
             </p>
           </div>
         </div>
+        {staffing && <StaffingCard rows={staffing.rows} live={staffing.live} weeks={staffing.weeks} />}
       </>
     );
   }
@@ -198,6 +201,7 @@ export default function PerformanceScreen({ empty = false, live = false, perf }:
           </div>
         </div>
       </div>
+      {staffing && <StaffingCard rows={staffing.rows} live={staffing.live} weeks={staffing.weeks} />}
     </>
   );
 }
