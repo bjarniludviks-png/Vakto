@@ -442,6 +442,7 @@ html.dark .mblock.day{background:#23264a;color:#c7ccff} html.dark .mblock.eve{ba
 .help-steps li{display:flex;gap:12px;align-items:flex-start;font-size:14px;line-height:1.55;color:var(--ink)}
 .help-steps li .n{flex-shrink:0;width:24px;height:24px;border-radius:50%;background:var(--brand-soft);color:var(--brand);font-size:12.5px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
 .emp-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--line);margin-bottom:20px;-webkit-overflow-scrolling:touch}
+.settabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:22px;overflow-x:auto;-webkit-overflow-scrolling:touch}
 .etab2{padding:10px 14px;font-size:14px;font-weight:600;color:var(--ink2);border:none;border-bottom:2px solid transparent;background:none;white-space:nowrap;cursor:pointer;margin-bottom:-1px}
 .etab2.on{color:var(--brand);border-bottom-color:var(--brand)}
 .etab2:hover{color:var(--ink)}

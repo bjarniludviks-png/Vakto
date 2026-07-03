@@ -209,6 +209,8 @@ export const DICT: Dict = {
   "Samtals unnið": { is: "Samtals unnið", en: "Total worked" },
   "Áætluð upphæð fyrir unna tíma á tímabilinu. Formlegur launaseðill kemur frá Payday.": { is: "Áætluð upphæð fyrir unna tíma á tímabilinu. Formlegur launaseðill kemur frá Payday.", en: "Estimated amount for hours worked in the period. The formal payslip comes from Payday." },
   "Skipta um félag": { is: "Skipta um félag", en: "Switch company" },
+  "Velja félag": { is: "Velja félag", en: "Select company" },
+  "Ekkert fannst.": { is: "Ekkert fannst.", en: "No matches." },
   "Launareglur": { is: "Launareglur", en: "Pay rules" },
   "Notendur": { is: "Notendur", en: "Users" },
   "Áskrift": { is: "Áskrift", en: "Subscription" },

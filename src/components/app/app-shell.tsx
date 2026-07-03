@@ -33,11 +33,12 @@ export default function AppShell({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [menu, setMenu] = useState<null | "lang" | "new" | "notif" | "acct">(null);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
+  const [picker, setPicker] = useState(false);
   useEffect(() => {
-    if (menu === "acct" && companies.length === 0) getMyCompanies().then(setCompanies);
-  }, [menu]); // eslint-disable-line react-hooks/exhaustive-deps
+    if ((menu === "acct" || picker) && companies.length === 0) getMyCompanies().then(setCompanies);
+  }, [menu, picker]); // eslint-disable-line react-hooks/exhaustive-deps
   async function pickCompany(id: string) {
-    setMenu(null);
+    setMenu(null); setPicker(false);
     const res = await switchCompany(id);
     if (res.ok) { toast(t("Skipt um félag")); window.location.assign("/maelabord"); }
     else toast(res.error ?? "Villa");
@@ -279,14 +280,9 @@ export default function AppShell({
                 {companies.length > 1 && (
                   <>
                     <div className="sep" />
-                    <div style={{ padding: "2px 12px 4px", fontSize: 11, fontWeight: 600, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--ink3)" }}>{t("Skipta um félag")}</div>
-                    {companies.map((c) => (
-                      <div className="mi" key={c.id} onClick={() => !c.active && pickCompany(c.id)} style={c.active ? { color: "var(--brand)", fontWeight: 600 } : undefined}>
-                        <Icon name="building" className="ei" />
-                        <span style={{ flex: 1 }}>{c.name}</span>
-                        {c.active && <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M5 12.5l4 4 10-10" /></svg>}
-                      </div>
-                    ))}
+                    <div className="mi" onClick={() => { setMenu(null); setPicker(true); }}>
+                      <Icon name="building" className="ei" />{t("Skipta um félag")}
+                    </div>
                   </>
                 )}
                 <div className="sep" />
@@ -347,6 +343,9 @@ export default function AppShell({
         <Icon name="chat" />
         {!chatOpen && <span className="fdot">1</span>}
       </button>
+
+      {/* ---------- company picker (Payday-style) ---------- */}
+      {picker && <CompanyPicker companies={companies} onPick={pickCompany} onClose={() => setPicker(false)} />}
 
       {/* ---------- cookie consent ---------- */}
       {cookie && (
@@ -420,3 +419,35 @@ const ROLE_IDENTITY: Record<Role, Account> = {
   employee: { initials: "MÍ", name: "Mína Huong", company: "Kaffi Krónan", role: "employee" },
   contractor: { initials: "VK", name: "Verktaki", company: "Kaffi Krónan", role: "contractor" },
 };
+
+/** Payday-style company picker: search + avatar list of the user's companies. */
+function CompanyPicker({ companies, onPick, onClose }: { companies: CompanyOption[]; onPick: (id: string) => void; onClose: () => void }) {
+  const { t } = useLang();
+  const [q, setQ] = useState("");
+  const list = q ? companies.filter((c) => c.name.toLowerCase().includes(q.toLowerCase())) : companies;
+  const initials = (n: string) => n.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "VK";
+  const COLORS = ["#5b50e6", "#1fb6a6", "#e9700f", "#0891b2", "#db2777", "#7c6ff2"];
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal" style={{ maxWidth: 460 }}>
+        <div className="mh"><div style={{ fontSize: 17, fontWeight: 700 }}>{t("Velja félag")}</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="mb">
+          <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("Leita…")}
+            style={{ width: "100%", border: "1px solid var(--line)", borderRadius: 9, padding: "10px 12px", font: "inherit", fontSize: 14, background: "var(--panel)", color: "var(--ink)", marginBottom: 10 }} />
+          <div style={{ maxHeight: "52vh", overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+            {list.map((c, i) => (
+              <button key={c.id} onClick={() => !c.active && onPick(c.id)}
+                style={{ display: "flex", alignItems: "center", gap: 12, padding: "11px 12px", borderRadius: 11, border: "1px solid " + (c.active ? "var(--brand)" : "transparent"), background: c.active ? "var(--brand-soft)" : "transparent", cursor: c.active ? "default" : "pointer", textAlign: "left", width: "100%" }}>
+                <span className="avt" style={{ background: COLORS[i % COLORS.length], width: 40, height: 40, fontSize: 14 }}>{initials(c.name)}</span>
+                <span style={{ flex: 1, minWidth: 0 }}><b style={{ display: "block", fontSize: 14 }}>{c.name}</b><span className="muted" style={{ fontSize: 12 }}>{t("role:" + c.role)}</span></span>
+                {c.active && <span className="tag good" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("virkt")}</span>}
+              </button>
+            ))}
+            {!list.length && <p className="muted" style={{ fontSize: 13, textAlign: "center", padding: 18 }}>{t("Ekkert fannst.")}</p>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

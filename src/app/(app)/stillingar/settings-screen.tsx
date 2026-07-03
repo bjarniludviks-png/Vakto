@@ -60,20 +60,12 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
   return (
     <>
       <PageHeader title="Stillingar" subtitle="Fyrirtæki, tengingar, notendur og áskrift" />
-      <div className="emp-layout">
-        <aside className="emp-side">
-          <select className="emp-navsel" value={section} onChange={(e) => setSection(e.target.value)}>
-            {SECTIONS.map(([id, label]) => <option key={id} value={id}>{t(label)}</option>)}
-          </select>
-          <nav className="emp-nav">
-            {SECTIONS.map(([id, label]) => (
-              <button key={id} className={`emp-navi${section === id ? " on" : ""}`} onClick={() => setSection(id)}>
-                <span style={{ width: 17, textAlign: "center", flexShrink: 0, color: "var(--ink3)" }}>{label.charAt(0)}</span><span>{t(label)}</span>
-              </button>
-            ))}
-          </nav>
-        </aside>
-        <main className="emp-main" style={{ maxWidth: 900 }}>
+      <div className="settabs">
+        {SECTIONS.map(([id, label]) => (
+          <button key={id} className={`etab2${section === id ? " on" : ""}`} onClick={() => setSection(id)}>{t(label)}</button>
+        ))}
+      </div>
+      <div>
 
       {section === "fyrirtaeki" && <>
       <div className="grid2b">
@@ -221,7 +213,6 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
       </div>
       )}
 
-        </main>
       </div>
 
       {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} />}
