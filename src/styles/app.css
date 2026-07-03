@@ -359,13 +359,18 @@ table.sgrid{min-width:840px;width:100%}
 .mcal .cell .st{font-size:11.5px;color:var(--ink2);margin-top:auto}
 .mcal .cell .cs2{font-size:12px;font-weight:650;font-variant-numeric:tabular-nums;margin-top:1px}
 .mcal .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--brand);margin-right:5px;vertical-align:middle}
-.mcal .mcell{min-height:112px;cursor:pointer}
+.mcal .mcell{min-height:150px;cursor:pointer}
 .mcal .mcell:hover{border-color:var(--brand)}
-.mblocks{display:flex;flex-direction:column;gap:3px;margin-top:7px}
-.mblock{font-size:10px;font-weight:600;padding:2px 6px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.mcal .mhead{display:flex;align-items:center;justify-content:space-between}
+.mcal .mtot{font-size:10.5px;font-weight:700;color:var(--ink2);font-variant-numeric:tabular-nums}
+.mblocks{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.mblock{font-size:11px;padding:4px 7px;border-radius:6px;overflow:hidden;cursor:pointer;line-height:1.25}
+.mblock b{display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mblock span{display:block;font-weight:500;font-size:10px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mblock.day{background:#eef0ff;color:#4338ca} .mblock.eve{background:#fff2e2;color:#b06a12}
-.mblock:hover{filter:brightness(.95)}
-.mmore{font-size:10px;color:var(--ink3);font-weight:600;padding:1px 6px}
+.mblock:hover{filter:brightness(.96)}
+.mmore{font-size:10.5px;color:var(--ink3);font-weight:600;padding:1px 6px}
+html.dark .mblock.day{background:#23264a;color:#c7ccff} html.dark .mblock.eve{background:#3a2a12;color:#f0c58a}
 @media(max-width:760px){.mcal{gap:4px}.mcal .cell{min-height:64px;padding:6px}.mcal .cell .st{font-size:10px}}
 
 /* field */

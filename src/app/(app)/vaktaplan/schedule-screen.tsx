@@ -17,6 +17,7 @@ type ShiftDef = { l: string; s: string; h: number; c: "day" | "eve" | "off" };
 type ShiftType = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
 type AiItem = { kind: "good" | "info" | "warn" | "bad"; title: string; detail: string; tag: string };
 type AiProposal = { summary: string; items: AiItem[]; laborPct: string; live: boolean; error?: string };
+type MonthBlock = { name: string; time: string; hrs: number; type: string };
 
 const COST_HR = 3752, BASE_HRS = 116;
 const SH: Record<string, ShiftDef> = {
@@ -92,7 +93,8 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
   const [sel, setSel] = useState<{ r: number; c: number }>({ r: 0, c: 0 });
   const [monthShifts, setMonthShifts] = useState<Record<string, { first: string; start: string; end: string }[]>>({});
   const [drag, setDrag] = useState<{ r: number; c: number } | null>(null);
-  const [clip, setClip] = useState<string | null>(null);
+  // Copied shift: code + real times, so pasting preserves them and saves.
+  const [clip, setClip] = useState<{ code: string; start?: string; end?: string } | null>(null);
   const [modal, setModal] = useState<null | "types" | "addEmp" | "shift" | "ai" | "aiResult" | "staff">(null);
   const [targets, setTargets] = useState<number[]>(initial?.targets?.length ? initial.targets : []);
   const [aiQuery, setAiQuery] = useState("");
@@ -352,8 +354,14 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
   }
   function cellClick(r: number, c: number) {
     if (clip !== null) {
-      setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = clip; return ng; });
-      toast("Vakt límd");
+      setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = clip.code; return ng; });
+      if (clip.code !== "off" && clip.start && clip.end) {
+        setCellTimes((m) => ({ ...m, [ckey(r, c)]: { start: clip.start!, end: clip.end! } }));
+        if (liveCompany) void saveShift({ employeeName: emp[r][1], date: fmtISO(weekDays[c]), startTime: clip.start, endTime: clip.end, shiftTypeName: "" });
+      } else if (clip.code !== "off") {
+        setCellTimes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
+      }
+      toast(t("Vakt límd"));
       return;
     }
     setSel({ r, c });
@@ -422,10 +430,10 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
   function monthBlocks(iso: string, wd: number) {
     if (liveCompany) {
       return (monthShifts[iso] ?? []).slice().sort((a, b) => a.start.localeCompare(b.start))
-        .map((s) => ({ i: s.first.slice(0, 2).toUpperCase(), l: `${s.start.slice(0, 2)}–${s.end.slice(0, 2)}`, type: SH[codeForStart(s.start)].c }));
+        .map((s) => ({ name: s.first, time: `${s.start.slice(0, 5)}–${s.end.slice(0, 5)}`, hrs: hrsBetween(s.start, s.end), type: SH[codeForStart(s.start)].c }));
     }
-    const out: { i: string; l: string; type: string }[] = [];
-    vis.forEach((r) => { const s = grid[r]?.[wd]; if (s && s !== "off") out.push({ i: emp[r][0], l: cellLabel(r, wd, s), type: SH[s].c }); });
+    const out: MonthBlock[] = [];
+    vis.forEach((r) => { const s = grid[r]?.[wd]; if (s && s !== "off") { const tt = timeOf(r, wd); out.push({ name: emp[r][1], time: tt ? `${tt.start}–${tt.end}` : SH[s].l, hrs: cellHrs(r, wd, s), type: SH[s].c }); } });
     return out;
   }
 
@@ -527,7 +535,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
 
       {clip !== null && (
         <div id="pastebar" style={{ display: "flex" }}>
-          <span className="pbtxt"><b>{t("Líma-hamur:")}</b> {t("smelltu á reiti til að líma")} {clip !== "off" ? `„${SH[clip].l}"` : t("frí")}</span>
+          <span className="pbtxt"><b>{t("Líma-hamur:")}</b> {t("smelltu á reiti til að líma")} {clip.code !== "off" ? `„${clip.start && clip.end ? `${clip.start}–${clip.end}` : SH[clip.code].l}"` : t("frí")}</span>
           <button className="btn ghost sm" onClick={() => setClip(null)}>{t("Hætta")}</button>
         </div>
       )}
@@ -697,7 +705,7 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
       {modal === "staff" && <StaffNeedModal targets={targets} onClose={() => setModal(null)} onSave={(ts) => { setTargets(ts); setModal(null); setStaffingTargets(ts).then((r) => toast(r.ok ? "Mönnunarþörf vistuð" : (r.error ?? "Villa"))); }} />}
       {modal === "types" && <ShiftTypesModal types={types} setTypes={setTypes} onClose={() => setModal(null)} />}
       {modal === "addEmp" && <AddEmpModal pool={pool} onPick={pickEmp} onClose={() => setModal(null)} />}
-      {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { setClip("D"); setModal(null); toast("Vakt afrituð — smelltu á reiti til að líma"); }} onTypes={() => setModal("types")} />}
+      {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
       {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} />}
       {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={async () => { setModal(null); await publish(); }} />}
     </>
@@ -734,7 +742,7 @@ function DayView({ day, col, rows, onAdd }: { day: Date; col: number; rows: DayR
   );
 }
 
-function MonthView({ monthDate, todayISO, blocks, onOpenDay }: { monthDate: Date; todayISO: string; blocks: (iso: string, wd: number) => { i: string; l: string; type: string }[]; onOpenDay: (d: Date) => void }) {
+function MonthView({ monthDate, todayISO, blocks, onOpenDay }: { monthDate: Date; todayISO: string; blocks: (iso: string, wd: number) => MonthBlock[]; onOpenDay: (d: Date) => void }) {
   const { t } = useLang();
   const hd = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
   const y = monthDate.getFullYear(), m = monthDate.getMonth();
@@ -755,12 +763,14 @@ function MonthView({ monthDate, todayISO, blocks, onOpenDay }: { monthDate: Date
               const sh = blocks(fmtISO(date), wd);
               return (
                 <div key={d} className={`cell mcell ${we ? "we" : ""} ${tod ? "tod" : ""}`} onClick={() => onOpenDay(date)}>
-                  <div className="dd">{d}</div>
+                  <div className="mhead"><span className="dd">{d}</span>{sh.length > 0 && <span className="mtot">{dec1(sh.reduce((a, s) => a + s.hrs, 0))} {t("klst")}</span>}</div>
                   <div className="mblocks">
-                    {sh.slice(0, 3).map((x, i) => (
-                      <div key={i} className={`mblock ${x.type}`} onClick={(e) => { e.stopPropagation(); onOpenDay(date); }}>{x.i} {x.l}</div>
+                    {sh.slice(0, 4).map((x, i) => (
+                      <div key={i} className={`mblock ${x.type}`} onClick={(e) => { e.stopPropagation(); onOpenDay(date); }} title={`${x.name} · ${x.time}`}>
+                        <b>{x.name}</b><span>{x.time} · {dec1(x.hrs)}{t("klst-stutt")}</span>
+                      </div>
                     ))}
-                    {sh.length > 3 && <div className="mmore">+{sh.length - 3} {t("fleiri")}</div>}
+                    {sh.length > 4 && <div className="mmore">+{sh.length - 4} {t("fleiri")}</div>}
                   </div>
                 </div>
               );
