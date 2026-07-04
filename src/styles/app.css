@@ -607,3 +607,13 @@ button .spin{width:14px;height:14px;border-width:2px;border-color:currentColor;b
 @keyframes vspin{to{transform:rotate(360deg)}}
 .btn[disabled],button[disabled]{opacity:.65;cursor:default}
 .is-busy svg{display:none}
+
+/* wallet "add to" buttons */
+.wallet-btn{display:flex;align-items:center;gap:9px;padding:11px 16px;border-radius:11px;font-size:14px;font-weight:600;cursor:pointer;border:none;transition:.12s}
+.wallet-btn.apple{background:#000;color:#fff}
+.wallet-btn.apple:hover{background:#222}
+.wallet-btn.google{background:#fff;color:#3c4043;border:1px solid var(--line)}
+.wallet-btn.google:hover{background:var(--line2)}
+.wallet-btn .wsoon{margin-left:auto;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.18)}
+.wallet-btn.google .wsoon{background:var(--line2);color:var(--ink3)}
+html.dark .wallet-btn.google{background:var(--panel);color:var(--ink)}

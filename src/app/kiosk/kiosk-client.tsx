@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { kioskPunch, kioskPunchByPin, type KioskData } from "./actions";
+import { kioskPunch, kioskPunchByPin, kioskPunchByToken, type KioskData } from "./actions";
 
 type Emp = { id: string; initials: string; name: string; color: string };
 
@@ -41,6 +41,7 @@ const STR = {
     at: (tm: string, into: boolean) => `kl. ${tm}${into ? " · Góða vakt!" : " · Takk fyrir daginn!"}`,
     notFound: "Kiosk fannst ekki", notFoundSub: "Þetta fyrirtæki fannst ekki. Sæktu rétta kiosk-slóð í Stillingum → Kiosk.",
     date: (d: Date) => `${WD.is[d.getDay()]} ${d.getDate()}. ${MO.is[d.getMonth()]} ${d.getFullYear()}`,
+    scanBtn: "Skanna skírteini", scanTitle: "Sýndu QR-skírteinið fyrir myndavélina", scanUnsupported: "Þessi vafri styður ekki QR-skönnun — notaðu PIN.", scanNoCam: "Ekki tókst að opna myndavél.",
   },
   en: {
     title: "Time clock", tap: "Tap your name to clock in or out.",
@@ -55,6 +56,7 @@ const STR = {
     at: (tm: string, into: boolean) => `at ${tm}${into ? " · Have a great shift!" : " · Thanks for today!"}`,
     notFound: "Kiosk not found", notFoundSub: "This company wasn't found. Get the correct kiosk link in Settings → Kiosk.",
     date: (d: Date) => `${WD.en[d.getDay()]} ${d.getDate()} ${MO.en[d.getMonth()]} ${d.getFullYear()}`,
+    scanBtn: "Scan ID card", scanTitle: "Show the QR ID card to the camera", scanUnsupported: "This browser doesn't support QR scanning — use a PIN.", scanNoCam: "Couldn't open the camera.",
   },
 } as const;
 
@@ -80,6 +82,9 @@ export default function KioskClient({ companyId, data }: { companyId: string | n
   const [lang, setLang] = useState<Lang>("is");
   const s = STR[lang];
   const flashT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [scan, setScan] = useState(false);
+  const [scanErr, setScanErr] = useState("");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("vakto-kiosk-lang");
@@ -119,6 +124,36 @@ export default function KioskClient({ companyId, data }: { companyId: string | n
     }
   }
   function nowHM() { const t = new Date(); return `${z(t.getHours())}:${z(t.getMinutes())}`; }
+
+  // QR scan — read the staff Wallet pass with the camera (BarcodeDetector) and punch.
+  useEffect(() => {
+    if (!scan) return;
+    let stream: MediaStream | null = null, raf = 0, done = false;
+    const BD = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> } }).BarcodeDetector;
+    if (!BD) { setScanErr(s.scanUnsupported); return; }
+    const detector = new BD({ formats: ["qr_code"] });
+    (async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
+      } catch { setScanErr(s.scanNoCam); return; }
+      const tick = async () => {
+        if (done || !videoRef.current) return;
+        try {
+          const codes = await detector.detect(videoRef.current);
+          if (codes[0]?.rawValue) {
+            done = true;
+            const res = await kioskPunchByToken(companyId!, codes[0].rawValue);
+            if (res.ok) { setScan(false); finish({ id: res.name ?? "", initials: "", name: res.name ?? "", color: "#e9700f" }, !!res.into, res.time ?? nowHM()); return; }
+            setScanErr(res.error ?? s.err); done = false;
+          }
+        } catch { /* keep scanning */ }
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    })();
+    return () => { done = true; cancelAnimationFrame(raf); stream?.getTracks().forEach((t) => t.stop()); };
+  }, [scan]); // eslint-disable-line react-hooks/exhaustive-deps
   function finish(e: Emp, into: boolean, tm: string) {
     if (!real) void kioskPunch(e.name, into);
     setOn((s) => ({ ...s, [e.id]: into }));
@@ -173,6 +208,10 @@ export default function KioskClient({ companyId, data }: { companyId: string | n
       <div className="wrap">
         <h1>{s.title}</h1>
         <div className="sub">{s.tap}</div>
+        {real && <button className="scanbtn" onClick={() => { setScanErr(""); setScan(true); }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7V5a1 1 0 0 1 1-1h2M4 17v2a1 1 0 0 0 1 1h2M20 7V5a1 1 0 0 0-1-1h-2M20 17v2a1 1 0 0 1-1 1h-2M4 12h16" /></svg>
+          {s.scanBtn}
+        </button>}
         {real && emps.length === 0 && (
           <div className="sub" style={{ marginTop: 20 }}>{s.noStaff}</div>
         )}
@@ -215,6 +254,22 @@ export default function KioskClient({ companyId, data }: { companyId: string | n
               {real
                 ? s.hintReal
                 : <>{s.demoFor(cur.name.split(" ")[0])}<b>{DEMO_PIN[cur.name]}</b></>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {scan && (
+        <div className="ov show" onClick={(e) => e.target === e.currentTarget && setScan(false)}>
+          <div className="card" style={{ maxWidth: 420 }}>
+            <div className="nm" style={{ marginBottom: 12 }}>{s.scanTitle}</div>
+            <div style={{ position: "relative", borderRadius: 14, overflow: "hidden", background: "#000", aspectRatio: "1" }}>
+              <video ref={videoRef} playsInline muted style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <div style={{ position: "absolute", inset: "18%", border: "3px solid rgba(255,255,255,.85)", borderRadius: 16 }} />
+            </div>
+            {scanErr && <div className="pin-err" style={{ marginTop: 10 }}>{scanErr}</div>}
+            <div className="pad" style={{ gridTemplateColumns: "1fr", marginTop: 14 }}>
+              <button className="muted" onClick={() => setScan(false)}>{s.cancel}</button>
             </div>
           </div>
         </div>

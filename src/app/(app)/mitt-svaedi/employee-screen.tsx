@@ -12,6 +12,7 @@ import type { StaffCard } from "@/lib/mycard.server";
 import { resolvePerms, type Perms } from "@/lib/permissions";
 import PushToggle from "@/components/app/push-toggle";
 import { AsyncButton } from "@/components/app/async-button";
+import { WalletButtons } from "@/components/app/wallet-buttons";
 
 type ReqKind = "leave" | "avail" | "swap" | "pickup";
 const IC = (d: string) => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">{d.split("|").map((p, i) => <path key={i} d={p} />)}</svg>;
@@ -353,6 +354,7 @@ function Profile({ photo, setPhoto }: { photo: string | null; setPhoto: (s: stri
         <div className="emp-fld"><label>{t("Kjarasamningur")}</label><select><option>Efling</option><option>VR</option><option>SGS</option></select></div>
         <button className="btn sm" style={{ width: "100%", justifyContent: "center" }} disabled={busy} onClick={save}>{t("Vista breytingar")}</button>
       </div></div>
+      <WalletButtons />
     </div>
   );
 }

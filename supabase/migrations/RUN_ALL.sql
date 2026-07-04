@@ -798,6 +798,10 @@ alter table employees add column if not exists orlof jsonb;
 -- ===== 0022 — company country (gates Icelandic-specific modules) =====
 alter table companies add column if not exists country text default 'IS';
 
+-- ===== 0024 — per-employee clock token (Wallet ID card QR) =====
+alter table employees add column if not exists clock_token text unique;
+update employees set clock_token = replace(gen_random_uuid()::text, '-', '') where clock_token is null;
+
 -- ===== 0023 — multi-company memberships (switch between companies) =====
 create table if not exists company_members (
   user_id uuid not null references auth.users(id) on delete cascade,

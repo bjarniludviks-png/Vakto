@@ -69,3 +69,7 @@ body{font-family:"General Sans","Plus Jakarta Sans",ui-sans-serif,system-ui,-app
 .flash .fs{font-size:14px;color:var(--ink2);margin-top:6px}
 .foot{text-align:center;color:var(--ink3);font-size:12.5px;padding:18px;border-top:1px solid var(--line);background:var(--panel)}
 @media(max-width:560px){.grid{grid-template-columns:repeat(2,1fr)}.clock .t{font-size:18px}}
+
+.scanbtn{display:inline-flex;align-items:center;gap:8px;margin-top:16px;background:var(--brand);color:#fff;font-size:15px;font-weight:600;padding:11px 20px;border-radius:12px;border:none;cursor:pointer}
+.scanbtn svg{width:19px;height:19px}
+.scanbtn:hover{background:var(--brand-deep,#cf5f0c)}

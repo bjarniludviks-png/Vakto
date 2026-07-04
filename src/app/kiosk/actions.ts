@@ -77,6 +77,35 @@ export async function kioskPunchByPin(
   }
 }
 
+/** Punch by scanning the staff Wallet QR (clock_token). Company-scoped. */
+export async function kioskPunchByToken(
+  companyId: string, token: string,
+): Promise<PunchResult & { into?: boolean; time?: string; name?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const admin = createAdminClient();
+    const { data: emp, error: e0 } = await admin
+      .from("employees").select("id, full_name").eq("clock_token", token.trim()).eq("company_id", companyId).maybeSingle();
+    if (e0) return { ok: false, error: "Keyrðu migration 0024" };
+    if (!emp) return { ok: false, error: "Skírteini fannst ekki" };
+    const name = (emp.full_name as string)?.split(/\s+/)[0] ?? "";
+    const { data: open } = await admin
+      .from("punches").select("id").eq("employee_id", emp.id)
+      .is("clock_out", null).order("clock_in", { ascending: false }).limit(1).maybeSingle();
+    const now = new Date().toISOString();
+    if (open) {
+      const { error } = await admin.from("punches").update({ clock_out: now }).eq("id", open.id);
+      if (error) return { ok: false, error: error.message };
+      return { ok: true, into: false, time: hm(now), name };
+    }
+    const { error } = await admin.from("punches").insert({ company_id: companyId, employee_id: emp.id, clock_in: now, source: "kiosk" });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, into: true, time: hm(now), name };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /** Legacy demo punch (name-based, Kaffi Krónan) — used only in the unbound demo kiosk. */
 export async function kioskPunch(fullName: string, into: boolean): Promise<PunchResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
