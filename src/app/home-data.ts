@@ -88,11 +88,11 @@ export const SHOWCASE: Record<Lang, Showcase[]> = {
     { tab: "Skírteini", title: "Stafrænt starfsmannaskírteini", desc: "Hver starfsmaður fær skírteini í Apple Wallet og Google Wallet með mynd, stöðu og QR-kóða. Skannaðu kóðann á stimpilklukkunni til að stimpla inn eða út — engir PIN-kóðar, engin lyklaborð.", img: "/showcase/skirteini.png" },
   ],
   en: [
-    { tab: "Scheduling", title: "Build a schedule in seconds", desc: "Drag shifts, copy a whole week, and publish in one click. See hours and estimated labor cost per employee live — and let AI suggest staffing.", img: "/showcase/vaktaplan.png" },
-    { tab: "Time tracking", title: "Attendance in real time", desc: "Staff clock in via the app, GPS or a shared tablet. See who's on shift now, approve hours in one click, and everything flows straight into payroll.", img: "/showcase/timaskraning.png" },
-    { tab: "Payroll", title: "Pay by Icelandic rules", desc: "VAKTO computes regular pay, premiums, overtime and bonuses per union agreements — and exports straight to accounting (Payday, DK). No manual work, no errors.", img: "/showcase/launakeyrsla.png" },
-    { tab: "Dashboard", title: "Real numbers and deviations in one place", desc: "Planned vs. actual hours, labor as a % of revenue, and what the deviation is costing you — all live as staff clock in and out. Spot drift from plan before month-end.", img: "/showcase/maelabord.png" },
-    { tab: "Staff ID", title: "Digital staff ID card", desc: "Every employee gets an ID card in Apple Wallet and Google Wallet with photo, role and a QR code. Scan it at the time clock to punch in or out — no PINs, no keypads.", img: "/showcase/skirteini.png" },
+    { tab: "Scheduling", title: "Build a schedule in seconds", desc: "Drag shifts, copy a whole week, and publish in one click. See hours and estimated labor cost per employee live — and let AI suggest staffing.", img: "/showcase/en/vaktaplan.png" },
+    { tab: "Time tracking", title: "Attendance in real time", desc: "Staff clock in via the app, GPS or a shared tablet. See who's on shift now, approve hours in one click, and everything flows straight into payroll.", img: "/showcase/en/timaskraning.png" },
+    { tab: "Payroll", title: "Pay by Icelandic rules", desc: "VAKTO computes regular pay, premiums, overtime and bonuses per union agreements — and exports straight to accounting (Payday, DK). No manual work, no errors.", img: "/showcase/en/launakeyrsla.png" },
+    { tab: "Dashboard", title: "Real numbers and deviations in one place", desc: "Planned vs. actual hours, labor as a % of revenue, and what the deviation is costing you — all live as staff clock in and out. Spot drift from plan before month-end.", img: "/showcase/en/maelabord.png" },
+    { tab: "Staff ID", title: "Digital staff ID card", desc: "Every employee gets an ID card in Apple Wallet and Google Wallet with photo, role and a QR code. Scan it at the time clock to punch in or out — no PINs, no keypads.", img: "/showcase/en/skirteini.png" },
   ],
 };
 export const SHOWCASE_HEAD: Record<Lang, { eyebrow: string; title: string; sub: string }> = {

@@ -29,11 +29,15 @@ const FeatIcon = () => (
 );
 
 export default function Home() {
-  const [lang, setLang] = useState<Lang>("is");
+  const [lang, setLangState] = useState<Lang>("is");
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showTab, setShowTab] = useState(0);
   const t = I18N[lang];
+  // Persist the choice so the login page and app shell open in the same language.
+  const setLang = (l: Lang) => { setLangState(l); try { localStorage.setItem("vakto-lang", l); } catch {} };
+  const loginHref = `/login?lang=${lang}`;
+  const tryHref = lang === "en" ? "/nyskraning?lang=en" : "/nyskraning";
 
   return (
     <>
@@ -51,8 +55,8 @@ export default function Home() {
               <button className={lang === "is" ? "on" : ""} onClick={() => setLang("is")}>IS</button>
               <button className={lang === "en" ? "on" : ""} onClick={() => setLang("en")}>EN</button>
             </div>
-            <a className="btn btn-gho" href="/login">{t.nav_login}</a>
-            <a className="btn btn-pri" href="/nyskraning">{t.nav_try}</a>
+            <a className="btn btn-gho" href={loginHref}>{t.nav_login}</a>
+            <a className="btn btn-pri" href={tryHref}>{t.nav_try}</a>
           </div>
           <button className="nav-burger" aria-label="Valmynd" onClick={() => setMenuOpen((o) => !o)}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -66,8 +70,8 @@ export default function Home() {
             <a href="#ferli" onClick={() => setMenuOpen(false)}>{t.nav_how}</a>
             <a href="#tengingar" onClick={() => setMenuOpen(false)}>{t.nav_integrations}</a>
             <a href="#verd" onClick={() => setMenuOpen(false)}>{t.nav_pricing}</a>
-            <a className="btn btn-gho" href="/login">{t.nav_login}</a>
-            <a className="btn btn-pri" href="/nyskraning" onClick={() => setMenuOpen(false)}>{t.nav_try}</a>
+            <a className="btn btn-gho" href={loginHref}>{t.nav_login}</a>
+            <a className="btn btn-pri" href={tryHref} onClick={() => setMenuOpen(false)}>{t.nav_try}</a>
           </div>
         )}
       </nav>
@@ -78,7 +82,7 @@ export default function Home() {
           <h1 dangerouslySetInnerHTML={{ __html: t.hero_title }} />
           <p className="sub">{t.hero_sub}</p>
           <div className="hero-cta">
-            <a className="btn btn-pri btn-lg" href="/nyskraning">{t.hero_cta1}</a>
+            <a className="btn btn-pri btn-lg" href={tryHref}>{t.hero_cta1}</a>
             <a className="btn btn-gho btn-lg" href="#">{t.hero_cta2}</a>
           </div>
           <p className="hero-note">{t.hero_note}</p>
@@ -142,7 +146,7 @@ export default function Home() {
             <div className="fshow-txt">
               <h3>{SHOWCASE[lang][showTab].title}</h3>
               <p>{SHOWCASE[lang][showTab].desc}</p>
-              <a className="btn btn-pri" href="/nyskraning">{t.hero_cta1}</a>
+              <a className="btn btn-pri" href={tryHref}>{t.hero_cta1}</a>
             </div>
             <div className="fshow-img">
               <img src={SHOWCASE[lang][showTab].img} alt={SHOWCASE[lang][showTab].title} loading="lazy" />
@@ -211,7 +215,7 @@ export default function Home() {
                 {p.soon ? (
                   <span className="btn btn-gho" style={{ marginTop: "auto", justifyContent: "center", opacity: .55, cursor: "default" }}>{SOON[lang]}</span>
                 ) : (
-                  <a className={`btn ${p.pop ? "btn-pri" : "btn-gho"}`} style={{ marginTop: "auto", justifyContent: "center" }} href="/nyskraning">{PCTA[lang]}</a>
+                  <a className={`btn ${p.pop ? "btn-pri" : "btn-gho"}`} style={{ marginTop: "auto", justifyContent: "center" }} href={tryHref}>{PCTA[lang]}</a>
                 )}
               </div>
             );
@@ -236,7 +240,7 @@ export default function Home() {
         <p>{t.cta_sub}</p>
         <div className="hero-cta" style={{ marginTop: 28 }}>
           <a className="btn btn-lg" style={{ background: "#fff", color: "var(--green)" }} href="#">{t.cta_btn1}</a>
-          <a className="btn btn-lg" style={{ background: "rgba(255,255,255,.16)", color: "#fff", borderColor: "rgba(255,255,255,.32)" }} href="/nyskraning">{t.cta_btn2}</a>
+          <a className="btn btn-lg" style={{ background: "rgba(255,255,255,.16)", color: "#fff", borderColor: "rgba(255,255,255,.32)" }} href={tryHref}>{t.cta_btn2}</a>
         </div>
       </div></section>
 

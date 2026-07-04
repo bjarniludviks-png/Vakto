@@ -1,62 +1,51 @@
 import type { Metadata } from "next";
 import "./login.css";
 import LoginForm from "./login-form";
+import { LOGIN_I18N, pickLang } from "./login-i18n";
 
 export const metadata: Metadata = {
   title: "VAKTO — Skrá inn",
 };
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ lang?: string | string[] }>;
+}) {
+  const sp = await searchParams;
+  const lang = pickLang(sp.lang);
+  const s = LOGIN_I18N[lang];
+
   return (
     <div className="wrap">
       <div className="left">
-        <LoginForm />
+        <LoginForm lang={lang} />
       </div>
 
       <div className="right">
-        <div className="tag">Vinnuafls-arðsemi fyrir fyrirtæki</div>
+        <div className="tag">{s.tag}</div>
         <div className="mid">
           <h2>
-            Vaktaplan <span className="arr">→</span> mæting{" "}
-            <span className="arr">→</span> laun <span className="arr">→</span>{" "}
-            arðsemi.
+            {s.h2[0]} <span className="arr">→</span> {s.h2[1]}{" "}
+            <span className="arr">→</span> {s.h2[2]} <span className="arr">→</span>{" "}
+            {s.h2[3]}
           </h2>
-          <p className="desc">
-            Vakto sýnir þér laun sem hlutfall af veltu í rauntíma, ber áætlað
-            vaktaplan saman við raunverulega tíma, og hjálpar þér að halda
-            launakostnaði í skefjum — áður en mánuðurinn er búinn.
-          </p>
+          <p className="desc">{s.desc}</p>
           <div className="bullets">
-            <div className="bullet">
-              <span className="ck">
-                <svg viewBox="0 0 24 24" fill="none">
-                  <path d="M5 12.5l4 4 10-10" />
-                </svg>
-              </span>{" "}
-              Laun vs velta í rauntíma
-            </div>
-            <div className="bullet">
-              <span className="ck">
-                <svg viewBox="0 0 24 24" fill="none">
-                  <path d="M5 12.5l4 4 10-10" />
-                </svg>
-              </span>{" "}
-              Íslensk launalógík — kjarasamningar, staðgreiðsla, tryggingagjald
-            </div>
-            <div className="bullet">
-              <span className="ck">
-                <svg viewBox="0 0 24 24" fill="none">
-                  <path d="M5 12.5l4 4 10-10" />
-                </svg>
-              </span>{" "}
-              Vaktaplan, stimpilklukka og starfsmannaapp á einum stað
-            </div>
+            {s.bullets.map((b, i) => (
+              <div className="bullet" key={i}>
+                <span className="ck">
+                  <svg viewBox="0 0 24 24" fill="none">
+                    <path d="M5 12.5l4 4 10-10" />
+                  </svg>
+                </span>{" "}
+                {b}
+              </div>
+            ))}
           </div>
         </div>
         <div className="quote">
-          „Vakto sýndi okkur strax hvar launin voru að éta framlegðina — við
-          lækkuðum launahlutfallið um 4% á tveimur mánuðum.&quot; —
-          veitingahúsaeigandi
+          {s.quote} {s.quoteBy}
         </div>
       </div>
     </div>
