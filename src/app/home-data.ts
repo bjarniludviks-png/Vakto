@@ -84,18 +84,20 @@ export const SHOWCASE: Record<Lang, Showcase[]> = {
     { tab: "Vaktaplan", title: "Vaktaplan á nokkrum sekúndum", desc: "Dragðu vaktir, afritaðu heila viku og birtu með einum smelli. Sjáðu tíma og áætlaðan launakostnað per starfsmann jafnóðum — og láttu gervigreind stinga upp á mönnun.", img: "/showcase/vaktaplan.png" },
     { tab: "Tímaskráning", title: "Mæting í rauntíma", desc: "Starfsfólk stimplar sig með appinu, GPS eða á sameiginlegri spjaldtölvu. Þú sérð hverjir eru á vakt núna, samþykkir tíma með einum smelli og allt rennur beint í launin.", img: "/showcase/timaskraning.png" },
     { tab: "Launakeyrsla", title: "Laun eftir íslenskum reglum", desc: "VAKTO reiknar dagvinnu, álög, yfirvinnu og uppbætur eftir kjarasamningum — og flytur beint í bókhaldið (Payday, DK). Engin handavinna, engar villur.", img: "/showcase/launakeyrsla.png" },
-    { tab: "Arðsemi", title: "Laun sem % af veltu — lifandi", desc: "Tengdu sölukerfið og sjáðu launakostnað á móti veltu í rauntíma, litakóðað. Frávik, yfirvinna og mannaflaþörf blasa við áður en mánuðurinn er búinn.", img: "/showcase/ardsemi.png" },
+    { tab: "Mælaborð", title: "Rauntölur og frávik á einum stað", desc: "Áætlaðir tímar á móti unnum, launahlutfall af veltu og hvað frávikið er að kosta — allt lifandi eftir því sem stimplað er inn og út. Sérðu frávik frá plani áður en mánuðurinn er búinn.", img: "/showcase/maelabord.png" },
+    { tab: "Skírteini", title: "Stafrænt starfsmannaskírteini", desc: "Hver starfsmaður fær skírteini í Apple Wallet og Google Wallet með mynd, stöðu og QR-kóða. Skannaðu kóðann á stimpilklukkunni til að stimpla inn eða út — engir PIN-kóðar, engin lyklaborð.", img: "/showcase/skirteini.png" },
   ],
   en: [
     { tab: "Scheduling", title: "Build a schedule in seconds", desc: "Drag shifts, copy a whole week, and publish in one click. See hours and estimated labor cost per employee live — and let AI suggest staffing.", img: "/showcase/vaktaplan.png" },
     { tab: "Time tracking", title: "Attendance in real time", desc: "Staff clock in via the app, GPS or a shared tablet. See who's on shift now, approve hours in one click, and everything flows straight into payroll.", img: "/showcase/timaskraning.png" },
     { tab: "Payroll", title: "Pay by Icelandic rules", desc: "VAKTO computes regular pay, premiums, overtime and bonuses per union agreements — and exports straight to accounting (Payday, DK). No manual work, no errors.", img: "/showcase/launakeyrsla.png" },
-    { tab: "Profit", title: "Labor as % of revenue — live", desc: "Connect your POS and watch labor cost against revenue in real time, color-coded. Deviations, overtime and staffing needs are clear before month-end.", img: "/showcase/ardsemi.png" },
+    { tab: "Dashboard", title: "Real numbers and deviations in one place", desc: "Planned vs. actual hours, labor as a % of revenue, and what the deviation is costing you — all live as staff clock in and out. Spot drift from plan before month-end.", img: "/showcase/maelabord.png" },
+    { tab: "Staff ID", title: "Digital staff ID card", desc: "Every employee gets an ID card in Apple Wallet and Google Wallet with photo, role and a QR code. Scan it at the time clock to punch in or out — no PINs, no keypads.", img: "/showcase/skirteini.png" },
   ],
 };
 export const SHOWCASE_HEAD: Record<Lang, { eyebrow: string; title: string; sub: string }> = {
-  is: { eyebrow: "Skoðaðu kerfið", title: "Sjáðu VAKTO í verki", sub: "Fjórar kjarnaeiningar — smelltu til að skoða hverja." },
-  en: { eyebrow: "See it in action", title: "See VAKTO at work", sub: "Four core modules — click to explore each." },
+  is: { eyebrow: "Skoðaðu kerfið", title: "Sjáðu VAKTO í verki", sub: "Smelltu á flipana til að skoða hverja einingu." },
+  en: { eyebrow: "See it in action", title: "See VAKTO at work", sub: "Click the tabs to explore each module." },
 };
 
 export const FLOW: Record<Lang, [string, string][]> = {

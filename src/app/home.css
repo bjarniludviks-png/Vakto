@@ -130,8 +130,9 @@ h1,h2,h3{letter-spacing:-.03em;line-height:1.08;font-weight:700}
 
 /* tabbed feature showcase (real screenshots) */
 .fshow{margin-top:36px}
-.fshow-tabs{display:flex;gap:4px;justify-content:center;border-bottom:1px solid #e6e6ea;margin-bottom:30px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.fshow-tab{padding:12px 20px;font-size:16px;font-weight:600;color:#5f6470;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;white-space:nowrap;transition:.15s}
+.fshow-tabs{display:flex;flex-wrap:nowrap;gap:4px;justify-content:center;border-bottom:1px solid #e6e6ea;margin-bottom:30px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.fshow-tabs::-webkit-scrollbar{display:none}
+.fshow-tab{flex-shrink:0;padding:12px 20px;font-size:16px;font-weight:600;color:#5f6470;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;white-space:nowrap;transition:.15s}
 .fshow-tab:hover{color:#1a1a1f}
 .fshow-tab.on{color:#e9700f;border-bottom-color:#e9700f}
 .fshow-body{display:grid;grid-template-columns:0.85fr 1.15fr;gap:44px;align-items:center}
