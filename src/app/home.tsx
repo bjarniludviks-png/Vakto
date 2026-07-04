@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import {
-  I18N, FEAT, FLOW, PRICE, FAQ, PUNIT, POP, PCTA, CUSTOM, FREE, SOON, type Lang,
+  I18N, FEAT, FLOW, PRICE, FAQ, PUNIT, POP, PCTA, CUSTOM, FREE, SOON, SHOWCASE, SHOWCASE_HEAD, type Lang,
 } from "./home-data";
 
 function LogoSvg({ w = 26 }: { w?: number }) {
@@ -32,6 +32,7 @@ export default function Home() {
   const [lang, setLang] = useState<Lang>("is");
   const [faqOpen, setFaqOpen] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showTab, setShowTab] = useState(0);
   const t = I18N[lang];
 
   return (
@@ -121,6 +122,32 @@ export default function Home() {
         <div className="logos">
           <span>Kaffi Krónan</span><span>Hótel Umi</span><span>Sushi Co</span>
           <span>Norður Bakarí</span><span>Bílaverk</span><span>Fjörukráin</span>
+        </div>
+      </div></section>
+
+      {/* ---------- tabbed feature showcase (real screenshots) ---------- */}
+      <section className="sec"><div className="wrap">
+        <div className="sh">
+          <span className="eyebrow">{SHOWCASE_HEAD[lang].eyebrow}</span>
+          <h2 style={{ marginTop: 14 }}>{SHOWCASE_HEAD[lang].title}</h2>
+          <p>{SHOWCASE_HEAD[lang].sub}</p>
+        </div>
+        <div className="fshow">
+          <div className="fshow-tabs">
+            {SHOWCASE[lang].map((s, i) => (
+              <button key={i} className={`fshow-tab${showTab === i ? " on" : ""}`} onClick={() => setShowTab(i)}>{s.tab}</button>
+            ))}
+          </div>
+          <div className="fshow-body">
+            <div className="fshow-txt">
+              <h3>{SHOWCASE[lang][showTab].title}</h3>
+              <p>{SHOWCASE[lang][showTab].desc}</p>
+              <a className="btn btn-pri" href="/nyskraning">{t.hero_cta1}</a>
+            </div>
+            <div className="fshow-img">
+              <img src={SHOWCASE[lang][showTab].img} alt={SHOWCASE[lang][showTab].title} loading="lazy" />
+            </div>
+          </div>
         </div>
       </div></section>
 

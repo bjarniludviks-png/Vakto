@@ -77,6 +77,27 @@ export const FEAT: Record<Lang, [string, string][]> = {
   ],
 };
 
+// Tabbed feature showcase — [tab label, heading, description, screenshot path].
+export type Showcase = { tab: string; title: string; desc: string; img: string };
+export const SHOWCASE: Record<Lang, Showcase[]> = {
+  is: [
+    { tab: "Vaktaplan", title: "Vaktaplan á nokkrum sekúndum", desc: "Dragðu vaktir, afritaðu heila viku og birtu með einum smelli. Sjáðu tíma og áætlaðan launakostnað per starfsmann jafnóðum — og láttu gervigreind stinga upp á mönnun.", img: "/showcase/vaktaplan.png" },
+    { tab: "Tímaskráning", title: "Mæting í rauntíma", desc: "Starfsfólk stimplar sig með appinu, GPS eða á sameiginlegri spjaldtölvu. Þú sérð hverjir eru á vakt núna, samþykkir tíma með einum smelli og allt rennur beint í launin.", img: "/showcase/timaskraning.png" },
+    { tab: "Launakeyrsla", title: "Laun eftir íslenskum reglum", desc: "VAKTO reiknar dagvinnu, álög, yfirvinnu og uppbætur eftir kjarasamningum — og flytur beint í bókhaldið (Payday, DK). Engin handavinna, engar villur.", img: "/showcase/launakeyrsla.png" },
+    { tab: "Arðsemi", title: "Laun sem % af veltu — lifandi", desc: "Tengdu sölukerfið og sjáðu launakostnað á móti veltu í rauntíma, litakóðað. Frávik, yfirvinna og mannaflaþörf blasa við áður en mánuðurinn er búinn.", img: "/showcase/ardsemi.png" },
+  ],
+  en: [
+    { tab: "Scheduling", title: "Build a schedule in seconds", desc: "Drag shifts, copy a whole week, and publish in one click. See hours and estimated labor cost per employee live — and let AI suggest staffing.", img: "/showcase/vaktaplan.png" },
+    { tab: "Time tracking", title: "Attendance in real time", desc: "Staff clock in via the app, GPS or a shared tablet. See who's on shift now, approve hours in one click, and everything flows straight into payroll.", img: "/showcase/timaskraning.png" },
+    { tab: "Payroll", title: "Pay by Icelandic rules", desc: "VAKTO computes regular pay, premiums, overtime and bonuses per union agreements — and exports straight to accounting (Payday, DK). No manual work, no errors.", img: "/showcase/launakeyrsla.png" },
+    { tab: "Profit", title: "Labor as % of revenue — live", desc: "Connect your POS and watch labor cost against revenue in real time, color-coded. Deviations, overtime and staffing needs are clear before month-end.", img: "/showcase/ardsemi.png" },
+  ],
+};
+export const SHOWCASE_HEAD: Record<Lang, { eyebrow: string; title: string; sub: string }> = {
+  is: { eyebrow: "Skoðaðu kerfið", title: "Sjáðu VAKTO í verki", sub: "Fjórar kjarnaeiningar — smelltu til að skoða hverja." },
+  en: { eyebrow: "See it in action", title: "See VAKTO at work", sub: "Four core modules — click to explore each." },
+};
+
 export const FLOW: Record<Lang, [string, string][]> = {
   is: [["Vaktaplan", "Settu upp skipulagið með AI-tillögum og birtu með einum smelli."], ["Mæting", "Starfsfólk stimplar sig inn og út; rauntölur vs. áætlun uppfærast samstundis."], ["Laun", "Kjarasamningar og álög reiknast sjálfkrafa; sendu beint í Payday."], ["Arðsemi", "Fylgstu með launahlutfallinu lifandi og berðu saman tímabil á einfaldan hátt."]],
   en: [["Schedule", "Build the schedule with smart AI recommendations and publish instantly."], ["Attendance", "Staff clock in/out; actual vs. planned data updates in real time."], ["Pay", "Union rules and premiums compile automatically; export straight to Payday."], ["Profit", "Track labor as a % of revenue dynamically and compare business periods."]],
