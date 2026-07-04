@@ -105,6 +105,43 @@ export const FLOW: Record<Lang, [string, string][]> = {
   en: [["Schedule", "Build the schedule with smart AI recommendations and publish instantly."], ["Attendance", "Staff clock in/out; actual vs. planned data updates in real time."], ["Pay", "Union rules and premiums compile automatically; export straight to Payday."], ["Profit", "Track labor as a % of revenue dynamically and compare business periods."]],
 };
 
+// ---------------------------------------------------------------------------
+// Brand logos (integration partners + customers).
+// Drop a real logo file into /public/logos/<slug>.svg (or .png) and set `img`
+// to that path — the wall then renders the real asset. Until then a tasteful
+// typographic wordmark is shown, styled per brand via `wm`.
+// ---------------------------------------------------------------------------
+export type Brand = {
+  name: string;
+  slug: string;
+  img?: string;               // e.g. "/logos/payday.svg" once the real file is added
+  wm?: {
+    case?: "lower" | "upper"; // force casing of the wordmark
+    weight?: number;          // font-weight
+    spacing?: string;         // letter-spacing
+    family?: "sans" | "serif";
+    accent?: string;          // small dot after the name (brand colour cue)
+  };
+};
+
+// What VAKTO connects to — payroll, POS and accounting.
+export const INTEGRATIONS: Brand[] = [
+  { name: "Payday",     slug: "payday",     wm: { case: "lower", weight: 700, accent: "#6c4bf4" } },
+  { name: "dk",         slug: "dk",         wm: { case: "lower", weight: 800, spacing: ".02em", accent: "#00a3ad" } },
+  { name: "Dineout",    slug: "dineout",    wm: { case: "lower", weight: 700, accent: "#e2483b" } },
+  { name: "SalesCloud", slug: "salescloud", wm: { weight: 700, accent: "#2e7cf6" } },
+  { name: "INVENTRA",   slug: "inventra",   wm: { case: "upper", weight: 700, spacing: ".08em" } },
+  { name: "Uniconta",   slug: "uniconta",   wm: { weight: 700, accent: "#0e9f6e" } },
+];
+
+// Businesses running on VAKTO (shown in the trust strip).
+export const CUSTOMERS: Brand[] = [
+  { name: "Beint úr sjó", slug: "beint-ur-sjo", wm: { family: "serif", weight: 600 } },
+  { name: "Njótum",       slug: "njotum",       wm: { weight: 700, spacing: ".02em" } },
+  { name: "Thai Keflavík", slug: "thai-keflavik", wm: { weight: 700 } },
+  { name: "RVK Asian",    slug: "rvk-asian",    wm: { case: "upper", weight: 800, spacing: ".04em" } },
+];
+
 export type Plan = { name: string; price: string; desc: string; unit?: string; features: string[]; pop: boolean; soon?: boolean };
 export const PRICE: Record<Lang, Plan[]> = {
   is: [

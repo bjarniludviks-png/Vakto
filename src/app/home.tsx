@@ -2,8 +2,31 @@
 
 import { useState } from "react";
 import {
-  I18N, FEAT, FLOW, PRICE, FAQ, PUNIT, POP, PCTA, CUSTOM, FREE, SOON, SHOWCASE, SHOWCASE_HEAD, type Lang,
+  I18N, FEAT, FLOW, PRICE, FAQ, PUNIT, POP, PCTA, CUSTOM, FREE, SOON, SHOWCASE, SHOWCASE_HEAD,
+  INTEGRATIONS, CUSTOMERS, type Brand, type Lang,
 } from "./home-data";
+
+/** A brand on the logo wall: real asset if `img` is set, else a styled wordmark. */
+function BrandLogo({ b }: { b: Brand }) {
+  if (b.img) {
+    return <img className="brandlogo-img" src={b.img} alt={b.name} loading="lazy" />;
+  }
+  const wm = b.wm ?? {};
+  const name = wm.case === "upper" ? b.name.toUpperCase() : wm.case === "lower" ? b.name.toLowerCase() : b.name;
+  return (
+    <span
+      className="brandlogo-wm"
+      style={{
+        fontWeight: wm.weight ?? 700,
+        letterSpacing: wm.spacing,
+        fontFamily: wm.family === "serif" ? "Georgia, 'Times New Roman', serif" : undefined,
+      }}
+    >
+      {name}
+      {wm.accent && <i className="brandlogo-dot" style={{ background: wm.accent }} />}
+    </span>
+  );
+}
 
 function LogoSvg({ w = 26 }: { w?: number }) {
   return (
@@ -123,9 +146,8 @@ export default function Home() {
 
       <section className="trust"><div className="wrap">
         <p>{t.trust_label}</p>
-        <div className="logos">
-          <span>Kaffi Krónan</span><span>Hótel Umi</span><span>Sushi Co</span>
-          <span>Norður Bakarí</span><span>Bílaverk</span><span>Fjörukráin</span>
+        <div className="logos brandwall">
+          {CUSTOMERS.map((b) => <BrandLogo key={b.slug} b={b} />)}
         </div>
       </div></section>
 
@@ -184,8 +206,8 @@ export default function Home() {
 
       <section className="sec" id="tengingar"><div className="wrap">
         <div className="sh"><h2>{t.int_title}</h2><p>{t.int_sub}</p></div>
-        <div className="logos" style={{ gap: 48 }}>
-          <span>Payday</span><span>DK</span><span>INVENTRA</span><span>Uniconta</span><span>H3 laun</span><span>Excel</span>
+        <div className="logos brandwall" style={{ gap: 48 }}>
+          {INTEGRATIONS.map((b) => <BrandLogo key={b.slug} b={b} />)}
         </div>
       </div></section>
 
