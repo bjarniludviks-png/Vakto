@@ -197,6 +197,7 @@ export const DICT: Dict = {
   "handvirkt": { is: "handvirkt", en: "manual" },
   "Í gær": { is: "Í gær", en: "Yesterday" },
   "Skírteini": { is: "Skírteini", en: "ID card" },
+  "Fara á forsíðu": { is: "Fara á forsíðu", en: "Go to homepage" },
   "Fast (kr/mán)": { is: "Fast (kr/mán)", en: "Fixed (kr/mo)" },
   "Per km": { is: "Per km", en: "Per km" },
   "Upphæð": { is: "Upphæð", en: "Amount" },

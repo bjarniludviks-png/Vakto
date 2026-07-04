@@ -25,6 +25,8 @@ svg{stroke-width:1.8}
 .side{width:250px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;
   position:sticky;top:0;height:100vh;flex-shrink:0;z-index:40}
 .brand{display:flex;align-items:center;gap:9px;padding:22px 22px 18px}
+.brandlink{display:flex;align-items:center;gap:9px;text-decoration:none;color:inherit;border-radius:8px;transition:opacity .12s}
+.brandlink:hover{opacity:.7}
 .brand .m{display:flex;align-items:center;justify-content:center}
 .brand .m svg{width:26px;height:26px;display:block}
 .brand b{font-size:18px;font-weight:700;letter-spacing:.04em;color:var(--ink)}

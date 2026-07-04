@@ -136,10 +136,12 @@ export default function AppShell({
         {/* ---------- sidebar ---------- */}
         <aside className={`side${navOpen ? " open" : ""}`}>
           <div className="brand">
-            <div className="m">
-              <Logo size={26} />
-            </div>
-            <b>VAKTO</b>
+            <Link href="/" className="brandlink" title={t("Fara á forsíðu")} aria-label={t("Fara á forsíðu")}>
+              <div className="m">
+                <Logo size={26} />
+              </div>
+              <b>VAKTO</b>
+            </Link>
             <button className="railtog" onClick={toggleRail} title={railed ? "Sýna hliðarstiku" : "Fela hliðarstiku"} aria-label="toggle sidebar">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 6l-6 6 6 6M21 6l-6 6 6 6" /></svg>
             </button>
