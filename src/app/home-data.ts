@@ -20,7 +20,7 @@ export const I18N = {
     show4_t: "Innra spjall fyrirtækis", show4_s: "Rásir og grúppur fyrir allt teymið — ekkert sér-spjallforrit.",
     flow_title: "Vaktaplan → Mæting → Laun → Arðsemi", flow_sub: "Heildaryfirlit yfir reksturinn — frá skipulagi til launaseðils.",
     int_title: "Óaðfinnanleg tenging við núverandi kerfi", int_sub: "Launakerfi, bókhald og sölukerfi (POS) — allt á einum stað.",
-    verd_title: "Eitt fast verð — allt innifalið", verd_sub: "29.990 kr á mánuði með VSK, 10 notendur innifaldir og 990 kr fyrir hvern til viðbótar. Engar faldar greiðslur, engin binding.",
+    verd_title: "Eitt fast verð — allt innifalið", verd_sub: "9.990 kr á mánuði með VSK, 5 notendur innifaldir og 990 kr fyrir hvern til viðbótar. Ekkert falið, engin binding.",
     faq_title: "Algengar spurningar",
     cta_title: "Sjáðu launahlutfallið í rauntíma — strax.", cta_sub: "Bókaðu 20 mínútna kynningu og við sýnum þér hversu mikið VAKTO getur sparað þér í launakostnað.", cta_btn1: "Bóka kynningu", cta_btn2: "Byrja núna",
     foot_about: "Hámarkaðu arðsemi vinnuaflsins. Vaktaplön, mætingarstjórnun, launavinnsla og rekstrargreining á einum stað.",
@@ -47,7 +47,7 @@ export const I18N = {
     show4_t: "Built-in team chat", show4_s: "Channels and groups for the whole team — no separate chat app.",
     flow_title: "Schedule → Attendance → Pay → Profit", flow_sub: "The complete operations cycle — from planning to payslip.",
     int_title: "Connects with the tools you already use", int_sub: "Seamlessly integrates with your payroll, accounting, and POS systems.",
-    verd_title: "One flat price — everything included", verd_sub: "29,990 ISK/month incl. VAT, 10 users included and 990 ISK for each additional. No hidden fees, no lock-in.",
+    verd_title: "One flat price — everything included", verd_sub: "9,990 ISK/month incl. VAT, 5 users included and 990 ISK for each additional. Nothing hidden, no lock-in.",
     faq_title: "Frequently asked questions",
     cta_title: "See labor as a percentage of revenue — instantly.", cta_sub: "Book a 20-minute demo and see exactly how much VAKTO can shave off your labor costs.", cta_btn1: "Book a demo", cta_btn2: "Get started",
     foot_about: "Maximize workforce profitability. Schedule, attendance, payroll, and real-time business intelligence in one place.",
@@ -108,30 +108,30 @@ export const FLOW: Record<Lang, [string, string][]> = {
 export type Plan = { name: string; price: string; desc: string; unit?: string; features: string[]; pop: boolean; soon?: boolean };
 export const PRICE: Record<Lang, Plan[]> = {
   is: [
-    { name: "VAKTO", price: "29.990", unit: "kr/mán · VSK innifalið", desc: "Allt innifalið — 10 notendur", features: [
-      "10 notendur innifaldir",
+    { name: "VAKTO", price: "9.990", unit: "kr/mán · VSK innifalið", desc: "Allt innifalið — 5 notendur", features: [
+      "5 notendur innifaldir",
       "+990 kr per notanda umfram",
       "Vaktaplan, tímaskráning & Kiosk",
       "Mælaborð með laun% í rauntíma",
       "Starfsmannaapp + stafrænt skírteini",
       "Spjall, skýrslur & greiningar",
       "Tenging við bókhald (Payday, DK)",
+      "Margar starfsstöðvar & félög — flakk á milli",
       "Engin binding — hættu hvenær sem er",
     ], pop: true },
-    { name: "Enterprise", price: "Sérsniðið", desc: "Keðjur & mörg félög", features: ["Margar starfsstöðvar & félög", "Flakk milli félaga", "SSO & öryggisúttektir", "Opið API & sérlausnir", "Sérstakur tengiliður"], pop: false },
   ],
   en: [
-    { name: "VAKTO", price: "29,990", unit: "ISK/mo · VAT included", desc: "Everything included — 10 users", features: [
-      "10 users included",
+    { name: "VAKTO", price: "9,990", unit: "ISK/mo · VAT included", desc: "Everything included — 5 users", features: [
+      "5 users included",
       "+990 ISK per extra user",
       "Scheduling, time tracking & Kiosk",
       "Dashboard with real-time labor %",
       "Employee app + digital ID card",
       "Chat, reports & analytics",
       "Accounting integration (Payday, DK)",
+      "Multiple locations & companies — switch freely",
       "No lock-in — cancel anytime",
     ], pop: true },
-    { name: "Enterprise", price: "Custom", desc: "Chains & multiple companies", features: ["Multi-location & companies", "Switch between companies", "SSO & advanced audit logs", "Open API & custom workflows", "Dedicated account manager"], pop: false },
   ],
 };
 export const SOON: Record<Lang, string> = { is: "Væntanlegt", en: "Coming soon" };

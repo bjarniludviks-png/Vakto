@@ -167,49 +167,6 @@ export default function Home() {
         </div>
       </div></section>
 
-      <section className="sec"><div className="wrap">
-        <div className="sh">
-          <span className="eyebrow">{t.show_eyebrow}</span>
-          <h2 style={{ marginTop: 14 }}>{t.show_title}</h2>
-          <p>{t.show_sub}</p>
-        </div>
-        <div className="showcase">
-          <div className="scard">
-            <div className="mock">
-              <div className="ringm"><span>32,1%</span></div>
-            </div>
-            <h3>{t.show1_t}</h3><p>{t.show1_s}</p>
-          </div>
-          <div className="scard">
-            <div className="mock">
-              <div className="gridm">
-                {Array.from({ length: 21 }, (_, i) => <i key={i} className={[5, 8, 11, 14, 1, 17, 9, 12].includes(i) ? "on" : (i % 5 === 0 ? "eve" : "")} />)}
-              </div>
-            </div>
-            <h3>{t.show2_t}</h3><p>{t.show2_s}</p>
-          </div>
-          <div className="scard">
-            <div className="mock">
-              <div className="cardm">
-                <div className="cardm-top"><b>VAKTO</b><span>SKÍRTEINI</span></div>
-                <div className="cardm-body"><span className="cardm-av">BA</span><div className="qrm">{Array.from({ length: 36 }, (_, i) => <i key={i} className={(i * 7) % 3 === 0 ? "on" : ""} />)}</div></div>
-              </div>
-            </div>
-            <h3>{t.show3_t}</h3><p>{t.show3_s}</p>
-          </div>
-          <div className="scard">
-            <div className="mock">
-              <div className="chatm">
-                <span className="bubm them">Munið vaktaskiptin 👍</span>
-                <span className="bubm me">Á vakt kl. 16!</span>
-                <span className="bubm them">Takk 🙌</span>
-              </div>
-            </div>
-            <h3>{t.show4_t}</h3><p>{t.show4_s}</p>
-          </div>
-        </div>
-      </div></section>
-
       <section className="sec soft" id="ferli"><div className="wrap">
         <div className="sh"><h2>{t.flow_title}</h2><p>{t.flow_sub}</p></div>
         <div className="flow">

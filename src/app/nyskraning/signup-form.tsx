@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { createOwnerAccount, setCompanyPlan } from "./actions";
 
 const PLANS = [
-  { id: "vakto", name: "VAKTO", price: "29.990", per: "kr/mán · VSK innifalið", blurb: "Allt innifalið — 10 notendur, +990 kr per notanda umfram" },
+  { id: "vakto", name: "VAKTO", price: "9.990", per: "kr/mán · VSK innifalið", blurb: "Allt innifalið — 5 notendur, +990 kr per notanda umfram" },
 ];
 
 const Bars = () => (

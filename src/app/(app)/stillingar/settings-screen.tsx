@@ -173,8 +173,8 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
       <div className="card owner-only">
         <div className="ch"><div><div className="ct">{t("Áskrift & greiðslur")}</div><div className="cs">{t("VAKTO · mánaðarlega")}</div></div><span className="badge" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("virk")}</span></div>
         <div className="cb">
-          <div className="statline"><span className="k">{t("Mánaðargjald")}</span><span className="v">29.990 kr {t("m/VSK")}</span></div>
-          <div className="statline"><span className="k">{t("Notendur innifaldir")}</span><span className="v">10</span></div>
+          <div className="statline"><span className="k">{t("Mánaðargjald")}</span><span className="v">9.990 kr {t("m/VSK")}</span></div>
+          <div className="statline"><span className="k">{t("Notendur innifaldir")}</span><span className="v">5</span></div>
           <div className="statline"><span className="k">{t("Umfram notendur")}</span><span className="v">990 kr/{t("notanda")}</span></div>
           <div className="statline"><span className="k">{t("Næsta greiðsla")}</span><span className="v">13. júlí 2026</span></div>
           <div className="hr" />
@@ -183,7 +183,7 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
             <button className="btn ghost sm" onClick={() => toast("Opna kortastillingar")}>{t("Uppfæra kort")}</button>
             <button className="btn ghost sm" onClick={() => toast("Sæki reikninga")}>{t("Reikningar")}</button>
           </div>
-          <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>{t("Fast mánaðarverð með VSK, 10 notendur innifaldir og 990 kr fyrir hvern til viðbótar. Engin binding.")}</p>
+          <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>{t("Fast mánaðarverð með VSK, 5 notendur innifaldir og 990 kr fyrir hvern til viðbótar. Engin binding.")}</p>
         </div>
       </div>
       )}

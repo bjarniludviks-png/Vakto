@@ -230,7 +230,7 @@ export const DICT: Dict = {
   "Notendur innifaldir": { is: "Notendur innifaldir", en: "Users included" },
   "Umfram notendur": { is: "Umfram notendur", en: "Extra users" },
   "notanda": { is: "notanda", en: "user" },
-  "Fast mánaðarverð með VSK, 10 notendur innifaldir og 990 kr fyrir hvern til viðbótar. Engin binding.": { is: "Fast mánaðarverð með VSK, 10 notendur innifaldir og 990 kr fyrir hvern til viðbótar. Engin binding.", en: "Flat monthly price incl. VAT, 10 users included and 990 ISK for each additional. No lock-in." },
+  "Fast mánaðarverð með VSK, 5 notendur innifaldir og 990 kr fyrir hvern til viðbótar. Engin binding.": { is: "Fast mánaðarverð með VSK, 5 notendur innifaldir og 990 kr fyrir hvern til viðbótar. Engin binding.", en: "Flat monthly price incl. VAT, 5 users included and 990 ISK for each additional. No lock-in." },
   "framleiðsluvelta í rauntíma · smelltu til að sækja veltu": { is: "framleiðsluvelta í rauntíma · smelltu til að sækja veltu", en: "production revenue in real time · click to pull" },
   "söluvelta veitingastaða í rauntíma": { is: "söluvelta veitingastaða í rauntíma", en: "restaurant sales revenue in real time" },
   "söluvelta úr POS í rauntíma": { is: "söluvelta úr POS í rauntíma", en: "POS sales revenue in real time" },
