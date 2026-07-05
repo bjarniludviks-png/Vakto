@@ -277,7 +277,6 @@ function LaunTab({ e }: { e: Employee }) {
   const { t } = useLang();
   const { isIS } = useCountry();
   const pay = payrollPreview(e);
-  const rateLabel = e.payType === "monthly" ? `${nf(e.rate)} kr/mán` : `${nf(e.rate)} kr/klst`;
   // International companies always use the standardized rule engine (custom rules).
   const [union, setUnion] = useState<string>(isIS ? (e.union ?? "Efling") : CUSTOM_UNION);
   const custom = union === CUSTOM_UNION;
@@ -299,14 +298,27 @@ function LaunTab({ e }: { e: Employee }) {
     setBands((b) => [...b, { label: nbLabel.trim() || `${nbFrom}–${nbTo}`, days: [...nbDays].sort((x, y) => x - y), from: nbFrom, to: nbTo, pct }]);
     setNbDays([]); setNbLabel("");
   }
+  // Launasnið — controlled so the unit label + derived counterpart stay live.
+  const [payType, setPayType] = useState<"Tímakaup" | "Mánaðarlaun">(e.payType === "monthly" ? "Mánaðarlaun" : "Tímakaup");
+  const [rate, setRate] = useState<number>(e.rate);
+  const [ratio, setRatio] = useState<number>(e.employmentRatio);
+  const monthlyHrs = DEFAULT_MONTHLY_HOURS; // 173,33 klst/mán = fullt starf
+  const isMonthly = payType === "Mánaðarlaun";
+  const baseMonthly = isMonthly ? rate : Math.round(rate * monthlyHrs);   // grunnlaun 100%
+  const hourly = isMonthly ? Math.round(rate / monthlyHrs) : rate;        // kr/klst (grunnur álaga)
+  const actualMonthly = Math.round(baseMonthly * ratio / 100);           // áætluð mánaðarlaun v. starfshlutfall
+
   const [benefits, setBenefits] = useState<Benefit[]>(e.benefits ?? []);
   const [bName, setBName] = useState(BENEFIT_PRESETS[0].name);
   const [bType, setBType] = useState<"fixed" | "perkm">(BENEFIT_PRESETS[0].type);
   const [bTax, setBTax] = useState<boolean>(BENEFIT_PRESETS[0].taxable);
   const [bAmt, setBAmt] = useState("");
+  const [bCustom, setBCustom] = useState(false);
 
   // Picking a known preset auto-fills its type + tax status (still editable).
   function pickBenefit(name: string) {
+    if (name === "__other") { setBCustom(true); setBName(""); return; }
+    setBCustom(false);
     setBName(name);
     const p = benefitPreset(name);
     if (p) { setBType(p.type); setBTax(p.taxable); }
@@ -340,23 +352,9 @@ function LaunTab({ e }: { e: Employee }) {
   return (
     <>
       <Sec first>Launasnið</Sec>
-      <div className="statline">
-        <span className="k">Tegund</span>
-        <select name="payType" style={FLD} defaultValue={e.payType === "monthly" ? "Mánaðarlaun" : "Tímakaup"}>
-          <option>Tímakaup</option><option>Mánaðarlaun</option>
-        </select>
-      </div>
-      <div className="statline">
-        <span className="k">Taxti</span>
-        <input name="rate" defaultValue={rateLabel} style={{ ...FLD, width: 150, textAlign: "right" }} />
-      </div>
-      <div className="statline">
-        <span className="k">Starfshlutfall</span>
-        <input name="employmentRatio" defaultValue={`${e.employmentRatio}%`} style={{ ...FLD, width: 80, textAlign: "right" }} />
-      </div>
       {isIS ? (
         <div className="statline">
-          <span className="k">Kjarasamningur</span>
+          <span className="k">Kjarasamningur <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· ræður álögum</span></span>
           <select name="union" value={union} onChange={(ev) => setUnion(ev.target.value)} style={{ ...FLD, width: 190 }}>
             {Object.keys(UNION_PRESETS).map((u) => <option key={u}>{u}</option>)}
             <option>{CUSTOM_UNION}</option>
@@ -366,6 +364,47 @@ function LaunTab({ e }: { e: Employee }) {
         // International mode: no union presets — always the standardized rule engine.
         <input type="hidden" name="union" value={CUSTOM_UNION} />
       )}
+      <div className="statline">
+        <span className="k">Launagerð</span>
+        <span style={{ display: "inline-flex", gap: 4, background: "var(--line2)", padding: 3, borderRadius: 9 }}>
+          {(["Tímakaup", "Mánaðarlaun"] as const).map((pt) => (
+            <button type="button" key={pt} onClick={() => setPayType(pt)}
+              style={{ border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, padding: "6px 12px", borderRadius: 7,
+                background: payType === pt ? "#fff" : "transparent", color: payType === pt ? "var(--ink)" : "var(--ink3)",
+                boxShadow: payType === pt ? "0 1px 2px rgba(15,23,42,.08)" : "none" }}>{pt}</button>
+          ))}
+        </span>
+        <input type="hidden" name="payType" value={payType} />
+      </div>
+      <div className="statline">
+        <span className="k">{isMonthly ? "Grunnlaun" : "Tímakaup"} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {isMonthly ? "fullt starf (100%)" : "grunntaxti"}</span></span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <input name="rate" inputMode="numeric" value={rate ? nf(rate) : ""}
+            onChange={(ev) => setRate(Math.max(0, Number(ev.target.value.replace(/\D/g, "")) || 0))}
+            style={{ ...FLD, width: 130, textAlign: "right" }} />
+          <span className="muted" style={{ minWidth: 46 }}>{isMonthly ? "kr/mán" : "kr/klst"}</span>
+        </span>
+      </div>
+      <div className="statline">
+        <span className="k">Starfshlutfall</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <input name="employmentRatio" type="number" min={0} value={ratio}
+            onChange={(ev) => setRatio(Math.max(0, Number(ev.target.value) || 0))}
+            style={{ ...FLD, width: 72, textAlign: "right" }} />
+          <span className="muted">%</span>
+        </span>
+      </div>
+      <div className="statline">
+        <span className="k muted">{isMonthly ? "≈ Tímakaup" : "≈ Grunnlaun (100%)"} <span style={{ fontWeight: 400, fontSize: 11.5 }}>· afleitt</span></span>
+        <b className="muted">{isMonthly ? `${nf(hourly)} kr/klst` : `${nf(baseMonthly)} kr/mán`}</b>
+      </div>
+      <div className="statline">
+        <span className="k">Áætluð mánaðarlaun <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {ratio}% starf</span></span>
+        <b>{nf(actualMonthly)} kr/mán</b>
+      </div>
+      <p className="muted" style={{ fontSize: 11.5, margin: "6px 0 0" }}>
+        Álög og yfirvinna reiknast sem % ofan á tímakaupið ({nf(hourly)} kr/klst). Taxtann slærð þú inn — yfirfarðu hann gegn kjarasamningi.
+      </p>
 
       <Sec>Álög & yfirvinna {custom ? "· sérsniðnar reglur" : "· úr kjarasamningi"}</Sec>
       {RULE_FIELDS.map((f) => (
@@ -487,8 +526,17 @@ function LaunTab({ e }: { e: Employee }) {
         </div>
       ))}
       <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
-        <input list="benefit-presets" value={bName} onChange={(e2) => pickBenefit(e2.target.value)} placeholder={t("Heiti")} style={{ ...FLD, flex: 1, minWidth: 120 }} />
-        <datalist id="benefit-presets">{BENEFIT_NAMES.map((p) => <option key={p} value={p} />)}</datalist>
+        {bCustom ? (
+          <span style={{ display: "inline-flex", gap: 6, flex: 1, minWidth: 160 }}>
+            <input value={bName} onChange={(e2) => setBName(e2.target.value)} placeholder={t("Heiti")} autoFocus style={{ ...FLD, flex: 1, minWidth: 100 }} />
+            <button type="button" className="btn ghost sm" onClick={() => pickBenefit(BENEFIT_NAMES[0])} title={t("Velja af lista")}>↩</button>
+          </span>
+        ) : (
+          <select value={bName} onChange={(e2) => pickBenefit(e2.target.value)} style={{ ...FLD, flex: 1, minWidth: 160 }}>
+            {BENEFIT_NAMES.map((p) => <option key={p} value={p}>{p}</option>)}
+            <option value="__other">{t("Annað…")}</option>
+          </select>
+        )}
         <select value={bType} onChange={(e2) => setBType(e2.target.value as "fixed" | "perkm")} style={FLD}><option value="fixed">{t("Fast (kr/mán)")}</option><option value="perkm">{t("Per km")}</option></select>
         <select value={bTax ? "1" : "0"} onChange={(e2) => setBTax(e2.target.value === "1")} style={FLD} title={t("Staðgreiðsla")}><option value="1">{t("Staðgr.skylt")}</option><option value="0">{t("Undanþegið")}</option></select>
         <input type="number" min={0} value={bAmt} onChange={(e2) => setBAmt(e2.target.value)} placeholder={t("Upphæð")} style={{ ...FLD, width: 100, textAlign: "right" }} />
