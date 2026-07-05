@@ -397,3 +397,58 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
+
+const DEMO_DEPARTMENTS = ["Eldhús", "Sal", "Stjórnun"];
+
+/** List the company's department names (for the oversight picker + filters). */
+export async function getCompanyDepartments(): Promise<string[]> {
+  if (!isSupabaseConfigured()) return DEMO_DEPARTMENTS;
+  try {
+    const supabase = await createClient();
+    const company = await companyId(supabase);
+    if (!company) return DEMO_DEPARTMENTS;
+    const { data } = await supabase
+      .from("departments")
+      .select("name, locations!inner(company_id)")
+      .eq("locations.company_id", company)
+      .order("name");
+    const names = Array.from(new Set((data ?? []).map((d) => d.name as string).filter(Boolean)));
+    return names.length ? names : DEMO_DEPARTMENTS;
+  } catch {
+    return DEMO_DEPARTMENTS;
+  }
+}
+
+/** The departments a manager oversees (empty = all). */
+export async function getOverseenDepartments(employeeId: string): Promise<string[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.from("employees").select("oversees_departments").eq("id", employeeId).maybeSingle();
+    return (data?.oversees_departments as string[] | null) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Assign which departments a manager oversees. Empty array = sees everything. */
+export async function setOverseenDepartments(employeeId: string, names: string[]): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  if (employeeId.startsWith("e") && employeeId.length <= 3) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    // Best-effort — column exists only after migration 0025.
+    const { error } = await supabase.from("employees").update({ oversees_departments: names }).eq("id", employeeId);
+    if (error) return { ok: false, error: "Keyrðu migration 0025" };
+    const { data: { user } } = await supabase.auth.getUser();
+    const company = await companyId(supabase);
+    if (company) await logAudit(supabase, company, user?.id ?? null, {
+      action: "employee.update", entity: "employee", entityId: employeeId,
+      detail: names.length ? `Umsjón deilda: ${names.join(", ")}` : "Umsjón deilda: allar",
+    });
+    revalidatePath("/starfsfolk");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}

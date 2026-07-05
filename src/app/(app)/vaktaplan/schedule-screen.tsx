@@ -80,13 +80,14 @@ const REQ_ICON: Record<ReqItem["kind"], React.ReactNode> = {
   avail: <><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></>,
 };
 
-export default function ScheduleScreen({ requests = [], initial = null }: { requests?: ReqItem[]; initial?: ScheduleInitial | null }) {
+export default function ScheduleScreen({ requests = [], initial = null, scopeDepts = [] }: { requests?: ReqItem[]; initial?: ScheduleInitial | null; scopeDepts?: string[] }) {
   const [emp, setEmp] = useState<Emp[]>(initial?.emp ?? INIT_EMP);
   const [grid, setGrid] = useState<string[][]>(initial?.grid ?? INIT_GRID);
   const [cellTimes, setCellTimes] = useState<Record<string, { start: string; end: string }>>(initial?.times ?? {});
   const [pool, setPool] = useState<Emp[]>(initial?.pool ?? INIT_POOL);
   const [types, setTypes] = useState<ShiftType[]>(initial?.types?.length ? initial.types : INIT_TYPES);
-  const [dept, setDept] = useState("all");
+  // A manager scoped to a single department lands on it; otherwise "all" (within scope).
+  const [dept, setDept] = useState(scopeDepts.length === 1 ? scopeDepts[0] : "all");
   const [view, setView] = useState<"Vika" | "Dagur" | "Mánuður">("Vika");
   const todayISO = initial?.todayISO ?? DEMO_TODAY;
   const [cur, setCur] = useState(() => parseISO(initial?.todayISO ?? DEMO_TODAY)); // anchor day
@@ -103,8 +104,14 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
   const { t } = useLang();
 
   const vis = useMemo(
-    () => emp.map((_, r) => r).filter((r) => dept === "all" || deptOf(emp[r][2]) === dept),
-    [emp, dept],
+    () => emp.map((_, r) => r).filter((r) => {
+      const dn = emp[r][2];
+      // Managers only see the departments assigned to them (empty = all).
+      const inScope = scopeDepts.length === 0 || scopeDepts.includes(dn) || scopeDepts.includes(deptOf(dn));
+      const inSel = dept === "all" || dn === dept || deptOf(dn) === dept;
+      return inScope && inSel;
+    }),
+    [emp, dept, scopeDepts],
   );
   // Real (signed-in) companies start at 0 — BASE_HRS is only demo padding.
   const liveCompany = !!initial;
@@ -519,10 +526,10 @@ export default function ScheduleScreen({ requests = [], initial = null }: { requ
           ))}
         </div>
         <select className="badge" style={{ border: "1px solid var(--line)", padding: "7px 11px" }} value={dept} onChange={(e) => setDept(e.target.value)}>
-          <option value="all">{t("Allar deildir")}</option>
-          <option value="Eldhús">Eldhús</option>
-          <option value="Sal">Sal</option>
-          <option value="Stjórnun">Stjórnun</option>
+          <option value="all">{scopeDepts.length ? t("Allar mínar deildir") : t("Allar deildir")}</option>
+          {(scopeDepts.length ? scopeDepts : ["Eldhús", "Sal", "Stjórnun"]).map((d) => (
+            <option key={d} value={d}>{d}</option>
+          ))}
         </select>
         <div className="sp" style={{ flex: 1 }} />
         {view === "Vika" && (

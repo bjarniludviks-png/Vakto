@@ -7,7 +7,7 @@ import { toast } from "@/components/app/toast";
 import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getDocuments, getDocumentSignedUrl } from "./actions";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getOverseenDepartments, setOverseenDepartments } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField } from "@/components/app/fields";
@@ -552,6 +552,53 @@ function LaunTab({ e }: { e: Employee }) {
   );
 }
 
+/** Assign which departments a shift-lead/manager oversees (migration 0025). */
+function DeptOversight({ e }: { e: Employee }) {
+  const { t } = useLang();
+  const [all, setAll] = useState<string[]>([]);
+  const [sel, setSel] = useState<string[]>([]);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let live = true;
+    Promise.all([getCompanyDepartments(), getOverseenDepartments(e.id)]).then(([a, s]) => {
+      if (!live) return;
+      setAll(a); setSel(s); setReady(true);
+    });
+    return () => { live = false; };
+  }, [e.id]);
+  function toggle(name: string) {
+    const next = sel.includes(name) ? sel.filter((d) => d !== name) : [...sel, name];
+    setSel(next);
+    setOverseenDepartments(e.id, next).then((r) => toast(r.ok ? (r.demo ? "Vistað (demo — tengdu Supabase)" : "Umsjón deilda vistuð") : (r.error ?? "Villa")));
+  }
+  return (
+    <>
+      <Sec>{t("Umsjón deilda")}</Sec>
+      <p className="muted" style={{ fontSize: 11.5, margin: "2px 0 8px" }}>
+        {t("Veldu deildir sem þessi vaktstjóri ber ábyrgð á — hann sér þá sjálfgefið aðeins þær í vaktaplani, tímaskráningu og skýrslum. Engin valin = sér allar.")}
+      </p>
+      {!ready ? <p className="muted" style={{ fontSize: 12 }}>{t("Hleð…")}</p>
+        : all.length === 0 ? <p className="muted" style={{ fontSize: 12 }}>{t("Engar deildir skráðar.")}</p>
+        : <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {all.map((d) => {
+              const on = sel.includes(d);
+              return (
+                <button type="button" key={d} onClick={() => toggle(d)}
+                  style={{ ...FLD, padding: "6px 12px", cursor: "pointer", fontWeight: 600, fontSize: 12.5,
+                    background: on ? "var(--brand)" : "#fff", color: on ? "#fff" : "var(--ink2)",
+                    borderColor: on ? "var(--brand)" : "var(--line)" }}>{d}</button>
+              );
+            })}
+          </div>}
+      {ready && (
+        <p className="muted" style={{ fontSize: 11.5, margin: "8px 0 0" }}>
+          {sel.length ? `${t("Umsjón")}: ${sel.join(", ")}` : t("Sér allar deildir")}
+        </p>
+      )}
+    </>
+  );
+}
+
 export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
 
   if (tab === "Laun") return <LaunTab e={e} />;
@@ -606,6 +653,8 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
             <input type="checkbox" name={`perm_${f.key}`} defaultChecked={perms[f.key]} style={{ width: 18, height: 18, accentColor: "var(--brand)" }} />
           </label>
         )); })()}
+
+        {e.role === "manager" && <DeptOversight e={e} />}
       </>
     );
   }
