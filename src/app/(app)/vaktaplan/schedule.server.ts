@@ -45,9 +45,9 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
       : { data: null };
     const company = profile?.company_id as string | undefined;
 
-    const emp: Emp4[] = employees.map((e) => [
+    const rowOf = (e: (typeof employees)[number]): Emp4 => [
       initials(e.fullName), e.fullName.split(/\s+/)[0], e.department ?? "Stjórnun", e.avatarColor,
-    ]);
+    ];
 
     // shift types
     let types: ShiftTypeView[] = [];
@@ -92,8 +92,29 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
       if (Array.isArray(st?.staffing_targets)) targets = (st!.staffing_targets as number[]).slice(0, 7);
     }
 
+    // Partition: employees WITH a shift this week are "on the plan" (grid rows);
+    // the rest go to the pool. This way, removing someone from the plan (which
+    // deletes their shifts) keeps them off the grid on refresh instead of
+    // reappearing as an empty row — and they stay reachable via "Bæta á plan".
+    const emp: Emp4[] = [];
+    const gridOut: string[][] = [];
+    const timesOut: Record<string, { start: string; end: string }> = {};
+    const pool: Emp4[] = [];
+    // Empty week (no shifts yet) → show the whole roster so scheduling can begin.
+    const anyShift = grid.some((row) => row.some((s) => s !== "off"));
+    employees.forEach((e, i) => {
+      if (!anyShift || grid[i].some((s) => s !== "off")) {
+        const nr = emp.length;
+        emp.push(rowOf(e));
+        gridOut.push(grid[i]);
+        grid[i].forEach((_, c) => { const k = `${i}:${c}`; if (times[k]) timesOut[`${nr}:${c}`] = times[k]; });
+      } else {
+        pool.push(rowOf(e));
+      }
+    });
+
     const fte = dec1(employees.reduce((a, e) => a + e.employmentRatio, 0) / 100);
-    return { emp, grid, times, types, pool: [], fte, company: companyName, todayISO, targets };
+    return { emp, grid: gridOut, times: timesOut, types, pool, fte, company: companyName, todayISO, targets };
   } catch {
     return null;
   }

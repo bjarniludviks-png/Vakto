@@ -148,12 +148,15 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     return prem;
   };
 
+  // Sum only the visible rows so the KPI matches the grid's own Σ column + day
+  // totals (which also iterate `vis`). Iterating the whole grid double-counts
+  // rows hidden by the department filter / scope.
   const visHrs = useMemo(() => {
     let h = 0;
-    grid.forEach((row, r) => row.forEach((s, c) => { if (s && s !== "off") h += cellHrs(r, c, s); }));
+    vis.forEach((r) => grid[r]?.forEach((s, c) => { if (s && s !== "off") h += cellHrs(r, c, s); }));
     return h;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grid, cellTimes]);
+  }, [vis, grid, cellTimes]);
   const totalHrs = visHrs + (liveCompany ? 0 : BASE_HRS);
   const cost = totalHrs * COST_HR;
 
