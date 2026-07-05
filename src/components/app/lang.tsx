@@ -201,6 +201,8 @@ export const DICT: Dict = {
   "Annað…": { is: "Annað…", en: "Other…" },
   "Velja af lista": { is: "Velja af lista", en: "Pick from list" },
   "Umsjón deilda": { is: "Umsjón deilda", en: "Department oversight" },
+  "Nr.": { is: "Nr.", en: "No." },
+  "skannaðu á stimpilklukku": { is: "skannaðu á stimpilklukku", en: "scan at the time clock" },
   "Allar mínar deildir": { is: "Allar mínar deildir", en: "All my departments" },
   "Umsjón": { is: "Umsjón", en: "Oversees" },
   "Sér allar deildir": { is: "Sér allar deildir", en: "Sees all departments" },

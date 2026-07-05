@@ -7,6 +7,7 @@ import { resolvePerms, type Perms } from "@/lib/permissions";
 export type StaffCard = {
   name: string;
   role: string;
+  department: string | null;
   company: string;
   photoUrl: string | null;
   idCode: string;
@@ -19,7 +20,7 @@ export type StaffCard = {
 };
 
 const DEMO: StaffCard = {
-  name: "Mína Huong", role: "Vaktstjóri", company: "Kaffi Krónan",
+  name: "Mína Huong", role: "Kokkur", department: "Eldhús", company: "Kaffi Krónan",
   photoUrl: null, idCode: "demo", initials: "MÍ", color: "#5b50e6",
   employeeKt: "010190-2389", companyKt: "550101-2210", perms: resolvePerms(), live: false,
 };
@@ -42,7 +43,7 @@ export async function getMyCard(): Promise<StaffCard> {
 
     const { data: emp } = await supabase
       .from("employees")
-      .select("id, full_name, title, avatar_color, photo_url, kennitala, positions(name)")
+      .select("id, full_name, title, avatar_color, photo_url, kennitala, positions(name), departments(name)")
       .eq("user_id", user.id).maybeSingle();
 
     // Company kennitala (tolerant — column added in migration 0009).
@@ -63,10 +64,12 @@ export async function getMyCard(): Promise<StaffCard> {
       ?? (user.email ? user.email.split("@")[0] : "Starfsmaður");
     const position = ((Array.isArray(emp?.positions) ? emp?.positions[0] : emp?.positions) as { name?: string } | null)?.name;
     const role = position ?? (emp?.title as string) ?? ROLE_IS[(profile?.role as string) ?? "employee"] ?? "Starfsmaður";
+    const department = ((Array.isArray(emp?.departments) ? emp?.departments[0] : emp?.departments) as { name?: string } | null)?.name ?? null;
 
     return {
       name,
       role,
+      department,
       company,
       photoUrl: (emp?.photo_url as string) ?? null,
       idCode: (emp?.id as string) ?? user.id,
