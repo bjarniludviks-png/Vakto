@@ -4,6 +4,11 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 /** A viewer's department scope. `departments` empty = sees every department. */
 export type Scope = { role: string; departments: string[] };
 
+/** Keep only rows in the viewer's department scope (empty scope = keep all). */
+export function scopeRows<T extends { dept?: string | null }>(depts: string[], rows: T[]): T[] {
+  return depts.length === 0 ? rows : rows.filter((r) => !!r.dept && depts.includes(r.dept));
+}
+
 /**
  * The current user's department scope for screens that filter by department.
  * Owners always see everything. Managers/shift-leads are limited to the

@@ -18,10 +18,16 @@ const WEEKS_PER_MONTH = 4.33;
 const NO_ONBOARD: Onboarding = { show: false, hasLocation: true, hasStaff: true, hasSchedule: true, hasRevenue: true };
 const DEMO: DashboardView = { laborPct: 32.1, laborCostWeek: "1,40", hoursWeek: "374", live: false, onboarding: NO_ONBOARD };
 
-/** Dashboard headline KPIs + new-company onboarding status. */
-export async function getDashboard(): Promise<DashboardView> {
+/** Dashboard headline KPIs + new-company onboarding status.
+ *  `scopeDepts` (a scoped manager's departments; empty = all) limits the labor
+ *  cost/hours KPIs to those departments. laborPct stays company-wide (revenue
+ *  is not split by department). */
+export async function getDashboard(scopeDepts: string[] = []): Promise<DashboardView> {
   const metrics = await getLaborMetrics();
-  const { employees, live } = await getEmployees();
+  const { employees: allEmployees, live } = await getEmployees();
+  const employees = scopeDepts.length
+    ? allEmployees.filter((e) => !!e.department && scopeDepts.includes(e.department))
+    : allEmployees;
   if (!live) return { ...DEMO, laborPct: metrics.live ? metrics.laborPct : DEMO.laborPct, live: metrics.live };
 
   // Signed-in company. Compute onboarding completion from real tables.
