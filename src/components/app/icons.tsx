@@ -35,6 +35,12 @@ const PATHS: Record<string, ReactNode> = {
     </>
   ),
   reports: <path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3M20 16V6" />,
+  shield: (
+    <>
+      <path d="M12 2l7 4v6c0 5-3.5 8-7 10-3.5-2-7-5-7-10V6z" />
+      <path d="M9 12l2 2 4-4" />
+    </>
+  ),
   trend: (
     <>
       <path d="M3 17l5-5 4 3 6-7" />

@@ -825,3 +825,6 @@ alter table companies add column if not exists email text;
 
 -- ===== 0025 — managers scoped to overseen departments (names; null = all) =====
 alter table employees add column if not exists oversees_departments text[];
+
+-- ===== 0027 — manual billing status per company (VAKTO admin) =====
+alter table companies add column if not exists billing_status text;

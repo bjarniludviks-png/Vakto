@@ -5,6 +5,7 @@ import { CountryProvider } from "@/components/app/country";
 import type { Role } from "@/components/app/nav";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { isVaktoAdmin } from "@/lib/vakto-admin.server";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);
@@ -63,11 +64,11 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { country, ...account } = await getAccount();
+  const [{ country, ...account }, vaktoAdmin] = await Promise.all([getAccount(), isVaktoAdmin()]);
   return (
     <LangProvider>
       <CountryProvider value={country}>
-        <AppShell account={account}>{children}</AppShell>
+        <AppShell account={{ ...account, vaktoAdmin }}>{children}</AppShell>
       </CountryProvider>
     </LangProvider>
   );

@@ -16,6 +16,8 @@ export type Account = {
   name: string;
   company: string;
   role: Role;
+  /** SaaS-owner super-admin (email allowlist) — shows the VAKTO Admin menu entry. */
+  vaktoAdmin?: boolean;
 };
 
 type MenuPos = { top: number; right: number } | null;
@@ -294,6 +296,11 @@ export default function AppShell({
                 <div className="mi" onClick={() => nav("/stillingar")}>
                   <Icon name="settings" className="ei" />{t("acct:settings")}
                 </div>
+                {account.vaktoAdmin && (
+                  <div className="mi" onClick={() => nav("/admin")}>
+                    <Icon name="shield" className="ei" />VAKTO Admin
+                  </div>
+                )}
                 <div className="mi" onClick={() => nav("/hjalp")}>
                   <Icon name="help" className="ei" />{t("acct:help")}
                 </div>

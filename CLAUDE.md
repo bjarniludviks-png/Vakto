@@ -162,6 +162,14 @@
   `/api/ai/schedule` fellur á demo-tillögu. Setja lykil (console.anthropic.com) + `vercel env add`.
 - **Still remaining:** contractor billable-vs-cost/GPS job tracking, a signed-URL viewer for the
   private `documents` bucket, Google/Microsoft/Auðkenni OAuth (scaffolded in `login-form`).
-  **Næsti fasi (ákveðið af eiganda):** mobile app (eigandi með ákveðna leið), Apple Wallet skírteini
-  (WalletButtons til), VAKTO-admin fyrir eigandann (notendur/fyrirtæki/greiðslustaða/velta),
-  alvöru stuðningsspjall við eigandann, Teya-áskriftir tengdar Payday (mánaðarreikningar sjálfvirkt).
+- ✅ **VAKTO Admin (ofurstjórnborð SaaS-eigandans):** `/admin` — aðgangur EINGÖNGU fyrir netföng í
+  `VAKTO_ADMIN_EMAILS` (default bjarniludviks@icloud.com; síðan redirect-ar aðra á /maelabord).
+  `src/lib/vakto-admin.server.ts` (`isVaktoAdmin`, `getAdminOverview` — service-role yfir ÖLL fyrirtæki:
+  notendur/starfsmenn/staðir/síðasta virkni/plan/prufa/greiðslustaða/MRR). KPI: fyrirtæki, notendur,
+  borga, MRR (9.990 + 990×umfram-notanda, telur bara „paying"). Aðgerðir í `admin/actions.ts`:
+  `setBillingStatus` (paying/unpaid/free/auto — handvirkt þar til Teya) + `extendTrial` (+14 d, þolið
+  án 0027). Migration **0027** (`billing_status` á companies). „VAKTO Admin" hlekkur í account-valmynd
+  (shield-íkon) fyrir admin. Sannreynt e2e á prod-gögnum (2 fyrirtæki, trial-framlenging virkar).
+  **Næsti fasi (ákveðið af eiganda):** mobile app (eigandi með ákveðna leið — SPYRJA hann), Apple
+  Wallet skírteini (WalletButtons til), alvöru stuðningsspjall við eigandann, Teya-áskriftir tengdar
+  Payday (mánaðarreikningar sjálfvirkt — kveikja þá á sjálfvirkri greiðslustöðu í /admin).
