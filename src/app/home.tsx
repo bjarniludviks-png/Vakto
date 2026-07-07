@@ -54,7 +54,15 @@ function useLiveMock() {
 /** A brand on the logo wall: real asset if `img` is set, else a styled wordmark. */
 function BrandLogo({ b }: { b: Brand }) {
   if (b.img) {
-    return <img className="brandlogo-img" src={b.img} alt={b.name} loading="lazy" />;
+    return (
+      <img
+        className="brandlogo-img"
+        src={b.img}
+        alt={b.name}
+        loading="lazy"
+        style={b.scale ? { height: `${Math.round(40 * b.scale)}px` } : undefined}
+      />
+    );
   }
   const wm = b.wm ?? {};
   const name = wm.case === "upper" ? b.name.toUpperCase() : wm.case === "lower" ? b.name.toLowerCase() : b.name;

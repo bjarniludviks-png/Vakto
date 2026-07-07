@@ -115,6 +115,7 @@ export type Brand = {
   name: string;
   slug: string;
   img?: string;               // e.g. "/logos/payday.svg" once the real file is added
+  scale?: number;             // visual-weight multiplier for img (square marks need more height)
   wm?: {
     case?: "lower" | "upper"; // force casing of the wordmark
     weight?: number;          // font-weight
@@ -135,11 +136,13 @@ export const INTEGRATIONS: Brand[] = [
 ];
 
 // Businesses running on VAKTO (shown in the trust strip).
+// White monochrome marks (generated from the real logos); the light homepage
+// inverts them to dark via CSS, the dark /ny shows them as-is.
 export const CUSTOMERS: Brand[] = [
-  { name: "Beint úr sjó", slug: "beint-ur-sjo", img: "/logos/beint-ur-sjo.png", wm: { family: "serif", weight: 600 } },
-  { name: "Njótum",       slug: "njotum",       img: "/logos/njotum.jpg",       wm: { weight: 700, spacing: ".02em" } },
-  { name: "Thai Keflavík", slug: "thai-keflavik", img: "/logos/thai-keflavik.png", wm: { weight: 700 } },
-  { name: "RVK Asian",    slug: "rvk-asian",    img: "/logos/rvk-asian.png",    wm: { case: "upper", weight: 800, spacing: ".04em" } },
+  { name: "Beint úr sjó", slug: "beint-ur-sjo", img: "/logos/white/beint-ur-sjo.png", scale: 1.5,  wm: { family: "serif", weight: 600 } },
+  { name: "Njótum",       slug: "njotum",       img: "/logos/white/njotum.png",       scale: 0.85, wm: { weight: 700, spacing: ".02em" } },
+  { name: "Thai Keflavík", slug: "thai-keflavik", img: "/logos/white/thai-keflavik.png", scale: 1.2, wm: { weight: 700 } },
+  { name: "RVK Asian",    slug: "rvk-asian",    img: "/logos/white/rvk-asian.png",    wm: { case: "upper", weight: 800, spacing: ".04em" } },
 ];
 
 export type Plan = { name: string; price: string; desc: string; unit?: string; features: string[]; pop: boolean; soon?: boolean };

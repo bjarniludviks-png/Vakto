@@ -141,8 +141,8 @@
 .ny-wall{display:flex;justify-content:center;gap:46px;flex-wrap:wrap;align-items:center}
 .ny-wm{display:inline-flex;font-size:20px;line-height:1;color:rgba(244,242,238,.42);transition:color .2s;white-space:nowrap}
 @media(hover:hover) and (pointer:fine){.ny-wall:hover .ny-wm{color:rgba(244,242,238,.6)}}
-.ny-wm-img{height:52px;width:auto;border-radius:12px;opacity:.85;box-shadow:0 6px 20px -6px rgba(0,0,0,.6);transition:opacity .2s,transform .2s}
-@media(hover:hover) and (pointer:fine){.ny-wm-img:hover{opacity:1;transform:translateY(-2px)}}
+.ny-wm-img{height:46px;width:auto;object-fit:contain;opacity:.6;transition:opacity .2s,transform .2s}
+@media(hover:hover) and (pointer:fine){.ny-wm-img:hover{opacity:.95;transform:translateY(-2px)}}
 
 /* ---------- statement + the industry planet ---------- */
 .ny-state{padding:120px 24px 40px}
