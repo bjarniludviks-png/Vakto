@@ -14,13 +14,16 @@
 .ny :focus-visible{outline:2px solid var(--brand2);outline-offset:3px;border-radius:6px}
 .ny h1,.ny h2,.ny h3{font-weight:600;letter-spacing:-.035em;line-height:1.05}
 
-/* motion */
-@keyframes nyin{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
-.ny-hin{opacity:0;animation:nyin .8s var(--ease) forwards}
+/* motion: first-load choreography + scroll reveals */
+@keyframes nyin{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+.ny-hin{opacity:0;animation:nyin .85s var(--ease) forwards}
+/* the screenshot rises out of the horizon glow, slower and further */
+@keyframes nyshot{from{opacity:0;transform:translateY(70px)}to{opacity:1;transform:none}}
+.ny-shot.ny-hin{animation:nyshot 1.15s var(--ease) forwards}
 .ny-rise{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ease),transform .7s var(--ease)}
 .ny-rise.in{opacity:1;transform:none}
 @media(prefers-reduced-motion:reduce){
-  .ny-hin{animation:none;opacity:1}
+  .ny-hin,.ny-shot.ny-hin{animation:none;opacity:1}
   .ny-rise{opacity:1;transform:none;transition:none}
 }
 
@@ -36,12 +39,12 @@
 }
 
 /* ---------- nav: floating glass pill ---------- */
-@keyframes nynav{from{opacity:0}to{opacity:1}}
+@keyframes nynav{from{opacity:0;transform:translate(-50%,-16px)}to{opacity:1;transform:translate(-50%,0)}}
 .ny-nav{position:fixed;top:18px;left:50%;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:26px;
   background:rgba(12,12,14,.55);border:1px solid var(--line);border-radius:999px;padding:9px 12px 9px 20px;
   backdrop-filter:blur(18px) saturate(150%);box-shadow:0 10px 40px -12px rgba(0,0,0,.7);width:min(880px,calc(100% - 32px));
-  animation:nynav .6s ease .1s both}
-@media(prefers-reduced-motion:reduce){.ny-nav{animation:none}}
+  animation:nynav .7s var(--ease) .2s both}
+@media(prefers-reduced-motion:reduce){.ny-nav{animation:none;transform:translateX(-50%)}}
 .ny-logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16.5px;letter-spacing:1px}
 .ny-links{display:flex;gap:22px;margin:0 auto}
 .ny-links a{font-size:14px;color:var(--dim);font-weight:500;transition:color .15s}
@@ -56,23 +59,57 @@
 .ny-sub{font-size:18px;color:var(--dim);max-width:620px;margin:24px auto 0;line-height:1.65}
 .ny-ctas{display:flex;gap:12px;justify-content:center;margin-top:34px;flex-wrap:wrap}
 
-/* the aurora: layered glow + light rays + a luminous horizon arc */
-.ny-aurora{position:absolute;inset:0;pointer-events:none}
-.ny-aurora i{position:absolute;border-radius:50%;filter:blur(70px)}
-.ny-aurora .a1{left:50%;top:20%;width:1350px;height:760px;transform:translateX(-54%);background:radial-gradient(50% 50% at 50% 60%,rgba(233,112,15,.42),transparent 70%)}
-.ny-aurora .a2{left:50%;top:34%;width:820px;height:500px;transform:translateX(-92%);background:radial-gradient(50% 50% at 50% 50%,rgba(245,147,49,.3),transparent 70%)}
-.ny-aurora .a3{left:50%;top:30%;width:880px;height:520px;transform:translateX(10%);background:radial-gradient(50% 50% at 50% 50%,rgba(64,120,220,.24),transparent 70%)}
-.ny-rays{position:absolute;left:50%;top:8%;width:1300px;height:760px;transform:translateX(-50%);
-  background:repeating-linear-gradient(90deg,rgba(255,255,255,.045) 0 2px,transparent 2px 110px);
-  -webkit-mask-image:radial-gradient(55% 60% at 50% 70%,#000 30%,transparent 75%);
-  mask-image:radial-gradient(55% 60% at 50% 70%,#000 30%,transparent 75%);filter:blur(1px)}
+/* the aurora: stars + breathing glow + DRIFTING light shafts + horizon arc.
+   Everything animates via transform/opacity only (GPU-safe); filters are static. */
+.ny-aurora{position:absolute;inset:0;pointer-events:none;animation:nyignite 1.8s ease-out both}
+@keyframes nyignite{from{opacity:0}to{opacity:1}}
+
+/* starfield: two repeating dot patterns, gentle twinkle */
+.ny-stars{position:absolute;inset:0 0 30% 0;opacity:.9;
+  background-image:
+    radial-gradient(1.3px 1.3px at 22px 34px,rgba(255,255,255,.6),transparent 100%),
+    radial-gradient(1px 1px at 130px 92px,rgba(255,255,255,.42),transparent 100%),
+    radial-gradient(.9px .9px at 76px 158px,rgba(255,255,255,.5),transparent 100%),
+    radial-gradient(1.1px 1.1px at 190px 210px,rgba(255,255,255,.3),transparent 100%);
+  background-size:230px 230px,290px 290px,340px 340px,410px 410px;
+  -webkit-mask-image:linear-gradient(to bottom,#000 55%,transparent 100%);
+  mask-image:linear-gradient(to bottom,#000 55%,transparent 100%);
+  animation:nytwinkle 7s ease-in-out infinite}
+@keyframes nytwinkle{0%,100%{opacity:.55}50%{opacity:1}}
+
+/* breathing glow blobs, drifting sideways very slowly */
+.ny-aurora i{position:absolute;border-radius:50%;filter:blur(70px);will-change:transform,opacity}
+.ny-aurora .a1{left:50%;top:20%;width:1350px;height:760px;transform:translateX(-54%);background:radial-gradient(50% 50% at 50% 60%,rgba(233,112,15,.42),transparent 70%);animation:nyaurA 11s ease-in-out infinite}
+.ny-aurora .a2{left:50%;top:34%;width:820px;height:500px;transform:translateX(-92%);background:radial-gradient(50% 50% at 50% 50%,rgba(245,147,49,.3),transparent 70%);animation:nyaurB 14s ease-in-out infinite}
+.ny-aurora .a3{left:50%;top:30%;width:880px;height:520px;transform:translateX(10%);background:radial-gradient(50% 50% at 50% 50%,rgba(64,120,220,.24),transparent 70%);animation:nyaurC 17s ease-in-out infinite}
+@keyframes nyaurA{0%,100%{opacity:.85;transform:translateX(-54%)}50%{opacity:1;transform:translateX(-51%)}}
+@keyframes nyaurB{0%,100%{opacity:.8;transform:translateX(-92%)}50%{opacity:1;transform:translateX(-86%)}}
+@keyframes nyaurC{0%,100%{opacity:.75;transform:translateX(10%)}50%{opacity:1;transform:translateX(4%)}}
+
+/* the sun-shaft layers: three colored ray fields sliding at different speeds */
+.ny-rays{position:absolute;top:-6%;height:900px;width:2200px;will-change:transform;
+  -webkit-mask-image:radial-gradient(50% 62% at 50% 74%,#000 22%,transparent 72%);
+  mask-image:radial-gradient(50% 62% at 50% 74%,#000 22%,transparent 72%)}
+.ny-rays.r1{left:42%;filter:blur(7px);
+  background:repeating-linear-gradient(90deg,transparent 0 48px,rgba(245,147,49,.18) 48px 58px,transparent 58px 128px,rgba(233,112,15,.13) 128px 140px,transparent 140px 210px);
+  animation:nydrift1 23s ease-in-out infinite alternate}
+.ny-rays.r2{left:50%;filter:blur(3px);
+  background:repeating-linear-gradient(90deg,transparent 0 82px,rgba(255,244,230,.1) 82px 87px,transparent 87px 205px);
+  animation:nydrift2 31s ease-in-out infinite alternate}
+.ny-rays.r3{left:58%;filter:blur(8px);
+  background:repeating-linear-gradient(90deg,transparent 0 64px,rgba(96,150,235,.15) 64px 74px,transparent 74px 170px);
+  animation:nydrift3 41s ease-in-out infinite alternate}
+@keyframes nydrift1{from{transform:translateX(-53%)}to{transform:translateX(-47%)}}
+@keyframes nydrift2{from{transform:translateX(-47%)}to{transform:translateX(-53%)}}
+@keyframes nydrift3{from{transform:translateX(-52%)}to{transform:translateX(-48%)}}
+
 .ny-horizon{position:absolute;left:50%;top:565px;width:2600px;height:2600px;transform:translateX(-50%);border-radius:50%;
   background:#060607;
   box-shadow:0 -3px 24px rgba(255,214,170,.85),0 -18px 90px 6px rgba(233,112,15,.6),0 -60px 220px 30px rgba(233,112,15,.32);
   border-top:1px solid rgba(255,226,190,.9)}
-@keyframes nyaur{0%,100%{opacity:.9}50%{opacity:1}}
-.ny-aurora i{animation:nyaur 7s ease-in-out infinite}
-@media(prefers-reduced-motion:reduce){.ny-aurora i{animation:none}}
+@media(prefers-reduced-motion:reduce){
+  .ny-aurora,.ny-aurora i,.ny-stars,.ny-rays{animation:none;opacity:1}
+}
 
 /* hero screenshot riding the horizon */
 .ny-shot{position:relative;z-index:2;max-width:960px;margin:64px auto 0}

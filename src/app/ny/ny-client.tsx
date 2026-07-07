@@ -92,24 +92,27 @@ export default function NyClient() {
       {/* ---------- hero: the midnight-sun horizon ---------- */}
       <header className="ny-hero">
         <div className="ny-aurora" aria-hidden="true">
+          <span className="ny-stars" />
           <i className="a1" /><i className="a2" /><i className="a3" />
-          <span className="ny-rays" />
+          <span className="ny-rays r1" />
+          <span className="ny-rays r2" />
+          <span className="ny-rays r3" />
           <span className="ny-horizon" />
         </div>
         <div className="ny-hero-in">
-          <span className="ny-pill ny-hin" style={{ animationDelay: "60ms" }}>14 daga frí prufa · Uppsetning samdægurs</span>
-          <h1 className="ny-hin" style={{ animationDelay: "140ms" }}>
+          <span className="ny-pill ny-hin" style={{ animationDelay: "350ms" }}>14 daga frí prufa · Uppsetning samdægurs</span>
+          <h1 className="ny-hin" style={{ animationDelay: "480ms" }}>
             Vaktir, stimplun og laun.<br />Á sjálfstýringu.
           </h1>
-          <p className="ny-sub ny-hin" style={{ animationDelay: "220ms" }}>
+          <p className="ny-sub ny-hin" style={{ animationDelay: "620ms" }}>
             VAKTO tengir vaktaplanið, stimpilklukkuna og sölukerfið og sýnir þér
             launahlutfall af veltu í rauntíma. Fyrir veitingastaði, verslanir og keðjur.
           </p>
-          <div className="ny-ctas ny-hin" style={{ animationDelay: "300ms" }}>
+          <div className="ny-ctas ny-hin" style={{ animationDelay: "760ms" }}>
             <a className="ny-btn glow lg" href="/nyskraning">Byrja núna</a>
             <a className="ny-btn ghost lg" href="#eiginleikar">Sjá eiginleika</a>
           </div>
-          <div className="ny-shot ny-hin" style={{ animationDelay: "420ms" }}>
+          <div className="ny-shot ny-hin" style={{ animationDelay: "900ms" }}>
             <img src="/showcase/maelabord.png" alt="VAKTO mælaborð — launahlutfall í rauntíma" />
           </div>
         </div>
