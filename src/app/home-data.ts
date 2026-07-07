@@ -1,6 +1,70 @@
 // Content dictionaries ported from prototypes/vakto-heimasida.html (I18N/FEAT/FLOW/PRICE/FAQ).
 export type Lang = "is" | "en";
 
+// ---- 2026 redesign: dark "eftir lokun" hero with a live day simulation ----
+export const HERO2 = {
+  is: {
+    eyebrow: "VAKTAPLAN · STIMPILKLUKKA · LAUN Í RAUNTÍMA",
+    t1: "Launin éta veltuna.",
+    t2: "Horfðu á það í beinni.",
+    sub: "VAKTO tengir vaktaplanið, stimpilklukkuna og sölukerfið — og sýnir launahlutfallið þitt á meðan dagurinn gerist. Ekki þremur vikum seinna í bókhaldinu.",
+    note: "14 daga prufa · Uppsetning samdægurs · Engin binding",
+    panel_head: "MÁNUDAGUR · UPPGJÖR Í RAUNTÍMA",
+    velta: "VELTA DAGSINS",
+    laun: "LAUNAKOSTNAÐUR",
+    onshift: "Á VAKT",
+    pct: "LAUN AF TEKJUM",
+    target: "MARKMIÐ 30%",
+    panel_note: "Svona lítur dagurinn út í VAKTO — uppfært við hverja stimplun og hverja sölu.",
+  },
+  en: {
+    eyebrow: "SCHEDULING · TIME CLOCK · LIVE LABOR COST",
+    t1: "Labor eats revenue.",
+    t2: "Watch it happen live.",
+    sub: "VAKTO connects your schedule, time clock and POS — and shows your labor ratio while the day is happening. Not three weeks later in the books.",
+    note: "14-day trial · Same-day setup · No lock-in",
+    panel_head: "MONDAY · LIVE DAY REPORT",
+    velta: "REVENUE TODAY",
+    laun: "LABOR COST",
+    onshift: "ON SHIFT",
+    pct: "LABOR % OF REVENUE",
+    target: "TARGET 30%",
+    panel_note: "This is your day in VAKTO — updated with every punch and every sale.",
+  },
+} as const;
+
+// Simulated-day ticker events: [minutes from 00:00, label].
+export const SIM_EVENTS: Record<Lang, [number, string][]> = {
+  is: [
+    [458, "07:38 · Mína stimplar inn — opnunarvakt"],
+    [487, "08:07 · Bach stimplar inn"],
+    [560, "09:20 · Vörumóttaka — 2 á vakt"],
+    [655, "10:55 · Hádegisvaktin mætir"],
+    [718, "11:58 · Hádegisösin hefst"],
+    [822, "13:42 · Laun% komið undir markmið"],
+    [905, "15:05 · Rólegur eftirmiðdagur"],
+    [1005, "16:45 · Kvöldvaktin stimplar inn"],
+    [1152, "19:12 · Metkvöld í sölu"],
+    [1290, "21:30 · Lokunarvaktin ein eftir"],
+    [1351, "22:31 · Síðasta stimplun út"],
+    [1408, "23:28 · Uppgjör dagsins tilbúið"],
+  ],
+  en: [
+    [458, "07:38 · Mína clocks in — opening shift"],
+    [487, "08:07 · Bach clocks in"],
+    [560, "09:20 · Delivery arrives — 2 on shift"],
+    [655, "10:55 · Lunch crew clocks in"],
+    [718, "11:58 · Lunch rush begins"],
+    [822, "13:42 · Labor % drops below target"],
+    [905, "15:05 · Quiet afternoon"],
+    [1005, "16:45 · Evening crew clocks in"],
+    [1152, "19:12 · Record evening sales"],
+    [1290, "21:30 · Closing crew only"],
+    [1351, "22:31 · Last punch out"],
+    [1408, "23:28 · Day report ready"],
+  ],
+};
+
 export const I18N = {
   is: {
     nav_features: "Eiginleikar", nav_how: "Hvernig það virkar", nav_integrations: "Tengingar", nav_pricing: "Verð", nav_login: "Innskráning", nav_try: "Byrja",

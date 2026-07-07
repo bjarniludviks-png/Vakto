@@ -1,10 +1,116 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   I18N, FEAT, FLOW, PRICE, FAQ, PUNIT, POP, PCTA, CUSTOM, FREE, SOON, SHOWCASE, SHOWCASE_HEAD,
-  INTEGRATIONS, CUSTOMERS, type Brand, type Lang,
+  INTEGRATIONS, CUSTOMERS, HERO2, SIM_EVENTS, type Brand, type Lang,
 } from "./home-data";
+
+/* ---------- live day simulation (hero signature) ----------
+   One business day (07:30–23:30) plays out on a loop: revenue accumulates
+   through lunch/dinner peaks, staff punch in and out, and laun% breathes
+   between red (expensive morning prep) and green (busy service). Numbers are
+   deterministic functions of sim-time so SSR and client agree, and
+   prefers-reduced-motion freezes the day at 13:37. */
+
+const DAY_START = 450;  // 07:30
+const DAY_END = 1410;   // 23:30
+const FROZEN_AT = 817;  // 13:37 snapshot for reduced motion / first paint
+
+// [fromMin, revenue kr/min, staff on shift]
+const DAY_PHASES: [number, number, number][] = [
+  [450, 350, 2],    // opening prep — costs, little revenue
+  [600, 900, 3],    // morning
+  [660, 1900, 5],   // pre-lunch
+  [715, 4100, 6],   // lunch rush
+  [810, 1600, 4],   // afternoon
+  [1000, 2300, 7],  // early evening
+  [1080, 4400, 7],  // dinner rush
+  [1260, 1400, 3],  // late evening
+  [1350, 500, 2],   // closing
+];
+const STAFF_COST_PER_MIN = 99; // ≈5.940 kr/klst incl. burden per person
+
+function simAt(min: number): { revenue: number; cost: number; staff: number } {
+  let revenue = 0, cost = 0, staff = DAY_PHASES[0][2];
+  for (let i = 0; i < DAY_PHASES.length; i++) {
+    const [from, rate, s] = DAY_PHASES[i];
+    const to = i + 1 < DAY_PHASES.length ? DAY_PHASES[i + 1][0] : DAY_END;
+    if (min <= from) break;
+    const span = Math.min(min, to) - from;
+    revenue += span * rate;
+    cost += span * s * STAFF_COST_PER_MIN;
+    if (min > from) staff = s;
+  }
+  return { revenue, cost, staff };
+}
+
+const knr = (n: number) => Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+const hhmm = (min: number) => `${String(Math.floor(min / 60)).padStart(2, "0")}:${String(Math.floor(min % 60)).padStart(2, "0")}`;
+
+function LiveSim({ lang }: { lang: Lang }) {
+  const h = HERO2[lang];
+  const [min, setMin] = useState(FROZEN_AT);
+  const raf = useRef<number | null>(null);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let last = performance.now();
+    let cur = FROZEN_AT;
+    const tick = (now: number) => {
+      // ~34s per simulated day: 28.5 sim-minutes per real second.
+      cur += ((now - last) / 1000) * 28.5;
+      last = now;
+      if (cur >= DAY_END) cur = DAY_START;
+      setMin(cur);
+      raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+    return () => { if (raf.current) cancelAnimationFrame(raf.current); };
+  }, []);
+
+  const { revenue, cost, staff } = simAt(min);
+  const pct = revenue > 0 ? (cost / revenue) * 100 : 0;
+  const state = pct <= 30 ? "good" : pct <= 36 ? "warn" : "bad";
+  const events = SIM_EVENTS[lang];
+  const evt = [...events].reverse().find((e) => e[0] <= min) ?? events[0];
+  const gauge = Math.min(100, (pct / 60) * 100); // 0–60% scale
+
+  return (
+    <div className="sim" role="img" aria-label={`${h.pct} ${pct.toFixed(1)}%`}>
+      <div className="sim-head">
+        <span className="sim-day">{h.panel_head}</span>
+        <span className="sim-clock">{hhmm(min)}</span>
+      </div>
+      <div className="sim-stats">
+        <div className="sim-stat">
+          <span className="sl">{h.velta}</span>
+          <span className="sv">{knr(revenue)} <em>kr</em></span>
+        </div>
+        <div className="sim-stat">
+          <span className="sl">{h.laun}</span>
+          <span className="sv">{knr(cost)} <em>kr</em></span>
+        </div>
+        <div className="sim-stat">
+          <span className="sl">{h.onshift}</span>
+          <span className="sv">{staff}</span>
+        </div>
+      </div>
+      <div className={`sim-pct ${state}`}>
+        <div className="sp-top">
+          <span className="sl">{h.pct}</span>
+          <span className="sl target">{h.target}</span>
+        </div>
+        <div className="sp-num">{pct.toFixed(1).replace(".", ",")}<em>%</em></div>
+        <div className="sp-bar">
+          <i style={{ width: `${gauge}%` }} />
+          <b style={{ left: `${(30 / 60) * 100}%` }} />
+        </div>
+      </div>
+      <div className="sim-ticker"><span className="tick-dot" />{evt[1]}</div>
+      <div className="sim-note">{h.panel_note}</div>
+    </div>
+  );
+}
 
 /** A brand on the logo wall: real asset if `img` is set, else a styled wordmark. */
 function BrandLogo({ b }: { b: Brand }) {
@@ -44,11 +150,17 @@ const Chk = () => (
   </svg>
 );
 
-const FeatIcon = () => (
-  <svg className="ic" viewBox="0 0 24 24">
-    <circle cx="12" cy="12" r="9" />
-    <path d="M12 7v5l3 2" />
-  </svg>
+// One line icon per feature card: schedule, time clock, labor%, staffing, app+ID, integrations.
+const FEAT_ICONS = [
+  <><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></>,
+  <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+  <><path d="M4 19V5M4 19h16" /><path d="M8 16v-5M12 16V8M16 16v-3" /></>,
+  <><circle cx="9" cy="8" r="3.2" /><path d="M3.5 20a5.5 5.5 0 0 1 11 0M16 6.5a3 3 0 0 1 0 5.8M19.5 20a4.8 4.8 0 0 0-3-4.4" /></>,
+  <><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18.5h2" /></>,
+  <><path d="M8 12h8M12 8v8" /><circle cx="12" cy="12" r="9" /></>,
+];
+const FeatIcon = ({ i = 0 }: { i?: number }) => (
+  <svg className="ic" viewBox="0 0 24 24">{FEAT_ICONS[i % FEAT_ICONS.length]}</svg>
 );
 
 export default function Home() {
@@ -100,47 +212,21 @@ export default function Home() {
       </nav>
 
       <header className="hero">
-        <div className="wrap">
-          <span className="eyebrow"><span className="dot" /><span>{t.hero_badge}</span></span>
-          <h1 dangerouslySetInnerHTML={{ __html: t.hero_title }} />
-          <p className="sub">{t.hero_sub}</p>
-          <div className="hero-cta">
-            <a className="btn btn-pri btn-lg" href={tryHref}>{t.hero_cta1}</a>
-            <a className="btn btn-gho btn-lg" href="#">{t.hero_cta2}</a>
-          </div>
-          <p className="hero-note">{t.hero_note}</p>
-          <div className="mockwrap"><div className="mock">
-            <div className="mbar"><i /><i /><i /></div>
-            <div className="app">
-              <div className="side">
-                <div className="br"><LogoSvg w={18} />VAKTO</div>
-                <div className="ni on"><span className="di" /><span>{t.m_dashboard}</span></div>
-                <div className="ni"><span className="di" /><span>{t.m_schedule}</span></div>
-                <div className="ni"><span className="di" /><span>{t.m_time}</span></div>
-                <div className="ni"><span className="di" /><span>{t.m_pay}</span></div>
-                <div className="ni"><span className="di" /><span>{t.m_perf}</span></div>
-              </div>
-              <div className="appmain">
-                <div className="aphero">
-                  <div className="st"><div className="l">{t.m_planned}</div><div className="v">368</div></div>
-                  <div className="st"><div className="l">{t.m_actual}</div><div className="v">374</div></div>
-                  <div className="st"><div className="l">{t.m_laborcost}</div><div className="v">1,40 m</div></div>
-                  <div className="st"><div className="l">{t.m_laborpct}</div><div className="v" style={{ color: "#f7a35a" }}>32,1%</div></div>
-                </div>
-                <div className="apk" style={{ marginTop: 14 }}>
-                  <div className="c"><div className="l">{t.m_revtoday}</div><div className="v">612 þ</div><div className="d">+8,0%</div></div>
-                  <div className="c"><div className="l">{t.m_laborpct2}</div><div className="v">32,1%</div><div className="d" style={{ color: "var(--warn)" }}>{t.m_target}</div></div>
-                  <div className="c"><div className="l">{t.m_cost}</div><div className="v">198 þ</div></div>
-                  <div className="c"><div className="l">{t.m_staffing}</div><div className="v">5 / 6</div></div>
-                </div>
-                <div className="spark">
-                  {[62, 54, 70, 80, 96, 88, 58, 66, 74, 84, 92, 78].map((h, i) => (
-                    <span key={i} style={{ height: `${h}%` }} />
-                  ))}
-                </div>
-              </div>
+        <div className="wrap hero-grid">
+          <div className="hero-copy">
+            <span className="mono-eyebrow">{HERO2[lang].eyebrow}</span>
+            <h1 className="hero-h1">
+              {HERO2[lang].t1}
+              <span className="h1-live">{HERO2[lang].t2}</span>
+            </h1>
+            <p className="sub">{HERO2[lang].sub}</p>
+            <div className="hero-cta">
+              <a className="btn btn-pri btn-lg" href={tryHref}>{t.hero_cta1}</a>
+              <a className="btn btn-dark btn-lg" href="#">{t.hero_cta2}</a>
             </div>
-          </div></div>
+            <p className="hero-note">{HERO2[lang].note}</p>
+          </div>
+          <LiveSim lang={lang} />
         </div>
       </header>
 
@@ -186,7 +272,7 @@ export default function Home() {
         <div className="bento">
           {FEAT[lang].map((f, i) => (
             <div className="bcard" key={i}>
-              <div className="bi"><FeatIcon /></div>
+              <div className="bi"><FeatIcon i={i} /></div>
               <h3>{f[0]}</h3><p>{f[1]}</p>
             </div>
           ))}
@@ -198,7 +284,7 @@ export default function Home() {
         <div className="flow">
           {FLOW[lang].map((f, i) => (
             <div className="fstep" key={i}>
-              <div className="n">{i + 1}</div><h3>{f[0]}</h3><p>{f[1]}</p>
+              <div className="n">{String(i + 1).padStart(2, "0")}</div><h3>{f[0]}</h3><p>{f[1]}</p>
             </div>
           ))}
         </div>
@@ -260,9 +346,9 @@ export default function Home() {
       <section className="cta"><div className="cta-box">
         <h2>{t.cta_title}</h2>
         <p>{t.cta_sub}</p>
-        <div className="hero-cta" style={{ marginTop: 28 }}>
-          <a className="btn btn-lg" style={{ background: "#fff", color: "var(--green)" }} href="#">{t.cta_btn1}</a>
-          <a className="btn btn-lg" style={{ background: "rgba(255,255,255,.16)", color: "#fff", borderColor: "rgba(255,255,255,.32)" }} href={tryHref}>{t.cta_btn2}</a>
+        <div className="hero-cta cta-btns">
+          <a className="btn btn-pri btn-lg" href="#">{t.cta_btn1}</a>
+          <a className="btn btn-dark btn-lg" href={tryHref}>{t.cta_btn2}</a>
         </div>
       </div></section>
 
