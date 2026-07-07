@@ -9,7 +9,8 @@ import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { nf, dec1 } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
 import { fetchAttendance, getTimeReport } from "../timaskraning/actions";
-import { exportTimeReportXlsx, exportTimeReportPdf } from "@/lib/export-report";
+import { exportTimeReportXlsx, exportTimeReportPdf, exportTableXlsx, exportTablePdf } from "@/lib/export-report";
+import { getManagerReport, type ReportKind } from "./actions";
 import { TimeBankCard } from "./timebank-card";
 import type { TimeBank } from "./timebank.server";
 
@@ -56,12 +57,48 @@ const BANK = [
   { n: "Ha Vu", req: "120", w: "112", b: "−8,0", c: "var(--warn)" },
   { n: "Bach", req: "162", w: "160", b: "−2,0", c: "" },
 ];
-const LIB = [
-  ["Launatímar per starfsmaður", "fyrir launakeyrslu · CSV/Excel", "Excel", "M4 6h16M4 12h16M4 18h10"],
-  ["Yfirvinna & álög", "sundurliðun á álagstímum", "PDF", "M3 17l5-5 4 3 6-7"],
-  ["Mæting & frávik", "seinkomur, fjarvistir, vantar útstimplun", "PDF", "CLOCK"],
-  ["Orlof & réttindi", "staða orlofs og tímabanka per starfsmann", "Excel", "M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5"],
+const LIB: { kind: ReportKind; title: string; sub: string; fmt: "Excel" | "PDF"; icon: string }[] = [
+  { kind: "hours", title: "Launatímar per starfsmaður", sub: "dagvinna, álag og yfirvinna fyrir launakeyrslu", fmt: "Excel", icon: "M4 6h16M4 12h16M4 18h10" },
+  { kind: "overtime", title: "Yfirvinna & álög", sub: "sundurliðun á álagstímum og aukakostnaði", fmt: "PDF", icon: "M3 17l5-5 4 3 6-7" },
+  { kind: "attendance", title: "Mæting & frávik", sub: "áætlað vs raun, vantar útstimplun", fmt: "PDF", icon: "CLOCK" },
+  { kind: "timebank", title: "Orlof & tímabanki", sub: "áunnið orlof og staða tímabanka per starfsmann", fmt: "Excel", icon: "M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5" },
 ];
+
+/** Downloadable manager reports for the selected period — real data, Excel/PDF. */
+function ReportLibrary({ from, to }: { from: string; to: string }) {
+  const { t } = useLang();
+  const [busy, setBusy] = useState<ReportKind | null>(null);
+  async function download(item: (typeof LIB)[number]) {
+    if (busy) return;
+    setBusy(item.kind);
+    try {
+      const rep = await getManagerReport(item.kind, from, to);
+      if (!rep.ok) { toast(rep.error ?? "Tókst ekki að sækja gögn"); return; }
+      if (!rep.rows.length) { toast("Engin gögn á tímabilinu"); return; }
+      const payload = { title: rep.title, company: rep.company, from, to, columns: rep.columns, numeric: rep.numeric, rows: rep.rows };
+      if (item.fmt === "Excel") await exportTableXlsx(payload); else await exportTablePdf(payload);
+      toast(rep.demo ? `${rep.title} — sýnigögn (tengdu Supabase)` : `${rep.title} sótt`);
+    } catch { toast("Villa við útflutning"); } finally { setBusy(null); }
+  }
+  return (
+    <div className="card">
+      <div className="ch"><div><div className="ct">{t("Skýrslusafn")}</div><div className="cs">{t("smelltu til að sækja fyrir valið tímabil — Excel eða PDF")}</div></div></div>
+      <div className="cb att">
+        {LIB.map((r) => (
+          <div className="it rowlink" key={r.kind} style={busy === r.kind ? { opacity: 0.55 } : undefined} onClick={() => download(r)}>
+            <div className="ic info">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}>
+                {r.icon === "CLOCK" ? <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></> : <path d={r.icon} />}
+              </svg>
+            </div>
+            <div className="tx"><b>{t(r.title)}</b><span>{busy === r.kind ? t("Sæki…") : t(r.sub)}</span></div>
+            <span className="badge">{r.fmt}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function ReportsScreen({ empty = false, live = false, rows = [], timebank }: { empty?: boolean; live?: boolean; rows?: AttRow[]; timebank?: TimeBank }) {
   const { t } = useLang();
@@ -171,22 +208,7 @@ export default function ReportsScreen({ empty = false, live = false, rows = [], 
             </table>
           </div>
         </div>
-        <div className="card">
-          <div className="ch"><div className="ct">{t("Skýrslusafn")}</div><div className="cs">{t("smelltu til að sækja — PDF eða Excel")}</div></div>
-          <div className="cb att">
-            {LIB.map((r) => (
-              <div className="it rowlink" key={r[0]} onClick={() => toast(`Sæki: ${r[0]}`)}>
-                <div className="ic info">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}>
-                    {r[3] === "CLOCK" ? <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></> : <path d={r[3]} />}
-                  </svg>
-                </div>
-                <div className="tx"><b>{r[0]}</b><span>{r[1]}</span></div>
-                <span className="badge">{r[2]}</span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <ReportLibrary from={period === "Sérsniðið" && from && to ? from : rangeFor(period).from} to={period === "Sérsniðið" && from && to ? to : rangeFor(period).to} />
       </div>
     </>
   );
@@ -264,6 +286,9 @@ function LiveReports({ initial, timebank }: { initial: AttRow[]; timebank?: Time
             </tbody>
           </table>
         </div>
+      </div>
+      <div style={{ marginTop: 16 }}>
+        <ReportLibrary from={from} to={to} />
       </div>
       {timebank && <TimeBankCard rows={timebank.rows} live={timebank.live} monthLabels={timebank.monthLabels} />}
     </>

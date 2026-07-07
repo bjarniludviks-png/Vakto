@@ -132,6 +132,41 @@ export async function setWeekdayRevenue(map: Record<string, number>): Promise<Se
   }
 }
 
+/** Save the company's own info (name, kennitala, address, contact). Owner-only via RLS. */
+export async function saveCompanyInfo(
+  input: { name: string; kennitala?: string; address?: string; phone?: string; email?: string },
+): Promise<SettingsResult> {
+  if (!input.name?.trim()) return { ok: false, error: "Nafn fyrirtækis vantar" };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const patch = {
+      name: input.name.trim(),
+      kennitala: input.kennitala?.trim() || null,
+      address: input.address?.trim() || null,
+      phone: input.phone?.trim() || null,
+      email: input.email?.trim() || null,
+    };
+    let { error } = await supabase.from("companies").update(patch).eq("id", ctx.company);
+    if (error && /address|phone|email/.test(error.message)) {
+      // 0026 not run yet — save what the schema has.
+      ({ error } = await supabase.from("companies")
+        .update({ name: patch.name, kennitala: patch.kennitala }).eq("id", ctx.company));
+      if (!error) error = { message: "Vistað að hluta — keyrðu migration 0026 fyrir heimilisfang/síma/netfang" } as never;
+    }
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "company.update", entity: "company", detail: `Fyrirtækjaupplýsingar uppfærðar — ${patch.name}`,
+    });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /** Add a location (staður) to the company. */
 export async function addLocation(input: { name: string }): Promise<SettingsResult> {
   if (!input.name?.trim()) return { ok: false, error: "Nafn vantar" };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useLang } from "@/components/app/lang";
 import { dec1 } from "@/lib/format";
 import type { TbRow } from "./timebank.server";
@@ -25,15 +25,15 @@ export function TimeBankCard({ rows, live, monthLabels }: { rows: TbRow[]; live:
           <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Staða banka")}</th><th></th></tr></thead>
           <tbody>
             {rows.map((r) => (
-              <>
-                <tr key={r.id} className="rowlink" onClick={() => setOpen(open === r.id ? null : r.id)}>
+              <Fragment key={r.id}>
+                <tr className="rowlink" onClick={() => setOpen(open === r.id ? null : r.id)}>
                   <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.name}</span></td>
                   <td>{t(r.dept)}</td>
                   <td className="r">{bal(r.balance, true)} <small style={{ color: "var(--ink3)" }}>{t("klst")}</small></td>
                   <td className="r" style={{ width: 24, color: "var(--ink3)" }}>{r.months.some((m) => m.actual > 0) ? (open === r.id ? "▾" : "▸") : ""}</td>
                 </tr>
                 {open === r.id && r.months.some((m) => m.actual > 0) && (
-                  <tr key={r.id + "-d"}>
+                  <tr>
                     <td colSpan={4} style={{ background: "var(--line2)", padding: "6px 14px" }}>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 14 }}>
                         {r.months.filter((m) => m.actual > 0).map((m, i) => (
@@ -45,7 +45,7 @@ export function TimeBankCard({ rows, live, monthLabels }: { rows: TbRow[]; live:
                     </td>
                   </tr>
                 )}
-              </>
+              </Fragment>
             ))}
             {!rows.length && <tr><td colSpan={4} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn enn.")}</td></tr>}
           </tbody>

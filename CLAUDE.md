@@ -141,6 +141,27 @@
   cost, hours, time-bank) by a period factor while true rates/ratios (laun%, per-hour, attendance %)
   stay stable; comparison badges update per period. Demo-grade scaling until real period
   aggregations are wired.
-- **Still remaining:** contractor billable-vs-cost/GPS job tracking, push notifications, a
-  signed-URL viewer for the private `documents` bucket, Excel/PDF export generation (CSV works),
-  dashboard widget customization, and Google/Microsoft/Auðkenni OAuth (scaffolded in `login-form`).
+- ✅ **UX-hreinsun & stjórnendagögn (júlí 2026):** dedup á mælaborði (hero-röndin á tölurnar, KPI-röðin
+  sýnir bara NÝJAR upplýsingar: laun%-hringur, yfirvinnukostnaður, álagstímar, launatengd gjöld, kr/klst);
+  **Skýrslusafnið er alvöru** — `skyrslur/actions.ts` `getManagerReport()` (hours/overtime/attendance/
+  timebank) + generic `exportTableXlsx/Pdf` í `export-report.ts`, birt í BÆÐI demo- og live-view með
+  tímabili síunnar; **Frammistaða live** — `frammistada/perf.server.ts` `getPerfHistory()` (velta/kostn./
+  laun% per mánuð + deildaskipting), samanburðartafla mán vs mán, KPI-haus fylgir nýjasta mánuði;
+  **chart-hover** — `.ctip` tooltip í `charts.tsx` (Bars/Stacked/Paired taka `labels`); **Stillingar** —
+  "Fyrirtækið mitt" spjald (nafn/kt/heimilisfang/sími/netfang → `saveCompanyInfo`, migration **0026**),
+  Aðgerðaskrá-flipinn fjarlægður (logAudit skrifar áfram í töfluna); **Mitt svæði live** —
+  `mitt-svaedi/my.server.ts` `getMyArea()` (vikuplan, næstu vaktir, opin stimplun í PunchCard, launamat
+  úr punches m. classifyPay, orlof/tímabanki, prófílgögn, opnar vaktir) + innskráður án starfsmannaprófíls
+  fær tómstöður en ALDREI demo; **Spjall** — ólesin merki (localStorage seen), tímastimplar, röðun eftir
+  virkni (Almennt fest efst), listi endurhlaðast í pollinu; **getDashboardPeriod** — 40-daga þakið →370,
+  áætluð vikudagsvelta fyllir daga ÁN rauntalna (raun vinnur alltaf per dag) svo sérsniðið tímabil
+  summar velta/laun% rétt; **AI-vaktaplan skilar nú `shifts`** (employee/day/start/end) sem
+  `approveAiProposal` setur í gridið og birtir — samhengið inniheldur núverandi plan + raunveltu vikunnar.
+  Öll ný UI-strengir í DICT (IS/EN). Migration 0025+0026 bætt í RUN_ALL.
+- ⚠️ **AI er EKKI virkt:** `ANTHROPIC_API_KEY` er tómur í `.env.local` og EKKI settur á Vercel —
+  `/api/ai/schedule` fellur á demo-tillögu. Setja lykil (console.anthropic.com) + `vercel env add`.
+- **Still remaining:** contractor billable-vs-cost/GPS job tracking, a signed-URL viewer for the
+  private `documents` bucket, Google/Microsoft/Auðkenni OAuth (scaffolded in `login-form`).
+  **Næsti fasi (ákveðið af eiganda):** mobile app (eigandi með ákveðna leið), Apple Wallet skírteini
+  (WalletButtons til), VAKTO-admin fyrir eigandann (notendur/fyrirtæki/greiðslustaða/velta),
+  alvöru stuðningsspjall við eigandann, Teya-áskriftir tengdar Payday (mánaðarreikningar sjálfvirkt).

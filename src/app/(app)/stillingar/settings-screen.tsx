@@ -6,9 +6,8 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { syncInventraRevenue, addLocation, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue } from "./actions";
-import type { AuditEntry } from "@/lib/audit";
-import type { SettingsData } from "./settings.server";
+import { syncInventraRevenue, addLocation, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo } from "./actions";
+import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { dec1 } from "@/lib/format";
 
@@ -18,20 +17,12 @@ type SettingsModal = "location" | "position" | "invite" | "revenue" | "avgrevenu
 const WEEKDAYS: [number, string][] = [[1, "Mánudagur"], [2, "Þriðjudagur"], [3, "Miðvikudagur"], [4, "Fimmtudagur"], [5, "Föstudagur"], [6, "Laugardagur"], [0, "Sunnudagur"]];
 
 const ROLE_LABEL: Record<string, string> = { owner: "Eigandi", manager: "Stjórnandi", employee: "role:employee", contractor: "Verktaki" };
-const DEMO_SETTINGS: SettingsData = { locations: [], positions: [], users: [], companyId: null, live: false };
+const DEMO_SETTINGS: SettingsData = { locations: [], positions: [], users: [], companyId: null, company: null, live: false };
 
 function copyKioskLink(companyId: string | null) {
   const url = `${window.location.origin}/kiosk${companyId ? `?company=${companyId}` : ""}`;
   navigator.clipboard?.writeText(url).then(() => toast("Kiosk-slóð afrituð"), () => toast(url));
 }
-
-const AUDIT_ICON: Record<string, string> = {
-  "employee.create": "M12 5v14M5 12h14",
-  "employee.update": "M4 13.5V19a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5.5M16 6l-4-4-4 4M12 2v13",
-  "payroll.run": "M3 7h18v12H3zM3 11h18",
-  "schedule.publish": "M3 4h18v17H3zM3 9h18M8 2v4M16 2v4",
-  "inventra.sync": "M4 12a8 8 0 0 1 14-5l2 2M20 12a8 8 0 0 1-14 5l-2-2",
-};
 
 async function syncInventra() {
   const res = await syncInventraRevenue();
@@ -46,7 +37,7 @@ const Pin = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z" /><circle cx="12" cy="9" r="2.5" /></svg>
 );
 
-export default function SettingsScreen({ audit = [], initialModal = null, data = DEMO_SETTINGS, payRules = [] }: { audit?: AuditEntry[]; initialModal?: SettingsModal; data?: SettingsData; payRules?: PayRule[] }) {
+export default function SettingsScreen({ initialModal = null, data = DEMO_SETTINGS, payRules = [] }: { initialModal?: SettingsModal; data?: SettingsData; payRules?: PayRule[] }) {
   const { t } = useLang();
   const [modal, setModal] = useState<SettingsModal>(initialModal);
   const [editRule, setEditRule] = useState<PayRule | null>(null);
@@ -55,7 +46,7 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
   const [section, setSection] = useState<string>("fyrirtaeki");
   const SECTIONS: [string, string][] = [
     ["fyrirtaeki", "Fyrirtæki"], ["tengingar", "Tengingar"], ["launareglur", "Launareglur"],
-    ["notendur", "Notendur"], ["askrift", "Áskrift"], ["adgerdaskra", "Aðgerðaskrá"],
+    ["notendur", "Notendur"], ["askrift", "Áskrift"],
   ];
   return (
     <>
@@ -69,6 +60,7 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
 
       {section === "fyrirtaeki" && <>
       <div className="grid2b">
+        <CompanyCard info={data.company} />
         <div className="card">
           <div className="ch"><div className="ct">{t("Land & launareglur")}</div></div>
           <div className="cb">
@@ -188,37 +180,44 @@ export default function SettingsScreen({ audit = [], initialModal = null, data =
       </div>
       )}
 
-      {section === "adgerdaskra" && (
-      <div className="card owner-only">
-        <div className="ch"><div><div className="ct">{t("audit:title")}</div><div className="cs">{t("audit:sub")}</div></div><span className="badge">{audit.length}</span></div>
-        <div className="cb att">
-          {audit.length === 0 ? (
-            <p className="muted" style={{ fontSize: 13 }}>{t("audit:empty")}</p>
-          ) : (
-            audit.map((a, i) => (
-              <div className="it" key={i}>
-                <div className="ic info">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}>
-                    <path d={AUDIT_ICON[a.action] ?? "M5 12h14"} />
-                  </svg>
-                </div>
-                <div className="tx"><b>{a.detail ?? a.action}</b><span>{a.action}</span></div>
-                <span className="tag mut" style={{ background: "var(--line2)", color: "var(--ink3)" }}>
-                  {a.at.slice(8, 10)}.{a.at.slice(5, 7)}. · {a.at.slice(11, 16)}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-      )}
-
       </div>
 
       {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} />}
       {editRule && <PayRuleModal rule={editRule} onClose={() => setEditRule(null)} />}
       {posName !== null && <PosConnectModal name={posName} onClose={() => setPosName(null)} />}
     </>
+  );
+}
+
+/** Editable company info (name, kennitala, address, contact) — Stillingar → Fyrirtæki. */
+function CompanyCard({ info }: { info: CompanyInfo | null }) {
+  const { t } = useLang();
+  const [name, setName] = useState(info?.name ?? "");
+  const [kt, setKt] = useState(info?.kennitala ?? "");
+  const [address, setAddress] = useState(info?.address ?? "");
+  const [phone, setPhone] = useState(info?.phone ?? "");
+  const [email, setEmail] = useState(info?.email ?? "");
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    setBusy(true);
+    const res = await saveCompanyInfo({ name, kennitala: kt, address, phone, email });
+    setBusy(false);
+    toast(res.ok ? (res.demo ? "Vistað (demo — tengdu Supabase)" : "Fyrirtækjaupplýsingar vistaðar") : (res.error ?? "Tókst ekki"));
+  }
+  return (
+    <div className="card">
+      <div className="ch"><div><div className="ct">{t("Fyrirtækið mitt")}</div><div className="cs">{t("birtist á skírteinum, skýrslum og launaseðlum")}</div></div></div>
+      <div className="cb">
+        <div className="field"><label>{t("Nafn fyrirtækis")}</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="t.d. Kaffi Krónan ehf." /></div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <div className="field" style={{ flex: 1 }}><label>{t("Kennitala")}</label><input value={kt} onChange={(e) => setKt(e.target.value)} placeholder="550101-2210" /></div>
+          <div className="field" style={{ flex: 1 }}><label>{t("Sími")}</label><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+354 555 1234" /></div>
+        </div>
+        <div className="field"><label>{t("Heimilisfang")}</label><input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("t.d. Laugavegur 1, 101 Reykjavík")} /></div>
+        <div className="field"><label>{t("Netfang")}</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="bokhald@fyrirtaeki.is" /></div>
+        <button className="btn sm" disabled={busy} onClick={save}>{t("Vista")}</button>
+      </div>
+    </div>
   );
 }
 

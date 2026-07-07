@@ -898,6 +898,56 @@ export const DICT: Dict = {
   "audit:title": { is: "Kerfisaðgerðaskrá (Audit Log)", en: "System Audit Log Ledger" },
   "audit:sub": { is: "nýlegar breytingar og breytingasaga í kerfinu", en: "recent security, configuration and system access changes" },
   "audit:empty": { is: "Engar aðgerðir skráðar í aðgerðaskrá enn.", en: "No administrative entries logged in audit trail yet." },
+
+  // Dashboard KPI row (deduplicated vs hero strip)
+  "Yfirvinnukostnaður": { is: "Yfirvinnukostnaður", en: "Overtime cost" },
+  "umfram grunnlaun": { is: "umfram grunnlaun", en: "above base pay" },
+
+  // Settings — company info card
+  "Fyrirtækið mitt": { is: "Fyrirtækið mitt", en: "My company" },
+  "birtist á skírteinum, skýrslum og launaseðlum": { is: "birtist á skírteinum, skýrslum og launaseðlum", en: "shown on ID cards, reports and payslips" },
+  "Nafn fyrirtækis": { is: "Nafn fyrirtækis", en: "Company name" },
+  "Heimilisfang": { is: "Heimilisfang", en: "Address" },
+  "t.d. Laugavegur 1, 101 Reykjavík": { is: "t.d. Laugavegur 1, 101 Reykjavík", en: "e.g. Laugavegur 1, 101 Reykjavík" },
+
+  // Reports — manager report library
+  "smelltu til að sækja fyrir valið tímabil — Excel eða PDF": { is: "smelltu til að sækja fyrir valið tímabil — Excel eða PDF", en: "click to download for the selected period — Excel or PDF" },
+  "Launatímar per starfsmaður": { is: "Launatímar per starfsmaður", en: "Paid hours per employee" },
+  "dagvinna, álag og yfirvinna fyrir launakeyrslu": { is: "dagvinna, álag og yfirvinna fyrir launakeyrslu", en: "day, premium and overtime hours for payroll" },
+  "Yfirvinna & álög": { is: "Yfirvinna & álög", en: "Overtime & premiums" },
+  "sundurliðun á álagstímum og aukakostnaði": { is: "sundurliðun á álagstímum og aukakostnaði", en: "breakdown of premium hours and extra cost" },
+  "Mæting & frávik": { is: "Mæting & frávik", en: "Attendance & deviations" },
+  "áætlað vs raun, vantar útstimplun": { is: "áætlað vs raun, vantar útstimplun", en: "planned vs actual, missing clock-outs" },
+  "Orlof & tímabanki": { is: "Orlof & tímabanki", en: "Leave & time bank" },
+  "áunnið orlof og staða tímabanka per starfsmann": { is: "áunnið orlof og staða tímabanka per starfsmann", en: "accrued leave and time-bank balance per employee" },
+  "Sæki…": { is: "Sæki…", en: "Downloading…" },
+
+  // Performance — live history
+  "per mánuð · farðu með músina yfir fyrir tölur": { is: "per mánuð · farðu með músina yfir fyrir tölur", en: "per month · hover for the exact numbers" },
+  "síðustu 6 mánuðir · farðu með músina yfir fyrir tölur": { is: "síðustu 6 mánuðir · farðu með músina yfir fyrir tölur", en: "last 6 months · hover for the exact numbers" },
+  "Skráðu veltu til að sjá laun% per mánuð.": { is: "Skráðu veltu til að sjá laun% per mánuð.", en: "Log revenue to see labor% per month." },
+  "Launakostnaður eftir deild": { is: "Launakostnaður eftir deild", en: "Labor cost by department" },
+  "þessi mánuður · hlutfall af heildarkostnaði": { is: "þessi mánuður · hlutfall af heildarkostnaði", en: "this month · share of total cost" },
+
+  // My area — live data
+  "Á vakt síðan": { is: "Á vakt síðan", en: "On shift since" },
+  "Engar vaktir á plani framundan.": { is: "Engar vaktir á plani framundan.", en: "No upcoming shifts scheduled." },
+  "í dag": { is: "í dag", en: "today" },
+  "Mánaðarlaun (föst)": { is: "Mánaðarlaun (föst)", en: "Monthly salary (fixed)" },
+  "áætlað": { is: "áætlað", en: "estimated" },
+  "Áunnir dagar (í ár)": { is: "Áunnir dagar (í ár)", en: "Accrued days (this year)" },
+  "Unnið (þessi mán)": { is: "Unnið (þessi mán)", en: "Worked (this month)" },
+  "Staða, deild og kjarasamningur eru skráð af stjórnanda — hafðu samband ef eitthvað er rangt.": { is: "Staða, deild og kjarasamningur eru skráð af stjórnanda — hafðu samband ef eitthvað er rangt.", en: "Position, department and union agreement are managed by your admin — get in touch if anything is wrong." },
+  "Nafn samstarfsmanns (má sleppa)": { is: "Nafn samstarfsmanns (má sleppa)", en: "Colleague's name (optional)" },
+  "Engar opnar vaktir í boði núna — kíktu aftur síðar.": { is: "Engar opnar vaktir í boði núna — kíktu aftur síðar.", en: "No open shifts available right now — check back later." },
+  "Vaktaplan birtist hér þegar vaktir eru birtar á þig.": { is: "Vaktaplan birtist hér þegar vaktir eru birtar á þig.", en: "Your schedule appears here once shifts are published for you." },
+  "Orlof, tímabanki og réttindi birtast þegar starfsmannaprófíll og stimplanir eru til staðar.": { is: "Orlof, tímabanki og réttindi birtast þegar starfsmannaprófíll og stimplanir eru til staðar.", en: "Leave, time bank and entitlements appear once an employee profile and punches exist." },
+  "álag": { is: "álag", en: "premium" },
+  "dagvinna": { is: "dagvinna", en: "day rate" },
+
+  // Schedule — AI proposal
+  "Tillagan gildir fyrir vikuna sem er opin í planinu — flettu fyrst á réttu vikuna (t.d. næstu viku) með örvunum efst.": { is: "Tillagan gildir fyrir vikuna sem er opin í planinu — flettu fyrst á réttu vikuna (t.d. næstu viku) með örvunum efst.", en: "The proposal applies to the week currently open in the plan — navigate to the right week first (e.g. next week) with the arrows above." },
+  "vaktir í tillögunni — við samþykki eru þær settar í planið og það birt.": { is: "vaktir í tillögunni — við samþykki eru þær settar í planið og það birt.", en: "shifts in the proposal — on approval they are placed into the plan and published." },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

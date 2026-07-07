@@ -17,6 +17,20 @@ export default function ChatScreen({ initial }: { initial?: { ok: boolean; items
   return <Messenger initial={initial} />;
 }
 
+// Last-seen timestamps per conversation (client-side unread markers).
+const SEEN_KEY = "vakto-chat-seen";
+function readSeen(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "{}"); } catch { return {}; }
+}
+/** "13:45" today, else "24.6." */
+function convTime(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${d.getDate()}.${d.getMonth() + 1}.`;
+}
+
 function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[]; meId: string } }) {
   const { t } = useLang();
   const [convs, setConvs] = useState<Conversation[]>(initial.items);
@@ -27,18 +41,29 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
   const [emoji, setEmoji] = useState(false);
   const [rec, setRec] = useState(false);
   const [modal, setModal] = useState<null | "dm" | "group" | "info">(null);
+  const [seen, setSeen] = useState<Record<string, string>>({});
   const endRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
 
   function reloadConvs() { listConversations().then((r) => { if (r.ok) setConvs(r.items); }); }
   function loadMsgs(id?: string) { if (id) listMessages(id).then((r) => { if (r.ok) setMsgs(r.messages); }); }
+  function markSeen(id: string) {
+    setSeen(() => {
+      const next = { ...readSeen(), [id]: new Date().toISOString() };
+      try { localStorage.setItem(SEEN_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }
+  useEffect(() => { setSeen(readSeen()); }, []);
   useEffect(() => {
     loadMsgs(active?.id);
-    const iv = setInterval(() => loadMsgs(active?.id), 4000);
+    if (active?.id) markSeen(active.id);
+    const iv = setInterval(() => { loadMsgs(active?.id); reloadConvs(); if (active?.id) markSeen(active.id); }, 4000);
     return () => clearInterval(iv);
   }, [active?.id]);
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs]);
+  const unread = (c: Conversation) => !!c.lastAt && c.id !== active?.id && (!seen[c.id] || c.lastAt > seen[c.id]);
 
   async function send(kind: "text" | "image" | "audio" = "text", url?: string, body?: string) {
     const text = body ?? val;
@@ -98,12 +123,22 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
             <button className="iconbtn" title={t("Ný grúppa")} onClick={() => setModal("group")}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" /></svg></button>
           </div>
           <div style={{ flex: 1, overflowY: "auto" }}>
-            {shown.map((c) => (
-              <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}`} onClick={() => setActive(c)}>
-                <span className="avt" style={{ background: c.color, width: 40, height: 40, fontSize: c.kind === "general" ? 18 : 13 }}>{c.av}</span>
-                <div className="tx"><b>{c.kind === "general" ? "# " + c.name : c.name}</b><span>{c.last || (c.dm ? t("Bein skilaboð") : t("Grúppa"))}</span></div>
-              </div>
-            ))}
+            {shown.map((c) => {
+              const un = unread(c);
+              return (
+                <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}`} onClick={() => { setActive(c); markSeen(c.id); }}>
+                  <span className="avt" style={{ background: c.color, width: 40, height: 40, fontSize: c.kind === "general" ? 18 : 13 }}>{c.av}</span>
+                  <div className="tx">
+                    <b style={un ? { fontWeight: 800 } : undefined}>{c.kind === "general" ? "# " + c.name : c.name}</b>
+                    <span style={un ? { color: "var(--ink)", fontWeight: 600 } : undefined}>{c.last || (c.dm ? t("Bein skilaboð") : t("Grúppa"))}</span>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, marginLeft: "auto", flexShrink: 0 }}>
+                    <span className="muted" style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{convTime(c.lastAt)}</span>
+                    {un && <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--brand)", display: "inline-block" }} />}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

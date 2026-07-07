@@ -43,13 +43,14 @@ function shiftHours(start?: string | null, end?: string | null): number {
 }
 
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-/** Inclusive list of ISO dates from..to (capped for safety). */
+/** Inclusive list of ISO dates from..to (capped at ~1 year for safety — must cover
+ * the whole selected period, otherwise prorated costs/estimates come out wrong). */
 function dateRange(fromISO: string, toISO: string): string[] {
   const out: string[] = [];
   const [fy, fm, fd] = fromISO.split("-").map(Number);
   const [ty, tm, td] = toISO.split("-").map(Number);
   const d = new Date(fy, fm - 1, fd), end = new Date(ty, tm - 1, td);
-  while (d <= end && out.length < 40) { out.push(isoOf(d)); d.setDate(d.getDate() + 1); }
+  while (d <= end && out.length < 370) { out.push(isoOf(d)); d.setDate(d.getDate() + 1); }
   return out;
 }
 
@@ -149,21 +150,28 @@ export async function getDashboardPeriod(fromISO: string, toISO: string): Promis
     let revenueSource: PeriodData["revenueSource"] = "none";
     const { data: locs } = await supabase.from("locations").select("id").eq("company_id", company);
     const locIds = (locs ?? []).map((l) => l.id as string);
+    const coveredDays = new Set<string>(); // days with a REAL revenue row
     if (locIds.length) {
-      const { data: rev } = await supabase.from("revenue").select("amount, source")
+      const { data: rev } = await supabase.from("revenue").select("amount, source, date")
         .in("location_id", locIds).gte("date", fromISO).lte("date", toISO);
       revenue = (rev ?? []).reduce((a, r) => a + Number(r.amount ?? 0), 0);
+      for (const r of rev ?? []) coveredDays.add(String(r.date).slice(0, 10));
       const srcs = new Set((rev ?? []).map((r) => (String(r.source ?? "manual") === "inventra" ? "inventra" : "manual")));
       revenueSource = srcs.size === 0 ? "none" : srcs.size > 1 ? "mixed" : (srcs.has("inventra") ? "inventra" : "manual");
     }
-    // No real revenue for the period → estimate from the company's per-weekday averages.
-    if (revenue === 0) {
+    // Days WITHOUT a real revenue row → fill from the company's per-weekday
+    // averages, so velta sums over the WHOLE selected period and laun% divides
+    // cost by the full period's revenue (real figures always win per day).
+    if (coveredDays.size < days.length) {
       const { data: comp } = await supabase.from("companies").select("weekday_revenue").eq("id", company).maybeSingle();
       const wr = comp?.weekday_revenue as Record<string, number> | null | undefined;
       if (wr) {
         let est = 0;
-        for (const d of days) est += Number(wr[String(new Date(d + "T00:00:00").getDay())] ?? 0);
-        if (est > 0) { revenue = est; revenueSource = "estimated"; }
+        for (const d of days) if (!coveredDays.has(d)) est += Number(wr[String(new Date(d + "T00:00:00").getDay())] ?? 0);
+        if (est > 0) {
+          revenue += est;
+          revenueSource = revenueSource === "none" ? "estimated" : "mixed";
+        }
       }
     }
     return {

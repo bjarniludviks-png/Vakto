@@ -1,6 +1,6 @@
 // Client-side Excel (.xlsx) + PDF export for the time report. Heavy deps are
 // dynamically imported so they don't bloat the initial bundle.
-import { dec1 } from "@/lib/format";
+import { dec1, nf } from "@/lib/format";
 import type { TimeReportRow } from "@/app/(app)/timaskraning/actions";
 
 const statusIs = (a: boolean) => (a ? "Samþykkt" : "Bíður");
@@ -79,6 +79,47 @@ function logoFooter(doc: any) {
     doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
     doc.text("vakto.is", pw - 14, by, { align: "right" });
   }
+}
+
+export type TableExport = { title: string; company: string; from: string; to: string; columns: string[]; numeric: number[]; rows: (string | number)[][] };
+
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9áðéíóúýþæö]+/gi, "-").replace(/^-|-$/g, "");
+
+/** Generic branded table → .xlsx (manager report library). */
+export async function exportTableXlsx(d: TableExport) {
+  const XLSX = await import("xlsx");
+  const aoa: (string | number)[][] = [
+    [`${d.title} — ${d.company}`],
+    [`Tímabil: ${d.from} – ${d.to}`],
+    [],
+    d.columns,
+    ...d.rows,
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws["!cols"] = d.columns.map((c, i) => ({ wch: Math.max(12, c.length + 2, i === 0 ? 24 : 0) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, d.title.slice(0, 31));
+  XLSX.writeFile(wb, `vakto-${slug(d.title)}-${d.from}_${d.to}.xlsx`);
+}
+
+/** Generic branded table → PDF (manager report library). */
+export async function exportTablePdf(d: TableExport) {
+  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
+  const doc = new jsPDF(d.columns.length > 6 ? "landscape" : "portrait");
+  doc.setFontSize(15); doc.setTextColor(20); doc.text(`${d.title} — ${d.company}`, 14, 18);
+  doc.setFontSize(10); doc.setTextColor(120); doc.text(`Tímabil: ${d.from} – ${d.to}`, 14, 25);
+  const columnStyles: Record<number, { halign: "right" }> = {};
+  for (const i of d.numeric) columnStyles[i] = { halign: "right" };
+  autoTable(doc, {
+    startY: 31,
+    head: [d.columns],
+    body: d.rows.map((r) => r.map((v) => (typeof v === "number" ? (Number.isInteger(v) ? nf(v) : dec1(v)) : v))),
+    styles: { fontSize: 9, cellPadding: 2.5 },
+    headStyles: { fillColor: [233, 112, 15], textColor: 255 },
+    columnStyles,
+  });
+  logoFooter(doc);
+  doc.save(`vakto-${slug(d.title)}-${d.from}_${d.to}.pdf`);
 }
 
 export type PayslipExport = { name: string; period: string; company?: string; hours: string; gross: string; withholding: string; pension: string; net: string };

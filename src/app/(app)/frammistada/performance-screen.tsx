@@ -7,10 +7,11 @@ import { Paired, Bars } from "@/components/app/charts";
 import { useLang } from "@/components/app/lang";
 import { EmptyState } from "@/components/app/empty-state";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
-import { dec1 } from "@/lib/format";
+import { dec1, krCompact } from "@/lib/format";
 import type { PerfView } from "@/lib/analytics.server";
 import { StaffingCard } from "./staffing-card";
 import type { StaffingPattern } from "./staffing.server";
+import type { PerfHistory } from "./perf.server";
 
 // Period factors relative to the monthly baseline (demo analytics scale by period).
 const PERIODS: Period[] = ["Vika", "Mánuður", "Ársfj.", "Ár", "Sérsniðið"];
@@ -36,7 +37,7 @@ const CMP: Row[] = [
 // color for change columns: green for good. Specific overrides per prototype.
 const goodChange = new Set(["Velta", "Framlegð", "Laun af tekjum", "Velta á launatíma", "Velta vs spá", "Unnið eftir áætlun"]);
 
-export default function PerformanceScreen({ empty = false, live = false, perf, staffing }: { empty?: boolean; live?: boolean; perf?: PerfView; staffing?: StaffingPattern }) {
+export default function PerformanceScreen({ empty = false, live = false, perf, staffing, history }: { empty?: boolean; live?: boolean; perf?: PerfView; staffing?: StaffingPattern; history?: PerfHistory }) {
   const { t } = useLang();
   const [period, setPeriod] = useState<Period>("Mánuður");
   const [from, setFrom] = useState("");
@@ -58,28 +59,114 @@ export default function PerformanceScreen({ empty = false, live = false, perf, s
       </>
     );
   }
-  // Live company: real headline KPIs from revenue + computed labor cost.
+  // Live company: real headline KPIs + monthly history + department breakdown.
   if (live && perf) {
-    const lp = perf.laborPct;
+    const months = history?.months ?? [];
+    const withRev = months.filter((m) => m.revenue > 0);
+    const cur = months[months.length - 1];
+    const prev = months.length >= 2 ? months[months.length - 2] : undefined;
+    const m = (n: number) => Math.round(n / 100000) / 10; // kr → m kr (1 decimal)
+    // Headline KPIs follow the current month's real figures when history exists.
+    const lp = cur && cur.laborPct > 0 ? cur.laborPct : perf.laborPct;
     const lpColor = lp === 0 ? "var(--ink3)" : lp <= 30 ? "var(--good)" : lp <= 33 ? "var(--warn)" : "var(--bad)";
+    const kRevenue = cur ? dec1(m(cur.revenue)) : perf.revenueM;
+    const kCost = cur ? dec1(m(cur.cost)) : perf.laborCostM;
+    const kMargin = cur ? dec1(m(Math.max(0, cur.revenue - cur.cost))) : perf.marginM;
+    const chg = (a: number, b: number) => (b > 0 ? Math.round(((a - b) / b) * 1000) / 10 : 0);
+    const chgCell = (a: number, b: number, goodUp: boolean) => {
+      const c = chg(a, b);
+      const good = c === 0 ? undefined : (c > 0) === goodUp ? "var(--good)" : "var(--bad)";
+      return <td className="r" style={good ? { color: good } : undefined}>{c > 0 ? "+" : ""}{dec1(c)}%</td>;
+    };
     return (
       <>
         <PageHeader title="Frammistaða" subtitle="Þróun, framlegð og launasundurliðun" />
         <div className="kpis">
-          <div className="kpi"><div className="lab">{t("Velta")}</div><div className="val">{perf.revenueM} <small>m kr</small></div></div>
-          <div className="kpi"><div className="lab">{t("Launakostnaður (byrði)")}</div><div className="val">{perf.laborCostM} <small>m kr</small></div></div>
+          <div className="kpi"><div className="lab">{t("Velta")}</div><div className="val">{kRevenue} <small>m kr</small></div></div>
+          <div className="kpi"><div className="lab">{t("Launakostnaður (byrði)")}</div><div className="val">{kCost} <small>m kr</small></div></div>
           <div className="kpi"><div className="lab">{t("Laun af tekjum")}</div><div className="val" style={{ color: lpColor }}>{lp > 0 ? dec1(lp) + "%" : "—"}</div></div>
-          <div className="kpi"><div className="lab">{t("Framlegð")}</div><div className="val">{perf.marginM} <small>m kr</small></div></div>
+          <div className="kpi"><div className="lab">{t("Framlegð")}</div><div className="val">{kMargin} <small>m kr</small></div></div>
         </div>
-        <div className="card" style={{ marginTop: 20 }}>
-          <div className="cb">
-            <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.6, margin: 0 }}>
-              {perf.laborPct === 0
-                ? t("Skráðu veltu (eða tengdu Inventra) til að sjá laun af tekjum og framlegð. Launakostnaður reiknast af starfsfólki og kjarasamningum.")
-                : t("Söguleg þróun og samanburður tímabila birtist eftir því sem fleiri launatímabil og veltutölur safnast.")}
-            </p>
+
+        {months.length > 0 && (
+          <div className="grid2">
+            <div className="card">
+              <div className="ch"><div><div className="ct">{t("Velta vs launakostnaður")}</div><div className="cs">{t("per mánuð · farðu með músina yfir fyrir tölur")}</div></div></div>
+              <div className="cb">
+                <Paired
+                  a={months.map((x) => m(x.revenue))}
+                  b={months.map((x) => m(x.cost))}
+                  height={200}
+                  labels={months.map((x) => x.label)}
+                  aName={t("Velta")}
+                  bName={t("Launakostnaður")}
+                />
+                <div className="legend"><span><i style={{ background: "var(--teal)" }} />{t("Velta")}</span><span><i style={{ background: "var(--brand)" }} />{t("Launakostnaður")}</span></div>
+              </div>
+            </div>
+            <div className="card">
+              <div className="ch"><div><div className="ct">{t("Laun% þróun vs 30% markmið")}</div><div className="cs">{t("per mánuð · farðu með músina yfir fyrir tölur")}</div></div></div>
+              <div className="cb">
+                {withRev.length
+                  ? <Bars vals={withRev.map((x) => x.laborPct)} t={30} labels={withRev.map((x) => x.label)} />
+                  : <p className="muted" style={{ fontSize: 13, margin: 0 }}>{t("Skráðu veltu til að sjá laun% per mánuð.")}</p>}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
+
+        {cur && prev && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div className="ch"><div><div className="ct">{t("Samanburður tímabila")}</div><div className="cs">{cur.label} {t("vs")} {prev.label}</div></div></div>
+            <div className="cb tbl" style={{ paddingTop: 8 }}>
+              <table>
+                <thead><tr><th>{t("Mælikvarði")}</th><th className="r">{cur.label}</th><th className="r">{prev.label}</th><th className="r">{t("Breyting")}</th></tr></thead>
+                <tbody>
+                  <tr><td>{t("Velta")}</td><td className="r">{krCompact(cur.revenue)}</td><td className="r">{krCompact(prev.revenue)}</td>{chgCell(cur.revenue, prev.revenue, true)}</tr>
+                  <tr><td>{t("Launakostnaður (byrði)")}</td><td className="r">{krCompact(cur.cost)}</td><td className="r">{krCompact(prev.cost)}</td>{chgCell(cur.cost, prev.cost, false)}</tr>
+                  <tr>
+                    <td><b>{t("Laun af tekjum")}</b></td>
+                    <td className="r"><b>{cur.laborPct > 0 ? dec1(cur.laborPct) + "%" : "—"}</b></td>
+                    <td className="r">{prev.laborPct > 0 ? dec1(prev.laborPct) + "%" : "—"}</td>
+                    <td className="r" style={cur.laborPct && prev.laborPct ? { color: cur.laborPct <= prev.laborPct ? "var(--good)" : "var(--bad)" } : undefined}>
+                      {cur.laborPct && prev.laborPct ? `${cur.laborPct <= prev.laborPct ? "−" : "+"}${dec1(Math.abs(cur.laborPct - prev.laborPct))} ${t("stig")}` : "—"}
+                    </td>
+                  </tr>
+                  <tr><td>{t("Framlegð")}</td><td className="r">{krCompact(Math.max(0, cur.revenue - cur.cost))}</td><td className="r">{krCompact(Math.max(0, prev.revenue - prev.cost))}</td>{chgCell(Math.max(0, cur.revenue - cur.cost), Math.max(0, prev.revenue - prev.cost), true)}</tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {(history?.departments?.length ?? 0) > 0 && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div className="ch"><div><div className="ct">{t("Launakostnaður eftir deild")}</div><div className="cs">{t("þessi mánuður · hlutfall af heildarkostnaði")}</div></div></div>
+            <div className="cb">
+              {history!.departments.map((d) => (
+                <div key={d.name} style={{ marginBottom: 15 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
+                    <b>{t(d.name)}</b>
+                    <span className="muted">{dec1(d.hours)} {t("klst")} · {krCompact(d.cost)} · {d.share}%</span>
+                  </div>
+                  <div className="prog"><i style={{ width: `${Math.max(3, d.share)}%`, background: "var(--brand)" }} /></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {months.length === 0 && (
+          <div className="card" style={{ marginTop: 20 }}>
+            <div className="cb">
+              <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.6, margin: 0 }}>
+                {perf.laborPct === 0
+                  ? t("Skráðu veltu (eða tengdu Inventra) til að sjá laun af tekjum og framlegð. Launakostnaður reiknast af starfsfólki og kjarasamningum.")
+                  : t("Söguleg þróun og samanburður tímabila birtist eftir því sem fleiri launatímabil og veltutölur safnast.")}
+              </p>
+            </div>
+          </div>
+        )}
         {staffing && <StaffingCard rows={staffing.rows} live={staffing.live} weeks={staffing.weeks} />}
       </>
     );
@@ -140,13 +227,13 @@ export default function PerformanceScreen({ empty = false, live = false, perf, s
         <div className="card">
           <div className="ch"><div className="ct">{t("Velta vs launakostnaður")}</div><div className="cs">{t("6 mánuðir")}</div></div>
           <div className="cb">
-            <Paired a={[3.9, 4.1, 4.4, 3.8, 4.2, 4.3]} b={[1.33, 1.30, 1.47, 1.15, 1.38, 1.38]} height={200} />
+            <Paired a={[3.9, 4.1, 4.4, 3.8, 4.2, 4.3]} b={[1.33, 1.30, 1.47, 1.15, 1.38, 1.38]} height={200} labels={["jan", "feb", "mar", "apr", "maí", "jún"]} aName={t("Velta")} bName={t("Launakostnaður")} />
             <div className="legend"><span><i style={{ background: "var(--teal)" }} />{t("Velta")}</span><span><i style={{ background: "var(--brand)" }} />{t("Launakostnaður")}</span></div>
           </div>
         </div>
         <div className="card">
-          <div className="ch"><div className="ct">{t("Laun% þróun vs 30% markmið")}</div><div className="cs">{t("síðustu 6 mánuðir")}</div></div>
-          <div className="cb"><Bars vals={[40.9, 39.4, 40.8, 38.2, 40.9, 39.7]} t={30} /></div>
+          <div className="ch"><div className="ct">{t("Laun% þróun vs 30% markmið")}</div><div className="cs">{t("síðustu 6 mánuðir · farðu með músina yfir fyrir tölur")}</div></div>
+          <div className="cb"><Bars vals={[40.9, 39.4, 40.8, 38.2, 40.9, 39.7]} t={30} labels={["jan", "feb", "mar", "apr", "maí", "jún"]} /></div>
         </div>
       </div>
 

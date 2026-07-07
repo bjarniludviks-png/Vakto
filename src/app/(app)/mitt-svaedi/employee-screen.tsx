@@ -6,9 +6,10 @@ import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
 import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, type LeaveType, type MyPunchRow } from "./actions";
-import { dec1 } from "@/lib/format";
+import { dec1, nf } from "@/lib/format";
 import { StaffCardModal, type StaffCardData } from "@/components/app/staff-card";
 import type { StaffCard } from "@/lib/mycard.server";
+import type { MyArea } from "./my.server";
 import { resolvePerms, type Perms } from "@/lib/permissions";
 import PushToggle from "@/components/app/push-toggle";
 import { AsyncButton } from "@/components/app/async-button";
@@ -24,10 +25,21 @@ const NAV: [string, string, React.ReactNode][] = [
   ["pr", "Prófíll", IC("M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8|M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7")],
 ];
 
-export default function EmployeeScreen({ card }: { card?: StaffCard }) {
+export default function EmployeeScreen({ card, my: myProp }: { card?: StaffCard; my?: MyArea }) {
   const { t } = useLang();
   const [tab, setTab] = useState<string>("ov");
-  const [photo, setPhoto] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<string | null>(card?.photoUrl ?? null);
+  // Signed-in user WITHOUT an employee profile (e.g. owner-only account): never
+  // show demo data — synthesize an empty live state from the card instead.
+  const my: MyArea | undefined = myProp?.live
+    ? myProp
+    : card?.live
+      ? {
+        live: true, openSince: null, weekLabel: "", days: [], upcoming: [], weekHours: 0,
+        nextPayday: "", pay: null, rights: null, openShifts: [],
+        profile: { name: card.name, kennitala: card.employeeKt ?? "", position: card.role, dept: card.department ?? "", phone: "", email: "", bank: "", union: "" },
+      }
+      : myProp;
   const [req, setReq] = useState<ReqKind | null>(null);
   const [showCard, setShowCard] = useState(false);
   const perms = card?.perms ?? resolvePerms();
@@ -41,7 +53,7 @@ export default function EmployeeScreen({ card }: { card?: StaffCard }) {
 
       <div className="card" style={{ marginBottom: 18 }}>
         <div className="cb" style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
-          <PhotoAvatar photo={photo} setPhoto={setPhoto} big={false} />
+          <PhotoAvatar photo={photo} setPhoto={setPhoto} big={false} initials={cardData.initials} />
           <div style={{ flex: 1, minWidth: 0 }}><div className="emp-nm">{card?.name ?? "Mína Huong"}</div><div className="emp-meta">{card ? `${t(card.role)} · ${card.company}` : t("emp:meta")}</div></div>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
             <PushToggle />
@@ -59,20 +71,20 @@ export default function EmployeeScreen({ card }: { card?: StaffCard }) {
       </div>
 
       <div>
-        {tab === "ov" && <Overview onReq={setReq} perms={perms} />}
-        {tab === "sh" && perms.shifts && <MyShifts onReq={setReq} perms={perms} />}
-        {tab === "pay" && perms.pay && <Pay />}
-        {tab === "ri" && <Rights />}
-        {tab === "pr" && <Profile photo={photo} setPhoto={setPhoto} />}
+        {tab === "ov" && <Overview onReq={setReq} perms={perms} my={my} />}
+        {tab === "sh" && perms.shifts && <MyShifts onReq={setReq} perms={perms} my={my} />}
+        {tab === "pay" && perms.pay && <Pay my={my} />}
+        {tab === "ri" && <Rights my={my} />}
+        {tab === "pr" && <Profile photo={photo} setPhoto={setPhoto} my={my} />}
       </div>
 
-      {req && <ReqModal kind={req} onClose={() => setReq(null)} />}
+      {req && <ReqModal kind={req} onClose={() => setReq(null)} my={my} />}
       {showCard && <StaffCardModal card={cardData} onClose={() => setShowCard(false)} />}
     </>
   );
 }
 
-function PhotoAvatar({ photo, setPhoto, big }: { photo: string | null; setPhoto: (s: string) => void; big: boolean }) {
+function PhotoAvatar({ photo, setPhoto, big, initials = "MÍ" }: { photo: string | null; setPhoto: (s: string) => void; big: boolean; initials?: string }) {
   function onChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -88,41 +100,51 @@ function PhotoAvatar({ photo, setPhoto, big }: { photo: string | null; setPhoto:
   const style = photo ? { backgroundImage: `url(${photo})` } : undefined;
   return (
     <label className={big ? "emp-ava-lg" : "emp-ava"} style={{ cursor: "pointer", ...style }} title="Smelltu til að hlaða mynd af þér">
-      {!photo && <span className="ini">MÍ</span>}
+      {!photo && <span className="ini">{initials}</span>}
       <input type="file" accept="image/*" hidden onChange={onChange} />
       <span className="cam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z" /><circle cx="12" cy="13" r="3.2" /></svg></span>
     </label>
   );
 }
 
-function PunchCard() {
+function PunchCard({ live = false, openSince = null }: { live?: boolean; openSince?: string | null }) {
   const { t } = useLang();
-  const [on, setOn] = useState(true);
+  // Live: real open-punch state from Supabase. Demo: illustrative running shift.
+  const [on, setOn] = useState(live ? !!openSince : true);
+  const [since, setSince] = useState(live && openSince ? openSince.slice(11, 16) : "08:02");
   const startRef = useRef<number>(0);
-  const [elapsed, setElapsed] = useState("04:18:22");
+  const [elapsed, setElapsed] = useState("00:00:00");
   useEffect(() => {
-    if (startRef.current === 0) startRef.current = Date.now() - (4 * 3600 + 18 * 60 + 22) * 1000;
-  }, []);
+    if (startRef.current !== 0) return;
+    if (live) startRef.current = openSince ? new Date(openSince).getTime() : 0;
+    else startRef.current = Date.now() - (4 * 3600 + 18 * 60 + 22) * 1000;
+  }, [live, openSince]);
   useEffect(() => {
     const tick = () => {
-      if (!on) { setElapsed("00:00:00"); return; }
-      const s = Math.floor((Date.now() - startRef.current) / 1000);
+      if (!on || !startRef.current) { setElapsed("00:00:00"); return; }
+      const s = Math.max(0, Math.floor((Date.now() - startRef.current) / 1000));
       const z = (n: number) => String(n).padStart(2, "0");
       setElapsed(`${z(Math.floor(s / 3600))}:${z(Math.floor((s % 3600) / 60))}:${z(s % 60)}`);
     };
+    tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [on]);
   async function toggle() {
     const next = !on;
-    await myPunch(next);
-    if (next) startRef.current = Date.now();
+    const res = await myPunch(next);
+    if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
+    if (next) {
+      startRef.current = Date.now();
+      const d = new Date();
+      setSince(`${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`);
+    }
     setOn(next);
     toast(next ? t("Stimplað inn") : t("Stimplað út"));
   }
   return (
     <div className={`punch${on ? "" : " out"}`}>
-      <div className="st">{on ? t("Á vakt síðan 08:02") : t("Ekki á vakt")}</div>
+      <div className="st">{on ? `${t("Á vakt síðan")} ${since}` : t("Ekki á vakt")}</div>
       <div className="big">{elapsed}</div>
       <AsyncButton className="" onClick={toggle}>{on ? t("Stimpla út") : t("Stimpla inn")}</AsyncButton>
     </div>
@@ -141,49 +163,75 @@ function QuickActions({ onReq }: { onReq: (k: ReqKind) => void }) {
   );
 }
 
-function Overview({ onReq, perms }: { onReq: (k: ReqKind) => void; perms: Perms }) {
+function Overview({ onReq, perms, my }: { onReq: (k: ReqKind) => void; perms: Perms; my?: MyArea }) {
   const { t } = useLang();
+  const live = !!my?.live;
   return (
     <div className="emp-pane on">
-      {perms.clock && <PunchCard />}
+      {perms.clock && <PunchCard live={live} openSince={my?.openSince ?? null} />}
       <div className="mini">
         <div className="mh">{t("Næsta vakt")}</div>
-        <div className="mr"><span>Í dag · Mið 24. júní</span><b>08:00–16:00</b></div>
-        <div className="mr"><span>Fim 25. júní</span><b>10:00–18:00</b></div>
-        <div className="mr"><span>Lau 27. júní</span><b style={{ color: "var(--warn)" }}>12:00–20:00 +45%</b></div>
+        {live ? (
+          my!.upcoming.length ? my!.upcoming.map((s, i) => (
+            <div className="mr" key={i}>
+              <span>{s.label}</span>
+              <b style={s.premium ? { color: "var(--warn)" } : undefined}>{s.time}{s.premium ? ` ${s.premium}` : ""}</b>
+            </div>
+          )) : <div className="muted" style={{ fontSize: 12.5, padding: "8px 0" }}>{t("Engar vaktir á plani framundan.")}</div>
+        ) : (
+          <>
+            <div className="mr"><span>Í dag · Mið 24. júní</span><b>08:00–16:00</b></div>
+            <div className="mr"><span>Fim 25. júní</span><b>10:00–18:00</b></div>
+            <div className="mr"><span>Lau 27. júní</span><b style={{ color: "var(--warn)" }}>12:00–20:00 +45%</b></div>
+          </>
+        )}
       </div>
-      <div className="mini">
-        <div className="mh">{t("Verkefni vaktarinnar")}</div>
-        {[["Opna kassa & kveikja á græjum", true], ["Fylla á sósur og meðlæti", false], ["Þrífa grill fyrir lokun", false]].map((task, i) => (
-          <label key={i} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13.5, padding: "6px 0" }}>
-            <input type="checkbox" defaultChecked={task[1] as boolean} /> <span>{t(task[0] as string)}</span>
-          </label>
-        ))}
-      </div>
+      {!live && (
+        <div className="mini">
+          <div className="mh">{t("Verkefni vaktarinnar")}</div>
+          {[["Opna kassa & kveikja á græjum", true], ["Fylla á sósur og meðlæti", false], ["Þrífa grill fyrir lokun", false]].map((task, i) => (
+            <label key={i} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13.5, padding: "6px 0" }}>
+              <input type="checkbox" defaultChecked={task[1] as boolean} /> <span>{t(task[0] as string)}</span>
+            </label>
+          ))}
+        </div>
+      )}
       {perms.requests && <QuickActions onReq={onReq} />}
     </div>
   );
 }
 
-function MyShifts({ onReq, perms }: { onReq: (k: ReqKind) => void; perms: Perms }) {
+function MyShifts({ onReq, perms, my }: { onReq: (k: ReqKind) => void; perms: Perms; my?: MyArea }) {
   const { t } = useLang();
+  const live = !!my?.live;
   return (
     <div className="emp-pane on">
       <div className="mini">
-        <div className="mh">{t("Mitt vaktaplan · 22.–28. júní")}</div>
-        <div className="mr"><span>Mán 22.</span><b className="muted">Frí</b></div>
-        <div className="mr"><span>Þri 23.</span><b>14:00–22:00 <span style={{ color: "var(--warn)", fontWeight: 500 }}>+33%</span></b></div>
-        <div className="mr"><span>Mið 24. <span style={{ color: "var(--brand)", fontWeight: 600 }}>· í dag</span></span><b>08:00–16:00</b></div>
-        <div className="mr"><span>Fim 25.</span><b>10:00–18:00</b></div>
-        <div className="mr"><span>Fös 26.</span><b className="muted">Frí</b></div>
-        <div className="mr"><span>Lau 27.</span><b style={{ color: "var(--warn)" }}>12:00–20:00 +45%</b></div>
-        <div className="mr"><span>Sun 28.</span><b className="muted">Frí</b></div>
+        <div className="mh">{t("Mitt vaktaplan")}{(live ? my!.weekLabel : "22.–28. júní") ? ` · ${live ? my!.weekLabel : "22.–28. júní"}` : ""}</div>
+        {live && !my!.days.length && <div className="muted" style={{ fontSize: 12.5, padding: "8px 0" }}>{t("Vaktaplan birtist hér þegar vaktir eru birtar á þig.")}</div>}
+        {live ? my!.days.map((d, i) => (
+          <div className="mr" key={i}>
+            <span>{d.label}{d.today && <span style={{ color: "var(--brand)", fontWeight: 600 }}> · {t("í dag")}</span>}</span>
+            {d.time
+              ? <b style={d.premium ? { color: "var(--warn)" } : undefined}>{d.time}{d.premium ? ` ${d.premium}` : ""}</b>
+              : <b className="muted">{t("Frí")}</b>}
+          </div>
+        )) : (
+          <>
+            <div className="mr"><span>Mán 22.</span><b className="muted">Frí</b></div>
+            <div className="mr"><span>Þri 23.</span><b>14:00–22:00 <span style={{ color: "var(--warn)", fontWeight: 500 }}>+33%</span></b></div>
+            <div className="mr"><span>Mið 24. <span style={{ color: "var(--brand)", fontWeight: 600 }}>· í dag</span></span><b>08:00–16:00</b></div>
+            <div className="mr"><span>Fim 25.</span><b>10:00–18:00</b></div>
+            <div className="mr"><span>Fös 26.</span><b className="muted">Frí</b></div>
+            <div className="mr"><span>Lau 27.</span><b style={{ color: "var(--warn)" }}>12:00–20:00 +45%</b></div>
+            <div className="mr"><span>Sun 28.</span><b className="muted">Frí</b></div>
+          </>
+        )}
       </div>
       <div className="mini">
         <div className="mh">{t("Samantekt")}</div>
-        <div className="mr"><span>{t("Tímar vikunnar")}</span><b>32,0 {t("klst")}</b></div>
-        <div className="mr"><span>{t("Tímar mánaðar (til þessa)")}</span><b>142,5 {t("klst")}</b></div>
-        <div className="mr"><span>{t("Næsta útborgun")}</span><b>1. júlí</b></div>
+        <div className="mr"><span>{t("Tímar vikunnar")}</span><b>{live ? dec1(my!.weekHours) : "32,0"} {t("klst")}</b></div>
+        <div className="mr"><span>{t("Næsta útborgun")}</span><b>{live ? (my!.nextPayday || "—") : "1. júlí"}</b></div>
       </div>
       <MyHours canRequest={perms.requests} />
       {perms.requests && <QuickActions onReq={onReq} />}
@@ -278,24 +326,78 @@ function CorrectionModal({ init, onClose, onDone }: { init: { punchId?: string; 
 
 // Simplified "Mín launamál" — worked hours + the amount earned for them. The formal
 // payslip (and payment history) comes from Payday, so we don't duplicate it here.
-function Pay() {
+function Pay({ my }: { my?: MyArea }) {
   const { t } = useLang();
+  const live = !!my?.live;
+  const p = my?.pay ?? null;
   return (
     <div className="emp-pane on">
       <div className="mini">
         <div className="mh">{t("Unnir tímar — þessi mánuður")}</div>
-        <div className="mr"><span>{t("Dagvinna")}</span><b>118,0 {t("klst")} · 342.200 kr</b></div>
-        <div className="mr"><span>{t("Álagstímar (kvöld/helgi)")}</span><b>18,5 {t("klst")} · 78.400 kr</b></div>
-        <div className="mr"><span>{t("Yfirvinna")}</span><b>6,0 {t("klst")} · 30.400 kr</b></div>
-        <div className="mr" style={{ borderTop: "1px solid var(--line)", marginTop: 3, paddingTop: 7 }}><span style={{ fontWeight: 650 }}>{t("Samtals unnið")}</span><b style={{ fontSize: 15 }}>142,5 {t("klst")} · 451.000 kr</b></div>
+        {live ? (
+          p ? (p.monthly ? (
+            <>
+              <div className="mr"><span>{t("Mánaðarlaun (föst)")}</span><b>{nf(p.totalKr)} kr</b></div>
+              <div className="mr"><span>{t("Unnir tímar")}</span><b>{dec1(p.totalH)} {t("klst")}</b></div>
+            </>
+          ) : (
+            <>
+              <div className="mr"><span>{t("Dagvinna")}</span><b>{dec1(p.dayH)} {t("klst")} · {nf(p.dayKr)} kr</b></div>
+              <div className="mr"><span>{t("Álagstímar (kvöld/helgi)")}</span><b>{dec1(p.premH)} {t("klst")} · {nf(p.premKr)} kr</b></div>
+              <div className="mr"><span>{t("Yfirvinna")}</span><b>{dec1(p.otH)} {t("klst")} · {nf(p.otKr)} kr</b></div>
+              <div className="mr" style={{ borderTop: "1px solid var(--line)", marginTop: 3, paddingTop: 7 }}><span style={{ fontWeight: 650 }}>{t("Samtals unnið")}</span><b style={{ fontSize: 15 }}>{dec1(p.totalH)} {t("klst")} · {nf(p.totalKr)} kr</b></div>
+            </>
+          )) : <div className="muted" style={{ fontSize: 12.5, padding: "8px 0" }}>{t("Engar stimplanir í þessum mánuði enn.")}</div>
+        ) : (
+          <>
+            <div className="mr"><span>{t("Dagvinna")}</span><b>118,0 {t("klst")} · 342.200 kr</b></div>
+            <div className="mr"><span>{t("Álagstímar (kvöld/helgi)")}</span><b>18,5 {t("klst")} · 78.400 kr</b></div>
+            <div className="mr"><span>{t("Yfirvinna")}</span><b>6,0 {t("klst")} · 30.400 kr</b></div>
+            <div className="mr" style={{ borderTop: "1px solid var(--line)", marginTop: 3, paddingTop: 7 }}><span style={{ fontWeight: 650 }}>{t("Samtals unnið")}</span><b style={{ fontSize: 15 }}>142,5 {t("klst")} · 451.000 kr</b></div>
+          </>
+        )}
       </div>
       <p className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>{t("Áætluð upphæð fyrir unna tíma á tímabilinu. Formlegur launaseðill kemur frá Payday.")}</p>
     </div>
   );
 }
 
-function Rights() {
+function Rights({ my }: { my?: MyArea }) {
   const { t } = useLang();
+  const r = my?.live ? my.rights : null;
+  if (my?.live && !r) {
+    return (
+      <div className="emp-pane on">
+        <div className="mini">
+          <div className="mh">{t("Réttindi")}</div>
+          <div className="muted" style={{ fontSize: 12.5, padding: "8px 0" }}>{t("Orlof, tímabanki og réttindi birtast þegar starfsmannaprófíll og stimplanir eru til staðar.")}</div>
+        </div>
+      </div>
+    );
+  }
+  if (r) {
+    const bankC = r.bank > 0.05 ? "var(--good)" : r.bank < -0.05 ? "var(--bad)" : undefined;
+    return (
+      <div className="emp-pane on">
+        <div className="mini">
+          <div className="mh">{t("Orlof")} <span className="muted" style={{ fontWeight: 500 }}>· {t("áætlað")}</span></div>
+          <div className="mr"><span>{t("Áunnir dagar (í ár)")}</span><b>{dec1(r.orlofDays)} {t("dagar")}</b></div>
+          {r.orlofFund > 0 && <div className="mr"><span>{t("Orlofssjóður")}</span><b>{nf(r.orlofFund)} kr</b></div>}
+        </div>
+        <div className="mini">
+          <div className="mh">{t("Tímabanki")}</div>
+          <div className="mr"><span>{t("Vinnuskylda (mán)")}</span><b>{dec1(r.required)} {t("klst")}</b></div>
+          <div className="mr"><span>{t("Unnið (þessi mán)")}</span><b>{dec1(r.worked)} {t("klst")}</b></div>
+          <div className="mr"><span>{t("Staða banka")}</span><b style={bankC ? { color: bankC } : undefined}>{r.bank > 0 ? "+" : ""}{dec1(r.bank)} {t("klst")}</b></div>
+        </div>
+        <div className="mini">
+          <div className="mh">{t("Réttindi")}</div>
+          <div className="mr"><span>{t("Kjarasamningur")}</span><b>{r.union}</b></div>
+          <div className="mr"><span>{t("Hvíldartími (11 klst)")}</span><b style={{ color: "var(--good)" }}>{t("Í lagi")}</b></div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="emp-pane on">
       <div className="mini">
@@ -321,11 +423,12 @@ function Rights() {
   );
 }
 
-function Profile({ photo, setPhoto }: { photo: string | null; setPhoto: (s: string) => void }) {
+function Profile({ photo, setPhoto, my }: { photo: string | null; setPhoto: (s: string) => void; my?: MyArea }) {
   const { t } = useLang();
-  const [phone, setPhone] = useState("+354 691 2389");
-  const [email, setEmail] = useState("mina@kaffikronan.is");
-  const [bank, setBank] = useState("0133-26-001234");
+  const p = my?.live ? my.profile : null;
+  const [phone, setPhone] = useState(p ? p.phone : "+354 691 2389");
+  const [email, setEmail] = useState(p ? p.email : "mina@kaffikronan.is");
+  const [bank, setBank] = useState(p ? p.bank : "0133-26-001234");
   const [busy, setBusy] = useState(false);
   async function save() {
     setBusy(true);
@@ -339,19 +442,24 @@ function Profile({ photo, setPhoto }: { photo: string | null; setPhoto: (s: stri
         <PhotoAvatar photo={photo} setPhoto={setPhoto} big />
         <p style={{ textAlign: "center", fontSize: 12.5, color: "var(--ink3)", marginBottom: 18 }}>{t("Smelltu á myndina til að hlaða upp nýrri")}</p>
         <div className="emp-row2">
-          <div className="emp-fld"><label>{t("Fullt nafn")}</label><input defaultValue="Mína Huong" /></div>
-          <div className="emp-fld"><label>{t("Kennitala")}</label><input defaultValue="010195-2389" /></div>
+          <div className="emp-fld"><label>{t("Fullt nafn")}</label><input defaultValue={p ? p.name : "Mína Huong"} readOnly={!!p} /></div>
+          <div className="emp-fld"><label>{t("Kennitala")}</label><input defaultValue={p ? p.kennitala : "010195-2389"} readOnly={!!p} /></div>
         </div>
         <div className="emp-row2">
-          <div className="emp-fld"><label>{t("prof:position")}</label><input defaultValue="Kokkur" /></div>
-          <div className="emp-fld"><label>{t("Deild")}</label><input defaultValue="Eldhús" /></div>
+          <div className="emp-fld"><label>{t("prof:position")}</label><input defaultValue={p ? p.position : "Kokkur"} readOnly={!!p} /></div>
+          <div className="emp-fld"><label>{t("Deild")}</label><input defaultValue={p ? p.dept : "Eldhús"} readOnly={!!p} /></div>
         </div>
         <div className="emp-row2">
           <div className="emp-fld"><label>{t("Sími")}</label><input value={phone} onChange={(e) => setPhone(e.target.value)} /></div>
           <div className="emp-fld"><label>{t("Netfang")}</label><input value={email} onChange={(e) => setEmail(e.target.value)} /></div>
         </div>
         <div className="emp-fld"><label>{t("Bankareikningur (laun)")}</label><input value={bank} onChange={(e) => setBank(e.target.value)} /></div>
-        <div className="emp-fld"><label>{t("Kjarasamningur")}</label><select><option>Efling</option><option>VR</option><option>SGS</option></select></div>
+        <div className="emp-fld"><label>{t("Kjarasamningur")}</label>
+          {p
+            ? <input defaultValue={p.union} readOnly />
+            : <select><option>Efling</option><option>VR</option><option>SGS</option></select>}
+        </div>
+        {p && <p className="muted" style={{ fontSize: 11.5, margin: "2px 0 10px" }}>{t("Staða, deild og kjarasamningur eru skráð af stjórnanda — hafðu samband ef eitthvað er rangt.")}</p>}
         <button className="btn sm" style={{ width: "100%", justifyContent: "center" }} disabled={busy} onClick={save}>{t("Vista breytingar")}</button>
       </div></div>
       <WalletButtons />
@@ -359,24 +467,44 @@ function Profile({ photo, setPhoto }: { photo: string | null; setPhoto: (s: stri
   );
 }
 
-function PickupBody() {
+const CalIcon = () => <svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg>;
+
+function PickupBody({ my }: { my?: MyArea }) {
   const { t } = useLang();
+  if (my?.live) {
+    if (!my.openShifts.length) return <p className="muted" style={{ fontSize: 13, margin: 0 }}>{t("Engar opnar vaktir í boði núna — kíktu aftur síðar.")}</p>;
+    return (
+      <div className="att">
+        {my.openShifts.map((s) => (
+          <div className="it" key={s.id}>
+            <div className="ic info"><CalIcon /></div>
+            <div className="tx"><b>{s.label} · {s.time}</b><span>{s.premium ? `${t("álag")} ${s.premium}` : t("dagvinna")}</span></div>
+            <AsyncButton className="btn sm" onClick={async () => { const res = await applyForShift({ note: `${s.label} ${s.time}` }); toast(res.ok ? "Umsókn send — bíður úthlutunar" : (res.error ?? "Villa")); }}>{t("Sækja um")}</AsyncButton>
+          </div>
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="att">
-      <div className="it"><div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg></div><div className="tx"><b>Laugardagur 12:00–20:00</b><span>Sal · +45% helgarálag</span></div><AsyncButton className="btn sm" onClick={async () => { const res = await applyForShift({ note: "Laugardagur 12:00–20:00 · Sal" }); toast(res.ok ? "Umsókn send — bíður úthlutunar" : (res.error ?? "Villa")); }}>{t("Sækja um")}</AsyncButton></div>
-      <div className="it"><div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg></div><div className="tx"><b>Sunnudagur 10:00–18:00</b><span>Eldhús · +45%</span></div><AsyncButton className="btn sm" onClick={async () => { const res = await applyForShift({ note: "Sunnudagur 10:00–18:00 · Eldhús" }); toast(res.ok ? "Umsókn send" : (res.error ?? "Villa")); }}>{t("Sækja um")}</AsyncButton></div>
+      <div className="it"><div className="ic info"><CalIcon /></div><div className="tx"><b>Laugardagur 12:00–20:00</b><span>Sal · +45% helgarálag</span></div><AsyncButton className="btn sm" onClick={async () => { const res = await applyForShift({ note: "Laugardagur 12:00–20:00 · Sal" }); toast(res.ok ? "Umsókn send — bíður úthlutunar" : (res.error ?? "Villa")); }}>{t("Sækja um")}</AsyncButton></div>
+      <div className="it"><div className="ic info"><CalIcon /></div><div className="tx"><b>Sunnudagur 10:00–18:00</b><span>Eldhús · +45%</span></div><AsyncButton className="btn sm" onClick={async () => { const res = await applyForShift({ note: "Sunnudagur 10:00–18:00 · Eldhús" }); toast(res.ok ? "Umsókn send" : (res.error ?? "Villa")); }}>{t("Sækja um")}</AsyncButton></div>
     </div>
   );
 }
 
-function ReqModal({ kind, onClose }: { kind: ReqKind; onClose: () => void }) {
+function ReqModal({ kind, onClose, my }: { kind: ReqKind; onClose: () => void; my?: MyArea }) {
   const { t } = useLang();
-  const [leaveFrom, setLeaveFrom] = useState("2026-06-27");
-  const [leaveTo, setLeaveTo] = useState("2026-06-28");
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const [leaveFrom, setLeaveFrom] = useState(todayISO);
+  const [leaveTo, setLeaveTo] = useState(todayISO);
   const [leaveType, setLeaveType] = useState<LeaveType>("orlof");
   const [days, setDays] = useState<boolean[]>([true, true, true, true, true, false, false]);
-  const [swapShift, setSwapShift] = useState("Laugardagur 12:00–20:00");
-  const [swapWith, setSwapWith] = useState("Phong");
+  const myShiftOptions = my?.live && my.upcoming.length
+    ? my.upcoming.map((s) => `${s.label} ${s.time}`)
+    : ["Laugardagur 12:00–20:00", "Föstudagur 16:00–24:00"];
+  const [swapShift, setSwapShift] = useState(myShiftOptions[0]);
+  const [swapWith, setSwapWith] = useState("");
   const [busy, setBusy] = useState(false);
 
   const titleIcon: Record<ReqKind, React.ReactNode> = {
@@ -425,14 +553,16 @@ function ReqModal({ kind, onClose }: { kind: ReqKind; onClose: () => void }) {
   } else if (kind === "swap") {
     body = <>
       <div className="field"><label>{t("Vaktin þín")}</label>
-        <select value={swapShift} onChange={(e) => setSwapShift(e.target.value)}><option>Laugardagur 12:00–20:00</option><option>Föstudagur 16:00–24:00</option></select>
+        <select value={swapShift} onChange={(e) => setSwapShift(e.target.value)}>{myShiftOptions.map((o) => <option key={o}>{o}</option>)}</select>
       </div>
       <div className="field"><label>{t("Skipta við")}</label>
-        <select value={swapWith} onChange={(e) => setSwapWith(e.target.value)}><option>Phong</option><option>Bach</option><option>Ha Vu</option></select>
+        {my?.live
+          ? <input value={swapWith} onChange={(e) => setSwapWith(e.target.value)} placeholder={t("Nafn samstarfsmanns (má sleppa)")} />
+          : <select value={swapWith} onChange={(e) => setSwapWith(e.target.value)}><option>Phong</option><option>Bach</option><option>Ha Vu</option></select>}
       </div>
     </>;
   } else {
-    body = <PickupBody />;
+    body = <PickupBody my={my} />;
   }
 
   return (

@@ -287,12 +287,13 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
             <div className="dhero-right">
               <div className="l">{t("Launakostnaður")}</div>
               <div className="big">{costStr}</div>
-              <div className="s2">{t("Áætlað v. plan")} {plannedCostStr} · {t("frávik")} <span style={dvColor ? { color: dvColor } : undefined}>{deviationCostStr}</span>{lp > 0 ? ` · ${t("Laun af tekjum")} ${dec1(lp)}%` : ""}</div>
+              <div className="s2">{t("Áætlað v. plan")} {plannedCostStr} · {t("frávik")} <span style={dvColor ? { color: dvColor } : undefined}>{deviationCostStr}</span></div>
             </div>
           </div>
         </div>
 
-        {/* headline KPIs (real, period-aware) */}
+        {/* headline KPIs (real, period-aware) — hours/cost/deviation live in the
+            hero strip above, so this row only adds NEW information */}
         <div className="kpis">
           <div className="kpi flex">
             <div className="ring" style={{ ["--p" as string]: lp === 0 ? 0 : Math.round(lp), ["--c" as string]: lpColor }}>
@@ -306,10 +307,7 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
                 : <Link href="/stillingar?new=revenue" className="muted" style={{ fontSize: 11.5, fontWeight: 600, color: "var(--brand)", textDecoration: "none", display: "inline-block", marginTop: 2 }}>{t("Skrá veltu")}</Link>}
             </div>
           </div>
-          <div className="kpi"><div className="lab">{t("Launakostnaður")}</div><div className="val">{costStr}</div></div>
-          <div className="kpi"><div className="lab">{t("Raun tímar")}</div><div className="val">{actualH} <small>{t("klst")}</small></div></div>
-          <div className="kpi"><div className="lab">{t("Frávik frá plani")}</div><div className="val" style={dvColor ? { color: dvColor } : undefined}>{deviationH} <small>{t("klst")}</small></div></div>
-          <div className="kpi"><div className="lab">{t("Yfirvinna")}</div><div className="val" style={pd?.ok && pd.overtime > 0 ? { color: "var(--bad)" } : undefined}>{overtimeH} <small>{t("klst")}</small></div><div className="muted" style={{ fontSize: 11.5, fontWeight: 600, marginTop: 2 }}>{overtimePayStr}</div></div>
+          <div className="kpi"><div className="lab">{t("Yfirvinnukostnaður")}</div><div className="val" style={pd?.ok && pd.overtimePay > 0 ? { color: "var(--bad)" } : undefined}>{overtimePayStr}</div><div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{t("umfram grunnlaun")}</div></div>
           <div className="kpi"><div className="lab">{t("Álagstímar")}</div><div className="val">{premiumH} <small>{t("klst")}</small></div><div className="muted" style={{ fontSize: 11.5, fontWeight: 600, marginTop: 2 }}>{premiumPayStr}</div></div>
           <div className="kpi"><div className="lab">{t("Launatengd gjöld")}</div><div className="val">{leviesStr}</div><div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{t("tryggingagjald, lífeyrir o.fl.")}</div></div>
           <div className="kpi"><div className="lab">{t("Kostnaður á klst")}</div><div className="val">{costPerHourStr}</div><div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{t("meðaltal m. byrði")}</div></div>

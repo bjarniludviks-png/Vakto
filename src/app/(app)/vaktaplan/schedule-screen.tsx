@@ -8,6 +8,7 @@ import { nf, dec1 } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
 import { AsyncButton } from "@/components/app/async-button";
 import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, type ShiftInput } from "./actions";
+import { getDashboardPeriod } from "../maelabord/actions";
 import { buildSchedulePdf, type PdfShift } from "./pdf";
 import type { ReqItem } from "./requests.server";
 import type { ScheduleInitial } from "./schedule.server";
@@ -16,7 +17,8 @@ type Emp = [string, string, string, string]; // initials, name, dept, color
 type ShiftDef = { l: string; s: string; h: number; c: "day" | "eve" | "off" };
 type ShiftType = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
 type AiItem = { kind: "good" | "info" | "warn" | "bad"; title: string; detail: string; tag: string };
-type AiProposal = { summary: string; items: AiItem[]; laborPct: string; live: boolean; error?: string };
+type AiShift = { employee: string; day: number; start: string; end: string };
+type AiProposal = { summary: string; items: AiItem[]; laborPct: string; shifts?: AiShift[]; live: boolean; error?: string };
 type MonthBlock = { name: string; time: string; hrs: number; type: string };
 
 const COST_HR = 3752, BASE_HRS = 116;
@@ -325,9 +327,29 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     setAiProposal(null);
     setAiLoading(true);
     setModal("aiResult");
-    const context = `Starfsmenn á plani: ${emp.map((e) => `${e[1]} (${e[2]})`).join(", ")}. `
-      + `Tímar vikunnar: ${totalHrs} klst. Launakostnaður: ${nf(cost)} kr. `
-      + `Áætluð velta vikunnar: 4.300.000 kr. `
+    // Current plan of the visible week, per employee — so the AI proposes real shifts.
+    const planLines = vis.map((r) => {
+      const e = emp[r];
+      const cells = weekDays.map((_, c) => {
+        const code = grid[r]?.[c];
+        if (!code || code === "off") return null;
+        const tt = timeOf(r, c);
+        return `${DAYS[c]} ${tt ? `${tt.start}–${tt.end}` : SH[code].l}`;
+      }).filter(Boolean).join(", ");
+      return `- ${e[1]} (${e[2]}): ${cells || "engar vaktir"}`;
+    }).join("\n");
+    // Real weekly revenue when available (real rows + weekday averages), else demo figure.
+    let velta = liveCompany ? "" : "Áætluð velta vikunnar: 4.300.000 kr. ";
+    if (liveCompany) {
+      try {
+        const pd = await getDashboardPeriod(fmtISO(weekDays[0]), fmtISO(weekDays[6]));
+        if (pd.ok && pd.revenue > 0) velta = `Áætluð velta vikunnar: ${nf(pd.revenue)} kr. `;
+      } catch { /* velta line omitted */ }
+    }
+    const context = `Vikan sem er opin: ${wklbl} ${weekDays[0].getFullYear()} (mánudagur = ${weekMonISO}, day 0=mán … 6=sun).\n`
+      + `Starfsmenn á plani: ${vis.map((r) => `${emp[r][1]} (${emp[r][2]})`).join(", ")}.\n`
+      + `Núverandi plan vikunnar:\n${planLines}\n`
+      + `Tímar vikunnar: ${totalHrs} klst. Launakostnaður: ${nf(cost)} kr. ${velta}`
       + `Vaktategundir: ${types.map((t) => `${t.nm} ${t.t} ${t.prem}`).join("; ")}.`;
     try {
       const res = await fetch("/api/ai/schedule", {
@@ -341,12 +363,61 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       setAiProposal({
         summary: prompt ? `„${prompt}"` : "Bestun vaktaplans",
         laborPct: "31,8%",
+        shifts: [],
         live: false,
         items: [{ kind: "info", title: "Tókst ekki að ná í AI", detail: "Sýni demo-tillögu.", tag: "demo" }],
       });
     } finally {
       setAiLoading(false);
     }
+  }
+
+  /** Apply the AI's proposed shifts to the visible week's grid, then publish.
+   * Rows of employees the proposal names are replaced in full; others untouched. */
+  async function approveAiProposal() {
+    setModal(null);
+    const shifts = (aiProposal?.shifts ?? []).filter((s) => s.day >= 0 && s.day <= 6 && /^\d{1,2}:\d{2}$/.test(s.start) && /^\d{1,2}:\d{2}$/.test(s.end));
+    if (!shifts.length) { await publish(); return; }
+    const rowOf = (name: string) => {
+      const n = name.trim().toLowerCase();
+      let r = emp.findIndex((e) => e[1].toLowerCase() === n);
+      if (r < 0) r = emp.findIndex((e) => e[1].toLowerCase().startsWith(n.split(/\s+/)[0]));
+      return r;
+    };
+    const touched = new Set<number>();
+    for (const s of shifts) { const r = rowOf(s.employee); if (r >= 0) touched.add(r); }
+    const ng = grid.map((row) => [...row]);
+    const nt = { ...cellTimes };
+    touched.forEach((r) => { ng[r] = ng[r].map(() => "off"); weekDays.forEach((_, c) => delete nt[ckey(r, c)]); });
+    let applied = 0;
+    for (const s of shifts) {
+      const r = rowOf(s.employee);
+      if (r < 0) continue;
+      const start = s.start.padStart(5, "0"), end = s.end.padStart(5, "0");
+      ng[r][s.day] = codeForStart(start);
+      nt[ckey(r, s.day)] = { start, end };
+      applied++;
+    }
+    setGrid(ng); setCellTimes(nt);
+    // Publish from the NEW grid (state is async — build the payload directly).
+    const payload: ShiftInput[] = [];
+    emp.forEach((e, r) => {
+      ng[r]?.forEach((code, c) => {
+        if (!code || code === "off") return;
+        const tt = nt[ckey(r, c)];
+        const [a, b] = SH[code].l.split("–");
+        payload.push({
+          employeeName: e[1],
+          date: fmtISO(weekDays[c]),
+          startTime: tt ? tt.start : `${a.padStart(2, "0")}:00`,
+          endTime: tt ? tt.end : `${b.padStart(2, "0")}:00`,
+          shiftTypeName: SH[code].s || "Dagvakt",
+        });
+      });
+    });
+    const res = await publishSchedule(payload);
+    if (!res.ok) { toast(res.error ?? "Tókst ekki að birta"); return; }
+    toast(res.demo ? `AI-plan sett í grid (${applied} vaktir, demo)` : `AI-plan samþykkt — ${applied} vaktir settar og planið birt`);
   }
 
   function dropOn(tr: number, tc: number) {
@@ -722,7 +793,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       {modal === "addEmp" && <AddEmpModal pool={pool} onPick={pickEmp} onClose={() => setModal(null)} />}
       {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
       {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} />}
-      {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={async () => { setModal(null); await publish(); }} />}
+      {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={approveAiProposal} />}
     </>
   );
 }
@@ -939,6 +1010,7 @@ function AiPromptModal({ query, setQuery, onClose, onGen }: { query: string; set
   return (
     <Modal onClose={onClose} title={<><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 7, verticalAlign: -3 }}><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6Z" /></svg>{tr("Biðja AI um vaktaplan")}</>}>
       <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>{tr("Lýstu því sem þú vilt á venjulegri íslensku — VAKTO býr til vaktirnar og þú samþykkir.")}</p>
+      <p className="muted" style={{ fontSize: 11.5, marginBottom: 12 }}>{tr("Tillagan gildir fyrir vikuna sem er opin í planinu — flettu fyrst á réttu vikuna (t.d. næstu viku) með örvunum efst.")}</p>
       <textarea className="lf-ta" rows={3} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr("sched:aiph")} />
       <div className="chips">{ex.map((c) => <button className="chip" key={c} onClick={() => setQuery(c)}>{tr(c)}</button>)}</div>
       <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
@@ -984,6 +1056,11 @@ function AiResultModal({ query, proposal, loading, onClose, onEdit, onApprove }:
             </div>
           ))}
         </div>
+      )}
+      {!loading && proposal && (proposal.shifts?.length ?? 0) > 0 && (
+        <p className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>
+          <b style={{ color: "var(--brand)" }}>{proposal.shifts!.length}</b> {tr("vaktir í tillögunni — við samþykki eru þær settar í planið og það birt.")}
+        </p>
       )}
       {!loading && proposal && !proposal.live && (
         <p className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>

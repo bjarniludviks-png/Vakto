@@ -22,6 +22,7 @@ export async function POST(request: Request) {
       {
         summary: prompt ? `„${prompt}" — VAKTO bjó til eftirfarandi tillögu:` : "Bestun vaktaplans",
         laborPct: "31,8%",
+        shifts: [],
         live: false,
         error: message,
         items: [

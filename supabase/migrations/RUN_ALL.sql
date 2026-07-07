@@ -817,3 +817,11 @@ create policy company_members_own on company_members for select using (user_id =
 insert into company_members (user_id, company_id, role)
   select id, company_id, role from public.users where company_id is not null
   on conflict (user_id, company_id) do nothing;
+
+-- ===== 0026 — company contact/info fields (Stillingar → Fyrirtæki) =====
+alter table companies add column if not exists address text;
+alter table companies add column if not exists phone text;
+alter table companies add column if not exists email text;
+
+-- ===== 0025 — managers scoped to overseen departments (names; null = all) =====
+alter table employees add column if not exists oversees_departments text[];

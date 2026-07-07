@@ -38,7 +38,18 @@
       "Bash(npx next *)",
       "Bash(npx eslint *)",
       "Bash(echo \"exit: $?\")",
-      "Bash(echo \"lint exit: $?\")"
+      "Bash(echo \"lint exit: $?\")",
+      "Bash(sed -i '' 's|const key = env.match\\(/ANTHROPIC_API_KEY\\\\\\\\s\\\\*=\\\\\\\\s\\\\*\\(.+\\)/\\)?.\\\\[1\\\\]?.trim\\(\\);|const key = env.match\\(/ANTHROPIC_API_KEY\\\\\\\\s*=\\\\\\\\s*\\([A-Za-z0-9_-]+\\)/\\)?.[1];|' test-ai.mjs)",
+      "Bash(node test-ai.mjs)",
+      "Bash(vercel env *)",
+      "Bash(vercel link *)",
+      "Bash(git -C /Users/bjarniludviksson/vakto status --short)",
+      "Skill(claude-api)",
+      "Bash(sed -i '' 's/day: { type: \"integer\", minimum: 0, maximum: 6 },/day: { type: \"integer\" },/' test-ai.mjs)",
+      "Bash(ant auth *)",
+      "Read(//tmp/**)",
+      "Bash(kill %1)",
+      "Bash(git add *)"
     ]
   }
 }

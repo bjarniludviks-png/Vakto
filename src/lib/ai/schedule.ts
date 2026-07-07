@@ -2,7 +2,9 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 
 export type AiItem = { kind: "good" | "info" | "warn" | "bad"; title: string; detail: string; tag: string };
-export type AiProposal = { summary: string; items: AiItem[]; laborPct: string; live: boolean };
+/** One proposed shift: day 0=mánudagur … 6=sunnudagur, times HH:MM. */
+export type AiShift = { employee: string; day: number; start: string; end: string };
+export type AiProposal = { summary: string; items: AiItem[]; laborPct: string; shifts: AiShift[]; live: boolean };
 
 const SCHEMA = {
   type: "object",
@@ -23,8 +25,23 @@ const SCHEMA = {
       },
     },
     laborPct: { type: "string", description: "Áætlað laun% eftir breytingu, t.d. 31,8%" },
+    shifts: {
+      type: "array",
+      description: "FULLT vaktaplan vikunnar sem tillagan felur í sér — ein færsla fyrir hverja vakt, líka óbreyttar vaktir. Tómt fylki ef engin vaktabreyting á við.",
+      items: {
+        type: "object",
+        properties: {
+          employee: { type: "string", description: "Fornafn starfsmanns nákvæmlega eins og það birtist í samhenginu" },
+          day: { type: "integer", description: "Vikudagur: 0=mánudagur, 1=þriðjudagur … 6=sunnudagur (aðeins 0–6)" },
+          start: { type: "string", description: "Upphaf vaktar, HH:MM (24 klst)" },
+          end: { type: "string", description: "Lok vaktar, HH:MM (24 klst)" },
+        },
+        required: ["employee", "day", "start", "end"],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ["summary", "items", "laborPct"],
+  required: ["summary", "items", "laborPct", "shifts"],
   additionalProperties: false,
 } as const;
 
@@ -36,11 +53,16 @@ og þú leggur til breytingar á vaktaplani vikunnar. Reglur sem ber að virða:
 - Markmið er laun% af veltu ≤ 30% (grænt), ≤ 33% (gult), annars rautt.
 - Þú breytir ekki sjálfvirkt — notandi samþykkir. Skilaðu tillögu sem lista yfir breytingar.
 Svaraðu á íslensku. Gefðu 3–5 atriði (items) sem lýsa breytingunum, hvíldartíma/yfirvinnu-athugun og
-áhrifum á laun%. Notaðu kind='good' fyrir jákvætt, 'warn' fyrir aðvörun, 'info' fyrir hlutlaust.`;
+áhrifum á laun%. Notaðu kind='good' fyrir jákvætt, 'warn' fyrir aðvörun, 'info' fyrir hlutlaust.
+Skilaðu líka 'shifts': FULLT vaktaplan vikunnar fyrir þá starfsmenn sem tillagan snertir — hver vakt
+sem hlutur {employee, day, start, end} þar sem day er 0=mánudagur … 6=sunnudagur og tímar HH:MM.
+Notaðu fornöfnin nákvæmlega eins og þau birtast í samhenginu. Ef starfsmaður í tillögunni á að halda
+núverandi vakt skaltu samt hafa hana með (planið fyrir viðkomandi er skipt út í heild).`;
 
 const DEMO: AiProposal = {
   summary: "VAKTO bjó til eftirfarandi tillögu:",
   laborPct: "31,8%",
+  shifts: [],
   live: false,
   items: [
     { kind: "good", title: "14 vaktir búnar til", detail: "Ómar · 2-2-3 mynstur · 11:00–22:00 · maí 2026", tag: "+128 klst" },

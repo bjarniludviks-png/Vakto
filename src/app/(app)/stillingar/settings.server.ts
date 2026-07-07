@@ -7,7 +7,8 @@ import { nf } from "@/lib/format";
 export type LocationRow = { name: string; staff: number; timezone: string };
 export type PositionRow = { name: string; staff: number; baseRate: string };
 export type UserRow = { name: string; initials: string; role: string; email: string };
-export type SettingsData = { locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; companyId: string | null; live: boolean };
+export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string };
+export type SettingsData = { locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; companyId: string | null; company: CompanyInfo | null; live: boolean };
 
 const DEMO: SettingsData = {
   locations: [
@@ -24,6 +25,7 @@ const DEMO: SettingsData = {
     { name: "Jón", initials: "JÓ", role: "manager", email: "Rekstrarstjóri — vaktir, laun, skýrslur" },
   ],
   companyId: null,
+  company: null,
   live: false,
 };
 
@@ -47,11 +49,17 @@ export async function getSettingsData(): Promise<SettingsData> {
     const countBy = (key: "location" | "position") => (name: string) =>
       employees.filter((e) => e[key] === name).length;
 
-    const [{ data: locs }, { data: pos }, { data: usrs }] = await Promise.all([
+    const [{ data: locs }, { data: pos }, { data: usrs }, compRes] = await Promise.all([
       supabase.from("locations").select("name, timezone").eq("company_id", company).order("name"),
       supabase.from("positions").select("name, base_rate").eq("company_id", company).order("name"),
       supabase.from("users").select("full_name, email, role").eq("company_id", company).order("role"),
+      supabase.from("companies").select("name, kennitala, address, phone, email").eq("id", company).maybeSingle(),
     ]);
+    // Tolerant of missing 0026 columns — fall back to name+kennitala only.
+    const comp = compRes.error
+      ? (await supabase.from("companies").select("name, kennitala").eq("id", company).maybeSingle()).data
+      : compRes.data;
+    const c = (comp ?? {}) as Record<string, string | null>;
 
     return {
       locations: (locs ?? []).map((l) => ({
@@ -69,6 +77,7 @@ export async function getSettingsData(): Promise<SettingsData> {
         email: (u.email as string) ?? "",
       })),
       companyId: company,
+      company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", phone: c.phone ?? "", email: c.email ?? "" },
       live: true,
     };
   } catch {

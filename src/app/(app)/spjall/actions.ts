@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { initials } from "@/lib/employees";
 
-export type Conversation = { id: string; name: string; kind: string; av: string; color: string; last: string; dm: boolean };
+export type Conversation = { id: string; name: string; kind: string; av: string; color: string; last: string; lastAt: string | null; dm: boolean };
 export type ChatMessage = { id: string; sender: string; senderId: string; me: boolean; body: string; at: string; kind: string; url: string | null };
 export type Person = { userId: string; name: string; av: string; color: string };
 export type Members = { members: Person[]; adminId: string | null; meId: string };
@@ -53,9 +53,11 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
       memByCh.get(m.channel_id as string)!.push({ id: m.user_id as string, name: u?.full_name ?? "?" });
     }
     const lastByCh = new Map<string, string>();
+    const lastAtByCh = new Map<string, string>();
     for (const m of msgs ?? []) {
       if (lastByCh.has(m.channel_id as string)) continue;
       lastByCh.set(m.channel_id as string, m.kind === "image" ? "📷 Mynd" : m.kind === "audio" ? "🎤 Talskilaboð" : (m.body as string));
+      lastAtByCh.set(m.channel_id as string, m.created_at as string);
     }
 
     const items: Conversation[] = channels.map((c) => {
@@ -65,8 +67,10 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
         : dm ? (others[0]?.name ?? "Bein skilaboð")
           : c.name;
       const first = name.split(/\s+/)[0];
-      return { id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: colorOf(first), last: lastByCh.get(c.id) ?? "", dm };
+      return { id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: colorOf(first), last: lastByCh.get(c.id) ?? "", lastAt: lastAtByCh.get(c.id) ?? null, dm };
     });
+    // Newest activity on top; the company-wide "Almennt" channel stays pinned first.
+    items.sort((a, b) => (a.kind === "general" ? -1 : b.kind === "general" ? 1 : (b.lastAt ?? "").localeCompare(a.lastAt ?? "")));
     return { ok: true, items, meId: ctx.userId };
   } catch {
     return { ok: false, items: [], meId: "" };
