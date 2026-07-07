@@ -153,3 +153,24 @@ h1,h2,h3{letter-spacing:-.03em;line-height:1.08;font-weight:700}
   .fshow-txt h3{font-size:24px}
   .fshow-txt{order:1}.fshow-img{order:2}
 }
+
+/* ---- v1.1 polish: subtle motion ON TOP of the prototype design.
+   Additive only — no rule above this line is modified. Layout, palette and
+   typography stay exactly as designed. Everything collapses under
+   prefers-reduced-motion. ---- */
+@keyframes hin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+.hin{opacity:0;animation:hin .65s cubic-bezier(.23,1,.32,1) forwards}
+@keyframes mockin{from{opacity:0;transform:translateY(34px)}to{opacity:1;transform:none}}
+.mockin{opacity:0;animation:mockin .9s cubic-bezier(.32,.72,0,1) .34s forwards}
+.rv{opacity:0;transform:translateY(16px);transition:opacity .55s cubic-bezier(.23,1,.32,1),transform .55s cubic-bezier(.23,1,.32,1)}
+.rv.in{opacity:1;transform:none}
+.btn:active{transform:scale(.97)}
+:focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:4px}
+/* hero mockup: spark bars grow in, live values crossfade gently */
+@keyframes sparkup{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+.spark span{transform-origin:bottom;animation:sparkup .6s cubic-bezier(.23,1,.32,1) backwards}
+.lv{transition:opacity .3s ease;font-variant-numeric:tabular-nums}
+@media(prefers-reduced-motion:reduce){
+  .hin,.mockin,.spark span{animation:none;opacity:1;transform:none}
+  .rv{opacity:1;transform:none;transition:none}
+}

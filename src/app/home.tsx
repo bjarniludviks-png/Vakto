@@ -1,10 +1,55 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   I18N, FEAT, FLOW, PRICE, FAQ, PUNIT, POP, PCTA, CUSTOM, FREE, SOON, SHOWCASE, SHOWCASE_HEAD,
   INTEGRATIONS, CUSTOMERS, type Brand, type Lang,
 } from "./home-data";
+
+/** Scroll-reveal wrapper: gentle fade-up when the element enters the viewport.
+ * Purely additive polish on top of the prototype design — layout untouched.
+ * IntersectionObserver only; prefers-reduced-motion renders instantly. */
+function Reveal({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { setSeen(true); return; }
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setSeen(true); io.disconnect(); } },
+      { threshold: 0.15, rootMargin: "0px 0px -6% 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  return (
+    <div ref={ref} className={`rv${seen ? " in" : ""}${className ? ` ${className}` : ""}`} style={delay ? { transitionDelay: `${delay}ms` } : undefined}>
+      {children}
+    </div>
+  );
+}
+
+/** Slowly evolving mockup figures so the hero dashboard feels alive.
+ * Starts at the prototype's exact values (SSR-safe), then drifts gently. */
+function useLiveMock() {
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = setInterval(() => setTick((v) => v + 1), 1400);
+    return () => clearInterval(id);
+  }, []);
+  const velta = 612 + tick;                                   // þ kr, counts up
+  const pct = 32.1 + 0.25 * Math.sin(tick / 5);               // laun% breathes
+  const cost = Math.round(velta * (pct / 100));               // þ kr, follows
+  const hours = 374 + Math.floor(tick / 40);                  // creeps very slowly
+  return {
+    velta: `${velta} þ`,
+    cost: `${cost} þ`,
+    pct: `${pct.toFixed(1).replace(".", ",")}%`,
+    hours: String(hours),
+  };
+}
 
 /** A brand on the logo wall: real asset if `img` is set, else a styled wordmark. */
 function BrandLogo({ b }: { b: Brand }) {
@@ -57,6 +102,7 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showTab, setShowTab] = useState(0);
   const t = I18N[lang];
+  const live = useLiveMock();
   // Persist the choice so the login page and app shell open in the same language.
   const setLang = (l: Lang) => { setLangState(l); try { localStorage.setItem("vakto-lang", l); } catch {} };
   const loginHref = `/login?lang=${lang}`;
@@ -101,15 +147,15 @@ export default function Home() {
 
       <header className="hero">
         <div className="wrap">
-          <span className="eyebrow"><span className="dot" /><span>{t.hero_badge}</span></span>
-          <h1 dangerouslySetInnerHTML={{ __html: t.hero_title }} />
-          <p className="sub">{t.hero_sub}</p>
-          <div className="hero-cta">
+          <span className="eyebrow hin"><span className="dot" /><span>{t.hero_badge}</span></span>
+          <h1 className="hin" style={{ animationDelay: "70ms" }} dangerouslySetInnerHTML={{ __html: t.hero_title }} />
+          <p className="sub hin" style={{ animationDelay: "140ms" }}>{t.hero_sub}</p>
+          <div className="hero-cta hin" style={{ animationDelay: "210ms" }}>
             <a className="btn btn-pri btn-lg" href={tryHref}>{t.hero_cta1}</a>
             <a className="btn btn-gho btn-lg" href="#">{t.hero_cta2}</a>
           </div>
-          <p className="hero-note">{t.hero_note}</p>
-          <div className="mockwrap"><div className="mock">
+          <p className="hero-note hin" style={{ animationDelay: "280ms" }}>{t.hero_note}</p>
+          <div className="mockwrap mockin"><div className="mock">
             <div className="mbar"><i /><i /><i /></div>
             <div className="app">
               <div className="side">
@@ -123,19 +169,19 @@ export default function Home() {
               <div className="appmain">
                 <div className="aphero">
                   <div className="st"><div className="l">{t.m_planned}</div><div className="v">368</div></div>
-                  <div className="st"><div className="l">{t.m_actual}</div><div className="v">374</div></div>
+                  <div className="st"><div className="l">{t.m_actual}</div><div className="v lv">{live.hours}</div></div>
                   <div className="st"><div className="l">{t.m_laborcost}</div><div className="v">1,40 m</div></div>
-                  <div className="st"><div className="l">{t.m_laborpct}</div><div className="v" style={{ color: "#f7a35a" }}>32,1%</div></div>
+                  <div className="st"><div className="l">{t.m_laborpct}</div><div className="v lv" style={{ color: "#f7a35a" }}>{live.pct}</div></div>
                 </div>
                 <div className="apk" style={{ marginTop: 14 }}>
-                  <div className="c"><div className="l">{t.m_revtoday}</div><div className="v">612 þ</div><div className="d">+8,0%</div></div>
-                  <div className="c"><div className="l">{t.m_laborpct2}</div><div className="v">32,1%</div><div className="d" style={{ color: "var(--warn)" }}>{t.m_target}</div></div>
-                  <div className="c"><div className="l">{t.m_cost}</div><div className="v">198 þ</div></div>
+                  <div className="c"><div className="l">{t.m_revtoday}</div><div className="v lv">{live.velta}</div><div className="d">+8,0%</div></div>
+                  <div className="c"><div className="l">{t.m_laborpct2}</div><div className="v lv">{live.pct}</div><div className="d" style={{ color: "var(--warn)" }}>{t.m_target}</div></div>
+                  <div className="c"><div className="l">{t.m_cost}</div><div className="v lv">{live.cost}</div></div>
                   <div className="c"><div className="l">{t.m_staffing}</div><div className="v">5 / 6</div></div>
                 </div>
                 <div className="spark">
                   {[62, 54, 70, 80, 96, 88, 58, 66, 74, 84, 92, 78].map((h, i) => (
-                    <span key={i} style={{ height: `${h}%` }} />
+                    <span key={i} style={{ height: `${h}%`, animationDelay: `${520 + i * 45}ms` }} />
                   ))}
                 </div>
               </div>
@@ -153,12 +199,12 @@ export default function Home() {
 
       {/* ---------- tabbed feature showcase (real screenshots) ---------- */}
       <section className="sec"><div className="wrap">
-        <div className="sh">
+        <Reveal><div className="sh">
           <span className="eyebrow">{SHOWCASE_HEAD[lang].eyebrow}</span>
           <h2 style={{ marginTop: 14 }}>{SHOWCASE_HEAD[lang].title}</h2>
           <p>{SHOWCASE_HEAD[lang].sub}</p>
-        </div>
-        <div className="fshow">
+        </div></Reveal>
+        <Reveal delay={70}><div className="fshow">
           <div className="fshow-tabs">
             {SHOWCASE[lang].map((s, i) => (
               <button key={i} className={`fshow-tab${showTab === i ? " on" : ""}`} onClick={() => setShowTab(i)}>{s.tab}</button>
@@ -174,46 +220,46 @@ export default function Home() {
               <img src={SHOWCASE[lang][showTab].img} alt={SHOWCASE[lang][showTab].title} loading="lazy" />
             </div>
           </div>
-        </div>
+        </div></Reveal>
       </div></section>
 
       <section className="sec" id="eiginleikar"><div className="wrap">
-        <div className="sh">
+        <Reveal><div className="sh">
           <span className="eyebrow">{t.feat_eyebrow}</span>
           <h2 style={{ marginTop: 14 }}>{t.feat_title}</h2>
           <p>{t.feat_sub}</p>
-        </div>
+        </div></Reveal>
         <div className="bento">
           {FEAT[lang].map((f, i) => (
-            <div className="bcard" key={i}>
+            <Reveal className="bcard" delay={(i % 3) * 70} key={i}>
               <div className="bi"><FeatIcon /></div>
               <h3>{f[0]}</h3><p>{f[1]}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </div></section>
 
       <section className="sec soft" id="ferli"><div className="wrap">
-        <div className="sh"><h2>{t.flow_title}</h2><p>{t.flow_sub}</p></div>
+        <Reveal><div className="sh"><h2>{t.flow_title}</h2><p>{t.flow_sub}</p></div></Reveal>
         <div className="flow">
           {FLOW[lang].map((f, i) => (
-            <div className="fstep" key={i}>
+            <Reveal className="fstep" delay={i * 70} key={i}>
               <div className="n">{i + 1}</div><h3>{f[0]}</h3><p>{f[1]}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </div></section>
 
       <section className="sec" id="tengingar"><div className="wrap">
-        <div className="sh"><h2>{t.int_title}</h2><p>{t.int_sub}</p></div>
-        <div className="logos brandwall" style={{ gap: 48 }}>
+        <Reveal><div className="sh"><h2>{t.int_title}</h2><p>{t.int_sub}</p></div></Reveal>
+        <Reveal delay={70}><div className="logos brandwall" style={{ gap: 48 }}>
           {INTEGRATIONS.map((b) => <BrandLogo key={b.slug} b={b} />)}
-        </div>
+        </div></Reveal>
       </div></section>
 
       <section className="sec soft"><div className="wrap">
-        <div className="sh"><h2 id="verd">{t.verd_title}</h2><p>{t.verd_sub}</p></div>
-        <div className="price">
+        <Reveal><div className="sh"><h2 id="verd">{t.verd_title}</h2><p>{t.verd_sub}</p></div></Reveal>
+        <Reveal delay={70}><div className="price">
           {PRICE[lang].map((p, i) => {
             const plain = p.price === CUSTOM[lang] || p.price === FREE[lang];
             return (
@@ -242,11 +288,11 @@ export default function Home() {
               </div>
             );
           })}
-        </div>
+        </div></Reveal>
       </div></section>
 
       <section className="sec"><div className="wrap">
-        <div className="sh"><h2>{t.faq_title}</h2></div>
+        <Reveal><div className="sh"><h2>{t.faq_title}</h2></div></Reveal>
         <div className="faq">
           {FAQ[lang].map((f, i) => (
             <div className={`fitem${faqOpen === i ? " open" : ""}`} key={i} onClick={() => setFaqOpen(faqOpen === i ? null : i)}>
@@ -257,14 +303,14 @@ export default function Home() {
         </div>
       </div></section>
 
-      <section className="cta"><div className="cta-box">
+      <section className="cta"><Reveal><div className="cta-box">
         <h2>{t.cta_title}</h2>
         <p>{t.cta_sub}</p>
         <div className="hero-cta" style={{ marginTop: 28 }}>
           <a className="btn btn-lg" style={{ background: "#fff", color: "var(--green)" }} href="#">{t.cta_btn1}</a>
           <a className="btn btn-lg" style={{ background: "rgba(255,255,255,.16)", color: "#fff", borderColor: "rgba(255,255,255,.32)" }} href={tryHref}>{t.cta_btn2}</a>
         </div>
-      </div></section>
+      </div></Reveal></section>
 
       <footer className="foot"><div className="wrap">
         <div className="foot-grid">
