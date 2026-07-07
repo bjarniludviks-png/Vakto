@@ -244,11 +244,11 @@ export default function Home() {
             </h1>
             <p className="sub hin" style={{ animationDelay: "160ms" }}>{HERO2[lang].sub}</p>
             <div className="hero-cta hin" style={{ animationDelay: "240ms" }}>
-              <a className="btn btn-pri btn-lg" href={tryHref}>{t.hero_cta1}</a>
-              <a className="btn btn-dark btn-lg" href="#">{t.hero_cta2}</a>
+              <a className="btn btn-ink btn-lg" href={tryHref}>{t.hero_cta1}</a>
+              <a className="btn btn-paper btn-lg" href="#">{t.hero_cta2}</a>
             </div>
           </div>
-          <div className="shell shell-dark hin" style={{ animationDelay: "200ms" }}>
+          <div className="rcpt hin" style={{ animationDelay: "160ms" }}>
             <LiveSim lang={lang} />
           </div>
         </div>
@@ -331,7 +331,7 @@ export default function Home() {
         </div>
       </div></section>
 
-      <section className="sec soft" id="ferli"><div className="wrap">
+      <section className="sec band" id="ferli"><div className="wrap">
         <Reveal><div className="sh"><h2>{t.flow_title}</h2><p>{t.flow_sub}</p></div></Reveal>
         <div className="flow">
           {FLOW[lang].map((f, i) => (
