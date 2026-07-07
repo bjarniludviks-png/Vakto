@@ -51,6 +51,24 @@
 @media(hover:hover) and (pointer:fine){.ny-links a:hover{color:var(--ink)}}
 .ny-navcta{display:flex;gap:8px}
 
+/* mobile hamburger + dropdown menu (same glass as the pill) */
+.ny-burger{display:none;width:40px;height:40px;flex-shrink:0;background:none;border:0;cursor:pointer;position:relative;padding:0}
+.ny-burger i{position:absolute;left:10px;right:10px;height:2px;border-radius:2px;background:var(--ink);transition:transform .25s var(--ease),top .25s var(--ease)}
+.ny-burger i:first-child{top:15px}
+.ny-burger i:last-child{top:23px}
+.ny-burger.open i:first-child{top:19px;transform:rotate(45deg)}
+.ny-burger.open i:last-child{top:19px;transform:rotate(-45deg)}
+@keyframes nymenu{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+.ny-menu{position:absolute;top:calc(100% + 10px);left:0;right:0;display:flex;flex-direction:column;gap:4px;
+  background:rgba(12,12,14,.92);border:1px solid var(--line);border-radius:20px;padding:14px;
+  backdrop-filter:blur(18px) saturate(150%);box-shadow:0 18px 50px -12px rgba(0,0,0,.8);
+  animation:nymenu .3s var(--ease) both}
+@media(prefers-reduced-motion:reduce){.ny-menu{animation:none}}
+.ny-menu>a:not(.ny-btn){font-size:15px;font-weight:500;color:var(--ink);padding:11px 10px;border-radius:10px}
+.ny-menu>a:not(.ny-btn):active{background:rgba(255,255,255,.06)}
+.ny-menu-sep{height:1px;background:var(--line);margin:6px 0}
+.ny-menu .ny-btn{justify-content:center}
+
 /* ---------- hero ---------- */
 .ny-hero{position:relative;padding:150px 24px 0;text-align:center;overflow:hidden}
 .ny-hero-in{position:relative;z-index:2;max-width:1060px;margin:0 auto}
@@ -138,7 +156,15 @@
 /* ---------- customers ---------- */
 .ny-trust{padding:36px 24px 8px;text-align:center}
 .ny-trust p{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim2);font-weight:500;margin-bottom:22px}
-.ny-wall{display:flex;justify-content:center;gap:46px;flex-wrap:wrap;align-items:center}
+/* infinite marquee: two identical sets, the track slides one set-width */
+.ny-wall{overflow:hidden;max-width:900px;margin:0 auto;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 16%,#000 84%,transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 16%,#000 84%,transparent)}
+.ny-wall-track{display:flex;width:max-content;animation:nywall 28s linear infinite;will-change:transform}
+.ny-wall-set{display:flex;align-items:center;gap:72px;padding-right:72px}
+@keyframes nywall{to{transform:translateX(-50%)}}
+@media(hover:hover) and (pointer:fine){.ny-wall:hover .ny-wall-track{animation-play-state:paused}}
+@media(prefers-reduced-motion:reduce){.ny-wall-track{animation:none}}
 .ny-wm{display:inline-flex;font-size:20px;line-height:1;color:rgba(244,242,238,.42);transition:color .2s;white-space:nowrap}
 @media(hover:hover) and (pointer:fine){.ny-wall:hover .ny-wm{color:rgba(244,242,238,.6)}}
 .ny-wm-img{height:46px;width:auto;object-fit:contain;opacity:.6;transition:opacity .2s,transform .2s}
@@ -286,6 +312,8 @@
 @media(max-width:900px){
   .ny-links{display:none}
   .ny-nav{gap:12px}
+  .ny-navcta{display:none}
+  .ny-burger{display:block;margin-left:auto}
   .ny-card.big,.ny-card.wide{grid-template-columns:1fr}
   .ny-card.big .ny-card-vis{order:0}
   .ny-state-grid{flex-direction:column-reverse;gap:36px;text-align:center}
@@ -298,7 +326,6 @@
   .ny-foot-grid{grid-template-columns:1fr 1fr}
 }
 @media(max-width:560px){
-  .ny-navcta .ghost{display:none}
   .ny-hero{padding-top:120px}
   .ny-horizon{top:640px}
   .ny-ctas .ny-btn{flex:1;justify-content:center}

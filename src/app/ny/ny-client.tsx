@@ -141,6 +141,7 @@ const VOICES = [
 ];
 
 export default function NyClient() {
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div className="ny">
       {/* floating glass pill nav */}
@@ -155,6 +156,24 @@ export default function NyClient() {
           <a className="ny-btn ghost" href="/login">Innskráning</a>
           <a className="ny-btn glow" href="/nyskraning">Byrja núna</a>
         </div>
+        <button
+          className={`ny-burger${menuOpen ? " open" : ""}`}
+          aria-label={menuOpen ? "Loka valmynd" : "Opna valmynd"}
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((v) => !v)}
+        >
+          <i /><i />
+        </button>
+        {menuOpen && (
+          <div className="ny-menu" onClick={() => setMenuOpen(false)}>
+            <a href="#eiginleikar">Eiginleikar</a>
+            <a href="#skref">Hvernig það virkar</a>
+            <a href="#verd">Verð</a>
+            <div className="ny-menu-sep" />
+            <a className="ny-btn ghost" href="/login">Innskráning</a>
+            <a className="ny-btn glow" href="/nyskraning">Byrja núna</a>
+          </div>
+        )}
       </nav>
 
       {/* ---------- hero: the midnight-sun horizon ---------- */}
@@ -193,7 +212,12 @@ export default function NyClient() {
       <section className="ny-trust">
         <Rise>
           <p>Treyst af veitingastöðum og verslunum um allt land</p>
-          <div className="ny-wall">{CUSTOMERS.map((b) => <BrandWm key={b.slug} b={b} />)}</div>
+          <div className="ny-wall">
+            <div className="ny-wall-track">
+              <div className="ny-wall-set">{CUSTOMERS.map((b) => <BrandWm key={b.slug} b={b} />)}</div>
+              <div className="ny-wall-set" aria-hidden="true">{CUSTOMERS.map((b) => <BrandWm key={b.slug} b={b} />)}</div>
+            </div>
+          </div>
         </Rise>
       </section>
 
