@@ -70,7 +70,7 @@ h1,h2,h3{letter-spacing:-.03em;line-height:1.08;font-weight:700}
 .brandlogo-wm{display:inline-flex;align-items:center;font-size:21px;line-height:1;white-space:nowrap;transition:color .15s}
 .brandwall:hover .brandlogo-wm{color:#6a7180}
 .brandlogo-dot{width:5px;height:5px;border-radius:50%;display:inline-block;margin-left:4px;flex:0 0 auto}
-.brandlogo-img{height:27px;width:auto;object-fit:contain;filter:grayscale(1);opacity:.62;transition:filter .15s,opacity .15s}
+.brandlogo-img{height:44px;width:auto;object-fit:contain;border-radius:10px;filter:grayscale(1);opacity:.7;transition:filter .15s,opacity .15s}
 .brandlogo-img:hover{filter:none;opacity:1}
 .bento{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
 .bcard{background:#fff;border:1px solid #f1e6dc;border-radius:20px;padding:24px;box-shadow:var(--sh1)}

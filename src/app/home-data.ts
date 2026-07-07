@@ -136,10 +136,10 @@ export const INTEGRATIONS: Brand[] = [
 
 // Businesses running on VAKTO (shown in the trust strip).
 export const CUSTOMERS: Brand[] = [
-  { name: "Beint úr sjó", slug: "beint-ur-sjo", wm: { family: "serif", weight: 600 } },
-  { name: "Njótum",       slug: "njotum",       wm: { weight: 700, spacing: ".02em" } },
-  { name: "Thai Keflavík", slug: "thai-keflavik", wm: { weight: 700 } },
-  { name: "RVK Asian",    slug: "rvk-asian",    wm: { case: "upper", weight: 800, spacing: ".04em" } },
+  { name: "Beint úr sjó", slug: "beint-ur-sjo", img: "/logos/beint-ur-sjo.png", wm: { family: "serif", weight: 600 } },
+  { name: "Njótum",       slug: "njotum",       img: "/logos/njotum.jpg",       wm: { weight: 700, spacing: ".02em" } },
+  { name: "Thai Keflavík", slug: "thai-keflavik", img: "/logos/thai-keflavik.png", wm: { weight: 700 } },
+  { name: "RVK Asian",    slug: "rvk-asian",    img: "/logos/rvk-asian.png",    wm: { case: "upper", weight: 800, spacing: ".04em" } },
 ];
 
 export type Plan = { name: string; price: string; desc: string; unit?: string; features: string[]; pop: boolean; soon?: boolean };

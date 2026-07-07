@@ -20,6 +20,9 @@ function Logo({ w = 26 }: { w?: number }) {
 }
 
 function BrandWm({ b }: { b: Brand }) {
+  if (b.img) {
+    return <img className="ny-wm-img" src={b.img} alt={b.name} title={b.name} loading="lazy" />;
+  }
   const wm = b.wm ?? {};
   const name = wm.case === "upper" ? b.name.toUpperCase() : wm.case === "lower" ? b.name.toLowerCase() : b.name;
   return (
