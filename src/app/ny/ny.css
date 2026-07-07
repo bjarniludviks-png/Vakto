@@ -64,18 +64,29 @@
 .ny-aurora{position:absolute;inset:0;pointer-events:none;animation:nyignite 1.8s ease-out both}
 @keyframes nyignite{from{opacity:0}to{opacity:1}}
 
-/* starfield: two repeating dot patterns, gentle twinkle */
-.ny-stars{position:absolute;inset:0 0 30% 0;opacity:.9;
+/* starfield: two DRIFTING layers (parallax) with independent twinkle */
+.ny-stars{position:absolute;inset:-12% -12% 18% -12%;will-change:transform;
+  -webkit-mask-image:linear-gradient(to bottom,#000 58%,transparent 100%);
+  mask-image:linear-gradient(to bottom,#000 58%,transparent 100%)}
+.ny-stars.s1{
   background-image:
-    radial-gradient(1.3px 1.3px at 22px 34px,rgba(255,255,255,.6),transparent 100%),
-    radial-gradient(1px 1px at 130px 92px,rgba(255,255,255,.42),transparent 100%),
-    radial-gradient(.9px .9px at 76px 158px,rgba(255,255,255,.5),transparent 100%),
-    radial-gradient(1.1px 1.1px at 190px 210px,rgba(255,255,255,.3),transparent 100%);
-  background-size:230px 230px,290px 290px,340px 340px,410px 410px;
-  -webkit-mask-image:linear-gradient(to bottom,#000 55%,transparent 100%);
-  mask-image:linear-gradient(to bottom,#000 55%,transparent 100%);
-  animation:nytwinkle 7s ease-in-out infinite}
-@keyframes nytwinkle{0%,100%{opacity:.55}50%{opacity:1}}
+    radial-gradient(1.4px 1.4px at 22px 34px,rgba(255,255,255,.7),transparent 100%),
+    radial-gradient(1px 1px at 130px 92px,rgba(255,255,255,.5),transparent 100%),
+    radial-gradient(1px 1px at 76px 158px,rgba(255,244,230,.55),transparent 100%),
+    radial-gradient(1.2px 1.2px at 178px 40px,rgba(255,255,255,.4),transparent 100%);
+  background-size:190px 190px,240px 240px,285px 285px,330px 330px;
+  animation:nystars1 140s linear infinite alternate,nytwinkle 6s ease-in-out infinite}
+.ny-stars.s2{
+  background-image:
+    radial-gradient(1px 1px at 48px 66px,rgba(214,228,255,.55),transparent 100%),
+    radial-gradient(.9px .9px at 154px 128px,rgba(255,255,255,.38),transparent 100%),
+    radial-gradient(1.6px 1.6px at 96px 200px,rgba(255,255,255,.6),transparent 100%),
+    radial-gradient(.8px .8px at 220px 90px,rgba(214,228,255,.42),transparent 100%);
+  background-size:260px 260px,310px 310px,380px 380px,430px 430px;
+  animation:nystars2 200s linear infinite alternate,nytwinkle 9s ease-in-out infinite 1.4s}
+@keyframes nystars1{from{transform:translate3d(0,0,0)}to{transform:translate3d(-90px,40px,0)}}
+@keyframes nystars2{from{transform:translate3d(0,0,0)}to{transform:translate3d(70px,-50px,0)}}
+@keyframes nytwinkle{0%,100%{opacity:.5}50%{opacity:1}}
 
 /* breathing glow blobs, drifting sideways very slowly */
 .ny-aurora i{position:absolute;border-radius:50%;filter:blur(70px);will-change:transform,opacity}
@@ -91,13 +102,13 @@
   -webkit-mask-image:radial-gradient(50% 62% at 50% 74%,#000 22%,transparent 72%);
   mask-image:radial-gradient(50% 62% at 50% 74%,#000 22%,transparent 72%)}
 .ny-rays.r1{left:42%;filter:blur(7px);
-  background:repeating-linear-gradient(90deg,transparent 0 48px,rgba(245,147,49,.18) 48px 58px,transparent 58px 128px,rgba(233,112,15,.13) 128px 140px,transparent 140px 210px);
+  background:repeating-linear-gradient(90deg,transparent 0 48px,rgba(245,147,49,.18) 48px 58px,transparent 58px 128px,rgba(233,112,15,.13) 128px 140px,transparent 140px 176px,rgba(96,150,235,.08) 176px 184px,transparent 184px 230px);
   animation:nydrift1 23s ease-in-out infinite alternate}
 .ny-rays.r2{left:50%;filter:blur(3px);
-  background:repeating-linear-gradient(90deg,transparent 0 82px,rgba(255,244,230,.1) 82px 87px,transparent 87px 205px);
+  background:repeating-linear-gradient(90deg,transparent 0 82px,rgba(255,244,230,.1) 82px 87px,transparent 87px 150px,rgba(120,168,240,.08) 150px 155px,transparent 155px 205px);
   animation:nydrift2 31s ease-in-out infinite alternate}
 .ny-rays.r3{left:58%;filter:blur(8px);
-  background:repeating-linear-gradient(90deg,transparent 0 64px,rgba(96,150,235,.15) 64px 74px,transparent 74px 170px);
+  background:repeating-linear-gradient(90deg,transparent 0 64px,rgba(96,150,235,.17) 64px 74px,transparent 74px 130px,rgba(120,180,255,.1) 130px 138px,transparent 138px 170px);
   animation:nydrift3 41s ease-in-out infinite alternate}
 @keyframes nydrift1{from{transform:translateX(-53%)}to{transform:translateX(-47%)}}
 @keyframes nydrift2{from{transform:translateX(-47%)}to{transform:translateX(-53%)}}
@@ -105,10 +116,16 @@
 
 .ny-horizon{position:absolute;left:50%;top:565px;width:2600px;height:2600px;transform:translateX(-50%);border-radius:50%;
   background:#060607;
-  box-shadow:0 -3px 24px rgba(255,214,170,.85),0 -18px 90px 6px rgba(233,112,15,.6),0 -60px 220px 30px rgba(233,112,15,.32);
+  box-shadow:0 -3px 24px rgba(255,214,170,.85),0 -18px 90px 6px rgba(233,112,15,.6),0 -60px 220px 30px rgba(233,112,15,.32),
+    inset 0 6px 22px rgba(255,214,170,.5),inset 0 34px 110px -12px rgba(233,112,15,.4),inset 0 90px 240px -30px rgba(233,112,15,.18);
   border-top:1px solid rgba(255,226,190,.9)}
+/* soft wash bleeding DOWN from the horizon line, behind the screenshot */
+.ny-underglow{position:absolute;left:50%;top:600px;width:1500px;height:520px;transform:translateX(-50%);
+  background:radial-gradient(50% 56% at 50% 0%,rgba(233,112,15,.26),rgba(96,150,235,.07) 55%,transparent 75%);
+  filter:blur(34px);animation:nyaur 9s ease-in-out infinite}
+@keyframes nyaur{0%,100%{opacity:.85}50%{opacity:1}}
 @media(prefers-reduced-motion:reduce){
-  .ny-aurora,.ny-aurora i,.ny-stars,.ny-rays{animation:none;opacity:1}
+  .ny-aurora,.ny-aurora i,.ny-stars,.ny-rays,.ny-underglow{animation:none;opacity:1}
 }
 
 /* hero screenshot riding the horizon */
@@ -125,17 +142,25 @@
 .ny-wm{display:inline-flex;font-size:20px;line-height:1;color:rgba(244,242,238,.42);transition:color .2s;white-space:nowrap}
 @media(hover:hover) and (pointer:fine){.ny-wall:hover .ny-wm{color:rgba(244,242,238,.6)}}
 
-/* ---------- statement ---------- */
+/* ---------- statement + the industry planet ---------- */
 .ny-state{padding:120px 24px 40px}
 .ny-state-grid{display:flex;align-items:center;gap:56px;max-width:1000px;margin:0 auto}
 .ny-statement{font-size:clamp(21px,2.6vw,30px);font-weight:500;letter-spacing:-.02em;line-height:1.45;color:var(--ink)}
 .ny-statement em{font-style:normal;color:var(--brand2)}
-.ny-orb{flex:0 0 auto;width:170px;height:170px;border-radius:50%;
-  background:radial-gradient(circle at 34% 30%,#ffcf9e,#f08018 42%,#5a2c04 78%,#160a02);
-  box-shadow:0 0 70px -6px var(--glow),inset -14px -18px 44px rgba(0,0,0,.55)}
+/* glassy rotating planet cycling through the industries VAKTO serves */
+.ny-planet{position:relative;flex:0 0 auto;width:220px;height:220px;border-radius:50%;overflow:hidden;
+  background:radial-gradient(130% 130% at 30% 22%,#5b7fd4 0%,#2c3f77 36%,#181b2b 56%,#b85e10 80%,#f09a3e 102%);
+  box-shadow:0 0 90px -12px var(--glow),0 0 70px -24px rgba(80,120,220,.5),inset 0 2px 18px rgba(255,255,255,.28),inset 0 -22px 60px rgba(0,0,0,.6);
+  animation:nyfloat 7s ease-in-out infinite}
+.ny-planet-swirl{position:absolute;inset:-42%;background:conic-gradient(from 0deg,rgba(96,150,235,.4),rgba(233,112,15,.44),rgba(14,16,26,.25),rgba(96,150,235,.4));filter:blur(26px);animation:nyspin 20s linear infinite}
+@keyframes nyspin{to{transform:rotate(360deg)}}
+.ny-planet-shine{position:absolute;inset:0;border-radius:50%;background:radial-gradient(58% 42% at 32% 20%,rgba(255,255,255,.42),transparent 62%)}
+.ny-planet-face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:11px;color:#fff;animation:nyface .55s var(--ease)}
+.ny-planet-face svg{width:46px;height:46px;filter:drop-shadow(0 2px 12px rgba(0,0,0,.45))}
+.ny-planet-face span{font-size:15px;font-weight:600;letter-spacing:-.01em;text-shadow:0 1px 10px rgba(0,0,0,.55)}
+@keyframes nyface{from{opacity:0;transform:scale(.9) translateY(8px)}to{opacity:1;transform:none}}
 @keyframes nyfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
-.ny-orb{animation:nyfloat 6.5s ease-in-out infinite}
-@media(prefers-reduced-motion:reduce){.ny-orb{animation:none}}
+@media(prefers-reduced-motion:reduce){.ny-planet,.ny-planet-swirl,.ny-planet-face{animation:none}}
 
 /* ---------- sections & feature cards ---------- */
 .ny-sec{padding:110px 24px}
@@ -177,6 +202,25 @@
 @media(prefers-reduced-motion:reduce){.ny-clock .ring{animation:none}}
 .ny-rows{display:flex;flex-direction:column;gap:10px;width:64%}
 .ny-rows i{height:9px;border-radius:5px;background:linear-gradient(90deg,rgba(245,147,49,.8),rgba(245,147,49,.15))}
+/* mini staff ID card */
+.ny-idcard{width:252px;border-radius:14px;overflow:hidden;background:#141518;border:1px solid rgba(255,255,255,.16);box-shadow:0 20px 44px -14px rgba(0,0,0,.65);transform:rotate(-3deg);animation:nyfloat 6s ease-in-out infinite}
+.ny-idcard .top{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(120deg,#e9700f,#f59331);padding:8px 12px;color:#fff}
+.ny-idcard .top b{font-size:12px;letter-spacing:.08em}
+.ny-idcard .top span{font-size:6.5px;letter-spacing:.16em;opacity:.9}
+.ny-idcard .body{display:flex;gap:10px;align-items:center;padding:12px}
+.ny-idcard .av{width:38px;height:38px;border-radius:10px;background:#5b50e6;color:#fff;display:grid;place-items:center;font-weight:700;font-size:13px;flex:0 0 auto}
+.ny-idcard .tx b{display:block;font-size:13px;color:#fff}
+.ny-idcard .tx span{font-size:10.5px;color:rgba(255,255,255,.55)}
+.ny-idcard .qr{margin-left:auto;display:grid;grid-template-columns:repeat(5,6px);gap:1.5px}
+.ny-idcard .qr i{width:6px;height:6px;background:rgba(255,255,255,.12);border-radius:1px}
+.ny-idcard .qr i.on{background:#fff}
+@media(prefers-reduced-motion:reduce){.ny-idcard{animation:none}}
+/* mini team chat */
+.ny-chat{display:flex;flex-direction:column;gap:9px;width:min(300px,86%)}
+.ny-chat .bub{font-size:12.5px;padding:8px 13px;border-radius:13px;line-height:1.4}
+.ny-chat .them{background:rgba(255,255,255,.1);color:#fff;align-self:flex-start;border-bottom-left-radius:4px}
+.ny-chat .me{background:var(--brand);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.ny-chat .tag{align-self:center;background:rgba(46,194,126,.14);color:var(--good);font-size:11px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid rgba(46,194,126,.3)}
 
 /* ---------- steps ---------- */
 .ny-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:1060px;margin:0 auto}
@@ -185,10 +229,24 @@
 .ny-step h3{font-size:19px;color:#fff;margin-top:14px}
 .ny-step p{font-size:14.5px;color:var(--dim);margin-top:9px;line-height:1.6}
 
-/* ---------- quote ---------- */
-.ny-quote{padding:40px 24px 10px;text-align:center}
-.ny-quote blockquote{font-size:clamp(22px,3vw,34px);font-weight:500;letter-spacing:-.025em;line-height:1.35;max-width:820px;margin:0 auto;color:#fff}
-.ny-quote cite{display:block;margin-top:18px;font-style:normal;font-size:14px;color:var(--dim2)}
+/* ---------- voices (testimonials) ---------- */
+.ny-voices{padding-top:80px}
+.ny-voice-main{display:grid;grid-template-columns:340px 1fr;gap:36px;align-items:stretch;max-width:1000px;margin:0 auto 18px;
+  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid var(--line);border-radius:22px;padding:22px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.ny-voice-main img{width:100%;height:100%;min-height:300px;object-fit:cover;border-radius:14px}
+.ny-voice-main .vx{display:flex;flex-direction:column;justify-content:space-between;padding:14px 10px 8px}
+.ny-voice-main blockquote{font-size:clamp(17px,1.9vw,22px);font-weight:500;letter-spacing:-.015em;line-height:1.5;color:#fff;margin:0}
+.ny-voice-main .who{margin-top:26px}
+.ny-voice-main .who b{display:block;font-size:15px;color:#fff}
+.ny-voice-main .who span{font-size:13px;color:var(--dim2)}
+.ny-voice-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:1000px;margin:0 auto}
+.ny-voice{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));border:1px solid var(--line);border-radius:18px;padding:26px}
+.ny-voice blockquote{font-size:15px;line-height:1.6;color:var(--ink);margin:0}
+.ny-voice .who{display:flex;gap:12px;align-items:center;margin-top:20px}
+.ny-voice .who img{width:44px;height:44px;border-radius:50%;object-fit:cover}
+.ny-voice .who b{display:block;font-size:13.5px;color:#fff}
+.ny-voice .who span{font-size:12px;color:var(--dim2)}
 
 /* ---------- pricing ---------- */
 .ny-price{position:relative;overflow:hidden;max-width:520px;margin:0 auto;text-align:center;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(245,147,49,.35);border-radius:24px;padding:44px 36px 36px;box-shadow:0 0 60px -18px var(--glow),inset 0 1px 0 rgba(255,255,255,.09)}
@@ -203,12 +261,20 @@
 /* ---------- CTA + giant wordmark footer ---------- */
 .ny-cta{padding:120px 24px 90px;text-align:center}
 .ny-cta h2{font-size:clamp(28px,3.6vw,44px);color:#fff;max-width:720px;margin:0 auto 34px}
-.ny-foot{position:relative;border-top:1px solid var(--line);padding:48px 24px 0;overflow:hidden}
-.ny-foot-links{display:flex;align-items:center;justify-content:space-between;gap:20px;max-width:1060px;margin:0 auto 40px;flex-wrap:wrap}
-.ny-foot-links div{display:flex;gap:22px;flex-wrap:wrap}
-.ny-foot-links a{font-size:14px;color:var(--dim)}
-@media(hover:hover) and (pointer:fine){.ny-foot-links a:hover{color:var(--ink)}}
-.ny-foot-links span{font-size:12.5px;color:var(--dim2)}
+.ny-foot{position:relative;border-top:1px solid var(--line);padding:64px 24px 0;overflow:hidden}
+/* aurora wash across the footer top edge, like the reference */
+.ny-foot-aurora{position:absolute;left:50%;top:-160px;width:1900px;height:320px;transform:translateX(-50%);pointer-events:none;
+  background:
+    radial-gradient(34% 70% at 26% 50%,rgba(233,112,15,.28),transparent 70%),
+    radial-gradient(30% 64% at 55% 40%,rgba(245,147,49,.14),transparent 70%),
+    radial-gradient(32% 70% at 76% 50%,rgba(80,124,220,.24),transparent 70%);
+  filter:blur(42px)}
+.ny-foot-grid{position:relative;display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 1fr;gap:36px;max-width:1060px;margin:0 auto 44px}
+.ny-foot-brand p{font-size:13.5px;color:var(--dim2);line-height:1.6;margin-top:14px;max-width:30ch}
+.ny-foot-col h4{font-size:14px;font-weight:600;color:#fff;margin:0 0 14px}
+.ny-foot-col a{display:block;font-size:13.5px;color:var(--dim);margin-bottom:10px}
+@media(hover:hover) and (pointer:fine){.ny-foot-col a:hover{color:var(--ink)}}
+.ny-foot-bot{position:relative;display:flex;justify-content:space-between;gap:14px;max-width:1060px;margin:0 auto 8px;padding-top:20px;border-top:1px solid var(--line);font-size:12.5px;color:var(--dim2);flex-wrap:wrap}
 .ny-mark{font-size:clamp(120px,22vw,330px);font-weight:700;letter-spacing:-.02em;line-height:.72;text-align:center;
   background:linear-gradient(180deg,rgba(255,255,255,.16),rgba(255,255,255,.015) 78%);
   -webkit-background-clip:text;background-clip:text;color:transparent;
@@ -224,6 +290,10 @@
   .ny-steps{grid-template-columns:1fr}
   .ny-cards{grid-template-columns:1fr}
   .ny-sec{padding:80px 20px}
+  .ny-voice-main{grid-template-columns:1fr}
+  .ny-voice-main img{min-height:0;max-height:340px}
+  .ny-voice-grid{grid-template-columns:1fr}
+  .ny-foot-grid{grid-template-columns:1fr 1fr}
 }
 @media(max-width:560px){
   .ny-navcta .ghost{display:none}
