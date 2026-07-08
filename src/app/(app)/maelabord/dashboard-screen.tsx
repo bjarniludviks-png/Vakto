@@ -209,6 +209,7 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
     const overtimePayStr = pd?.ok ? krCompact(pd.overtimePay) : "—";
     const premiumPayStr = pd?.ok ? krCompact(pd.premiumPay) : "—";
     const leviesStr = pd?.ok ? krCompact(pd.levies) : "—";
+    const wagesStr = pd?.ok ? krCompact(pd.cost - pd.levies) : "—";
     const costPerHourStr = pd?.ok ? krCompact(pd.costPerHour) : "—";
     const revenueStr = pd?.ok && pd.revenue > 0 ? krCompact(pd.revenue) : "";
     const sourceLabel = pd?.ok ? (pd.revenueSource === "inventra" ? t("tengt Inventra") : pd.revenueSource === "manual" ? t("handvirkt") : pd.revenueSource === "mixed" ? t("blandað") : pd.revenueSource === "estimated" ? t("áætluð") : "") : "";
@@ -285,8 +286,9 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
               <div className="fs"><div className="l">{t("Yfirvinna")}</div><div className="v">{overtimeH} <small style={{ fontSize: 14, color: "var(--ink3)", fontWeight: 600 }}>{t("klst")}</small></div></div>
             </div>
             <div className="dhero-right">
-              <div className="l">{t("Launakostnaður")}</div>
+              <div className="l">{t("Heildarlaunakostnaður")}</div>
               <div className="big">{costStr}</div>
+              {pd?.ok && <div className="s2">{t("þar af laun")} {wagesStr} · {t("launatengd gjöld")} {leviesStr}</div>}
               <div className="s2">{t("Áætlað v. plan")} {plannedCostStr} · {t("frávik")} <span style={dvColor ? { color: dvColor } : undefined}>{deviationCostStr}</span></div>
             </div>
           </div>
