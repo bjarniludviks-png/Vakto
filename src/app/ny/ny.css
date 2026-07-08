@@ -49,7 +49,14 @@
 .ny-links{display:flex;gap:22px;margin:0 auto}
 .ny-links a{font-size:14px;color:var(--dim);font-weight:500;transition:color .15s}
 @media(hover:hover) and (pointer:fine){.ny-links a:hover{color:var(--ink)}}
-.ny-navcta{display:flex;gap:8px}
+.ny-navcta{display:flex;gap:8px;align-items:center}
+
+/* language globe */
+.ny-lang{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12.5px;font-weight:600;letter-spacing:.04em;
+  color:var(--dim);background:none;border:1px solid var(--line);border-radius:999px;padding:8px 13px;cursor:pointer;transition:color .15s,background .15s}
+.ny-lang svg{width:15px;height:15px}
+@media(hover:hover) and (pointer:fine){.ny-lang:hover{color:var(--ink);background:rgba(255,255,255,.06)}}
+.ny-menu .ny-lang{width:100%;justify-content:center;padding:11px}
 
 /* mobile hamburger + dropdown menu (same glass as the pill) */
 .ny-burger{display:none;width:40px;height:40px;flex-shrink:0;background:none;border:0;cursor:pointer;position:relative;padding:0}

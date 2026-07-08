@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { createOwnerAccount, setCompanyPlan } from "./actions";
 
 const PLANS = [
-  { id: "vakto", name: "VAKTO", price: "9.990", per: "kr/mán · VSK innifalið", blurb: "Allt innifalið — 5 notendur, +990 kr per notanda umfram" },
+  { id: "vakto", name: "VAKTO", price: "9.990", per: "kr/mán · VSK innifalið", blurb: "Allt innifalið — 5 notendur, +990 kr á notanda umfram" },
 ];
 
 const Bars = () => (
@@ -81,7 +81,7 @@ export default function SignupForm({ initialPlan = "vakto" }: { initialPlan?: st
           <span className="done">1 · Aðgangur</span><span className="sep">→</span><span className="cur">2 · Áskrift</span>
         </div>
         <h1>Veldu áskrift</h1>
-        <div className="sub">14 daga frí prufa — engin greiðsla fyrr en hún rennur út.</div>
+        <div className="sub">14 daga frí prufa — engin greiðsla fyrr en þú ert viss.</div>
 
         <div className="planpick">
           {PLANS.map((pl) => (
@@ -102,7 +102,7 @@ export default function SignupForm({ initialPlan = "vakto" }: { initialPlan?: st
 
         {error && <div style={{ color: "var(--bad)", fontSize: 13, fontWeight: 600, marginBottom: 14 }}>{error}</div>}
         <button className="btn" type="submit">Byrja frí prufu — {p.name}</button>
-        <p className="pcy">Greitt með Teya · örugg greiðsla. Þú getur sagt upp hvenær sem er.</p>
+        <p className="pcy">Greitt með Teya · örugg greiðsla · uppsögn hvenær sem er</p>
         <div className="foot"><a onClick={() => window.location.assign("/maelabord")} style={{ cursor: "pointer" }}>Sleppa í bili</a></div>
       </form>
     );
@@ -115,7 +115,7 @@ export default function SignupForm({ initialPlan = "vakto" }: { initialPlan?: st
         <span className="cur">1 · Aðgangur</span><span className="sep">→</span><span>2 · Áskrift</span>
       </div>
       <h1>Stofna aðgang</h1>
-      <div className="sub">Komdu rekstrinum í VAKTO á nokkrum mínútum.</div>
+      <div className="sub">Korter — og þú ert í loftinu.</div>
 
       <div className="field"><div className="lbl"><label htmlFor="fn">Fullt nafn</label></div><input id="fn" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Nafn Nafnsson" autoComplete="name" required /></div>
       <div className="field"><div className="lbl"><label htmlFor="co">Fyrirtæki</label></div><input id="co" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Fyrirtækið ehf" autoComplete="organization" required /></div>
