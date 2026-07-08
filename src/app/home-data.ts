@@ -143,6 +143,9 @@ export const CUSTOMERS: Brand[] = [
   { name: "Njótum",       slug: "njotum",       img: "/logos/white/njotum.png",       scale: 0.85, wm: { weight: 700, spacing: ".02em" } },
   { name: "Thai Keflavík", slug: "thai-keflavik", img: "/logos/white/thai-keflavik.png", scale: 1.2, wm: { weight: 700 } },
   { name: "RVK Asian",    slug: "rvk-asian",    img: "/logos/white/rvk-asian.png",    wm: { case: "upper", weight: 800, spacing: ".04em" } },
+  { name: "Reykjanes Tours", slug: "reykjanes-tours", img: "/logos/white/reykjanes-tours.png", scale: 0.6,  wm: { weight: 700 } },
+  { name: "SMAKK",        slug: "smakk",        img: "/logos/white/smakk.png",        scale: 0.65, wm: { case: "upper", weight: 800, spacing: ".06em" } },
+  { name: "Nordic Gourmet", slug: "nordic-gourmet", img: "/logos/white/nordic-gourmet.png", scale: 0.75, wm: { case: "upper", weight: 700, spacing: ".08em" } },
 ];
 
 export type Plan = { name: string; price: string; desc: string; unit?: string; features: string[]; pop: boolean; soon?: boolean };
