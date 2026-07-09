@@ -338,3 +338,78 @@
   .ny-ctas .ny-btn{flex:1;justify-content:center}
   .ny-foot-links{flex-direction:column;align-items:flex-start}
 }
+
+/* ---------- product showcase slider ---------- */
+.ny-showsec{padding-bottom:40px}
+.ny-show{position:relative;max-width:1060px;margin:0 auto}
+.ny-show-track{display:flex;gap:20px;overflow-x:auto;scroll-snap-type:x mandatory;
+  padding:6px 8% 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.ny-show-track::-webkit-scrollbar{display:none}
+.ny-slide{flex:0 0 84%;scroll-snap-align:center;margin:0}
+.ny-slide img{display:block;width:100%;height:auto;border-radius:14px;border:1px solid rgba(255,255,255,.13);
+  box-shadow:0 30px 90px -30px rgba(0,0,0,.85),0 0 46px -16px rgba(233,112,15,.35);
+  background:#0a0a0d}
+.ny-slide figcaption{display:flex;flex-direction:column;gap:3px;margin-top:14px;text-align:center}
+.ny-slide figcaption b{font-size:15.5px;font-weight:600;color:var(--ink)}
+.ny-slide figcaption span{font-size:13.5px;color:var(--dim)}
+.ny-show-arr{position:absolute;top:38%;z-index:3;width:42px;height:42px;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:var(--ink);
+  background:rgba(16,16,18,.75);border:1px solid var(--line);backdrop-filter:blur(10px);
+  transition:background .15s,opacity .15s,transform .15s}
+.ny-show-arr svg{width:18px;height:18px}
+.ny-show-arr.l{left:10px}
+.ny-show-arr.r{right:10px}
+.ny-show-arr:disabled{opacity:.3;cursor:default}
+@media(hover:hover) and (pointer:fine){.ny-show-arr:not(:disabled):hover{background:rgba(255,255,255,.12);transform:scale(1.06)}}
+.ny-show-dots{display:flex;gap:7px;justify-content:center;margin-top:16px}
+.ny-show-dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.18);transition:background .2s,transform .2s}
+.ny-show-dots i.on{background:var(--brand2);transform:scale(1.25)}
+
+/* ---------- mobile-app preview: orange iPhone mockup ---------- */
+.ny-appsec{padding-top:40px}
+.ny-app-grid{display:flex;align-items:center;gap:64px;max-width:1000px;margin:0 auto}
+.ny-app-txt{flex:1;min-width:0}
+.ny-app-badge{display:inline-block;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--brand2);background:rgba(233,112,15,.12);border:1px solid rgba(245,147,49,.35);border-radius:999px;padding:5px 13px;margin-bottom:18px}
+.ny-app-txt h2{font-size:clamp(26px,3.4vw,38px);color:#fff}
+.ny-app-txt>p{font-size:16px;color:var(--dim);margin-top:14px;line-height:1.6;max-width:440px}
+.ny-app-txt ul{list-style:none;margin:24px 0 0;padding:0;display:flex;flex-direction:column;gap:12px}
+.ny-app-txt li{display:flex;align-items:center;gap:11px;font-size:15px;color:var(--ink)}
+.ny-app-txt li svg{width:17px;height:17px;color:var(--brand2);flex-shrink:0}
+.ny-app-vis{position:relative;flex:0 0 auto;padding:30px 26px}
+.ny-app-glow{position:absolute;inset:-10%;border-radius:50%;
+  background:radial-gradient(50% 50% at 50% 50%,rgba(233,112,15,.22),transparent 70%);filter:blur(30px)}
+@keyframes nyfloat{0%,100%{transform:rotate(-6deg) translateY(0)}50%{transform:rotate(-6deg) translateY(-10px)}}
+.ny-phone{position:relative;width:264px;height:548px;border-radius:46px;padding:9px;
+  background:linear-gradient(160deg,#f5a04c,#e9700f 45%,#b85109);
+  box-shadow:0 40px 90px -30px rgba(0,0,0,.9),0 0 60px -20px rgba(233,112,15,.55),inset 0 1px 1px rgba(255,255,255,.4);
+  transform:rotate(-6deg);animation:nyfloat 7s ease-in-out infinite;will-change:transform}
+@media(prefers-reduced-motion:reduce){.ny-phone{animation:none}}
+.ny-phone-scr{position:relative;height:100%;border-radius:38px;background:#0a0a0d;overflow:hidden;
+  display:flex;flex-direction:column;gap:12px;padding:52px 14px 16px}
+.ny-phone-scr .isl{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:86px;height:24px;border-radius:999px;background:#000;border:1px solid rgba(255,255,255,.06)}
+.ph-head{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;letter-spacing:.06em;color:var(--ink)}
+.ph-head .av{margin-left:auto;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#f59331,#cf5f0c);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:0}
+.ph-card{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;padding:13px 14px;display:flex;flex-direction:column;gap:4px}
+.ph-card small{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim2);font-weight:600}
+.ph-card b{font-size:14px;color:var(--ink);font-weight:600}
+.ph-clock{border:1px solid rgba(245,147,49,.55);border-radius:13px;padding:13px;font:inherit;font-size:14px;font-weight:700;color:#fff;
+  background:linear-gradient(180deg,#f08222,#d96509);box-shadow:0 0 24px -8px rgba(233,112,15,.7)}
+.ph-wallet{margin-top:2px;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.14)}
+.ph-wallet .wtop{display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#f59331,#cf5f0c);padding:9px 12px;font-size:11px;font-weight:800;letter-spacing:.08em;color:#fff}
+.ph-wallet .wtop span{width:22px;height:22px;border-radius:5px;background:
+  conic-gradient(#fff 25%,transparent 0 50%,#fff 0 75%,transparent 0);opacity:.9}
+.ph-wallet .wbot{display:flex;align-items:center;gap:9px;background:#141417;padding:10px 12px}
+.ph-wallet .wav{width:26px;height:26px;border-radius:50%;background:#2c2c31;color:var(--ink);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.ph-wallet i{font-style:normal;font-size:11.5px;color:var(--dim)}
+.ph-notif{margin-top:auto;display:flex;align-items:center;gap:8px;background:rgba(46,194,126,.1);border:1px solid rgba(46,194,126,.3);
+  border-radius:11px;padding:10px 12px;font-size:12px;font-weight:600;color:#5fd9a2}
+.ph-notif .dot{width:7px;height:7px;border-radius:50%;background:#2ec27e;flex-shrink:0}
+
+@media(max-width:900px){
+  .ny-slide{flex-basis:92%}
+  .ny-show-arr{display:none}
+  .ny-app-grid{flex-direction:column;gap:44px;text-align:center}
+  .ny-app-txt ul{align-items:flex-start;text-align:left;margin-inline:auto;width:fit-content}
+  .ny-app-vis{padding:16px}
+}

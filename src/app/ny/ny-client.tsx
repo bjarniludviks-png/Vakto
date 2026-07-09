@@ -26,6 +26,11 @@ const T: Record<Lang, {
   idLabel: string; idRole: string;
   stepsHead: string;
   steps: { title: string; desc: string }[];
+  showHead: string; showSub: string;
+  slides: { title: string; desc: string }[];
+  appBadge: string; appHead: string; appSub: string;
+  appPoints: string[];
+  phNext: string; phShift: string; phClockIn: string; phWallet: string; phNotif: string;
   voicesHead: string; voicesSub: string;
   voices: { quote: string; role: string }[];
   priceHead: string; priceSub: string; priceAmt: string; priceUnit: string;
@@ -71,6 +76,28 @@ const T: Record<Lang, {
       { title: "Láttu AI sjá um planið", desc: "Lýstu vikunni og AI raðar eftir álagi og reglum. Þú samþykkir — og planið lendir í símum starfsfólksins, með skírteini og öllu." },
       { title: "Sjáðu kostnaðinn fyrirfram", desc: "Launakostnaðurinn birtist áður en þú birtir planið og frávikin dag frá degi. Mánaðamótin verða bara dagsetning." },
     ],
+    showHead: "Sjáðu kerfið í alvöru",
+    showSub: "Alvöru skjámyndir úr VAKTO — flettu á milli.",
+    slides: [
+      { title: "Mælaborð", desc: "Reksturinn í rauntíma: tímar, kostnaður og laun% á einum skjá." },
+      { title: "Vaktaplan", desc: "Full vika á sekúndum með AI — kostnaðurinn sést áður en þú birtir." },
+      { title: "Tímaskráning", desc: "Áætlað vs raun, yfirvinna og frávik — lifandi yfir daginn." },
+      { title: "Starfsfólk", desc: "Prófílar, réttindi, skjöl og skírteini á einum stað." },
+      { title: "Skýrslur", desc: "Tímar, kostnaður og samanburður — sótt sem Excel eða PDF." },
+      { title: "Stimpilklukka", desc: "Sameiginleg spjaldtölva á staðnum — inn og út með einni snertingu." },
+    ],
+    appBadge: "Væntanlegt",
+    appHead: "Appið sem fylgir fólkinu heim",
+    appSub: "VAKTO appið er á leiðinni — allt sem starfsfólkið þarf, í vasanum.",
+    appPoints: [
+      "Vaktirnar og næsta vakt",
+      "Stimpla inn og út",
+      "Skírteinið í Apple Wallet og Google Wallet",
+      "Fríbeiðnir og vaktaskipti",
+      "Tilkynningar um leið og eitthvað breytist",
+    ],
+    phNext: "Næsta vakt", phShift: "Fim 9. júlí · 08:00–16:00", phClockIn: "Stimpla inn",
+    phWallet: "Skírteini · Apple Wallet", phNotif: "Vaktaskipti samþykkt ✓",
     voicesHead: "Rekstrarfólk elskar VAKTO",
     voicesSub: "Og starfsfólkið líka. Það er allur galdurinn.",
     voices: [
@@ -129,6 +156,28 @@ const T: Record<Lang, {
       { title: "Let AI do the planning", desc: "Describe your week and AI staffs it by demand and rules. You approve — and the schedule lands on your team's phones, badge included." },
       { title: "See the cost up front", desc: "Labor cost shows before you publish, and deviations day by day. Month-end becomes just a date." },
     ],
+    showHead: "See the real thing",
+    showSub: "Actual screenshots from VAKTO — swipe through.",
+    slides: [
+      { title: "Dashboard", desc: "Your business in real time: hours, cost and labor % on one screen." },
+      { title: "Scheduling", desc: "A full week in seconds with AI — see the cost before you publish." },
+      { title: "Time tracking", desc: "Planned vs actual, overtime and deviations — live through the day." },
+      { title: "People", desc: "Profiles, entitlements, documents and IDs in one place." },
+      { title: "Reports", desc: "Hours, cost and comparisons — exported as Excel or PDF." },
+      { title: "Time clock", desc: "A shared tablet on site — in and out with one tap." },
+    ],
+    appBadge: "Coming soon",
+    appHead: "The app that goes home with your people",
+    appSub: "The VAKTO app is on its way — everything your team needs, in their pocket.",
+    appPoints: [
+      "Shifts and what's next",
+      "Clock in and out",
+      "ID in Apple Wallet and Google Wallet",
+      "Time off and shift swaps",
+      "Notifications the moment anything changes",
+    ],
+    phNext: "Next shift", phShift: "Thu 9 July · 08:00–16:00", phClockIn: "Clock in",
+    phWallet: "ID · Apple Wallet", phNotif: "Swap approved ✓",
     voicesHead: "Owners love VAKTO",
     voicesSub: "So do their teams. That's the whole trick.",
     voices: [
@@ -245,6 +294,108 @@ function IndustryOrb({ names }: { names: string[] }) {
 }
 
 /* ---------- feature-card visuals (static mockups) ---------- */
+
+const SLIDE_IMGS = [
+  "/showcase/maelabord-dark.png",
+  "/showcase/dark/vaktaplan.png",
+  "/showcase/dark/timaskraning.png",
+  "/showcase/dark/starfsfolk.png",
+  "/showcase/dark/skyrslur.png",
+  "/showcase/dark/kiosk.png",
+];
+
+/** Horizontal product showcase — scroll-snap slider with arrows + dots. */
+function Showcase({ slides, head, sub }: { slides: { title: string; desc: string }[]; head: string; sub: string }) {
+  const track = useRef<HTMLDivElement>(null);
+  const [idx, setIdx] = useState(0);
+  const go = (d: number) => {
+    const el = track.current;
+    if (!el) return;
+    const slide = el.querySelector<HTMLElement>(".ny-slide");
+    if (!slide) return;
+    el.scrollBy({ left: d * (slide.offsetWidth + 20), behavior: "smooth" });
+  };
+  const onScroll = () => {
+    const el = track.current;
+    if (!el) return;
+    const slide = el.querySelector<HTMLElement>(".ny-slide");
+    if (!slide) return;
+    setIdx(Math.min(slides.length - 1, Math.max(0, Math.round(el.scrollLeft / (slide.offsetWidth + 20)))));
+  };
+  return (
+    <section className="ny-sec ny-showsec" id="kerfid">
+      <Rise><div className="ny-head">
+        <h2>{head}</h2>
+        <p>{sub}</p>
+      </div></Rise>
+      <Rise delay={60}>
+        <div className="ny-show">
+          <button className="ny-show-arr l" aria-label="Fyrri" onClick={() => go(-1)} disabled={idx === 0}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M15 5l-7 7 7 7" /></svg>
+          </button>
+          <div className="ny-show-track" ref={track} onScroll={onScroll}>
+            {slides.map((s, i) => (
+              <figure className="ny-slide" key={i}>
+                <img src={SLIDE_IMGS[i]} alt={s.title} loading="lazy" />
+                <figcaption><b>{s.title}</b><span>{s.desc}</span></figcaption>
+              </figure>
+            ))}
+          </div>
+          <button className="ny-show-arr r" aria-label="Næsta" onClick={() => go(1)} disabled={idx === slides.length - 1}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M9 5l7 7-7 7" /></svg>
+          </button>
+        </div>
+        <div className="ny-show-dots" aria-hidden="true">
+          {slides.map((_, i) => <i key={i} className={i === idx ? "on" : ""} />)}
+        </div>
+      </Rise>
+    </section>
+  );
+}
+
+/** The future mobile app — CSS iPhone mockup with placeholder screens. */
+function AppPreview({ t }: { t: (typeof T)["is"] }) {
+  return (
+    <section className="ny-sec ny-appsec">
+      <Rise className="ny-app-grid">
+        <div className="ny-app-txt">
+          <span className="ny-app-badge">{t.appBadge}</span>
+          <h2>{t.appHead}</h2>
+          <p>{t.appSub}</p>
+          <ul>
+            {t.appPoints.map((pt) => (
+              <li key={pt}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M5 12.5l4 4 10-10" /></svg>
+                {pt}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="ny-app-vis" aria-hidden="true">
+          <span className="ny-app-glow" />
+          <div className="ny-phone">
+            <div className="ny-phone-scr">
+              <span className="isl" />
+              <div className="ph-head"><Logo w={14} /><b>VAKTO</b><span className="av">MÍ</span></div>
+              <div className="ph-card">
+                <small>{t.phNext}</small>
+                <b>{t.phShift}</b>
+              </div>
+              <button className="ph-clock">{t.phClockIn}</button>
+              <div className="ph-wallet">
+                <div className="wtop"><b>VAKTO</b><span /></div>
+                <div className="wbot"><span className="wav">MÍ</span><i>{t.phWallet}</i></div>
+              </div>
+              <div className="ph-notif">
+                <span className="dot" />{t.phNotif}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Rise>
+    </section>
+  );
+}
 
 const FEATURE_VISUALS = ["gauge", "grid", "pulse", "card", "rows", "chat"] as const;
 const FEATURE_LAYOUT = [{ big: true }, {}, {}, {}, {}, { wide: true }] as const;
@@ -431,6 +582,9 @@ export default function NyClient() {
         </div>
       </section>
 
+      {/* product showcase — real screenshots in a slider */}
+      <Showcase slides={t.slides} head={t.showHead} sub={t.showSub} />
+
       {/* voices: featured card + two smaller (photos generated for the preview) */}
       <section className="ny-sec ny-voices">
         <Rise><div className="ny-head">
@@ -456,6 +610,9 @@ export default function NyClient() {
           ))}
         </div>
       </section>
+
+      {/* the future mobile app */}
+      <AppPreview t={t} />
 
       {/* ---------- pricing ---------- */}
       <section className="ny-sec" id="verd">
