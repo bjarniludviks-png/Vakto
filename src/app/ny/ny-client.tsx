@@ -374,7 +374,7 @@ function AppPreview({ t }: { t: (typeof T)["is"] }) {
         <div className="ny-app-vis" aria-hidden="true">
           <span className="ny-app-glow" />
           <div className="ny-phone-real">
-            <img className="frame" src="/app/phone-side.png" alt="" width={383} height={849} loading="lazy" />
+            <img className="frame" src="/app/phone-side-l.png" alt="" width={383} height={849} loading="lazy" />
             <div className="ny-phone-ui">
               <div className="ph-head"><Logo w={14} /><b>VAKTO</b><span className="av">MÍ</span></div>
               <div className="ph-card">
