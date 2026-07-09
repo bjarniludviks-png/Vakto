@@ -12,6 +12,7 @@ import type { PerfView } from "@/lib/analytics.server";
 import { StaffingCard } from "./staffing-card";
 import type { StaffingPattern } from "./staffing.server";
 import type { PerfHistory } from "./perf.server";
+import type { Insight } from "./insights.server";
 
 // Period factors relative to the monthly baseline (demo analytics scale by period).
 const PERIODS: Period[] = ["Vika", "Mánuður", "Ársfj.", "Ár", "Sérsniðið"];
@@ -37,7 +38,39 @@ const CMP: Row[] = [
 // color for change columns: green for good. Specific overrides per prototype.
 const goodChange = new Set(["Velta", "Framlegð", "Laun af tekjum", "Velta á launatíma", "Velta vs spá", "Unnið eftir áætlun"]);
 
-export default function PerformanceScreen({ empty = false, live = false, perf, staffing, history }: { empty?: boolean; live?: boolean; perf?: PerfView; staffing?: StaffingPattern; history?: PerfHistory }) {
+const INSIGHT_ICON: Record<string, React.ReactNode> = {
+  good: <path d="M5 12.5l4 4 10-10" />,
+  info: <><path d="M4 16l5-5 4 3 6-7" /><path d="M16 7h4v4" /></>,
+  warn: <><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16.5v.5" /></>,
+  bad: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+};
+
+/** Plain-language recommendations — where to add/remove people, overtime and
+ * cost drift, department efficiency. Suggestions only, computed from real data. */
+export function InsightsCard({ insights }: { insights: Insight[] }) {
+  const { t } = useLang();
+  if (!insights.length) return null;
+  return (
+    <div className="card" style={{ marginTop: 20 }}>
+      <div className="ch"><div>
+        <div className="ct">{t("Innsýn & ráðleggingar")}</div>
+        <div className="cs">{t("reiknað úr þínum gögnum — tillögur, ekki sjálfvirkar aðgerðir")}</div>
+      </div></div>
+      <div className="cb att">
+        {insights.map((ins, i) => (
+          <div className="it" key={i}>
+            <div className={`ic ${ins.kind}`}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}>{INSIGHT_ICON[ins.kind]}</svg>
+            </div>
+            <div className="tx"><b>{ins.title}</b><span>{ins.detail}</span></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export default function PerformanceScreen({ empty = false, live = false, perf, staffing, history, insights = [] }: { empty?: boolean; live?: boolean; perf?: PerfView; staffing?: StaffingPattern; history?: PerfHistory; insights?: Insight[] }) {
   const { t } = useLang();
   const [period, setPeriod] = useState<Period>("Mánuður");
   const [from, setFrom] = useState("");
@@ -167,6 +200,7 @@ export default function PerformanceScreen({ empty = false, live = false, perf, s
             </div>
           </div>
         )}
+        <InsightsCard insights={insights} />
         {staffing && <StaffingCard rows={staffing.rows} live={staffing.live} weeks={staffing.weeks} />}
       </>
     );

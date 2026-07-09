@@ -62,17 +62,26 @@ const LIB: { kind: ReportKind; title: string; sub: string; fmt: "Excel" | "PDF";
   { kind: "overtime", title: "Yfirvinna & álög", sub: "sundurliðun á álagstímum og aukakostnaði", fmt: "PDF", icon: "M3 17l5-5 4 3 6-7" },
   { kind: "attendance", title: "Mæting & frávik", sub: "áætlað vs raun, vantar útstimplun", fmt: "PDF", icon: "CLOCK" },
   { kind: "timebank", title: "Orlof & tímabanki", sub: "áunnið orlof og staða tímabanka per starfsmann", fmt: "Excel", icon: "M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5" },
+  { kind: "cost", title: "Launakostnaður per starfsmaður", sub: "grunnlaun, álag, yfirvinna, gjöld og heild", fmt: "Excel", icon: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
+  { kind: "costDept", title: "Kostnaður per deild", sub: "samanburður á deildum — klst, kostnaður og hlutfall", fmt: "PDF", icon: "M3 21h18M5 21V7l5-4v18M14 21V11l5-3v13" },
+  { kind: "absence", title: "Fjarvistir & veikindi", sub: "veikindadagar, orlof og aðrar fjarvistir", fmt: "Excel", icon: "M8 2v4M16 2v4M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" },
 ];
 
-/** Downloadable manager reports for the selected period — real data, Excel/PDF. */
-function ReportLibrary({ from, to }: { from: string; to: string }) {
+/** Downloadable manager reports — filter-first (period, department, employee),
+ * then pick the metric. Real data, Excel/PDF. */
+function ReportLibrary({ from, to, departments }: { from: string; to: string; departments: string[] }) {
   const { t } = useLang();
   const [busy, setBusy] = useState<ReportKind | null>(null);
+  const [dept, setDept] = useState("");
+  const [who, setWho] = useState("");
   async function download(item: (typeof LIB)[number]) {
     if (busy) return;
     setBusy(item.kind);
     try {
-      const rep = await getManagerReport(item.kind, from, to);
+      const rep = await getManagerReport(item.kind, from, to, {
+        department: dept || undefined,
+        employee: who.trim() || undefined,
+      });
       if (!rep.ok) { toast(rep.error ?? "Tókst ekki að sækja gögn"); return; }
       if (!rep.rows.length) { toast("Engin gögn á tímabilinu"); return; }
       const payload = { title: rep.title, company: rep.company, from, to, columns: rep.columns, numeric: rep.numeric, rows: rep.rows };
@@ -82,8 +91,17 @@ function ReportLibrary({ from, to }: { from: string; to: string }) {
   }
   return (
     <div className="card">
-      <div className="ch"><div><div className="ct">{t("Skýrslusafn")}</div><div className="cs">{t("smelltu til að sækja fyrir valið tímabil — Excel eða PDF")}</div></div></div>
-      <div className="cb att">
+      <div className="ch"><div><div className="ct">{t("Skýrslusafn")}</div><div className="cs">{t("veldu fyrst síur — svo skýrsluna sem þú vilt sækja")}</div></div></div>
+      <div className="cb" style={{ paddingBottom: 0 }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          <select className="pchip" style={{ font: "inherit", fontSize: 13 }} value={dept} onChange={(e) => setDept(e.target.value)}>
+            <option value="">{t("Allar deildir")}</option>
+            {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <input className="pchip" style={{ font: "inherit", fontSize: 13, minWidth: 170 }} value={who} onChange={(e) => setWho(e.target.value)} placeholder={t("Starfsmaður (allir)")} />
+        </div>
+      </div>
+      <div className="cb att" style={{ paddingTop: 0 }}>
         {LIB.map((r) => (
           <div className="it rowlink" key={r.kind} style={busy === r.kind ? { opacity: 0.55 } : undefined} onClick={() => download(r)}>
             <div className="ic info">
@@ -208,7 +226,7 @@ export default function ReportsScreen({ empty = false, live = false, rows = [], 
             </table>
           </div>
         </div>
-        <ReportLibrary from={period === "Sérsniðið" && from && to ? from : rangeFor(period).from} to={period === "Sérsniðið" && from && to ? to : rangeFor(period).to} />
+        <ReportLibrary from={period === "Sérsniðið" && from && to ? from : rangeFor(period).from} to={period === "Sérsniðið" && from && to ? to : rangeFor(period).to} departments={["Eldhús", "Sal", "Stjórnun"]} />
       </div>
     </>
   );
@@ -288,7 +306,7 @@ function LiveReports({ initial, timebank }: { initial: AttRow[]; timebank?: Time
         </div>
       </div>
       <div style={{ marginTop: 16 }}>
-        <ReportLibrary from={from} to={to} />
+        <ReportLibrary from={from} to={to} departments={depts.filter((d) => d !== "all")} />
       </div>
       {timebank && <TimeBankCard rows={timebank.rows} live={timebank.live} monthLabels={timebank.monthLabels} />}
     </>
