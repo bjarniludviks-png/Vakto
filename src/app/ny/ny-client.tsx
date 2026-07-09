@@ -295,17 +295,14 @@ function IndustryOrb({ names }: { names: string[] }) {
 
 /* ---------- feature-card visuals (static mockups) ---------- */
 
-const SLIDE_IMGS = [
-  "/showcase/maelabord-dark.png",
-  "/showcase/dark/vaktaplan.png",
-  "/showcase/dark/timaskraning.png",
-  "/showcase/dark/starfsfolk.png",
-  "/showcase/dark/skyrslur.png",
-  "/showcase/dark/kiosk.png",
-];
+// Screenshots exist in both languages; the EN set lives under dark/en/.
+const SLIDE_KEYS = ["maelabord", "vaktaplan", "timaskraning", "starfsfolk", "skyrslur", "kiosk"];
+const slideImg = (key: string, lang: Lang) =>
+  lang === "en" ? `/showcase/dark/en/${key}.png`
+    : key === "maelabord" ? "/showcase/maelabord-dark.png" : `/showcase/dark/${key}.png`;
 
 /** Horizontal product showcase — scroll-snap slider with arrows + dots. */
-function Showcase({ slides, head, sub }: { slides: { title: string; desc: string }[]; head: string; sub: string }) {
+function Showcase({ slides, head, sub, lang }: { slides: { title: string; desc: string }[]; head: string; sub: string; lang: Lang }) {
   const track = useRef<HTMLDivElement>(null);
   const [idx, setIdx] = useState(0);
   const go = (d: number) => {
@@ -336,7 +333,7 @@ function Showcase({ slides, head, sub }: { slides: { title: string; desc: string
           <div className="ny-show-track" ref={track} onScroll={onScroll}>
             {slides.map((s, i) => (
               <figure className="ny-slide" key={i}>
-                <img src={SLIDE_IMGS[i]} alt={s.title} loading="lazy" />
+                <img src={slideImg(SLIDE_KEYS[i], lang)} alt={s.title} loading="lazy" />
                 <figcaption><b>{s.title}</b><span>{s.desc}</span></figcaption>
               </figure>
             ))}
@@ -485,7 +482,7 @@ export default function NyClient() {
             <a className="ny-btn ghost lg" href="#eiginleikar">{t.ctaSee}</a>
           </div>
           <div className="ny-shot ny-hin" style={{ animationDelay: "900ms" }}>
-            <img src="/showcase/maelabord-dark.png" alt={t.shotAlt} />
+            <img src={slideImg("maelabord", lang)} alt={t.shotAlt} />
           </div>
         </div>
       </header>
@@ -583,7 +580,7 @@ export default function NyClient() {
       </section>
 
       {/* product showcase — real screenshots in a slider */}
-      <Showcase slides={t.slides} head={t.showHead} sub={t.showSub} />
+      <Showcase slides={t.slides} head={t.showHead} sub={t.showSub} lang={lang} />
 
       {/* voices: featured card + two smaller (photos generated for the preview) */}
       <section className="ny-sec ny-voices">
