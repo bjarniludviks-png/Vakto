@@ -7,11 +7,13 @@ import { toast } from "@/components/app/toast";
 import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getOverseenDepartments, setOverseenDepartments } from "./actions";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getOverseenDepartments, setOverseenDepartments, generateContract, listContracts, setContractStatus, type ContractRow } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField } from "@/components/app/fields";
 import { useCountry } from "@/components/app/country";
+import { CONTRACT_TYPES, SCHEDULE_PATTERNS, type RuleTemplate } from "@/lib/rules";
+import { listRuleTemplates } from "../stillingar/actions";
 
 /** Best-effort document type from a filename (for the documents table). */
 function detectDocType(name: string): string {
@@ -50,7 +52,7 @@ function statusBadge(e: Employee) {
   return { cls: "good", bg: "var(--good-soft)", fg: "var(--good)", labelKey: "emp:active" };
 }
 
-export const PROFILE_TABS = ["Laun", "Vinna", "Frí", "Skjöl", "Persónulegt"] as const;
+export const PROFILE_TABS = ["Laun", "Vinna", "Frí", "Samningur", "Skjöl", "Persónulegt"] as const;
 export type ProfileTab = (typeof PROFILE_TABS)[number];
 
 export default function EmployeesScreen({
@@ -678,6 +680,9 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
   if (tab === "Skjöl") {
     return <DocsTab employeeId={e.id} />;
   }
+  if (tab === "Samningur") {
+    return <ContractTab employeeId={e.id} />;
+  }
   return (
     <>
       <Sec first>Persónulegt</Sec>
@@ -696,6 +701,77 @@ const DEMO_DOCS: { name: string; meta: string; path?: string }[] = [
   { name: "Matvælanámskeið.pdf", meta: "gildir til 2027" },
 ];
 function docDate(iso: string): string { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`; }
+
+const CONTRACT_STATUS: Record<string, { label: string; tag: string }> = {
+  draft: { label: "drög", tag: "mut" },
+  sent: { label: "sent til undirritunar", tag: "info" },
+  signed: { label: "undirritað", tag: "good" },
+  void: { label: "ógilt", tag: "mut" },
+};
+
+/** Employment contracts: generate from employee data, view, track status.
+ * E-signature comes later — sent/signed are tracked manually until then. */
+function ContractTab({ employeeId }: { employeeId: string }) {
+  const { t } = useLang();
+  const [contracts, setContracts] = useState<ContractRow[]>([]);
+  const [live, setLive] = useState(false);
+  const [view, setView] = useState<ContractRow | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = () => listContracts(employeeId).then((r) => { setContracts(r.contracts); setLive(r.live); }).catch(() => {});
+  useEffect(() => { load(); }, [employeeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function create() {
+    setBusy(true);
+    const res = await generateContract(employeeId);
+    setBusy(false);
+    if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
+    toast(res.demo ? "Samningur búinn til (demo)" : "Samningur búinn til úr gögnum starfsmannsins");
+    load();
+  }
+  async function mark(c: ContractRow, status: "sent" | "signed" | "void") {
+    const res = await setContractStatus(c.id, status);
+    toast(res.ok ? t("Staða uppfærð") : (res.error ?? "Villa"));
+    load();
+  }
+
+  return (
+    <>
+      <Sec first>Ráðningarsamningur</Sec>
+      {contracts.length === 0 && (
+        <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
+          {live ? t("Enginn samningur til — búðu hann til úr gögnum starfsmannsins með einum smelli.") : t("Samningar birtast hér þegar migration 0028 hefur verið keyrð í Supabase.")}
+        </p>
+      )}
+      <div className="docs">
+        {contracts.map((c) => (
+          <div className="docrow" key={c.id}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /></svg>
+            <span style={{ cursor: "pointer" }} onClick={() => setView(c)}>{c.title}</span>
+            <span className={`tag ${CONTRACT_STATUS[c.status]?.tag ?? "mut"}`}>{t(CONTRACT_STATUS[c.status]?.label ?? c.status)}</span>
+            <span className="dl">{c.signed_at ?? c.created}</span>
+            {c.status === "draft" && <button className="btn ghost sm" type="button" onClick={() => mark(c, "sent")}>{t("Merkja sent")}</button>}
+            {c.status !== "signed" && c.status !== "void" && <button className="btn ghost sm" type="button" onClick={() => mark(c, "signed")}>{t("Merkja undirritað")}</button>}
+          </div>
+        ))}
+      </div>
+      <button className="btn sm" type="button" disabled={busy} onClick={create} style={{ marginTop: 12 }}>
+        {busy ? t("Bý til…") : t("+ Búa til samning úr gögnum")}
+      </button>
+      <p className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>{t("Samningurinn byggir á starfsmanninum, fyrirtækinu og völdu reglusniðmáti. Rafræn undirritun er væntanleg — þangað til er staðan merkt handvirkt.")}</p>
+      {view && (
+        <div className="mwrap show" onClick={(ev) => ev.target === ev.currentTarget && setView(null)}>
+          <div className="mbg" onClick={() => setView(null)} />
+          <div className="modal" style={{ maxWidth: 620 }}>
+            <div className="mh"><div style={{ fontSize: 15, fontWeight: 700 }}>{view.title}</div><button className="x" type="button" onClick={() => setView(null)}>✕</button></div>
+            <div className="mb" style={{ maxHeight: "65vh", overflowY: "auto" }}>
+              <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13, lineHeight: 1.6 }}>{view.content}</pre>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 
 function DocsTab({ employeeId }: { employeeId: string }) {
   const { t } = useLang();
@@ -771,6 +847,8 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
   const staged = useRef<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [tpls, setTpls] = useState<RuleTemplate[]>([]);
+  useEffect(() => { listRuleTemplates().then((r) => setTpls(r.templates)).catch(() => {}); }, []);
   function onFiles(files: FileList | null) {
     if (!files) return;
     const list = [...files];
@@ -799,6 +877,7 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
       department: g("department"), location: g("location"), hireDate: g("hireDate"),
       employmentRatio: g("employmentRatio"), payType: g("payType"), rate: g("rate"), union: g("union"),
       monthlyHours: g("monthlyHours"),
+      ruleTemplateId: g("ruleTemplateId"), contractType: g("contractType"), schedulePattern: g("schedulePattern"),
     });
     if (!res.ok) { setBusy(false); setError(res.error ?? "Tókst ekki að stofna"); return; }
     // Persist any staged documents now that the employee exists.
@@ -862,8 +941,32 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
             <div className="emp-fld"><label>Taxti</label><input name="rate" defaultValue="2.900 kr/klst" /></div>
           </div>
           <div className="emp-fld">
-            <label>Kjarasamningur</label>
-            <select name="union"><option>Efling</option><option>Efling – veitingar/SGS</option><option>VR</option><option>Matvís</option><option>Eigin reglur</option></select>
+            <label>Stéttarfélag / samningur</label>
+            <input name="union" list="union-suggest" defaultValue="Efling" placeholder="Frjáls texti — hvaða félag sem er" />
+            <datalist id="union-suggest">
+              <option value="Efling" /><option value="Efling – veitingar/SGS" /><option value="VR" /><option value="Matvís" /><option value="Eigin reglur" />
+            </datalist>
+          </div>
+          <div className="emp-row2">
+            <div className="emp-fld">
+              <label>Reglusniðmát</label>
+              <select name="ruleTemplateId" defaultValue="">
+                <option value="">— ekkert (grunnreglur) —</option>
+                {tpls.map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}
+              </select>
+            </div>
+            <div className="emp-fld">
+              <label>Ráðningarform</label>
+              <select name="contractType" defaultValue="fulltime">
+                {CONTRACT_TYPES.map((c) => <option key={c.key} value={c.key}>{c.is}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="emp-fld">
+            <label>Vaktamynstur</label>
+            <select name="schedulePattern" defaultValue="open">
+              {SCHEDULE_PATTERNS.map((s) => <option key={s.key} value={s.key}>{s.is}</option>)}
+            </select>
           </div>
 
           <Sec>Skjöl</Sec>

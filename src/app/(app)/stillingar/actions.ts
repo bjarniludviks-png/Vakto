@@ -287,3 +287,158 @@ export async function inviteUser(input: { email: string; role: string }): Promis
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
+
+// ============================================================
+// Universal rule templates (0028) — CRUD + the AI rule assistant.
+// AI only SUGGESTS; the user reviews/edits and saving = approval.
+// ============================================================
+
+import type { RuleSet, RuleTemplate } from "@/lib/rules";
+import { RULE_PRESETS } from "@/lib/rules";
+
+export type RuleTemplateInput = {
+  id?: string;
+  name: string;
+  description?: string;
+  country?: string;
+  region?: string;
+  industry?: string;
+  unionName?: string;
+  rules: RuleSet;
+  source?: "manual" | "preset" | "ai";
+};
+
+export async function listRuleTemplates(): Promise<{ templates: RuleTemplate[]; live: boolean }> {
+  if (!isSupabaseConfigured()) return { templates: [], live: false };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { templates: [], live: false };
+    const { data, error } = await supabase
+      .from("rule_templates")
+      .select("id, name, description, country, region, industry, union_name, rules, source, approved")
+      .eq("company_id", ctx.company).order("created_at");
+    if (error) return { templates: [], live: false }; // table missing until 0028 runs
+    return { templates: (data ?? []) as RuleTemplate[], live: true };
+  } catch {
+    return { templates: [], live: false };
+  }
+}
+
+export async function saveRuleTemplate(input: RuleTemplateInput): Promise<SettingsResult & { id?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const row = {
+      company_id: ctx.company,
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      country: input.country?.trim() || null,
+      region: input.region?.trim() || null,
+      industry: input.industry?.trim() || null,
+      union_name: input.unionName?.trim() || null,
+      rules: input.rules,
+      source: input.source ?? "manual",
+      approved: true, // saving IS the approval
+      updated_at: new Date().toISOString(),
+    };
+    const res = input.id
+      ? await supabase.from("rule_templates").update(row).eq("id", input.id).eq("company_id", ctx.company).select("id").maybeSingle()
+      : await supabase.from("rule_templates").insert(row).select("id").maybeSingle();
+    if (res.error) return { ok: false, error: res.error.message.includes("rule_templates") ? "Keyrðu migration 0028 í Supabase fyrst." : res.error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "rules.save", entity: "rule_templates", detail: `Reglusniðmát: ${row.name}` });
+    revalidatePath("/stillingar");
+    return { ok: true, id: res.data?.id as string | undefined };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+export async function deleteRuleTemplate(id: string): Promise<SettingsResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("rule_templates").delete().eq("id", id).eq("company_id", ctx.company);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+export type AiRuleSuggestion = { rules: RuleSet; name: string; explanation: string; live: boolean };
+
+/** AI labor-rule assistant: suggests a rule set from country/region/industry/
+ * union. NEVER auto-applies — the UI shows the suggestion for review/edit and
+ * only saving stores it. Falls back to a sensible template when no API key. */
+export async function aiSuggestRules(input: { country?: string; region?: string; industry?: string; unionName?: string; role?: string; notes?: string }): Promise<AiRuleSuggestion> {
+  const base = RULE_PRESETS.find((p) => /ísland|iceland/i.test(input.country ?? ""))?.rules
+    ?? RULE_PRESETS[1].rules;
+  const fallback: AiRuleSuggestion = {
+    name: [input.country, input.industry, input.unionName].filter(Boolean).join(" · ") || "Nýtt reglusniðmát",
+    rules: base,
+    explanation: "Tillaga byggð á innbyggðu sniðmáti — settu ANTHROPIC_API_KEY til að fá AI-greiningu á þínu landi/svæði/stéttarfélagi. Yfirfarðu allar tölur áður en þú vistar.",
+    live: false,
+  };
+  if (!process.env.ANTHROPIC_API_KEY) return fallback;
+  try {
+    const { default: Anthropic } = await import("@anthropic-ai/sdk");
+    const client = new Anthropic();
+    const msg = await client.messages.create({
+      model: "claude-opus-4-8",
+      max_tokens: 2000,
+      thinking: { type: "adaptive" },
+      output_config: {
+        format: {
+          type: "json_schema",
+          schema: {
+            type: "object",
+            properties: {
+              name: { type: "string" },
+              explanation: { type: "string", description: "Stutt skýring á íslensku á því á hverju reglurnar byggja og hvað þarf að staðfesta" },
+              rules: {
+                type: "object",
+                properties: {
+                  overtime: { type: "object", properties: { afterHoursPerDay: { type: "number" }, afterHoursPerWeek: { type: "number" }, pct: { type: "number" } } },
+                  weekend: { type: "object", properties: { pct: { type: "number" } } },
+                  night: { type: "object", properties: { from: { type: "string" }, to: { type: "string" }, pct: { type: "number" } } },
+                  holiday: { type: "object", properties: { pct: { type: "number" } } },
+                  breaks: { type: "object", properties: { minutesPer6h: { type: "number" }, paid: { type: "boolean" } } },
+                  rest: { type: "object", properties: { minHoursBetweenShifts: { type: "number" }, maxConsecutiveDays: { type: "number" } } },
+                  vacation: { type: "object", properties: { daysPerYear: { type: "number" }, accrualPct: { type: "number" } } },
+                  sick: { type: "object", properties: { daysPerYear: { type: "number" }, paidPct: { type: "number" } } },
+                  levies: { type: "object", properties: { pct: { type: "number" } } },
+                  notes: { type: "string" },
+                },
+              },
+            },
+            required: ["name", "explanation", "rules"],
+          },
+        },
+      },
+      messages: [{
+        role: "user",
+        content: `Þú ert sérfræðingur í vinnurétti og kjarasamningum. Stingdu upp á vinnureglum (yfirvinna, álag, hvíld, orlof, veikindi, launatengd gjöld) fyrir:
+Land: ${input.country || "óskilgreint"}
+Svæði/bær: ${input.region || "óskilgreint"}
+Atvinnugrein: ${input.industry || "óskilgreint"}
+Stéttarfélag/samningur: ${input.unionName || "óskilgreint"}
+Hlutverk: ${input.role || "almennt starfsfólk"}
+Athugasemdir: ${input.notes || "engar"}
+
+Skilaðu raunhæfum tölum fyrir þetta samhengi og taktu skýrt fram í explanation hvað notandinn þarf að staðfesta sjálfur. Þetta er TILLAGA — ekki lögfræðiráðgjöf.`,
+      }],
+    });
+    const block = msg.content.find((b) => b.type === "text");
+    const parsed = block && "text" in block ? JSON.parse(block.text) : null;
+    if (!parsed?.rules) return fallback;
+    return { name: parsed.name, rules: parsed.rules as RuleSet, explanation: parsed.explanation, live: true };
+  } catch {
+    return fallback;
+  }
+}

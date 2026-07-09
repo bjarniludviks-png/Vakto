@@ -6,9 +6,10 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { syncInventraRevenue, addLocation, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo } from "./actions";
+import { syncInventraRevenue, addLocation, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules } from "./actions";
 import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
+import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
 import { dec1 } from "@/lib/format";
 
 type SettingsModal = "location" | "position" | "invite" | "revenue" | "avgrevenue" | null;
@@ -37,10 +38,11 @@ const Pin = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z" /><circle cx="12" cy="9" r="2.5" /></svg>
 );
 
-export default function SettingsScreen({ initialModal = null, data = DEMO_SETTINGS, payRules = [] }: { initialModal?: SettingsModal; data?: SettingsData; payRules?: PayRule[] }) {
+export default function SettingsScreen({ initialModal = null, data = DEMO_SETTINGS, payRules = [], ruleTemplates = [] }: { initialModal?: SettingsModal; data?: SettingsData; payRules?: PayRule[]; ruleTemplates?: RuleTemplate[] }) {
   const { t } = useLang();
   const [modal, setModal] = useState<SettingsModal>(initialModal);
   const [editRule, setEditRule] = useState<PayRule | null>(null);
+  const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
   const [posName, setPosName] = useState<string | null>(null);
   function posConnect(name: string) { setPosName(name === "POS" ? "" : name); }
   const [section, setSection] = useState<string>("fyrirtaeki");
@@ -93,6 +95,28 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
             <div className="it rowlink" onClick={() => posConnect("POS")}><div className="ic mut" style={{ background: "var(--line2)" }}>P</div><div className="tx"><b>{t("Fleiri sölukerfi")}</b><span>Dótturkassi, Salt, Verifone{t(" o.fl.")}</span></div><span className="tag mut">{t("tengja")}</span></div>
           </div>
         </div>
+      )}
+
+      {section === "launareglur" && (
+      <div className="card" style={{ marginBottom: 16 }}>
+        <div className="ch">
+          <div><div className="ct">{t("Reglusniðmát")}</div><div className="cs">{t("þín eigin vinnureglur — fyrir hvaða land, grein eða stéttarfélag sem er")}</div></div>
+          <button className="btn sm" onClick={() => setTplModal("new")}>{t("+ Nýtt sniðmát")}</button>
+        </div>
+        <div className="cb att">
+          {ruleTemplates.map((tp) => (
+            <div className="it rowlink" key={tp.id} onClick={() => setTplModal(tp)}>
+              <div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M9 12h6M9 16h4M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" /></svg></div>
+              <div className="tx"><b>{tp.name}</b><span>{summarizeRules(tp.rules)}</span></div>
+              <span className={`tag ${tp.source === "ai" ? "info" : "good"}`}>{tp.source === "ai" ? "AI" : tp.source === "preset" ? t("sniðmát") : t("eigin")}</span>
+            </div>
+          ))}
+          {ruleTemplates.length === 0 && (
+            <p className="muted" style={{ fontSize: 12.5 }}>{t("Engin sniðmát enn. Búðu til þitt eigið, byrjaðu á innbyggðu sniðmáti eða láttu AI stinga upp á reglum fyrir þitt land og grein — þú yfirferð og samþykkir alltaf áður en neitt er vistað.")}</p>
+          )}
+          <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("Sniðmát eru tengd starfsfólki í starfsmannaspjaldinu — yfirvinna, álag, hvíld, orlof og veikindi fylgja sniðmátinu.")}</p>
+        </div>
+      </div>
       )}
 
       {section === "launareglur" && (
@@ -183,6 +207,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
       </div>
 
       {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} />}
+      {tplModal && <RuleTemplateModal tpl={tplModal === "new" ? null : tplModal} onClose={() => setTplModal(null)} />}
       {editRule && <PayRuleModal rule={editRule} onClose={() => setEditRule(null)} />}
       {posName !== null && <PosConnectModal name={posName} onClose={() => setPosName(null)} />}
     </>
@@ -298,6 +323,135 @@ function SettingsFormModal({ modal, onClose }: { modal: Exclude<SettingsModal, n
           {error && <p style={{ color: "var(--bad)", fontSize: 12.5, marginTop: 8 }}>{error}</p>}
           <div style={{ display: "flex", gap: 9, marginTop: 18 }}>
             <button className="btn" disabled={busy} onClick={submit}>{t("Vista")}</button>
+            <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Universal rule-template editor: manual fields, presets, and the AI
+ * assistant (suggests only — the user reviews, edits and saves = approval). */
+function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose: () => void }) {
+  const { t } = useLang();
+  const [name, setName] = useState(tpl?.name ?? "");
+  const [country, setCountry] = useState(tpl?.country ?? "");
+  const [region, setRegion] = useState(tpl?.region ?? "");
+  const [industry, setIndustry] = useState(tpl?.industry ?? "");
+  const [unionName, setUnionName] = useState(tpl?.union_name ?? "");
+  const [rules, setRules] = useState<RuleSet>(tpl?.rules ?? {});
+  const [source, setSource] = useState<"manual" | "preset" | "ai">(tpl?.source ?? "manual");
+  const [aiNote, setAiNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+
+  const numVal = (v: number | undefined) => (v == null ? "" : String(v).replace(".", ","));
+  const setNum = (path: (r: RuleSet, n: number | undefined) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(",", ".").trim();
+    const n = raw === "" ? undefined : Number(raw);
+    setRules((r) => { const c = structuredClone(r); path(c, Number.isFinite(n as number) ? (n as number) : undefined); return c; });
+  };
+
+  function applyPreset(key: string) {
+    const p = RULE_PRESETS.find((x) => x.key === key);
+    if (!p) return;
+    setRules(p.rules);
+    if (!name) setName(p.name);
+    if (!country) setCountry(p.country);
+    setSource("preset");
+    setAiNote(null);
+  }
+
+  async function askAi() {
+    setAiBusy(true);
+    const res = await aiSuggestRules({ country, region, industry, unionName });
+    setAiBusy(false);
+    setRules(res.rules);
+    if (!name) setName(res.name);
+    setSource("ai");
+    setAiNote(res.explanation);
+  }
+
+  async function submit() {
+    if (!name.trim()) { toast(t("Gefðu sniðmátinu nafn")); return; }
+    setBusy(true);
+    const res = await saveRuleTemplate({ id: tpl?.id, name, country, region, industry, unionName, rules, source });
+    setBusy(false);
+    if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
+    onClose();
+    toast(res.demo ? t("Vistað (demo)") : t("Reglusniðmát vistað"));
+  }
+
+  async function remove() {
+    if (!tpl?.id) return;
+    setBusy(true);
+    const res = await deleteRuleTemplate(tpl.id);
+    setBusy(false);
+    onClose();
+    toast(res.ok ? t("Sniðmáti eytt") : (res.error ?? "Tókst ekki"));
+  }
+
+  const F = ({ label, value, onChange, ph }: { label: string; value: string; onChange: (v: string) => void; ph?: string }) => (
+    <div className="field" style={{ flex: 1, minWidth: 0 }}><label>{label}</label><input value={value} onChange={(e) => onChange(e.target.value)} placeholder={ph} /></div>
+  );
+  const N = ({ label, value, onChange }: { label: string; value: number | undefined; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) => (
+    <div className="field" style={{ flex: 1, minWidth: 0 }}><label>{label}</label><input inputMode="decimal" value={numVal(value)} onChange={onChange} placeholder="—" /></div>
+  );
+
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal" style={{ maxWidth: 640 }}>
+        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{tpl ? tpl.name : t("Nýtt reglusniðmát")}</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="mb" style={{ maxHeight: "70vh", overflowY: "auto" }}>
+          <div className="field"><label>{t("Nafn sniðmáts")}</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("t.d. Veitingastaður — Reykjavík")} autoFocus /></div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <F label={t("Land")} value={country} onChange={setCountry} ph="Ísland" />
+            <F label={t("Svæði/bær")} value={region} onChange={setRegion} ph="Reykjavík" />
+          </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <F label={t("Atvinnugrein")} value={industry} onChange={setIndustry} ph={t("t.d. veitingar")} />
+            <F label={t("Stéttarfélag / samningur")} value={unionName} onChange={setUnionName} ph={t("frjáls texti")} />
+          </div>
+
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "4px 0 10px" }}>
+            {RULE_PRESETS.map((p) => (
+              <button key={p.key} className="btn ghost sm" onClick={() => applyPreset(p.key)}>{p.name.split(" — ")[0]} {t("sniðmát")}</button>
+            ))}
+            <button className="btn sm" disabled={aiBusy} onClick={askAi}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6Z" /></svg>
+              {aiBusy ? t("AI hugsar…") : t("Fá tillögu með AI")}
+            </button>
+          </div>
+          {aiNote && <p className="muted" style={{ fontSize: 12, background: "var(--brand-soft)", borderRadius: 9, padding: "9px 11px", marginBottom: 10 }}>{aiNote}</p>}
+
+          <div className="hr" />
+          <div style={{ display: "flex", gap: 10 }}>
+            <N label={t("Yfirvinna eftir klst/viku")} value={rules.overtime?.afterHoursPerWeek} onChange={setNum((r, n) => { r.overtime = { ...r.overtime, afterHoursPerWeek: n }; })} />
+            <N label={t("Yfirvinnuálag %")} value={rules.overtime?.pct} onChange={setNum((r, n) => { r.overtime = { ...r.overtime, pct: n }; })} />
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <N label={t("Helgarálag %")} value={rules.weekend?.pct} onChange={setNum((r, n) => { r.weekend = { pct: n }; })} />
+            <N label={t("Kvöld/næturálag %")} value={rules.night?.pct} onChange={setNum((r, n) => { r.night = { ...r.night, pct: n }; })} />
+            <N label={t("Stórhátíðarálag %")} value={rules.holiday?.pct} onChange={setNum((r, n) => { r.holiday = { pct: n }; })} />
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <N label={t("Lágm. hvíld milli vakta (klst)")} value={rules.rest?.minHoursBetweenShifts} onChange={setNum((r, n) => { r.rest = { ...r.rest, minHoursBetweenShifts: n }; })} />
+            <N label={t("Hámark samfelldir dagar")} value={rules.rest?.maxConsecutiveDays} onChange={setNum((r, n) => { r.rest = { ...r.rest, maxConsecutiveDays: n }; })} />
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <N label={t("Orlofsdagar á ári")} value={rules.vacation?.daysPerYear} onChange={setNum((r, n) => { r.vacation = { ...r.vacation, daysPerYear: n }; })} />
+            <N label={t("Veikindadagar á ári")} value={rules.sick?.daysPerYear} onChange={setNum((r, n) => { r.sick = { ...r.sick, daysPerYear: n }; })} />
+            <N label={t("Launatengd gjöld %")} value={rules.levies?.pct} onChange={setNum((r, n) => { r.levies = { pct: n }; })} />
+          </div>
+          <div className="field"><label>{t("Aðrar reglur (frjáls texti)")}</label>
+            <textarea className="lf-ta" rows={3} value={rules.notes ?? ""} onChange={(e) => setRules((r) => ({ ...r, notes: e.target.value }))} placeholder={t("t.d. matartími, ferðakostnaður, sérreglur samnings…")} />
+          </div>
+          <p className="muted" style={{ fontSize: 11.5 }}>{t("AI-tillögur eru aldrei notaðar sjálfkrafa — það sem þú vistar hér er það sem gildir.")}</p>
+          <div style={{ display: "flex", gap: 9, marginTop: 12 }}>
+            <button className="btn" disabled={busy} onClick={submit}>{t("Vista sniðmát")}</button>
+            {tpl?.id && <button className="btn ghost" disabled={busy} onClick={remove} style={{ color: "var(--bad)" }}>{t("Eyða")}</button>}
             <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
           </div>
         </div>

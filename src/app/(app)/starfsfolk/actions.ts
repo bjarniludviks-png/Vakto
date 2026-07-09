@@ -22,6 +22,10 @@ export type NewEmployeeInput = {
   rate?: string;
   union?: string;
   monthlyHours?: string;
+  // universal fields (0028) — written tolerantly until the migration runs
+  ruleTemplateId?: string;
+  contractType?: string;
+  schedulePattern?: string; // SchedulePattern.kind
 };
 
 export type ActionResult = { ok: boolean; demo?: boolean; error?: string; id?: string };
@@ -97,7 +101,7 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
       lookupId(supabase, "locations", input.location, company),
     ]);
 
-    const { data: created, error } = await supabase.from("employees").insert({
+    const baseRow = {
       company_id: company,
       full_name: input.fullName.trim(),
       kennitala: input.kennitala || null,
@@ -114,8 +118,20 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
       union_agreement: input.union || "Efling",
       monthly_hours: input.monthlyHours ? num(input.monthlyHours, 0) || null : null,
       hire_date: input.hireDate || null,
-      status: "active",
-    }).select("id").maybeSingle();
+      status: "active" as const,
+    };
+    // Universal fields (0028) — retry without them if the columns don't exist yet.
+    const universal = {
+      union_name: input.union || null,
+      rule_template_id: input.ruleTemplateId || null,
+      contract_type: input.contractType || null,
+      schedule_pattern: input.schedulePattern ? { kind: input.schedulePattern } : null,
+    };
+    let { data: created, error } = await supabase.from("employees")
+      .insert({ ...baseRow, ...universal }).select("id").maybeSingle();
+    if (error && /column|schema/i.test(error.message)) {
+      ({ data: created, error } = await supabase.from("employees").insert(baseRow).select("id").maybeSingle());
+    }
     if (error) return { ok: false, error: error.message };
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -280,6 +296,9 @@ export type UpdateEmployeeInput = {
   permissions?: Record<string, boolean> | null;
   benefits?: { name: string; type: string; amount: number }[] | null;
   orlof?: { mode: string; pct: number } | null;
+  ruleTemplateId?: string | null;
+  contractType?: string | null;
+  schedulePattern?: string | null;
 };
 
 /** Tolerant read of an employee's orlof (vacation) settings (null before 0021). */
@@ -376,6 +395,15 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
       const { error } = await supabase.from("employees").update(patch).eq("id", id);
       if (error) return { ok: false, error: error.message };
     }
+    // Universal fields (0028) — best-effort until the migration runs.
+    const uni: Record<string, unknown> = {};
+    if (input.union !== undefined) uni.union_name = input.union || null;
+    if (input.ruleTemplateId !== undefined) uni.rule_template_id = input.ruleTemplateId;
+    if (input.contractType !== undefined) uni.contract_type = input.contractType;
+    if (input.schedulePattern !== undefined) uni.schedule_pattern = input.schedulePattern ? { kind: input.schedulePattern } : null;
+    if (Object.keys(uni).length) {
+      await supabase.from("employees").update(uni).eq("id", id).then(() => {});
+    }
     // Custom pay-rule set — best-effort (ignored before migration 0013).
     if (input.payRule !== undefined) {
       await supabase.from("employees").update({ pay_rule: input.payRule }).eq("id", id);
@@ -450,5 +478,142 @@ export async function setOverseenDepartments(employeeId: string, names: string[]
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+// ============================================================
+// Employment contracts (0028) — generate from employee data, track status.
+// Universal template: works for any country; e-signature comes later
+// (status flow draft → sent → signed covers the manual path today).
+// ============================================================
+
+export type ContractRow = {
+  id: string;
+  title: string;
+  template: string | null;
+  status: "draft" | "sent" | "signed" | "void";
+  content: string;
+  created: string;
+  signed_at: string | null;
+};
+
+function contractMarkdown(e: Record<string, unknown>, c: Record<string, unknown>, extras: { unionName?: string; contractType?: string }): string {
+  const line = (k: string, v: unknown) => (v ? `**${k}:** ${v}\n\n` : "");
+  return `# Ráðningarsamningur / Employment contract
+
+## Vinnuveitandi / Employer
+${line("Fyrirtæki", c.name)}${line("Kennitala", c.kennitala)}${line("Heimilisfang", c.address)}
+## Starfsmaður / Employee
+${line("Nafn", e.full_name)}${line("Kennitala", e.kennitala)}${line("Netfang", e.email)}${line("Sími", e.phone)}
+## Starfið / The role
+${line("Starfsheiti", e.title)}${line("Ráðningarform", extras.contractType)}${line("Starfshlutfall", e.employment_ratio ? `${e.employment_ratio}%` : "")}${line("Ráðningardagur", e.hire_date)}
+## Kjör / Terms
+${line("Launafyrirkomulag", e.pay_type === "monthly" ? "Mánaðarlaun" : "Tímakaup")}${line("Taxti", e.rate ? `${e.rate} kr` : "")}${line("Stéttarfélag / samningur", extras.unionName)}
+## Annað / Other
+Um starfið gilda að öðru leyti þær vinnureglur sem fyrirtækið hefur skilgreint í VAKTO
+(yfirvinna, álög, hvíldartími, orlof og veikindaréttur skv. völdu reglusniðmáti) og
+gildandi lög á starfsstað. / The role is otherwise governed by the working rules the
+company has defined in VAKTO and applicable local law.
+
+_Undirritun / Signatures:_
+
+Vinnuveitandi: ______________________　Dags: ________
+
+Starfsmaður: ______________________　Dags: ________
+`;
+}
+
+/** Generate a contract draft from employee + company data. */
+export async function generateContract(employeeId: string): Promise<ActionResult & { content?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const company = await companyId(supabase);
+    if (!company) return { ok: false, error: "Fyrirtæki fannst ekki" };
+    const [{ data: emp }, { data: comp }] = await Promise.all([
+      supabase.from("employees").select("*").eq("id", employeeId).maybeSingle(),
+      supabase.from("companies").select("*").eq("id", company).maybeSingle(),
+    ]);
+    if (!emp) return { ok: false, error: "Starfsmaður fannst ekki" };
+    const content = contractMarkdown(emp, comp ?? {}, {
+      unionName: (emp.union_name as string) || (emp.union_agreement as string) || undefined,
+      contractType: (emp.contract_type as string) || undefined,
+    });
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: created, error } = await supabase.from("contracts").insert({
+      company_id: company,
+      employee_id: employeeId,
+      template: "universal-v1",
+      title: `Ráðningarsamningur — ${emp.full_name}`,
+      content,
+      status: "draft",
+      created_by: user?.id ?? null,
+    }).select("id").maybeSingle();
+    if (error) return { ok: false, error: /contracts/.test(error.message) ? "Keyrðu migration 0028 í Supabase fyrst." : error.message, content };
+    await logAudit(supabase, company, user?.id ?? null, { action: "contract.create", entity: "contracts", detail: `Samningur búinn til — ${emp.full_name}` });
+    revalidatePath("/starfsfolk");
+    return { ok: true, id: created?.id as string | undefined, content };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+export async function listContracts(employeeId: string): Promise<{ contracts: ContractRow[]; live: boolean }> {
+  if (!isSupabaseConfigured()) return { contracts: [], live: false };
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("contracts")
+      .select("id, title, template, status, content, created_at, signed_at")
+      .eq("employee_id", employeeId).order("created_at", { ascending: false });
+    if (error) return { contracts: [], live: false };
+    return {
+      live: true,
+      contracts: (data ?? []).map((r) => ({
+        id: r.id as string, title: r.title as string, template: r.template as string | null,
+        status: r.status as ContractRow["status"], content: r.content as string,
+        created: String(r.created_at).slice(0, 10), signed_at: r.signed_at ? String(r.signed_at).slice(0, 10) : null,
+      })),
+    };
+  } catch {
+    return { contracts: [], live: false };
+  }
+}
+
+export async function setContractStatus(id: string, status: "draft" | "sent" | "signed" | "void"): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const patch: Record<string, unknown> = { status };
+    if (status === "sent") patch.sent_at = new Date().toISOString();
+    if (status === "signed") patch.signed_at = new Date().toISOString();
+    const { error } = await supabase.from("contracts").update(patch).eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/starfsfolk");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Employee ids that have NO signed contract (for the missing-contracts chip). */
+export async function getContractStatusMap(): Promise<Record<string, string>> {
+  if (!isSupabaseConfigured()) return {};
+  try {
+    const supabase = await createClient();
+    const company = await companyId(supabase);
+    if (!company) return {};
+    const { data, error } = await supabase.from("contracts")
+      .select("employee_id, status").eq("company_id", company);
+    if (error) return {};
+    const map: Record<string, string> = {};
+    for (const r of data ?? []) {
+      const cur = map[r.employee_id as string];
+      // signed wins over sent wins over draft
+      const rank: Record<string, number> = { signed: 3, sent: 2, draft: 1, void: 0 };
+      if (!cur || (rank[r.status as string] ?? 0) > (rank[cur] ?? 0)) map[r.employee_id as string] = r.status as string;
+    }
+    return map;
+  } catch {
+    return {};
   }
 }
