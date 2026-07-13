@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
 import { notifyEmployee } from "@/lib/push";
 import { getEmployees } from "@/lib/employees.server";
+import { initials as empInitials } from "@/lib/employees";
 
 export type ShiftInput = {
   employeeName: string; // first name as shown in the grid
@@ -86,7 +87,7 @@ function weekCodeForStart(start: string | null): string {
 /** Load the grid (employee × 7 days) for a specific week, aligned to the
  * full_name-ordered employee list (same order the screen renders). Returns
  * both the coarse code grid (for colour) and the real start/end times per cell. */
-export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][]; times: Record<string, { start: string; end: string }> }> {
+export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][]; times: Record<string, { start: string; end: string }>; names?: string[]; inits?: string[] }> {
   if (!isSupabaseConfigured()) return { ok: false, grid: [], times: {} };
   try {
     const supabase = await createClient();
@@ -115,7 +116,11 @@ export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; gri
         times[`${r}:${c}`] = { start: ((s.start_time as string) ?? "").slice(0, 5), end: ((s.end_time as string) ?? "").slice(0, 5) };
       }
     }
-    return { ok: true, grid, times };
+    // The client's grid rows may be a SUBSET of the full roster (only staff on
+    // the plan) — return names so it can remap rows instead of assuming order.
+    const names = employees.map((e) => e.fullName.split(/\s+/)[0]);
+    const inits = employees.map((e) => empInitials(e.fullName));
+    return { ok: true, grid, times, names, inits };
   } catch {
     return { ok: false, grid: [], times: {} };
   }
@@ -309,6 +314,33 @@ export async function approveShiftSwap(id: string): Promise<DecisionResult> {
     });
     revalidatePath("/vaktaplan");
     return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Wipe ALL shifts for the given dates — the "Eyða öllu / byrja upp á nýtt"
+ * button in the schedule. Confirmed in the UI before calling. */
+export async function deleteWeekShifts(dates: string[]): Promise<{ ok: boolean; demo?: boolean; count?: number; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  if (!dates.length) return { ok: false, error: "Engar dagsetningar" };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
+    const { data: profile } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
+    const company = profile?.company_id as string | undefined;
+    if (!company) return { ok: false, error: "Fyrirtæki fannst ekki" };
+    const { data: gone } = await supabase.from("shifts").select("id")
+      .eq("company_id", company).in("date", dates);
+    const { error } = await supabase.from("shifts").delete()
+      .eq("company_id", company).in("date", dates);
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, company, user.id, {
+      action: "schedule.clear", entity: "shifts", detail: `Vika hreinsuð — ${gone?.length ?? 0} vaktir (${dates[0]}…)`,
+    });
+    revalidatePath("/vaktaplan");
+    return { ok: true, count: gone?.length ?? 0 };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }

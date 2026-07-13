@@ -7,7 +7,7 @@ import { useLang } from "@/components/app/lang";
 import { nf, dec1 } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
 import { AsyncButton } from "@/components/app/async-button";
-import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, type ShiftInput } from "./actions";
+import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, type ShiftInput } from "./actions";
 import { getDashboardPeriod } from "../maelabord/actions";
 import { buildSchedulePdf, type PdfShift } from "./pdf";
 import type { ReqItem } from "./requests.server";
@@ -184,6 +184,43 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   }
   const resetLabel = view === "Dagur" ? "Í dag" : view === "Mánuður" ? "Þessi mánuður" : "Þessi vika";
 
+  /** Apply a fetched week onto the CURRENT grid rows. The server grid is
+   * indexed by the full roster; our rows may be a filtered subset in a
+   * different order — remap by (initials, first name) so shifts never land on
+   * the wrong employee. Employees with shifts who aren't on the plan yet are
+   * pulled in from the pool. */
+  function applyWeek(res: { grid: string[][]; times?: Record<string, { start: string; end: string }>; names?: string[]; inits?: string[] }) {
+    if (!res.names || !res.inits) { setGrid(res.grid); setCellTimes(res.times ?? {}); return; }
+    const { names, inits } = res;
+    const keyOf = (e: Emp) => `${e[0]}|${e[1]}`;
+    const have = new Set(emp.map(keyOf));
+    const added: Emp[] = [];
+    names.forEach((n, j) => {
+      const key = `${inits[j]}|${n}`;
+      if (!have.has(key) && res.grid[j]?.some((s) => s !== "off")) {
+        const fromPool = pool.find((p) => p[0] === inits[j] && p[1] === n);
+        added.push(fromPool ?? [inits[j], n, "", "#5b50e6"]);
+        have.add(key);
+      }
+    });
+    const rows = added.length ? [...emp, ...added] : emp;
+    const g: string[][] = rows.map(() => Array(7).fill("off"));
+    const t2: Record<string, { start: string; end: string }> = {};
+    rows.forEach((e, r) => {
+      const j = names.findIndex((n, jj) => n === e[1] && inits[jj] === e[0]);
+      if (j >= 0 && res.grid[j]) {
+        g[r] = [...res.grid[j]];
+        for (let c = 0; c < 7; c++) { const k = `${j}:${c}`; const tt = res.times?.[k]; if (tt) t2[`${r}:${c}`] = tt; }
+      }
+    });
+    if (added.length) {
+      setEmp(rows);
+      setPool((p) => p.filter((x) => !added.some((a) => a[0] === x[0] && a[1] === x[1])));
+    }
+    setGrid(g);
+    setCellTimes(t2);
+  }
+
   // Live companies: load the visible week's shifts from the DB when the week
   // changes. The base week is already in `initial` (SSR), so skip first run.
   const firstWeekRun = useRef(true);
@@ -192,19 +229,33 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     if (firstWeekRun.current) { firstWeekRun.current = false; return; }
     let cancelled = false;
     getWeekShifts(weekMonISO).then((res) => {
-      if (!cancelled && res?.ok) { setGrid(res.grid); setCellTimes(res.times ?? {}); }
+      if (!cancelled && res?.ok) applyWeek(res);
     });
     return () => { cancelled = true; };
-  }, [weekMonISO, liveCompany]);
+  }, [weekMonISO, liveCompany]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Copy the previous week's plan into the current week (review, then publish).
+  /** "Eyða öllu": wipe the open week (grid + published shifts) to start fresh. */
+  async function clearWeek() {
+    if (!window.confirm(t("Eyða ÖLLUM vöktum þessarar viku og byrja upp á nýtt? Þetta fjarlægir líka birtar vaktir."))) return;
+    setGrid((g) => g.map((row) => row.map(() => "off")));
+    setCellTimes({});
+    if (liveCompany) {
+      const dates = weekDays.map((d) => fmtISO(d));
+      const res = await deleteWeekShifts(dates);
+      toast(res.ok ? `${t("Vika hreinsuð")}${res.count ? ` — ${res.count} ${t("vöktum eytt")}` : ""}` : (res.error ?? "Villa"));
+    } else {
+      toast(t("Vika hreinsuð"));
+    }
+  }
+
   async function copyLastWeek() {
     const prevMon = new Date(mondayOf(cur)); prevMon.setDate(prevMon.getDate() - 7);
     const prevISO = fmtISO(prevMon);
     if (liveCompany) {
       const res = await getWeekShifts(prevISO);
       if (res?.ok && res.grid.some((row) => row.some((s) => s && s !== "off"))) {
-        setGrid(res.grid); setCellTimes(res.times ?? {});
+        applyWeek(res);
         toast(t("Síðasta vika afrituð — yfirfarðu og birtu"));
       } else toast(t("Engar vaktir í síðustu viku til að afrita"));
     } else {
@@ -611,6 +662,11 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>{t("Afrita síðustu viku")}
           </button>
         )}
+        {view === "Vika" && (
+          <button className="btn ghost sm" style={{ color: "var(--bad)" }} onClick={clearWeek}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>{t("Eyða viku")}
+          </button>
+        )}
         <button className="btn sm" onClick={() => setModal("ai")}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4Z" /></svg>{t("Biðja AI")}
         </button>
@@ -792,7 +848,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       {modal === "types" && <ShiftTypesModal types={types} setTypes={setTypes} onClose={() => setModal(null)} />}
       {modal === "addEmp" && <AddEmpModal pool={pool} onPick={pickEmp} onClose={() => setModal(null)} />}
       {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
-      {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} />}
+      {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} names={emp.map((e) => e[1])} depts={[...new Set(emp.map((e) => e[2]).filter(Boolean))]} />}
       {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={approveAiProposal} />}
     </>
   );
@@ -1004,15 +1060,67 @@ function ShiftEditModal({
   );
 }
 
-function AiPromptModal({ query, setQuery, onClose, onGen }: { query: string; setQuery: (s: string) => void; onClose: () => void; onGen: () => void }) {
+function AiPromptModal({ query, setQuery, onClose, onGen, names = [], depts = [] }: { query: string; setQuery: (s: string) => void; onClose: () => void; onGen: () => void; names?: string[]; depts?: string[] }) {
   const { t: tr } = useLang();
-  const ex = ["Settu Ómar á 2-2-3 vaktir 11:00–22:00 yfir allan maí", "Lágmarkaðu yfirvinnu í þessari viku", "Mannaðu helgina með 2 í eldhúsi og 2 á sal", "Afritaðu þessa viku á næstu 4 vikur"];
+  const [listening, setListening] = useState(false);
+  const recRef = useRef<{ stop: () => void } | null>(null);
+  const speechOk = typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window);
+
+  /** Voice input: dictate the instruction (is-IS), appended into the textarea. */
+  function toggleVoice() {
+    if (listening) { recRef.current?.stop(); return; }
+    const Ctor = (window as unknown as { webkitSpeechRecognition?: new () => unknown; SpeechRecognition?: new () => unknown }).SpeechRecognition
+      ?? (window as unknown as { webkitSpeechRecognition?: new () => unknown }).webkitSpeechRecognition;
+    if (!Ctor) return;
+    const rec = new Ctor() as {
+      lang: string; interimResults: boolean; continuous: boolean;
+      onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
+      onend: () => void; onerror: () => void; start: () => void; stop: () => void;
+    };
+    rec.lang = "is-IS";
+    rec.interimResults = false;
+    rec.continuous = true;
+    rec.onresult = (e) => {
+      const text = Array.from({ length: e.results.length }, (_, i) => e.results[i][0]?.transcript ?? "").join(" ").trim();
+      if (text) setQuery(query ? `${query} ${text}` : text);
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recRef.current = rec;
+    setListening(true);
+    rec.start();
+  }
+
+  // Relevant examples built from the REAL roster (names + departments).
+  const ex = [
+    names[0] ? `Settu ${names[0]} á morgunvaktir 05:00–12:00 alla virka daga` : "Morgunvaktir 05:00–12:00 alla virka daga",
+    "Lágmarkaðu yfirvinnu í þessari viku",
+    depts.length >= 2 ? `Mannaðu helgina með 2 í ${depts[0]} og 2 í ${depts[1]}` : "Mannaðu helgina með 2 á morgunvakt og 2 eftir hádegi",
+    names[1] ? `Gefðu ${names[1]} frí á föstudag og færðu vaktina á annan` : "Afritaðu þessa viku á næstu 4 vikur",
+  ];
   return (
     <Modal onClose={onClose} title={<><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 7, verticalAlign: -3 }}><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6Z" /></svg>{tr("Biðja AI um vaktaplan")}</>}>
       <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>{tr("Lýstu því sem þú vilt á venjulegri íslensku — VAKTO býr til vaktirnar og þú samþykkir.")}</p>
       <p className="muted" style={{ fontSize: 11.5, marginBottom: 12 }}>{tr("Tillagan gildir fyrir vikuna sem er opin í planinu — flettu fyrst á réttu vikuna (t.d. næstu viku) með örvunum efst.")}</p>
-      <textarea className="lf-ta" rows={3} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr("sched:aiph")} />
-      <div className="chips">{ex.map((c) => <button className="chip" key={c} onClick={() => setQuery(c)}>{tr(c)}</button>)}</div>
+      <div style={{ position: "relative" }}>
+        <textarea className="lf-ta" rows={3} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr("sched:aiph")} style={speechOk ? { paddingRight: 44 } : undefined} />
+        {speechOk && (
+          <button
+            type="button"
+            onClick={toggleVoice}
+            title={listening ? tr("Stöðva upptöku") : tr("Tala inn fyrirmæli")}
+            style={{
+              position: "absolute", right: 8, top: 8, width: 32, height: 32, borderRadius: "50%",
+              border: "1px solid var(--line)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              background: listening ? "var(--bad)" : "var(--line2)", color: listening ? "#fff" : "var(--ink2)",
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="2.5" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5" /></svg>
+          </button>
+        )}
+      </div>
+      {listening && <p className="muted" style={{ fontSize: 12, margin: "6px 0 0", color: "var(--bad)" }}>{tr("Hlusta… talaðu fyrirmælin og smelltu svo aftur á hljóðnemann.")}</p>}
+      <div className="chips">{ex.map((c) => <button className="chip" key={c} onClick={() => setQuery(c)}>{c}</button>)}</div>
       <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
         <button className="btn" onClick={onGen}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6Z" /></svg>{tr("Búa til með AI")}</button>
         <button className="btn ghost" onClick={onClose}>{tr("Hætta við")}</button>
