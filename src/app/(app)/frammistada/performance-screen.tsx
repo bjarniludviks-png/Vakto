@@ -13,6 +13,7 @@ import { StaffingCard } from "./staffing-card";
 import type { StaffingPattern } from "./staffing.server";
 import type { PerfHistory } from "./perf.server";
 import type { Insight } from "./insights.server";
+import { AiReportCard } from "@/components/app/ai-report";
 
 // Period factors relative to the monthly baseline (demo analytics scale by period).
 const PERIODS: Period[] = ["Vika", "Mánuður", "Ársfj.", "Ár", "Sérsniðið"];
@@ -201,6 +202,12 @@ export default function PerformanceScreen({ empty = false, live = false, perf, s
           </div>
         )}
         <InsightsCard insights={insights} />
+        <AiReportCard examples={[
+          "Hvernig þróast launahlutfallið milli mánaða?",
+          "Hvaða deild er skilvirkust miðað við kostnað?",
+          "Berðu saman þennan mánuð og síðasta",
+          "Hvar er yfirvinna að myndast?",
+        ]} />
         {staffing && <StaffingCard rows={staffing.rows} live={staffing.live} weeks={staffing.weeks} />}
       </>
     );

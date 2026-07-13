@@ -12,6 +12,7 @@ import { fetchAttendance, getTimeReport } from "../timaskraning/actions";
 import { exportTimeReportXlsx, exportTimeReportPdf, exportTableXlsx, exportTablePdf } from "@/lib/export-report";
 import { getManagerReport, type ReportKind } from "./actions";
 import { TimeBankCard } from "./timebank-card";
+import { AiReportCard } from "@/components/app/ai-report";
 import type { TimeBank } from "./timebank.server";
 
 const MONTHS_IS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ágú.", "sep.", "okt.", "nóv.", "des."];
@@ -305,6 +306,7 @@ function LiveReports({ initial, timebank }: { initial: AttRow[]; timebank?: Time
           </table>
         </div>
       </div>
+      <AiReportCard />
       <div style={{ marginTop: 16 }}>
         <ReportLibrary from={from} to={to} departments={depts.filter((d) => d !== "all")} />
       </div>

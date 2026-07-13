@@ -4,7 +4,7 @@ const comma = (n: number) => n.toString().replace(".", ",");
 
 /** Labor% trend bars vs a target t (green ≤t, amber ≤t+3, red above).
  * labels default to V1..Vn; tips can add detail lines per bar. */
-export function Bars({ vals, t, height = 170, labels, tips }: { vals: number[]; t: number; height?: number; labels?: string[]; tips?: string[] }) {
+export function Bars({ vals, t, height = 170, labels, tips, unit = "%" }: { vals: number[]; t: number; height?: number; labels?: string[]; tips?: string[]; unit?: string }) {
   const max = Math.max(...vals, t) * 1.12;
   return (
     <div className="bars" style={{ height }}>
@@ -14,8 +14,8 @@ export function Bars({ vals, t, height = 170, labels, tips }: { vals: number[]; 
         const lab = labels?.[i] ?? `V${i + 1}`;
         return (
           <div className="b" key={i}>
-            <span className="ctip">{tips?.[i] ?? `${lab} · ${comma(v)}% (markmið ${comma(t)}%)`}</span>
-            <span className="pc">{comma(v)}%</span>
+            <span className="ctip">{tips?.[i] ?? `${lab} · ${comma(v)}${unit} (markmið ${comma(t)}${unit})`}</span>
+            <span className="pc">{comma(v)}{unit}</span>
             <div className="c" style={{ height: `${h}%`, background: c }} />
             <small>{lab}</small>
           </div>
