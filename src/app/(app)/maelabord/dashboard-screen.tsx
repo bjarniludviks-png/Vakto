@@ -262,9 +262,10 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
           <button className={`pchip${period === "custom" ? " on" : ""}`} onClick={() => setPeriod("custom")}>{t("Sérsnið")}</button>
           {period === "custom" && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: 4 }}>
-              <DateField value={customFrom} max={customTo || undefined} onChange={setCustomFrom} />
+              {/* No cross-constraints — pick any date; the other end follows if needed. */}
+              <DateField value={customFrom} onChange={(v) => { setCustomFrom(v); if (customTo && v > customTo) setCustomTo(v); }} />
               <span className="muted">–</span>
-              <DateField value={customTo} min={customFrom || undefined} onChange={setCustomTo} />
+              <DateField value={customTo} onChange={(v) => { setCustomTo(v); if (customFrom && v < customFrom) setCustomFrom(v); }} />
             </span>
           )}
         </div>

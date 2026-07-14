@@ -123,9 +123,9 @@ export function AiReportCard({ examples }: { examples?: string[] }) {
           ))}
           {period === "custom" && (
             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <DateField value={from} max={to || undefined} onChange={setFrom} />
+              <DateField value={from} onChange={(v) => { setFrom(v); if (to && v > to) setTo(v); }} />
               <span className="muted">–</span>
-              <DateField value={to} min={from || undefined} onChange={setTo} />
+              <DateField value={to} onChange={(v) => { setTo(v); if (from && v < from) setFrom(v); }} />
             </span>
           )}
         </div>
