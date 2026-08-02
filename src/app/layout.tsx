@@ -1,17 +1,17 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
-const DESC = "Framtíð vaktavinnu: AI raðar vöktunum, launin reikna sig sjálf og þú sérð launakostnaðinn í rauntíma. 14 daga frí prufa — ekkert kort.";
+const DESC = "Loksins einfalt vakta- og launakerfi: vaktaplan, stimpilklukka og laun sem stemma — og launakostnaðurinn í rauntíma. 14 daga frí prufa — ekkert kort.";
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is"),
-  title: "VAKTO — Vaktaplanið gerir sig sjálft. Launin líka.",
+  title: "VAKTO — Vaktaplan og laun. Loksins einfalt.",
   description: DESC,
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "VAKTO", statusBarStyle: "default" },
   openGraph: {
     type: "website",
     siteName: "VAKTO",
-    title: "VAKTO — Vaktaplanið gerir sig sjálft. Launin líka.",
+    title: "VAKTO — Vaktaplan og laun. Loksins einfalt.",
     description: DESC,
     locale: "is_IS",
     url: "/",

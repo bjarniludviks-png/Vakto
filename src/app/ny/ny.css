@@ -89,26 +89,13 @@
 .ny-aurora{position:absolute;inset:0;pointer-events:none;animation:nyignite 1.8s ease-out both}
 @keyframes nyignite{from{opacity:0}to{opacity:1}}
 
-/* starfield: two DRIFTING layers (parallax) with independent twinkle */
-.ny-stars{position:absolute;inset:-12% -12% 18% -12%;will-change:transform;
+/* starfield: two DRIFTING seeded-random SVG layers (parallax) with independent
+   twinkle — drawn in the component (Starfield), no tiling so no repeated rows */
+.ny-stars{position:absolute;inset:-12% -12% 18% -12%;width:auto;height:auto;will-change:transform;
   -webkit-mask-image:linear-gradient(to bottom,#000 58%,transparent 100%);
   mask-image:linear-gradient(to bottom,#000 58%,transparent 100%)}
-.ny-stars.s1{
-  background-image:
-    radial-gradient(1.4px 1.4px at 22px 34px,rgba(255,255,255,.7),transparent 100%),
-    radial-gradient(1px 1px at 130px 92px,rgba(255,255,255,.5),transparent 100%),
-    radial-gradient(1px 1px at 76px 158px,rgba(255,244,230,.55),transparent 100%),
-    radial-gradient(1.2px 1.2px at 178px 40px,rgba(255,255,255,.4),transparent 100%);
-  background-size:190px 190px,240px 240px,285px 285px,330px 330px;
-  animation:nystars1 140s linear infinite alternate,nytwinkle 6s ease-in-out infinite}
-.ny-stars.s2{
-  background-image:
-    radial-gradient(1px 1px at 48px 66px,rgba(214,228,255,.55),transparent 100%),
-    radial-gradient(.9px .9px at 154px 128px,rgba(255,255,255,.38),transparent 100%),
-    radial-gradient(1.6px 1.6px at 96px 200px,rgba(255,255,255,.6),transparent 100%),
-    radial-gradient(.8px .8px at 220px 90px,rgba(214,228,255,.42),transparent 100%);
-  background-size:260px 260px,310px 310px,380px 380px,430px 430px;
-  animation:nystars2 200s linear infinite alternate,nytwinkle 9s ease-in-out infinite 1.4s}
+.ny-stars.s1{animation:nystars1 140s linear infinite alternate,nytwinkle 6s ease-in-out infinite}
+.ny-stars.s2{animation:nystars2 200s linear infinite alternate,nytwinkle 9s ease-in-out infinite 1.4s}
 @keyframes nystars1{from{transform:translate3d(0,0,0)}to{transform:translate3d(-90px,40px,0)}}
 @keyframes nystars2{from{transform:translate3d(0,0,0)}to{transform:translate3d(70px,-50px,0)}}
 @keyframes nytwinkle{0%,100%{opacity:.5}50%{opacity:1}}

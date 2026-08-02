@@ -47,24 +47,24 @@ const T: Record<Lang, {
   is: {
     nav: ["Eiginleikar", "Svona virkar það", "Verð"],
     login: "Innskráning", start: "Byrja frítt",
-    pill: "Framtíð vaktavinnu · knúin af AI",
-    h1: ["Vaktaplanið gerir sig sjálft.", "Launin líka."],
-    sub: "AI raðar vöktunum á sekúndum. Launakostnaðurinn birtist áður en vikan byrjar. Starfsfólkið fær allt í símann. Segðu bless við Excel.",
+    pill: "Loksins — einfalt vakta- og launakerfi",
+    h1: ["Vaktaplan og laun.", "Loksins einfalt."],
+    sub: "Vaktaplan, stimpilklukka og launaútreikningur í einu þægilegu kerfi. Þú raðar vikunni á mínútum, launin stemma við kjarasamninga — og Excel fær loksins frí.",
     ctaSee: "Sjá hvernig",
     shotAlt: "VAKTO mælaborð í dökkri stillingu — launahlutfall í rauntíma",
     trust: "Vinnustaðir um allt Ísland keyra á VAKTO",
-    st1: "Vaktaplan á ekki að taka sunnudagskvöldið þitt. VAKTO raðar með AI, sýnir þér kostnaðinn ",
+    st1: "Vaktaplan á ekki að taka sunnudagskvöldið þitt. Í VAKTO raðar þú vikunni á nokkrum mínútum, sérð launakostnaðinn ",
     stEm: "áður en þú birtir",
-    st2: " og lætur þig vita um leið og eitthvað víkur frá. Þú rekur staðinn — ekki Excel-skjalið.",
+    st2: " og launin reiknast rétt. Þú rekur staðinn — ekki Excel-skjalið.",
     industries: ["Veitingastaðir", "Kaffihús", "Verslanir", "Hótel & gisting", "Bakarí", "Keðjur & útibú"],
     featHead: "Allt á einum stað. Loksins.",
     featSub: "Frá fyrsta plani að greiddum launum — eitt fallegt kerfi sem fólkið þitt elskar að nota.",
     features: [
       { title: "Sjáðu reksturinn í rauntíma", desc: "Laun sem hlutfall af veltu, lifandi yfir daginn. Grænt þegar þú ert á markmiði, rautt áður en það verður dýrt. Betri ákvarðanir á meðan þær eru enn ódýrar." },
-      { title: "Vaktaplan á sekúndum", desc: "Lýstu vikunni og AI stillir upp mönnuninni. Dragðu, fínstilltu, birtu — búið." },
+      { title: "Vaktaplan án vesens", desc: "Dragðu vaktir á sinn stað á mínútum — eða láttu AI stinga upp á plani. Fínstilltu, birtu — búið." },
       { title: "Mæting sem skráir sig sjálf", desc: "PIN, GPS eða QR-skírteini — inn og út á sekúndu. Yfirvinnan birtist í rauntíma, ekki eftir mánuð." },
       { title: "Skírteinið býr í veskinu", desc: "Stafrænt starfsmannaskírteini í Apple Wallet og Google Wallet — mynd, staða og QR-kóði sem stimplar inn og út. Plast heyrir sögunni til." },
-      { title: "Laun á sjálfstýringu", desc: "Dagvinna, álög, yfirvinna og uppbætur — rétt eftir kjarasamningum, beint í Payday eða DK. Núll handavinna." },
+      { title: "Laun sem bara stemma", desc: "Dagvinna, álög, yfirvinna og uppbætur — rétt eftir kjarasamningum, beint í Payday eða DK. Núll handavinna." },
       { title: "Appið sem starfsfólkið elskar", desc: "Vaktir, laun, vaktaskipti, fríbeiðnir og spjall — allt í símanum. Ein tilkynning í stað tuttugu skilaboða. Fólkið þitt veit alltaf hvað er næst og miðarnir á kaffistofunni heyra sögunni til." },
     ],
     gaugeTarget: "MARKMIÐ 30%",
@@ -73,14 +73,14 @@ const T: Record<Lang, {
     stepsHead: "Þrjú skref. Korter. Búið.",
     steps: [
       { title: "Stofnaðu aðgang", desc: "Fyrirtækið, fólkið og kjarasamningarnir — inn á korteri, ekki viku." },
-      { title: "Láttu AI sjá um planið", desc: "Lýstu vikunni og AI raðar eftir álagi og reglum. Þú samþykkir — og planið lendir í símum starfsfólksins, með skírteini og öllu." },
+      { title: "Raðaðu vikunni", desc: "Dragðu vaktir á sinn stað á mínútum — eða láttu AI stinga upp á plani og samþykktu. Planið lendir beint í símum starfsfólksins, með skírteini og öllu." },
       { title: "Sjáðu kostnaðinn fyrirfram", desc: "Launakostnaðurinn birtist áður en þú birtir planið og frávikin dag frá degi. Mánaðamótin verða bara dagsetning." },
     ],
     showHead: "Sjáðu kerfið í alvöru",
     showSub: "Alvöru skjámyndir úr VAKTO — flettu á milli.",
     slides: [
       { title: "Mælaborð", desc: "Reksturinn í rauntíma: tímar, kostnaður og laun% á einum skjá." },
-      { title: "Vaktaplan", desc: "Full vika á sekúndum með AI — kostnaðurinn sést áður en þú birtir." },
+      { title: "Vaktaplan", desc: "Full vika á nokkrum mínútum — kostnaðurinn sést áður en þú birtir." },
       { title: "Tímaskráning", desc: "Áætlað vs raun, yfirvinna og frávik — lifandi yfir daginn." },
       { title: "Starfsfólk", desc: "Prófílar, réttindi, skjöl og skírteini á einum stað." },
       { title: "Skýrslur", desc: "Tímar, kostnaður og samanburður — sótt sem Excel eða PDF." },
@@ -110,14 +110,14 @@ const T: Record<Lang, {
     priceAmt: "9.990", priceUnit: "kr/mán · VSK innifalið",
     priceItems: [
       "5 notendur innifaldir — +990 kr á notanda umfram",
-      "AI-vaktaplan, stimpilklukka og laun% í rauntíma",
+      "Vaktaplan, stimpilklukka og laun% í rauntíma",
       "App, skírteini, spjall og skýrslur",
       "Payday, DK og sölukerfin þín",
     ],
     priceFine: "14 daga frí prufa. Ekkert kort.",
     ctaEnd: "Reksturinn þinn. Í rauntíma. Frá og með deginum í dag.",
     ctaDemo: "Bóka kynningu",
-    footBlurb: "Framtíð vinnustaða: AI-vaktaplan, laun á sjálfstýringu og reksturinn í rauntíma — í einu fallegu kerfi.",
+    footBlurb: "Loksins einfalt vakta- og launakerfi: vaktaplan, stimpilklukka og laun sem stemma — í einu fallegu kerfi.",
     footProduct: "Vara", footHow: "Svona virkar það", footPrice: "Verð",
     footCompany: "Fyrirtækið", footContact: "Hafa samband", footKiosk: "Stimpilklukka",
     footLegal: "Lögfræði", footPrivacy: "Persónuvernd", footTerms: "Skilmálar", footCookies: "Vafrakökur",
@@ -127,24 +127,24 @@ const T: Record<Lang, {
   en: {
     nav: ["Features", "How it works", "Pricing"],
     login: "Sign in", start: "Start free",
-    pill: "The future of shift work · powered by AI",
-    h1: ["Schedules that build themselves.", "Payroll that follows."],
-    sub: "AI builds your schedule in seconds. Labor costs appear before the week begins. Your team gets everything on their phone. Say goodbye to spreadsheets.",
+    pill: "Finally — a simple scheduling & payroll system",
+    h1: ["Scheduling and payroll.", "Finally simple."],
+    sub: "Scheduling, a time clock and payroll in one simple, friendly system. Build your week in minutes, pay matches the union agreements — and the spreadsheet finally retires.",
     ctaSee: "See how",
     shotAlt: "VAKTO dashboard in dark mode — labor ratio in real time",
     trust: "Workplaces across Iceland run on VAKTO",
-    st1: "A schedule shouldn't cost you your Sunday night. VAKTO plans with AI, shows you the cost ",
+    st1: "A schedule shouldn't cost you your Sunday night. In VAKTO you build the week in minutes, see the labor cost ",
     stEm: "before you publish",
-    st2: " and tells you the moment something drifts. You run the place — not the spreadsheet.",
+    st2: " and pay comes out right. You run the place — not the spreadsheet.",
     industries: ["Restaurants", "Cafés", "Retail", "Hotels & stays", "Bakeries", "Chains & branches"],
     featHead: "Everything in one place. Finally.",
     featSub: "From the first schedule to paid salaries — one beautiful platform your people love to use.",
     features: [
       { title: "See your business in real time", desc: "Labor as a share of revenue, live through the day. Green when you're on target, red before it gets expensive. Better decisions while they're still cheap." },
-      { title: "Schedules in seconds", desc: "Describe your week and AI drafts the staffing. Drag, tweak, publish — done." },
+      { title: "Scheduling without the hassle", desc: "Drag shifts into place in minutes — or let AI suggest a draft. Tweak, publish — done." },
       { title: "Attendance that tracks itself", desc: "PIN, GPS or QR badge — in and out in a second. Overtime shows up in real time, not next month." },
       { title: "An ID that lives in the wallet", desc: "A digital employee ID in Apple Wallet and Google Wallet — photo, role and a QR code that clocks in and out. Plastic is history." },
-      { title: "Payroll on autopilot", desc: "Base pay, premiums, overtime and bonuses — correct per union agreements, straight into Payday or DK. Zero manual work." },
+      { title: "Payroll that just adds up", desc: "Base pay, premiums, overtime and bonuses — correct per union agreements, straight into Payday or DK. Zero manual work." },
       { title: "The app your team loves", desc: "Shifts, pay, swaps, time off and chat — all on their phone. One notification instead of twenty messages. Your people always know what's next, and the break-room notes are history." },
     ],
     gaugeTarget: "TARGET 30%",
@@ -153,14 +153,14 @@ const T: Record<Lang, {
     stepsHead: "Three steps. Fifteen minutes. Done.",
     steps: [
       { title: "Create your account", desc: "Your company, your people, your agreements — set up in fifteen minutes, not a week." },
-      { title: "Let AI do the planning", desc: "Describe your week and AI staffs it by demand and rules. You approve — and the schedule lands on your team's phones, badge included." },
+      { title: "Build your week", desc: "Drag shifts into place in minutes — or let AI suggest a plan and approve it. The schedule lands on your team's phones, badge included." },
       { title: "See the cost up front", desc: "Labor cost shows before you publish, and deviations day by day. Month-end becomes just a date." },
     ],
     showHead: "See the real thing",
     showSub: "Actual screenshots from VAKTO — swipe through.",
     slides: [
       { title: "Dashboard", desc: "Your business in real time: hours, cost and labor % on one screen." },
-      { title: "Scheduling", desc: "A full week in seconds with AI — see the cost before you publish." },
+      { title: "Scheduling", desc: "A full week in minutes — see the cost before you publish." },
       { title: "Time tracking", desc: "Planned vs actual, overtime and deviations — live through the day." },
       { title: "People", desc: "Profiles, entitlements, documents and IDs in one place." },
       { title: "Reports", desc: "Hours, cost and comparisons — exported as Excel or PDF." },
@@ -190,14 +190,14 @@ const T: Record<Lang, {
     priceAmt: "9,990", priceUnit: "ISK/mo · VAT included",
     priceItems: [
       "5 users included — +990 ISK per extra user",
-      "AI scheduling, time clock and real-time labor %",
+      "Scheduling, time clock and real-time labor %",
       "App, digital IDs, chat and reports",
       "Payday, DK and your POS systems",
     ],
     priceFine: "14-day free trial. No card.",
     ctaEnd: "Your business. In real time. Starting today.",
     ctaDemo: "Book a demo",
-    footBlurb: "The future of workforce management: AI scheduling, payroll on autopilot and your business in real time — in one beautiful platform.",
+    footBlurb: "Finally a simple scheduling & payroll system: shifts, a time clock and pay that adds up — in one beautiful platform.",
     footProduct: "Product", footHow: "How it works", footPrice: "Pricing",
     footCompany: "Company", footContact: "Contact", footKiosk: "Time clock",
     footLegal: "Legal", footPrivacy: "Privacy", footTerms: "Terms", footCookies: "Cookies",
@@ -207,6 +207,44 @@ const T: Record<Lang, {
 };
 
 /* ---------- shared bits ---------- */
+
+/* Seeded PRNG so the starfield is identical on server and client (no hydration
+   mismatch) but looks genuinely random — no tiling, so no accidental rows. */
+function mulberry32(seed: number) {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/* Jittered-grid sampling: one candidate star per cell, randomly offset within
+   it — evenly spread without clumps or straight lines. */
+function Starfield({ layer }: { layer: 1 | 2 }) {
+  const rnd = mulberry32(layer === 1 ? 0x5747a1 : 0x36c9d3);
+  const cols = 16, rows = 9, cw = 1600 / cols, ch = 900 / rows;
+  const colors = ["255,255,255", "255,244,230", "214,228,255"];
+  const stars = [];
+  for (let gy = 0; gy < rows; gy++) {
+    for (let gx = 0; gx < cols; gx++) {
+      const keep = rnd() < (layer === 1 ? 0.62 : 0.5);
+      const x = gx * cw + cw * (0.08 + rnd() * 0.84);
+      const y = gy * ch + ch * (0.08 + rnd() * 0.84);
+      const r = 0.5 + rnd() * (layer === 1 ? 1.0 : 0.8);
+      const c = colors[Math.floor(rnd() * colors.length)];
+      const o = 0.35 + rnd() * 0.55;
+      if (!keep) continue;
+      stars.push(<circle key={`${gx}-${gy}`} cx={x.toFixed(1)} cy={y.toFixed(1)} r={r.toFixed(2)} fill={`rgba(${c},${o.toFixed(2)})`} />);
+    }
+  }
+  return (
+    <svg className={`ny-stars s${layer}`} viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      {stars}
+    </svg>
+  );
+}
 
 function Logo({ w = 26 }: { w?: number }) {
   return (
@@ -462,8 +500,8 @@ export default function NyClient() {
       {/* ---------- hero: the midnight-sun horizon ---------- */}
       <header className="ny-hero">
         <div className="ny-aurora" aria-hidden="true">
-          <span className="ny-stars s1" />
-          <span className="ny-stars s2" />
+          <Starfield layer={1} />
+          <Starfield layer={2} />
           <i className="a1" /><i className="a2" /><i className="a3" />
           <span className="ny-rays r1" />
           <span className="ny-rays r2" />
