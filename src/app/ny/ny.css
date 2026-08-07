@@ -374,25 +374,62 @@
   filter:drop-shadow(0 42px 60px rgba(0,0,0,.75)) drop-shadow(0 0 42px rgba(233,112,15,.3))}
 @media(prefers-reduced-motion:reduce){.ny-phone-real{animation:none}}
 .ny-phone-real .frame{display:block;width:100%;height:auto;position:relative;z-index:1;pointer-events:none}
-.ny-phone-ui{position:absolute;left:2.9%;right:2.7%;top:.7%;bottom:1%;z-index:2;overflow:hidden;
-  border-radius:13%/6.3%;display:flex;flex-direction:column;gap:12px;padding:56px 14px 16px}
-.ph-head{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;letter-spacing:.06em;color:var(--ink)}
-.ph-head .av{margin-left:auto;width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#f59331,#cf5f0c);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:0}
-.ph-card{background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;padding:13px 14px;display:flex;flex-direction:column;gap:4px}
-.ph-card small{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim2);font-weight:600}
-.ph-card b{font-size:14px;color:var(--ink);font-weight:600}
-.ph-clock{border:1px solid rgba(245,147,49,.55);border-radius:13px;padding:13px;font:inherit;font-size:14px;font-weight:700;color:#fff;
-  background:linear-gradient(180deg,#f08222,#d96509);box-shadow:0 0 24px -8px rgba(233,112,15,.7)}
-.ph-wallet{margin-top:2px;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.14)}
-.ph-wallet .wtop{display:flex;align-items:center;justify-content:space-between;background:linear-gradient(135deg,#f59331,#cf5f0c);padding:9px 12px;font-size:11px;font-weight:800;letter-spacing:.08em;color:#fff}
-.ph-wallet .wtop span{width:22px;height:22px;border-radius:5px;background:
-  conic-gradient(#fff 25%,transparent 0 50%,#fff 0 75%,transparent 0);opacity:.9}
-.ph-wallet .wbot{display:flex;align-items:center;gap:9px;background:#141417;padding:10px 12px}
-.ph-wallet .wav{width:26px;height:26px;border-radius:50%;background:#2c2c31;color:var(--ink);font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
-.ph-wallet i{font-style:normal;font-size:11.5px;color:var(--dim)}
-.ph-notif{margin-top:auto;display:flex;align-items:center;gap:8px;background:rgba(46,194,126,.1);border:1px solid rgba(46,194,126,.3);
-  border-radius:11px;padding:10px 12px;font-size:12px;font-weight:600;color:#5fd9a2}
-.ph-notif .dot{width:7px;height:7px;border-radius:50%;background:#2ec27e;flex-shrink:0}
+.ny-phone-real{cursor:pointer}
+/* the screen area: a 3D stage whose content flips between two faces */
+.ny-phone-ui{position:absolute;left:2.9%;right:2.7%;top:.7%;bottom:1%;z-index:2;border-radius:13%/6.3%;perspective:1100px}
+.ny-flip{position:relative;width:100%;height:100%;border-radius:inherit;transform-style:preserve-3d;transition:transform .8s var(--ease)}
+.ny-flip.flipped{transform:rotateY(180deg)}
+@media(prefers-reduced-motion:reduce){.ny-flip{transition:none}}
+.ny-face{position:absolute;inset:0;overflow:hidden;border-radius:inherit;backface-visibility:hidden;-webkit-backface-visibility:hidden;
+  display:flex;flex-direction:column;gap:10px;padding:46px 12px 14px;background:#f4f4f6;color:#1a1a1f;text-align:left}
+.ny-face.back{transform:rotateY(180deg);gap:9px}
+/* our own dynamic island — the faces are opaque, so the frame's is covered */
+.ny-face .isl{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:72px;height:21px;border-radius:11px;background:#060607}
+
+/* front: Mitt svæði replica (matches the real app's light theme) */
+.mv-top{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;letter-spacing:.06em;color:#1a1a1f}
+.mv-top .av{margin-left:auto;width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#f59331,#cf5f0c);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;letter-spacing:0}
+.mv-punch{border-radius:14px;padding:13px 14px 12px;text-align:center;color:#fff;background:linear-gradient(140deg,#18a06a,#15915f);box-shadow:0 10px 24px -12px rgba(21,145,95,.6)}
+.mv-punch small{display:block;font-size:9.5px;font-weight:600;opacity:.92}
+.mv-punch b{display:block;font-size:23px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:1px;margin-top:2px}
+.mv-punch .pbtn{display:block;margin-top:9px;background:#fff;color:#15915f;font-weight:700;font-size:11.5px;padding:8px;border-radius:9px;text-align:center}
+.mv-mini{background:#fff;border:1px solid #e6e6e9;border-radius:14px;padding:10px 12px;box-shadow:0 6px 18px -14px rgba(15,17,23,.25)}
+.mv-mini .mh{font-size:9px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#8a8b93;margin-bottom:3px}
+.mv-mini .mr{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:5.5px 0;font-size:10.5px;color:#55565e}
+.mv-mini .mr+.mr{border-top:1px solid #f0f0f2}
+.mv-mini .mr b{font-weight:650;color:#1a1a1f;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mv-mini .mr b.warn{color:#bf8f3a}
+.mv-qa{display:flex;gap:7px;margin-top:auto}
+.mv-qa span{flex:1;text-align:center;font-size:10.5px;font-weight:650;padding:9px 4px;border-radius:10px;background:#e9700f;color:#fff}
+.mv-qa span.alt{background:#fff;border:1px solid #e6e6e9;color:#1a1a1f}
+
+/* back: the staff ID card (mirrors StaffCardModal) + wallet buttons */
+.sk-card{position:relative;overflow:hidden;border-radius:16px;color:#fff;padding:13px 14px 12px;display:flex;flex-direction:column;
+  background:linear-gradient(150deg,#e9700f 0%,#d9640d 55%,#c85a0b 100%);box-shadow:0 14px 30px -14px rgba(201,90,11,.55)}
+.sk-card::before{content:"";position:absolute;top:-56px;right:-40px;width:150px;height:150px;border-radius:50%;background:rgba(255,255,255,.10)}
+.sk-top{position:relative;display:flex;justify-content:space-between;align-items:center}
+.sk-brand{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.03em}
+.sk-co{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;opacity:.95}
+.sk-av{position:relative;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;margin-top:10px}
+.sk-lbl{position:relative;font-size:7.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:rgba(255,255,255,.75);margin-top:8px}
+.sk-nm{position:relative;font-size:17px;font-weight:800;letter-spacing:-.02em}
+.sk-flds{position:relative;display:flex;gap:18px;margin-top:7px}
+.sk-flds small{display:block;font-size:7px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.72)}
+.sk-flds b{font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+.sk-qrbox{position:relative;background:#fff;border-radius:10px;padding:8px;display:flex;justify-content:center;margin-top:9px}
+.sk-qr{display:grid;grid-template-columns:repeat(13,5px);gap:1.5px}
+.sk-qr i{width:5px;height:5px;border-radius:1px;background:#f4f4f6}
+.sk-qr i.on{background:#111827}
+.sk-ft{position:relative;text-align:center;font-size:7.5px;font-weight:600;color:rgba(255,255,255,.85);margin-top:8px}
+.sk-wallet{display:flex;gap:7px;margin-top:auto}
+.sk-wallet span{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;font-size:10px;font-weight:650;padding:9px 4px;border-radius:10px}
+.sk-wallet .apple{background:#111827;color:#fff}
+.sk-wallet .goog{background:#fff;border:1px solid #e6e6e9;color:#1a1a1f}
+
+/* toggle pills under the phone */
+.ny-phone-tabs{display:flex;gap:8px;justify-content:center;margin-top:20px;position:relative;z-index:2}
+.ny-phone-tabs button{font:inherit;font-size:12.5px;font-weight:600;color:var(--dim);background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:999px;padding:8px 16px;cursor:pointer;transition:color .15s,border-color .15s,background .15s}
+.ny-phone-tabs button.on{color:#fff;border-color:rgba(245,147,49,.55);background:rgba(233,112,15,.14);box-shadow:0 0 18px -6px var(--glow)}
 
 @media(max-width:900px){
   .ny-slide{flex-basis:92%}

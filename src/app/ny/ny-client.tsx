@@ -30,7 +30,12 @@ const T: Record<Lang, {
   slides: { title: string; desc: string }[];
   appBadge: string; appHead: string; appSub: string;
   appPoints: string[];
-  phNext: string; phShift: string; phClockIn: string; phWallet: string; phNotif: string;
+  phNext: string; phSince: string; phClockOut: string;
+  phRows: [string, string][];
+  phSum: string; phSumRows: [string, string][];
+  phLeave: string; phSwap: string;
+  phoneTabs: [string, string];
+  skRole: string; skRoleV: string; skNo: string; skScan: string;
   voicesHead: string; voicesSub: string;
   voices: { quote: string; role: string }[];
   priceHead: string; priceSub: string; priceAmt: string; priceUnit: string;
@@ -96,8 +101,12 @@ const T: Record<Lang, {
       "Fríbeiðnir og vaktaskipti",
       "Tilkynningar um leið og eitthvað breytist",
     ],
-    phNext: "Næsta vakt", phShift: "Fim 9. júlí · 08:00–16:00", phClockIn: "Stimpla inn",
-    phWallet: "Skírteini · Apple Wallet", phNotif: "Vaktaskipti samþykkt ✓",
+    phNext: "Næsta vakt", phSince: "Á vakt síðan 08:01", phClockOut: "Stimpla út",
+    phRows: [["Í dag · Fim 9. júlí", "08:00–16:00"], ["Fös 10. júlí", "10:00–18:00"], ["Lau 11. júlí", "12:00–20:00 · +45%"]],
+    phSum: "Samantekt", phSumRows: [["Tímar vikunnar", "32,0 klst"], ["Næsta útborgun", "1. ágúst"]],
+    phLeave: "Sækja um frí", phSwap: "Skipta á vakt",
+    phoneTabs: ["Mitt svæði", "Skírteinið"],
+    skRole: "Staða", skRoleV: "Kokkur", skNo: "Nr.", skScan: "Skannaðu á stimpilklukkunni",
     voicesHead: "Rekstrarfólk elskar VAKTO",
     voicesSub: "Og starfsfólkið líka. Það er allur galdurinn.",
     voices: [
@@ -176,8 +185,12 @@ const T: Record<Lang, {
       "Time off and shift swaps",
       "Notifications the moment anything changes",
     ],
-    phNext: "Next shift", phShift: "Thu 9 July · 08:00–16:00", phClockIn: "Clock in",
-    phWallet: "ID · Apple Wallet", phNotif: "Swap approved ✓",
+    phNext: "Next shift", phSince: "On shift since 08:01", phClockOut: "Clock out",
+    phRows: [["Today · Thu 9 July", "08:00–16:00"], ["Fri 10 July", "10:00–18:00"], ["Sat 11 July", "12:00–20:00 · +45%"]],
+    phSum: "Summary", phSumRows: [["Hours this week", "32.0 h"], ["Next payday", "1 August"]],
+    phLeave: "Request time off", phSwap: "Swap a shift",
+    phoneTabs: ["My area", "ID card"],
+    skRole: "Role", skRoleV: "Chef", skNo: "No.", skScan: "Scan at the time clock",
     voicesHead: "Owners love VAKTO",
     voicesSub: "So do their teams. That's the whole trick.",
     voices: [
@@ -388,8 +401,40 @@ function Showcase({ slides, head, sub, lang }: { slides: { title: string; desc: 
   );
 }
 
-/** The future mobile app — CSS iPhone mockup with placeholder screens. */
+/** Pseudo-QR for the badge preview — deterministic pattern with real-looking
+    finder squares in three corners, no actual payload. */
+function MiniQr() {
+  const n = 13;
+  const rnd = mulberry32(0x51c0de);
+  const inFinder = (r: number, c: number) => {
+    const zones: [number, number][] = [[0, 0], [0, n - 5], [n - 5, 0]];
+    for (const [zr, zc] of zones) {
+      const lr = r - zr, lc = c - zc;
+      if (lr >= 0 && lr < 5 && lc >= 0 && lc < 5) {
+        return lr === 0 || lr === 4 || lc === 0 || lc === 4 || (lr === 2 && lc === 2) ? "on" : "off";
+      }
+    }
+    return null;
+  };
+  const cells: boolean[] = [];
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    const f = inFinder(r, c);
+    cells.push(f ? f === "on" : rnd() < 0.44);
+  }
+  return <span className="sk-qr">{cells.map((v, i) => <i key={i} className={v ? "on" : ""} />)}</span>;
+}
+
+/** The future mobile app — real iPhone frame whose screen flips between a
+    faithful Mitt svæði mini-replica and the employee ID card (tap or wait). */
 function AppPreview({ t }: { t: (typeof T)["is"] }) {
+  const [face, setFace] = useState(0);
+  const manual = useRef(false);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const id = setInterval(() => { if (!manual.current) setFace((f) => 1 - f); }, 5200);
+    return () => clearInterval(id);
+  }, []);
+  const pick = (f: number) => { manual.current = true; setFace(f); };
   return (
     <section className="ny-sec ny-appsec">
       <Rise className="ny-app-grid">
@@ -406,25 +451,68 @@ function AppPreview({ t }: { t: (typeof T)["is"] }) {
             ))}
           </ul>
         </div>
-        <div className="ny-app-vis" aria-hidden="true">
-          <span className="ny-app-glow" />
-          <div className="ny-phone-real">
+        <div className="ny-app-vis">
+          <span className="ny-app-glow" aria-hidden="true" />
+          <div className="ny-phone-real" onClick={() => pick(1 - face)} aria-hidden="true">
             <img className="frame" src="/app/phone-frame.png" alt="" width={551} height={1137} loading="lazy" />
             <div className="ny-phone-ui">
-              <div className="ph-head"><Logo w={14} /><b>VAKTO</b><span className="av">MÍ</span></div>
-              <div className="ph-card">
-                <small>{t.phNext}</small>
-                <b>{t.phShift}</b>
-              </div>
-              <button className="ph-clock">{t.phClockIn}</button>
-              <div className="ph-wallet">
-                <div className="wtop"><b>VAKTO</b><span /></div>
-                <div className="wbot"><span className="wav">MÍ</span><i>{t.phWallet}</i></div>
-              </div>
-              <div className="ph-notif">
-                <span className="dot" />{t.phNotif}
+              <div className={`ny-flip${face === 1 ? " flipped" : ""}`}>
+
+                {/* front: Mitt svæði as it actually looks in the app (light theme) */}
+                <div className="ny-face front">
+                  <span className="isl" />
+                  <div className="mv-top"><Logo w={13} /><b>VAKTO</b><span className="av">MÍ</span></div>
+                  <div className="mv-punch">
+                    <small>{t.phSince}</small>
+                    <b>04:36:12</b>
+                    <span className="pbtn">{t.phClockOut}</span>
+                  </div>
+                  <div className="mv-mini">
+                    <div className="mh">{t.phNext}</div>
+                    {t.phRows.map(([d, h]) => (
+                      <div className="mr" key={d}><span>{d}</span><b className={h.includes("+") ? "warn" : ""}>{h}</b></div>
+                    ))}
+                  </div>
+                  <div className="mv-mini">
+                    <div className="mh">{t.phSum}</div>
+                    {t.phSumRows.map(([k, v]) => (
+                      <div className="mr" key={k}><span>{k}</span><b>{v}</b></div>
+                    ))}
+                  </div>
+                  <div className="mv-qa"><span>{t.phLeave}</span><span className="alt">{t.phSwap}</span></div>
+                </div>
+
+                {/* back: the staff ID card exactly like StaffCardModal renders it */}
+                <div className="ny-face back">
+                  <span className="isl" />
+                  <div className="sk-card">
+                    <div className="sk-top">
+                      <span className="sk-brand"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="3" y="13" width="4" height="8" rx="1.2" fill="#fff" /><rect x="10" y="8" width="4" height="13" rx="1.2" fill="#fff" /><rect x="17" y="4" width="4" height="17" rx="1.2" fill="#fff" /></svg>VAKTO</span>
+                      <span className="sk-co">Kaffi Krónan</span>
+                    </div>
+                    <span className="sk-av">MÍ</span>
+                    <small className="sk-lbl">{t.idLabel}</small>
+                    <b className="sk-nm">Mína Huong</b>
+                    <div className="sk-flds">
+                      <div><small>{t.skRole}</small><b>{t.skRoleV}</b></div>
+                      <div><small>{t.skNo}</small><b>#4821</b></div>
+                    </div>
+                    <span className="sk-qrbox"><MiniQr /></span>
+                    <span className="sk-ft">VAKTO-4821-KK · {t.skScan}</span>
+                  </div>
+                  <div className="sk-wallet">
+                    <span className="apple"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.9c0-2.3 1.9-3.4 2-3.4-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.8-3-.8-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.3 2.9 2.3 1.2 0 1.6-.7 3-.7 1.4 0 1.8.7 3 .7 1.2 0 2-1.1 2.8-2.2.9-1.3 1.2-2.5 1.3-2.6-.1 0-2.5-.9-2.5-3.5zM14.2 6c.6-.8 1.1-1.9.9-3-1 0-2.1.7-2.8 1.5-.6.7-1.1 1.8-1 2.8 1.1.1 2.2-.5 2.9-1.3z" /></svg>Apple Wallet</span>
+                    <span className="goog">Google Wallet</span>
+                  </div>
+                </div>
+
               </div>
             </div>
+          </div>
+          <div className="ny-phone-tabs">
+            {t.phoneTabs.map((lbl, i) => (
+              <button key={lbl} className={face === i ? "on" : ""} onClick={() => pick(i)}>{lbl}</button>
+            ))}
           </div>
         </div>
       </Rise>
