@@ -17,6 +17,19 @@
 - Never reproduce wrong pay: the kjarasamninga calc must be verified against real agreements.
 - **Per screen: build → screenshot → compare to prototype → fix until identical.**
 
+## Workflow — vakto.is er í notkun hjá viðskiptavinum
+
+> **ALDREI commit-a beint á `main`.** vakto.is (= main) er live hjá BM Veitingum.
+> Öll vinna fer á **`dev`** (eða feature-branch af dev) → Vercel býr til preview-URL →
+> eigandinn samþykkir þar → þá fyrst merge á main.
+>
+> - **Preview + local nota STAGING-Supabase** (`aptpckmrqepvcqhgkjoo`, „VAKTO Staging“):
+>   `.env.local` bendir á staging; prod-lyklar geymdir í `.env.local.PROD-BACKUP` (gitignored).
+>   Vercel: Preview-env = staging-lyklar, Production-env = prod-lyklar.
+> - **Migrations:** keyra fyrst á staging (Management API `database/query` eða SQL editor),
+>   prófa á preview, og á prod-grunninn (`lsnthbnqcelfgeyuxgfn`) aðeins við release á main.
+> - Staging-innskráning: bjarniludviks@icloud.com / Vakto!2026 (seed-gögn Kaffi Krónan).
+
 ## Architecture / conventions
 
 - **Stack:** Next.js 16 (App Router) + React 19 + Tailwind v4 + shadcn/ui + Supabase (cloud).
