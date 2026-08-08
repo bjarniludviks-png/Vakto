@@ -8,7 +8,8 @@ export type LocationRow = { name: string; staff: number; timezone: string };
 export type PositionRow = { name: string; staff: number; baseRate: string };
 export type UserRow = { name: string; initials: string; role: string; email: string };
 export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string };
-export type SettingsData = { locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; companyId: string | null; company: CompanyInfo | null; live: boolean };
+export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
+export type SettingsData = { locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; company: CompanyInfo | null; live: boolean };
 
 const DEMO: SettingsData = {
   locations: [
@@ -24,6 +25,7 @@ const DEMO: SettingsData = {
     { name: "Bjarni L.", initials: "BL", role: "owner", email: "Eigandi — fullur aðgangur" },
     { name: "Jón", initials: "JÓ", role: "manager", email: "Rekstrarstjóri — vaktir, laun, skýrslur" },
   ],
+  apiKeys: [],
   companyId: null,
   company: null,
   live: false,
@@ -55,6 +57,16 @@ export async function getSettingsData(): Promise<SettingsData> {
       supabase.from("users").select("full_name, email, role").eq("company_id", company).order("role"),
       supabase.from("companies").select("name, kennitala, address, phone, email").eq("id", company).maybeSingle(),
     ]);
+    // API connections (tolerant of a not-yet-run 0029 migration).
+    const keysRes = await supabase.from("api_keys")
+      .select("id, name, prefix, created_at, last_used_at, revoked")
+      .eq("company_id", company).order("created_at", { ascending: false });
+    const apiKeys: ApiKeyView[] = (keysRes.data ?? []).map((k) => ({
+      id: k.id as string, name: k.name as string, prefix: k.prefix as string,
+      created: (k.created_at as string).slice(0, 10),
+      lastUsed: k.last_used_at ? (k.last_used_at as string).slice(0, 10) : null,
+      revoked: !!k.revoked,
+    }));
     // Tolerant of missing 0026 columns — fall back to name+kennitala only.
     const comp = compRes.error
       ? (await supabase.from("companies").select("name, kennitala").eq("id", company).maybeSingle()).data
@@ -76,6 +88,7 @@ export async function getSettingsData(): Promise<SettingsData> {
         role: (u.role as string) ?? "employee",
         email: (u.email as string) ?? "",
       })),
+      apiKeys,
       companyId: company,
       company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", phone: c.phone ?? "", email: c.email ?? "" },
       live: true,

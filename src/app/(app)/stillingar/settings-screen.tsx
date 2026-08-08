@@ -6,7 +6,7 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { syncInventraRevenue, addLocation, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules } from "./actions";
+import { syncInventraRevenue, addLocation, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, createApiKey, revokeApiKey } from "./actions";
 import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
@@ -18,7 +18,7 @@ type SettingsModal = "location" | "position" | "invite" | "revenue" | "avgrevenu
 const WEEKDAYS: [number, string][] = [[1, "Mánudagur"], [2, "Þriðjudagur"], [3, "Miðvikudagur"], [4, "Fimmtudagur"], [5, "Föstudagur"], [6, "Laugardagur"], [0, "Sunnudagur"]];
 
 const ROLE_LABEL: Record<string, string> = { owner: "Eigandi", manager: "Stjórnandi", employee: "role:employee", contractor: "Verktaki" };
-const DEMO_SETTINGS: SettingsData = { locations: [], positions: [], users: [], companyId: null, company: null, live: false };
+const DEMO_SETTINGS: SettingsData = { locations: [], positions: [], users: [], apiKeys: [], companyId: null, company: null, live: false };
 
 function copyKioskLink(companyId: string | null) {
   const url = `${window.location.origin}/kiosk${companyId ? `?company=${companyId}` : ""}`;
@@ -41,6 +41,7 @@ const Pin = () => (
 export default function SettingsScreen({ initialModal = null, data = DEMO_SETTINGS, payRules = [], ruleTemplates = [] }: { initialModal?: SettingsModal; data?: SettingsData; payRules?: PayRule[]; ruleTemplates?: RuleTemplate[] }) {
   const { t } = useLang();
   const [modal, setModal] = useState<SettingsModal>(initialModal);
+  const [keyModal, setKeyModal] = useState(false);
   const [editRule, setEditRule] = useState<PayRule | null>(null);
   const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
   const [posName, setPosName] = useState<string | null>(null);
@@ -93,6 +94,37 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
             <div className="it"><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" /></svg></div><div className="tx"><b>{t("Push-tilkynningar")}</b><span>{t("vaktir, beiðnir og samþykki beint í símann")}</span></div><PushToggle /></div>
             <div className="it rowlink" onClick={() => copyKioskLink(data.companyId)}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><rect x="4" y="3" width="16" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg></div><div className="tx"><b>{t("Kiosk-stimpilklukka")}</b><span>{t("opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð")}</span></div><span className="tag info">{t("afrita slóð")}</span></div>
             <div className="it rowlink" onClick={() => posConnect("POS")}><div className="ic mut" style={{ background: "var(--line2)" }}>P</div><div className="tx"><b>{t("Fleiri sölukerfi")}</b><span>Dótturkassi, Salt, Verifone{t(" o.fl.")}</span></div><span className="tag mut">{t("tengja")}</span></div>
+          </div>
+        </div>
+      )}
+
+      {section === "tengingar" && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="ch">
+            <div>
+              <div className="ct">{t("API-tengingar")}</div>
+              <div className="cs">{t("búðu til lykil fyrir hvaða kerfi sem er — það sendir sölutölur beint inn og laun% uppfærist")}</div>
+            </div>
+            <button className="btn sm" onClick={() => setKeyModal(true)}>{t("+ Ný tenging")}</button>
+          </div>
+          <div className="cb att">
+            {data.apiKeys.length === 0 && (
+              <div className="muted" style={{ fontSize: 13, padding: "8px 2px" }}>
+                {t("Engin API-tenging enn — búðu til lykil og láttu sölukerfið þitt POST-a á")} <code style={{ fontSize: 12 }}>/api/v1/revenue</code>
+              </div>
+            )}
+            {data.apiKeys.map((k) => (
+              <div className="it" key={k.id}>
+                <div className={`ic ${k.revoked ? "mut" : "good"}`}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M21 2l-9.6 9.6M15.5 7.5l3 3L22 7l-3-3zM11.4 11.6a5 5 0 1 0 1 1z" /></svg></div>
+                <div className="tx">
+                  <b style={k.revoked ? { textDecoration: "line-through", color: "var(--ink3)" } : undefined}>{k.name}</b>
+                  <span>{k.prefix} · {t("stofnuð")} {k.created}{k.lastUsed ? ` · ${t("síðast notuð")} ${k.lastUsed}` : ` · ${t("aldrei notuð")}`}</span>
+                </div>
+                {k.revoked
+                  ? <span className="tag mut">{t("afturkölluð")}</span>
+                  : <button className="btn ghost sm" style={{ color: "var(--bad)" }} onClick={async () => { const r = await revokeApiKey(k.id); toast(r.ok ? t("Tenging afturkölluð") : (r.error ?? "Villa")); }}>{t("Afturkalla")}</button>}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -207,6 +239,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
       </div>
 
       {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} />}
+      {keyModal && <ApiKeyModal onClose={() => setKeyModal(false)} />}
       {tplModal && <RuleTemplateModal tpl={tplModal === "new" ? null : tplModal} onClose={() => setTplModal(null)} />}
       {editRule && <PayRuleModal rule={editRule} onClose={() => setEditRule(null)} />}
       {posName !== null && <PosConnectModal name={posName} onClose={() => setPosName(null)} />}
@@ -525,6 +558,59 @@ function PosConnectModal({ name, onClose }: { name: string; onClose: () => void 
             <button className="btn" disabled={busy} onClick={request}>{busy ? t("Sendi…") : t("Óska eftir tengingu")}</button>
             <button className="btn ghost" onClick={onClose}>{t("Loka")}</button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Create a named API connection — shows the full key ONCE with copy + a
+ * ready-to-paste curl example, then it only exists as a hash server-side. */
+function ApiKeyModal({ onClose }: { onClose: () => void }) {
+  const { t } = useLang();
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [key, setKey] = useState<string | null>(null);
+  async function create() {
+    if (!name.trim()) { toast(t("Gefðu tengingunni nafn")); return; }
+    setBusy(true);
+    const res = await createApiKey(name);
+    setBusy(false);
+    if (!res.ok || !res.key) { toast(res.error ?? "Villa"); return; }
+    setKey(res.key);
+  }
+  const curl = key
+    ? `curl -X POST ${typeof window !== "undefined" ? window.location.origin : "https://vakto.is"}/api/v1/revenue \\\n  -H "Authorization: Bearer ${key}" \\\n  -H "Content-Type: application/json" \\\n  -d '{"date":"2026-08-08","amount":214500}'`
+    : "";
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal" style={{ maxWidth: 520 }}>
+        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Ný API-tenging")}</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="mb">
+          {!key ? (
+            <>
+              <div className="field"><label>{t("Nafn tengingar")}</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("t.d. Kassinn Kringlunni, Shopify-búðin")} autoFocus /></div>
+              <p className="muted" style={{ fontSize: 12.5, marginTop: 4 }}>{t("Lykillinn birtist EINU sinni — kerfið sem fær hann getur sent sölutölur beint inn í VAKTO.")}</p>
+              <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
+                <button className="btn" disabled={busy} onClick={create}>{t("Búa til lykil")}</button>
+                <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: 13.5, fontWeight: 650, margin: "0 0 8px" }}>{t("Lykillinn — afritaðu hann NÚNA, hann sést ekki aftur:")}</p>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <code style={{ flex: 1, fontSize: 12, background: "var(--line2)", borderRadius: 9, padding: "10px 12px", wordBreak: "break-all" }}>{key}</code>
+                <button className="btn ghost sm" onClick={() => { navigator.clipboard?.writeText(key); toast(t("Lykill afritaður")); }}>{t("Afrita")}</button>
+              </div>
+              <p className="muted" style={{ fontSize: 12, margin: "14px 0 6px", fontWeight: 650 }}>{t("Svona sendir kerfið þitt inn veltu:")}</p>
+              <pre style={{ fontSize: 11, background: "var(--line2)", borderRadius: 9, padding: "10px 12px", overflowX: "auto", margin: 0 }}>{curl}</pre>
+              <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
+                <button className="btn" onClick={onClose}>{t("Lokið")}</button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

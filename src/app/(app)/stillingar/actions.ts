@@ -442,3 +442,54 @@ Skilaðu raunhæfum tölum fyrir þetta samhengi og taktu skýrt fram í explana
     return fallback;
   }
 }
+
+/* ---------- API-tengingar (open Revenue API keys) ---------- */
+
+export type ApiKeyRow = { id: string; name: string; prefix: string; createdAt: string; lastUsedAt: string | null; revoked: boolean };
+export type CreateKeyResult = { ok: boolean; demo?: boolean; key?: string; error?: string };
+
+/** Create a named API connection. The full key is returned ONCE — only its
+ * sha256 hash is stored. Key format: vk_live_<48 hex chars>. */
+export async function createApiKey(name: string): Promise<CreateKeyResult> {
+  const nm = name.trim();
+  if (!nm) return { ok: false, error: "Gefðu tengingunni nafn" };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true, key: "vk_live_demo0000000000000000000000000000000000000000" };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { randomBytes, createHash } = await import("crypto");
+    const key = "vk_live_" + randomBytes(24).toString("hex");
+    const hash = createHash("sha256").update(key).digest("hex");
+    const { error } = await supabase.from("api_keys").insert({
+      company_id: ctx.company, name: nm, prefix: key.slice(0, 15) + "…", key_hash: hash,
+    });
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "apikey.create", entity: "api_keys", detail: `API-tenging stofnuð — ${nm}`,
+    });
+    revalidatePath("/stillingar");
+    return { ok: true, key };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Revoke a key — external systems using it get 401 from then on. */
+export async function revokeApiKey(id: string): Promise<SettingsResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("api_keys").update({ revoked: true }).eq("id", id).eq("company_id", ctx.company);
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "apikey.revoke", entity: "api_keys", detail: `API-tenging afturkölluð`,
+    });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
