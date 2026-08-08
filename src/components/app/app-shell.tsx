@@ -48,32 +48,26 @@ export default function AppShell({
   }
   const [pos, setPos] = useState<MenuPos>(null);
   const [chatOpen, setChatOpen] = useState(false);
-  const [cookie, setCookie] = useState(false);
   const [roleModal, setRoleModal] = useState(false);
   // Owner can preview the app as another role (account menu → Skipta um hlutverk).
   const [role, setRoleState] = useState<Role>(account.role);
   const [dark, setDark] = useState(false);
   const [railed, setRailed] = useState(false);
 
-  // Apply persisted theme + cookie choice on mount (avoids hydration mismatch).
+  // Apply persisted theme on mount (avoids hydration mismatch). The cookie
+  // banner lives on the marketing site only — the signed-in app uses nothing
+  // but strictly necessary auth cookies, so no consent UI belongs here.
   useEffect(() => {
     const isDark = localStorage.getItem("vakto-theme") === "dark";
     if (isDark) document.documentElement.classList.add("dark");
-    const cookieSet = localStorage.getItem("vakto-cookie");
     const rail = localStorage.getItem("vakto-rail") === "1";
     requestAnimationFrame(() => {
       if (isDark) setDark(true);
-      if (!cookieSet) setCookie(true);
       if (rail) setRailed(true);
     });
   }, []);
   function toggleRail() {
     setRailed((r) => { try { localStorage.setItem("vakto-rail", r ? "0" : "1"); } catch {} return !r; });
-  }
-  function dismissCookie(allow: boolean) {
-    setCookie(false);
-    try { localStorage.setItem("vakto-cookie", allow ? "all" : "deny"); } catch {}
-    toast(allow ? t("cookie:allow") : t("cookie:deny"));
   }
   function toggleTheme() {
     const next = !dark;
@@ -349,34 +343,6 @@ export default function AppShell({
 
       {/* ---------- company picker (Payday-style) ---------- */}
       {picker && <CompanyPicker companies={companies} onPick={pickCompany} onClose={() => setPicker(false)} />}
-
-      {/* ---------- cookie consent ---------- */}
-      {cookie && (
-        <div className="cookie">
-          <h4>{t("cookie:h")}</h4>
-          <p>
-            {t("cookie:p")}{" "}
-            <a onClick={() => toast(t("cookie:more"))}>{t("cookie:more")}</a>
-          </p>
-          <div className="crow">
-            <button
-              className="allow"
-              onClick={() => dismissCookie(true)}
-            >
-              {t("cookie:allow")}
-            </button>
-            <button
-              className="deny"
-              onClick={() => dismissCookie(false)}
-            >
-              {t("cookie:deny")}
-            </button>
-          </div>
-          <button className="cset" onClick={() => toast(t("cookie:settings"))}>
-            {t("cookie:settings")}
-          </button>
-        </div>
-      )}
 
       {/* ---------- role preview ---------- */}
       {roleModal && (
