@@ -32,8 +32,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "Greining",
     items: [
-      { slug: "reports", href: "/skyrslur", label: "Skýrslur", roles: STAFF_MGMT, icon: "reports" },
-      { slug: "performance", href: "/frammistada", label: "Frammistaða", roles: ["owner"], icon: "trend" },
+      { slug: "insights", href: "/innsyn", label: "Innsýn", roles: STAFF_MGMT, icon: "trend" },
     ],
   },
   {

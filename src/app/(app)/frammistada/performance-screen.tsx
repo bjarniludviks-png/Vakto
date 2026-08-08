@@ -71,8 +71,12 @@ export function InsightsCard({ insights }: { insights: Insight[] }) {
   );
 }
 
-export default function PerformanceScreen({ empty = false, live = false, perf, staffing, history, insights = [] }: { empty?: boolean; live?: boolean; perf?: PerfView; staffing?: StaffingPattern; history?: PerfHistory; insights?: Insight[] }) {
+export default function PerformanceScreen({ empty = false, live = false, embedded = false, perf, staffing, history, insights = [] }: { empty?: boolean; live?: boolean; embedded?: boolean; perf?: PerfView; staffing?: StaffingPattern; history?: PerfHistory; insights?: Insight[] }) {
   const { t } = useLang();
+  // Inside the Innsyn tabs the shared header renders above us — show only actions.
+  const head = (actions?: React.ReactNode) => embedded
+    ? (actions ? <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>{actions}</div> : null)
+    : <PageHeader title="Frammistaða" subtitle="Þróun, framlegð og launasundurliðun" actions={actions} />;
   const [period, setPeriod] = useState<Period>("Mánuður");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -83,7 +87,7 @@ export default function PerformanceScreen({ empty = false, live = false, perf, s
   if (empty) {
     return (
       <>
-        <PageHeader title="Frammistaða" subtitle="Þróun, framlegð og launasundurliðun" />
+        {head()}
         <EmptyState
           title="Engin frammistöðugögn enn"
           message="Þróun, framlegð og laun% birtast hér þegar þú ert komin/n með veltu og launakeyrslur. Byrjaðu á að bæta við starfsfólki og skrá veltu."
@@ -114,7 +118,7 @@ export default function PerformanceScreen({ empty = false, live = false, perf, s
     };
     return (
       <>
-        <PageHeader title="Frammistaða" subtitle="Þróun, framlegð og launasundurliðun" />
+        {head()}
         {/* Every headline figure states its period — these are MONTH figures,
             unlike the dashboard's week figures, and must say so. */}
         <div className="kperiod">{cur ? `${t("Mánuður")}: ${cur.label}` : t("Nýjasti mánuður")}</div>
@@ -217,16 +221,12 @@ export default function PerformanceScreen({ empty = false, live = false, perf, s
   }
   return (
     <>
-      <PageHeader
-        title="Frammistaða"
-        subtitle="Þróun, framlegð og launasundurliðun"
-        actions={
-          <>
-            <button className="btn ghost sm" onClick={() => toast("Flyt út í Excel")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
-            <button className="btn ghost sm" style={{ marginLeft: 8 }} onClick={() => toast("Sæki PDF-skýrslu")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
-          </>
-        }
-      />
+      {head(
+        <>
+          <button className="btn ghost sm" onClick={() => toast("Flyt út í Excel")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
+          <button className="btn ghost sm" style={{ marginLeft: 8 }} onClick={() => toast("Sæki PDF-skýrslu")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
+        </>
+      )}
 
       <FilterBar
         periods={PERIODS} period={period} onPeriod={setPeriod}

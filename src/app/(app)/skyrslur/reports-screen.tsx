@@ -119,8 +119,11 @@ function ReportLibrary({ from, to, departments }: { from: string; to: string; de
   );
 }
 
-export default function ReportsScreen({ empty = false, live = false, rows = [], timebank }: { empty?: boolean; live?: boolean; rows?: AttRow[]; timebank?: TimeBank }) {
+export default function ReportsScreen({ empty = false, live = false, embedded = false, rows = [], timebank }: { empty?: boolean; live?: boolean; embedded?: boolean; rows?: AttRow[]; timebank?: TimeBank }) {
   const { t } = useLang();
+  const head = (actions?: React.ReactNode) => embedded
+    ? (actions ? <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>{actions}</div> : null)
+    : <PageHeader title="Skýrslur" subtitle="Greiningar og frammistaða" actions={actions} />;
   const [period, setPeriod] = useState<Period>("Vika");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -150,7 +153,7 @@ export default function ReportsScreen({ empty = false, live = false, rows = [], 
   if (empty) {
     return (
       <>
-        <PageHeader title="Skýrslur" subtitle="Greiningar og frammistaða" />
+        {head()}
         <EmptyState
           title="Engar skýrslur enn"
           message="Skýrslur byggja á vöktum, tímaskráningu og launakeyrslum. Bættu við starfsfólki og birtu vaktaplan — þá fyllast greiningarnar sjálfkrafa."
@@ -161,19 +164,15 @@ export default function ReportsScreen({ empty = false, live = false, rows = [], 
     );
   }
   // Live company: real planned vs actual + time-bank, with period/range/search.
-  if (live) return <LiveReports initial={rows} timebank={timebank} />;
+  if (live) return <LiveReports initial={rows} timebank={timebank} embedded={embedded} />;
   return (
     <>
-      <PageHeader
-        title="Skýrslur"
-        subtitle="Greiningar og frammistaða"
-        actions={
-          <>
-            <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
-            <button className="btn ghost sm" style={{ marginLeft: 8 }} disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
-          </>
-        }
-      />
+      {head(
+        <>
+          <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
+          <button className="btn ghost sm" style={{ marginLeft: 8 }} disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
+        </>
+      )}
 
       <FilterBar
         periods={PERIODS} period={period} onPeriod={setPeriod}
@@ -233,7 +232,7 @@ export default function ReportsScreen({ empty = false, live = false, rows = [], 
   );
 }
 
-function LiveReports({ initial, timebank }: { initial: AttRow[]; timebank?: TimeBank }) {
+function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[]; timebank?: TimeBank; embedded?: boolean }) {
   const { t } = useLang();
   const [period, setPeriod] = useState<Period>("Vika");
   const init0 = rangeFor("Vika");
@@ -274,12 +273,17 @@ function LiveReports({ initial, timebank }: { initial: AttRow[]; timebank?: Time
 
   return (
     <>
-      <PageHeader title="Skýrslur" subtitle="Greiningar og frammistaða" actions={
-        <>
-          <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
-          <button className="btn ghost sm" style={{ marginLeft: 8 }} disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
-        </>
-      } />
+      {(() => {
+        const acts = (
+          <>
+            <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
+            <button className="btn ghost sm" style={{ marginLeft: 8 }} disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
+          </>
+        );
+        return embedded
+          ? <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>{acts}</div>
+          : <PageHeader title="Skýrslur" subtitle="Greiningar og frammistaða" actions={acts} />;
+      })()}
       <FilterBar
         periods={["Dagur", "Vika", "Mánuður", "Sérsniðið"]}
         period={period} onPeriod={changePeriod}
