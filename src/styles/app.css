@@ -230,6 +230,10 @@ body.kioskmode .cookie{display:none}
 
 /* kpi */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+/* slim one-line stat strip (Vaktaplan) — figures without the card chrome */
+.kstrip{display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline;margin:2px 2px 14px;font-size:13px;color:var(--ink3)}
+.kstrip b{font-size:15.5px;font-weight:650;color:var(--ink);font-variant-numeric:tabular-nums;margin-left:2px}
+.kstrip .bad,.kstrip .bad b{color:var(--bad)}
 .kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow-card)}
 .kpi .lab{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--ink3)}
 .kpi .val{font-size:25px;font-weight:700;letter-spacing:-.03em;margin-top:10px;font-variant-numeric:tabular-nums}

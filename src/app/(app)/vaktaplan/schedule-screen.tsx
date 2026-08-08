@@ -99,6 +99,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   // Copied shift: code + real times, so pasting preserves them and saves.
   const [clip, setClip] = useState<{ code: string; start?: string; end?: string } | null>(null);
   const [modal, setModal] = useState<null | "types" | "addEmp" | "shift" | "ai" | "aiResult" | "staff">(null);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [targets, setTargets] = useState<number[]>(initial?.targets?.length ? initial.targets : []);
   const [aiQuery, setAiQuery] = useState("");
   const [aiProposal, setAiProposal] = useState<AiProposal | null>(null);
@@ -626,16 +627,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     <>
       <PageHeader
         title="Vaktaplan"
-        actions={
-          <>
-            <button className="btn ghost sm" onClick={exportPdf}>
-              <svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 6 }}>
-                <path d="M14 3v5h5" /><path d="M7 3h7l5 5v11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" /><path d="M9.5 13.5h1a1.2 1.2 0 0 1 0 2.4h-1V13.5Zm0 4.5v-2.1M14 13.5v4.5h.8a1.5 1.5 0 0 0 1.5-1.5v-1.5a1.5 1.5 0 0 0-1.5-1.5H14Z" />
-              </svg>{t("Sækja PDF")}
-            </button>
-            <button className="btn sm" style={{ marginLeft: 8 }} onClick={publish}>{t("Birta plan")}</button>
-          </>
-        }
+        actions={<button className="btn sm" onClick={publish}>{t("Birta plan")}</button>}
       />
 
       <div className="stoolbar">
@@ -644,7 +636,6 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
           <span className="lbl">{periodLabel}</span>
           <button onClick={() => shiftPeriod(1)}>›</button>
         </div>
-        <button className="btn ghost sm" onClick={() => setCur(parseISO(todayISO))}>{t(resetLabel)}</button>
         <div className="seg" style={{ marginLeft: 4 }}>
           {(["Vika", "Dagur", "Mánuður"] as const).map((v) => (
             <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{t(v)}</button>
@@ -662,17 +653,38 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>{t("Afrita síðustu viku")}
           </button>
         )}
-        {view === "Vika" && (
-          <button className="btn ghost sm" style={{ color: "var(--bad)" }} onClick={clearWeek}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>{t("Eyða viku")}
-          </button>
-        )}
         <button className="btn sm" onClick={() => setModal("ai")}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4Z" /></svg>{t("Biðja AI")}
         </button>
-        <button className="btn ghost sm" onClick={openNewShift}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 5v14M5 12h14" /></svg>{t("Vakt")}
-        </button>
+        <div style={{ position: "relative" }}>
+          <button className="btn ghost sm" aria-label={t("Fleiri aðgerðir")} aria-expanded={moreOpen} onClick={() => setMoreOpen((v) => !v)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+          </button>
+          {moreOpen && (
+            <>
+              <div style={{ position: "fixed", inset: 0, zIndex: 55 }} onClick={() => setMoreOpen(false)} />
+              <div className="tmenu show" style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", left: "auto" }} onClick={() => setMoreOpen(false)}>
+                <div className="mi" onClick={() => setCur(parseISO(todayISO))}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>{t(resetLabel)}
+                </div>
+                <div className="mi" onClick={openNewShift}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 5v14M5 12h14" /></svg>{t("Vakt")}
+                </div>
+                <div className="mi" onClick={exportPdf}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3v5h5" /><path d="M7 3h7l5 5v11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" /></svg>{t("Sækja PDF")}
+                </div>
+                {view === "Vika" && (
+                  <>
+                    <div className="sep" />
+                    <div className="mi danger" onClick={clearWeek}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>{t("Eyða viku")}
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {clip !== null && (
@@ -682,13 +694,14 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         </div>
       )}
 
-      <div className="kpis">
-        <div className="kpi"><div className="lab">{t(kpi.hl)}</div><div className="val">{dec1(kpi.hrs)} <small>{t("klst")}</small></div></div>
-        <div className="kpi"><div className="lab">{t("Áætl. launakostnaður")}</div><div className="val">{nf(Math.round(kpi.hrs * COST_HR))} <small>kr</small></div></div>
-        <div className="kpi"><div className="lab">{t("Áætl. álagstímar")}</div><div className="val">{dec1(estHrs.premium)} <small>{t("klst")}</small></div></div>
-        <div className="kpi"><div className="lab">{t("Áætl. yfirvinna")}</div><div className="val" style={estHrs.overtime > 0 ? { color: "var(--bad)" } : undefined}>{dec1(estHrs.overtime)} <small>{t("klst")}</small></div></div>
-        <div className="kpi"><div className="lab">{t(kpi.sl)}</div><div className="val">{kpi.shifts}{kpi.open && !liveCompany ? <small> · 2 {t("opnar")}</small> : null}</div></div>
-        <div className="kpi"><div className="lab">{t("Stöðugildi (FTE)")}</div><div className="val">{liveCompany ? (initial?.fte ?? "0,0") : "8,4"}</div></div>
+      {/* Slim one-line summary so the grid itself stays at the top of the
+          screen — the schedule is the point, the numbers just ride along. */}
+      <div className="kstrip">
+        <span>{t(kpi.hl)} <b>{dec1(kpi.hrs)}</b> {t("klst")}</span>
+        <span>{t("Áætl. launakostnaður")} <b>{nf(Math.round(kpi.hrs * COST_HR))}</b> kr</span>
+        <span>{t("Áætl. álagstímar")} <b>{dec1(estHrs.premium)}</b> {t("klst")}</span>
+        <span className={estHrs.overtime > 0 ? "bad" : ""}>{t("Áætl. yfirvinna")} <b>{dec1(estHrs.overtime)}</b> {t("klst")}</span>
+        <span>{t(kpi.sl)} <b>{kpi.shifts}</b>{kpi.open && !liveCompany ? <> · 2 {t("opnar")}</> : null}</span>
       </div>
 
       {view === "Vika" && (
@@ -861,11 +874,11 @@ function DayView({ day, col, rows, onAdd }: { day: Date; col: number; rows: DayR
   const tot = rows.reduce((a, x) => a + x.h, 0);
   return (
     <div style={{ marginTop: 16 }}>
-      <div className="kpis">
-        <div className="kpi"><div className="lab">{t("Á vakt")}</div><div className="val">{rows.length}</div></div>
-        <div className="kpi"><div className="lab">{t("Tímar dagsins")}</div><div className="val">{dec1(tot)} <small>{t("klst")}</small></div></div>
-        <div className="kpi"><div className="lab">{t("Kostnaður dagsins")}</div><div className="val">{nf(Math.round(tot * COST_HR))} <small>kr</small></div></div>
-        <div className="kpi"><div className="lab">{t("Mönnunarþörf")}</div><div className="val">{rows.length} <small>/ 6</small></div></div>
+      <div className="kstrip">
+        <span>{t("Á vakt")} <b>{rows.length}</b></span>
+        <span>{t("Tímar dagsins")} <b>{dec1(tot)}</b> {t("klst")}</span>
+        <span>{t("Kostnaður dagsins")} <b>{nf(Math.round(tot * COST_HR))}</b> kr</span>
+        <span>{t("Mönnunarþörf")} <b>{rows.length}</b> / 6</span>
       </div>
       <div className="card" style={{ marginTop: 16 }}>
         <div className="ch"><div><div className="ct">{t(DAYNAMES[col])} {day.getDate()}. {t(MONTHS_IS[day.getMonth()])}</div><div className="cs">{t("smelltu á vakt til að færa eða breyta")}</div></div><button className="btn sm" onClick={onAdd}>{t("+ Bæta við vakt")}</button></div>
