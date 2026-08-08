@@ -74,6 +74,21 @@ export async function sendWelcomeEmail(to: string, name: string, company: string
   });
 }
 
+export async function sendSchedulePublishedEmail(to: string, name: string, company: string) {
+  const first = (name || "").split(/\s+/)[0] || "";
+  return sendEmail({
+    to,
+    subject: "Nýtt vaktaplan í VAKTO",
+    html: template({
+      heading: `Vaktaplanið þitt er komið${first ? ", " + first : ""}`,
+      preheader: `${company} birti nýtt vaktaplan.`,
+      body: `<b>${company}</b> birti nýtt vaktaplan. Opnaðu Mitt svæði til að sjá vaktirnar þínar.`,
+      ctaLabel: "Sjá vaktirnar mínar",
+      ctaHref: `${APP_URL}/mitt-svaedi`,
+    }),
+  });
+}
+
 export async function sendInviteEmail(to: string, company: string, roleLabel: string, link: string) {
   return sendEmail({
     to,

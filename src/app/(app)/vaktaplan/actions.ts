@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
 import { notifyEmployee } from "@/lib/push";
+import { sendSchedulePublishedEmail } from "@/lib/email";
 import { getEmployees } from "@/lib/employees.server";
 import { initials as empInitials } from "@/lib/employees";
 
@@ -30,7 +31,7 @@ export async function publishSchedule(shifts: ShiftInput[]): Promise<PublishResu
 
     // Resolve employees + shift types once.
     const { data: emps } = await supabase
-      .from("employees").select("id, full_name").eq("company_id", company);
+      .from("employees").select("id, full_name, email").eq("company_id", company);
     const { data: types } = await supabase
       .from("shift_types").select("id, name").eq("company_id", company);
     const empId = (name: string) =>
@@ -62,9 +63,13 @@ export async function publishSchedule(shifts: ShiftInput[]): Promise<PublishResu
     await logAudit(supabase, company, user.id, {
       action: "schedule.publish", entity: "shifts", detail: `Vaktaplan birt — ${rows.length} vaktir`,
     });
-    // Notify each scheduled employee (best-effort).
+    // Notify each scheduled employee (best-effort): push + email.
+    const { data: co } = await supabase.from("companies").select("name").eq("id", company).maybeSingle();
+    const companyName = (co?.name as string) || "Fyrirtækið þitt";
     for (const eid of [...new Set(rows.map((r) => r.employee_id).filter(Boolean))] as string[]) {
       void notifyEmployee(eid, { title: "Nýtt vaktaplan", body: "Vaktaplanið þitt hefur verið uppfært.", url: "/mitt-svaedi", tag: "schedule" });
+      const emp = emps?.find((e) => e.id === eid);
+      if (emp?.email) void sendSchedulePublishedEmail(emp.email as string, emp.full_name as string, companyName);
     }
     revalidatePath("/vaktaplan");
     return { ok: true, count: rows.length };
