@@ -103,7 +103,7 @@ function presetRange(k: string): { from: string; to: string } {
   return { from: isoD(mon), to: isoD(sun) };
 }
 
-export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding, live = false, onNow = [], missing = [] }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean; onNow?: OnNow[]; missing?: Missing[] }) {
+export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding, live = false, onNow = [], missing = [], pending = 0 }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean; onNow?: OnNow[]; missing?: Missing[]; pending?: number }) {
   const { t } = useLang();
   const [chartSeg, setChartSeg] = useState("Vika");
   const [hideOnb, setHideOnb] = useState(false);
@@ -305,15 +305,30 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
             <div>
               <div className="lab">{t("Laun af tekjum")}</div>
               <div className="val" style={{ fontSize: 22 }}>{lp === 0 ? "—" : <>{dec1(lp)}<small>%</small></>}</div>
-              {revenueStr
-                ? <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{t("Velta")} {revenueStr} · {sourceLabel} · <Link href="/stillingar?new=revenue" style={{ color: "var(--brand)", fontWeight: 600, textDecoration: "none" }}>{t("breyta")}</Link></div>
-                : <Link href="/stillingar?new=revenue" className="muted" style={{ fontSize: 11.5, fontWeight: 600, color: "var(--brand)", textDecoration: "none", display: "inline-block", marginTop: 2 }}>{t("Skrá veltu")}</Link>}
+              <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{t("markmið 30%")}</div>
             </div>
+          </div>
+          <div className="kpi">
+            <div className="lab">{t("Velta (tímabil)")}</div>
+            <div className="val">{revenueStr || "—"}</div>
+            {revenueStr
+              ? <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{sourceLabel} · <Link href="/stillingar?new=revenue" style={{ color: "var(--brand)", fontWeight: 600, textDecoration: "none" }}>{t("breyta")}</Link></div>
+              : <Link href="/stillingar?new=revenue" className="muted" style={{ fontSize: 11.5, fontWeight: 600, color: "var(--brand)", textDecoration: "none", display: "inline-block", marginTop: 2 }}>{t("Skrá veltu")}</Link>}
           </div>
           <div className="kpi"><div className="lab">{t("Yfirvinnukostnaður")}</div><div className="val" style={pd?.ok && pd.overtimePay > 0 ? { color: "var(--bad)" } : undefined}>{overtimePayStr}</div><div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{t("umfram grunnlaun")}</div></div>
           <div className="kpi"><div className="lab">{t("Álagstímar")}</div><div className="val">{premiumH} <small>{t("klst")}</small></div><div className="muted" style={{ fontSize: 11.5, fontWeight: 600, marginTop: 2 }}>{premiumPayStr}</div></div>
           <div className="kpi"><div className="lab">{t("Launatengd gjöld")}</div><div className="val">{leviesStr}</div><div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{t("tryggingagjald, lífeyrir o.fl.")}</div></div>
           <div className="kpi"><div className="lab">{t("Kostnaður á klst")}</div><div className="val">{costPerHourStr}</div><div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{t("meðaltal m. byrði")}</div></div>
+          <div className="kpi">
+            <div className="lab">{t("Á vakt núna")}</div>
+            <div className="val" style={onNow.length > 0 ? { color: "var(--good)" } : undefined}>{onNow.length}</div>
+            <div className="muted" style={{ fontSize: 11.5, marginTop: 2 }}>{t("skráðir inn í rauntíma")}</div>
+          </div>
+          <div className="kpi">
+            <div className="lab">{t("Beiðnir í bið")}</div>
+            <div className="val" style={pending > 0 ? { color: "var(--warn)" } : undefined}>{pending}</div>
+            <Link href="/vaktaplan" className="muted" style={{ fontSize: 11.5, fontWeight: 600, color: "var(--brand)", textDecoration: "none", display: "inline-block", marginTop: 2 }}>{t("afgreiða í Vaktaplani")}</Link>
+          </div>
         </div>
 
         {/* comparison charts — empty until history accrues */}
