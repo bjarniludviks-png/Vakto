@@ -603,7 +603,7 @@ export const DICT: Dict = {
   "væntanlegt": { is: "í þróun", en: "coming soon" },
   "Mótframlag lífeyris": { is: "Mótframlag í lífeyrissjóð", en: "Employer pension match" },
   "Launatímabil": { is: "Uppsetning launatímabila", en: "Payroll cycle parameters" },
-  "Tengingar": { is: "Samþættingar (Integrations)", en: "System integrations" },
+  "Tengingar": { is: "Tengingar", en: "Integrations" },
   "launakeyrsla & skil": { is: "launakeyrsla og opinber skil", en: "payroll automation & reporting" },
   "tengt": { is: "tengt", en: "Connected" },
   "velta í rauntíma — laun vs velta · smelltu til að sækja veltu": { is: "velta í rauntíma — samanburður á launum og veltu · smelltu til að samstilla", en: "real-time revenue — labor tracking vs. sales analytics · click to pull current sales data" },

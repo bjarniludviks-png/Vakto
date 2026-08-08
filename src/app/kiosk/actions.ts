@@ -22,7 +22,7 @@ export async function getKioskData(companyId: string): Promise<KioskData | null>
     if (!company) return null;
     const { data: emps } = await admin
       .from("employees").select("id, full_name, avatar_color")
-      .eq("company_id", companyId).eq("status", "active").order("full_name");
+      .eq("company_id", companyId).in("status", ["active", "over_ratio"]).order("full_name");
     if (!emps) return { company: company.name as string, employees: [] };
 
     // Open punches (clocked in now).

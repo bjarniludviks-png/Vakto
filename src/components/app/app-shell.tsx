@@ -48,6 +48,7 @@ export default function AppShell({
   }
   const [pos, setPos] = useState<MenuPos>(null);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatSeen, setChatSeen] = useState(true); // resolved on mount from localStorage
   const [roleModal, setRoleModal] = useState(false);
   // Owner can preview the app as another role (account menu → Skipta um hlutverk).
   const [role, setRoleState] = useState<Role>(account.role);
@@ -61,9 +62,11 @@ export default function AppShell({
     const isDark = localStorage.getItem("vakto-theme") === "dark";
     if (isDark) document.documentElement.classList.add("dark");
     const rail = localStorage.getItem("vakto-rail") === "1";
+    const seen = localStorage.getItem("vakto-support-seen") === "1";
     requestAnimationFrame(() => {
       if (isDark) setDark(true);
       if (rail) setRailed(true);
+      if (!seen) setChatSeen(false);
     });
   }, []);
   function toggleRail() {
@@ -335,10 +338,11 @@ export default function AppShell({
       <button
         className={`fab${pathname.startsWith("/spjall") ? " fab-up" : ""}`}
         title="Aðstoð"
-        onClick={() => setChatOpen((o) => !o)}
+        onClick={() => { setChatOpen((o) => !o); setChatSeen(true); try { localStorage.setItem("vakto-support-seen", "1"); } catch {} }}
       >
         <Icon name="chat" />
-        {!chatOpen && <span className="fdot">1</span>}
+        {/* the dot invites a first visit — a permanent fake "1" trains users to ignore red badges */}
+        {!chatOpen && !chatSeen && <span className="fdot">1</span>}
       </button>
 
       {/* ---------- company picker (Payday-style) ---------- */}
