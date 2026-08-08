@@ -8,6 +8,7 @@ import { notifyEmployee } from "@/lib/push";
 import { sendSchedulePublishedEmail } from "@/lib/email";
 import { getEmployees } from "@/lib/employees.server";
 import { initials as empInitials } from "@/lib/employees";
+import { getWeekUnavail } from "./schedule.server";
 
 export type ShiftInput = {
   employeeName: string; // first name as shown in the grid
@@ -92,7 +93,7 @@ function weekCodeForStart(start: string | null): string {
 /** Load the grid (employee × 7 days) for a specific week, aligned to the
  * full_name-ordered employee list (same order the screen renders). Returns
  * both the coarse code grid (for colour) and the real start/end times per cell. */
-export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][]; times: Record<string, { start: string; end: string }>; names?: string[]; inits?: string[] }> {
+export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][]; times: Record<string, { start: string; end: string }>; names?: string[]; inits?: string[]; unavail?: Record<string, number[]> }> {
   if (!isSupabaseConfigured()) return { ok: false, grid: [], times: {} };
   try {
     const supabase = await createClient();
@@ -125,7 +126,8 @@ export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; gri
     // the plan) — return names so it can remap rows instead of assuming order.
     const names = employees.map((e) => e.fullName.split(/\s+/)[0]);
     const inits = employees.map((e) => empInitials(e.fullName));
-    return { ok: true, grid, times, names, inits };
+    const unavail = await getWeekUnavail(dates);
+    return { ok: true, grid, times, names, inits, unavail };
   } catch {
     return { ok: false, grid: [], times: {} };
   }

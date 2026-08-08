@@ -100,6 +100,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [clip, setClip] = useState<{ code: string; start?: string; end?: string } | null>(null);
   const [modal, setModal] = useState<null | "types" | "addEmp" | "shift" | "ai" | "aiResult" | "staff">(null);
   const [moreOpen, setMoreOpen] = useState(false);
+  // Registered UN-availability (first name, lowercase → day indices) for the visible week.
+  const [unavail, setUnavail] = useState<Record<string, number[]>>(initial?.unavail ?? {});
   const [targets, setTargets] = useState<number[]>(initial?.targets?.length ? initial.targets : []);
   const [aiQuery, setAiQuery] = useState("");
   const [aiProposal, setAiProposal] = useState<AiProposal | null>(null);
@@ -190,7 +192,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
    * different order — remap by (initials, first name) so shifts never land on
    * the wrong employee. Employees with shifts who aren't on the plan yet are
    * pulled in from the pool. */
-  function applyWeek(res: { grid: string[][]; times?: Record<string, { start: string; end: string }>; names?: string[]; inits?: string[] }) {
+  function applyWeek(res: { grid: string[][]; times?: Record<string, { start: string; end: string }>; names?: string[]; inits?: string[]; unavail?: Record<string, number[]> }) {
+    if (res.unavail) setUnavail(res.unavail);
     if (!res.names || !res.inits) { setGrid(res.grid); setCellTimes(res.times ?? {}); return; }
     const { names, inits } = res;
     const keyOf = (e: Emp) => `${e[0]}|${e[1]}`;
@@ -728,16 +731,19 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                           <button className="rmemp" title={t("Fjarlægja af plani")} onClick={() => removeEmpRow(r)}>✕</button>
                         </div>
                       </td>
-                      {grid[r].map((s, c) => (
+                      {grid[r].map((s, c) => {
+                        const isUnav = (unavail[e[1].toLowerCase()] ?? []).includes(c);
+                        return (
                         <td
                           key={c}
-                          className={c === todayCol ? "tod" : ""}
+                          className={`${c === todayCol ? "tod" : ""}${isUnav ? (s === "off" ? " unav" : " unav conf") : ""}`}
                           onDragOver={(ev) => { ev.preventDefault(); ev.currentTarget.classList.add("cellh"); }}
                           onDragLeave={(ev) => ev.currentTarget.classList.remove("cellh")}
                           onDrop={(ev) => { ev.preventDefault(); ev.currentTarget.classList.remove("cellh"); dropOn(r, c); }}
                         >
                           <div
                             className={`shift ${SH[s].c}`}
+                            title={isUnav ? (s === "off" ? t("Skráð ólaus þennan dag") : t("ATH: skráð ólaus þennan dag — árekstur")) : undefined}
                             draggable
                             onDragStart={() => setDrag({ r, c })}
                             onClick={() => cellClick(r, c)}
@@ -745,7 +751,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                             {s === "off" ? t("Frí") : <>{cellLabel(r, c, s)}<small>{SH[s].s ? t("sh:" + SH[s].s) :" "}</small></>}
                           </div>
                         </td>
-                      ))}
+                        );
+                      })}
                       <td className="r rowsum">{dec1(grid[r].reduce((a, s, c) => (s && s !== "off" ? a + cellHrs(r, c, s) : a), 0))}</td>
                     </tr>
                   );

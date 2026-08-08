@@ -7,7 +7,7 @@ import { dec1 } from "@/lib/format";
 
 export type Emp4 = [string, string, string, string]; // initials, first name, dept, color
 export type ShiftTypeView = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
-export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string; todayISO: string; targets: number[] };
+export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string; todayISO: string; targets: number[]; unavail: Record<string, number[]> };
 
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 // 7 ISO dates for the (Mon-start) week containing `ref`.
@@ -114,8 +114,45 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
     });
 
     const fte = dec1(employees.reduce((a, e) => a + e.employmentRatio, 0) / 100);
-    return { emp, grid: gridOut, times: timesOut, types, pool, fte, company: companyName, todayISO, targets };
+    const unavail = await getWeekUnavail(WEEK_DATES);
+    return { emp, grid: gridOut, times: timesOut, types, pool, fte, company: companyName, todayISO, targets, unavail };
   } catch {
     return null;
+  }
+}
+
+/** Registered UN-availability per employee first name (lowercase) for a week —
+ * day indices 0=Mán … 6=Sun. Weekday rules + date ranges from `availability`
+ * (Mitt svæði → Skrá framboð). Empty map on any failure. */
+export async function getWeekUnavail(weekDates: string[]): Promise<Record<string, number[]>> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return {};
+    const { data: profile } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
+    const company = profile?.company_id as string | undefined;
+    if (!company) return {};
+    const { data: av } = await supabase
+      .from("availability")
+      .select("available, weekdays, from_date, to_date, employees(full_name)")
+      .eq("company_id", company).eq("available", false);
+    const out: Record<string, number[]> = {};
+    for (const a of av ?? []) {
+      const full = (a.employees as unknown as { full_name?: string } | null)?.full_name ?? "";
+      const name = full.split(/\s+/)[0]?.toLowerCase();
+      if (!name) continue;
+      for (let c = 0; c < 7; c++) {
+        const date = weekDates[c];
+        const inRange = (!a.from_date || date >= (a.from_date as string)) && (!a.to_date || date <= (a.to_date as string));
+        if (!inRange) continue;
+        const wd = (a.weekdays ?? []) as number[];
+        if (wd.length === 0 || wd.includes(c)) {
+          if (!(out[name] ?? []).includes(c)) (out[name] ??= []).push(c);
+        }
+      }
+    }
+    return out;
+  } catch {
+    return {};
   }
 }

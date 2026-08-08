@@ -275,6 +275,8 @@ export const DICT: Dict = {
   "Svona sendir kerfið þitt inn veltu:": { is: "Svona sendir kerfið þitt inn veltu:", en: "This is how your system pushes revenue:" },
   "Lokið": { is: "Lokið", en: "Done" },
   "Gefðu tengingunni nafn": { is: "Gefðu tengingunni nafn", en: "Name the connection" },
+  "Skráð ólaus þennan dag": { is: "Skráð ólaus þennan dag", en: "Registered unavailable this day" },
+  "ATH: skráð ólaus þennan dag — árekstur": { is: "ATH: skráð ólaus þennan dag — árekstur", en: "NOTE: registered unavailable this day — conflict" },
   "afgreiða í Vaktaplani": { is: "afgreiða í Vaktaplani", en: "handle in Schedule" },
   " o.fl.": { is: " o.fl.", en: " and more" },
   "Sölukerfi": { is: "Sölukerfi", en: "POS system" },
