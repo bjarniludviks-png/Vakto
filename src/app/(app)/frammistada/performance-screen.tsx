@@ -115,11 +115,14 @@ export default function PerformanceScreen({ empty = false, live = false, perf, s
     return (
       <>
         <PageHeader title="Frammistaða" subtitle="Þróun, framlegð og launasundurliðun" />
+        {/* Every headline figure states its period — these are MONTH figures,
+            unlike the dashboard's week figures, and must say so. */}
+        <div className="kperiod">{cur ? `${t("Mánuður")}: ${cur.label}` : t("Nýjasti mánuður")}</div>
         <div className="kpis">
-          <div className="kpi"><div className="lab">{t("Velta")}</div><div className="val">{kRevenue} <small>m kr</small></div></div>
-          <div className="kpi"><div className="lab">{t("Launakostnaður (byrði)")}</div><div className="val">{kCost} <small>m kr</small></div></div>
+          <div className="kpi"><div className="lab">{t("Velta")} <small>/{t("mán")}</small></div><div className="val">{kRevenue} <small>m.kr.</small></div></div>
+          <div className="kpi"><div className="lab">{t("Launakostnaður (byrði)")} <small>/{t("mán")}</small></div><div className="val">{kCost} <small>m.kr.</small></div></div>
           <div className="kpi"><div className="lab">{t("Laun af tekjum")}</div><div className="val" style={{ color: lpColor }}>{lp > 0 ? dec1(lp) + "%" : "—"}</div></div>
-          <div className="kpi"><div className="lab">{t("Framlegð")}</div><div className="val">{kMargin} <small>m kr</small></div></div>
+          <div className="kpi"><div className="lab">{t("Framlegð")} <small>/{t("mán")}</small></div><div className="val">{kMargin} <small>m.kr.</small></div></div>
         </div>
 
         {months.length > 0 && (
@@ -234,10 +237,10 @@ export default function PerformanceScreen({ empty = false, live = false, perf, s
       />
 
       <div className="kpis">
-        <div className="kpi"><div className="lab">{t("Velta")}</div><div className="val">{dec1(18.6 * f)} <small>m kr</small></div><div className="d up">▲ 6,2% <span className="muted" style={{ fontWeight: 500 }}>{t("vs")} {t(period)}</span></div></div>
-        <div className="kpi"><div className="lab">{t("Launakostnaður (byrði)")}</div><div className="val">{dec1(7.39 * f)} <small>m kr</small></div><div className="d dn">▲ 3,1% <span className="muted" style={{ fontWeight: 500 }}>{t("vs")} {t(period)}</span></div></div>
+        <div className="kpi"><div className="lab">{t("Velta")}</div><div className="val">{dec1(18.6 * f)} <small>m.kr.</small></div><div className="d up">▲ 6,2% <span className="muted" style={{ fontWeight: 500 }}>{t("vs")} {t(period)}</span></div></div>
+        <div className="kpi"><div className="lab">{t("Launakostnaður (byrði)")}</div><div className="val">{dec1(7.39 * f)} <small>m.kr.</small></div><div className="d dn">▲ 3,1% <span className="muted" style={{ fontWeight: 500 }}>{t("vs")} {t(period)}</span></div></div>
         <div className="kpi"><div className="lab">{t("Laun af tekjum")}</div><div className="val" style={{ color: "var(--warn)" }}>39,7%</div><div className="d up">▼ 1,2 {t("stig")} <span className="muted" style={{ fontWeight: 500 }}>{t("batnar")}</span></div></div>
-        <div className="kpi"><div className="lab">{t("Framlegð")}</div><div className="val">{dec1(11.2 * f)} <small>m kr</small></div><div className="d up">▲ 4,1% <span className="muted" style={{ fontWeight: 500 }}>{t("vs")} {t(period)}</span></div></div>
+        <div className="kpi"><div className="lab">{t("Framlegð")}</div><div className="val">{dec1(11.2 * f)} <small>m.kr.</small></div><div className="d up">▲ 4,1% <span className="muted" style={{ fontWeight: 500 }}>{t("vs")} {t(period)}</span></div></div>
       </div>
 
       <div className="card" style={{ marginTop: 20 }}>

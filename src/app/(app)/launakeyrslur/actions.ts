@@ -76,7 +76,7 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
 
 /** Period payroll view from approved hours — drives the screen's period selector. */
 export async function getPayrollPeriod(from: string, to: string): Promise<PeriodPayroll> {
-  const empty: PeriodPayroll = { rows: [], totals: { count: 0, hours: "0", gross: "0", withholding: "0", pensionUnion: "0", net: "0", cost: "0", grossM: "0", netM: "0", costM: "0", withholdingM: "0" }, live: false, needsMigration: false, periodLabel: `${niceISO(from)} – ${niceISO(to)}`, from, to };
+  const empty: PeriodPayroll = { rows: [], totals: { count: 0, hours: "0", gross: "0", withholding: "0", pensionUnion: "0", net: "0", cost: "0", grossM: "0", netM: "0", costM: "0", withholdingM: "0", insuranceM: "0" }, live: false, needsMigration: false, periodLabel: `${niceISO(from)} – ${niceISO(to)}`, from, to };
   if (!isSupabaseConfigured()) return empty;
   try {
     const supabase = await createClient();
@@ -95,7 +95,7 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
       totals: {
         count: lines.length, hours: dec1(t.hours), gross: nf(t.gross), withholding: "−" + nf(t.withholding),
         pensionUnion: "−" + nf(t.pension + t.union), net: nf(t.net), cost: nf(t.cost),
-        grossM: million(t.gross), netM: million(t.net), costM: million(t.cost), withholdingM: million(t.withholding),
+        grossM: million(t.gross), netM: million(t.net), costM: million(t.cost), withholdingM: million(t.withholding), insuranceM: million(Math.round(t.gross * 0.0635)),
       },
       live: true, needsMigration, periodLabel: `${niceISO(from)} – ${niceISO(to)}`, from, to,
     };

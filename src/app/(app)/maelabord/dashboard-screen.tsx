@@ -454,7 +454,7 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
             <Link href="/stillingar?new=revenue" className="muted" style={{ fontSize: 11.5, fontWeight: 600, color: "var(--brand)", textDecoration: "none", display: "inline-block", marginTop: 2 }}>{t("Skrá veltu")}</Link>
           </div>
         </div>
-        <div className="kpi"><div className="lab">{t("Launakostnaður (vika)")}</div><div className="val">{laborCostWeek} <small>m kr</small></div><div className="d dn">▲ 3,0% <span className="muted" style={{ fontWeight: 500 }}>{t("vs fyrri viku")}</span></div></div>
+        <div className="kpi"><div className="lab">{t("Launakostnaður (vika)")}</div><div className="val">{laborCostWeek} <small>m.kr.</small></div><div className="d dn">▲ 3,0% <span className="muted" style={{ fontWeight: 500 }}>{t("vs fyrri viku")}</span></div></div>
         <div className="kpi"><div className="lab">{t("Unnir tímar (vika)")}</div><div className="val">{hoursWeek} <small>{t("/ 368 áætl")}</small></div><div className="d dn">+6 {t("klst")} <span className="muted" style={{ fontWeight: 500 }}>{t("yfir plani")}</span></div></div>
         <div className="kpi"><div className="lab">{t("Yfirvinna (vika)")}</div><div className="val">18 <small>{t("klst")}</small></div><div className="d dn">▲ 4 {t("klst")} <span className="muted" style={{ fontWeight: 500 }}>{t("vs fyrri viku")}</span></div></div>
       </div>
@@ -512,9 +512,9 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
       </div>
       <div className="kpis">
         <div className="kpi"><div className="lab">{t("Unnir tímar")}</div><div className="val">1.968</div><div className="d mut">+1,2% {t("vs maí")}</div></div>
-        <div className="kpi"><div className="lab">{t("Launakostn. (byrði)")}</div><div className="val">7,39 <small>m kr</small></div><div className="d dn">▲ 3,1% <span className="muted" style={{ fontWeight: 500 }}>{t("vs maí")}</span></div></div>
+        <div className="kpi"><div className="lab">{t("Launakostn. (byrði)")}</div><div className="val">7,39 <small>m.kr.</small></div><div className="d dn">▲ 3,1% <span className="muted" style={{ fontWeight: 500 }}>{t("vs maí")}</span></div></div>
         <div className="kpi"><div className="lab">{t("Laun% (með byrði)")}</div><div className="val" style={{ color: "var(--warn)" }}>39,7%</div><div className="d up">▼ 1,2 {t("stig")} <span className="muted" style={{ fontWeight: 500 }}>{t("batnar")}</span></div></div>
-        <div className="kpi"><div className="lab">{t("Launaspá (mánuður)")}</div><div className="val">5,68 <small>m kr</small></div><div className="d mut">{t("brúttó · fyrir byrði")}</div></div>
+        <div className="kpi"><div className="lab">{t("Launaspá (mánuður)")}</div><div className="val">5,68 <small>m.kr.</small></div><div className="d mut">{t("brúttó · fyrir byrði")}</div></div>
       </div>
     </>
   );

@@ -101,7 +101,7 @@ export default function PayrollScreen({ view, empty = false }: { view: PayrollVi
             <span className="ar">·</span>
             <div className="fs"><div className="l">{t("Unnir tímar")}</div><div className="v">{T.hours}</div></div>
             <span className="ar">·</span>
-            <div className="fs"><div className="l">{t("Brúttó")}</div><div className="v">{T.grossM} <small style={{ fontSize: 14, color: "var(--ink3)", fontWeight: 600 }}>m</small></div></div>
+            <div className="fs"><div className="l">{t("Brúttó")}</div><div className="v">{T.grossM} <small style={{ fontSize: 14, color: "var(--ink3)", fontWeight: 600 }}>m.kr.</small></div></div>
           </div>
           <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
             <button className="btn ghost sm" onClick={() => toast("Forskoða launakeyrslu")}>{t("Forskoða")}</button>
@@ -115,10 +115,10 @@ export default function PayrollScreen({ view, empty = false }: { view: PayrollVi
       )}
 
       <div className="kpis">
-        <div className="kpi"><div className="lab">{t("Útborgað")}</div><div className="val">{T.netM} <small>m kr</small></div></div>
-        <div className="kpi"><div className="lab">{t("Heildarkostnaður")}</div><div className="val">{T.costM} <small>m kr</small></div><div className="d mut">+30,2% {t("byrði")}</div></div>
-        <div className="kpi"><div className="lab">{t("Staðgreiðsla")}</div><div className="val">{T.withholdingM} <small>m kr</small></div></div>
-        <div className="kpi"><div className="lab">{t("Tryggingagjald")}</div><div className="val">0,40 <small>m kr</small></div></div>
+        <div className="kpi"><div className="lab">{t("Útborgað")}</div><div className="val">{T.netM} <small>m.kr.</small></div></div>
+        <div className="kpi"><div className="lab">{t("Heildarkostnaður")}</div><div className="val">{T.costM} <small>m.kr.</small></div><div className="d mut">+30,2% {t("byrði")}</div></div>
+        <div className="kpi"><div className="lab">{t("Staðgreiðsla")}</div><div className="val">{T.withholdingM} <small>m.kr.</small></div></div>
+        <div className="kpi"><div className="lab">{t("Tryggingagjald")}</div><div className="val">{T.insuranceM} <small>m.kr.</small></div></div>
       </div>
 
       <div className="card" style={{ marginTop: 20 }}>

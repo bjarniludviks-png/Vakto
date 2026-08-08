@@ -7,7 +7,7 @@ import { initials } from "@/lib/employees";
 import { nf, dec1 } from "@/lib/format";
 
 export type PayrollRow = { n: string; av: string; c: string; h: string; g: string; w: string; p: string; net: string };
-export type PayrollTotalsView = { count: number; hours: string; gross: string; withholding: string; pensionUnion: string; net: string; cost: string; grossM: string; netM: string; costM: string; withholdingM: string };
+export type PayrollTotalsView = { count: number; hours: string; gross: string; withholding: string; pensionUnion: string; net: string; cost: string; grossM: string; netM: string; costM: string; withholdingM: string; insuranceM: string };
 export type PayrollView = { rows: PayrollRow[]; totals: PayrollTotalsView; live: boolean };
 
 // Demo rows mirror the prototype (5 shown) — used before Supabase is connected.
@@ -19,7 +19,7 @@ const DEMO: PayrollView = {
     { n: "Jón", av: "JÓ", c: "#8b7bff", h: "160,0", g: "560.000", w: "−118.600", p: "−28.000", net: "413.400" },
     { n: "Ómar", av: "ÓM", c: "#e0533f", h: "148,0", g: "528.700", w: "−110.300", p: "−26.435", net: "391.965" },
   ],
-  totals: { count: 12, hours: "1.968", gross: "5.676.918", withholding: "−986.300", pensionUnion: "−283.846", net: "4.460.772", cost: "7.389.405", grossM: "5,68", netM: "4,46", costM: "7,39", withholdingM: "0,99" },
+  totals: { count: 12, hours: "1.968", gross: "5.676.918", withholding: "−986.300", pensionUnion: "−283.846", net: "4.460.772", cost: "7.389.405", grossM: "5,68", netM: "4,46", costM: "7,39", withholdingM: "0,99", insuranceM: "0,36" },
   live: false,
 };
 
@@ -97,6 +97,7 @@ export async function getPayroll(): Promise<PayrollView> {
         netM: million(t.net),
         costM: million(t.cost),
         withholdingM: million(t.withholding),
+        insuranceM: million(Math.round(t.gross * 0.0635)),
       },
       live: true,
     };

@@ -247,6 +247,8 @@ export const DICT: Dict = {
   "söluvelta úr POS í rauntíma": { is: "söluvelta úr POS í rauntíma", en: "POS sales revenue in real time" },
   "Fleiri sölukerfi": { is: "Fleiri sölukerfi", en: "More POS systems" },
   "Fleiri aðgerðir": { is: "Fleiri aðgerðir", en: "More actions" },
+  "mán": { is: "mán", en: "mo" },
+  "Nýjasti mánuður": { is: "Nýjasti mánuður", en: "Latest month" },
   " o.fl.": { is: " o.fl.", en: " and more" },
   "Sölukerfi": { is: "Sölukerfi", en: "POS system" },
   "VAKTO les veltu í rauntíma úr sölukerfinu þínu og reiknar launahlutfall jafnóðum. Veldu hvað þú vilt fylgjast með:": { is: "VAKTO les veltu í rauntíma úr sölukerfinu þínu og reiknar launahlutfall jafnóðum. Veldu hvað þú vilt fylgjast með:", en: "VAKTO reads revenue from your POS in real time and computes labor % on the fly. Choose what to track:" },
