@@ -95,6 +95,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [cur, setCur] = useState(() => parseISO(initial?.todayISO ?? DEMO_TODAY)); // anchor day
   const [sel, setSel] = useState<{ r: number; c: number }>({ r: 0, c: 0 });
   const [monthShifts, setMonthShifts] = useState<Record<string, { first: string; start: string; end: string }[]>>({});
+  const [monthVer, setMonthVer] = useState(0);
+  const [dayModal, setDayModal] = useState<Date | null>(null);
+  const monthDragRef = useRef<{ first: string; start: string; end: string; fromISO: string } | null>(null);
   const [drag, setDrag] = useState<{ r: number; c: number } | null>(null);
   // Copied shift: code + real times, so pasting preserves them and saves.
   const [clip, setClip] = useState<{ code: string; start?: string; end?: string } | null>(null);
@@ -282,7 +285,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       setMonthShifts(map);
     });
     return () => { cancelled = true; };
-  }, [liveCompany, view, cur]);
+  }, [liveCompany, view, cur, monthVer]);
 
   const d0 = weekDays[0], d6 = weekDays[6];
   const wklbl = d0.getMonth() === d6.getMonth()
@@ -578,6 +581,27 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     return out;
   }
 
+  // Entries (with real times) for one day — used by the month popup editor.
+  const norm = (x: string) => (x.length === 2 ? x + ":00" : x.slice(0, 5));
+  function entriesFor(date: Date): { first: string; start: string; end: string }[] {
+    const iso = fmtISO(date);
+    if (liveCompany) return (monthShifts[iso] ?? []).map((x) => ({ first: x.first, start: norm(x.start), end: norm(x.end) }));
+    return monthBlocks(iso, (date.getDay() + 6) % 7).map((b) => {
+      const [a, z] = b.time.split("–");
+      return { first: b.name, start: norm(a ?? "08:00"), end: norm(z ?? "16:00") };
+    });
+  }
+  const typeGuessFor = (start: string) => types.find((x) => x.t.startsWith(start))?.nm ?? types[0]?.nm ?? "Dagvakt";
+  async function moveMonthShift(toISO: string) {
+    const d = monthDragRef.current; monthDragRef.current = null;
+    if (!d || d.fromISO === toISO) return;
+    const r1 = await saveShift({ employeeName: d.first, date: toISO, startTime: d.start, endTime: d.end, shiftTypeName: typeGuessFor(d.start) });
+    if (!r1.ok) { toast(r1.error ?? "Villa"); return; }
+    if (!r1.demo) await deleteShift({ employeeName: d.first, dateISO: d.fromISO });
+    setMonthVer((v) => v + 1);
+    toast(r1.demo ? t("Vakt færð (demo)") : t("Vakt færð"));
+  }
+
   async function exportPdf() {
     toast("Bý til PDF…");
     let dates: string[] = [], dayLabels: string[] = [], subtitle = "";
@@ -794,7 +818,13 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       )}
 
       {view === "Dagur" && <DayView day={cur} col={curCol} rows={colShifts(curCol)} onAdd={openNewShift} />}
-      {view === "Mánuður" && <MonthView monthDate={cur} todayISO={todayISO} blocks={monthBlocks} onOpenDay={(d) => { setCur(d); setView("Dagur"); }} />}
+      {view === "Mánuður" && <MonthView monthDate={cur} todayISO={todayISO} blocks={monthBlocks}
+        onEdit={(d) => setDayModal(d)}
+        onDragBlock={(b, iso) => { const [a, z] = b.time.split("–"); monthDragRef.current = { first: b.name, start: norm(a ?? "08:00"), end: norm(z ?? "16:00"), fromISO: iso }; }}
+        onDropDay={(iso) => moveMonthShift(iso)} />}
+      {dayModal && <MonthShiftModal date={dayModal} entries={entriesFor(dayModal)} names={[...emp, ...pool].map((x) => x[1])} types={types}
+        onClose={() => setDayModal(null)} onChanged={() => setMonthVer((v) => v + 1)}
+        onOpenDayView={() => { setCur(dayModal); setView("Dagur"); setDayModal(null); }} />}
 
       <div className="grid2b">
         <div className="card">
@@ -904,7 +934,7 @@ function DayView({ day, col, rows, onAdd }: { day: Date; col: number; rows: DayR
   );
 }
 
-function MonthView({ monthDate, todayISO, blocks, onOpenDay }: { monthDate: Date; todayISO: string; blocks: (iso: string, wd: number) => MonthBlock[]; onOpenDay: (d: Date) => void }) {
+function MonthView({ monthDate, todayISO, blocks, onEdit, onDragBlock, onDropDay }: { monthDate: Date; todayISO: string; blocks: (iso: string, wd: number) => MonthBlock[]; onEdit: (d: Date) => void; onDragBlock: (b: MonthBlock, iso: string) => void; onDropDay: (iso: string) => void }) {
   const { t } = useLang();
   const hd = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
   const y = monthDate.getFullYear(), m = monthDate.getMonth();
@@ -913,7 +943,7 @@ function MonthView({ monthDate, todayISO, blocks, onOpenDay }: { monthDate: Date
   return (
     <div style={{ marginTop: 16 }}>
       <div className="card">
-        <div className="ch"><div><div className="ct">{t(MONTHS_IS[m])} {y}</div><div className="cs">{t("smelltu á dag til að opna · á vakt til að breyta")}</div></div></div>
+        <div className="ch"><div><div className="ct">{t(MONTHS_IS[m])} {y}</div><div className="cs">{t("smelltu á dag eða vakt til að breyta · dragðu vakt á annan dag til að færa")}</div></div></div>
         <div className="cb">
           <div className="mcal">
             {hd.map((h) => <div className="hd" key={h}>{t(h)}</div>)}
@@ -924,11 +954,16 @@ function MonthView({ monthDate, todayISO, blocks, onOpenDay }: { monthDate: Date
               const tod = fmtISO(date) === todayISO;
               const sh = blocks(fmtISO(date), wd);
               return (
-                <div key={d} className={`cell mcell ${we ? "we" : ""} ${tod ? "tod" : ""}`} onClick={() => onOpenDay(date)}>
+                <div key={d} className={`cell mcell ${we ? "we" : ""} ${tod ? "tod" : ""}`} onClick={() => onEdit(date)}
+                  onDragOver={(ev) => { ev.preventDefault(); ev.currentTarget.classList.add("cellh"); }}
+                  onDragLeave={(ev) => ev.currentTarget.classList.remove("cellh")}
+                  onDrop={(ev) => { ev.preventDefault(); ev.currentTarget.classList.remove("cellh"); onDropDay(fmtISO(date)); }}>
                   <div className="mhead"><span className="dd">{d}</span>{sh.length > 0 && <span className="mtot">{dec1(sh.reduce((a, s) => a + s.hrs, 0))} {t("klst")}</span>}</div>
                   <div className="mblocks">
                     {sh.slice(0, 4).map((x, i) => (
-                      <div key={i} className={`mblock ${x.type}`} onClick={(e) => { e.stopPropagation(); onOpenDay(date); }} title={`${x.name} · ${x.time}`}>
+                      <div key={i} className={`mblock ${x.type}`} draggable
+                        onDragStart={(ev) => { ev.stopPropagation(); onDragBlock(x, fmtISO(date)); }}
+                        onClick={(e) => { e.stopPropagation(); onEdit(date); }} title={`${x.name} · ${x.time}`}>
                         <b>{x.name}</b><span>{x.time} · {dec1(x.hrs)}{t("klst-stutt")}</span>
                       </div>
                     ))}
@@ -941,6 +976,81 @@ function MonthView({ monthDate, todayISO, blocks, onOpenDay }: { monthDate: Date
         </div>
       </div>
     </div>
+  );
+}
+
+/** Month-view popup: the day's shifts inline-editable + add a new one. */
+function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOpenDayView }: {
+  date: Date; entries: { first: string; start: string; end: string }[]; names: string[]; types: ShiftType[];
+  onClose: () => void; onChanged: () => void; onOpenDayView: () => void;
+}) {
+  const { t: tr } = useLang();
+  const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const [rows, setRows] = useState(entries);
+  useEffect(() => { setRows(entries); }, [entries]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [nName, setNName] = useState(names[0] ?? "");
+  const t0 = (types[0]?.t ?? "08:00–16:00").split("–");
+  const [nStart, setNStart] = useState(t0[0]?.slice(0, 5) ?? "08:00");
+  const [nEnd, setNEnd] = useState(t0[1]?.slice(0, 5) ?? "16:00");
+  const [busy, setBusy] = useState(false);
+  const typeOf = (start: string) => types.find((x) => x.t.startsWith(start))?.nm ?? types[0]?.nm ?? "Dagvakt";
+  const DN = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
+  const title = `${tr(DN[(date.getDay() + 6) % 7])} ${date.getDate()}. ${tr(MONTHS_IS[date.getMonth()])}`;
+
+  async function saveRow(i: number) {
+    const r = rows[i];
+    if (r.start >= r.end) { toast("Lok verða að vera eftir upphaf"); return; }
+    setBusy(true);
+    const res = await saveShift({ employeeName: r.first, date: iso, startTime: r.start, endTime: r.end, shiftTypeName: typeOf(r.start) });
+    setBusy(false);
+    toast(res.ok ? (res.demo ? "Vistað (demo)" : tr("Vakt vistuð")) : (res.error ?? "Villa"));
+    if (res.ok) onChanged();
+  }
+  async function delRow(i: number) {
+    const r = rows[i];
+    setBusy(true);
+    const res = await deleteShift({ employeeName: r.first, dateISO: iso });
+    setBusy(false);
+    toast(res.ok ? (res.demo ? "Eytt (demo)" : tr("Vakt eytt")) : (res.error ?? "Villa"));
+    if (res.ok) { setRows((rs) => rs.filter((_, j) => j !== i)); onChanged(); }
+  }
+  async function addRow() {
+    if (!nName) return;
+    if (nStart >= nEnd) { toast("Lok verða að vera eftir upphaf"); return; }
+    setBusy(true);
+    const res = await saveShift({ employeeName: nName, date: iso, startTime: nStart, endTime: nEnd, shiftTypeName: typeOf(nStart) });
+    setBusy(false);
+    toast(res.ok ? (res.demo ? "Vistað (demo)" : tr("Vakt vistuð")) : (res.error ?? "Villa"));
+    if (res.ok) onChanged();
+  }
+
+  return (
+    <Modal onClose={onClose} title={title}>
+      {rows.length === 0 && <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>{tr("Engar vaktir þennan dag — bættu við hér fyrir neðan.")}</p>}
+      {rows.map((r, i) => (
+        <div key={`${r.first}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--line2)" }}>
+          <b style={{ flex: 1, fontSize: 13.5 }}>{r.first}</b>
+          <TimeField value={r.start} onChange={(v) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, start: v } : x)))} style={{ width: 76 }} />
+          <span className="muted">–</span>
+          <TimeField value={r.end} onChange={(v) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, end: v } : x)))} style={{ width: 76 }} />
+          <button className="btn ghost sm" disabled={busy} onClick={() => saveRow(i)}>{tr("Vista")}</button>
+          <button className="x" title={tr("Eyða vakt")} disabled={busy} onClick={() => delRow(i)}>✕</button>
+        </div>
+      ))}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
+        <select value={nName} onChange={(e) => setNName(e.target.value)} style={{ flex: 1 }}>
+          {names.map((n) => <option key={n} value={n}>{n}</option>)}
+        </select>
+        <TimeField value={nStart} onChange={setNStart} style={{ width: 76 }} />
+        <span className="muted">–</span>
+        <TimeField value={nEnd} onChange={setNEnd} style={{ width: 76 }} />
+        <button className="btn sm" disabled={busy} onClick={addRow}>{tr("Bæta við")}</button>
+      </div>
+      <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
+        <button className="btn ghost" onClick={onOpenDayView}>{tr("Opna dagsýn")}</button>
+        <button className="btn ghost" onClick={onClose}>{tr("Loka")}</button>
+      </div>
+    </Modal>
   );
 }
 
