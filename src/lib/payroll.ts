@@ -195,3 +195,16 @@ export function totals(lines: PayLine[]): PayrollTotals {
     { hours: 0, gross: 0, withholding: 0, pension: 0, union: 0, net: 0, cost: 0 },
   );
 }
+
+/** Re-derive a line after a pre-tax gross adjustment (e.g. time-bank
+ * settlement at BASE rate — premiums/overtime pay stay untouched). */
+export function applyGrossAdjustment(l: PayLine, adj: number): PayLine {
+  const gross = Math.max(0, l.gross - Math.round(adj));
+  const pension = Math.round(gross * PENSION_RATE);
+  const union = Math.round(gross * UNION_RATE);
+  const taxable = gross - pension;
+  const withholding = Math.max(0, Math.round(taxable * WITHHOLDING_RATE - PERSONAL_ALLOWANCE));
+  const net = Math.round(gross - pension - union - withholding);
+  const cost = Math.round(gross * (1 + BURDEN));
+  return { ...l, gross, pension, union, withholding, net, cost };
+}

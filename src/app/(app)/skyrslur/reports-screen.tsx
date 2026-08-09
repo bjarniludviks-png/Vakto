@@ -292,20 +292,35 @@ function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[
         filters={[{ value: deptF, onChange: setDeptF, options: depts.map((d) => ({ value: d, label: d === "all" ? "Allar deildir" : d })) }]}
         rangeLabel={`${niceISO(from)} – ${niceISO(to)}`}
       />
-      <div className="card" style={{ marginTop: 20 }}>
-        <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)}</div></div></div>
+      {(() => {
+        const estC = shown.reduce((a, r) => a + r.estCost, 0);
+        const actC = shown.reduce((a, r) => a + r.actCost, 0);
+        const devC = actC - estC;
+        const worst = [...shown].sort((a, b) => Math.abs(b.actCost - b.estCost) - Math.abs(a.actCost - a.estCost))[0];
+        return shown.length > 0 && (
+        <div className="kstrip" style={{ margin: "16px 2px 0" }}>
+          <span>{t("Tímabilið kostaði")} <b>{nf(actC)}</b> kr</span>
+          <span className={devC > 0 ? "bad" : ""}>{devC >= 0 ? "+" : "−"}<b>{nf(Math.abs(devC))}</b> kr {t("miðað við plan")}</span>
+          {worst && Math.abs(worst.actCost - worst.estCost) > 0 && <span>{t("mesta frávik hjá")} <b>{worst.name}</b></span>}
+        </div>
+        );
+      })()}
+      <div className="card" style={{ marginTop: 12 }}>
+        <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)} · {t("kostnaður m. byrði")}</div></div></div>
         <div className="cb tbl" style={{ paddingTop: 8, opacity: loading ? 0.5 : 1 }}>
           <table>
-            <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th></tr></thead>
+            <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th><th className="r">{t("Áætl. kostn.")}</th><th className="r">{t("Raun kostn.")}</th></tr></thead>
             <tbody>
               {shown.length ? shown.map((r) => (
                 <tr key={r.id}>
                   <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.name}</span></td>
                   <td>{r.dept}</td><td className="r">{dec1(r.planned)}</td><td className="r">{dec1(r.actual)}</td>
                   <td className="r" style={{ color: r.deviation > 0 ? "var(--warn)" : r.deviation < 0 ? "var(--bad)" : undefined }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>
+                  <td className="r">{nf(r.estCost)}</td>
+                  <td className="r" style={r.actCost > r.estCost ? { color: "var(--bad)", fontWeight: 650 } : undefined}>{nf(r.actCost)}</td>
                 </tr>
-              )) : <tr><td colSpan={5} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
-              {shown.length > 0 && <tr className="foot"><td style={{ textAlign: "left" }}>{t("Samtals")} · {shown.length} {t("starfsm.")}</td><td></td><td className="r">{dec1(planned)}</td><td className="r">{dec1(actual)}</td><td className="r">{actual >= planned ? "+" : ""}{dec1(actual - planned)}</td></tr>}
+              )) : <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
+              {shown.length > 0 && <tr className="foot"><td style={{ textAlign: "left" }}>{t("Samtals")} · {shown.length} {t("starfsm.")}</td><td></td><td className="r">{dec1(planned)}</td><td className="r">{dec1(actual)}</td><td className="r">{actual >= planned ? "+" : ""}{dec1(actual - planned)}</td><td className="r">{nf(shown.reduce((a, r) => a + r.estCost, 0))}</td><td className="r">{nf(shown.reduce((a, r) => a + r.actCost, 0))}</td></tr>}
             </tbody>
           </table>
         </div>

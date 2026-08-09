@@ -42,6 +42,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
   const [cf, setCf] = useState(thisMonth.from);
   const [ct, setCt] = useState(thisMonth.to);
   const [pp, setPp] = useState<PeriodPayroll | null>(null);
+  const [useTb, setUseTb] = useState(false);
 
   const range = payRange(period, cf, ct, periodStart);
   useEffect(() => {
@@ -62,7 +63,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
     window.location.href = `/api/payroll/export${qs.replace("$F", format)}`;
   }
   async function keyra() {
-    const res = await runPayroll(view.live ? range.from : undefined, view.live ? range.to : undefined);
+    const res = await runPayroll(view.live ? range.from : undefined, view.live ? range.to : undefined, useTb);
     if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
     toast(res.demo ? `Launakeyrsla keyrð (demo — ${res.count} starfsm.)` : `Launakeyrsla keyrð & vistuð — ${res.count} starfsmenn`);
   }
@@ -119,6 +120,10 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
           </div>
           <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
             <button className="btn ghost sm" onClick={() => toast("Forskoða launakeyrslu")}>{t("Forskoða")}</button>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", marginRight: 4 }} title={t("Jafnar mínus-stöðu tímabanka á GRUNNTAXTA — yfirvinnuálagið helst alltaf hjá starfsmanninum")}>
+              <input type="checkbox" checked={useTb} onChange={(e) => setUseTb(e.target.checked)} />
+              {t("Jafna tímabanka")}
+            </label>
             <button className="btn" onClick={keyra}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12l5 5L20 6" /></svg>{t("Keyra launakeyrslu")}</button>
           </div>
         </div>

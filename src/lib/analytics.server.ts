@@ -17,6 +17,8 @@ export type AttRow = {
   id: string; name: string; av: string; c: string; dept: string;
   planned: number; actual: number; deviation: number;
   required: number; // monthly contracted hours (vinnuskylda)
+  estCost: number;  // planned hours × hourly base × 1.302 (m. byrði)
+  actCost: number;  // actual hours × hourly base × 1.302
 };
 export type WeekAttendance = { rows: AttRow[]; live: boolean };
 
@@ -70,10 +72,15 @@ export async function getWeekAttendance(fromISO?: string, toISO?: string): Promi
     const rows: AttRow[] = employees.map((e) => {
       const pl = Math.round((planned.get(e.id) ?? 0) * 10) / 10;
       const ac = Math.round((actual.get(e.id) ?? 0) * 10) / 10;
+      // Hourly base: hourly staff use their rate; monthly staff rate ÷ 173,33.
+      const hourly = e.payType === "monthly" ? (Number(e.rate) || 0) / 173.33 : (Number(e.rate) || 0);
+      const withLevies = hourly * 1.302;
       return {
         id: e.id, name: e.fullName.split(/\s+/)[0], av: initials(e.fullName), c: e.avatarColor,
         dept: e.department ?? "—", planned: pl, actual: ac, deviation: Math.round((ac - pl) * 10) / 10,
         required: Math.round((e.employmentRatio / 100) * 173.33),
+        estCost: Math.round(pl * withLevies),
+        actCost: Math.round(ac * withLevies),
       };
     });
     return { rows, live: true };

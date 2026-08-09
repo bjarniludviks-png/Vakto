@@ -335,41 +335,41 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
               ? <PlannedActual series={weekSeries} t={t} />
               : <EmptyBody msg="Birtist þegar vaktir eru birtar og stimplað er inn." />}
           </div></Widget>
-          <Widget id="onnow"><div className="card">
-            <div className="ch"><div><div className="ct">{t("Á vakt núna")}</div><div className="cs">{t("skráðir inn í rauntíma")}</div></div><Link href="/timaskraning" className="badge" style={{ background: "var(--good-soft)", color: "var(--good)", textDecoration: "none" }}>{onNow.length} {t("á vakt")}</Link></div>
-            {onNow.length ? (
+          <Widget id="missing"><div className="card">
+            <div className="ch">
+              <div><div className="ct">{t("Ekki mætt af plani")}</div><div className="cs">{t("á plani í dag en ekki stimplaðir inn")}</div></div>
+              {missing.length > 0 && <Link href="/timaskraning" className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)", textDecoration: "none" }}>{missing.filter((m) => m.late).length} {t("seinir")}</Link>}
+            </div>
+            {missing.length ? (
               <div className="cb att">
-                {onNow.map((r) => (
-                  <div className="it" key={r.punchId}>
-                    <span className="avt" style={{ background: r.c, width: 32, height: 32 }}>{r.av}</span>
-                    <div className="tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}</span></div>
-                    <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)", marginLeft: "auto" }}>{nowMs ? durSince(r.since, nowMs) : t("á vakt")}</span>
+                {missing.map((m) => (
+                  <div className="it" key={m.employeeId}>
+                    <span className="avt" style={{ background: m.c, width: 32, height: 32 }}>{m.av}</span>
+                    <div className="tx"><b>{m.name}</b><span>{t(m.dept)} · {t("á plani")} {m.start}</span></div>
+                    {m.late
+                      ? <span className="tag" style={{ background: "var(--bad-soft)", color: "var(--bad)", marginLeft: "auto" }}>{m.mins >= 60 ? `${Math.floor(m.mins / 60)} klst ${m.mins % 60} mín` : `${m.mins} mín`} {t("of seint")}</span>
+                      : <span className="tag" style={{ background: "var(--line2)", color: "var(--ink2)", marginLeft: "auto" }}>{t("væntanleg/ur")}</span>}
                   </div>
                 ))}
               </div>
-            ) : <EmptyBody msg="Enginn skráður inn núna." />}
+            ) : <EmptyBody msg="Allir á plani hafa mætt." />}
           </div></Widget>
         </div>
 
-        {/* not clocked in — scheduled today but no punch (late / forgot / upcoming) */}
-        <Widget id="missing"><div className="card" style={{ marginTop: 20 }}>
-          <div className="ch">
-            <div><div className="ct">{t("Ekki mætt af plani")}</div><div className="cs">{t("á plani í dag en ekki stimplaðir inn")}</div></div>
-            {missing.length > 0 && <Link href="/timaskraning" className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)", textDecoration: "none" }}>{missing.filter((m) => m.late).length} {t("seinir")}</Link>}
-          </div>
-          {missing.length ? (
+        {/* clocked in right now — full width below */}
+        <Widget id="onnow"><div className="card" style={{ marginTop: 20 }}>
+          <div className="ch"><div><div className="ct">{t("Á vakt núna")}</div><div className="cs">{t("skráðir inn í rauntíma")}</div></div><Link href="/timaskraning" className="badge" style={{ background: "var(--good-soft)", color: "var(--good)", textDecoration: "none" }}>{onNow.length} {t("á vakt")}</Link></div>
+          {onNow.length ? (
             <div className="cb att">
-              {missing.map((m) => (
-                <div className="it" key={m.employeeId}>
-                  <span className="avt" style={{ background: m.c, width: 32, height: 32 }}>{m.av}</span>
-                  <div className="tx"><b>{m.name}</b><span>{t(m.dept)} · {t("á plani")} {m.start}</span></div>
-                  {m.late
-                    ? <span className="tag" style={{ background: "var(--bad-soft)", color: "var(--bad)", marginLeft: "auto" }}>{m.mins >= 60 ? `${Math.floor(m.mins / 60)} klst ${m.mins % 60} mín` : `${m.mins} mín`} {t("of seint")}</span>
-                    : <span className="tag" style={{ background: "var(--line2)", color: "var(--ink2)", marginLeft: "auto" }}>{t("væntanleg/ur")}</span>}
+              {onNow.map((r) => (
+                <div className="it" key={r.punchId}>
+                  <span className="avt" style={{ background: r.c, width: 32, height: 32 }}>{r.av}</span>
+                  <div className="tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}</span></div>
+                  <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)", marginLeft: "auto" }}>{nowMs ? durSince(r.since, nowMs) : t("á vakt")}</span>
                 </div>
               ))}
             </div>
-          ) : <EmptyBody msg="Allir á plani hafa mætt." />}
+          ) : <EmptyBody msg="Enginn skráður inn núna." />}
         </div></Widget>
 
         {/* within vs over plan — who stays inside their hours, who runs over */}

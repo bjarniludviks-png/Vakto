@@ -60,6 +60,15 @@ export async function getTimeBank(months = 6): Promise<TimeBank> {
       actual.get(p.employee_id as string)![idx] += h;
     }
 
+    // Hours already settled in payroll runs come back OFF the debt.
+    const settled = new Map<string, number>();
+    const setRes = await supabase
+      .from("payroll_lines").select("employee_id, timebank_hours, payroll_runs!inner(company_id)")
+      .eq("payroll_runs.company_id", company).gt("timebank_hours", 0);
+    if (!setRes.error) for (const r of setRes.data ?? []) {
+      settled.set(r.employee_id as string, (settled.get(r.employee_id as string) ?? 0) + Number(r.timebank_hours));
+    }
+
     const rows: TbRow[] = employees.map((e) => {
       const required = Math.round(MONTHLY_HOURS * (e.employmentRatio / 100) * 10) / 10;
       const acts = actual.get(e.id) ?? new Array(windows.length).fill(0);
@@ -80,6 +89,7 @@ export async function getTimeBank(months = 6): Promise<TimeBank> {
         if (m.delta < 0) balance += m.delta;
         else if (balance < 0) balance = Math.min(0, balance + m.delta);
       }
+      balance = Math.min(0, balance + (settled.get(e.id) ?? 0));
       balance = Math.round(balance * 10) / 10;
       return { id: e.id, name: e.fullName.split(/\s+/)[0], av: initials(e.fullName), c: e.avatarColor, dept: e.department ?? "—", months: monthsOut, balance };
     });

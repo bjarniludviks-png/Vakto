@@ -105,7 +105,7 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
 }
 
 /** Run + persist payroll for a period using approved worked hours. */
-export async function runPayroll(from?: string, to?: string): Promise<RunResult> {
+export async function runPayroll(from?: string, to?: string, useTimebank = false): Promise<RunResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true, count: 0 };
   try {
     const supabase = await createClient();
@@ -120,6 +120,33 @@ export async function runPayroll(from?: string, to?: string): Promise<RunResult>
     const { lines } = await approvedLines(supabase, company, start, end);
     if (!lines.length) return { ok: false, error: "Engir samþykktir tímar á tímabilinu" };
 
+    // Optional time-bank settlement — MONTHLY staff with a negative balance.
+    // Deduction = owed hours × BASE hourly rate (rate/173,33). Overtime pay
+    // and premiums are untouched: when overtime fills the deficit the
+    // employee keeps the premium, only the base part cancels.
+    const tb = new Map<string, { hours: number; adj: number }>();
+    if (useTimebank) {
+      const [{ getTimeBank }, { applyGrossAdjustment }] = await Promise.all([
+        import("../skyrslur/timebank.server"), import("@/lib/payroll"),
+      ]);
+      const bank = await getTimeBank();
+      const { data: empsMeta } = await supabase
+        .from("employees").select("id, pay_type, rate").eq("company_id", company);
+      const metaById = new Map((empsMeta ?? []).map((e) => [e.id as string, e]));
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i];
+        const bal = bank.rows.find((r) => r.id === l.employeeId)?.balance ?? 0;
+        const meta = metaById.get(l.employeeId);
+        if (bal >= 0 || !meta || meta.pay_type !== "monthly") continue;
+        const baseHourly = (Number(meta.rate) || 0) / 173.33;
+        if (baseHourly <= 0) continue;
+        const offsetHours = Math.min(-bal, 173);
+        const adj = Math.round(offsetHours * baseHourly);
+        lines[i] = applyGrossAdjustment(l, adj);
+        tb.set(l.employeeId, { hours: Math.round(offsetHours * 10) / 10, adj });
+      }
+    }
+
     const { data: run, error: runErr } = await supabase
       .from("payroll_runs")
       .insert({ company_id: company, period_start: start, period_end: end, status: "approved" })
@@ -133,8 +160,16 @@ export async function runPayroll(from?: string, to?: string): Promise<RunResult>
     });
     // Try with the uppbot column (migration 0017); retry without if not yet run.
     let linesErr = (await supabase.from("payroll_lines").insert(
-      lines.map((l) => ({ ...baseRow(l), uppbot: l.uppbot })),
+      lines.map((l) => {
+        const t2 = tb.get(l.employeeId);
+        return { ...baseRow(l), uppbot: l.uppbot, timebank_hours: t2?.hours ?? 0, timebank_adj: t2?.adj ?? 0 };
+      }),
     )).error;
+    if (linesErr && /timebank/.test(linesErr.message)) {
+      linesErr = (await supabase.from("payroll_lines").insert(
+        lines.map((l) => ({ ...baseRow(l), uppbot: l.uppbot })),
+      )).error;
+    }
     if (linesErr) {
       linesErr = (await supabase.from("payroll_lines").insert(lines.map(baseRow))).error;
     }
