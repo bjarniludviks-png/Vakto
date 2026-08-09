@@ -230,7 +230,20 @@ body.kioskmode .cookie{display:none}
 
 /* kpi */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
-/* ---------- news feed (Spjall → Fréttaveita) ---------- */
+/* ---------- Fréttaveita (company feed, Facebook-style) ---------- */
+.feedwrap{max-width:640px;margin:0 auto}
+.fc-input{width:100%;border:0;background:none;font:inherit;font-size:14px;resize:none;outline:none;color:var(--ink);padding:2px 0 6px}
+.fc-bar{display:flex;gap:8px;align-items:center;border-top:1px solid var(--line2);padding-top:10px;margin-top:6px}
+.fc-act{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:12.5px;font-weight:600;color:var(--ink3);background:none;border:1px solid var(--line);border-radius:10px;padding:7px 12px;cursor:pointer}
+.fc-act:hover{color:var(--ink);background:var(--line2)}
+.fp-img{display:block;width:100%;max-height:420px;object-fit:cover;border-radius:12px;margin:4px 0 8px;cursor:pointer;border:1px solid var(--line2)}
+.fp-file{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:600;color:var(--ink);background:var(--line2);border-radius:11px;padding:10px 13px;margin:4px 0 8px;text-decoration:none}
+.fp-sum{display:flex;gap:12px;font-size:12.5px;color:var(--ink3);padding:2px 2px 8px;border-bottom:1px solid var(--line2);margin-bottom:8px}
+.fp-picker{position:absolute;bottom:calc(100% + 6px);left:0;display:flex;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:5px 8px;box-shadow:0 14px 34px rgba(20,22,28,.18);z-index:5}
+.fp-picker button{font-size:20px;background:none;border:0;cursor:pointer;padding:3px 5px;border-radius:8px;transition:transform .12s}
+.fp-picker button:hover{transform:scale(1.25)}
+.fp-picker button.on{background:var(--brand-soft, #fdf1e7)}
+.fp-cb{background:var(--line2);border-radius:12px;padding:7px 11px;flex:1}
 .feed-compose{display:flex;gap:9px;align-items:flex-end;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:11px}
 .feed-compose textarea{flex:1;border:0;background:none;font:inherit;font-size:13.5px;resize:none;outline:none;color:var(--ink)}
 .feed-post{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}

@@ -270,7 +270,11 @@ export async function uploadChatMedia(dataUrl: string, ext: string): Promise<{ o
 export type FeedComment = { id: string; sender: string; av: string; color: string; body: string; at: string };
 export type FeedPost = {
   id: string; sender: string; av: string; color: string; me: boolean;
-  body: string; at: string; likes: number; likedByMe: boolean; comments: FeedComment[];
+  body: string; at: string;
+  imageUrl: string | null; fileUrl: string | null; fileName: string | null;
+  reactions: { emoji: string; count: number }[];
+  myReaction: string | null;
+  comments: FeedComment[];
 };
 
 /** Latest 50 posts with likes + comments, newest first. */
@@ -281,22 +285,26 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, posts: [], meId: "" };
     const { data: rows } = await supabase
-      .from("posts").select("id, sender_id, body, created_at, users!posts_sender_id_fkey(full_name)")
+      .from("posts").select("id, sender_id, body, created_at, image_url, file_url, file_name, users!posts_sender_id_fkey(full_name)")
       .eq("company_id", ctx.company).order("created_at", { ascending: false }).limit(50);
     const ids = (rows ?? []).map((r) => r.id as string);
     const [{ data: likes }, { data: comments }] = await Promise.all([
-      supabase.from("post_likes").select("post_id, user_id").in("post_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
+      supabase.from("post_likes").select("post_id, user_id, reaction").in("post_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
       supabase.from("post_comments").select("id, post_id, sender_id, body, created_at, users!post_comments_sender_id_fkey(full_name)").in("post_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).order("created_at"),
     ]);
     const nameOf = (u: unknown) => ((Array.isArray(u) ? u[0] : u) as { full_name?: string } | null)?.full_name ?? "Notandi";
     const posts: FeedPost[] = (rows ?? []).map((r) => {
       const name = nameOf(r.users);
       const pLikes = (likes ?? []).filter((l) => l.post_id === r.id);
+      const byEmoji = new Map<string, number>();
+      for (const l of pLikes) byEmoji.set((l.reaction as string) || "❤️", (byEmoji.get((l.reaction as string) || "❤️") ?? 0) + 1);
       return {
         id: r.id as string, sender: name, av: initials(name), color: colorOf(name.split(/\s+/)[0] || name),
         me: r.sender_id === ctx.userId,
         body: r.body as string, at: hhmm(r.created_at as string) + " · " + new Date(r.created_at as string).toLocaleDateString("de-DE").replace(/\./g, "."),
-        likes: pLikes.length, likedByMe: pLikes.some((l) => l.user_id === ctx.userId),
+        imageUrl: (r.image_url as string) ?? null, fileUrl: (r.file_url as string) ?? null, fileName: (r.file_name as string) ?? null,
+        reactions: [...byEmoji.entries()].map(([emoji, count]) => ({ emoji, count })).sort((a, b) => b.count - a.count),
+        myReaction: (pLikes.find((l) => l.user_id === ctx.userId)?.reaction as string) ?? null,
         comments: (comments ?? []).filter((cm) => cm.post_id === r.id).map((cm) => {
           const cn = nameOf(cm.users);
           return { id: cm.id as string, sender: cn, av: initials(cn), color: colorOf(cn.split(/\s+/)[0] || cn), body: cm.body as string, at: hhmm(cm.created_at as string) };
@@ -309,27 +317,31 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
   }
 }
 
-export async function createPost(body: string): Promise<{ ok: boolean; error?: string }> {
-  if (!body.trim()) return { ok: false, error: "Skrifaðu eitthvað fyrst" };
+export async function createPost(body: string, media?: { imageUrl?: string; fileUrl?: string; fileName?: string }): Promise<{ ok: boolean; error?: string }> {
+  if (!body.trim() && !media?.imageUrl && !media?.fileUrl) return { ok: false, error: "Skrifaðu eitthvað fyrst" };
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    const { error } = await supabase.from("posts").insert({ company_id: ctx.company, sender_id: ctx.userId, body: body.trim() });
+    const { error } = await supabase.from("posts").insert({
+      company_id: ctx.company, sender_id: ctx.userId, body: body.trim(),
+      image_url: media?.imageUrl ?? null, file_url: media?.fileUrl ?? null, file_name: media?.fileName ?? null,
+    });
     return error ? { ok: false, error: error.message } : { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
 
-export async function togglePostLike(postId: string, like: boolean): Promise<{ ok: boolean }> {
+/** One reaction per user per post — emoji sets/updates it, null removes it. */
+export async function setPostReaction(postId: string, emoji: string | null): Promise<{ ok: boolean }> {
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false };
-    if (like) await supabase.from("post_likes").upsert({ post_id: postId, user_id: ctx.userId, company_id: ctx.company });
+    if (emoji) await supabase.from("post_likes").upsert({ post_id: postId, user_id: ctx.userId, company_id: ctx.company, reaction: emoji });
     else await supabase.from("post_likes").delete().eq("post_id", postId).eq("user_id", ctx.userId);
     return { ok: true };
   } catch {

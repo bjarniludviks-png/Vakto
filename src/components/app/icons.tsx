@@ -54,6 +54,11 @@ const PATHS: Record<string, ReactNode> = {
     </>
   ),
   chat: <path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z" />,
+  megaphone: (
+    <>
+      <path d="M3 11l18-7-4 14-6-3.5L8 19l-1-5z" />
+    </>
+  ),
   settings: (
     <>
       <circle cx="12" cy="12" r="3" />
