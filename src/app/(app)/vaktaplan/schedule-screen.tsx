@@ -7,7 +7,7 @@ import { useLang } from "@/components/app/lang";
 import { nf, dec1 } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
 import { AsyncButton } from "@/components/app/async-button";
-import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, type ShiftInput } from "./actions";
+import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, type ShiftInput } from "./actions";
 import { getDashboardPeriod } from "../maelabord/actions";
 import { buildSchedulePdf, type PdfShift } from "./pdf";
 import type { ReqItem } from "./requests.server";
@@ -1052,6 +1052,22 @@ function ShiftEditModal({
   const [end, setEnd] = useState(tt0?.end ?? "16:00");
   const filled = gridCode(ri, ci) !== "off";
   const DNAMES = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
+  // Checklist for this employee+day (Sling-parity "shift tasks").
+  const [tasks, setTasks] = useState<string[]>([]);
+  const [newTask, setNewTask] = useState("");
+  const dateISOOf = (c: number) => {
+    const d = weekDays[c];
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  useEffect(() => {
+    let gone = false;
+    getShiftTasks(emp[ri]?.[1] ?? "", dateISOOf(ci)).then((res) => { if (!gone && res.ok) setTasks(res.tasks.map((x) => x.title)); });
+    return () => { gone = true; };
+  }, [ri, ci]); // eslint-disable-line react-hooks/exhaustive-deps
+  async function persistTasks() {
+    const all = newTask.trim() ? [...tasks, newTask.trim()] : tasks;
+    await saveShiftTasks(emp[ri]?.[1] ?? "", dateISOOf(ci), all);
+  }
   return (
     <Modal onClose={onClose} title={filled ? tr("Breyta vakt") : tr("Ný vakt")}>
       <div style={{ display: "flex", gap: 10 }}>
@@ -1068,8 +1084,24 @@ function ShiftEditModal({
         <div className="field" style={{ flex: 1 }}><label>{tr("Lok")}</label><TimeField value={end} onChange={setEnd} style={{ width: "100%" }} /></div>
       </div>
       <p className="muted" style={{ fontSize: 11.5, margin: "-6px 0 8px" }}>{tr("Veldu tilbúna vaktategund eða stilltu tíma sjálf/ur. Vantar tegund?")} <a onClick={() => { onClose(); onTypes(); }} style={{ color: "var(--brand)", fontWeight: 600, cursor: "pointer" }}>{tr("Búa til vaktategund")}</a></p>
+      <div className="field">
+        <label>{tr("Verkefni vaktarinnar")}</label>
+        {tasks.map((title, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 13.5 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink3)" strokeWidth="2"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" /></svg>
+            <span style={{ flex: 1 }}>{title}</span>
+            <button className="x" style={{ fontSize: 12 }} onClick={() => setTasks((ts) => ts.filter((_, j) => j !== i))}>✕</button>
+          </div>
+        ))}
+        <div style={{ display: "flex", gap: 8 }}>
+          <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder={tr("t.d. Opna kassa, fylla á sósur…")}
+            onKeyDown={(e) => { if (e.key === "Enter" && newTask.trim()) { setTasks((ts) => [...ts, newTask.trim()]); setNewTask(""); } }} style={{ flex: 1 }} />
+          <button className="btn ghost sm" onClick={() => { if (newTask.trim()) { setTasks((ts) => [...ts, newTask.trim()]); setNewTask(""); } }}>{tr("Bæta við")}</button>
+        </div>
+        <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>{tr("Starfsmaðurinn hakar við verkefnin í Mitt svæði á vaktinni.")}</p>
+      </div>
       <div style={{ display: "flex", gap: 9, marginTop: 8, flexWrap: "wrap" }}>
-        <button className="btn" onClick={() => { if (start >= end) { toast("Lok verða að vera eftir upphaf"); return; } onSave(ri, ci, start, end, type); }}>{tr("Vista")}</button>
+        <button className="btn" onClick={async () => { if (start >= end) { toast("Lok verða að vera eftir upphaf"); return; } await persistTasks(); onSave(ri, ci, start, end, type); }}>{tr("Vista")}</button>
         {filled && <button className="btn ghost" style={{ color: "var(--bad)", borderColor: "var(--bad-soft, #f3c7c0)" }} onClick={() => onDelete(ri, ci)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>{tr("Eyða vakt")}
         </button>}

@@ -32,9 +32,10 @@ export type MyArea = {
   rights: { required: number; worked: number; bank: number; orlofDays: number; orlofFund: number; union: string } | null;
   profile: { name: string; kennitala: string; position: string; dept: string; phone: string; email: string; bank: string; union: string } | null;
   openShifts: MyOpenShift[];
+  tasks: { id: string; title: string; done: boolean }[];   // today's shift checklist
 };
 
-const EMPTY: MyArea = { live: false, openSince: null, weekLabel: "", days: [], upcoming: [], weekHours: 0, nextPayday: "", pay: null, rights: null, profile: null, openShifts: [] };
+const EMPTY: MyArea = { live: false, openSince: null, weekLabel: "", days: [], upcoming: [], weekHours: 0, nextPayday: "", pay: null, rights: null, profile: null, openShifts: [], tasks: [] };
 
 export async function getMyArea(): Promise<MyArea> {
   if (!isSupabaseConfigured()) return EMPTY;
@@ -196,6 +197,11 @@ export async function getMyArea(): Promise<MyArea> {
       premium: premOf(String(s.date), s.start_time as string),
     }));
 
+    // Today's shift checklist (0030) — tolerant of a not-yet-run migration.
+    let myTasks: { id: string; title: string; done: boolean }[] = [];
+    const tRes = await supabase.from("shift_tasks").select("id, title, done").eq("employee_id", empId).eq("date", todayISO).order("created_at");
+    if (!tRes.error) myTasks = (tRes.data ?? []).map((r) => ({ id: r.id as string, title: r.title as string, done: !!r.done }));
+
     const payday = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     return {
       live: true,
@@ -217,6 +223,7 @@ export async function getMyArea(): Promise<MyArea> {
         bank: (emp.bank_account as string) ?? "",
         union,
       },
+      tasks: myTasks,
       openShifts,
     };
   } catch {

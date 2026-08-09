@@ -352,3 +352,59 @@ export async function deleteWeekShifts(dates: string[]): Promise<{ ok: boolean; 
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
+
+/* ---------- shift tasks (checklists on a shift) ---------- */
+
+export type ShiftTaskRow = { id: string; title: string; done: boolean };
+
+/** Tasks for one employee+day (manager view in the shift modal). */
+export async function getShiftTasks(employeeName: string, dateISO: string): Promise<{ ok: boolean; tasks: ShiftTaskRow[] }> {
+  if (!isSupabaseConfigured()) return { ok: false, tasks: [] };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, tasks: [] };
+    const { data: emps } = await supabase
+      .from("employees").select("id, full_name").eq("company_id", ctx.company);
+    const eid = emps?.find((e) => (e.full_name as string).toLowerCase().startsWith(employeeName.toLowerCase()))?.id;
+    if (!eid) return { ok: false, tasks: [] };
+    const { data } = await supabase
+      .from("shift_tasks").select("id, title, done")
+      .eq("employee_id", eid).eq("date", dateISO).order("created_at");
+    return { ok: true, tasks: (data ?? []).map((r) => ({ id: r.id as string, title: r.title as string, done: !!r.done })) };
+  } catch {
+    return { ok: false, tasks: [] };
+  }
+}
+
+/** Replace the checklist for employee+day. Existing rows with an unchanged
+ * title survive (keeping their done state); removed ones are deleted. */
+export async function saveShiftTasks(employeeName: string, dateISO: string, titles: string[]): Promise<DecisionResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data: emps } = await supabase
+      .from("employees").select("id, full_name").eq("company_id", ctx.company);
+    const eid = emps?.find((e) => (e.full_name as string).toLowerCase().startsWith(employeeName.toLowerCase()))?.id;
+    if (!eid) return { ok: false, error: "Starfsmaður fannst ekki" };
+    const clean = titles.map((s) => s.trim()).filter(Boolean);
+    const { data: existing } = await supabase
+      .from("shift_tasks").select("id, title").eq("employee_id", eid).eq("date", dateISO);
+    const keep = new Set(clean);
+    const toDelete = (existing ?? []).filter((r) => !keep.has(r.title as string)).map((r) => r.id as string);
+    if (toDelete.length) await supabase.from("shift_tasks").delete().in("id", toDelete);
+    const have = new Set((existing ?? []).map((r) => r.title as string));
+    const toInsert = clean.filter((s) => !have.has(s)).map((title) => ({
+      company_id: ctx.company, employee_id: eid, date: dateISO, title,
+    }));
+    if (toInsert.length) {
+      const { error } = await supabase.from("shift_tasks").insert(toInsert);
+      if (error) return { ok: false, error: error.message };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}

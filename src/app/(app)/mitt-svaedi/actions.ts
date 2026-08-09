@@ -302,3 +302,17 @@ export async function uploadPhoto(dataUrl: string): Promise<ActionResult & { url
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
+
+/** Tick/untick a task on my shift (RLS limits to my own rows). */
+export async function toggleShiftTask(id: string, done: boolean): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.from("shift_tasks")
+      .update({ done, done_at: done ? new Date().toISOString() : null }).eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}

@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
-import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, type LeaveType, type MyPunchRow } from "./actions";
+import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, type LeaveType, type MyPunchRow } from "./actions";
 import { dec1, nf } from "@/lib/format";
 import { StaffCardModal, type StaffCardData } from "@/components/app/staff-card";
 import type { StaffCard } from "@/lib/mycard.server";
@@ -36,7 +36,7 @@ export default function EmployeeScreen({ card, my: myProp }: { card?: StaffCard;
     : card?.live
       ? {
         live: true, openSince: null, weekLabel: "", days: [], upcoming: [], weekHours: 0,
-        nextPayday: "", pay: null, rights: null, openShifts: [],
+        nextPayday: "", pay: null, rights: null, openShifts: [], tasks: [],
         profile: { name: card.name, kennitala: card.employeeKt ?? "", position: card.role, dept: card.department ?? "", phone: "", email: "", bank: "", union: "" },
       }
       : myProp;
@@ -151,6 +151,32 @@ function PunchCard({ live = false, openSince = null }: { live?: boolean; openSin
   );
 }
 
+/** Today's shift checklist — set by the manager on the shift, ticked here. */
+function TasksCard({ initial }: { initial: { id: string; title: string; done: boolean }[] }) {
+  const { t } = useLang();
+  const [tasks, setTasks] = useState(initial);
+  const doneCount = tasks.filter((x) => x.done).length;
+  async function tick(id: string, done: boolean) {
+    setTasks((ts) => ts.map((x) => (x.id === id ? { ...x, done } : x)));
+    const res = await toggleShiftTask(id, done);
+    if (!res.ok) { setTasks((ts) => ts.map((x) => (x.id === id ? { ...x, done: !done } : x))); toast(res.error ?? "Villa"); }
+  }
+  return (
+    <div className="mini">
+      <div className="mh" style={{ display: "flex", justifyContent: "space-between" }}>
+        <span>{t("Verkefni vaktarinnar")}</span>
+        <span style={{ color: doneCount === tasks.length ? "var(--good)" : "var(--ink3)" }}>{doneCount}/{tasks.length}</span>
+      </div>
+      {tasks.map((task) => (
+        <label key={task.id} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13.5, padding: "6px 0", cursor: "pointer" }}>
+          <input type="checkbox" checked={task.done} onChange={(e) => tick(task.id, e.target.checked)} />
+          <span style={task.done ? { textDecoration: "line-through", color: "var(--ink3)" } : undefined}>{task.title}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
 function QuickActions({ onReq }: { onReq: (k: ReqKind) => void }) {
   const { t } = useLang();
   return (
@@ -196,6 +222,7 @@ function Overview({ onReq, perms, my }: { onReq: (k: ReqKind) => void; perms: Pe
           ))}
         </div>
       )}
+      {live && my!.tasks.length > 0 && <TasksCard initial={my!.tasks} />}
       {perms.requests && <QuickActions onReq={onReq} />}
     </div>
   );
