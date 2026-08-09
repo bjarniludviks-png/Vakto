@@ -46,10 +46,10 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
   const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
   const [posName, setPosName] = useState<string | null>(null);
   function posConnect(name: string) { setPosName(name === "POS" ? "" : name); }
-  const [section, setSection] = useState<string>("fyrirtaeki");
+  const [section, setSection] = useState<string>(initialModal === "revenue" || initialModal === "avgrevenue" ? "velta" : "fyrirtaeki");
   const SECTIONS: [string, string][] = [
-    ["fyrirtaeki", "Fyrirtæki"], ["tengingar", "Tengingar"], ["launareglur", "Launareglur"],
-    ["notendur", "Notendur"], ["askrift", "Áskrift"],
+    ["fyrirtaeki", "Fyrirtæki"], ["tengingar", "Samþættingar"], ["velta", "Veltuskráning"],
+    ["launareglur", "Launareglur"], ["notendur", "Notendur"], ["askrift", "Áskrift"],
   ];
   return (
     <>
@@ -83,27 +83,10 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
 
       {section === "tengingar" && (
         <div className="card">
-          <div className="ch"><div className="ct">{t("Tengingar")}</div></div>
-          <div className="cb att">
-            <div className="it"><div className="ic good">P</div><div className="tx"><b>Payday</b><span>{t("launakeyrsla & skil")}</span></div><span className="tag good">{t("tengt")}</span></div>
-            <div className="it rowlink" onClick={syncInventra}><div className="ic info">IN</div><div className="tx"><b>INVENTRA</b><span>{t("framleiðsluvelta í rauntíma · smelltu til að sækja veltu")}</span></div><span className="tag good">{t("tengt")}</span></div>
-            <div className="it rowlink" onClick={() => posConnect("Dineout")}><div className="ic info">DO</div><div className="tx"><b>Dineout</b><span>{t("söluvelta veitingastaða í rauntíma")}</span></div><span className="tag info">{t("tengja")}</span></div>
-            <div className="it rowlink" onClick={() => posConnect("SalesCloud")}><div className="ic info">SC</div><div className="tx"><b>SalesCloud</b><span>{t("söluvelta úr POS í rauntíma")}</span></div><span className="tag info">{t("tengja")}</span></div>
-            <div className="it rowlink" onClick={() => setModal("revenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div><div className="tx"><b>{t("Skrá veltu handvirkt")}</b><span>{t("án Inventra — sláðu inn veltu til að sjá laun vs velta")}</span></div><span className="tag info">{t("slá inn")}</span></div>
-            <div className="it rowlink" onClick={() => setModal("avgrevenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M3 3v18h18M7 15l4-4 3 3 5-6" /></svg></div><div className="tx"><b>{t("Meðalvelta per vikudag")}</b><span>{t("áætluð velta per vikudag — laun% án tengingar")}</span></div><span className="tag info">{t("slá inn")}</span></div>
-            <div className="it"><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" /></svg></div><div className="tx"><b>{t("Push-tilkynningar")}</b><span>{t("vaktir, beiðnir og samþykki beint í símann")}</span></div><PushToggle /></div>
-            <div className="it rowlink" onClick={() => copyKioskLink(data.companyId)}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><rect x="4" y="3" width="16" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg></div><div className="tx"><b>{t("Kiosk-stimpilklukka")}</b><span>{t("opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð")}</span></div><span className="tag info">{t("afrita slóð")}</span></div>
-            <div className="it rowlink" onClick={() => posConnect("POS")}><div className="ic mut" style={{ background: "var(--line2)" }}>P</div><div className="tx"><b>{t("Fleiri sölukerfi")}</b><span>Dótturkassi, Salt, Verifone{t(" o.fl.")}</span></div><span className="tag mut">{t("tengja")}</span></div>
-          </div>
-        </div>
-      )}
-
-      {section === "tengingar" && (
-        <div className="card" style={{ marginTop: 16 }}>
           <div className="ch">
             <div>
-              <div className="ct">{t("API-tengingar")}</div>
-              <div className="cs">{t("búðu til lykil fyrir hvaða kerfi sem er — það sendir sölutölur beint inn og laun% uppfærist")}</div>
+              <div className="ct">{t("Samþættingar (API)")}</div>
+              <div className="cs">{t("búðu til samþættingu fyrir hvaða kerfi sem er — nefndu hana (t.d. SalesCloud) og settu lykilinn í kerfið sem á að senda sölutölur")}</div>
             </div>
             <button className="btn sm" onClick={() => setKeyModal(true)}>{t("+ Ný tenging")}</button>
           </div>
@@ -125,6 +108,29 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
                   : <button className="btn ghost sm" style={{ color: "var(--bad)" }} onClick={async () => { const r = await revokeApiKey(k.id); toast(r.ok ? t("Tenging afturkölluð") : (r.error ?? "Villa")); }}>{t("Afturkalla")}</button>}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {section === "tengingar" && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="ch"><div><div className="ct">{t("Tæki & tilkynningar")}</div><div className="cs">{t("stimpilklukkan á staðnum, push í símana og launaskil")}</div></div></div>
+          <div className="cb att">
+            <div className="it"><div className="ic good">P</div><div className="tx"><b>Payday</b><span>{t("launakeyrsla & skil")}</span></div><span className="tag good">{t("tengt")}</span></div>
+            <div className="it"><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" /></svg></div><div className="tx"><b>{t("Push-tilkynningar")}</b><span>{t("vaktir, beiðnir og samþykki beint í símann")}</span></div><PushToggle /></div>
+            <div className="it rowlink" onClick={() => copyKioskLink(data.companyId)}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><rect x="4" y="3" width="16" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg></div><div className="tx"><b>{t("Kiosk-stimpilklukka")}</b><span>{t("opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð")}</span></div><span className="tag info">{t("afrita slóð")}</span></div>
+          </div>
+        </div>
+      )}
+
+      {section === "velta" && (
+        <div className="card">
+          <div className="ch"><div><div className="ct">{t("Velta & sölutölur")}</div><div className="cs">{t("fóðraðu laun%-útreikninginn — sjálfvirkt gegnum samþættingu eða handvirkt")}</div></div></div>
+          <div className="cb att">
+            <div className="it rowlink" onClick={syncInventra}><div className="ic info">IN</div><div className="tx"><b>INVENTRA</b><span>{t("framleiðsluvelta í rauntíma · smelltu til að sækja veltu")}</span></div><span className="tag good">{t("tengt")}</span></div>
+            <div className="it rowlink" onClick={() => setModal("revenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div><div className="tx"><b>{t("Skrá veltu handvirkt")}</b><span>{t("án Inventra — sláðu inn veltu til að sjá laun vs velta")}</span></div><span className="tag info">{t("slá inn")}</span></div>
+            <div className="it rowlink" onClick={() => setModal("avgrevenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M3 3v18h18M7 15l4-4 3 3 5-6" /></svg></div><div className="tx"><b>{t("Meðalvelta per vikudag")}</b><span>{t("áætluð velta per vikudag — laun% án tengingar")}</span></div><span className="tag info">{t("slá inn")}</span></div>
+            <div className="it rowlink" onClick={() => setSection("tengingar")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M21 2l-9.6 9.6M15.5 7.5l3 3L22 7l-3-3zM11.4 11.6a5 5 0 1 0 1 1z" /></svg></div><div className="tx"><b>{t("Sjálfvirkt gegnum API")}</b><span>{t("búðu til samþættingu — sölukerfið þitt sendir þá veltuna sjálft")}</span></div><span className="tag info">{t("opna Samþættingar")}</span></div>
           </div>
         </div>
       )}
