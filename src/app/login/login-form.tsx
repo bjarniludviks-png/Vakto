@@ -9,6 +9,7 @@ export default function LoginForm({ lang = "is" }: { lang?: Lang }) {
   const s = LOGIN_I18N[lang];
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -98,15 +99,22 @@ export default function LoginForm({ lang = "is" }: { lang?: Lang }) {
           <label htmlFor="password">{s.passwordLabel}</label>
           <span className="forgot">{s.forgot}</span>
         </div>
-        <input
-          id="password"
-          type="password"
-          placeholder="••••••••••"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete="current-password"
-          required
-        />
+        <div className="pwwrap">
+          <input
+            id="password"
+            type={showPw ? "text" : "password"}
+            placeholder="••••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            required
+          />
+          <button type="button" className="pweye" aria-label={showPw ? "Fela lykilorð" : "Sýna lykilorð"} onClick={() => setShowPw((v) => !v)}>
+            {showPw
+              ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M17.94 17.94A10.5 10.5 0 0 1 12 20c-7 0-10-8-10-8a18.4 18.4 0 0 1 5.06-5.94M9.9 4.24A9.9 9.9 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24" /><path d="m2 2 20 20" /></svg>
+              : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 12s3-8 10-8 10 8 10 8-3 8-10 8-10-8-10-8Z" /><circle cx="12" cy="12" r="3" /></svg>}
+          </button>
+        </div>
       </div>
       <label className="remember">
         <input type="checkbox" /> {s.remember}

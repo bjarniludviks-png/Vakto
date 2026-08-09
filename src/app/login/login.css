@@ -120,3 +120,9 @@ body{font-family:"General Sans","Plus Jakarta Sans",ui-sans-serif,system-ui,-app
 .planopt .pp small{font-size:10px;font-weight:600;color:var(--ink3);display:block}
 .planopt .pb{font-size:11px;color:var(--ink2);margin-top:6px;line-height:1.35}
 .pcy{font-size:11.5px;color:var(--ink3);text-align:center;margin:12px 0 0}
+
+/* password visibility toggle */
+.pwwrap{position:relative}
+.pwwrap input{width:100%;padding-right:44px}
+.pweye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:0;cursor:pointer;color:var(--ink3,#8a8b93);padding:8px;border-radius:8px;display:flex;align-items:center}
+.pweye:hover{color:var(--ink,#1a1a1f)}

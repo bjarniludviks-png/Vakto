@@ -23,6 +23,7 @@ export default function SignupForm({ initialPlan = "vakto" }: { initialPlan?: st
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [plan, setPlan] = useState(initialPlan || "vakto");
   const [country, setCountry] = useState<"IS" | "OTHER">("IS");
   const [error, setError] = useState<string | null>(null);
@@ -126,7 +127,16 @@ export default function SignupForm({ initialPlan = "vakto" }: { initialPlan?: st
         </select>
       </div>
       <div className="field"><div className="lbl"><label htmlFor="em">Netfang</label></div><input id="em" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="netfang@fyrirtaeki.is" autoComplete="email" required /></div>
-      <div className="field"><div className="lbl"><label htmlFor="pw">Lykilorð</label></div><input id="pw" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="a.m.k. 8 stafir" autoComplete="new-password" required /></div>
+      <div className="field"><div className="lbl"><label htmlFor="pw">Lykilorð</label></div>
+        <div className="pwwrap">
+          <input id="pw" type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="a.m.k. 8 stafir" autoComplete="new-password" required />
+          <button type="button" className="pweye" aria-label={showPw ? "Fela lykilorð" : "Sýna lykilorð"} onClick={() => setShowPw((v) => !v)}>
+            {showPw
+              ? <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M17.94 17.94A10.5 10.5 0 0 1 12 20c-7 0-10-8-10-8a18.4 18.4 0 0 1 5.06-5.94M9.9 4.24A9.9 9.9 0 0 1 12 4c7 0 10 8 10 8a18.5 18.5 0 0 1-2.16 3.19M14.12 14.12a3 3 0 1 1-4.24-4.24" /><path d="m2 2 20 20" /></svg>
+              : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M2 12s3-8 10-8 10 8 10 8-3 8-10 8-10-8-10-8Z" /><circle cx="12" cy="12" r="3" /></svg>}
+          </button>
+        </div>
+      </div>
 
       {error && <div style={{ color: "var(--bad)", fontSize: 13, fontWeight: 600, marginBottom: 14 }}>{error}</div>}
       <button className="btn" type="submit" disabled={busy}>{busy ? "Stofna…" : "Halda áfram"}</button>
