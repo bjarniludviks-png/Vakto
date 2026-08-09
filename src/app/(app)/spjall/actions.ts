@@ -3,6 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { initials } from "@/lib/employees";
+import { notifyEmployee } from "@/lib/push";
 
 export type Conversation = { id: string; name: string; kind: string; av: string; color: string; last: string; lastAt: string | null; dm: boolean };
 export type ChatMessage = { id: string; sender: string; senderId: string; me: boolean; body: string; at: string; kind: string; url: string | null };
@@ -270,7 +271,7 @@ export async function uploadChatMedia(dataUrl: string, ext: string): Promise<{ o
 export type FeedComment = { id: string; sender: string; av: string; color: string; body: string; at: string };
 export type FeedPost = {
   id: string; sender: string; av: string; color: string; me: boolean;
-  body: string; at: string;
+  body: string; at: string; pinned: boolean; system: boolean;
   imageUrl: string | null; fileUrl: string | null; fileName: string | null;
   reactions: { emoji: string; count: number }[];
   myReaction: string | null;
@@ -278,15 +279,17 @@ export type FeedPost = {
 };
 
 /** Latest 50 posts with likes + comments, newest first. */
-export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meId: string }> {
-  if (!isSupabaseConfigured()) return { ok: false, posts: [], meId: "" };
+export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meId: string; canPin: boolean }> {
+  if (!isSupabaseConfigured()) return { ok: false, posts: [], meId: "", canPin: false };
   try {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
-    if ("error" in ctx) return { ok: false, posts: [], meId: "" };
+    if ("error" in ctx) return { ok: false, posts: [], meId: "", canPin: false };
+    const { data: meRow } = await supabase.from("users").select("role").eq("id", ctx.userId).maybeSingle();
+    const canPin = meRow?.role === "owner" || meRow?.role === "manager";
     const { data: rows } = await supabase
-      .from("posts").select("id, sender_id, body, created_at, image_url, file_url, file_name, users!posts_sender_id_fkey(full_name)")
-      .eq("company_id", ctx.company).order("created_at", { ascending: false }).limit(50);
+      .from("posts").select("id, sender_id, body, created_at, image_url, file_url, file_name, pinned, users!posts_sender_id_fkey(full_name)")
+      .eq("company_id", ctx.company).order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(50);
     const ids = (rows ?? []).map((r) => r.id as string);
     const [{ data: likes }, { data: comments }] = await Promise.all([
       supabase.from("post_likes").select("post_id, user_id, reaction").in("post_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
@@ -294,12 +297,16 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
     ]);
     const nameOf = (u: unknown) => ((Array.isArray(u) ? u[0] : u) as { full_name?: string } | null)?.full_name ?? "Notandi";
     const posts: FeedPost[] = (rows ?? []).map((r) => {
-      const name = nameOf(r.users);
+      const system = !r.sender_id;
+      const name = system ? "VAKTO" : nameOf(r.users);
       const pLikes = (likes ?? []).filter((l) => l.post_id === r.id);
       const byEmoji = new Map<string, number>();
       for (const l of pLikes) byEmoji.set((l.reaction as string) || "❤️", (byEmoji.get((l.reaction as string) || "❤️") ?? 0) + 1);
       return {
-        id: r.id as string, sender: name, av: initials(name), color: colorOf(name.split(/\s+/)[0] || name),
+        id: r.id as string, sender: name,
+        av: system ? "🎂" : initials(name),
+        color: system ? "#e9700f" : colorOf(name.split(/\s+/)[0] || name),
+        pinned: !!r.pinned, system,
         me: r.sender_id === ctx.userId,
         body: r.body as string, at: hhmm(r.created_at as string) + " · " + new Date(r.created_at as string).toLocaleDateString("de-DE").replace(/\./g, "."),
         imageUrl: (r.image_url as string) ?? null, fileUrl: (r.file_url as string) ?? null, fileName: (r.file_name as string) ?? null,
@@ -311,9 +318,25 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
         }),
       };
     });
-    return { ok: true, posts, meId: ctx.userId };
+    return { ok: true, posts, meId: ctx.userId, canPin };
   } catch {
-    return { ok: false, posts: [], meId: "" };
+    return { ok: false, posts: [], meId: "", canPin: false };
+  }
+}
+
+/** Pin/unpin an announcement (managers + owners only — checked server-side). */
+export async function setPostPinned(postId: string, pinned: boolean): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data: meRow } = await supabase.from("users").select("role").eq("id", ctx.userId).maybeSingle();
+    if (meRow?.role !== "owner" && meRow?.role !== "manager") return { ok: false, error: "Aðeins stjórnendur geta fest tilkynningar" };
+    const { error } = await supabase.from("posts").update({ pinned }).eq("id", postId).eq("company_id", ctx.company);
+    return error ? { ok: false, error: error.message } : { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
 
@@ -328,7 +351,18 @@ export async function createPost(body: string, media?: { imageUrl?: string; file
       company_id: ctx.company, sender_id: ctx.userId, body: body.trim(),
       image_url: media?.imageUrl ?? null, file_url: media?.fileUrl ?? null, file_name: media?.fileName ?? null,
     });
-    return error ? { ok: false, error: error.message } : { ok: true };
+    if (error) return { ok: false, error: error.message };
+    // Manager/owner posts push to the team (best-effort, capped).
+    const { data: meRow } = await supabase.from("users").select("role, full_name").eq("id", ctx.userId).maybeSingle();
+    if (meRow?.role === "owner" || meRow?.role === "manager") {
+      const { data: team } = await supabase.from("employees").select("id, user_id").eq("company_id", ctx.company).eq("status", "active").limit(100);
+      const preview = body.trim().slice(0, 80) || "Ný færsla á fréttaveitunni";
+      for (const m of team ?? []) {
+        if (m.user_id === ctx.userId) continue;
+        void notifyEmployee(m.id as string, { title: `📣 ${(meRow.full_name as string) ?? "Stjórnandi"}`, body: preview, url: "/frettaveita", tag: "feed" });
+      }
+    }
+    return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }

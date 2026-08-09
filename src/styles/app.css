@@ -244,6 +244,10 @@ body.kioskmode .cookie{display:none}
 .fp-picker button:hover{transform:scale(1.25)}
 .fp-picker button.on{background:var(--brand-soft, #fdf1e7)}
 .fp-cb{background:var(--line2);border-radius:12px;padding:7px 11px;flex:1}
+.feed-post.pinned{border-color:rgba(233,112,15,.45);box-shadow:0 0 0 1px rgba(233,112,15,.12)}
+.fp-pinbadge{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--brand);margin-bottom:8px}
+.fp-pin{background:none;border:0;cursor:pointer;color:var(--ink3);padding:5px;border-radius:8px;flex-shrink:0}
+.fp-pin:hover{color:var(--brand);background:var(--line2)}
 .feed-compose{display:flex;gap:9px;align-items:flex-end;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:11px}
 .feed-compose textarea{flex:1;border:0;background:none;font:inherit;font-size:13.5px;resize:none;outline:none;color:var(--ink)}
 .feed-post{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}

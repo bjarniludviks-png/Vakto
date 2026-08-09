@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { useLang } from "@/components/app/lang";
 import { toast } from "@/components/app/toast";
 import {
-  listPosts, createPost, setPostReaction, addPostComment, uploadChatMedia,
+  listPosts, createPost, setPostReaction, addPostComment, uploadChatMedia, setPostPinned,
   type FeedPost,
 } from "../spjall/actions";
 
@@ -18,6 +18,7 @@ const REACTIONS = ["👍", "❤️", "😂", "🎉", "👏", "🔥"];
 export default function FeedScreen() {
   const { t } = useLang();
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [canPin, setCanPin] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [val, setVal] = useState("");
   const [busy, setBusy] = useState(false);
@@ -28,7 +29,7 @@ export default function FeedScreen() {
   const imgRef = useRef<HTMLInputElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  function reload() { listPosts().then((r) => { if (r.ok) setPosts(r.posts); setLoaded(true); }); }
+  function reload() { listPosts().then((r) => { if (r.ok) { setPosts(r.posts); setCanPin(r.canPin); } setLoaded(true); }); }
   useEffect(() => { reload(); const iv = setInterval(reload, 10000); return () => clearInterval(iv); }, []);
 
   function pickFile(kind: "image" | "file") {
@@ -123,10 +124,22 @@ export default function FeedScreen() {
         )}
 
         {posts.map((p) => (
-          <div className="feed-post" key={p.id} style={{ marginBottom: 14 }}>
+          <div className={`feed-post${p.pinned ? " pinned" : ""}`} key={p.id} style={{ marginBottom: 14 }}>
+            {p.pinned && (
+              <div className="fp-pinbadge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M16 3l5 5-6 2-4 8-2-2-5 5-1-1 5-5-2-2 8-4z" /></svg>
+                {t("Fest tilkynning")}
+              </div>
+            )}
             <div className="fp-head">
-              <span className="avt" style={{ background: p.color, width: 38, height: 38, fontSize: 13 }}>{p.av}</span>
-              <div><b>{p.sender}</b><span className="muted" style={{ fontSize: 11.5, display: "block" }}>{p.at}</span></div>
+              <span className="avt" style={{ background: p.color, width: 38, height: 38, fontSize: p.system ? 18 : 13 }}>{p.av}</span>
+              <div style={{ flex: 1 }}><b>{p.sender}</b><span className="muted" style={{ fontSize: 11.5, display: "block" }}>{p.at}</span></div>
+              {canPin && !p.system && (
+                <button className="fp-pin" title={p.pinned ? t("Losa tilkynningu") : t("Festa efst sem tilkynningu")}
+                  onClick={async () => { const r = await setPostPinned(p.id, !p.pinned); if (r.ok) reload(); else toast(r.error ?? "Villa"); }}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill={p.pinned ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8"><path d="M16 3l5 5-6 2-4 8-2-2-5 5-1-1 5-5-2-2 8-4z" /></svg>
+                </button>
+              )}
             </div>
             {p.body && <p className="fp-body">{p.body}</p>}
             {p.imageUrl && (

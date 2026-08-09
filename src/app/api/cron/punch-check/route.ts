@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkLongPunches } from "@/lib/punch-check.server";
+import { checkBirthdays } from "@/lib/birthday.server";
 
 // Daily backstop for forgotten clock-outs (Vercel cron). Managers opening
 // Tímaskráning trigger the same check opportunistically during the day.
@@ -10,6 +11,6 @@ export async function GET(req: NextRequest) {
   if (secret ? auth !== `Bearer ${secret}` : !isVercelCron) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
-  const reminded = await checkLongPunches();
-  return NextResponse.json({ ok: true, reminded });
+  const [reminded, birthdays] = await Promise.all([checkLongPunches(), checkBirthdays()]);
+  return NextResponse.json({ ok: true, reminded, birthdays });
 }
