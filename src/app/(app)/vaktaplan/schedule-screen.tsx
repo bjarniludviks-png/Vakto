@@ -968,6 +968,7 @@ function MonthView({ monthDate, todayISO, blocks, onEdit, onCopyBlock, onDragBlo
       <div className="card">
         <div className="ch"><div><div className="ct">{t(MONTHS_IS[m])} {y}</div><div className="cs">{t("smelltu á dag eða vakt til að breyta · dragðu vakt á annan dag til að færa")}</div></div></div>
         <div className="cb">
+          <div className="mcal-wrap">
           <div className="mcal">
             {hd.map((h) => <div className="hd" key={h}>{t(h)}</div>)}
             {Array.from({ length: lead }, (_, i) => <div className="cell empty" key={`l${i}`} />)}
@@ -996,6 +997,7 @@ function MonthView({ monthDate, todayISO, blocks, onEdit, onCopyBlock, onDragBlo
                 </div>
               );
             })}
+          </div>
           </div>
         </div>
       </div>

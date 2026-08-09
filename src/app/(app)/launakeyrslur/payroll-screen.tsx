@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { PeriodPicker } from "@/components/app/period-picker";
+import { dec1 } from "@/lib/format";
+import { getSettleCandidates, type SettleCandidate } from "./actions";
 import { toast } from "@/components/app/toast";
 import { Stacked } from "@/components/app/charts";
 import { useLang } from "@/components/app/lang";
@@ -42,7 +44,8 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
   const [cf, setCf] = useState(thisMonth.from);
   const [ct, setCt] = useState(thisMonth.to);
   const [pp, setPp] = useState<PeriodPayroll | null>(null);
-  const [useTb, setUseTb] = useState(false);
+  const [settleIds, setSettleIds] = useState<string[]>([]);
+  const [tbModal, setTbModal] = useState(false);
 
   const range = payRange(period, cf, ct, periodStart);
   useEffect(() => {
@@ -63,7 +66,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
     window.location.href = `/api/payroll/export${qs.replace("$F", format)}`;
   }
   async function keyra() {
-    const res = await runPayroll(view.live ? range.from : undefined, view.live ? range.to : undefined, useTb);
+    const res = await runPayroll(view.live ? range.from : undefined, view.live ? range.to : undefined, settleIds);
     if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
     toast(res.demo ? `Launakeyrsla keyrð (demo — ${res.count} starfsm.)` : `Launakeyrsla keyrð & vistuð — ${res.count} starfsmenn`);
   }
@@ -120,10 +123,11 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
           </div>
           <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
             <button className="btn ghost sm" onClick={() => toast("Forskoða launakeyrslu")}>{t("Forskoða")}</button>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", marginRight: 4 }} title={t("Jafnar mínus-stöðu tímabanka á GRUNNTAXTA — yfirvinnuálagið helst alltaf hjá starfsmanninum")}>
-              <input type="checkbox" checked={useTb} onChange={(e) => setUseTb(e.target.checked)} />
-              {t("Jafna tímabanka")}
-            </label>
+            <button className="btn ghost sm" style={settleIds.length ? { borderColor: "var(--brand)", color: "var(--brand)" } : undefined}
+              title={t("Jafnar mínus-stöðu tímabanka á GRUNNTAXTA — yfirvinnuálagið helst alltaf hjá starfsmanninum")}
+              onClick={() => setTbModal(true)}>
+              {t("Jafna tímabanka")}{settleIds.length ? ` (${settleIds.length})` : ""}
+            </button>
             <button className="btn" onClick={keyra}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12l5 5L20 6" /></svg>{t("Keyra launakeyrslu")}</button>
           </div>
         </div>
@@ -201,7 +205,50 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
         </div>
       </div>
 
+      {tbModal && <SettleModal selected={settleIds} onSave={(ids) => { setSettleIds(ids); setTbModal(false); }} onClose={() => setTbModal(false)} />}
       {slip && <PayslipModal data={slip} onClose={() => setSlip(null)} />}
     </>
+  );
+}
+
+
+/** Pick WHICH employees get their time bank settled in this run — sometimes
+ * the employer (or the employee) wants to wait, so it's per-person. */
+function SettleModal({ selected, onSave, onClose }: { selected: string[]; onSave: (ids: string[]) => void; onClose: () => void }) {
+  const { t } = useLang();
+  const [rows, setRows] = useState<SettleCandidate[]>([]);
+  const [sel, setSel] = useState<Set<string>>(new Set(selected));
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    getSettleCandidates().then((r) => {
+      setRows(r.rows);
+      // Default: everyone with a debt is picked (uncheck to skip someone).
+      if (!selected.length) setSel(new Set(r.rows.map((x) => x.id)));
+      setLoading(false);
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal" style={{ maxWidth: 460 }}>
+        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Jafna tímabanka")}</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="mb">
+          <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>{t("Veldu hjá hverjum á að jafna í þessari keyrslu. Dregið er af á grunntaxta — yfirvinnuálagið helst alltaf hjá starfsmanninum.")}</p>
+          {loading ? <p className="muted" style={{ fontSize: 13 }}>{t("Sæki stöðu…")}</p>
+            : rows.length === 0 ? <p className="muted" style={{ fontSize: 13 }}>{t("Enginn mánaðarlaunamaður er með mínus-stöðu í tímabankanum.")}</p>
+            : rows.map((r) => (
+              <label key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line2)", cursor: "pointer", fontSize: 13.5 }}>
+                <input type="checkbox" checked={sel.has(r.id)} onChange={(e) => setSel((sv) => { const n = new Set(sv); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} />
+                <b style={{ flex: 1 }}>{r.name}</b>
+                <span style={{ color: "var(--bad)", fontVariantNumeric: "tabular-nums", fontWeight: 650 }}>{dec1(r.balance)} {t("klst")}</span>
+              </label>
+            ))}
+          <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
+            <button className="btn" onClick={() => onSave([...sel])}>{t("Nota í keyrslu")}{sel.size ? ` (${sel.size})` : ""}</button>
+            <button className="btn ghost" onClick={() => onSave([])}>{t("Sleppa jöfnun")}</button>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

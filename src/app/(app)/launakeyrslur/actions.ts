@@ -105,7 +105,7 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
 }
 
 /** Run + persist payroll for a period using approved worked hours. */
-export async function runPayroll(from?: string, to?: string, useTimebank = false): Promise<RunResult> {
+export async function runPayroll(from?: string, to?: string, settleIds: string[] = []): Promise<RunResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true, count: 0 };
   try {
     const supabase = await createClient();
@@ -125,7 +125,7 @@ export async function runPayroll(from?: string, to?: string, useTimebank = false
     // and premiums are untouched: when overtime fills the deficit the
     // employee keeps the premium, only the base part cancels.
     const tb = new Map<string, { hours: number; adj: number }>();
-    if (useTimebank) {
+    if (settleIds.length) {
       const [{ getTimeBank }, { applyGrossAdjustment }] = await Promise.all([
         import("../skyrslur/timebank.server"), import("@/lib/payroll"),
       ]);
@@ -135,6 +135,7 @@ export async function runPayroll(from?: string, to?: string, useTimebank = false
       const metaById = new Map((empsMeta ?? []).map((e) => [e.id as string, e]));
       for (let i = 0; i < lines.length; i++) {
         const l = lines[i];
+        if (!settleIds.includes(l.employeeId)) continue;
         const bal = bank.rows.find((r) => r.id === l.employeeId)?.balance ?? 0;
         const meta = metaById.get(l.employeeId);
         if (bal >= 0 || !meta || meta.pay_type !== "monthly") continue;
@@ -186,5 +187,30 @@ export async function runPayroll(from?: string, to?: string, useTimebank = false
     return { ok: true, count: lines.length };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+
+export type SettleCandidate = { id: string; name: string; balance: number };
+
+/** Monthly-paid employees with a NEGATIVE time-bank balance — the pool the
+ * manager picks from when settling in a payroll run. */
+export async function getSettleCandidates(): Promise<{ ok: boolean; rows: SettleCandidate[] }> {
+  if (!isSupabaseConfigured()) return { ok: true, rows: [] };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, rows: [] };
+    const [{ getTimeBank }] = await Promise.all([import("../skyrslur/timebank.server")]);
+    const bank = await getTimeBank();
+    const { data: emps } = await supabase
+      .from("employees").select("id, full_name, pay_type").eq("company_id", ctx.company).eq("pay_type", "monthly");
+    const monthly = new Map((emps ?? []).map((e) => [e.id as string, e.full_name as string]));
+    const rows = bank.rows
+      .filter((r) => r.balance < 0 && monthly.has(r.id))
+      .map((r) => ({ id: r.id, name: monthly.get(r.id) ?? r.name, balance: r.balance }));
+    return { ok: true, rows };
+  } catch {
+    return { ok: false, rows: [] };
   }
 }

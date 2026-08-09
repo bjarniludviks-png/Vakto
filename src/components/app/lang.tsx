@@ -1104,6 +1104,11 @@ export const DICT: Dict = {
   // Schedule — AI proposal
   "Tillagan gildir fyrir vikuna sem er opin í planinu — flettu fyrst á réttu vikuna (t.d. næstu viku) með örvunum efst.": { is: "Tillagan gildir fyrir vikuna sem er opin í planinu — flettu fyrst á réttu vikuna (t.d. næstu viku) með örvunum efst.", en: "The proposal applies to the week currently open in the plan — navigate to the right week first (e.g. next week) with the arrows above.", vi: "Đề xuất áp dụng cho tuần đang mở trong lịch — hãy chuyển đến đúng tuần trước (vd. tuần sau) bằng các mũi tên phía trên." },
   "vaktir í tillögunni — við samþykki eru þær settar í planið og það birt.": { is: "vaktir í tillögunni — við samþykki eru þær settar í planið og það birt.", en: "shifts in the proposal — on approval they are placed into the plan and published.", vi: "ca làm trong đề xuất — khi duyệt, chúng sẽ được đưa vào lịch và đăng." },
+  "Veldu hjá hverjum á að jafna í þessari keyrslu. Dregið er af á grunntaxta — yfirvinnuálagið helst alltaf hjá starfsmanninum.": { is: "Veldu hjá hverjum á að jafna í þessari keyrslu. Dregið er af á grunntaxta — yfirvinnuálagið helst alltaf hjá starfsmanninum.", en: "Pick whose time bank to settle in this run. Deducted at base rate — the overtime premium always stays with the employee.", vi: "Chọn nhân viên sẽ cân bằng trong kỳ này. Chỉ trừ theo lương cơ bản — phụ cấp tăng ca luôn thuộc về nhân viên." },
+  "Sæki stöðu…": { is: "Sæki stöðu…", en: "Loading balances…", vi: "Đang tải…" },
+  "Enginn mánaðarlaunamaður er með mínus-stöðu í tímabankanum.": { is: "Enginn mánaðarlaunamaður er með mínus-stöðu í tímabankanum.", en: "No monthly-paid employee has a negative time-bank balance.", vi: "Không có nhân viên lương tháng nào có số giờ âm." },
+  "Nota í keyrslu": { is: "Nota í keyrslu", en: "Use in this run", vi: "Áp dụng cho kỳ này" },
+  "Sleppa jöfnun": { is: "Sleppa jöfnun", en: "Skip settlement", vi: "Bỏ qua cân bằng" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });
