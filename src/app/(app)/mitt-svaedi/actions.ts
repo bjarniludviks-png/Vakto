@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
+import { sendContractSignedEmail } from "@/lib/email";
 import { notifyManagers } from "@/lib/push";
 
 export type PunchResult = { ok: boolean; demo?: boolean; error?: string };
@@ -358,6 +359,17 @@ export async function signMyContract(id: string): Promise<{ ok: boolean; error?:
       status: "signed", signed_at: now.toISOString(), signed_by_name: name, signed_via: "inapp", content,
     }).eq("id", id);
     if (error) return { ok: false, error: error.message };
+    // Tell the owner(s) — best-effort, via admin client (employee sessions
+    // can't read the users table).
+    try {
+      const { createAdminClient } = await import("@/lib/supabase/admin");
+      const admin = createAdminClient();
+      const { data: empRow } = await admin.from("employees").select("company_id").eq("user_id", user.id).maybeSingle();
+      if (empRow?.company_id) {
+        const { data: owners } = await admin.from("users").select("email").eq("company_id", empRow.company_id).eq("role", "owner");
+        for (const o of owners ?? []) if (o.email) void sendContractSignedEmail(o.email as string, name);
+      }
+    } catch { /* email is best-effort */ }
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };

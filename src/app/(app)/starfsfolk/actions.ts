@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
+import { sendContractEmail } from "@/lib/email";
 import type { CustomRules } from "@/lib/payrules";
 
 export type NewEmployeeInput = {
@@ -586,8 +587,15 @@ export async function setContractStatus(id: string, status: "draft" | "sent" | "
     const patch: Record<string, unknown> = { status };
     if (status === "sent") patch.sent_at = new Date().toISOString();
     if (status === "signed") patch.signed_at = new Date().toISOString();
-    const { error } = await supabase.from("contracts").update(patch).eq("id", id);
+    const { data: row, error } = await supabase.from("contracts").update(patch).eq("id", id)
+      .select("employee_id, employees(full_name, email), companies(name)").maybeSingle();
     if (error) return { ok: false, error: error.message };
+    // "Sent" → tell the employee a contract awaits their signature (best-effort).
+    if (status === "sent" && row) {
+      const emp = (Array.isArray(row.employees) ? row.employees[0] : row.employees) as { full_name?: string; email?: string } | null;
+      const co = (Array.isArray(row.companies) ? row.companies[0] : row.companies) as { name?: string } | null;
+      if (emp?.email) void sendContractEmail(emp.email, emp.full_name ?? "", co?.name ?? "Fyrirtækið þitt");
+    }
     revalidatePath("/starfsfolk");
     return { ok: true };
   } catch (e) {

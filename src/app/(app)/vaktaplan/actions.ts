@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
 import { notifyEmployee } from "@/lib/push";
-import { sendSchedulePublishedEmail } from "@/lib/email";
+import { sendSchedulePublishedEmail, sendLeaveDecisionEmail } from "@/lib/email";
 import { getEmployees } from "@/lib/employees.server";
 import { initials as empInitials } from "@/lib/employees";
 import { getWeekUnavail } from "./schedule.server";
@@ -285,9 +285,11 @@ export async function updateLeaveRequest(id: string, approved: boolean): Promise
     const status = approved ? "approved" : "rejected";
     const { data: updated, error } = await supabase
       .from("leave_requests").update({ status }).eq("id", id).eq("company_id", ctx.company)
-      .select("employee_id").maybeSingle();
+      .select("employee_id, employees(full_name, email)").maybeSingle();
     if (error) return { ok: false, error: error.message };
-    // Notify the employee (best-effort; no-op until VAPID + a subscription exist).
+    // Notify the employee (best-effort): push + email.
+    const decEmp = (Array.isArray(updated?.employees) ? updated?.employees[0] : updated?.employees) as { full_name?: string; email?: string } | null;
+    if (decEmp?.email) void sendLeaveDecisionEmail(decEmp.email, decEmp.full_name ?? "", approved);
     void notifyEmployee(updated?.employee_id as string | undefined, {
       title: approved ? "Frí samþykkt" : "Frí hafnað",
       body: approved ? "Frí-beiðnin þín var samþykkt." : "Frí-beiðninni þinni var hafnað.",

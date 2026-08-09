@@ -89,6 +89,52 @@ export async function sendSchedulePublishedEmail(to: string, name: string, compa
   });
 }
 
+export async function sendContractEmail(to: string, name: string, company: string) {
+  const first = (name || "").split(/\s+/)[0] || "";
+  return sendEmail({
+    to,
+    subject: "Ráðningarsamningur bíður undirritunar",
+    html: template({
+      heading: `Samningurinn þinn er tilbúinn${first ? ", " + first : ""}`,
+      preheader: `${company} sendi þér ráðningarsamning til undirritunar.`,
+      body: `<b>${company}</b> sendi þér ráðningarsamning. Opnaðu Mitt svæði, lestu hann yfir og samþykktu rafrænt — það tekur mínútu.`,
+      ctaLabel: "Lesa og samþykkja",
+      ctaHref: `${APP_URL}/mitt-svaedi`,
+    }),
+  });
+}
+
+export async function sendContractSignedEmail(to: string, employeeName: string) {
+  return sendEmail({
+    to,
+    subject: `${employeeName} undirritaði ráðningarsamninginn`,
+    html: template({
+      heading: "Samningur undirritaður ✓",
+      preheader: `${employeeName} samþykkti ráðningarsamninginn rafrænt.`,
+      body: `<b>${employeeName}</b> samþykkti ráðningarsamninginn rafrænt í VAKTO. Undirritað eintak með tímastimpli er í skjalasafni starfsmannsins.`,
+      ctaLabel: "Opna starfsmannaspjald",
+      ctaHref: `${APP_URL}/starfsfolk`,
+    }),
+  });
+}
+
+export async function sendLeaveDecisionEmail(to: string, name: string, approved: boolean) {
+  const first = (name || "").split(/\s+/)[0] || "";
+  return sendEmail({
+    to,
+    subject: approved ? "Fríbeiðnin þín var samþykkt" : "Fríbeiðnin þín var afgreidd",
+    html: template({
+      heading: approved ? `Samþykkt${first ? ", " + first : ""} ✓` : "Beiðninni var hafnað",
+      preheader: approved ? "Fríbeiðnin þín var samþykkt." : "Fríbeiðninni þinni var hafnað.",
+      body: approved
+        ? "Fríbeiðnin þín var <b>samþykkt</b>. Vaktaplanið tekur mið af fríinu — sjáðu stöðuna í Mitt svæði."
+        : "Fríbeiðninni þinni var <b>hafnað</b> að þessu sinni. Talaðu við vaktstjórann þinn ef þú vilt ræða það — eða sendu nýja beiðni fyrir annað tímabil.",
+      ctaLabel: "Opna Mitt svæði",
+      ctaHref: `${APP_URL}/mitt-svaedi`,
+    }),
+  });
+}
+
 export async function sendInviteEmail(to: string, company: string, roleLabel: string, link: string) {
   return sendEmail({
     to,
