@@ -249,7 +249,7 @@ export default function AppShell({
                 <div className={`mi${lang === "en" ? " on" : ""}`} onClick={() => { setLang("en"); setMenu(null); toast("Language: English"); }}>
                   English
                 </div>
-                <div className="mi" onClick={() => { setMenu(null); toast("Tiếng Việt — væntanlegt"); }}>
+                <div className={`mi${lang === "vi" ? " on" : ""}`} onClick={() => { setLang("vi"); setMenu(null); toast("Ngôn ngữ: Tiếng Việt"); }}>
                   Tiếng Việt
                 </div>
               </>
@@ -301,7 +301,7 @@ export default function AppShell({
                 <div className="mi" onClick={() => nav("/hjalp")}>
                   <Icon name="help" className="ei" />{t("acct:help")}
                 </div>
-                <div className="mi" onClick={() => { setLang(lang === "is" ? "en" : "is"); setMenu(null); }}>
+                <div className="mi" onClick={() => { setLang(lang === "is" ? "en" : lang === "en" ? "vi" : "is"); setMenu(null); }}>
                   <Icon name="globe" className="ei" />{lang === "is" ? "English" : "Íslenska"}
                 </div>
                 <div className="mi" onClick={toggleTheme}>
