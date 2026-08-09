@@ -7,7 +7,8 @@ import { toast } from "@/components/app/toast";
 import {
   listConversations, listMessages, sendChatMessage, createGroup, startDM, searchPeople,
   listMembers, addMembers, removeMember, leaveChannel, uploadChatMedia,
-  type Conversation, type ChatMessage, type Person, type Members,
+  listPosts, createPost, togglePostLike, addPostComment,
+  type Conversation, type ChatMessage, type Person, type Members, type FeedPost,
 } from "./actions";
 
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "🔥", "👏", "😅", "😮", "😢", "💪", "✅", "🤝", "☕", "🍕", "🚀"];
@@ -41,6 +42,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
   const [emoji, setEmoji] = useState(false);
   const [rec, setRec] = useState(false);
   const [modal, setModal] = useState<null | "dm" | "group" | "info">(null);
+  const [view, setView] = useState<"chat" | "feed">("chat");
   const [seen, setSeen] = useState<Record<string, string>>({});
   const endRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
@@ -114,7 +116,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
 
   return (
     <>
-      <div className={`msgr full${active ? " thread-open" : ""}`}>
+      <div className={`msgr full${active || view === "feed" ? " thread-open" : ""}`}>
         {/* conversation list */}
         <div className="msgr-list">
           <div className="msgr-head" style={{ gap: 8 }}>
@@ -123,10 +125,16 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
             <button className="iconbtn" title={t("Ný grúppa")} onClick={() => setModal("group")}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" /></svg></button>
           </div>
           <div style={{ flex: 1, overflowY: "auto" }}>
+            <div className={`conv${view === "feed" ? " on" : ""}`} onClick={() => { setView("feed"); setActive(null); }}>
+              <span className="avt" style={{ background: "var(--brand)", width: 40, height: 40 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M3 11l18-7-4 14-6-3.5L8 19l-1-5z" /></svg>
+              </span>
+              <div className="tx"><b>{t("Fréttaveita")}</b><span>{t("tilkynningar og fréttir fyrirtækisins")}</span></div>
+            </div>
             {shown.map((c) => {
               const un = unread(c);
               return (
-                <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}`} onClick={() => { setActive(c); markSeen(c.id); }}>
+                <div key={c.id} className={`conv${view === "chat" && active?.id === c.id ? " on" : ""}`} onClick={() => { setView("chat"); setActive(c); markSeen(c.id); }}>
                   <span className="avt" style={{ background: c.color, width: 40, height: 40, fontSize: c.kind === "general" ? 18 : 13 }}>{c.av}</span>
                   <div className="tx">
                     <b style={un ? { fontWeight: 800 } : undefined}>{c.kind === "general" ? "# " + c.name : c.name}</b>
@@ -144,7 +152,9 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
 
         {/* thread */}
         <div className="msgr-thread">
-          {active ? (
+          {view === "feed" ? (
+            <FeedPane onBack={() => setView("chat")} />
+          ) : active ? (
             <>
               <div className="msgr-head">
                 <button className="iconbtn mob-back" onClick={() => setActive(null)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6" /></svg></button>
@@ -186,6 +196,90 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
       {modal === "dm" && <NewDMModal onClose={() => setModal(null)} onPick={async (p) => { const r = await startDM(p.userId); setModal(null); if (r.ok) { reloadConvs(); listConversations().then((c) => { const found = c.items.find((x) => x.id === r.id); if (found) setActive(found); }); } else toast(r.error ?? "Villa"); }} />}
       {modal === "group" && <NewGroupModal onClose={() => setModal(null)} onDone={(id) => { setModal(null); listConversations().then((c) => { if (c.ok) { setConvs(c.items); const f = c.items.find((x) => x.id === id); if (f) setActive(f); } }); }} />}
       {modal === "info" && active && <InfoModal conv={active} onClose={() => setModal(null)} onLeft={() => { setModal(null); setActive(null); reloadConvs(); }} />}
+    </>
+  );
+}
+
+/** Company news feed — compose, like, comment. Polls lightly while open. */
+function FeedPane({ onBack }: { onBack: () => void }) {
+  const { t } = useLang();
+  const [posts, setPosts] = useState<FeedPost[]>([]);
+  const [val, setVal] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [openC, setOpenC] = useState<Record<string, boolean>>({});
+  const [cVal, setCVal] = useState<Record<string, string>>({});
+  function reload() { listPosts().then((r) => { if (r.ok) setPosts(r.posts); }); }
+  useEffect(() => { reload(); const iv = setInterval(reload, 8000); return () => clearInterval(iv); }, []);
+  async function post() {
+    if (!val.trim()) return;
+    setBusy(true);
+    const r = await createPost(val);
+    setBusy(false);
+    if (!r.ok) { toast(r.error ?? "Villa"); return; }
+    setVal(""); reload();
+  }
+  async function like(p: FeedPost) {
+    setPosts((ps) => ps.map((x) => x.id === p.id ? { ...x, likedByMe: !p.likedByMe, likes: p.likes + (p.likedByMe ? -1 : 1) } : x));
+    await togglePostLike(p.id, !p.likedByMe);
+  }
+  async function comment(p: FeedPost) {
+    const body = (cVal[p.id] ?? "").trim();
+    if (!body) return;
+    setCVal((v) => ({ ...v, [p.id]: "" }));
+    const r = await addPostComment(p.id, body);
+    if (!r.ok) toast(r.error ?? "Villa"); else reload();
+  }
+  return (
+    <>
+      <div className="msgr-head">
+        <button className="iconbtn mob-back" onClick={onBack}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6" /></svg></button>
+        <span className="avt" style={{ background: "var(--brand)", width: 34, height: 34 }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><path d="M3 11l18-7-4 14-6-3.5L8 19l-1-5z" /></svg>
+        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>{t("Fréttaveita")}</div>
+      </div>
+      <div className="msgr-msgs" style={{ gap: 14 }}>
+        <div className="feed-compose">
+          <textarea rows={2} placeholder={t("Deildu fréttum með teyminu…")} value={val} onChange={(e) => setVal(e.target.value)} />
+          <button className="btn sm" disabled={busy || !val.trim()} onClick={post}>{t("Birta")}</button>
+        </div>
+        {posts.length === 0 && <div className="muted" style={{ textAlign: "center", margin: "auto", fontSize: 13 }}>{t("Engar fréttir enn — skrifaðu fyrstu færsluna!")}</div>}
+        {posts.map((p) => (
+          <div className="feed-post" key={p.id}>
+            <div className="fp-head">
+              <span className="avt" style={{ background: p.color, width: 34, height: 34, fontSize: 12 }}>{p.av}</span>
+              <div><b>{p.sender}</b><span className="muted" style={{ fontSize: 11.5, display: "block" }}>{p.at}</span></div>
+            </div>
+            <p className="fp-body">{p.body}</p>
+            <div className="fp-actions">
+              <button className={p.likedByMe ? "on" : ""} onClick={() => like(p)}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill={p.likedByMe ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 1 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8Z" /></svg>
+                {p.likes > 0 ? p.likes : ""}
+              </button>
+              <button onClick={() => setOpenC((v) => ({ ...v, [p.id]: !v[p.id] }))}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z" /></svg>
+                {p.comments.length > 0 ? p.comments.length : t("Athugasemd")}
+              </button>
+            </div>
+            {(openC[p.id] || p.comments.length > 0) && (
+              <div className="fp-comments">
+                {p.comments.map((cm) => (
+                  <div className="fp-c" key={cm.id}>
+                    <span className="avt" style={{ background: cm.color, width: 24, height: 24, fontSize: 9 }}>{cm.av}</span>
+                    <div><b>{cm.sender}</b> {cm.body} <span className="muted" style={{ fontSize: 10.5 }}>{cm.at}</span></div>
+                  </div>
+                ))}
+                {openC[p.id] && (
+                  <div className="fp-cin">
+                    <input placeholder={t("Skrifaðu athugasemd…")} value={cVal[p.id] ?? ""} onChange={(e) => setCVal((v) => ({ ...v, [p.id]: e.target.value }))} onKeyDown={(e) => e.key === "Enter" && comment(p)} />
+                    <button className="btn ghost sm" onClick={() => comment(p)}>{t("Senda")}</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </>
   );
 }

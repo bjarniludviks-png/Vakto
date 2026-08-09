@@ -230,6 +230,23 @@ body.kioskmode .cookie{display:none}
 
 /* kpi */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+/* ---------- news feed (Spjall → Fréttaveita) ---------- */
+.feed-compose{display:flex;gap:9px;align-items:flex-end;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:11px}
+.feed-compose textarea{flex:1;border:0;background:none;font:inherit;font-size:13.5px;resize:none;outline:none;color:var(--ink)}
+.feed-post{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.fp-head{display:flex;gap:10px;align-items:center}
+.fp-head b{font-size:13.5px}
+.fp-body{font-size:13.5px;line-height:1.55;margin:10px 0 8px;white-space:pre-wrap}
+.fp-actions{display:flex;gap:8px}
+.fp-actions button{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:12px;font-weight:600;color:var(--ink3);background:none;border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer;transition:color .15s,border-color .15s}
+.fp-actions button:hover{color:var(--ink)}
+.fp-actions button.on{color:var(--brand);border-color:var(--brand)}
+.fp-comments{border-top:1px solid var(--line2);margin-top:10px;padding-top:10px;display:flex;flex-direction:column;gap:8px}
+.fp-c{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.45}
+.fp-c b{font-weight:650}
+.fp-cin{display:flex;gap:8px;margin-top:2px}
+.fp-cin input{flex:1;border:1px solid var(--line);border-radius:10px;padding:7px 11px;font:inherit;font-size:12.5px;background:var(--panel);color:var(--ink);outline:none}
+
 /* schedule cells where the employee registered UN-availability */
 td.unav .shift.off{background:repeating-linear-gradient(135deg,transparent 0 6px,rgba(224,83,63,.09) 6px 12px);color:var(--ink3)}
 td.unav.conf .shift{outline:2px solid var(--bad);outline-offset:-2px}
