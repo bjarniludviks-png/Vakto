@@ -230,6 +230,38 @@ body.kioskmode .cookie{display:none}
 
 /* kpi */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:20px}
+/* ---------- period picker (Payday-style) ---------- */
+.pp{position:relative}
+.pp-btn{display:inline-flex;align-items:center;gap:9px;font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:8px 13px;cursor:pointer;font-variant-numeric:tabular-nums}
+.pp-btn:hover{border-color:var(--ink3)}
+.pp-panel{position:absolute;top:calc(100% + 8px);z-index:70;display:flex;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 60px rgba(20,22,28,.22);overflow:hidden}
+.pp-panel.left{left:0}.pp-panel.right{right:0}
+.pp-presets{display:flex;flex-direction:column;gap:4px;padding:12px;border-right:1px solid var(--line2);min-width:172px;background:var(--bg)}
+.pp-presets>button{font:inherit;font-size:12.5px;font-weight:600;text-align:left;color:var(--ink);background:var(--panel);border:1px solid var(--line2);border-radius:9px;padding:8px 12px;cursor:pointer}
+.pp-presets>button:hover{border-color:var(--ink3)}
+.pp-presets>button.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.pp-actions{display:flex;gap:6px;margin-top:8px}
+.pp-cal{padding:14px 16px}
+.pp-range{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:650;font-variant-numeric:tabular-nums;margin-bottom:10px}
+.pp-range span{background:var(--line2);border-radius:9px;padding:6px 12px}
+.pp-range .pp-arrow{background:none;padding:0;color:var(--ink3)}
+.pp-months{display:flex;gap:14px;align-items:flex-start}
+.pp-nav{font:inherit;font-size:16px;background:none;border:1px solid var(--line);border-radius:9px;width:28px;height:28px;cursor:pointer;color:var(--ink);align-self:center}
+.pp-month{width:224px}
+.pp-mtitle{font-size:13px;font-weight:700;text-align:center;margin-bottom:6px;text-transform:capitalize}
+.pp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px}
+.pp-grid .hd{font-size:10px;font-weight:700;color:var(--ink3);text-align:center;padding:3px 0}
+.pp-d{font:inherit;font-size:12px;font-variant-numeric:tabular-nums;background:none;border:0;border-radius:8px;height:28px;cursor:pointer;color:var(--ink)}
+.pp-d:hover{background:var(--line2)}
+.pp-d.in{background:var(--brand-soft, #fdf1e7);border-radius:0}
+.pp-d.edge{background:var(--brand);color:#fff;font-weight:700}
+.pp-d.tod:not(.edge){box-shadow:inset 0 0 0 1px var(--brand)}
+@media(max-width:760px){
+  .pp-panel{flex-direction:column;max-width:calc(100vw - 40px)}
+  .pp-presets{flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--line2);min-width:0}
+  .pp-months{overflow-x:auto}
+}
+
 /* ---------- Fréttaveita (company feed, Facebook-style) ---------- */
 .feedwrap{max-width:640px;margin:0 auto}
 .fc-input{width:100%;border:0;background:none;font:inherit;font-size:14px;resize:none;outline:none;color:var(--ink);padding:2px 0 6px}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
+import { PeriodPicker } from "@/components/app/period-picker";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { dec1, krCompact } from "@/lib/format";
@@ -254,20 +255,13 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
           </div>
         )}
 
-        {/* period presets + custom range */}
-        <div className="pchips" style={{ alignItems: "center", flexWrap: "wrap" }}>
-          {PRESETS.map((p) => (
-            <button key={p.k} className={`pchip${period === p.k ? " on" : ""}`} onClick={() => setPeriod(p.k)}>{t(p.label)}</button>
-          ))}
-          <button className={`pchip${period === "custom" ? " on" : ""}`} onClick={() => setPeriod("custom")}>{t("Sérsnið")}</button>
-          {period === "custom" && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6, marginLeft: 4 }}>
-              {/* No cross-constraints — pick any date; the other end follows if needed. */}
-              <DateField value={customFrom} onChange={(v) => { setCustomFrom(v); if (customTo && v > customTo) setCustomTo(v); }} />
-              <span className="muted">–</span>
-              <DateField value={customTo} onChange={(v) => { setCustomTo(v); if (customFrom && v < customFrom) setCustomFrom(v); }} />
-            </span>
-          )}
+        {/* period picker (Payday-style) — presets land as an explicit range */}
+        <div className="pchips" style={{ alignItems: "center" }}>
+          <PeriodPicker
+            from={period === "custom" ? customFrom : presetRange(period).from}
+            to={period === "custom" ? customTo : presetRange(period).to}
+            onApply={(a, b) => { setCustomFrom(a); setCustomTo(b); setPeriod("custom"); }}
+          />
         </div>
 
         {/* hero strip — figures follow the selected period */}

@@ -1,6 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { useLang } from "./lang";
+import { PeriodPicker, type PresetKey } from "./period-picker";
+
+// Map a picker preset onto the screen's Period model (fallback: Sérsniðið).
+const PRESET_TO_PERIOD: Record<PresetKey, Period> = {
+  today: "Dagur", yesterday: "Dagur", "7d": "Vika", "30d": "Mánuður",
+  thisMonth: "Mánuður", lastMonth: "Mánuður", thisYear: "Ár", lastYear: "Ár",
+  all: "Ár", custom: "Sérsniðið",
+};
 
 export type Period = "Dagur" | "Vika" | "Mánuður" | "Ársfj." | "Ár" | "Sérsniðið";
 
@@ -32,10 +41,22 @@ export function FilterBar({
   right?: React.ReactNode;
 }) {
   const { t } = useLang();
+  const [preset, setPreset] = useState<PresetKey>("7d");
   return (
     <>
       <div className="stoolbar">
-        {periods && period && onPeriod && (
+        {periods && period && onPeriod && onRange && (
+          <PeriodPicker
+            from={from ?? ""} to={to ?? ""} activePreset={preset}
+            onApply={(a, b, k) => {
+              setPreset(k);
+              const mapped = PRESET_TO_PERIOD[k];
+              onPeriod(periods.includes(mapped) ? mapped : "Sérsniðið");
+              onRange(a, b);
+            }}
+          />
+        )}
+        {periods && period && onPeriod && !onRange && (
           <div className="seg">
             {periods.map((p) => (
               <button key={p} className={period === p ? "on" : ""} onClick={() => onPeriod(p)}>{t(p)}</button>
@@ -64,16 +85,7 @@ export function FilterBar({
         {rangeLabel && <span className="badge" style={{ background: "var(--brand-soft)", color: "var(--brand)" }}>{rangeLabel}</span>}
         {right}
       </div>
-      {period === "Sérsniðið" && onRange && (
-        <div className="stoolbar" style={{ marginTop: -6 }}>
-          <div className="field" style={{ margin: 0 }}><label style={{ fontSize: 11 }}>{t("Frá")}</label>
-            <input type="date" value={from ?? ""} onChange={(e) => onRange(e.target.value, to ?? e.target.value)} style={{ padding: "6px 9px" }} />
-          </div>
-          <div className="field" style={{ margin: 0 }}><label style={{ fontSize: 11 }}>{t("Til")}</label>
-            <input type="date" value={to ?? ""} onChange={(e) => onRange(from ?? e.target.value, e.target.value)} style={{ padding: "6px 9px" }} />
-          </div>
-        </div>
-      )}
+
     </>
   );
 }

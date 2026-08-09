@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
+import { PeriodPicker } from "@/components/app/period-picker";
 import { toast } from "@/components/app/toast";
 import { Stacked } from "@/components/app/charts";
 import { useLang } from "@/components/app/lang";
@@ -78,17 +79,16 @@ export default function PayrollScreen({ view, empty = false }: { view: PayrollVi
         actions={<button className="btn ghost sm" onClick={() => download("payday")}>{t("↗ Flytja í Payday")}</button>}
       />
 
-      <div className="pchips">
-        {PRESETS.map((p) => (
+      {/* pay-period chips (21.–20. logic) + a Payday-style picker for any other range */}
+      <div className="pchips" style={{ alignItems: "center" }}>
+        {PRESETS.filter((p) => p.k !== "custom").map((p) => (
           <button key={p.k} className={`pchip${period === p.k ? " on" : ""}`} onClick={() => setPeriod(p.k)}>{t(p.label)}</button>
         ))}
+        <PeriodPicker
+          from={period === "custom" ? cf : range.from} to={period === "custom" ? ct : range.to}
+          onApply={(a, b) => { setCf(a); setCt(b); setPeriod("custom"); }}
+        />
       </div>
-      {period === "custom" && (
-        <div className="stoolbar" style={{ marginBottom: 14 }}>
-          <div className="field" style={{ margin: 0 }}><label style={{ fontSize: 11 }}>{t("Frá")}</label><input type="date" value={cf} onChange={(e) => setCf(e.target.value)} style={{ padding: "6px 9px" }} /></div>
-          <div className="field" style={{ margin: 0 }}><label style={{ fontSize: 11 }}>{t("Til")}</label><input type="date" value={ct} onChange={(e) => setCt(e.target.value)} style={{ padding: "6px 9px" }} /></div>
-        </div>
-      )}
 
       <div className="dhero" style={{ marginBottom: 20 }}>
         <div className="dhero-head">
