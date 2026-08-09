@@ -335,7 +335,7 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
               ? <PlannedActual series={weekSeries} t={t} />
               : <EmptyBody msg="Birtist þegar vaktir eru birtar og stimplað er inn." />}
           </div></Widget>
-          <Widget id="missing"><div className="card">
+          <Widget id="missing"><div className="card" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
             <div className="ch">
               <div><div className="ct">{t("Ekki mætt af plani")}</div><div className="cs">{t("á plani í dag en ekki stimplaðir inn")}</div></div>
               {missing.length > 0 && <Link href="/timaskraning" className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)", textDecoration: "none" }}>{missing.filter((m) => m.late).length} {t("seinir")}</Link>}
@@ -352,7 +352,14 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
                   </div>
                 ))}
               </div>
-            ) : <EmptyBody msg="Allir á plani hafa mætt." />}
+            ) : (
+              <div className="cb" style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <div className="muted" style={{ fontSize: 13, textAlign: "center" }}>
+                  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--good)" strokeWidth="1.6" style={{ display: "block", margin: "0 auto 10px" }}><circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.5 2.5L16 9.5" /></svg>
+                  {t("Allir á plani hafa mætt.")}
+                </div>
+              </div>
+            )}
           </div></Widget>
         </div>
 

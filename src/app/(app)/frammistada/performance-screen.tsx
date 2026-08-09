@@ -7,6 +7,7 @@ import { Paired, Bars } from "@/components/app/charts";
 import { useLang } from "@/components/app/lang";
 import { EmptyState } from "@/components/app/empty-state";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
+import { PeriodPicker } from "@/components/app/period-picker";
 import { dec1, krCompact } from "@/lib/format";
 import type { PerfView } from "@/lib/analytics.server";
 import { StaffingCard } from "./staffing-card";
@@ -82,6 +83,8 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
   const [to, setTo] = useState("");
   const [locF, setLocF] = useState("all");
   const [compare, setCompare] = useState("prev");
+  const [liveFrom, setLiveFrom] = useState("");
+  const [liveTo, setLiveTo] = useState("");
   const f = period === "Sérsniðið" ? daysBetween(from, to) / 30 : FACTOR[period];
   const cmpBadge = compare === "none" ? "Án samanburðar" : compare === "year" ? "vs í fyrra" : CMP_LABEL[period];
   if (empty) {
@@ -99,7 +102,12 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
   }
   // Live company: real headline KPIs + monthly history + department breakdown.
   if (live && perf) {
-    const months = history?.months ?? [];
+    const all = history?.months ?? [];
+    // Period filter (month granularity) — defaults to the last 6 months.
+    const defFrom = all.length ? `${all[Math.max(0, all.length - 6)].ym}-01` : "";
+    const defTo = all.length ? `${all[all.length - 1].ym}-28` : "";
+    const pFrom = liveFrom || defFrom, pTo = liveTo || defTo;
+    const months = all.filter((x) => x.ym >= pFrom.slice(0, 7) && x.ym <= pTo.slice(0, 7));
     const withRev = months.filter((m) => m.revenue > 0);
     const cur = months[months.length - 1];
     const prev = months.length >= 2 ? months[months.length - 2] : undefined;
@@ -137,8 +145,11 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
             <button className="btn ghost sm" style={{ marginLeft: 8 }} onClick={() => exportHistory("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
           </>
         )}
-        {/* Every headline figure states its period — these are MONTH figures, figure states its period — these are MONTH figures,
-            unlike the dashboard's week figures, and must say so. */}
+        <div style={{ margin: "0 0 14px" }}>
+          <PeriodPicker from={pFrom} to={pTo} onApply={(a, b) => { setLiveFrom(a); setLiveTo(b); }} />
+        </div>
+        {/* Every headline figure states its period — MONTH figures, unlike
+            the dashboard's week figures. */}
         <div className="kperiod">{cur ? `${t("Mánuður")}: ${cur.label}` : t("Nýjasti mánuður")}</div>
         <div className="kpis">
           <div className="kpi"><div className="lab">{t("Velta")} <small>/{t("mán")}</small></div><div className="val">{kRevenue} <small>m.kr.</small></div></div>

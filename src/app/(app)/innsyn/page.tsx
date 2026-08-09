@@ -15,7 +15,7 @@ export default async function InnsynPage({ searchParams }: { searchParams: Promi
   const to = new Date(); to.setHours(0, 0, 0, 0);
   const from = new Date(to); from.setDate(from.getDate() - 55);
   const [{ empty }, perf, staffing, history, { insights }, att, timebank, scope] = await Promise.all([
-    getCompanyData(), getPerformance(), getStaffingPattern(iso(from), iso(to)), getPerfHistory(6), getInsights(),
+    getCompanyData(), getPerformance(), getStaffingPattern(iso(from), iso(to)), getPerfHistory(12), getInsights(),
     getWeekAttendance(), getTimeBank(), getMyScope(),
   ]);
   const d = scope.departments;

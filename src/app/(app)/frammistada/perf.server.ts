@@ -11,7 +11,7 @@ import { BURDEN } from "@/lib/payroll";
 const MONTHS_IS = ["jan", "feb", "mar", "apr", "maí", "jún", "júl", "ágú", "sep", "okt", "nóv", "des"];
 const HOURLY_UPLIFT = 1.18; // avg premium uplift used across the app's quick cost estimates
 
-export type PerfMonth = { label: string; revenue: number; cost: number; laborPct: number };
+export type PerfMonth = { label: string; ym: string; revenue: number; cost: number; laborPct: number };
 export type PerfDept = { name: string; hours: number; cost: number; share: number };
 export type PerfHistory = { live: boolean; months: PerfMonth[]; departments: PerfDept[] };
 
@@ -99,6 +99,7 @@ export async function getPerfHistory(monthsBack = 6): Promise<PerfHistory> {
     const months: PerfMonth[] = windows
       .map((w, i) => ({
         label: w.label,
+        ym: `${w.y}-${String(w.m + 1).padStart(2, "0")}`,
         revenue: Math.round(revByMonth[i]),
         cost: Math.round(costByMonth[i]),
         laborPct: revByMonth[i] > 0 ? Math.round((costByMonth[i] / revByMonth[i]) * 1000) / 10 : 0,
