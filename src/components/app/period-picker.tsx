@@ -18,7 +18,6 @@ export const PRESET_LABELS: [PresetKey, string][] = [
   ["7d", "Síðustu 7 daga"], ["30d", "Síðustu 30 daga"],
   ["thisMonth", "Þennan mánuð"], ["lastMonth", "Síðasta mánuð"],
   ["thisYear", "Þetta ár"], ["lastYear", "Síðasta ár"],
-  ["custom", "Velja úr dagatali"],
 ];
 
 export function presetRange(k: PresetKey): { from: string; to: string } {
