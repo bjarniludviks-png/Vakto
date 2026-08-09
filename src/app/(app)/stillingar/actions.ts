@@ -404,7 +404,7 @@ export async function aiSuggestRules(input: { country?: string; region?: string;
               rules: {
                 type: "object",
                 properties: {
-                  overtime: { type: "object", properties: { afterHoursPerDay: { type: "number" }, afterHoursPerWeek: { type: "number" }, pct: { type: "number" } } },
+                  overtime: { type: "object", properties: { afterHoursPerDay: { type: "number" }, afterHoursPerWeek: { type: "number" }, afterHoursPerMonth: { type: "number" }, pct: { type: "number" } } },
                   weekend: { type: "object", properties: { pct: { type: "number" } } },
                   night: { type: "object", properties: { from: { type: "string" }, to: { type: "string" }, pct: { type: "number" } } },
                   holiday: { type: "object", properties: { pct: { type: "number" } } },

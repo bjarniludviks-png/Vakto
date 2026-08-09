@@ -7,7 +7,7 @@
 
 export type RuleSet = {
   /** Overtime: when it kicks in and what it pays. */
-  overtime?: { afterHoursPerDay?: number; afterHoursPerWeek?: number; pct?: number };
+  overtime?: { afterHoursPerDay?: number; afterHoursPerWeek?: number; afterHoursPerMonth?: number; pct?: number };
   /** Weekend premium (Sat/Sun unless days overridden). */
   weekend?: { pct?: number };
   /** Night/evening premium between from–to (HH:MM). */
@@ -111,8 +111,12 @@ export const SCHEDULE_PATTERNS: { key: SchedulePattern["kind"]; is: string; en: 
 export function summarizeRules(r: RuleSet, lang: "is" | "en" = "is"): string {
   const parts: string[] = [];
   const t = (is: string, en: string) => (lang === "is" ? is : en);
-  if (r.overtime?.pct != null)
-    parts.push(`${t("Yfirvinna", "Overtime")} +${r.overtime.pct}%${r.overtime.afterHoursPerWeek ? ` ${t("eftir", "after")} ${r.overtime.afterHoursPerWeek} ${t("klst/viku", "h/wk")}` : ""}`);
+  if (r.overtime?.pct != null) {
+    const thr = r.overtime.afterHoursPerMonth
+      ? ` ${t("eftir", "after")} ${r.overtime.afterHoursPerMonth} ${t("klst/mán", "h/mo")}`
+      : r.overtime.afterHoursPerWeek ? ` ${t("eftir", "after")} ${r.overtime.afterHoursPerWeek} ${t("klst/viku", "h/wk")}` : "";
+    parts.push(`${t("Yfirvinna", "Overtime")} +${r.overtime.pct}%${thr}`);
+  }
   if (r.night?.pct) parts.push(`${t("Nætur/kvöldálag", "Night")} +${r.night.pct}%`);
   if (r.weekend?.pct) parts.push(`${t("Helgarálag", "Weekend")} +${r.weekend.pct}%`);
   if (r.holiday?.pct) parts.push(`${t("Stórhátíð", "Holiday")} +${r.holiday.pct}%`);

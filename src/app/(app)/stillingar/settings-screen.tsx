@@ -42,7 +42,6 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
   const { t } = useLang();
   const [modal, setModal] = useState<SettingsModal>(initialModal);
   const [keyModal, setKeyModal] = useState(false);
-  const [editRule, setEditRule] = useState<PayRule | null>(null);
   const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
   const [posName, setPosName] = useState<string | null>(null);
   function posConnect(name: string) { setPosName(name === "POS" ? "" : name); }
@@ -157,26 +156,6 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
       </div>
       )}
 
-      {section === "launareglur" && (
-      <div className="card">
-        <div className="ch">
-          <div><div className="ct">{t("Launareglur kjarasamninga")}</div><div className="cs">{t("álag, yfirvinna og stórhátíðardagar — smelltu til að staðfesta")}</div></div>
-          {payRules.every((r) => r.confirmed) && payRules.length > 0
-            ? <span className="badge" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("staðfest")}</span>
-            : <span className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("óstaðfest")}</span>}
-        </div>
-        <div className="cb att">
-          {payRules.map((r) => (
-            <div className="it rowlink" key={r.code} onClick={() => setEditRule(r)}>
-              <div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div>
-              <div className="tx"><b>{t(r.label)}</b><span>{r.pct > 0 ? `+${dec1(r.pct)}%` : t("grunntaxti")}{r.kind === "overtime" ? " · " + t("yfirvinna") : r.kind === "holiday" ? " · " + t("stórhátíð") : ""}</span></div>
-              <span className={`tag ${r.confirmed ? "good" : "mut"}`} style={r.confirmed ? undefined : { background: "var(--warn-soft)", color: "var(--warn)" }}>{r.confirmed ? t("staðfest") : t("óstaðfest")}</span>
-            </div>
-          ))}
-          <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("⚠️ Prósenturnar eru staðlað sniðmát — staðfestu hverja gegn raunverulegum kjarasamningi (Efling/VR) áður en þær eru notaðar á laun.")}</p>
-        </div>
-      </div>
-      )}
 
       {section === "fyrirtaeki" && <>
       <div className="grid2b" style={{ marginTop: 16 }}>
@@ -247,7 +226,6 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
       {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} />}
       {keyModal && <ApiKeyModal onClose={() => setKeyModal(false)} />}
       {tplModal && <RuleTemplateModal tpl={tplModal === "new" ? null : tplModal} onClose={() => setTplModal(null)} />}
-      {editRule && <PayRuleModal rule={editRule} onClose={() => setEditRule(null)} />}
       {posName !== null && <PosConnectModal name={posName} onClose={() => setPosName(null)} />}
     </>
   );
@@ -379,6 +357,8 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
   const [region, setRegion] = useState(tpl?.region ?? "");
   const [industry, setIndustry] = useState(tpl?.industry ?? "");
   const [unionName, setUnionName] = useState(tpl?.union_name ?? "");
+  const [role, setRole] = useState("");
+  const [tenure, setTenure] = useState("");
   const [rules, setRules] = useState<RuleSet>(tpl?.rules ?? {});
   const [source, setSource] = useState<"manual" | "preset" | "ai">(tpl?.source ?? "manual");
   const [aiNote, setAiNote] = useState<string | null>(null);
@@ -404,7 +384,7 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
 
   async function askAi() {
     setAiBusy(true);
-    const res = await aiSuggestRules({ country, region, industry, unionName });
+    const res = await aiSuggestRules({ country, region, industry, unionName, role, notes: tenure });
     setAiBusy(false);
     setRules(res.rules);
     if (!name) setName(res.name);
@@ -453,6 +433,10 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
             <F label={t("Atvinnugrein")} value={industry} onChange={setIndustry} ph={t("t.d. veitingar")} />
             <F label={t("Stéttarfélag / samningur")} value={unionName} onChange={setUnionName} ph={t("frjáls texti")} />
           </div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <F label={t("Starfsheiti (fyrir AI)")} value={role} onChange={setRole} ph={t("t.d. kokkur, þjónn")} />
+            <F label={t("Starfsaldur / annað samhengi (fyrir AI)")} value={tenure} onChange={setTenure} ph={t("t.d. unnið í 3 ár, næturvaktir")} />
+          </div>
 
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "4px 0 10px" }}>
             {RULE_PRESETS.map((p) => (
@@ -468,6 +452,7 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
           <div className="hr" />
           <div style={{ display: "flex", gap: 10 }}>
             <N label={t("Yfirvinna eftir klst/viku")} value={rules.overtime?.afterHoursPerWeek} onChange={setNum((r, n) => { r.overtime = { ...r.overtime, afterHoursPerWeek: n }; })} />
+            <N label={t("Yfirvinna eftir klst/mánuði")} value={rules.overtime?.afterHoursPerMonth} onChange={setNum((r, n) => { r.overtime = { ...r.overtime, afterHoursPerMonth: n }; })} />
             <N label={t("Yfirvinnuálag %")} value={rules.overtime?.pct} onChange={setNum((r, n) => { r.overtime = { ...r.overtime, pct: n }; })} />
           </div>
           <div style={{ display: "flex", gap: 10 }}>
@@ -499,42 +484,6 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
   );
 }
 
-function PayRuleModal({ rule, onClose }: { rule: PayRule; onClose: () => void }) {
-  const { t } = useLang();
-  const [pct, setPct] = useState(String(rule.pct).replace(".", ","));
-  const [confirmed, setConfirmed] = useState(rule.confirmed);
-  const [busy, setBusy] = useState(false);
-  async function submit() {
-    setBusy(true);
-    const res = await savePayRule({ code: rule.code, label: rule.label, kind: rule.kind, pct, confirmed });
-    setBusy(false);
-    onClose();
-    toast(res.ok ? (res.demo ? "Vistað (demo)" : "Launaregla vistuð") : "Tókst ekki");
-  }
-  return (
-    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="mbg" onClick={onClose} />
-      <div className="modal">
-        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t(rule.label)}</div><button className="x" onClick={onClose}>✕</button></div>
-        <div className="mb">
-          <div className="field"><label>{t("Álag / yfirvinna (%)")}</label><input value={pct} onChange={(e) => setPct(e.target.value)} placeholder="33" autoFocus /></div>
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13.5, margin: "4px 0 2px", cursor: "pointer" }}>
-            <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />
-            {t("Ég staðfesti að þetta stemmir við kjarasamninginn")}
-          </label>
-          <p className="muted" style={{ fontSize: 12, marginTop: 4 }}>{t("Berðu saman við réttan samning (Efling/VR/SGS) áður en þú staðfestir.")}</p>
-          <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
-            <button className="btn" disabled={busy} onClick={submit}>{t("Vista")}</button>
-            <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** POS / sales-system connection request. Real sync needs each provider's API key,
- * so this captures interest + explains sales vs production revenue. */
 function PosConnectModal({ name, onClose }: { name: string; onClose: () => void }) {
   const { t } = useLang();
   const [busy, setBusy] = useState(false);
