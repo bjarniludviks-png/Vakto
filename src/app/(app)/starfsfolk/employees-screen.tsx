@@ -7,6 +7,7 @@ import { toast } from "@/components/app/toast";
 import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
+import { downloadContractPdf } from "./contract-pdf";
 import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getOverseenDepartments, setOverseenDepartments, generateContract, listContracts, setContractStatus, type ContractRow } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
@@ -749,6 +750,7 @@ function ContractTab({ employeeId }: { employeeId: string }) {
             <span style={{ cursor: "pointer" }} onClick={() => setView(c)}>{c.title}</span>
             <span className={`tag ${CONTRACT_STATUS[c.status]?.tag ?? "mut"}`}>{t(CONTRACT_STATUS[c.status]?.label ?? c.status)}</span>
             <span className="dl">{c.signed_at ?? c.created}</span>
+            <button className="btn ghost sm" type="button" onClick={() => downloadContractPdf(c.title, c.content)}>PDF</button>
             {c.status === "draft" && <button className="btn ghost sm" type="button" onClick={() => mark(c, "sent")}>{t("Merkja sent")}</button>}
             {c.status !== "signed" && c.status !== "void" && <button className="btn ghost sm" type="button" onClick={() => mark(c, "signed")}>{t("Merkja undirritað")}</button>}
           </div>
@@ -765,6 +767,7 @@ function ContractTab({ employeeId }: { employeeId: string }) {
             <div className="mh"><div style={{ fontSize: 15, fontWeight: 700 }}>{view.title}</div><button className="x" type="button" onClick={() => setView(null)}>✕</button></div>
             <div className="mb" style={{ maxHeight: "65vh", overflowY: "auto" }}>
               <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13, lineHeight: 1.6 }}>{view.content}</pre>
+              <button className="btn sm" type="button" style={{ marginTop: 6 }} onClick={() => downloadContractPdf(view.title, view.content)}>{t("Sækja PDF")}</button>
             </div>
           </div>
         </div>
