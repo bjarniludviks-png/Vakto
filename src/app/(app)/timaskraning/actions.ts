@@ -384,3 +384,27 @@ export async function approveAllTimesheets(): Promise<ApproveResult> {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
+
+/** Approve a specific set of punches in one update (checkbox selection). */
+export async function approvePunchList(ids: string[]): Promise<ApproveResult> {
+  if (!ids.length) return { ok: true, count: 0 };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true, count: ids.length };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data, error } = await supabase.from("punches")
+      .update({ approved: true, approved_by: ctx.userId, approved_at: new Date().toISOString() })
+      .in("id", ids).eq("company_id", ctx.company)
+      .not("clock_out", "is", null).select("id");
+    if (error) return { ok: false, error: "Keyrðu migration 0008 í Supabase til að virkja samþykki." };
+    const count = data?.length ?? 0;
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "punch.approve_selected", entity: "punch", detail: `Valdar stimplanir samþykktar — ${count}`,
+    });
+    revalidatePath("/timaskraning");
+    return { ok: true, count };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}

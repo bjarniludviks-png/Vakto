@@ -8,7 +8,7 @@ import { useLang } from "@/components/app/lang";
 import { TimeField } from "@/components/app/fields";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
-import { getEmployeePunches, adjustPunch, deletePunch, setPunchApproved, approveEmployeePunches, type PunchRow } from "../actions";
+import { getEmployeePunches, adjustPunch, deletePunch, setPunchApproved, approveEmployeePunches, approvePunchList, type PunchRow } from "../actions";
 import { exportTimeReportXlsx, exportTimeReportPdf } from "@/lib/export-report";
 import { AsyncButton } from "@/components/app/async-button";
 
@@ -33,6 +33,7 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
   const [mig, setMig] = useState(needsMigration);
   const [loading, setLoading] = useState(false);
   const [edit, setEdit] = useState<PunchRow | null>(null);
+  const [selP, setSelP] = useState<Set<string>>(new Set());
   const [nowMs, setNowMs] = useState(0);
   useEffect(() => { setNowMs(Date.now()); const id = setInterval(() => setNowMs(Date.now()), 30000); return () => clearInterval(id); }, []);
   // Live elapsed for an open (on-shift) punch, from its clock-in.
@@ -106,12 +107,34 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
 
       <div className="card" style={{ marginTop: 16 }}>
         <div className="ch">
-          <div><div className="ct">{t("Allar skráningar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)}</div></div>
-          {pending > 0 && <AsyncButton className="btn sm" onClick={approveAll}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Samþykkja allar")}</AsyncButton>}
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {pending > 0 && (
+              <input type="checkbox" title={t("Velja allar óafgreiddar")}
+                checked={selP.size > 0 && selP.size === rows.filter((r) => !r.open && !r.approved).length}
+                onChange={(e) => setSelP(e.target.checked ? new Set(rows.filter((r) => !r.open && !r.approved).map((r) => r.punchId)) : new Set())} />
+            )}
+            <div><div className="ct">{t("Allar skráningar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)}</div></div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {selP.size > 0 && (
+              <AsyncButton className="btn sm" onClick={async () => {
+                const res = await approvePunchList([...selP]);
+                if (res.ok) { setSelP(new Set()); toast(`${res.count ?? 0} ${t("stimplanir samþykktar")}`); reload(); }
+                else toast(res.error ?? "Villa");
+              }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Samþykkja valdar")} ({selP.size})
+              </AsyncButton>
+            )}
+            {pending > 0 && selP.size === 0 && <AsyncButton className="btn sm" onClick={approveAll}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Samþykkja allar")}</AsyncButton>}
+          </div>
         </div>
         <div className="cb att" style={{ opacity: loading ? 0.5 : 1 }}>
           {rows.length ? rows.map((p) => (
             <div className="it" key={p.punchId}>
+              {!p.open && !p.approved && (
+                <input type="checkbox" style={{ flexShrink: 0 }} checked={selP.has(p.punchId)}
+                  onChange={(e) => setSelP((sv) => { const n = new Set(sv); if (e.target.checked) n.add(p.punchId); else n.delete(p.punchId); return n; })} />
+              )}
               <div className="tx">
                 <b>{niceISO(p.date)}</b>
                 <span>{p.in} – {p.out ?? t("opin")}{p.open ? ` · ${openElapsed(p)}` : ` · ${dec1(p.hours)} ${t("klst")}`}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>
