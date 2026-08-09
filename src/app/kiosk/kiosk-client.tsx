@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { kioskPunch, kioskPunchByPin, kioskPunchByToken, type KioskData } from "./actions";
+import { kioskPunch, kioskPunchByPin, kioskPunchByToken, kioskPunchByKennitala, type KioskData } from "./actions";
 
 type Emp = { id: string; initials: string; name: string; color: string };
 
@@ -83,6 +83,10 @@ export default function KioskClient({ companyId, data }: { companyId: string | n
   const s = STR[lang];
   const flashT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [scan, setScan] = useState(false);
+  const [mode, setMode] = useState<"cards" | "kt">("cards");
+  const [kt, setKt] = useState("");
+  const [ktErr, setKtErr] = useState("");
+  const [ktBusy, setKtBusy] = useState(false);
   const [scanErr, setScanErr] = useState("");
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -94,6 +98,37 @@ export default function KioskClient({ companyId, data }: { companyId: string | n
     return () => { cancelAnimationFrame(raf); clearInterval(t); };
   }, []);
   function pickLang(l: Lang) { setLang(l); try { localStorage.setItem("vakto-kiosk-lang", l); } catch { /* ignore */ } }
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("vakto-kiosk-mode");
+      if (saved === "kt" || saved === "cards") setMode(saved);
+      else if ((data?.employees.length ?? 0) > 20) setMode("kt");
+    } catch { /* ignore */ }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  function pickMode(m: "cards" | "kt") { setMode(m); setKt(""); setKtErr(""); try { localStorage.setItem("vakto-kiosk-mode", m); } catch { /* ignore */ } }
+  function ktKey(d: string) {
+    if (ktBusy || kt.length >= 10) return;
+    setKtErr("");
+    const nk = kt + d;
+    setKt(nk);
+    if (nk.length === 10) setTimeout(() => ktSubmit(nk), 160);
+  }
+  async function ktSubmit(nk: string) {
+    if (!real) { setKtErr(lang === "is" ? "Virkar þegar kiosk er tengdur fyrirtæki" : "Works when the kiosk is linked to a company"); setKt(""); return; }
+    setKtBusy(true);
+    const res = await kioskPunchByKennitala(companyId!, nk);
+    setKtBusy(false);
+    if (!res.ok) { setKtErr(res.error ?? s.err); setKt(""); return; }
+    setKt("");
+    if (res.employeeId) {
+      setOn((m) => ({ ...m, [res.employeeId!]: !!res.into }));
+      if (res.into) setInTime((m) => ({ ...m, [res.employeeId!]: res.time ?? nowHM() }));
+    }
+    setFlash({ name: res.name ?? "", into: !!res.into, tm: res.time ?? nowHM() });
+    if (flashT.current) clearTimeout(flashT.current);
+    flashT.current = setTimeout(() => setFlash(null), 2100);
+  }
+  const ktFmt = kt.length > 6 ? `${kt.slice(0, 6)}-${kt.slice(6)}` : kt;
 
   function open(e: Emp) { setCur(e); setPin(""); setErr(""); setShake(false); }
   function close() { setCur(null); setPin(""); setBusy(false); }
@@ -215,7 +250,26 @@ export default function KioskClient({ companyId, data }: { companyId: string | n
         {real && emps.length === 0 && (
           <div className="sub" style={{ marginTop: 20 }}>{s.noStaff}</div>
         )}
-        <div className="grid">
+        <div className="klang" style={{ justifyContent: "center", display: "flex", margin: "14px auto 22px" }}>
+          <button className={mode === "cards" ? "on" : ""} onClick={() => pickMode("cards")}>{lang === "is" ? "Nöfn" : "Names"}</button>
+          <button className={mode === "kt" ? "on" : ""} onClick={() => pickMode("kt")}>{lang === "is" ? "Kennitala" : "ID number"}</button>
+        </div>
+        {mode === "kt" && (
+          <div className="card" style={{ maxWidth: 400, margin: "0 auto" }}>
+            <div className="cur" style={{ marginBottom: 10 }}>{lang === "is" ? "Sláðu inn kennitöluna þína" : "Type your kennitala (ID number)"}</div>
+            <div className="dots" style={{ fontSize: 26, fontWeight: 700, letterSpacing: 2, minHeight: 38, display: "flex", alignItems: "center", justifyContent: "center", fontVariantNumeric: "tabular-nums" }}>
+              {ktFmt || <span style={{ opacity: .3 }}>ddmmáá-xxxx</span>}
+            </div>
+            <div className="pin-err">{ktErr}</div>
+            <div className="pad">
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => <button key={d} disabled={ktBusy} onClick={() => ktKey(String(d))}>{d}</button>)}
+              <button className="muted" onClick={() => { setKt(""); setKtErr(""); }}>{s.cancel}</button>
+              <button disabled={ktBusy} onClick={() => ktKey("0")}>0</button>
+              <button className="muted" onClick={() => { setKtErr(""); setKt((p) => p.slice(0, -1)); }}>⌫</button>
+            </div>
+          </div>
+        )}
+        {mode === "cards" && <div className="grid">
           {emps.map((e) => {
             const isOn = on[e.id];
             return (
@@ -226,7 +280,7 @@ export default function KioskClient({ companyId, data }: { companyId: string | n
               </div>
             );
           })}
-        </div>
+        </div>}
       </div>
       <div className="foot">
         {s.foot}

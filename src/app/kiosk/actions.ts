@@ -77,6 +77,40 @@ export async function kioskPunchByPin(
   }
 }
 
+/** Punch by typing the full kennitala — scales to 100+ staff where the
+ * name grid doesn't. Same toggle logic; 10 digits ≥ the 4-digit PIN. */
+export async function kioskPunchByKennitala(
+  companyId: string, kt: string,
+): Promise<PunchResult & { into?: boolean; time?: string; name?: string; employeeId?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  const digits = kt.replace(/\D/g, "");
+  if (digits.length !== 10) return { ok: false, error: "Sláðu inn 10 stafa kennitölu" };
+  try {
+    const admin = createAdminClient();
+    const { data: emps } = await admin
+      .from("employees").select("id, full_name, kennitala")
+      .eq("company_id", companyId).in("status", ["active", "over_ratio"]);
+    const emp = (emps ?? []).find((e) => ((e.kennitala as string) ?? "").replace(/\D/g, "") === digits);
+    if (!emp) return { ok: false, error: "Engin(n) starfsmaður fannst með þessa kennitölu" };
+    const { data: open } = await admin
+      .from("punches").select("id").eq("employee_id", emp.id)
+      .is("clock_out", null).order("clock_in", { ascending: false }).limit(1).maybeSingle();
+    const now = new Date().toISOString();
+    if (open) {
+      const { error } = await admin.from("punches").update({ clock_out: now }).eq("id", open.id);
+      if (error) return { ok: false, error: error.message };
+      return { ok: true, into: false, time: hm(now), name: emp.full_name as string, employeeId: emp.id as string };
+    }
+    const { error } = await admin.from("punches").insert({
+      company_id: companyId, employee_id: emp.id, clock_in: now, source: "kiosk",
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, into: true, time: hm(now), name: emp.full_name as string, employeeId: emp.id as string };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /** Punch by scanning the staff Wallet QR (clock_token). Company-scoped. */
 export async function kioskPunchByToken(
   companyId: string, token: string,
