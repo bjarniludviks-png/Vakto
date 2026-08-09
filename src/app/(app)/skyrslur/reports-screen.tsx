@@ -273,24 +273,24 @@ function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[
 
   return (
     <>
-      {(() => {
-        const acts = (
-          <>
-            <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
-            <button className="btn ghost sm" style={{ marginLeft: 8 }} disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
-          </>
-        );
-        return embedded
-          ? <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>{acts}</div>
-          : <PageHeader title="Skýrslur" subtitle="Greiningar og frammistaða" actions={acts} />;
-      })()}
+      {!embedded && <PageHeader title="Skýrslur" subtitle="Greiningar og frammistaða" actions={
+        <>
+          <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}>Excel</button>
+          <button className="btn ghost sm" style={{ marginLeft: 8 }} disabled={exporting} onClick={() => doExport("pdf")}>PDF</button>
+        </>
+      } />}
       <FilterBar
         periods={["Dagur", "Vika", "Mánuður", "Sérsniðið"]}
         period={period} onPeriod={changePeriod}
         from={from} to={to} onRange={changeRange}
         search={search} onSearch={setSearch}
         filters={[{ value: deptF, onChange: setDeptF, options: depts.map((d) => ({ value: d, label: d === "all" ? "Allar deildir" : d })) }]}
-        rangeLabel={`${niceISO(from)} – ${niceISO(to)}`}
+        right={
+          <span style={{ display: "inline-flex", gap: 8 }}>
+            <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
+            <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
+          </span>
+        }
       />
       {(() => {
         const estC = shown.reduce((a, r) => a + r.estCost, 0);

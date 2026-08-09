@@ -139,14 +139,13 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
     };
     return (
       <>
-        {head(
-          <>
-            <button className="btn ghost sm" onClick={() => exportHistory("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
-            <button className="btn ghost sm" style={{ marginLeft: 8 }} onClick={() => exportHistory("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
-          </>
-        )}
-        <div style={{ margin: "0 0 14px" }}>
+        {!embedded && head()}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, margin: "0 0 14px", flexWrap: "wrap" }}>
           <PeriodPicker from={pFrom} to={pTo} onApply={(a, b) => { setLiveFrom(a); setLiveTo(b); }} />
+          <span style={{ display: "inline-flex", gap: 8 }}>
+            <button className="btn ghost sm" onClick={() => exportHistory("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
+            <button className="btn ghost sm" onClick={() => exportHistory("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
+          </span>
         </div>
         {/* Every headline figure states its period — MONTH figures, unlike
             the dashboard's week figures. */}
