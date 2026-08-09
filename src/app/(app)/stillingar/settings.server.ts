@@ -7,7 +7,7 @@ import { nf } from "@/lib/format";
 export type LocationRow = { name: string; staff: number; timezone: string };
 export type PositionRow = { name: string; staff: number; baseRate: string };
 export type UserRow = { name: string; initials: string; role: string; email: string };
-export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string };
+export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string; payPeriodStart?: number };
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
 export type SettingsData = { locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; company: CompanyInfo | null; live: boolean };
 
@@ -67,6 +67,10 @@ export async function getSettingsData(): Promise<SettingsData> {
       lastUsed: k.last_used_at ? (k.last_used_at as string).slice(0, 10) : null,
       revoked: !!k.revoked,
     }));
+    // Pay-period start (0036) — tolerant separate fetch.
+    let ppd = 1;
+    const ppdRes = await supabase.from("companies").select("pay_period_start").eq("id", company).maybeSingle();
+    if (!ppdRes.error) { const n = Number(ppdRes.data?.pay_period_start); if (Number.isFinite(n) && n >= 1 && n <= 28) ppd = n; }
     // Tolerant of missing 0026 columns — fall back to name+kennitala only.
     const comp = compRes.error
       ? (await supabase.from("companies").select("name, kennitala").eq("id", company).maybeSingle()).data
@@ -90,7 +94,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       })),
       apiKeys,
       companyId: company,
-      company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", phone: c.phone ?? "", email: c.email ?? "" },
+      company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", phone: c.phone ?? "", email: c.email ?? "", payPeriodStart: ppd },
       live: true,
     };
   } catch {

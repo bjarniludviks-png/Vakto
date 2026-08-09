@@ -111,6 +111,19 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
     const kCost = cur ? dec1(m(cur.cost)) : perf.laborCostM;
     const kMargin = cur ? dec1(m(Math.max(0, cur.revenue - cur.cost))) : perf.marginM;
     const chg = (a: number, b: number) => (b > 0 ? Math.round(((a - b) / b) * 1000) / 10 : 0);
+    async function exportHistory(kind: "xlsx" | "pdf") {
+      const { exportTableXlsx, exportTablePdf } = await import("@/lib/export-report");
+      const d = {
+        title: t("Rekstur & framlegð"),
+        company: "VAKTO",
+        from: months[0]?.label ?? "", to: months[months.length - 1]?.label ?? "",
+        columns: [t("Mánuður"), t("Velta (m.kr.)"), t("Launakostnaður (m.kr.)"), t("Laun af tekjum %"), t("Framlegð (m.kr.)")],
+        numeric: [1, 2, 3, 4],
+        rows: months.map((x) => [x.label, m(x.revenue), m(x.cost), x.laborPct > 0 ? Math.round(x.laborPct * 10) / 10 : 0, m(Math.max(0, x.revenue - x.cost))]),
+      };
+      if (kind === "xlsx") await exportTableXlsx(d); else await exportTablePdf(d);
+      toast(kind === "xlsx" ? t("Excel-skýrsla sótt") : t("PDF-skýrsla sótt"));
+    }
     const chgCell = (a: number, b: number, goodUp: boolean) => {
       const c = chg(a, b);
       const good = c === 0 ? undefined : (c > 0) === goodUp ? "var(--good)" : "var(--bad)";
@@ -118,8 +131,13 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
     };
     return (
       <>
-        {head()}
-        {/* Every headline figure states its period — these are MONTH figures,
+        {head(
+          <>
+            <button className="btn ghost sm" onClick={() => exportHistory("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
+            <button className="btn ghost sm" style={{ marginLeft: 8 }} onClick={() => exportHistory("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
+          </>
+        )}
+        {/* Every headline figure states its period — these are MONTH figures, figure states its period — these are MONTH figures,
             unlike the dashboard's week figures, and must say so. */}
         <div className="kperiod">{cur ? `${t("Mánuður")}: ${cur.label}` : t("Nýjasti mánuður")}</div>
         <div className="kpis">

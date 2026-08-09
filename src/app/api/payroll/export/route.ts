@@ -74,7 +74,8 @@ async function getLines(from?: string, to?: string): Promise<{ lines: PayLine[];
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const format = url.searchParams.get("format") === "excel" ? "excel" : "payday";
+  const fmtParam = url.searchParams.get("format");
+  const format = fmtParam === "excel" ? "excel" : fmtParam === "dk" ? "dk" : "payday";
   const from = url.searchParams.get("from") ?? undefined;
   const to = url.searchParams.get("to") ?? undefined;
   const { lines, kt } = await getLines(from, to);
@@ -84,6 +85,10 @@ export async function GET(request: Request) {
   if (format === "payday") {
     header = ["Kennitala", "Nafn", "Tímar", "Uppbót", "Brúttó", "Lífeyrir", "Félagsgjald", "Staðgreiðsla", "Útborgað"];
     rows = lines.map((l) => [kt[l.employeeId] ?? "", l.name, l.hours, l.uppbot, l.gross, l.pension, l.union, l.withholding, l.net]);
+  } else if (format === "dk") {
+    // DK launakerfi: kennitala + launaliðir í röð sem DK-innlestur skilur.
+    header = ["Kennitala", "Nafn", "Dagvinnustundir", "Yfirvinnustundir", "Dagvinna", "Álag", "Yfirvinna", "Uppbót", "Brúttó"];
+    rows = lines.map((l) => [kt[l.employeeId] ?? "", l.name, l.hours, "", l.dayPay, l.premiums, l.overtime, l.uppbot, l.gross]);
   } else {
     header = ["Nafn", "Tímar", "Dagvinna", "Álög", "Yfirvinna", "Uppbót", "Brúttó", "Staðgreiðsla", "Lífeyrir", "Félagsgjald", "Útborgað", "Kostnaður m. byrði"];
     rows = lines.map((l) => [l.name, l.hours, l.dayPay, l.premiums, l.overtime, l.uppbot, l.gross, l.withholding, l.pension, l.union, l.net, l.cost]);
@@ -94,7 +99,7 @@ export async function GET(request: Request) {
     [header, ...rows].map((r) => r.map(csvCell).join(";")).join("\r\n") +
     "\r\n";
 
-  const filename = format === "payday" ? "vakto-payday-2026-06.csv" : "vakto-laun-2026-06.csv";
+  const filename = format === "payday" ? "vakto-payday.csv" : format === "dk" ? "vakto-dk.csv" : "vakto-laun.csv";
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

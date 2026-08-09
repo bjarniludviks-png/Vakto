@@ -19,23 +19,31 @@ const PRESETS: { k: string; label: string }[] = [
   { k: "this", label: "Þessi mánuður" }, { k: "last", label: "Síðasti mánuður" }, { k: "custom", label: "Sérsniðið" },
 ];
 const isoD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-function payRange(k: string, cf: string, ct: string): { from: string; to: string } {
-  const t = new Date();
-  if (k === "last") return { from: isoD(new Date(t.getFullYear(), t.getMonth() - 1, 1)), to: isoD(new Date(t.getFullYear(), t.getMonth(), 0)) };
+function payRange(k: string, cf: string, ct: string, startDay = 1): { from: string; to: string } {
   if (k === "custom") return { from: cf, to: ct };
-  return { from: isoD(new Date(t.getFullYear(), t.getMonth(), 1)), to: isoD(new Date(t.getFullYear(), t.getMonth() + 1, 0)) };
+  const t = new Date();
+  const d = Math.min(28, Math.max(1, startDay));
+  let from: Date;
+  if (d === 1) {
+    from = new Date(t.getFullYear(), t.getMonth() - (k === "last" ? 1 : 0), 1);
+  } else {
+    from = t.getDate() >= d ? new Date(t.getFullYear(), t.getMonth(), d) : new Date(t.getFullYear(), t.getMonth() - 1, d);
+    if (k === "last") from = new Date(from.getFullYear(), from.getMonth() - 1, d);
+  }
+  const to = d === 1 ? new Date(from.getFullYear(), from.getMonth() + 1, 0) : new Date(from.getFullYear(), from.getMonth() + 1, d - 1);
+  return { from: isoD(from), to: isoD(to) };
 }
 
-export default function PayrollScreen({ view, empty = false }: { view: PayrollView; empty?: boolean }) {
+export default function PayrollScreen({ view, empty = false, periodStart = 1 }: { view: PayrollView; empty?: boolean; periodStart?: number }) {
   const { t } = useLang();
   const [slip, setSlip] = useState<PayslipData | null>(null);
   const [period, setPeriod] = useState("this");
-  const thisMonth = payRange("this", "", "");
+  const thisMonth = payRange("this", "", "", periodStart);
   const [cf, setCf] = useState(thisMonth.from);
   const [ct, setCt] = useState(thisMonth.to);
   const [pp, setPp] = useState<PeriodPayroll | null>(null);
 
-  const range = payRange(period, cf, ct);
+  const range = payRange(period, cf, ct, periodStart);
   useEffect(() => {
     if (!view.live) return;
     if (period === "custom" && (!cf || !ct || cf > ct)) return;
@@ -50,7 +58,7 @@ export default function PayrollScreen({ view, empty = false }: { view: PayrollVi
   const T = usePp ? pp.totals : view.totals;
   const periodLabel = usePp ? pp.periodLabel : "21. maí – 20. júní 2026";
   const qs = `?format=$F&from=${range.from}&to=${range.to}`;
-  function download(format: "payday" | "excel") {
+  function download(format: "payday" | "excel" | "dk") {
     window.location.href = `/api/payroll/export${qs.replace("$F", format)}`;
   }
   async function keyra() {
@@ -76,7 +84,13 @@ export default function PayrollScreen({ view, empty = false }: { view: PayrollVi
       <PageHeader
         title="Launakeyrslur"
         subtitle="Launagreiðslur · 2026"
-        actions={<button className="btn ghost sm" onClick={() => download("payday")}>{t("↗ Flytja í Payday")}</button>}
+        actions={
+          <span style={{ display: "inline-flex", gap: 8 }}>
+            <button className="btn ghost sm" onClick={() => download("payday")}>{t("↗ Payday")}</button>
+            <button className="btn ghost sm" onClick={() => download("dk")}>{t("↗ DK")}</button>
+            <button className="btn ghost sm" onClick={() => download("excel")}>Excel</button>
+          </span>
+        }
       />
 
       {/* pay-period chips (21.–20. logic) + a Payday-style picker for any other range */}

@@ -493,3 +493,26 @@ export async function revokeApiKey(id: string): Promise<SettingsResult> {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
+
+
+/** Pay-period start day (1 = calendar month; 21 = 21st→20th …). */
+export async function savePayPeriodStart(day: number): Promise<SettingsResult> {
+  const d = Math.round(day);
+  if (!(d >= 1 && d <= 28)) return { ok: false, error: "Veldu dag 1–28" };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("companies").update({ pay_period_start: d }).eq("id", ctx.company);
+    if (error) return { ok: false, error: /pay_period_start/.test(error.message) ? "Keyrðu migration 0036 í Supabase fyrst." : error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "company.pay_period", entity: "companies", detail: `Launatímabil stillt — byrjar ${d}.`,
+    });
+    revalidatePath("/stillingar");
+    revalidatePath("/launakeyrslur");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}

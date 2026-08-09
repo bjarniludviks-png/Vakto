@@ -6,7 +6,7 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { syncInventraRevenue, addLocation, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, createApiKey, revokeApiKey } from "./actions";
+import { syncInventraRevenue, addLocation, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
 import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
@@ -74,7 +74,16 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
             <div className="statline"><span className="k">{t("Tryggingagjald")}</span><span className="v">6,35%</span></div>
             <div className="statline"><span className="k">{t("Mótframlag lífeyris")}</span><span className="v">11,5%</span></div>
             <div className="statline"><span className="k">{t("Orlof")}</span><span className="v">10,17%</span></div>
-            <div className="statline"><span className="k">{t("Launatímabil")}</span><span className="v">21. → 20.</span></div>
+            <div className="statline"><span className="k">{t("Launatímabil")}</span>
+              <select className="badge" style={{ border: "1px solid var(--line)", padding: "5px 9px", font: "inherit", fontSize: 12.5 }}
+                defaultValue={String(data.company && "payPeriodStart" in (data.company as object) ? (data.company as unknown as { payPeriodStart?: number }).payPeriodStart ?? 1 : 1)}
+                onChange={async (e) => { const r = await savePayPeriodStart(Number(e.target.value)); toast(r.ok ? t("Launatímabil vistað") : (r.error ?? "Villa")); }}>
+                <option value="1">1. → {t("mánaðamóta")}</option>
+                <option value="15">15. → 14.</option>
+                <option value="21">21. → 20.</option>
+                <option value="25">25. → 24.</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>

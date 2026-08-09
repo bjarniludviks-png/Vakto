@@ -67,10 +67,20 @@ export async function getTimeBank(months = 6): Promise<TimeBank> {
         const ac = Math.round(acts[i] * 10) / 10;
         return { label: w.label, required, actual: ac, delta: Math.round((ac - required) * 10) / 10 };
       });
-      // Only count months where the employee actually has punches (avoid penalising
-      // months before they started / with no data).
-      const worked = monthsOut.filter((m) => m.actual > 0);
-      const balance = Math.round(worked.reduce((a, m) => a + m.delta, 0) * 10) / 10;
+      // Running balance with the Icelandic settlement model:
+      //  - months short of vinnuskylda accrue a NEGATIVE balance (the company
+      //    holds a claim on those hours);
+      //  - months OVER vinnuskylda first fill that deficit hour-for-hour —
+      //    only the remainder is overtime, and overtime is PAID OUT, never
+      //    banked. So the balance can climb back to 0 but never above it.
+      // Months with no punches (pre-hire / no data) are skipped.
+      let balance = 0;
+      for (const m of monthsOut) {
+        if (m.actual <= 0) continue;
+        if (m.delta < 0) balance += m.delta;
+        else if (balance < 0) balance = Math.min(0, balance + m.delta);
+      }
+      balance = Math.round(balance * 10) / 10;
       return { id: e.id, name: e.fullName.split(/\s+/)[0], av: initials(e.fullName), c: e.avatarColor, dept: e.department ?? "—", months: monthsOut, balance };
     });
     const anyData = rows.some((r) => r.months.some((m) => m.actual > 0));
