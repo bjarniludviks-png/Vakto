@@ -12,6 +12,9 @@ export type RuleSet = {
   weekend?: { pct?: number };
   /** Night/evening premium between from–to (HH:MM). */
   night?: { from?: string; to?: string; pct?: number };
+  /** Free-form premium rules — the user builds any list: name + % and an
+   * optional time window and/or weekdays (0=Mon…6=Sun). */
+  premiums?: { label: string; pct: number; from?: string; to?: string; days?: number[] }[];
   /** Public-holiday pay premium. */
   holiday?: { pct?: number };
   /** Breaks: minutes owed per worked hours, paid or not. */
@@ -52,6 +55,11 @@ export const RULE_PRESETS: { key: string; name: string; country: string; rules: 
       weekend: { pct: 45 },
       night: { from: "17:00", to: "08:00", pct: 33 },
       holiday: { pct: 90 },
+      premiums: [
+        { label: "Kvöld-/næturálag", pct: 33, from: "17:00", to: "08:00" },
+        { label: "Helgarálag", pct: 45, days: [5, 6] },
+        { label: "Stórhátíðarálag", pct: 90 },
+      ],
       breaks: { minutesPer6h: 30, paid: true },
       rest: { minHoursBetweenShifts: 11, maxConsecutiveDays: 6 },
       vacation: { daysPerYear: 24, accrualPct: 10.17 },
@@ -117,9 +125,10 @@ export function summarizeRules(r: RuleSet, lang: "is" | "en" = "is"): string {
       : r.overtime.afterHoursPerWeek ? ` ${t("eftir", "after")} ${r.overtime.afterHoursPerWeek} ${t("klst/viku", "h/wk")}` : "";
     parts.push(`${t("Yfirvinna", "Overtime")} +${r.overtime.pct}%${thr}`);
   }
-  if (r.night?.pct) parts.push(`${t("Nætur/kvöldálag", "Night")} +${r.night.pct}%`);
-  if (r.weekend?.pct) parts.push(`${t("Helgarálag", "Weekend")} +${r.weekend.pct}%`);
-  if (r.holiday?.pct) parts.push(`${t("Stórhátíð", "Holiday")} +${r.holiday.pct}%`);
+  if (r.premiums?.length) for (const pr of r.premiums) parts.push(`${pr.label} +${pr.pct}%${pr.from && pr.to ? ` (${pr.from}–${pr.to})` : ""}`);
+  if (!r.premiums?.length && r.night?.pct) parts.push(`${t("Nætur/kvöldálag", "Night")} +${r.night.pct}%`);
+  if (!r.premiums?.length && r.weekend?.pct) parts.push(`${t("Helgarálag", "Weekend")} +${r.weekend.pct}%`);
+  if (!r.premiums?.length && r.holiday?.pct) parts.push(`${t("Stórhátíð", "Holiday")} +${r.holiday.pct}%`);
   if (r.rest?.minHoursBetweenShifts) parts.push(`${t("Hvíld", "Rest")} ${r.rest.minHoursBetweenShifts} ${t("klst", "h")}`);
   if (r.vacation?.daysPerYear) parts.push(`${t("Orlof", "Vacation")} ${r.vacation.daysPerYear} ${t("dagar", "days")}`);
   if (r.sick?.daysPerYear) parts.push(`${t("Veikindi", "Sick")} ${r.sick.daysPerYear} ${t("dagar", "days")}`);

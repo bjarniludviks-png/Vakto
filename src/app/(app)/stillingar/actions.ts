@@ -376,7 +376,7 @@ export type AiRuleSuggestion = { rules: RuleSet; name: string; explanation: stri
 /** AI labor-rule assistant: suggests a rule set from country/region/industry/
  * union. NEVER auto-applies — the UI shows the suggestion for review/edit and
  * only saving stores it. Falls back to a sensible template when no API key. */
-export async function aiSuggestRules(input: { country?: string; region?: string; industry?: string; unionName?: string; role?: string; notes?: string }): Promise<AiRuleSuggestion> {
+export async function aiSuggestRules(input: { country?: string; region?: string; industry?: string; unionName?: string; role?: string; notes?: string; freeText?: string }): Promise<AiRuleSuggestion> {
   const base = RULE_PRESETS.find((p) => /ísland|iceland/i.test(input.country ?? ""))?.rules
     ?? RULE_PRESETS[1].rules;
   const fallback: AiRuleSuggestion = {
@@ -407,6 +407,7 @@ export async function aiSuggestRules(input: { country?: string; region?: string;
                   overtime: { type: "object", properties: { afterHoursPerDay: { type: "number" }, afterHoursPerWeek: { type: "number" }, afterHoursPerMonth: { type: "number" }, pct: { type: "number" } } },
                   weekend: { type: "object", properties: { pct: { type: "number" } } },
                   night: { type: "object", properties: { from: { type: "string" }, to: { type: "string" }, pct: { type: "number" } } },
+                  premiums: { type: "array", description: "Frjáls listi af álagsreglum", items: { type: "object", properties: { label: { type: "string" }, pct: { type: "number" }, from: { type: "string" }, to: { type: "string" }, days: { type: "array", items: { type: "number" } } }, required: ["label", "pct"] } },
                   holiday: { type: "object", properties: { pct: { type: "number" } } },
                   breaks: { type: "object", properties: { minutesPer6h: { type: "number" }, paid: { type: "boolean" } } },
                   rest: { type: "object", properties: { minHoursBetweenShifts: { type: "number" }, maxConsecutiveDays: { type: "number" } } },
@@ -430,8 +431,9 @@ Atvinnugrein: ${input.industry || "óskilgreint"}
 Stéttarfélag/samningur: ${input.unionName || "óskilgreint"}
 Hlutverk: ${input.role || "almennt starfsfólk"}
 Athugasemdir: ${input.notes || "engar"}
+${input.freeText ? `Spurning notandans (svaraðu henni með reglunum): ${input.freeText}` : ""}
 
-Skilaðu raunhæfum tölum fyrir þetta samhengi og taktu skýrt fram í explanation hvað notandinn þarf að staðfesta sjálfur. Þetta er TILLAGA — ekki lögfræðiráðgjöf.`,
+Notaðu premiums-listann fyrir öll álög (heiti + % + tímabil/dagar ef við á). Skilaðu raunhæfum tölum fyrir þetta samhengi og taktu skýrt fram í explanation hvað notandinn þarf að staðfesta sjálfur. Þetta er TILLAGA — ekki lögfræðiráðgjöf.`,
       }],
     });
     const block = msg.content.find((b) => b.type === "text");

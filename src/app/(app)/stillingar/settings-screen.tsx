@@ -368,6 +368,7 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
   const [unionName, setUnionName] = useState(tpl?.union_name ?? "");
   const [role, setRole] = useState("");
   const [tenure, setTenure] = useState("");
+  const [aiQ, setAiQ] = useState("");
   const [rules, setRules] = useState<RuleSet>(tpl?.rules ?? {});
   const [source, setSource] = useState<"manual" | "preset" | "ai">(tpl?.source ?? "manual");
   const [aiNote, setAiNote] = useState<string | null>(null);
@@ -393,7 +394,7 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
 
   async function askAi() {
     setAiBusy(true);
-    const res = await aiSuggestRules({ country, region, industry, unionName, role, notes: tenure });
+    const res = await aiSuggestRules({ country, region, industry, unionName, role, notes: tenure, freeText: aiQ });
     setAiBusy(false);
     setRules(res.rules);
     if (!name) setName(res.name);
@@ -404,7 +405,18 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
   async function submit() {
     if (!name.trim()) { toast(t("Gefðu sniðmátinu nafn")); return; }
     setBusy(true);
-    const res = await saveRuleTemplate({ id: tpl?.id, name, country, region, industry, unionName, rules, source });
+    // Best-effort mapping of the free-form rows onto the structured slots the
+    // payroll calc reads today (night/weekend/holiday) — the rows stay the
+    // source of truth in premiums[].
+    const out = structuredClone(rules);
+    const rows2 = out.premiums ?? [];
+    const timeRow = rows2.find((x) => x.from && x.to);
+    if (timeRow) out.night = { from: timeRow.from, to: timeRow.to, pct: timeRow.pct };
+    const wk = rows2.find((x) => /helg|weekend/i.test(x.label) || (x.days ?? []).some((d) => d >= 5));
+    if (wk) out.weekend = { pct: wk.pct };
+    const hol = rows2.find((x) => /hátíð|holiday/i.test(x.label));
+    if (hol) out.holiday = { pct: hol.pct };
+    const res = await saveRuleTemplate({ id: tpl?.id, name, country, region, industry, unionName, rules: out, source });
     setBusy(false);
     if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
     onClose();
@@ -419,6 +431,12 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
     onClose();
     toast(res.ok ? t("Sniðmáti eytt") : (res.error ?? "Tókst ekki"));
   }
+
+  const prem = rules.premiums ?? [];
+  const setPrem = (i: number, patch: Partial<{ label: string; pct: number; from?: string; to?: string }>) =>
+    setRules((r) => ({ ...r, premiums: (r.premiums ?? []).map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
+  const addPrem = () => setRules((r) => ({ ...r, premiums: [...(r.premiums ?? []), { label: "", pct: 0 }] }));
+  const delPrem = (i: number) => setRules((r) => ({ ...r, premiums: (r.premiums ?? []).filter((_, j) => j !== i) }));
 
   const F = ({ label, value, onChange, ph }: { label: string; value: string; onChange: (v: string) => void; ph?: string }) => (
     <div className="field" style={{ flex: 1, minWidth: 0 }}><label>{label}</label><input value={value} onChange={(e) => onChange(e.target.value)} placeholder={ph} /></div>
@@ -447,6 +465,9 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
             <F label={t("Starfsaldur / annað samhengi (fyrir AI)")} value={tenure} onChange={setTenure} ph={t("t.d. unnið í 3 ár, næturvaktir")} />
           </div>
 
+          <div className="field"><label>{t("Spyrðu AI (frjáls texti)")}</label>
+            <textarea className="lf-ta" rows={2} value={aiQ} onChange={(e) => setAiQ(e.target.value)} placeholder={t("t.d. Hvað er ómenntaður þjónn með í laun og álög hjá Eflingu?")} />
+          </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "4px 0 10px" }}>
             {RULE_PRESETS.map((p) => (
               <button key={p.key} className="btn ghost sm" onClick={() => applyPreset(p.key)}>{p.name.split(" — ")[0]} {t("sniðmát")}</button>
@@ -459,15 +480,29 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
           {aiNote && <p className="muted" style={{ fontSize: 12, background: "var(--brand-soft)", borderRadius: 9, padding: "9px 11px", marginBottom: 10 }}>{aiNote}</p>}
 
           <div className="hr" />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <label style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--ink3)" }}>{t("Álagsreglur")}</label>
+            <button className="btn ghost sm" onClick={addPrem}>+ {t("Ný regla")}</button>
+          </div>
+          {prem.length === 0 && <p className="muted" style={{ fontSize: 12.5, margin: "2px 0 8px" }}>{t("Engar álagsreglur enn — bættu við (t.d. Kvöldálag 33% frá 16:00 til 18:00) eða notaðu sniðmát/AI.")}</p>}
+          {prem.map((pr, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 7 }}>
+              <input style={{ flex: 2 }} value={pr.label} placeholder={t("Heiti (t.d. Kvöldálag)")} onChange={(e) => setPrem(i, { label: e.target.value })} />
+              <input style={{ width: 68 }} inputMode="decimal" value={pr.pct ? String(pr.pct).replace(".", ",") : ""} placeholder="%" onChange={(e) => { const n = Number(e.target.value.replace(",", ".")); setPrem(i, { pct: Number.isFinite(n) ? n : 0 }); }} />
+              <span className="muted" style={{ fontSize: 11 }}>%</span>
+              <input style={{ width: 74 }} value={pr.from ?? ""} placeholder={t("frá")} onChange={(e) => setPrem(i, { from: e.target.value || undefined })} />
+              <span className="muted">–</span>
+              <input style={{ width: 74 }} value={pr.to ?? ""} placeholder={t("til")} onChange={(e) => setPrem(i, { to: e.target.value || undefined })} />
+              <button className="x" title={t("Eyða reglu")} onClick={() => delPrem(i)}>✕</button>
+            </div>
+          ))}
+
+          <div className="hr" />
+          <label style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--ink3)", display: "block", marginBottom: 6 }}>{t("Grunnstillingar")}</label>
           <div style={{ display: "flex", gap: 10 }}>
             <N label={t("Yfirvinna eftir klst/viku")} value={rules.overtime?.afterHoursPerWeek} onChange={setNum((r, n) => { r.overtime = { ...r.overtime, afterHoursPerWeek: n }; })} />
             <N label={t("Yfirvinna eftir klst/mánuði")} value={rules.overtime?.afterHoursPerMonth} onChange={setNum((r, n) => { r.overtime = { ...r.overtime, afterHoursPerMonth: n }; })} />
             <N label={t("Yfirvinnuálag %")} value={rules.overtime?.pct} onChange={setNum((r, n) => { r.overtime = { ...r.overtime, pct: n }; })} />
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <N label={t("Helgarálag %")} value={rules.weekend?.pct} onChange={setNum((r, n) => { r.weekend = { pct: n }; })} />
-            <N label={t("Kvöld/næturálag %")} value={rules.night?.pct} onChange={setNum((r, n) => { r.night = { ...r.night, pct: n }; })} />
-            <N label={t("Stórhátíðarálag %")} value={rules.holiday?.pct} onChange={setNum((r, n) => { r.holiday = { pct: n }; })} />
           </div>
           <div style={{ display: "flex", gap: 10 }}>
             <N label={t("Lágm. hvíld milli vakta (klst)")} value={rules.rest?.minHoursBetweenShifts} onChange={setNum((r, n) => { r.rest = { ...r.rest, minHoursBetweenShifts: n }; })} />
