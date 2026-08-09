@@ -121,7 +121,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
             <span className="ar">·</span>
             <div className="fs"><div className="l">{t("Brúttó")}</div><div className="v">{T.grossM} <small style={{ fontSize: 14, color: "var(--ink3)", fontWeight: 600 }}>m.kr.</small></div></div>
           </div>
-          <div style={{ display: "flex", gap: 9, alignItems: "center" }}>
+          <div className="payacts">
             <button className="btn ghost sm" onClick={() => toast("Forskoða launakeyrslu")}>{t("Forskoða")}</button>
             <button className="btn ghost sm" style={settleIds.length ? { borderColor: "var(--brand)", color: "var(--brand)" } : undefined}
               title={t("Jafnar mínus-stöðu tímabanka á GRUNNTAXTA — yfirvinnuálagið helst alltaf hjá starfsmanninum")}
