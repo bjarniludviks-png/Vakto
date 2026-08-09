@@ -98,6 +98,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [monthVer, setMonthVer] = useState(0);
   const [dayModal, setDayModal] = useState<Date | null>(null);
   const monthDragRef = useRef<{ first: string; start: string; end: string; fromISO: string } | null>(null);
+  const [monthClip, setMonthClip] = useState<{ first: string; start: string; end: string } | null>(null);
   const [drag, setDrag] = useState<{ r: number; c: number } | null>(null);
   // Copied shift: code + real times, so pasting preserves them and saves.
   const [clip, setClip] = useState<{ code: string; start?: string; end?: string } | null>(null);
@@ -592,6 +593,14 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     });
   }
   const typeGuessFor = (start: string) => types.find((x) => x.t.startsWith(start))?.nm ?? types[0]?.nm ?? "Dagvakt";
+  async function pasteMonthShift(toISO: string) {
+    if (!monthClip) return;
+    const res = await saveShift({ employeeName: monthClip.first, date: toISO, startTime: monthClip.start, endTime: monthClip.end, shiftTypeName: typeGuessFor(monthClip.start) });
+    if (!res.ok) { toast(res.error ?? "Villa"); return; }
+    setMonthVer((v) => v + 1);
+    toast(res.demo ? t("Vakt límd (demo)") : t("Vakt límd"));
+  }
+
   async function moveMonthShift(toISO: string) {
     const d = monthDragRef.current; monthDragRef.current = null;
     if (!d || d.fromISO === toISO) return;
@@ -825,8 +834,15 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       )}
 
       {view === "Dagur" && <DayView day={cur} col={curCol} rows={colShifts(curCol)} onAdd={openNewShift} />}
+      {view === "Mánuður" && monthClip && (
+        <div id="pastebar" style={{ display: "flex", marginTop: 12 }}>
+          <span className="pbtxt"><b>{t("Líma-hamur:")}</b> {monthClip.first} · {monthClip.start}–{monthClip.end} — {t("smelltu á daga til að líma")}</span>
+          <button className="btn ghost sm" onClick={() => setMonthClip(null)}>{t("Hætta")}</button>
+        </div>
+      )}
       {view === "Mánuður" && <MonthView monthDate={cur} todayISO={todayISO} blocks={monthBlocks}
-        onEdit={(d) => setDayModal(d)}
+        onEdit={(d) => { if (monthClip) { void pasteMonthShift(fmtISO(d)); } else setDayModal(d); }}
+        onCopyBlock={(b) => { const [a, z] = b.time.split("–"); setMonthClip({ first: b.name, start: norm(a ?? "08:00"), end: norm(z ?? "16:00") }); toast(t("Vakt afrituð — smelltu á daga til að líma")); }}
         onDragBlock={(b, iso) => { const [a, z] = b.time.split("–"); monthDragRef.current = { first: b.name, start: norm(a ?? "08:00"), end: norm(z ?? "16:00"), fromISO: iso }; }}
         onDropDay={(iso) => moveMonthShift(iso)} />}
       {dayModal && <MonthShiftModal date={dayModal} entries={entriesFor(dayModal)} names={[...emp, ...pool].map((x) => x[1])} types={types}
@@ -941,7 +957,7 @@ function DayView({ day, col, rows, onAdd }: { day: Date; col: number; rows: DayR
   );
 }
 
-function MonthView({ monthDate, todayISO, blocks, onEdit, onDragBlock, onDropDay }: { monthDate: Date; todayISO: string; blocks: (iso: string, wd: number) => MonthBlock[]; onEdit: (d: Date) => void; onDragBlock: (b: MonthBlock, iso: string) => void; onDropDay: (iso: string) => void }) {
+function MonthView({ monthDate, todayISO, blocks, onEdit, onCopyBlock, onDragBlock, onDropDay }: { monthDate: Date; todayISO: string; blocks: (iso: string, wd: number) => MonthBlock[]; onEdit: (d: Date) => void; onCopyBlock: (b: MonthBlock) => void; onDragBlock: (b: MonthBlock, iso: string) => void; onDropDay: (iso: string) => void }) {
   const { t } = useLang();
   const hd = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
   const y = monthDate.getFullYear(), m = monthDate.getMonth();
@@ -970,7 +986,8 @@ function MonthView({ monthDate, todayISO, blocks, onEdit, onDragBlock, onDropDay
                     {sh.slice(0, 4).map((x, i) => (
                       <div key={i} className={`mblock ${x.type}`} draggable
                         onDragStart={(ev) => { ev.stopPropagation(); onDragBlock(x, fmtISO(date)); }}
-                        onClick={(e) => { e.stopPropagation(); onEdit(date); }} title={`${x.name} · ${x.time}`}>
+                        onContextMenu={(ev) => { ev.preventDefault(); ev.stopPropagation(); onCopyBlock(x); }}
+                        onClick={(e) => { e.stopPropagation(); onEdit(date); }} title={`${x.name} · ${x.time} · ${"hægrismelltu til að afrita"}`}>
                         <b>{x.name}</b><span>{x.time} · {dec1(x.hrs)}{t("klst-stutt")}</span>
                       </div>
                     ))}
