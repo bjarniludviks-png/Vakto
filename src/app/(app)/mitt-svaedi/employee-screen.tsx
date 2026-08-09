@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
-import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, type LeaveType, type MyPunchRow } from "./actions";
+import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, getMyContract, signMyContract, type LeaveType, type MyPunchRow, type MyContract } from "./actions";
 import { dec1, nf } from "@/lib/format";
 import { StaffCardModal, type StaffCardData } from "@/components/app/staff-card";
 import type { StaffCard } from "@/lib/mycard.server";
@@ -151,6 +151,58 @@ function PunchCard({ live = false, openSince = null }: { live?: boolean; openSin
   );
 }
 
+/** In-app contract signing (þrep 1): shows only while a contract awaits
+ * approval; the confirm modal stamps name + time into the document. */
+function ContractSignCard() {
+  const { t } = useLang();
+  const [contract, setContract] = useState<MyContract | null>(null);
+  const [open, setOpen] = useState(false);
+  const [agreed, setAgreed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { getMyContract().then((r) => { if (r.ok && r.contract?.status === "sent") setContract(r.contract); }); }, []);
+  if (!contract) return null;
+  async function sign() {
+    if (!contract) return;
+    setBusy(true);
+    const res = await signMyContract(contract.id);
+    setBusy(false);
+    if (!res.ok) { toast(res.error ?? "Villa"); return; }
+    toast(t("Samningurinn er undirritaður — til hamingju!"));
+    setOpen(false);
+    setContract(null);
+  }
+  return (
+    <>
+      <div className="mini" style={{ borderColor: "var(--brand)", background: "var(--brand-soft, #fdf1e7)" }}>
+        <div className="mh" style={{ color: "var(--brand)" }}>{t("Ráðningarsamningur bíður undirritunar")}</div>
+        <p style={{ fontSize: 13, margin: "4px 0 10px" }}>{t("Vinnuveitandinn þinn sendi þér ráðningarsamning. Lestu hann yfir og samþykktu rafrænt.")}</p>
+        <button className="btn sm" onClick={() => setOpen(true)}>{t("Skoða & samþykkja")}</button>
+      </div>
+      {open && (
+        <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
+          <div className="mbg" onClick={() => setOpen(false)} />
+          <div className="modal" style={{ maxWidth: 620 }}>
+            <div className="mh"><div style={{ fontSize: 15, fontWeight: 700 }}>{contract.title}</div><button className="x" onClick={() => setOpen(false)}>✕</button></div>
+            <div className="mb">
+              <div style={{ maxHeight: "48vh", overflowY: "auto", border: "1px solid var(--line)", borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
+                <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13, lineHeight: 1.6, margin: 0 }}>{contract.content}</pre>
+              </div>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: 9, fontSize: 13, cursor: "pointer" }}>
+                <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 2 }} />
+                {t("Ég hef lesið samninginn og samþykki hann. Rafrænt samþykki mitt er skráð með nafni, tímastimpli og innskráningu.")}
+              </label>
+              <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
+                <button className="btn" disabled={!agreed || busy} onClick={sign}>{t("Samþykkja ráðningarsamninginn")}</button>
+                <button className="btn ghost" onClick={() => setOpen(false)}>{t("Loka")}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 /** Today's shift checklist — set by the manager on the shift, ticked here. */
 function TasksCard({ initial }: { initial: { id: string; title: string; done: boolean }[] }) {
   const { t } = useLang();
@@ -222,6 +274,7 @@ function Overview({ onReq, perms, my }: { onReq: (k: ReqKind) => void; perms: Pe
           ))}
         </div>
       )}
+      {live && <ContractSignCard />}
       {live && my!.tasks.length > 0 && <TasksCard initial={my!.tasks} />}
       {perms.requests && <QuickActions onReq={onReq} />}
     </div>

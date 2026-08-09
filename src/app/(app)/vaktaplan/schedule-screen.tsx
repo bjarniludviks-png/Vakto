@@ -767,10 +767,17 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                         >
                           <div
                             className={`shift ${SH[s].c}`}
-                            title={isUnav ? (s === "off" ? t("Skráð ólaus þennan dag") : t("ATH: skráð ólaus þennan dag — árekstur")) : undefined}
+                            title={isUnav ? (s === "off" ? t("Skráð ólaus þennan dag") : t("ATH: skráð ólaus þennan dag — árekstur")) : t("hægrismelltu til að afrita")}
                             draggable
                             onDragStart={() => setDrag({ r, c })}
                             onClick={() => cellClick(r, c)}
+                            onContextMenu={(ev) => {
+                              ev.preventDefault();
+                              if (s === "off") return;
+                              const tt = timeOf(r, c);
+                              setClip({ code: s, start: tt?.start, end: tt?.end });
+                              toast(t("Vakt afrituð — smelltu á reiti til að líma"));
+                            }}
                           >
                             {s === "off" ? t("Frí") : <>{cellLabel(r, c, s)}<small>{SH[s].s ? t("sh:" + SH[s].s) :" "}</small></>}
                           </div>
