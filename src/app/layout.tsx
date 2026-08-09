@@ -21,6 +21,11 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#e9700f",
+  // maximumScale 1 stops iOS Safari auto-zooming into focused inputs
+  // (chat/feed composers) — manual pinch-zoom still works on iOS 10+.
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export default function RootLayout({
