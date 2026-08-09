@@ -731,7 +731,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       )}
 
       {/* Slim one-line summary so the grid itself stays at the top of the
-          screen — the schedule is the point, the numbers just ride along. */}
+          screen — the schedule is the point, the numbers just ride along.
+          Day view has its own strip with the same figures, so skip here. */}
+      {view !== "Dagur" && (
       <div className="kstrip">
         <span>{t(kpi.hl)} <b>{dec1(kpi.hrs)}</b> {t("klst")}</span>
         <span>{t("Áætl. launakostnaður")} <b>{nf(Math.round(kpi.hrs * COST_HR))}</b> kr</span>
@@ -739,6 +741,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         <span className={estHrs.overtime > 0 ? "bad" : ""}>{t("Áætl. yfirvinna")} <b>{dec1(estHrs.overtime)}</b> {t("klst")}</span>
         <span>{t(kpi.sl)} <b>{kpi.shifts}</b>{kpi.open && !liveCompany ? <> · 2 {t("opnar")}</> : null}</span>
       </div>
+      )}
 
       {view === "Vika" && (
         <div>
