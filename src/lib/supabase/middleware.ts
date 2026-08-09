@@ -59,6 +59,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/splash") ||
     // Open Revenue API — authenticated by per-company API keys, not sessions.
     pathname.startsWith("/api/v1/") ||
+    pathname.startsWith("/api/cron/") ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
     pathname === "/favicon.ico";

@@ -151,8 +151,13 @@ export default function AttendanceScreen({ onShift = 5, empty = false, live = fa
 
 function nowHHMM() { const d = new Date(); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
 
+/** Hours a punch has been open. */
+const openHrsOf = (sinceISO: string) => Math.max(0, (Date.now() - Date.parse(sinceISO)) / 3600e3);
+
 function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onShift: number; initial: AttRow[]; onNow: OnNowRow[]; roster: RosterRow[]; corrections: CorrectionRow[] }) {
   const { t } = useLang();
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
   const router = useRouter();
   async function decideCorr(id: string, approve: boolean) {
     const res = await decideCorrection(id, approve);
@@ -207,7 +212,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
         rangeLabel={`${niceISO(from)} – ${niceISO(to)}`}
       />
       <div className="kpis">
-        <div className="kpi"><div className="lab">{t("Á vakt núna")}</div><div className="val">{onShift}</div></div>
+        <div className="kpi"><div className="lab">{t("Á vakt núna")}</div><div className="val">{onNow.length}</div></div>
         <div className="kpi"><div className="lab">{t("Áætl. klst")}</div><div className="val">{dec1(planned)} <small>{t("klst")}</small></div></div>
         <div className="kpi"><div className="lab">{t("Raun klst")}</div><div className="val">{dec1(actual)} <small>{t("klst")}</small></div></div>
         <div className="kpi"><div className="lab">{t("Frávik")}</div><div className="val" style={{ color: actual > planned ? "var(--bad)" : actual < planned ? "var(--good)" : undefined }}>{actual >= planned ? "+" : ""}{dec1(actual - planned)} <small>{t("klst")}</small></div></div>
@@ -227,7 +232,9 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
               <span className="avt" style={{ background: r.c, width: 34, height: 34, cursor: "pointer" }} onClick={() => router.push(`/timaskraning/${r.employeeId}`)}>{r.av}</span>
               <div className="tx" style={{ cursor: "pointer" }} onClick={() => router.push(`/timaskraning/${r.employeeId}`)}><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : ""}</span></div>
               <div className="itact">
-                <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>
+                {openHrsOf(r.since) > 12
+                  ? <span className="tag" style={{ background: "var(--bad-soft, #fbe9e5)", color: "var(--bad)" }} title={t("Opin stimplun í meira en 12 klst — gleymt að stimpla út?")}>⚠ {Math.round(openHrsOf(r.since))} {t("klst")}</span>
+                  : <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>}
                 <button className="btn ghost sm" onClick={() => setEditPunch(r)}>{t("Leiðrétta")}</button>
                 <AsyncButton className="btn sm" onClick={() => doClockOut(r)}>{t("tk:clockout")}</AsyncButton>
               </div>
@@ -255,21 +262,54 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
       )}
 
       <div className="card" style={{ marginTop: 20 }}>
-        <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)}{missing ? ` · ${missing} ${t("vantar stimplun")}` : ""}</div></div></div>
+        <div className="ch">
+          <div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)}{missing ? ` · ${missing} ${t("vantar stimplun")}` : ""}</div></div>
+          {sel.size > 0 && (
+            <button className="btn sm" disabled={bulkBusy} onClick={async () => {
+              setBulkBusy(true);
+              let n = 0;
+              const picked = sel.size;
+              for (const id of sel) { const res = await approveEmployeePunches(id, from, to); if (res.ok) n += res.count ?? 0; }
+              setBulkBusy(false);
+              setSel(new Set());
+              toast(`${t("Samþykkt")}: ${n} ${t("stimplanir hjá")} ${picked} ${t("starfsmönnum")}`);
+              router.refresh();
+            }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>
+              {t("Samþykkja valda")} ({sel.size})
+            </button>
+          )}
+        </div>
         <div className="cb tbl" style={{ paddingTop: 8, opacity: loading ? 0.5 : 1 }}>
           <table>
-            <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th><th>{t("Staða")}</th></tr></thead>
+            <thead><tr>
+              <th style={{ width: 34 }}><input type="checkbox" checked={shown.length > 0 && sel.size === shown.length} onChange={(e) => setSel(e.target.checked ? new Set(shown.map((r) => r.id)) : new Set())} /></th>
+              <th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th><th>{t("Staða")}</th>
+            </tr></thead>
             <tbody>
-              {shown.length ? shown.map((r) => (
+              {shown.length ? shown.map((r) => {
+                const longOpen = onNow.find((o) => o.employeeId === r.id && openHrsOf(o.since) > 12);
+                const bigDev = !longOpen && r.deviation > 4;
+                return (
                 <tr key={r.id} className="rowlink" onClick={() => router.push(`/timaskraning/${r.id}`)}>
+                  <td onClick={(e) => e.stopPropagation()}>
+                    <input type="checkbox" checked={sel.has(r.id)} onChange={(e) => setSel((sv) => { const n = new Set(sv); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} />
+                  </td>
                   <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.name}</span></td>
                   <td>{r.dept}</td>
                   <td className="r">{dec1(r.planned)}</td>
                   <td className="r">{dec1(r.actual)}</td>
                   <td className="r" style={{ color: r.deviation > 0 ? "var(--bad)" : r.deviation < 0 ? "var(--good)" : undefined }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>
-                  <td>{r.actual === 0 && r.planned === 0 ? <span className="pill" style={{ background: "var(--line2)", color: "var(--ink3)" }}>{t("engin gögn")}</span> : r.actual === 0 ? <span className="pill" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Vantar stimplun")}</span> : <span className="pill" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Á áætlun")}</span>}</td>
+                  <td>
+                    {longOpen ? <span className="pill" style={{ background: "var(--bad-soft, #fbe9e5)", color: "var(--bad)" }} title={t("Opin stimplun í meira en 12 klst — gleymt að stimpla út?")}>⚠ {t("Opin stimplun")}</span>
+                      : bigDev ? <span className="pill" style={{ background: "var(--warn-soft)", color: "var(--warn)" }} title={t("Frávik yfir 4 klst — skoðaðu stimplanirnar")}>⚠ {t("Mikið frávik")}</span>
+                      : r.actual === 0 && r.planned === 0 ? <span className="pill" style={{ background: "var(--line2)", color: "var(--ink3)" }}>{t("engin gögn")}</span>
+                      : r.actual === 0 ? <span className="pill" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Vantar stimplun")}</span>
+                      : <span className="pill" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Á áætlun")}</span>}
+                  </td>
                 </tr>
-              )) : <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
+                );
+              }) : <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
             </tbody>
           </table>
         </div>

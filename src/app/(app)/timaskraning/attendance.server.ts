@@ -44,7 +44,15 @@ export async function getWhoIsOn(): Promise<{ rows: OnNowRow[]; missing: Missing
       .order("clock_in", { ascending: true });
     const punchedToday = new Set((todayPunches ?? []).map((p) => p.employee_id as string));
 
-    const rows: OnNowRow[] = (todayPunches ?? []).filter((p) => p.clock_out == null).map((p) => {
+    // Still-open punches from BEFORE today (forgotten clock-outs) must surface
+    // too — otherwise the most important anomaly is invisible.
+    const back48 = new Date(now.getTime() - 48 * 3600e3);
+    const { data: oldOpen } = await supabase
+      .from("punches").select("id, employee_id, clock_in, clock_out, source")
+      .eq("company_id", company).is("clock_out", null)
+      .gte("clock_in", back48.toISOString()).lt("clock_in", start.toISOString());
+    const allPunches = [...(oldOpen ?? []), ...(todayPunches ?? [])];
+    const rows: OnNowRow[] = allPunches.filter((p) => p.clock_out == null).map((p) => {
       const m = meta.get(p.employee_id as string);
       const ci = new Date(p.clock_in as string);
       return {

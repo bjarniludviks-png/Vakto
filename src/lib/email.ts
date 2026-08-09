@@ -89,6 +89,21 @@ export async function sendSchedulePublishedEmail(to: string, name: string, compa
   });
 }
 
+export async function sendStillWorkingEmail(to: string, name: string) {
+  const first = (name || "").split(/\s+/)[0] || "";
+  return sendEmail({
+    to,
+    subject: "Ertu enn að vinna?",
+    html: template({
+      heading: `Ertu enn að vinna${first ? ", " + first : ""}?`,
+      preheader: "Opin stimplun í meira en 12 klst.",
+      body: "Þú hefur verið <b>stimplað/ur inn í meira en 12 klukkustundir</b>. Ef þú gleymdir að stimpla þig út skaltu laga það í Mitt svæði — eða biðja vaktstjórann um leiðréttingu.",
+      ctaLabel: "Opna Mitt svæði",
+      ctaHref: `${APP_URL}/mitt-svaedi`,
+    }),
+  });
+}
+
 export async function sendContractEmail(to: string, name: string, company: string) {
   const first = (name || "").split(/\s+/)[0] || "";
   return sendEmail({

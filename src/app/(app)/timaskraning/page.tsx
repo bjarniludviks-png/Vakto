@@ -4,8 +4,11 @@ import { getCorrections } from "./actions";
 import { getCompanyData } from "@/lib/employees.server";
 import { getWeekAttendance } from "@/lib/analytics.server";
 import { getMyScope, scopeRows } from "@/lib/scope.server";
+import { checkLongPunches } from "@/lib/punch-check.server";
 
 export default async function TimaskraningPage() {
+  // Opportunistic "Ertu enn að vinna?" check — the daily cron is the backstop.
+  void checkLongPunches();
   const [{ onShift }, { empty }, att, board, corr, scope] = await Promise.all([
     getTodayAttendance(), getCompanyData(), getWeekAttendance(), getWhoIsOn(), getCorrections(), getMyScope(),
   ]);
