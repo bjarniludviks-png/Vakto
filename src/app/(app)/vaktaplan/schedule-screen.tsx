@@ -862,7 +862,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         </div>
       )}
 
-      {view === "Dagur" && <DayView day={cur} col={curCol} rows={colShifts(curCol)} onAdd={openNewShift} onCtx={(x, ev) => {
+      {view === "Dagur" && <DayView day={cur} col={curCol} rows={colShifts(curCol)} need={targets[curCol] ?? 0} onAdd={openNewShift} onCtx={(x, ev) => {
         const r = emp.findIndex((e) => e[1] === x.n);
         if (r < 0) return;
         const code = grid[r]?.[curCol] ?? "off";
@@ -990,7 +990,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
 
 type DayRow = { i: string; n: string; c: string; dep: string; l: string; h: number; type: string; start: number };
 
-function DayView({ day, col, rows, onAdd, onCtx }: { day: Date; col: number; rows: DayRow[]; onAdd: () => void; onCtx: (x: DayRow, ev: React.MouseEvent) => void }) {
+function DayView({ day, col, rows, onAdd, onCtx, need = 0 }: { day: Date; col: number; rows: DayRow[]; onAdd: () => void; onCtx: (x: DayRow, ev: React.MouseEvent) => void; need?: number }) {
   const { t } = useLang();
   const tot = rows.reduce((a, x) => a + x.h, 0);
   return (
@@ -999,7 +999,7 @@ function DayView({ day, col, rows, onAdd, onCtx }: { day: Date; col: number; row
         <span>{t("Á vakt")} <b>{rows.length}</b></span>
         <span>{t("Tímar dagsins")} <b>{dec1(tot)}</b> {t("klst")}</span>
         <span>{t("Kostnaður dagsins")} <b>{nf(Math.round(tot * COST_HR))}</b> kr</span>
-        <span>{t("Mönnunarþörf")} <b>{rows.length}</b> / 6</span>
+        {need > 0 && <span className={rows.length < need ? "bad" : ""}>{t("Mönnunarþörf")} <b>{rows.length}</b> / {need}</span>}
       </div>
       <div className="card" style={{ marginTop: 16 }}>
         <div className="ch"><div><div className="ct">{t(DAYNAMES[col])} {day.getDate()}. {t(MONTHS_IS[day.getMonth()])}</div><div className="cs">{t("smelltu á vakt til að færa eða breyta")}</div></div><button className="btn sm" onClick={onAdd}>{t("+ Bæta við vakt")}</button></div>

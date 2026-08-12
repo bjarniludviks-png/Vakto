@@ -1137,6 +1137,13 @@ export const DICT: Dict = {
   "Eyða deildinni? Starfsfólk í henni verður án deildar (ekki eytt).": { is: "Eyða deildinni? Starfsfólk í henni verður án deildar (ekki eytt).", en: "Delete this department? Its staff will be left without a department (not deleted).", vi: "Xóa bộ phận này? Nhân viên trong đó sẽ không thuộc bộ phận nào (không bị xóa)." },
   "Vistað (demo)": { is: "Vistað (demo)", en: "Saved (demo)", vi: "Đã lưu (demo)" },
   "Eytt (demo)": { is: "Eytt (demo)", en: "Deleted (demo)", vi: "Đã xóa (demo)" },
+  "Færa upp": { is: "Færa upp", en: "Move up", vi: "Chuyển lên" },
+  "Færa niður": { is: "Færa niður", en: "Move down", vi: "Chuyển xuống" },
+  "Lykiltölur mánaðar": { is: "Lykiltölur mánaðar", en: "Monthly key figures", vi: "Số liệu chính của tháng" },
+  "Gröf — velta & laun%": { is: "Gröf — velta & laun%", en: "Charts — revenue & labor %", vi: "Biểu đồ — doanh thu & % lương" },
+  "Ábendingar (innsýn)": { is: "Ábendingar (innsýn)", en: "Insights & tips", vi: "Gợi ý & phân tích" },
+  "Mönnunarmynstur": { is: "Mönnunarmynstur", en: "Staffing pattern", vi: "Mô hình nhân sự" },
+  "Samantekt tímabils": { is: "Samantekt tímabils", en: "Period summary", vi: "Tóm tắt kỳ" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

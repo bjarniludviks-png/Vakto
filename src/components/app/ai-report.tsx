@@ -48,7 +48,11 @@ export function AiReportCard({ examples }: { examples?: string[] }) {
   const recRef = useRef<{ stop: () => void } | null>(null);
   useEffect(() => { setSaved(loadSaved()); }, []);
 
-  const speechOk = typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window);
+  // Detected after mount — a window-only check at render time breaks hydration.
+  const [speechOk, setSpeechOk] = useState(false);
+  useEffect(() => {
+    setSpeechOk("webkitSpeechRecognition" in window || "SpeechRecognition" in window);
+  }, []);
   function toggleVoice() {
     if (listening) { recRef.current?.stop(); return; }
     const Ctor = (window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown }).SpeechRecognition

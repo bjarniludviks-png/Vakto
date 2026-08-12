@@ -8,6 +8,7 @@ import { useLang } from "@/components/app/lang";
 import { EmptyState } from "@/components/app/empty-state";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { PeriodPicker } from "@/components/app/period-picker";
+import { CustomSections, CustomizeButton } from "@/components/app/section-prefs";
 import { dec1, krCompact } from "@/lib/format";
 import type { PerfView } from "@/lib/analytics.server";
 import { StaffingCard } from "./staffing-card";
@@ -85,6 +86,7 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
   const [compare, setCompare] = useState("prev");
   const [liveFrom, setLiveFrom] = useState("");
   const [liveTo, setLiveTo] = useState("");
+  const [customizing, setCustomizing] = useState(false);
   const f = period === "Sérsniðið" ? daysBetween(from, to) / 30 : FACTOR[period];
   const cmpBadge = compare === "none" ? "Án samanburðar" : compare === "year" ? "vs í fyrra" : CMP_LABEL[period];
   if (empty) {
@@ -145,10 +147,11 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
           <span style={{ display: "inline-flex", gap: 8 }}>
             <button className="btn ghost sm" onClick={() => exportHistory("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
             <button className="btn ghost sm" onClick={() => exportHistory("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
+            <CustomizeButton on={customizing} setOn={setCustomizing} />
           </span>
         </div>
-        {/* Every headline figure states its period — MONTH figures, unlike
-            the dashboard's week figures. */}
+        <CustomSections storageKey="vakto-innsyn-rekstur" customizing={customizing} defs={[
+          { id: "kpis", title: "Lykiltölur mánaðar", node: (<>
         <div className="kperiod">{cur ? `${t("Mánuður")}: ${cur.label}` : t("Nýjasti mánuður")}</div>
         <div className="kpis">
           <div className="kpi"><div className="lab">{t("Velta")} <small>/{t("mán")}</small></div><div className="val">{kRevenue} <small>m.kr.</small></div></div>
@@ -156,8 +159,8 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
           <div className="kpi"><div className="lab">{t("Laun af tekjum")}</div><div className="val" style={{ color: lpColor }}>{lp > 0 ? dec1(lp) + "%" : "—"}</div></div>
           <div className="kpi"><div className="lab">{t("Framlegð")} <small>/{t("mán")}</small></div><div className="val">{kMargin} <small>m.kr.</small></div></div>
         </div>
-
-        {months.length > 0 && (
+          </>) },
+          { id: "charts", title: "Gröf — velta & laun%", node: months.length > 0 && (
           <div className="grid2">
             <div className="card">
               <div className="ch"><div><div className="ct">{t("Velta vs launakostnaður")}</div><div className="cs">{t("per mánuð · farðu með músina yfir fyrir tölur")}</div></div></div>
@@ -182,9 +185,8 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
               </div>
             </div>
           </div>
-        )}
-
-        {cur && prev && (
+          ) },
+          { id: "compare", title: "Samanburður tímabila", node: cur && prev && (
           <div className="card" style={{ marginTop: 20 }}>
             <div className="ch"><div><div className="ct">{t("Samanburður tímabila")}</div><div className="cs">{cur.label} {t("vs")} {prev.label}</div></div></div>
             <div className="cb tbl" style={{ paddingTop: 8 }}>
@@ -206,9 +208,8 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
               </table>
             </div>
           </div>
-        )}
-
-        {(history?.departments?.length ?? 0) > 0 && (
+          ) },
+          { id: "depts", title: "Launakostnaður eftir deild", node: (history?.departments?.length ?? 0) > 0 && (
           <div className="card" style={{ marginTop: 20 }}>
             <div className="ch"><div><div className="ct">{t("Launakostnaður eftir deild")}</div><div className="cs">{t("þessi mánuður · hlutfall af heildarkostnaði")}</div></div></div>
             <div className="cb">
@@ -223,8 +224,16 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
               ))}
             </div>
           </div>
-        )}
-
+          ) },
+          { id: "insights", title: "Ábendingar (innsýn)", node: <InsightsCard insights={insights} /> },
+          { id: "ai", title: "AI greining", node: <AiReportCard examples={[
+          "Hvernig þróast launahlutfallið milli mánaða?",
+          "Hvaða deild er skilvirkust miðað við kostnað?",
+          "Berðu saman þennan mánuð og síðasta",
+          "Hvar er yfirvinna að myndast?",
+        ]} /> },
+          { id: "staffing", title: "Mönnunarmynstur", node: staffing ? <StaffingCard rows={staffing.rows} live={staffing.live} weeks={staffing.weeks} /> : null },
+        ]} />
         {months.length === 0 && (
           <div className="card" style={{ marginTop: 20 }}>
             <div className="cb">
@@ -236,13 +245,6 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
             </div>
           </div>
         )}
-        <InsightsCard insights={insights} />
-        <AiReportCard examples={[
-          "Hvernig þróast launahlutfallið milli mánaða?",
-          "Hvaða deild er skilvirkust miðað við kostnað?",
-          "Berðu saman þennan mánuð og síðasta",
-          "Hvar er yfirvinna að myndast?",
-        ]} />
         {staffing && <StaffingCard rows={staffing.rows} live={staffing.live} weeks={staffing.weeks} />}
       </>
     );

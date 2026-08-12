@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { CustomSections, CustomizeButton } from "@/components/app/section-prefs";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
@@ -252,6 +253,7 @@ function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[
     if (p !== "Sérsniðið") { const r = rangeFor(p); setFrom(r.from); setTo(r.to); load(r.from, r.to); }
   }
   function changeRange(f: string, tt: string) { setFrom(f); setTo(tt); if (f && tt && f <= tt) load(f, tt); }
+  const [customizing, setCustomizing] = useState(false);
   const [exporting, setExporting] = useState(false);
   async function doExport(kind: "xlsx" | "pdf") {
     setExporting(true);
@@ -289,9 +291,12 @@ function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[
           <span style={{ display: "inline-flex", gap: 8 }}>
             <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
             <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
+            <CustomizeButton on={customizing} setOn={setCustomizing} />
           </span>
         }
       />
+      <CustomSections storageKey="vakto-innsyn-timar" customizing={customizing} defs={[
+        { id: "summary", title: "Samantekt tímabils", node: (<>
       {(() => {
         const estC = shown.reduce((a, r) => a + r.estCost, 0);
         const actC = shown.reduce((a, r) => a + r.actCost, 0);
@@ -305,6 +310,8 @@ function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[
         </div>
         );
       })()}
+        </>) },
+        { id: "table", title: "Vaktaplan vs raun-tímar", node: (<>
       <div className="card" style={{ marginTop: 12 }}>
         <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)} · {t("kostnaður m. byrði")}</div></div></div>
         <div className="cb tbl" style={{ paddingTop: 8, opacity: loading ? 0.5 : 1 }}>
@@ -325,11 +332,15 @@ function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[
           </table>
         </div>
       </div>
-      <AiReportCard />
+        </>) },
+        { id: "ai", title: "AI greining", node: <AiReportCard /> },
+        { id: "library", title: "Skýrslusafn", node: (<>
       <div style={{ marginTop: 16 }}>
         <ReportLibrary from={from} to={to} departments={depts.filter((d) => d !== "all")} />
       </div>
-      {timebank && <TimeBankCard rows={timebank.rows} live={timebank.live} monthLabels={timebank.monthLabels} />}
+        </>) },
+        { id: "timebank", title: "Tímabanki", node: timebank ? <TimeBankCard rows={timebank.rows} live={timebank.live} monthLabels={timebank.monthLabels} /> : null },
+      ]} />
     </>
   );
 }
