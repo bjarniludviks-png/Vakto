@@ -605,8 +605,10 @@ export type ContractRow = {
   signed_at: string | null;
 };
 
-function contractMarkdown(e: Record<string, unknown>, c: Record<string, unknown>, extras: { unionName?: string; contractType?: string }): string {
+function contractMarkdown(e: Record<string, unknown>, c: Record<string, unknown>, extras: { unionName?: string; contractType?: string; locationName?: string }): string {
   const line = (k: string, v: unknown) => (v ? `**${k}:** ${v}\n\n` : "");
+  // Official-form fields render even when empty (filled in by hand / later).
+  const alw = (k: string, v: unknown) => `**${k}:** ${v || "____________"}\n\n`;
   const ctLabel: Record<string, string> = {
     fulltime: "Ótímabundið — fullt starf / Permanent, full-time",
     parttime: "Ótímabundið — hlutastarf / Permanent, part-time",
@@ -620,11 +622,11 @@ function contractMarkdown(e: Record<string, unknown>, c: Record<string, unknown>
   return `# Ráðningarsamningur / Employment contract
 
 ## Vinnuveitandi / Employer
-${line("Fyrirtæki", c.name)}${line("Kennitala", c.kennitala)}${line("Heimilisfang", c.address)}${line("Sími", c.phone)}${line("Netfang", c.email)}
+${alw("Fyrirtæki", c.name)}${alw("Kennitala", c.kennitala)}${alw("Heimilisfang", c.address)}${alw("Sími", c.phone)}${alw("Netfang", c.email)}
 ## Starfsmaður / Employee
-${line("Nafn", e.full_name)}${line("Kennitala", e.kennitala)}${line("Netfang", e.email)}${line("Sími", e.phone)}${line("Bankareikningur", e.bank_account)}
+${alw("Nafn", e.full_name)}${alw("Kennitala", e.kennitala)}${alw("Heimilisfang", (e as { address?: string }).address)}${alw("Netfang", e.email)}${alw("Sími", e.phone)}${line("Bankareikningur", e.bank_account)}
 ## Starfið / The role
-${line("Starfsheiti", e.title)}${line("Vinnustaður", c.address ? `${c.name}, ${c.address}` : c.name)}${line("Ráðningarform", extras.contractType ? (ctLabel[extras.contractType] ?? extras.contractType) : "Ótímabundið / Permanent")}${line("Ráðningardagur / fyrsti starfsdagur", e.hire_date)}${line("Starfshlutfall", e.employment_ratio ? `${e.employment_ratio}%` : "")}${line("Vinnustundir á mánuði (fullt starf)", e.monthly_hours ? String(e.monthly_hours).replace(".", ",") : "173,33")}
+${line("Starfsheiti", e.title)}${alw("Vinnustaður / heimilisfang", c.address ? `${c.name}, ${c.address}` : c.name)}${extras.locationName && extras.locationName !== c.name ? line("Starfsstöð (ef önnur)", extras.locationName) : ""}${line("Ráðningarform", extras.contractType ? (ctLabel[extras.contractType] ?? extras.contractType) : "Ótímabundið / Permanent")}${line("Ráðningardagur / fyrsti starfsdagur", e.hire_date)}${line("Starfshlutfall", e.employment_ratio ? `${e.employment_ratio}%` : "")}${line("Vinnustundir á mánuði (fullt starf)", e.monthly_hours ? String(e.monthly_hours).replace(".", ",") : "173,33")}
 ## Laun og kjör / Wages and terms
 ${line("Launafyrirkomulag", e.pay_type === "monthly" ? "Mánaðarlaun / Monthly salary" : "Tímakaup / Hourly wages")}${line(e.pay_type === "monthly" ? "Grunnlaun á mánuði" : "Tímakaup (grunntaxti)", e.rate ? `${e.rate} kr` : "")}${line("Orlof", orlofTxt)}${line("Greiðsla launa", "Mánaðarlega, inn á bankareikning starfsmanns / Monthly, into the employee's bank account")}
 ## Lífeyrissjóður og stéttarfélag / Pension fund and union
@@ -658,9 +660,15 @@ export async function generateContract(employeeId: string): Promise<ActionResult
       supabase.from("companies").select("*").eq("id", company).maybeSingle(),
     ]);
     if (!emp) return { ok: false, error: "Starfsmaður fannst ekki" };
+    let locationName: string | undefined;
+    if (emp.location_id) {
+      const { data: loc } = await supabase.from("locations").select("name").eq("id", emp.location_id).maybeSingle();
+      locationName = (loc?.name as string) ?? undefined;
+    }
     const content = contractMarkdown(emp, comp ?? {}, {
       unionName: (emp.union_name as string) || (emp.union_agreement as string) || undefined,
       contractType: (emp.contract_type as string) || undefined,
+      locationName,
     });
     const { data: { user } } = await supabase.auth.getUser();
     const { data: created, error } = await supabase.from("contracts").insert({
@@ -699,6 +707,22 @@ export async function listContracts(employeeId: string): Promise<{ contracts: Co
     };
   } catch {
     return { contracts: [], live: false };
+  }
+}
+
+/** Save edited draft content — review-before-send flow. Drafts only. */
+export async function updateContractContent(id: string, content: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const { data: c } = await supabase.from("contracts").select("status").eq("id", id).maybeSingle();
+    if (!c) return { ok: false, error: "Samningur fannst ekki" };
+    if (c.status !== "draft") return { ok: false, error: "Aðeins er hægt að breyta drögum — gerðu nýjan samning." };
+    const { error } = await supabase.from("contracts").update({ content }).eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
 

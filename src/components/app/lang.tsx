@@ -1149,6 +1149,12 @@ export const DICT: Dict = {
   "Eyða þessum samningi? (Starfsmaðurinn sjálfur eyðist EKKI.)": { is: "Eyða þessum samningi? (Starfsmaðurinn sjálfur eyðist EKKI.)", en: "Delete this contract? (The employee is NOT deleted.)", vi: "Xóa hợp đồng này? (KHÔNG xóa nhân viên.)" },
   "Samningi eytt": { is: "Samningi eytt", en: "Contract deleted", vi: "Đã xóa hợp đồng" },
   "Eyðing er á starfsmannalistanum": { is: "Eyðing er á starfsmannalistanum", en: "Deletion lives on the staff list", vi: "Xóa nhân viên ở trang danh sách" },
+  "Drög vistuð": { is: "Drög vistuð", en: "Draft saved", vi: "Đã lưu bản nháp" },
+  "Sent til undirritunar": { is: "Sent til undirritunar", en: "Sent for signature", vi: "Đã gửi để ký" },
+  "Staðfesta & senda til undirritunar": { is: "Staðfesta & senda til undirritunar", en: "Confirm & send for signature", vi: "Xác nhận & gửi ký" },
+  "Vista drög": { is: "Vista drög", en: "Save draft", vi: "Lưu bản nháp" },
+  "Yfirfarðu drögin og lagaðu að vild — línur á forminu **Heiti:** gildi verða að snyrtilegum reitum í PDF. Staðfestu svo og sendu til undirritunar.": { is: "Yfirfarðu drögin og lagaðu að vild — línur á forminu **Heiti:** gildi verða að snyrtilegum reitum í PDF. Staðfestu svo og sendu til undirritunar.", en: "Review the draft and edit freely — lines in the form **Label:** value become tidy fields in the PDF. Then confirm and send for signature.", vi: "Xem lại bản nháp và chỉnh sửa tùy ý — các dòng dạng **Nhãn:** giá trị sẽ thành các ô gọn gàng trong PDF. Sau đó xác nhận và gửi ký." },
+  "drög": { is: "drög", en: "draft", vi: "nháp" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

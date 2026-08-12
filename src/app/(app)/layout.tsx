@@ -51,6 +51,7 @@ async function getAccount(): Promise<Account & { country: string }> {
       initials: initials(name),
       name,
       company: comp?.name ?? "VAKTO",
+      companyId: (profile as { company_id?: string } | null)?.company_id ?? undefined,
       role: (profile?.role as Role) ?? "owner",
       country: comp?.country ?? "IS",
     };

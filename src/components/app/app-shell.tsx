@@ -15,6 +15,8 @@ export type Account = {
   initials: string;
   name: string;
   company: string;
+  /** Real company id — binds the kiosk link to the user's own company. */
+  companyId?: string;
   role: Role;
   /** SaaS-owner super-admin (email allowlist) — shows the VAKTO Admin menu entry. */
   vaktoAdmin?: boolean;
@@ -281,13 +283,7 @@ export default function AppShell({
                   <Icon name="building" className="ei" />{companies.length > 1 ? t("Skipta um félag") : t("Mín félög")}
                 </div>
                 <div className="sep" />
-                <div className="mi" onClick={() => { setMenu(null); setRoleModal(true); }}>
-                  <Icon name="swap" className="ei" />{t("acct:role")}
-                </div>
-                <div className="mi" onClick={() => nav("/stillingar?new=location")}>
-                  <Icon name="building" className="ei" />{t("acct:loc")}
-                </div>
-                <div className="mi" onClick={() => nav("/kiosk")}>
+                <div className="mi" onClick={() => nav(account.companyId ? `/kiosk?company=${account.companyId}` : "/kiosk")}>
                   <Icon name="kclock" className="ei" />{t("acct:kiosk")}
                 </div>
                 <div className="mi" onClick={() => nav("/stillingar")}>

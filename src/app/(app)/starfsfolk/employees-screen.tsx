@@ -8,7 +8,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "./contract-pdf";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, type ContractRow } from "./actions";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, type ContractRow } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField } from "@/components/app/fields";
@@ -851,19 +851,58 @@ function ContractTab({ employeeId }: { employeeId: string }) {
         {busy ? t("Bý til…") : t("+ Búa til samning úr gögnum")}
       </button>
       <p className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>{t("Samningurinn byggir á starfsmanninum, fyrirtækinu og völdu reglusniðmáti. Rafræn undirritun er væntanleg — þangað til er staðan merkt handvirkt.")}</p>
-      {view && (
-        <div className="mwrap show" onClick={(ev) => ev.target === ev.currentTarget && setView(null)}>
-          <div className="mbg" onClick={() => setView(null)} />
-          <div className="modal" style={{ maxWidth: 620 }}>
-            <div className="mh"><div style={{ fontSize: 15, fontWeight: 700 }}>{view.title}</div><button className="x" type="button" onClick={() => setView(null)}>✕</button></div>
-            <div className="mb" style={{ maxHeight: "65vh", overflowY: "auto" }}>
-              <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13, lineHeight: 1.6 }}>{view.content}</pre>
-              <button className="btn sm" type="button" style={{ marginTop: 6 }} onClick={() => downloadContractPdf(view.title, view.content)}>{t("Sækja PDF")}</button>
-            </div>
+      {view && <ContractViewModal view={view} onClose={() => setView(null)} onChanged={load} />}
+    </>
+  );
+}
+
+/** Draft review flow: managers read the generated draft, edit it inline,
+ * then confirm & send for signature. Sent/signed contracts are read-only. */
+function ContractViewModal({ view, onClose, onChanged }: { view: ContractRow; onClose: () => void; onChanged: () => void }) {
+  const { t } = useLang();
+  const isDraft = view.status === "draft";
+  const [text, setText] = useState(view.content);
+  const [busy, setBusy] = useState(false);
+  async function saveDraft(): Promise<boolean> {
+    setBusy(true);
+    const res = await updateContractContent(view.id, text);
+    setBusy(false);
+    if (!res.ok) { toast(res.error ?? "Villa"); return false; }
+    toast(t("Drög vistuð"));
+    onChanged();
+    return true;
+  }
+  async function confirmSend() {
+    if (!(await saveDraft())) return;
+    setBusy(true);
+    const res = await setContractStatus(view.id, "sent");
+    setBusy(false);
+    toast(res.ok ? t("Sent til undirritunar") : (res.error ?? "Villa"));
+    onChanged();
+    onClose();
+  }
+  return (
+    <div className="mwrap show" onClick={(ev) => ev.target === ev.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal" style={{ maxWidth: 660 }}>
+        <div className="mh"><div style={{ fontSize: 15, fontWeight: 700 }}>{view.title} {isDraft && <span className="tag mut" style={{ marginLeft: 8 }}>{t("drög")}</span>}</div><button className="x" type="button" onClick={onClose}>✕</button></div>
+        <div className="mb" style={{ maxHeight: "70vh", overflowY: "auto" }}>
+          {isDraft ? (
+            <>
+              <p className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>{t("Yfirfarðu drögin og lagaðu að vild — línur á forminu **Heiti:** gildi verða að snyrtilegum reitum í PDF. Staðfestu svo og sendu til undirritunar.")}</p>
+              <textarea className="lf-ta" rows={18} value={text} onChange={(e) => setText(e.target.value)} style={{ fontSize: 12.5, lineHeight: 1.55, fontFamily: "ui-monospace, monospace" }} />
+            </>
+          ) : (
+            <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13, lineHeight: 1.6 }}>{view.content}</pre>
+          )}
+          <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+            {isDraft && <button className="btn" type="button" disabled={busy} onClick={confirmSend}>{t("Staðfesta & senda til undirritunar")}</button>}
+            {isDraft && <button className="btn ghost" type="button" disabled={busy} onClick={saveDraft}>{t("Vista drög")}</button>}
+            <button className="btn ghost sm" type="button" style={{ alignSelf: "center" }} onClick={() => downloadContractPdf(view.title, isDraft ? text : view.content)}>{t("Sækja PDF")}</button>
           </div>
         </div>
-      )}
-    </>
+      </div>
+    </div>
   );
 }
 
