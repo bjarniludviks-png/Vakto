@@ -9,9 +9,14 @@ export type PositionRow = { name: string; staff: number; baseRate: string };
 export type UserRow = { name: string; initials: string; role: string; email: string };
 export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string; payPeriodStart?: number };
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
-export type SettingsData = { locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; company: CompanyInfo | null; live: boolean };
+export type DepartmentRow = { id: string; name: string; location: string; staff: number };
+export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; company: CompanyInfo | null; live: boolean };
 
 const DEMO: SettingsData = {
+  departments: [
+    { id: "d1", name: "Eldhús", location: "Reykjavík Asian", staff: 6 },
+    { id: "d2", name: "Sal", location: "Reykjavík Asian", staff: 4 },
+  ],
   locations: [
     { name: "Reykjavík Asian", staff: 14, timezone: "Atlantic/Reykjavik" },
     { name: "Hotel Umi", staff: 0, timezone: "Atlantic/Reykjavik" },
@@ -58,6 +63,17 @@ export async function getSettingsData(): Promise<SettingsData> {
       supabase.from("companies").select("name, kennitala, address, phone, email").eq("id", company).maybeSingle(),
     ]);
     // API connections (tolerant of a not-yet-run 0029 migration).
+    // Departments live under locations (0001 schema) — join for the company.
+    const depRes = await supabase.from("departments")
+      .select("id, name, locations!inner(name, company_id)")
+      .eq("locations.company_id", company).order("name");
+    const departments: DepartmentRow[] = (depRes.data ?? []).map((d) => {
+      const loc = d.locations as unknown as { name: string };
+      return {
+        id: d.id as string, name: d.name as string, location: loc?.name ?? "",
+        staff: employees.filter((e) => e.department === (d.name as string)).length,
+      };
+    });
     const keysRes = await supabase.from("api_keys")
       .select("id, name, prefix, created_at, last_used_at, revoked")
       .eq("company_id", company).order("created_at", { ascending: false });
@@ -78,6 +94,7 @@ export async function getSettingsData(): Promise<SettingsData> {
     const c = (comp ?? {}) as Record<string, string | null>;
 
     return {
+      departments,
       locations: (locs ?? []).map((l) => ({
         name: l.name as string, timezone: (l.timezone as string) ?? "Atlantic/Reykjavik",
         staff: countBy("location")(l.name as string),

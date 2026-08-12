@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
+import { templateToPayRule, type RuleSet as TplRuleSet } from "@/lib/rules";
+import { getTimeBank } from "../skyrslur/timebank.server";
 import { sendContractEmail } from "@/lib/email";
 import type { CustomRules } from "@/lib/payrules";
 
@@ -95,6 +97,9 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
     const supabase = await createClient();
     const company = await companyId(supabase);
     if (!company) return { ok: false, error: "Fyrirtæki fannst ekki — tengdu reikninginn." };
+    let tplRes = await resolveUnionTemplate(supabase, company, input.union);
+    if (!tplRes.payRule && input.ruleTemplateId)
+      tplRes = await resolveUnionTemplate(supabase, company, `tpl:${input.ruleTemplateId}`);
 
     const [department_id, position_id, location_id] = await Promise.all([
       lookupId(supabase, "departments", input.department, company),
@@ -116,7 +121,8 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
       pay_type: input.payType === "Mánaðarlaun" ? "monthly" : "hourly",
       rate: num(input.rate, 2900),
       employment_ratio: num(input.employmentRatio, 100),
-      union_agreement: input.union || "Efling",
+      union_agreement: tplRes.union || "Efling",
+      ...(tplRes.payRule ? { pay_rule: tplRes.payRule } : {}),
       monthly_hours: input.monthlyHours ? num(input.monthlyHours, 0) || null : null,
       hire_date: input.hireDate || null,
       status: "active" as const,
@@ -386,10 +392,16 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
   if (id.startsWith("e") && id.length <= 3) return { ok: true, demo: true }; // demo row id
   try {
     const supabase = await createClient();
+    const companyU = await companyId(supabase);
+    if (!companyU) return { ok: false, error: "Fyrirtæki fannst ekki" };
     const patch: Record<string, unknown> = {};
     if (input.rate) patch.rate = num(input.rate, 2900);
     if (input.employmentRatio) patch.employment_ratio = num(input.employmentRatio, 100);
-    if (input.union) patch.union_agreement = input.union;
+    if (input.union) {
+      const tplRes2 = await resolveUnionTemplate(supabase, companyU, input.union);
+      patch.union_agreement = tplRes2.union ?? input.union;
+      if (tplRes2.payRule) patch.pay_rule = tplRes2.payRule;
+    }
     if (input.payType) patch.pay_type = input.payType === "Mánaðarlaun" ? "monthly" : "hourly";
 
     if (Object.keys(patch).length) {
@@ -399,7 +411,13 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
     // Universal fields (0028) — best-effort until the migration runs.
     const uni: Record<string, unknown> = {};
     if (input.union !== undefined) uni.union_name = input.union || null;
-    if (input.ruleTemplateId !== undefined) uni.rule_template_id = input.ruleTemplateId;
+    if (input.ruleTemplateId !== undefined) {
+      uni.rule_template_id = input.ruleTemplateId;
+      if (input.ruleTemplateId) {
+        const conv = await resolveUnionTemplate(supabase, companyU, `tpl:${input.ruleTemplateId}`);
+        if (conv.payRule) { uni.pay_rule = conv.payRule; uni.union_agreement = conv.union; }
+      }
+    }
     if (input.contractType !== undefined) uni.contract_type = input.contractType;
     if (input.schedulePattern !== undefined) uni.schedule_pattern = input.schedulePattern ? { kind: input.schedulePattern } : null;
     if (Object.keys(uni).length) {
@@ -428,6 +446,32 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
 }
 
 const DEMO_DEPARTMENTS = ["Eldhús", "Sal", "Stjórnun"];
+
+export type CompanyOptions = { departments: string[]; positions: string[]; locations: string[] };
+
+/** Real select-options for the new-employee form (demo fallback). */
+export async function getCompanyOptions(): Promise<CompanyOptions> {
+  const demo: CompanyOptions = { departments: DEMO_DEPARTMENTS, positions: ["Kokkur", "Þjónn / Sal", "Bílstjóri"], locations: ["Reykjavík Asian", "Hotel Umi"] };
+  if (!isSupabaseConfigured()) return demo;
+  try {
+    const supabase = await createClient();
+    const company = await companyId(supabase);
+    if (!company) return demo;
+    const [deps, pos, locs] = await Promise.all([
+      supabase.from("departments").select("name, locations!inner(company_id)").eq("locations.company_id", company).order("name"),
+      supabase.from("positions").select("name").eq("company_id", company).order("name"),
+      supabase.from("locations").select("name").eq("company_id", company).order("name"),
+    ]);
+    const uniq = (xs: (string | null)[]) => Array.from(new Set(xs.filter(Boolean))) as string[];
+    return {
+      departments: uniq((deps.data ?? []).map((d) => d.name as string)),
+      positions: uniq((pos.data ?? []).map((d) => d.name as string)),
+      locations: uniq((locs.data ?? []).map((d) => d.name as string)),
+    };
+  } catch {
+    return demo;
+  }
+}
 
 /** List the company's department names (for the oversight picker + filters). */
 export async function getCompanyDepartments(): Promise<string[]> {
@@ -623,5 +667,34 @@ export async function getContractStatusMap(): Promise<Record<string, string>> {
     return map;
   } catch {
     return {};
+  }
+}
+
+
+/** Resolve a "tpl:<id>" union value into (union label, pay_rule). */
+async function resolveUnionTemplate(
+  supabase: Awaited<ReturnType<typeof createClient>>, company: string, union: string | undefined,
+): Promise<{ union?: string; payRule?: unknown }> {
+  if (!union?.startsWith("tpl:")) return { union };
+  const id = union.slice(4);
+  const { data: tpl } = await supabase
+    .from("rule_templates").select("name, rules").eq("id", id).eq("company_id", company).maybeSingle();
+  if (!tpl) return { union: "Eigin reglur" };
+  return { union: "Eigin reglur", payRule: { ...templateToPayRule(tpl.rules as TplRuleSet), templateName: tpl.name as string } };
+}
+
+
+export type EmployeeTimebank = { live: boolean; balance: number; months: { label: string; required: number; actual: number; delta: number }[] };
+
+/** Time-bank summary for one employee — same running-balance model as Innsýn. */
+export async function getEmployeeTimebank(employeeId: string): Promise<EmployeeTimebank | null> {
+  try {
+    const tb = await getTimeBank(6);
+    if (!tb.live) return null;
+    const row = tb.rows.find((r) => r.id === employeeId);
+    if (!row) return { live: true, balance: 0, months: [] };
+    return { live: true, balance: row.balance, months: row.months };
+  } catch {
+    return null;
   }
 }

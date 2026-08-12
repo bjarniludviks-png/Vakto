@@ -8,12 +8,12 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "./contract-pdf";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getOverseenDepartments, setOverseenDepartments, generateContract, listContracts, setContractStatus, type ContractRow } from "./actions";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, generateContract, listContracts, setContractStatus, type ContractRow } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField } from "@/components/app/fields";
 import { useCountry } from "@/components/app/country";
-import { CONTRACT_TYPES, SCHEDULE_PATTERNS, type RuleTemplate } from "@/lib/rules";
+import { CONTRACT_TYPES, SCHEDULE_PATTERNS, templateToPayRule, type RuleTemplate } from "@/lib/rules";
 import { listRuleTemplates } from "../stillingar/actions";
 
 /** Best-effort document type from a filename (for the documents table). */
@@ -282,7 +282,10 @@ function LaunTab({ e }: { e: Employee }) {
   const pay = payrollPreview(e);
   // International companies always use the standardized rule engine (custom rules).
   const [union, setUnion] = useState<string>(isIS ? (e.union ?? "Efling") : CUSTOM_UNION);
-  const custom = union === CUSTOM_UNION;
+  const [tpls, setTpls] = useState<RuleTemplate[]>([]);
+  useEffect(() => { listRuleTemplates().then((r) => setTpls(r.templates)).catch(() => {}); }, []);
+  const isTpl = union.startsWith("tpl:");
+  const custom = union === CUSTOM_UNION || isTpl;
   const [rules, setRules] = useState<RuleSet>(resolveRuleSet(CUSTOM_UNION, e.payRule));
   const shown = custom ? rules : (UNION_PRESETS[union] ?? UNION_PRESETS["Efling"]);
   // Custom overtime thresholds + user-defined premium bands (0 = off for monthly).
@@ -358,9 +361,30 @@ function LaunTab({ e }: { e: Employee }) {
       {isIS ? (
         <div className="statline">
           <span className="k">Kjarasamningur <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· ræður álögum</span></span>
-          <select name="union" value={union} onChange={(ev) => setUnion(ev.target.value)} style={{ ...FLD, width: 190 }}>
-            {Object.keys(UNION_PRESETS).map((u) => <option key={u}>{u}</option>)}
-            <option>{CUSTOM_UNION}</option>
+          <select name="union" value={union} onChange={(ev) => {
+            const v = ev.target.value;
+            setUnion(v);
+            if (v.startsWith("tpl:")) {
+              const tp = tpls.find((x) => `tpl:${x.id}` === v);
+              if (tp) {
+                const cr = templateToPayRule(tp.rules);
+                setRules((r) => ({ ...r, eve: cr.eve, weekend: cr.weekend, overtime: cr.overtime, holiday: cr.holiday, night: cr.night }));
+                setOtWeekly(cr.otWeekly ?? DEFAULT_OT_WEEKLY);
+                setOtMonthly(cr.otMonthly ?? 0);
+                setBands(cr.bands);
+                toast(`Sniðmátið „${tp.name}" valið — reglurnar hér fyrir neðan fylgja því`);
+              }
+            }
+          }} style={{ ...FLD, width: 190 }}>
+            {tpls.length > 0 && (
+              <optgroup label="Launasniðmátin þín">
+                {tpls.map((tp) => <option key={tp.id} value={`tpl:${tp.id}`}>{tp.name}</option>)}
+              </optgroup>
+            )}
+            <optgroup label="Staðlar">
+              {Object.keys(UNION_PRESETS).map((u) => <option key={u}>{u}</option>)}
+              <option>{CUSTOM_UNION}</option>
+            </optgroup>
           </select>
         </div>
       ) : (
@@ -663,19 +687,7 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
   }
   if (tab === "Frí") {
     return (
-      <>
-        <Sec first>Orlof & frí</Sec>
-        <Stat k="Áunninn orlofsréttur" v="11,4 dagar" />
-        <Stat k="Orlofssjóður" v="66.200 kr" />
-        <Stat k="Frí tekið 2026" v="6 dagar" />
-        <Sec>Beiðnir</Sec>
-        <div className="statline">
-          <span className="k">27.–28. júní · orlof</span>
-          <span className="v">
-            <span className="pill warn" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>Bíður</span>
-          </span>
-        </div>
-      </>
+      <FriTab e={e} />
     );
   }
   if (tab === "Skjöl") {
@@ -692,6 +704,41 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
       <Stat k="Kennitala" v={e.kennitala ?? "—"} />
       <Stat k="Bankareikningur" v={e.bankAccount ?? "—"} />
       <Stat k="Tímabelti" v="Atlantic/Reykjavik" />
+    </>
+  );
+}
+
+/** Frí tab: real time-bank (same model as Innsýn) + vacation summary. */
+function FriTab({ e }: { e: Employee }) {
+  const { t } = useLang();
+  const [tb, setTb] = useState<EmployeeTimebank | null | undefined>(undefined);
+  useEffect(() => { getEmployeeTimebank(e.id).then(setTb).catch(() => setTb(null)); }, [e.id]);
+  const bal = tb?.balance ?? 0;
+  return (
+    <>
+      <Sec first>{t("Tímabanki")}</Sec>
+      {tb === undefined && <p className="muted" style={{ fontSize: 12.5 }}>{t("Sæki…")}</p>}
+      {tb === null && <p className="muted" style={{ fontSize: 12.5 }}>{t("Tímabanki reiknast af stimplunum þegar Supabase er tengt.")}</p>}
+      {tb && <>
+        <div className="statline">
+          <span className="k">{t("Staða tímabanka")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("mínus = skuld við fyrirtækið, yfirvinna alltaf greidd")}</span></span>
+          <span className="v" style={{ fontWeight: 700, color: bal < 0 ? "var(--bad)" : "var(--good)" }}>{bal > 0 ? "+" : ""}{String(Math.round(bal * 10) / 10).replace(".", ",")} {t("klst")}</span>
+        </div>
+        {tb.months.filter((m) => m.actual > 0).slice(-4).map((m) => (
+          <div className="statline" key={m.label}>
+            <span className="k">{m.label}</span>
+            <span className="v muted" style={{ fontSize: 12.5 }}>
+              {String(Math.round(m.actual * 10) / 10).replace(".", ",")} / {String(Math.round(m.required * 10) / 10).replace(".", ",")} {t("klst")}
+              <span style={{ marginLeft: 8, fontWeight: 600, color: m.delta < 0 ? "var(--bad)" : "var(--good)" }}>{m.delta > 0 ? "+" : ""}{String(Math.round(m.delta * 10) / 10).replace(".", ",")}</span>
+            </span>
+          </div>
+        ))}
+        <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("Heildaryfirlit allra starfsmanna er í Innsýn → Tímar & mæting. Jöfnun fer fram í launakeyrslu.")}</p>
+      </>}
+      <Sec>{t("Orlof & frí")}</Sec>
+      <Stat k={t("Áunninn orlofsréttur")} v="—" />
+      <Stat k={t("Frí tekið 2026")} v="—" />
+      <p className="muted" style={{ fontSize: 12 }}>{t("Orlofsyfirlit byggist á launakeyrslum ársins.")}</p>
     </>
   );
 }
@@ -851,7 +898,11 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tpls, setTpls] = useState<RuleTemplate[]>([]);
-  useEffect(() => { listRuleTemplates().then((r) => setTpls(r.templates)).catch(() => {}); }, []);
+  const [opts, setOpts] = useState<{ departments: string[]; positions: string[]; locations: string[] }>({ departments: [], positions: [], locations: [] });
+  useEffect(() => {
+    listRuleTemplates().then((r) => setTpls(r.templates)).catch(() => {});
+    getCompanyOptions().then(setOpts).catch(() => {});
+  }, []);
   function onFiles(files: FileList | null) {
     if (!files) return;
     const list = [...files];
@@ -926,11 +977,28 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
             </select>
           </div>
           <div className="emp-row2">
-            <div className="emp-fld"><label>Staða</label><select name="position"><option>Kokkur</option><option>Þjónn / Sal</option><option>Bílstjóri</option></select></div>
-            <div className="emp-fld"><label>Deild</label><select name="department"><option>Eldhús</option><option>Sal</option><option>Stjórnun</option></select></div>
+            <div className="emp-fld"><label>Staða</label>
+              <select name="position">
+                {opts.positions.map((o) => <option key={o}>{o}</option>)}
+                {opts.positions.length === 0 && <option value="">— engin staða skráð —</option>}
+              </select>
+              {opts.positions.length === 0 && <span className="muted" style={{ fontSize: 11 }}>Stofnaðu stöður í Stillingar → Fyrirtækið</span>}
+            </div>
+            <div className="emp-fld"><label>Deild</label>
+              <select name="department">
+                {opts.departments.map((o) => <option key={o}>{o}</option>)}
+                {opts.departments.length === 0 && <option value="">— engin deild skráð —</option>}
+              </select>
+              {opts.departments.length === 0 && <span className="muted" style={{ fontSize: 11 }}>Stofnaðu deildir í Stillingar → Fyrirtækið</span>}
+            </div>
           </div>
           <div className="emp-row2">
-            <div className="emp-fld"><label>Staðsetning</label><select name="location"><option>Reykjavík Asian</option><option>Hotel Umi</option></select></div>
+            <div className="emp-fld"><label>Staðsetning</label>
+              <select name="location">
+                {opts.locations.map((o) => <option key={o}>{o}</option>)}
+                {opts.locations.length === 0 && <option value="">— enginn staður skráður —</option>}
+              </select>
+            </div>
             <div className="emp-fld"><label>Ráðningardagur</label><DateField name="hireDate" defaultValue="2026-06-23" style={{ width: "100%" }} /></div>
           </div>
           <div className="emp-row2">

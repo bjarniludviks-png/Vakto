@@ -211,6 +211,30 @@ export async function addPosition(input: { name: string; baseRate?: string }): P
   }
 }
 
+/** Create a department under a location (departments hang off locations in the schema). */
+export async function addDepartment(input: { name: string; locationName?: string }): Promise<SettingsResult> {
+  if (!input.name?.trim()) return { ok: false, error: "Nafn vantar" };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    let locQ = supabase.from("locations").select("id, name").eq("company_id", ctx.company).order("name");
+    const { data: locs } = await locQ;
+    if (!locs?.length) return { ok: false, error: "Búðu fyrst til stað (Staðir)" };
+    const loc = input.locationName ? locs.find((l) => l.name === input.locationName) ?? locs[0] : locs[0];
+    const { error } = await supabase.from("departments").insert({ location_id: loc.id, name: input.name.trim() });
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "department.create", entity: "department", detail: `Ný deild — ${input.name.trim()} (${loc.name})`,
+    });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /** Save (confirm) a pay rule's premium % for the company. */
 export async function savePayRule(
   input: { code: string; label: string; kind: string; pct: string; confirmed: boolean },

@@ -135,3 +135,31 @@ export function summarizeRules(r: RuleSet, lang: "is" | "en" = "is"): string {
   if (r.levies?.pct) parts.push(`${t("Launatengd gjöld", "Levies")} ${r.levies.pct}%`);
   return parts.join(" · ") || t("Engar reglur skilgreindar enn", "No rules defined yet");
 }
+
+/** Convert a saved rule template into the per-employee pay-rule shape the
+ * payroll engine consumes (bands + thresholds). Used when an employee is
+ * assigned a template — one conversion path, client and server alike. */
+export function templateToPayRule(r: RuleSet): {
+  eve: number; weekend: number; overtime: number; holiday: number; night: number;
+  otWeekly?: number; otMonthly?: number;
+  bands: { label: string; days: number[]; from: string; to: string; pct: number }[];
+} {
+  // Template premiums use 0=Mon…6=Sun; payroll bands use JS getDay (0=Sun…6=Sat).
+  const bands = (r.premiums ?? []).map((p) => ({
+    label: p.label || "Álag",
+    days: p.days && p.days.length ? p.days.map((d) => (d + 1) % 7) : [0, 1, 2, 3, 4, 5, 6],
+    from: p.from ?? "00:00",
+    to: p.to ?? "23:59",
+    pct: p.pct,
+  }));
+  return {
+    eve: r.night?.pct ?? 0,
+    night: r.night?.pct ?? 0,
+    weekend: r.weekend?.pct ?? 0,
+    overtime: r.overtime?.pct ?? 80,
+    holiday: r.holiday?.pct ?? 90,
+    otWeekly: r.overtime?.afterHoursPerWeek,
+    otMonthly: r.overtime?.afterHoursPerMonth,
+    bands,
+  };
+}

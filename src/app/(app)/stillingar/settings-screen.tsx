@@ -6,19 +6,19 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { syncInventraRevenue, addLocation, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
+import { syncInventraRevenue, addLocation, addDepartment, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
 import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
 import { dec1 } from "@/lib/format";
 
-type SettingsModal = "location" | "position" | "invite" | "revenue" | "avgrevenue" | null;
+type SettingsModal = "location" | "department" | "position" | "invite" | "revenue" | "avgrevenue" | null;
 
 // Mon-first weekday chips; value = JS getDay() (0=Sun … 6=Sat).
 const WEEKDAYS: [number, string][] = [[1, "Mánudagur"], [2, "Þriðjudagur"], [3, "Miðvikudagur"], [4, "Fimmtudagur"], [5, "Föstudagur"], [6, "Laugardagur"], [0, "Sunnudagur"]];
 
 const ROLE_LABEL: Record<string, string> = { owner: "Eigandi", manager: "Stjórnandi", employee: "role:employee", contractor: "Verktaki" };
-const DEMO_SETTINGS: SettingsData = { locations: [], positions: [], users: [], apiKeys: [], companyId: null, company: null, live: false };
+const DEMO_SETTINGS: SettingsData = { departments: [], locations: [], positions: [], users: [], apiKeys: [], companyId: null, company: null, live: false };
 
 function copyKioskLink(companyId: string | null) {
   const url = `${window.location.origin}/kiosk${companyId ? `?company=${companyId}` : ""}`;
@@ -190,6 +190,22 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
                 <div className="tx"><b>{p.name}</b><span>{p.staff} {t("starfsmenn")} · {t("grunntaxti")} {p.baseRate} kr</span></div>
               </div>
             ))}
+            {data.positions.length === 0 && <p className="muted" style={{ fontSize: 12.5 }}>{t("Engar stöður enn — stöður birtast í vali þegar þú stofnar starfsmann.")}</p>}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid2b" style={{ marginTop: 16 }}>
+        <div className="card">
+          <div className="ch"><div className="ct">{t("Deildir")}</div><button className="btn sm" onClick={() => setModal("department")}>{t("+ Ný deild")}</button></div>
+          <div className="cb att">
+            {data.departments.map((d) => (
+              <div className="it" key={d.id}>
+                <div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" /></svg></div>
+                <div className="tx"><b>{d.name}</b><span>{d.location} · {d.staff} {t("starfsmenn")}</span></div>
+              </div>
+            ))}
+            {data.departments.length === 0 && <p className="muted" style={{ fontSize: 12.5 }}>{t("Engar deildir enn — deildir (t.d. Eldhús, Sal) birtast í vali þegar þú stofnar starfsmann.")}</p>}
           </div>
         </div>
       </div>
@@ -232,7 +248,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
 
       </div>
 
-      {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} />}
+      {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} locations={data.locations.map((l) => l.name)} />}
       {keyModal && <ApiKeyModal onClose={() => setKeyModal(false)} />}
       {tplModal && <RuleTemplateModal tpl={tplModal === "new" ? null : tplModal} onClose={() => setTplModal(null)} />}
       {posName !== null && <PosConnectModal name={posName} onClose={() => setPosName(null)} />}
@@ -272,7 +288,7 @@ function CompanyCard({ info }: { info: CompanyInfo | null }) {
   );
 }
 
-function SettingsFormModal({ modal, onClose }: { modal: Exclude<SettingsModal, null>; onClose: () => void }) {
+function SettingsFormModal({ modal, onClose, locations = [] }: { modal: Exclude<SettingsModal, null>; onClose: () => void; locations?: string[] }) {
   const { t } = useLang();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -284,6 +300,7 @@ function SettingsFormModal({ modal, onClose }: { modal: Exclude<SettingsModal, n
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [week, setWeek] = useState<string[]>(["", "", "", "", "", "", ""]); // by getDay 0..6
+  const [dept, setDept] = useState(locations[0] ?? "");
 
   useEffect(() => {
     if (modal !== "avgrevenue") return;
@@ -291,13 +308,14 @@ function SettingsFormModal({ modal, onClose }: { modal: Exclude<SettingsModal, n
   }, [modal]);
 
   const titles: Record<Exclude<SettingsModal, null>, string> = {
-    location: "Bæta við stað", position: "Ný staða", invite: "Bjóða notanda", revenue: "Skrá veltu handvirkt", avgrevenue: "Meðalvelta per vikudag",
+    location: "Bæta við stað", department: "Ný deild", position: "Ný staða", invite: "Bjóða notanda", revenue: "Skrá veltu handvirkt", avgrevenue: "Meðalvelta per vikudag",
   };
 
   async function submit() {
     setBusy(true); setError(null);
     let res: { ok: boolean; demo?: boolean; error?: string } = { ok: true };
     if (modal === "location") res = await addLocation({ name });
+    else if (modal === "department") res = await addDepartment({ name, locationName: dept });
     else if (modal === "position") res = await addPosition({ name, baseRate: rate });
     else if (modal === "invite") res = await inviteUser({ email, role });
     else if (modal === "revenue") res = await addRevenue({ amount, date });
@@ -306,7 +324,7 @@ function SettingsFormModal({ modal, onClose }: { modal: Exclude<SettingsModal, n
     if (!res.ok) { setError(res.error ?? "Tókst ekki"); return; }
     onClose();
     const ok: Record<Exclude<SettingsModal, null>, string> = {
-      location: "Staður bætt við", position: "Staða stofnuð", invite: "Boð sent", revenue: "Velta skráð — laun% uppfært", avgrevenue: "Meðalvelta vistuð — laun% uppfært",
+      location: "Staður bætt við", department: "Deild stofnuð", position: "Staða stofnuð", invite: "Boð sent", revenue: "Velta skráð — laun% uppfært", avgrevenue: "Meðalvelta vistuð — laun% uppfært",
     };
     toast(res.demo ? `${ok[modal]} (demo — tengdu Supabase)` : ok[modal]);
   }
@@ -320,6 +338,16 @@ function SettingsFormModal({ modal, onClose }: { modal: Exclude<SettingsModal, n
           {modal === "location" && (
             <div className="field"><label>{t("Heiti staðar")}</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="t.d. Hotel Umi" autoFocus /></div>
           )}
+          {modal === "department" && <>
+            <div className="field"><label>{t("Heiti deildar")}</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("t.d. Eldhús")} autoFocus /></div>
+            {locations.length > 1 && (
+              <div className="field"><label>{t("Staður")}</label>
+                <select value={dept} onChange={(e) => setDept(e.target.value)}>
+                  {locations.map((l) => <option key={l}>{l}</option>)}
+                </select>
+              </div>
+            )}
+          </>}
           {modal === "position" && <>
             <div className="field"><label>{t("Heiti stöðu")}</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder="t.d. Vaktstjóri" autoFocus /></div>
             <div className="field"><label>{t("Grunntaxti (kr/klst)")}</label><input value={rate} onChange={(e) => setRate(e.target.value)} placeholder="2.900" /></div>
@@ -359,6 +387,8 @@ function SettingsFormModal({ modal, onClose }: { modal: Exclude<SettingsModal, n
 
 /** Universal rule-template editor: manual fields, presets, and the AI
  * assistant (suggests only — the user reviews, edits and saves = approval). */
+const TPL_DAYS: [number, string][] = [[0, "Má"], [1, "Þr"], [2, "Mi"], [3, "Fi"], [4, "Fö"], [5, "La"], [6, "Su"]];
+
 function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose: () => void }) {
   const { t } = useLang();
   const [name, setName] = useState(tpl?.name ?? "");
@@ -433,14 +463,16 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
   }
 
   const prem = rules.premiums ?? [];
-  const setPrem = (i: number, patch: Partial<{ label: string; pct: number; from?: string; to?: string }>) =>
+  const setPrem = (i: number, patch: Partial<{ label: string; pct: number; from?: string; to?: string; days?: number[] }>) =>
     setRules((r) => ({ ...r, premiums: (r.premiums ?? []).map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
+  const toggleDay = (i: number, d: number) => {
+    const cur = prem[i]?.days ?? [];
+    const next = cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d].sort((a, b) => a - b);
+    setPrem(i, { days: next.length ? next : undefined });
+  };
   const addPrem = () => setRules((r) => ({ ...r, premiums: [...(r.premiums ?? []), { label: "", pct: 0 }] }));
   const delPrem = (i: number) => setRules((r) => ({ ...r, premiums: (r.premiums ?? []).filter((_, j) => j !== i) }));
 
-  const F = ({ label, value, onChange, ph }: { label: string; value: string; onChange: (v: string) => void; ph?: string }) => (
-    <div className="field" style={{ flex: 1, minWidth: 0 }}><label>{label}</label><input value={value} onChange={(e) => onChange(e.target.value)} placeholder={ph} /></div>
-  );
   const N = ({ label, value, onChange }: { label: string; value: number | undefined; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) => (
     <div className="field" style={{ flex: 1, minWidth: 0 }}><label>{label}</label><input inputMode="decimal" value={numVal(value)} onChange={onChange} placeholder="—" /></div>
   );
@@ -451,22 +483,10 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
       <div className="modal" style={{ maxWidth: 640 }}>
         <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{tpl ? tpl.name : t("Nýtt reglusniðmát")}</div><button className="x" onClick={onClose}>✕</button></div>
         <div className="mb" style={{ maxHeight: "70vh", overflowY: "auto" }}>
-          <div className="field"><label>{t("Nafn sniðmáts")}</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("t.d. Veitingastaður — Reykjavík")} autoFocus /></div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <F label={t("Land")} value={country} onChange={setCountry} ph="Ísland" />
-            <F label={t("Svæði/bær")} value={region} onChange={setRegion} ph="Reykjavík" />
-          </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <F label={t("Atvinnugrein")} value={industry} onChange={setIndustry} ph={t("t.d. veitingar")} />
-            <F label={t("Stéttarfélag / samningur")} value={unionName} onChange={setUnionName} ph={t("frjáls texti")} />
-          </div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <F label={t("Starfsheiti (fyrir AI)")} value={role} onChange={setRole} ph={t("t.d. kokkur, þjónn")} />
-            <F label={t("Starfsaldur / annað samhengi (fyrir AI)")} value={tenure} onChange={setTenure} ph={t("t.d. unnið í 3 ár, næturvaktir")} />
-          </div>
-
+          <div className="field"><label>{t("Nafn sniðmáts")}</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("t.d. Efling — þjónn")} autoFocus /></div>
           <div className="field"><label>{t("Spyrðu AI (frjáls texti)")}</label>
-            <textarea className="lf-ta" rows={2} value={aiQ} onChange={(e) => setAiQ(e.target.value)} placeholder={t("t.d. Hvað er ómenntaður þjónn með í laun og álög hjá Eflingu?")} />
+            <textarea className="lf-ta" rows={2} value={aiQ} onChange={(e) => setAiQ(e.target.value)} placeholder={t("t.d. Ómenntaður þjónn hjá Eflingu í Reykjavík, unnið í 3 ár — hvaða laun og álög?")} />
+            <p className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>{t("Nefndu stéttarfélag, starf, svæði og starfsaldur í textanum — AI fyllir reglurnar inn og þú yfirferð.")}</p>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "4px 0 10px" }}>
             {RULE_PRESETS.map((p) => (
@@ -486,14 +506,27 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
           </div>
           {prem.length === 0 && <p className="muted" style={{ fontSize: 12.5, margin: "2px 0 8px" }}>{t("Engar álagsreglur enn — bættu við (t.d. Kvöldálag 33% frá 16:00 til 18:00) eða notaðu sniðmát/AI.")}</p>}
           {prem.map((pr, i) => (
-            <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 7 }}>
-              <input style={{ flex: 2 }} value={pr.label} placeholder={t("Heiti (t.d. Kvöldálag)")} onChange={(e) => setPrem(i, { label: e.target.value })} />
-              <input style={{ width: 68 }} inputMode="decimal" value={pr.pct ? String(pr.pct).replace(".", ",") : ""} placeholder="%" onChange={(e) => { const n = Number(e.target.value.replace(",", ".")); setPrem(i, { pct: Number.isFinite(n) ? n : 0 }); }} />
-              <span className="muted" style={{ fontSize: 11 }}>%</span>
-              <input style={{ width: 74 }} value={pr.from ?? ""} placeholder={t("frá")} onChange={(e) => setPrem(i, { from: e.target.value || undefined })} />
-              <span className="muted">–</span>
-              <input style={{ width: 74 }} value={pr.to ?? ""} placeholder={t("til")} onChange={(e) => setPrem(i, { to: e.target.value || undefined })} />
-              <button className="x" title={t("Eyða reglu")} onClick={() => delPrem(i)}>✕</button>
+            <div key={i} style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "8px 9px", marginBottom: 8 }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <input style={{ flex: 2, minWidth: 120 }} value={pr.label} placeholder={t("Heiti (t.d. Kvöldálag)")} onChange={(e) => setPrem(i, { label: e.target.value })} />
+                <input style={{ width: 62 }} inputMode="decimal" value={pr.pct ? String(pr.pct).replace(".", ",") : ""} placeholder="%" onChange={(e) => { const n = Number(e.target.value.replace(",", ".")); setPrem(i, { pct: Number.isFinite(n) ? n : 0 }); }} />
+                <span className="muted" style={{ fontSize: 11 }}>%</span>
+                <input style={{ width: 70 }} value={pr.from ?? ""} placeholder={t("frá")} onChange={(e) => setPrem(i, { from: e.target.value || undefined })} />
+                <span className="muted">–</span>
+                <input style={{ width: 70 }} value={pr.to ?? ""} placeholder={t("til")} onChange={(e) => setPrem(i, { to: e.target.value || undefined })} />
+                <button className="x" title={t("Eyða reglu")} onClick={() => delPrem(i)}>✕</button>
+              </div>
+              <div style={{ display: "flex", gap: 5, alignItems: "center", marginTop: 7, flexWrap: "wrap" }}>
+                {TPL_DAYS.map(([d, l]) => (
+                  <button key={d} type="button" onClick={() => toggleDay(i, d)}
+                    className="btn ghost sm"
+                    style={{ padding: "3px 8px", fontSize: 11.5, fontWeight: 600,
+                      background: (pr.days ?? []).includes(d) ? "var(--brand)" : "#fff",
+                      color: (pr.days ?? []).includes(d) ? "#fff" : "var(--ink2)",
+                      borderColor: (pr.days ?? []).includes(d) ? "var(--brand)" : "var(--line)" }}>{l}</button>
+                ))}
+                <span className="muted" style={{ fontSize: 11 }}>{(pr.days ?? []).length ? "" : t("— alla daga")}</span>
+              </div>
             </div>
           ))}
 
