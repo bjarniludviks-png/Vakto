@@ -128,8 +128,11 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
       status: "active" as const,
     };
     // Universal fields (0028) — retry without them if the columns don't exist yet.
+    const tplName = (tplRes.payRule as { templateName?: string } | undefined)?.templateName;
     const universal = {
-      union_name: input.union || null,
+      union_name: input.union?.startsWith("tpl:") || input.ruleTemplateId
+        ? (tplName ?? "Eigin reglur")
+        : (input.union || null),
       rule_template_id: input.ruleTemplateId || null,
       contract_type: input.contractType || null,
       schedule_pattern: input.schedulePattern ? { kind: input.schedulePattern } : null,
@@ -410,7 +413,12 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
     }
     // Universal fields (0028) — best-effort until the migration runs.
     const uni: Record<string, unknown> = {};
-    if (input.union !== undefined) uni.union_name = input.union || null;
+    if (input.union !== undefined) {
+      const tplName2 = input.union?.startsWith("tpl:")
+        ? ((await resolveUnionTemplate(supabase, companyU, input.union)).payRule as { templateName?: string } | undefined)?.templateName
+        : undefined;
+      uni.union_name = input.union?.startsWith("tpl:") ? (tplName2 ?? "Eigin reglur") : (input.union || null);
+    }
     if (input.ruleTemplateId !== undefined) {
       uni.rule_template_id = input.ruleTemplateId;
       if (input.ruleTemplateId) {
