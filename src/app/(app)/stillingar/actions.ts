@@ -235,6 +235,52 @@ export async function addDepartment(input: { name: string; locationName?: string
   }
 }
 
+/** Rename a department (company-scoped via its location). */
+export async function renameDepartment(id: string, name: string): Promise<SettingsResult> {
+  if (!name?.trim()) return { ok: false, error: "Nafn vantar" };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data: dep } = await supabase.from("departments")
+      .select("id, locations!inner(company_id)").eq("id", id).eq("locations.company_id", ctx.company).maybeSingle();
+    if (!dep) return { ok: false, error: "Deild fannst ekki" };
+    const { error } = await supabase.from("departments").update({ name: name.trim() }).eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "department.rename", entity: "department", entityId: id, detail: `Deild endurskírð — ${name.trim()}`,
+    });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Delete a department — employees in it are left without a department (not deleted). */
+export async function deleteDepartment(id: string): Promise<SettingsResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data: dep } = await supabase.from("departments")
+      .select("id, locations!inner(company_id)").eq("id", id).eq("locations.company_id", ctx.company).maybeSingle();
+    if (!dep) return { ok: false, error: "Deild fannst ekki" };
+    await supabase.from("employees").update({ department_id: null }).eq("department_id", id).eq("company_id", ctx.company);
+    const { error } = await supabase.from("departments").delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "department.delete", entity: "department", entityId: id, detail: "Deild eytt",
+    });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /** Save (confirm) a pay rule's premium % for the company. */
 export async function savePayRule(
   input: { code: string; label: string; kind: string; pct: string; confirmed: boolean },

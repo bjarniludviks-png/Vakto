@@ -755,3 +755,7 @@ button .spin{width:14px;height:14px;border-width:2px;border-color:currentColor;b
 .wallet-btn .wsoon{margin-left:auto;font-size:10.5px;font-weight:600;padding:2px 7px;border-radius:6px;background:rgba(255,255,255,.18)}
 .wallet-btn.google .wsoon{background:var(--line2);color:var(--ink3)}
 html.dark .wallet-btn.google{background:var(--panel);color:var(--ink)}
+
+/* Month view: adjacent-month days shown dimmed */
+.mcal .mcell.adj{opacity:.45;background:var(--line2)}
+.mcal .mcell.adj .mblock{filter:grayscale(.4)}

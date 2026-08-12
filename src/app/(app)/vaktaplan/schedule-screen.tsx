@@ -8,6 +8,7 @@ import { nf, dec1 } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
 import { AsyncButton } from "@/components/app/async-button";
 import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, type ShiftInput } from "./actions";
+import { getCompanyDepartments } from "../starfsfolk/actions";
 import { getDashboardPeriod } from "../maelabord/actions";
 import { buildSchedulePdf, type PdfShift } from "./pdf";
 import type { ReqItem } from "./requests.server";
@@ -102,6 +103,17 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [drag, setDrag] = useState<{ r: number; c: number } | null>(null);
   // Copied shift: code + real times, so pasting preserves them and saves.
   const [clip, setClip] = useState<{ code: string; start?: string; end?: string } | null>(null);
+  // Company departments for the filter (live sync with Settings).
+  const [deptList, setDeptList] = useState<string[]>(["Eldhús", "Sal", "Stjórnun"]);
+  useEffect(() => { getCompanyDepartments().then((d) => { if (d.length) setDeptList(d); }).catch(() => {}); }, []);
+  // Unified right-click menu (week/day/month views).
+  type CtxItem = { label: string; danger?: boolean; act: () => void };
+  const [ctx, setCtx] = useState<{ x: number; y: number; items: CtxItem[] } | null>(null);
+  function openCtx(ev: React.MouseEvent, items: CtxItem[]) {
+    ev.preventDefault(); ev.stopPropagation();
+    if (!items.length) return;
+    setCtx({ x: ev.clientX, y: ev.clientY, items });
+  }
   const [modal, setModal] = useState<null | "types" | "addEmp" | "shift" | "ai" | "aiResult" | "staff">(null);
   const [moreOpen, setMoreOpen] = useState(false);
   // Registered UN-availability (first name, lowercase → day indices) for the visible week.
@@ -277,7 +289,11 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   useEffect(() => {
     if (!liveCompany || view !== "Mánuður") return;
     const y = cur.getFullYear(), m = cur.getMonth();
-    const from = fmtISO(new Date(y, m, 1)), to = fmtISO(new Date(y, m + 1, 0));
+    // Cover the whole calendar grid: leading + trailing adjacent-month days too.
+    const lead = (new Date(y, m, 1).getDay() + 6) % 7;
+    const days = new Date(y, m + 1, 0).getDate();
+    const trail = (7 - ((lead + days) % 7)) % 7;
+    const from = fmtISO(new Date(y, m, 1 - lead)), to = fmtISO(new Date(y, m + 1, trail));
     let cancelled = false;
     getShiftsInRange(from, to).then((res) => {
       if (cancelled || !res.ok) return;
@@ -679,7 +695,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         </div>
         <select className="badge" style={{ border: "1px solid var(--line)", padding: "7px 11px" }} value={dept} onChange={(e) => setDept(e.target.value)}>
           <option value="all">{scopeDepts.length ? t("Allar mínar deildir") : t("Allar deildir")}</option>
-          {(scopeDepts.length ? scopeDepts : ["Eldhús", "Sal", "Stjórnun"]).map((d) => (
+          {(scopeDepts.length ? scopeDepts : deptList).map((d) => (
             <option key={d} value={d}>{d}</option>
           ))}
         </select>
@@ -779,16 +795,22 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                         >
                           <div
                             className={`shift ${SH[s].c}`}
-                            title={isUnav ? (s === "off" ? t("Skráð ólaus þennan dag") : t("ATH: skráð ólaus þennan dag — árekstur")) : t("hægrismelltu til að afrita")}
+                            title={isUnav ? (s === "off" ? t("Skráð ólaus þennan dag") : t("ATH: skráð ólaus þennan dag — árekstur")) : t("hægrismelltu fyrir aðgerðir")}
                             draggable
                             onDragStart={() => setDrag({ r, c })}
                             onClick={() => cellClick(r, c)}
                             onContextMenu={(ev) => {
-                              ev.preventDefault();
-                              if (s === "off") return;
                               const tt = timeOf(r, c);
-                              setClip({ code: s, start: tt?.start, end: tt?.end });
-                              toast(t("Vakt afrituð — smelltu á reiti til að líma"));
+                              const items: { label: string; danger?: boolean; act: () => void }[] = [];
+                              if (s !== "off") {
+                                items.push({ label: t("Breyta"), act: () => { setSel({ r, c }); setModal("shift"); } });
+                                items.push({ label: t("Afrita"), act: () => { setClip({ code: s, start: tt?.start, end: tt?.end }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } });
+                              } else {
+                                items.push({ label: t("Ný vakt"), act: () => { setSel({ r, c }); setModal("shift"); } });
+                              }
+                              if (clip) items.push({ label: t("Líma hér"), act: () => cellClick(r, c) });
+                              if (s !== "off") items.push({ label: t("Eyða vakt"), danger: true, act: () => delCell(r, c) });
+                              openCtx(ev, items);
                             }}
                           >
                             {s === "off" ? t("Frí") : <>{cellLabel(r, c, s)}<small>{SH[s].s ? t("sh:" + SH[s].s) :" "}</small></>}
@@ -836,7 +858,17 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         </div>
       )}
 
-      {view === "Dagur" && <DayView day={cur} col={curCol} rows={colShifts(curCol)} onAdd={openNewShift} />}
+      {view === "Dagur" && <DayView day={cur} col={curCol} rows={colShifts(curCol)} onAdd={openNewShift} onCtx={(x, ev) => {
+        const r = emp.findIndex((e) => e[1] === x.n);
+        if (r < 0) return;
+        const code = grid[r]?.[curCol] ?? "off";
+        const tt = timeOf(r, curCol);
+        openCtx(ev, [
+          { label: t("Breyta"), act: () => { setSel({ r, c: curCol }); setModal("shift"); } },
+          { label: t("Afrita"), act: () => { setClip({ code, start: tt?.start, end: tt?.end }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } },
+          { label: t("Eyða vakt"), danger: true, act: () => delCell(r, curCol) },
+        ]);
+      }} />}
       {view === "Mánuður" && monthClip && (
         <div id="pastebar" style={{ display: "flex", marginTop: 12 }}>
           <span className="pbtxt"><b>{t("Líma-hamur:")}</b> {monthClip.first} · {monthClip.start}–{monthClip.end} — {t("smelltu á daga til að líma")}</span>
@@ -845,7 +877,19 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       )}
       {view === "Mánuður" && <MonthView monthDate={cur} todayISO={todayISO} blocks={monthBlocks}
         onEdit={(d) => { if (monthClip) { void pasteMonthShift(fmtISO(d)); } else setDayModal(d); }}
-        onCopyBlock={(b) => { const [a, z] = b.time.split("–"); setMonthClip({ first: b.name, start: norm(a ?? "08:00"), end: norm(z ?? "16:00") }); toast(t("Vakt afrituð — smelltu á daga til að líma")); }}
+        onCtxBlock={(b, iso, ev) => openCtx(ev, [
+          { label: t("Breyta"), act: () => setDayModal(parseISO(iso)) },
+          { label: t("Afrita"), act: () => { const [a, z] = b.time.split("–"); setMonthClip({ first: b.name, start: norm(a ?? "08:00"), end: norm(z ?? "16:00") }); toast(t("Vakt afrituð — smelltu á daga til að líma")); } },
+          ...(monthClip ? [{ label: t("Líma hér"), act: () => { void pasteMonthShift(iso); } }] : []),
+          { label: t("Eyða vakt"), danger: true, act: () => {
+            if (!liveCompany) { toast("Vakt eydd (demo)"); return; }
+            void deleteShift({ employeeName: b.name, dateISO: iso }).then((res) => { setMonthVer((v) => v + 1); toast(res.ok ? "Vakt eydd" : (res.error ?? "Villa")); });
+          } },
+        ])}
+        onCtxDay={(d, ev) => openCtx(ev, [
+          { label: t("Ný vakt"), act: () => setDayModal(d) },
+          ...(monthClip ? [{ label: t("Líma hér"), act: () => { void pasteMonthShift(fmtISO(d)); } }] : []),
+        ])}
         onDragBlock={(b, iso) => { const [a, z] = b.time.split("–"); monthDragRef.current = { first: b.name, start: norm(a ?? "08:00"), end: norm(z ?? "16:00"), fromISO: iso }; }}
         onDropDay={(iso) => moveMonthShift(iso)} />}
       {dayModal && <MonthShiftModal date={dayModal} entries={entriesFor(dayModal)} names={[...emp, ...pool].map((x) => x[1])} types={types}
@@ -923,6 +967,16 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       {modal === "staff" && <StaffNeedModal targets={targets} onClose={() => setModal(null)} onSave={(ts) => { setTargets(ts); setModal(null); setStaffingTargets(ts).then((r) => toast(r.ok ? "Mönnunarþörf vistuð" : (r.error ?? "Villa"))); }} />}
       {modal === "types" && <ShiftTypesModal types={types} setTypes={setTypes} onClose={() => setModal(null)} />}
       {modal === "addEmp" && <AddEmpModal pool={pool} onPick={pickEmp} onClose={() => setModal(null)} />}
+      {ctx && (
+        <>
+          <div style={{ position: "fixed", inset: 0, zIndex: 90 }} onClick={() => setCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCtx(null); }} />
+          <div className="tmenu show" style={{ position: "fixed", zIndex: 91, left: Math.min(ctx.x, (typeof window !== "undefined" ? window.innerWidth : 1200) - 190), top: Math.min(ctx.y, (typeof window !== "undefined" ? window.innerHeight : 800) - ctx.items.length * 42 - 10), right: "auto" }}>
+            {ctx.items.map((it) => (
+              <div className="mi" key={it.label} style={it.danger ? { color: "var(--bad)" } : undefined} onClick={() => { setCtx(null); it.act(); }}>{it.label}</div>
+            ))}
+          </div>
+        </>
+      )}
       {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
       {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} names={emp.map((e) => e[1])} depts={[...new Set(emp.map((e) => e[2]).filter(Boolean))]} />}
       {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={approveAiProposal} />}
@@ -932,7 +986,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
 
 type DayRow = { i: string; n: string; c: string; dep: string; l: string; h: number; type: string; start: number };
 
-function DayView({ day, col, rows, onAdd }: { day: Date; col: number; rows: DayRow[]; onAdd: () => void }) {
+function DayView({ day, col, rows, onAdd, onCtx }: { day: Date; col: number; rows: DayRow[]; onAdd: () => void; onCtx: (x: DayRow, ev: React.MouseEvent) => void }) {
   const { t } = useLang();
   const tot = rows.reduce((a, x) => a + x.h, 0);
   return (
@@ -947,7 +1001,7 @@ function DayView({ day, col, rows, onAdd }: { day: Date; col: number; rows: DayR
         <div className="ch"><div><div className="ct">{t(DAYNAMES[col])} {day.getDate()}. {t(MONTHS_IS[day.getMonth()])}</div><div className="cs">{t("smelltu á vakt til að færa eða breyta")}</div></div><button className="btn sm" onClick={onAdd}>{t("+ Bæta við vakt")}</button></div>
         <div className="cb att">
           {rows.length ? rows.map((x, i) => (
-            <div className="it rowlink" key={i} onClick={onAdd}>
+            <div className="it rowlink" key={i} onClick={onAdd} onContextMenu={(ev) => onCtx(x, ev)}>
               <span className="avt" style={{ background: x.c, width: 32, height: 32 }}>{x.i}</span>
               <div className="tx"><b>{x.n}</b><span>{t(x.dep)}</span></div>
               <span style={{ fontWeight: 650, fontVariantNumeric: "tabular-nums", marginLeft: "auto" }}>{x.l}</span>
@@ -960,7 +1014,7 @@ function DayView({ day, col, rows, onAdd }: { day: Date; col: number; rows: DayR
   );
 }
 
-function MonthView({ monthDate, todayISO, blocks, onEdit, onCopyBlock, onDragBlock, onDropDay }: { monthDate: Date; todayISO: string; blocks: (iso: string, wd: number) => MonthBlock[]; onEdit: (d: Date) => void; onCopyBlock: (b: MonthBlock) => void; onDragBlock: (b: MonthBlock, iso: string) => void; onDropDay: (iso: string) => void }) {
+function MonthView({ monthDate, todayISO, blocks, onEdit, onCtxBlock, onCtxDay, onDragBlock, onDropDay }: { monthDate: Date; todayISO: string; blocks: (iso: string, wd: number) => MonthBlock[]; onEdit: (d: Date) => void; onCtxBlock: (b: MonthBlock, iso: string, ev: React.MouseEvent) => void; onCtxDay: (d: Date, ev: React.MouseEvent) => void; onDragBlock: (b: MonthBlock, iso: string) => void; onDropDay: (iso: string) => void }) {
   const { t } = useLang();
   const hd = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
   const y = monthDate.getFullYear(), m = monthDate.getMonth();
@@ -974,24 +1028,25 @@ function MonthView({ monthDate, todayISO, blocks, onEdit, onCopyBlock, onDragBlo
           <div className="mcal-wrap">
           <div className="mcal">
             {hd.map((h) => <div className="hd" key={h}>{t(h)}</div>)}
-            {Array.from({ length: lead }, (_, i) => <div className="cell empty" key={`l${i}`} />)}
-            {Array.from({ length: days }, (_, k) => k + 1).map((d) => {
+            {Array.from({ length: lead + days + ((7 - ((lead + days) % 7)) % 7) }, (_, k) => k - lead + 1).map((d) => {
               const date = new Date(y, m, d);
+              const adj = d < 1 || d > days;
               const wd = (date.getDay() + 6) % 7, we = wd >= 5;
               const tod = fmtISO(date) === todayISO;
               const sh = blocks(fmtISO(date), wd);
               return (
-                <div key={d} className={`cell mcell ${we ? "we" : ""} ${tod ? "tod" : ""}`} onClick={() => onEdit(date)}
+                <div key={d} className={`cell mcell ${we ? "we" : ""} ${tod ? "tod" : ""}${adj ? " adj" : ""}`} onClick={() => onEdit(date)}
+                  onContextMenu={(ev) => onCtxDay(date, ev)}
                   onDragOver={(ev) => { ev.preventDefault(); ev.currentTarget.classList.add("cellh"); }}
                   onDragLeave={(ev) => ev.currentTarget.classList.remove("cellh")}
                   onDrop={(ev) => { ev.preventDefault(); ev.currentTarget.classList.remove("cellh"); onDropDay(fmtISO(date)); }}>
-                  <div className="mhead"><span className="dd">{d}</span>{sh.length > 0 && <span className="mtot">{dec1(sh.reduce((a, s) => a + s.hrs, 0))} {t("klst")}</span>}</div>
+                  <div className="mhead"><span className="dd">{date.getDate()}</span>{sh.length > 0 && <span className="mtot">{dec1(sh.reduce((a, s) => a + s.hrs, 0))} {t("klst")}</span>}</div>
                   <div className="mblocks">
                     {sh.slice(0, 4).map((x, i) => (
                       <div key={i} className={`mblock ${x.type}`} draggable
                         onDragStart={(ev) => { ev.stopPropagation(); onDragBlock(x, fmtISO(date)); }}
-                        onContextMenu={(ev) => { ev.preventDefault(); ev.stopPropagation(); onCopyBlock(x); }}
-                        onClick={(e) => { e.stopPropagation(); onEdit(date); }} title={`${x.name} · ${x.time} · ${"hægrismelltu til að afrita"}`}>
+                        onContextMenu={(ev) => onCtxBlock(x, fmtISO(date), ev)}
+                        onClick={(e) => { e.stopPropagation(); onEdit(date); }} title={`${x.name} · ${x.time} · ${t("hægrismelltu fyrir aðgerðir")}`}>
                         <b>{x.name}</b><span>{x.time} · {dec1(x.hrs)}{t("klst-stutt")}</span>
                       </div>
                     ))}

@@ -6,7 +6,7 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { syncInventraRevenue, addLocation, addDepartment, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
+import { syncInventraRevenue, addLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
 import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
@@ -43,6 +43,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
   const [modal, setModal] = useState<SettingsModal>(initialModal);
   const [keyModal, setKeyModal] = useState(false);
   const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
+  const [deptEdit, setDeptEdit] = useState<{ id: string; name: string; location: string; staff: number } | null>(null);
   const [posName, setPosName] = useState<string | null>(null);
   function posConnect(name: string) { setPosName(name === "POS" ? "" : name); }
   const [section, setSection] = useState<string>(initialModal === "revenue" || initialModal === "avgrevenue" ? "velta" : "fyrirtaeki");
@@ -200,7 +201,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
           <div className="ch"><div className="ct">{t("Deildir")}</div><button className="btn sm" onClick={() => setModal("department")}>{t("+ Ný deild")}</button></div>
           <div className="cb att">
             {data.departments.map((d) => (
-              <div className="it" key={d.id}>
+              <div className="it rowlink" key={d.id} onClick={() => setDeptEdit(d)}>
                 <div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" /></svg></div>
                 <div className="tx"><b>{d.name}</b><span>{d.location} · {d.staff} {t("starfsmenn")}</span></div>
               </div>
@@ -249,6 +250,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
       </div>
 
       {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} locations={data.locations.map((l) => l.name)} />}
+      {deptEdit && <DeptEditModal dept={deptEdit} onClose={() => setDeptEdit(null)} />}
       {keyModal && <ApiKeyModal onClose={() => setKeyModal(false)} />}
       {tplModal && <RuleTemplateModal tpl={tplModal === "new" ? null : tplModal} onClose={() => setTplModal(null)} />}
       {posName !== null && <PosConnectModal name={posName} onClose={() => setPosName(null)} />}
@@ -553,6 +555,47 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
           <div style={{ display: "flex", gap: 9, marginTop: 12 }}>
             <button className="btn" disabled={busy} onClick={submit}>{t("Vista sniðmát")}</button>
             {tpl?.id && <button className="btn ghost" disabled={busy} onClick={remove} style={{ color: "var(--bad)" }}>{t("Eyða")}</button>}
+            <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Rename or delete a department. */
+function DeptEditModal({ dept, onClose }: { dept: { id: string; name: string; location: string; staff: number }; onClose: () => void }) {
+  const { t } = useLang();
+  const [name, setName] = useState(dept.name);
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    setBusy(true);
+    const res = await renameDepartment(dept.id, name);
+    setBusy(false);
+    if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
+    onClose();
+    toast(res.demo ? t("Vistað (demo)") : t("Deild uppfærð"));
+  }
+  async function remove() {
+    if (!window.confirm(t("Eyða deildinni? Starfsfólk í henni verður án deildar (ekki eytt)."))) return;
+    setBusy(true);
+    const res = await deleteDepartment(dept.id);
+    setBusy(false);
+    if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
+    onClose();
+    toast(res.demo ? t("Eytt (demo)") : t("Deild eydd"));
+  }
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal">
+        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{dept.name}</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="mb">
+          <div className="field"><label>{t("Heiti deildar")}</label><input value={name} onChange={(e) => setName(e.target.value)} autoFocus /></div>
+          <p className="muted" style={{ fontSize: 12 }}>{dept.location} · {dept.staff} {t("starfsmenn")}</p>
+          <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
+            <button className="btn" disabled={busy} onClick={save}>{t("Vista")}</button>
+            <button className="btn ghost" disabled={busy} onClick={remove} style={{ color: "var(--bad)" }}>{t("Eyða")}</button>
             <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
           </div>
         </div>

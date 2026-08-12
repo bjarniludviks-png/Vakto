@@ -1129,6 +1129,14 @@ export const DICT: Dict = {
   "Áunninn orlofsréttur": { is: "Áunninn orlofsréttur", en: "Accrued vacation", vi: "Phép tích lũy" },
   "Frí tekið 2026": { is: "Frí tekið 2026", en: "Leave taken 2026", vi: "Đã nghỉ 2026" },
   "Orlofsyfirlit byggist á launakeyrslum ársins.": { is: "Orlofsyfirlit byggist á launakeyrslum ársins.", en: "Vacation overview builds up from this year's payroll runs.", vi: "Tổng quan nghỉ phép dựa trên các kỳ lương trong năm." },
+  "Breyta": { is: "Breyta", en: "Edit", vi: "Sửa" },
+  "Líma hér": { is: "Líma hér", en: "Paste here", vi: "Dán vào đây" },
+  "hægrismelltu fyrir aðgerðir": { is: "hægrismelltu fyrir aðgerðir", en: "right-click for actions", vi: "nhấp chuột phải để thao tác" },
+  "Deild uppfærð": { is: "Deild uppfærð", en: "Department updated", vi: "Đã cập nhật bộ phận" },
+  "Deild eydd": { is: "Deild eydd", en: "Department deleted", vi: "Đã xóa bộ phận" },
+  "Eyða deildinni? Starfsfólk í henni verður án deildar (ekki eytt).": { is: "Eyða deildinni? Starfsfólk í henni verður án deildar (ekki eytt).", en: "Delete this department? Its staff will be left without a department (not deleted).", vi: "Xóa bộ phận này? Nhân viên trong đó sẽ không thuộc bộ phận nào (không bị xóa)." },
+  "Vistað (demo)": { is: "Vistað (demo)", en: "Saved (demo)", vi: "Đã lưu (demo)" },
+  "Eytt (demo)": { is: "Eytt (demo)", en: "Deleted (demo)", vi: "Đã xóa (demo)" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });
