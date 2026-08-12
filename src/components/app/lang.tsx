@@ -1144,6 +1144,11 @@ export const DICT: Dict = {
   "Ábendingar (innsýn)": { is: "Ábendingar (innsýn)", en: "Insights & tips", vi: "Gợi ý & phân tích" },
   "Mönnunarmynstur": { is: "Mönnunarmynstur", en: "Staffing pattern", vi: "Mô hình nhân sự" },
   "Samantekt tímabils": { is: "Samantekt tímabils", en: "Period summary", vi: "Tóm tắt kỳ" },
+"Eyða starfsmanni": { is: "Eyða starfsmanni", en: "Delete employee", vi: "Xóa nhân viên" },
+  "Eyða samningi": { is: "Eyða samningi", en: "Delete contract", vi: "Xóa hợp đồng" },
+  "Eyða þessum samningi? (Starfsmaðurinn sjálfur eyðist EKKI.)": { is: "Eyða þessum samningi? (Starfsmaðurinn sjálfur eyðist EKKI.)", en: "Delete this contract? (The employee is NOT deleted.)", vi: "Xóa hợp đồng này? (KHÔNG xóa nhân viên.)" },
+  "Samningi eytt": { is: "Samningi eytt", en: "Contract deleted", vi: "Đã xóa hợp đồng" },
+  "Eyðing er á starfsmannalistanum": { is: "Eyðing er á starfsmannalistanum", en: "Deletion lives on the staff list", vi: "Xóa nhân viên ở trang danh sách" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

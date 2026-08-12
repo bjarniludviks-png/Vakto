@@ -397,6 +397,16 @@ export async function deleteEmployee(id: string): Promise<ActionResult> {
   try {
     const supabase = await createClient();
     const company = await companyId(supabase);
+    // Employees with recorded history must never be hard-deleted — punches,
+    // shifts and payroll history would cascade away. Deactivate instead.
+    const [pu, ts] = await Promise.all([
+      supabase.from("punches").select("id", { count: "exact", head: true }).eq("employee_id", id),
+      supabase.from("shifts").select("id", { count: "exact", head: true }).eq("employee_id", id),
+    ]);
+    if ((pu.count ?? 0) > 0 || (ts.count ?? 0) > 0) {
+      await supabase.from("employees").update({ status: "inactive" }).eq("id", id);
+      return { ok: false, error: "Starfsmaðurinn á stimplanir eða vaktir — ekki er hægt að eyða, en hann var gerður óvirkur. Saga hans (tímar, laun) helst órofin." };
+    }
     const { error } = await supabase.from("employees").delete().eq("id", id);
     if (error) return { ok: false, error: error.message };
     const { data: { user } } = await supabase.auth.getUser();
@@ -689,6 +699,25 @@ export async function listContracts(employeeId: string): Promise<{ contracts: Co
     };
   } catch {
     return { contracts: [], live: false };
+  }
+}
+
+export async function deleteContract(id: string): Promise<ActionResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const { data: c } = await supabase.from("contracts").select("company_id, title, status").eq("id", id).maybeSingle();
+    if (!c) return { ok: false, error: "Samningur fannst ekki" };
+    if (c.status === "signed") return { ok: false, error: "Undirritaðum samningi verður ekki eytt — merktu hann ógildan (void) og gerðu nýjan." };
+    const { error } = await supabase.from("contracts").delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    const { data: { user } } = await supabase.auth.getUser();
+    await logAudit(supabase, c.company_id as string, user?.id ?? null, {
+      action: "contract.delete", entity: "contracts", entityId: id, detail: `Samningi eytt — ${c.title}`,
+    });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
 

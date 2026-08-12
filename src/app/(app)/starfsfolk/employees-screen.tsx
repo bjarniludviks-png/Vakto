@@ -8,7 +8,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "./contract-pdf";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, generateContract, listContracts, setContractStatus, type ContractRow } from "./actions";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, type ContractRow } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField } from "@/components/app/fields";
@@ -128,6 +128,12 @@ export default function EmployeesScreen({
   function openEmp(e: Employee) {
     router.push(`/starfsfolk/${e.id}`);
   }
+  async function delEmp(id: string, name: string) {
+    if (!window.confirm(`Eyða ${name}? Starfsfólk með stimplanir eða vaktir er ekki hægt að eyða — það er þá gert óvirkt í staðinn (sagan helst).`)) return;
+    const res = await deleteEmployee(id);
+    toast(res.ok ? "Starfsmanni eytt" : (res.error ?? "Villa"));
+    router.refresh();
+  }
 
   return (
     <>
@@ -183,7 +189,7 @@ export default function EmployeesScreen({
                 <th className="r">{t("emp:th:ratio")}</th>
                 <th>{t("emp:th:union")}</th>
                 <th>{t("emp:th:status")}</th>
-              </tr>
+              <th className="r"></th></tr>
             </thead>
             <tbody>
               {employees.map((e) => {
@@ -228,6 +234,12 @@ export default function EmployeesScreen({
                       <span className="pill" style={{ background: b.bg, color: b.fg }}>
                         {t(b.labelKey)}
                       </span>
+                    </td>
+                    <td className="r" onClick={(ev) => ev.stopPropagation()}>
+                      <button className="x" title={t("Eyða starfsmanni")} style={{ color: "var(--bad)" }}
+                        onClick={() => delEmp(e.id, e.fullName)}>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
+                      </button>
                     </td>
                   </tr>
                 );
@@ -806,6 +818,12 @@ function ContractTab({ employeeId }: { employeeId: string }) {
     toast(res.ok ? t("Staða uppfærð") : (res.error ?? "Villa"));
     load();
   }
+  async function remove(c: ContractRow) {
+    if (!window.confirm(t("Eyða þessum samningi? (Starfsmaðurinn sjálfur eyðist EKKI.)"))) return;
+    const res = await deleteContract(c.id);
+    toast(res.ok ? t("Samningi eytt") : (res.error ?? "Villa"));
+    load();
+  }
 
   return (
     <>
@@ -825,6 +843,7 @@ function ContractTab({ employeeId }: { employeeId: string }) {
             <button className="btn ghost sm" type="button" onClick={() => downloadContractPdf(c.title, c.content)}>PDF</button>
             {c.status === "draft" && <button className="btn ghost sm" type="button" onClick={() => mark(c, "sent")}>{t("Merkja sent")}</button>}
             {c.status !== "signed" && c.status !== "void" && <button className="btn ghost sm" type="button" onClick={() => mark(c, "signed")}>{t("Merkja undirritað")}</button>}
+            {c.status !== "signed" && <button className="x" type="button" title={t("Eyða samningi")} onClick={() => remove(c)} style={{ color: "var(--bad)" }}>✕</button>}
           </div>
         ))}
       </div>

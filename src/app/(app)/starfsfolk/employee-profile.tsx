@@ -9,7 +9,7 @@ import { useLang } from "@/components/app/lang";
 import { initials, type Employee } from "@/lib/employees";
 import { CUSTOM_UNION } from "@/lib/payrules";
 import { PERM_FIELDS } from "@/lib/permissions";
-import { updateEmployee, setEmployeeStatus, deleteEmployee } from "./actions";
+import { updateEmployee, setEmployeeStatus } from "./actions";
 import { ProfileTabBody, PROFILE_TABS, type ProfileTab } from "./employees-screen";
 
 /** Full-page employee profile (replaces the cramped modal). Each section has room
@@ -56,14 +56,6 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
     router.refresh();
   }
 
-  async function remove() {
-    if (!window.confirm(`Eyða ${e.fullName}? Þetta er endanlegt og fjarlægir allar vaktir, stimplanir og sögu viðkomandi. Til að halda sögu skaltu frekar óvirkja.`)) return;
-    setSaving(true);
-    const res = await deleteEmployee(e.id);
-    setSaving(false);
-    if (res.ok) { toast("Starfsmanni eytt"); router.push("/starfsfolk"); }
-    else toast(res.error ?? "Villa");
-  }
 
   return (
     <>
@@ -96,9 +88,7 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
           <div style={{ display: "flex", gap: 9, marginTop: 22, flexWrap: "wrap" }}>
             <button className="btn" type="submit" disabled={saving}>{saving ? t("Vista…") : t("Vista")}</button>
             <button className="btn ghost" type="button" disabled={saving} onClick={toggleActive}>{e.status === "inactive" ? t("Virkja") : t("Óvirkja")}</button>
-            <button className="btn ghost" type="button" disabled={saving} style={{ marginLeft: "auto", color: "var(--bad)" }} onClick={remove}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>{t("Eyða")}
-            </button>
+            <span className="muted" style={{ marginLeft: "auto", fontSize: 12, alignSelf: "center" }}>{t("Eyðing er á starfsmannalistanum")}</span>
           </div>
         </form>
       </div>
