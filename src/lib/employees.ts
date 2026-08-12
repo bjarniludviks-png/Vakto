@@ -10,6 +10,7 @@ export type Employee = {
   location: string | null;
   payType: "hourly" | "monthly";
   rate: number;
+  monthlyHours?: number | null;
   employmentRatio: number;
   union: string | null;
   status: string;

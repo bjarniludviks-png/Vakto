@@ -36,6 +36,11 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
       : undefined;
     const res = await updateEmployee(e.id, {
       rate: g("rate"), employmentRatio: g("employmentRatio"), union, payType: g("payType"), payRule, permissions,
+      monthlyHours: g("monthlyHours"),
+      // Vinna tab (only present when that tab is open — undefined otherwise)
+      position: fd.has("position") ? (fd.get("position") as string) : undefined,
+      department: fd.has("department") ? (fd.get("department") as string) : undefined,
+      location: fd.has("location") ? (fd.get("location") as string) : undefined,
     });
     setSaving(false);
     toast(res.demo ? "Vistað (demo — tengdu Supabase)" : "Vistað");

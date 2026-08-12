@@ -71,22 +71,23 @@ async function lookupId(
 ): Promise<string | null> {
   if (!name) return null;
   // departments are scoped via locations; positions/locations carry company_id directly
+  // limit(1) instead of maybeSingle — duplicate names must not null the lookup.
   if (table === "departments") {
     const { data } = await supabase
       .from("departments")
       .select("id, locations!inner(company_id)")
       .eq("name", name)
       .eq("locations.company_id", company)
-      .maybeSingle();
-    return (data?.id as string) ?? null;
+      .limit(1);
+    return (data?.[0]?.id as string) ?? null;
   }
   const { data } = await supabase
     .from(table)
     .select("id")
     .eq("name", name)
     .eq("company_id", company)
-    .maybeSingle();
-  return (data?.id as string) ?? null;
+    .limit(1);
+  return (data?.[0]?.id as string) ?? null;
 }
 
 export async function createEmployee(input: NewEmployeeInput): Promise<ActionResult> {
@@ -302,6 +303,12 @@ export type UpdateEmployeeInput = {
   employmentRatio?: string;
   union?: string;
   payType?: string;
+  monthlyHours?: string;
+  pensionFund?: string;
+  position?: string;
+  department?: string;
+  location?: string;
+  hireDate?: string;
   payRule?: CustomRules | null;
   permissions?: Record<string, boolean> | null;
   benefits?: { name: string; type: string; amount: number }[] | null;
@@ -310,6 +317,19 @@ export type UpdateEmployeeInput = {
   contractType?: string | null;
   schedulePattern?: string | null;
 };
+
+/** Tolerant read of an employee's pension fund (null before 0039). */
+export async function getEmployeePension(id: string): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("employees").select("pension_fund").eq("id", id).maybeSingle();
+    if (error) return null;
+    return (data?.pension_fund as string) ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** Tolerant read of an employee's orlof (vacation) settings (null before 0021). */
 export async function getEmployeeOrlof(id: string): Promise<{ mode: string; pct: number } | null> {
@@ -406,6 +426,12 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
       if (tplRes2.payRule) patch.pay_rule = tplRes2.payRule;
     }
     if (input.payType) patch.pay_type = input.payType === "Mánaðarlaun" ? "monthly" : "hourly";
+    if (input.monthlyHours !== undefined) patch.monthly_hours = num(input.monthlyHours, 0) || null;
+    if (input.pensionFund !== undefined) patch.pension_fund = input.pensionFund || null;
+    if (input.hireDate) patch.hire_date = input.hireDate;
+    if (input.position !== undefined) patch.position_id = await lookupId(supabase, "positions", input.position, companyU);
+    if (input.department !== undefined) patch.department_id = await lookupId(supabase, "departments", input.department, companyU);
+    if (input.location !== undefined) patch.location_id = await lookupId(supabase, "locations", input.location, companyU);
 
     if (Object.keys(patch).length) {
       const { error } = await supabase.from("employees").update(patch).eq("id", id);
@@ -456,6 +482,25 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
 const DEMO_DEPARTMENTS = ["Eldhús", "Sal", "Stjórnun"];
 
 export type CompanyOptions = { departments: string[]; positions: string[]; locations: string[] };
+
+/** Department name → color (for schedule/staff labels). Empty when 0038 hasn't run. */
+export async function getDepartmentColors(): Promise<Record<string, string>> {
+  if (!isSupabaseConfigured()) return {};
+  try {
+    const supabase = await createClient();
+    const company = await companyId(supabase);
+    if (!company) return {};
+    const { data, error } = await supabase.from("departments")
+      .select("name, color, locations!inner(company_id)")
+      .eq("locations.company_id", company);
+    if (error) return {};
+    const out: Record<string, string> = {};
+    for (const d of data ?? []) if (d.color) out[d.name as string] = d.color as string;
+    return out;
+  } catch {
+    return {};
+  }
+}
 
 /** Real select-options for the new-employee form (demo fallback). */
 export async function getCompanyOptions(): Promise<CompanyOptions> {
@@ -552,16 +597,31 @@ export type ContractRow = {
 
 function contractMarkdown(e: Record<string, unknown>, c: Record<string, unknown>, extras: { unionName?: string; contractType?: string }): string {
   const line = (k: string, v: unknown) => (v ? `**${k}:** ${v}\n\n` : "");
+  const ctLabel: Record<string, string> = {
+    fulltime: "Ótímabundið — fullt starf / Permanent, full-time",
+    parttime: "Ótímabundið — hlutastarf / Permanent, part-time",
+    temporary: "Tímabundið / Temporary",
+    contractor: "Verktakasamningur / Contractor agreement",
+    custom: "Annað / Other",
+  };
+  const orlof = e.orlof as { mode?: string; pct?: number } | null;
+  const orlofTxt = orlof?.pct ? `${String(orlof.pct).replace(".", ",")}% ${orlof.mode === "pay_out" ? "greitt út með launum / paid out with wages" : "áunnið skv. kjarasamningi / accrued per agreement"}` : "Samkvæmt kjarasamningi / According to the collective agreement";
+  const terms = (c.contract_terms as string | null)?.trim();
   return `# Ráðningarsamningur / Employment contract
 
 ## Vinnuveitandi / Employer
-${line("Fyrirtæki", c.name)}${line("Kennitala", c.kennitala)}${line("Heimilisfang", c.address)}
+${line("Fyrirtæki", c.name)}${line("Kennitala", c.kennitala)}${line("Heimilisfang", c.address)}${line("Sími", c.phone)}${line("Netfang", c.email)}
 ## Starfsmaður / Employee
-${line("Nafn", e.full_name)}${line("Kennitala", e.kennitala)}${line("Netfang", e.email)}${line("Sími", e.phone)}
+${line("Nafn", e.full_name)}${line("Kennitala", e.kennitala)}${line("Netfang", e.email)}${line("Sími", e.phone)}${line("Bankareikningur", e.bank_account)}
 ## Starfið / The role
-${line("Starfsheiti", e.title)}${line("Ráðningarform", extras.contractType)}${line("Starfshlutfall", e.employment_ratio ? `${e.employment_ratio}%` : "")}${line("Ráðningardagur", e.hire_date)}
-## Kjör / Terms
-${line("Launafyrirkomulag", e.pay_type === "monthly" ? "Mánaðarlaun" : "Tímakaup")}${line("Taxti", e.rate ? `${e.rate} kr` : "")}${line("Stéttarfélag / samningur", extras.unionName)}
+${line("Starfsheiti", e.title)}${line("Vinnustaður", c.address ? `${c.name}, ${c.address}` : c.name)}${line("Ráðningarform", extras.contractType ? (ctLabel[extras.contractType] ?? extras.contractType) : "Ótímabundið / Permanent")}${line("Ráðningardagur / fyrsti starfsdagur", e.hire_date)}${line("Starfshlutfall", e.employment_ratio ? `${e.employment_ratio}%` : "")}${line("Vinnustundir á mánuði (fullt starf)", e.monthly_hours ? String(e.monthly_hours).replace(".", ",") : "173,33")}
+## Laun og kjör / Wages and terms
+${line("Launafyrirkomulag", e.pay_type === "monthly" ? "Mánaðarlaun / Monthly salary" : "Tímakaup / Hourly wages")}${line(e.pay_type === "monthly" ? "Grunnlaun á mánuði" : "Tímakaup (grunntaxti)", e.rate ? `${e.rate} kr` : "")}${line("Orlof", orlofTxt)}${line("Greiðsla launa", "Mánaðarlega, inn á bankareikning starfsmanns / Monthly, into the employee's bank account")}
+## Lífeyrissjóður og stéttarfélag / Pension fund and union
+${line("Lífeyrissjóður", (e.pension_fund as string) || "Skv. vali starfsmanns eða kjarasamningi / Per the employee's choice or agreement")}${line("Stéttarfélag / kjarasamningur", extras.unionName)}
+## Uppsagnarfrestur, orlof og veikindi / Notice period, holiday and sick pay
+Fer eftir gildandi kjarasamningi og lögum á starfsstað, þ.m.t. áunnin réttindi miðað við starfsaldur. / According to the applicable collective agreement and local law, including earned rights based on tenure.
+${terms ? `\n## Sérákvæði fyrirtækisins / Company provisions\n${terms}\n` : ""}
 ## Annað / Other
 Um starfið gilda að öðru leyti þær vinnureglur sem fyrirtækið hefur skilgreint í VAKTO
 (yfirvinna, álög, hvíldartími, orlof og veikindaréttur skv. völdu reglusniðmáti) og

@@ -6,7 +6,7 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { syncInventraRevenue, addLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
+import { syncInventraRevenue, addLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
 import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
@@ -43,7 +43,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
   const [modal, setModal] = useState<SettingsModal>(initialModal);
   const [keyModal, setKeyModal] = useState(false);
   const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
-  const [deptEdit, setDeptEdit] = useState<{ id: string; name: string; location: string; staff: number } | null>(null);
+  const [deptEdit, setDeptEdit] = useState<{ id: string; name: string; location: string; staff: number; color: string | null; members: string[] } | null>(null);
   const [posName, setPosName] = useState<string | null>(null);
   function posConnect(name: string) { setPosName(name === "POS" ? "" : name); }
   const [section, setSection] = useState<string>(initialModal === "revenue" || initialModal === "avgrevenue" ? "velta" : "fyrirtaeki");
@@ -144,7 +144,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
         </div>
       )}
 
-      {section === "launareglur" && (
+      {section === "launareglur" && (<>
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="ch">
           <div><div className="ct">{t("Reglusniðmát")}</div><div className="cs">{t("þín eigin vinnureglur — fyrir hvaða land, grein eða stéttarfélag sem er")}</div></div>
@@ -164,6 +164,8 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
           <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("Sniðmát eru tengd starfsfólki í starfsmannaspjaldinu — yfirvinna, álag, hvíld, orlof og veikindi fylgja sniðmátinu.")}</p>
         </div>
       </div>
+      <ContractTermsCard />
+      </>
       )}
 
 
@@ -202,8 +204,8 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
           <div className="cb att">
             {data.departments.map((d) => (
               <div className="it rowlink" key={d.id} onClick={() => setDeptEdit(d)}>
-                <div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" /></svg></div>
-                <div className="tx"><b>{d.name}</b><span>{d.location} · {d.staff} {t("starfsmenn")}</span></div>
+                <div className="ic" style={{ background: (d.color ?? "#8b93a7") + "22", color: d.color ?? "#8b93a7" }}><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01" /></svg></div>
+                <div className="tx"><b><span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: d.color ?? "var(--line)", marginRight: 7 }} />{d.name}</b><span>{d.location} · {d.staff} {t("starfsmenn")}{d.members.length ? ` — ${d.members.slice(0, 3).map((m) => m.split(" ")[0]).join(", ")}${d.members.length > 3 ? ` +${d.members.length - 3}` : ""}` : ""}</span></div>
               </div>
             ))}
             {data.departments.length === 0 && <p className="muted" style={{ fontSize: 12.5 }}>{t("Engar deildir enn — deildir (t.d. Eldhús, Sal) birtast í vali þegar þú stofnar starfsmann.")}</p>}
@@ -255,6 +257,31 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
       {tplModal && <RuleTemplateModal tpl={tplModal === "new" ? null : tplModal} onClose={() => setTplModal(null)} />}
       {posName !== null && <PosConnectModal name={posName} onClose={() => setPosName(null)} />}
     </>
+  );
+}
+
+/** Company-wide custom contract terms — appended to every new employment contract. */
+function ContractTermsCard() {
+  const { t } = useLang();
+  const [terms, setTerms] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { getContractTerms().then(setTerms).catch(() => {}); }, []);
+  async function save() {
+    setBusy(true);
+    const res = await saveContractTerms(terms);
+    setBusy(false);
+    toast(res.ok ? (res.demo ? t("Vistað (demo)") : t("Skilmálar vistaðir — birtast á nýjum samningum")) : (res.error ?? "Tókst ekki"));
+  }
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="ch"><div><div className="ct">{t("Sérskilmálar ráðningarsamninga")}</div><div className="cs">{t("þínir skilmálar — birtast sem sér kafli á hverjum nýjum samningi")}</div></div></div>
+      <div className="cb">
+        <textarea className="lf-ta" rows={5} value={terms} onChange={(e) => setTerms(e.target.value)}
+          placeholder={t("t.d. Trúnaðarskylda gildir um öll viðskiptaleyndarmál. Starfsmaður skal tilkynna veikindi fyrir kl. 10:00. Einkennisfatnaður er lagður til af fyrirtækinu…")} />
+        <button className="btn sm" disabled={busy} onClick={save} style={{ marginTop: 10 }}>{t("Vista skilmála")}</button>
+        <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{t("Skilmálarnir bætast við alla nýja ráðningarsamninga sem kaflinn „Sérákvæði fyrirtækisins“. Eldri samningar breytast ekki.")}</p>
+      </div>
+    </div>
   );
 }
 
@@ -563,14 +590,17 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
   );
 }
 
-/** Rename or delete a department. */
-function DeptEditModal({ dept, onClose }: { dept: { id: string; name: string; location: string; staff: number }; onClose: () => void }) {
+const DEPT_COLORS = ["#e9700f", "#5b50e6", "#1fb6a6", "#0891b2", "#e0356b", "#7c6ff2", "#16a34a", "#f59e0b"];
+
+/** Rename, recolor or delete a department — with its member list. */
+function DeptEditModal({ dept, onClose }: { dept: { id: string; name: string; location: string; staff: number; color: string | null; members: string[] }; onClose: () => void }) {
   const { t } = useLang();
   const [name, setName] = useState(dept.name);
+  const [color, setColor] = useState<string | null>(dept.color);
   const [busy, setBusy] = useState(false);
   async function save() {
     setBusy(true);
-    const res = await renameDepartment(dept.id, name);
+    const res = await renameDepartment(dept.id, name, color);
     setBusy(false);
     if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
     onClose();
@@ -592,7 +622,27 @@ function DeptEditModal({ dept, onClose }: { dept: { id: string; name: string; lo
         <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{dept.name}</div><button className="x" onClick={onClose}>✕</button></div>
         <div className="mb">
           <div className="field"><label>{t("Heiti deildar")}</label><input value={name} onChange={(e) => setName(e.target.value)} autoFocus /></div>
-          <p className="muted" style={{ fontSize: 12 }}>{dept.location} · {dept.staff} {t("starfsmenn")}</p>
+          <div className="field"><label>{t("Litur deildar")}</label>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              {DEPT_COLORS.map((c) => (
+                <button key={c} type="button" onClick={() => setColor(c)} aria-label={c}
+                  style={{ width: 26, height: 26, borderRadius: 8, background: c, cursor: "pointer",
+                    border: color === c ? "2.5px solid var(--ink)" : "2.5px solid transparent" }} />
+              ))}
+              <button type="button" onClick={() => setColor(null)}
+                style={{ width: 26, height: 26, borderRadius: 8, background: "#fff", cursor: "pointer",
+                  border: color === null ? "2.5px solid var(--ink)" : "1px solid var(--line)", color: "var(--ink3)", fontSize: 12 }}>✕</button>
+            </div>
+          </div>
+          <label style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--ink3)", display: "block", margin: "10px 0 6px" }}>{t("Starfsfólk í deildinni")} ({dept.staff})</label>
+          {dept.members.length ? (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 4 }}>
+              {dept.members.map((m) => <span key={m} className="tag mut" style={{ fontSize: 12 }}>{m}</span>)}
+            </div>
+          ) : (
+            <p className="muted" style={{ fontSize: 12.5 }}>{t("Enginn skráður í deildina — veldu deild á starfsmanni (Starfsfólk → Vinna).")}</p>
+          )}
+          <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{dept.location}</p>
           <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
             <button className="btn" disabled={busy} onClick={save}>{t("Vista")}</button>
             <button className="btn ghost" disabled={busy} onClick={remove} style={{ color: "var(--bad)" }}>{t("Eyða")}</button>

@@ -8,7 +8,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "./contract-pdf";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, generateContract, listContracts, setContractStatus, type ContractRow } from "./actions";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, generateContract, listContracts, setContractStatus, type ContractRow } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField } from "@/components/app/fields";
@@ -308,7 +308,14 @@ function LaunTab({ e }: { e: Employee }) {
   const [payType, setPayType] = useState<"Tímakaup" | "Mánaðarlaun">(e.payType === "monthly" ? "Mánaðarlaun" : "Tímakaup");
   const [rate, setRate] = useState<number>(e.rate);
   const [ratio, setRatio] = useState<number>(e.employmentRatio);
-  const monthlyHrs = DEFAULT_MONTHLY_HOURS; // 173,33 klst/mán = fullt starf
+  const [monthlyHrs, setMonthlyHrs] = useState<number>(e.monthlyHours || DEFAULT_MONTHLY_HOURS);
+  // Switching pay type converts the rate both ways (hlutfall applies on top),
+  // so picking "Mánaðarlaun" lands on the computed salary from taxti × tímar.
+  function switchPayType(pt: "Tímakaup" | "Mánaðarlaun") {
+    if (pt === payType) return;
+    setRate((r) => (pt === "Mánaðarlaun" ? Math.round(r * monthlyHrs) : Math.round(r / monthlyHrs)));
+    setPayType(pt);
+  }
   const isMonthly = payType === "Mánaðarlaun";
   const baseMonthly = isMonthly ? rate : Math.round(rate * monthlyHrs);   // grunnlaun 100%
   const hourly = isMonthly ? Math.round(rate / monthlyHrs) : rate;        // kr/klst (grunnur álaga)
@@ -337,6 +344,12 @@ function LaunTab({ e }: { e: Employee }) {
     getEmployeeExtras(e.id).then((x) => { if (x.benefits) setBenefits(x.benefits as Benefit[]); });
   }, [e.id, e.union]);
 
+  // Lífeyrissjóður — birtist á launaseðli og ráðningarsamningi.
+  const [pension, setPension] = useState("");
+  useEffect(() => { getEmployeePension(e.id).then((v) => setPension(v ?? "")); }, [e.id]);
+  function savePension() {
+    updateEmployee(e.id, { pensionFund: pension }).then((r) => toast(r.ok ? "Lífeyrissjóður vistaður" : (r.error ?? "Villa")));
+  }
   // Orlof (vacation) handling — accrue vs pay out, + orlofsprósenta.
   const [orlofMode, setOrlofMode] = useState<string>(DEFAULT_ORLOF.mode);
   const [orlofPct, setOrlofPct] = useState<number>(DEFAULT_ORLOF.pct);
@@ -392,16 +405,33 @@ function LaunTab({ e }: { e: Employee }) {
         <input type="hidden" name="union" value={CUSTOM_UNION} />
       )}
       <div className="statline">
+        <span className="k">Lífeyrissjóður <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· á launaseðil & samning</span></span>
+        <input list="pension-funds" value={pension} onChange={(ev) => setPension(ev.target.value)} onBlur={savePension}
+          placeholder="t.d. Gildi" style={{ ...FLD, width: 190 }} />
+        <datalist id="pension-funds">
+          {["Gildi", "Lífeyrissjóður verzlunarmanna", "Birta", "Frjálsi lífeyrissjóðurinn", "Festa", "Stapi", "Brú", "Almenni lífeyrissjóðurinn", "LSR"].map((f) => <option key={f} value={f} />)}
+        </datalist>
+      </div>
+      <div className="statline">
         <span className="k">Launagerð</span>
         <span style={{ display: "inline-flex", gap: 4, background: "var(--line2)", padding: 3, borderRadius: 9 }}>
           {(["Tímakaup", "Mánaðarlaun"] as const).map((pt) => (
-            <button type="button" key={pt} onClick={() => setPayType(pt)}
+            <button type="button" key={pt} onClick={() => switchPayType(pt)}
               style={{ border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, padding: "6px 12px", borderRadius: 7,
                 background: payType === pt ? "#fff" : "transparent", color: payType === pt ? "var(--ink)" : "var(--ink3)",
                 boxShadow: payType === pt ? "0 1px 2px rgba(15,23,42,.08)" : "none" }}>{pt}</button>
           ))}
         </span>
         <input type="hidden" name="payType" value={payType} />
+      </div>
+      <div className="statline">
+        <span className="k">Vinnustundir á mánuði <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· fullt starf, grunnur útreiknings</span></span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <input name="monthlyHours" inputMode="decimal" value={String(monthlyHrs).replace(".", ",")}
+            onChange={(ev) => { const n = Number(ev.target.value.replace(/\./g, "").replace(",", ".")); if (Number.isFinite(n)) setMonthlyHrs(n); }}
+            style={{ ...FLD, width: 80, textAlign: "right" }} />
+          <span className="muted" style={{ fontSize: 11.5 }}>klst</span>
+        </span>
       </div>
       <div className="statline">
         <span className="k">{isMonthly ? "Grunnlaun" : "Tímakaup"} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {isMonthly ? "fullt starf (100%)" : "grunntaxti"}</span></span>
@@ -633,44 +663,7 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
     return (
       <>
         <Sec first>Starf & aðgangur</Sec>
-        <div className="statline">
-          <span className="k">Staða (position)</span>
-          <select style={{ ...FLD, width: 160 }} defaultValue={e.position ?? "Kokkur"}>
-            <option>Kokkur</option>
-            <option>Þjónn / Sal</option>
-            <option>Bílstjóri</option>
-          </select>
-        </div>
-        <div className="statline">
-          <span className="k">Staðsetning</span>
-          <select style={{ ...FLD, width: 160 }} defaultValue={e.location ?? "Reykjavík Asian"}>
-            <option>Reykjavík Asian</option>
-            <option>Hotel Umi</option>
-          </select>
-        </div>
-        <div className="statline">
-          <span className="k">Aðgangur (kerfishlutverk)</span>
-          <select style={{ ...FLD, width: 150 }} defaultValue={e.role === "manager" ? "Stjórnandi" : "Starfsmaður"}>
-            <option>Stjórnandi</option>
-            <option>Vaktstjóri</option>
-            <option>Starfsmaður</option>
-          </select>
-        </div>
-        <div className="statline">
-          <span className="k">Ráðningardagur</span>
-          <DateField defaultValue="2025-10-08" />
-        </div>
-        <div className="statline">
-          <span className="k">Æskilegir tímar/viku</span>
-          <input defaultValue={e.employmentRatio === 100 ? "40" : ""} style={{ ...FLD, width: 70, textAlign: "right" }} />
-        </div>
-        <div className="statline">
-          <span className="k">Yfirmaður</span>
-          <select style={{ ...FLD, width: 170 }}>
-            <option>Jón (rekstrarstjóri)</option>
-            <option>Bjarni (eigandi)</option>
-          </select>
-        </div>
+        <WorkFields e={e} />
 
         <Sec>Aðgangur að Mitt svæði</Sec>
         <input type="hidden" name="permform" value="1" />
@@ -704,6 +697,38 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
       <Stat k="Kennitala" v={e.kennitala ?? "—"} />
       <Stat k="Bankareikningur" v={e.bankAccount ?? "—"} />
       <Stat k="Tímabelti" v="Atlantic/Reykjavik" />
+    </>
+  );
+}
+
+/** Vinna tab: position / department / location as real, saving selects. */
+function WorkFields({ e }: { e: Employee }) {
+  const [opts, setOpts] = useState<{ departments: string[]; positions: string[]; locations: string[] }>({ departments: [], positions: [], locations: [] });
+  useEffect(() => { getCompanyOptions().then(setOpts).catch(() => {}); }, []);
+  const sel = (name: string, cur: string | null, list: string[], emptyHint: string) => (
+    // key re-mounts the uncontrolled select once options arrive so defaultValue applies
+    <select key={`${name}:${list.length}`} name={name} defaultValue={cur ?? ""} style={{ ...FLD, width: 180 }}>
+      <option value="">—</option>
+      {list.map((o) => <option key={o}>{o}</option>)}
+      {cur && !list.includes(cur) && <option>{cur}</option>}
+      {list.length === 0 && <option value="" disabled>{emptyHint}</option>}
+    </select>
+  );
+  return (
+    <>
+      <div className="statline">
+        <span className="k">Staða (position)</span>
+        {sel("position", e.position, opts.positions, "Stofnaðu stöður í Stillingum")}
+      </div>
+      <div className="statline">
+        <span className="k">Deild</span>
+        {sel("department", e.department, opts.departments, "Stofnaðu deildir í Stillingum")}
+      </div>
+      <div className="statline">
+        <span className="k">Staðsetning</span>
+        {sel("location", e.location, opts.locations, "Stofnaðu staði í Stillingum")}
+      </div>
+      <p className="muted" style={{ fontSize: 12, margin: "4px 0 0" }}>Deildir, stöður og staðir eru skilgreind í Stillingar → Fyrirtækið. Mundu að ýta á Vista.</p>
     </>
   );
 }

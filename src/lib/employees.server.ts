@@ -10,6 +10,7 @@ type Row = {
   title: string | null;
   pay_type: "hourly" | "monthly";
   rate: number;
+  monthly_hours: number | null;
   employment_ratio: number;
   union_agreement: string | null;
   status: string;
@@ -44,7 +45,7 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
     const { data, error } = await supabase
       .from("employees")
       .select(
-        "id, full_name, title, pay_type, rate, employment_ratio, union_agreement, status, avatar_color, email, kennitala, phone, bank_account, role, departments(name), positions(name), locations(name)",
+        "id, full_name, title, pay_type, rate, monthly_hours, employment_ratio, union_agreement, status, avatar_color, email, kennitala, phone, bank_account, role, departments(name), positions(name), locations(name)",
       )
       .order("full_name");
 
@@ -62,6 +63,7 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
       location: r.locations?.name ?? null,
       payType: r.pay_type,
       rate: Number(r.rate),
+      monthlyHours: r.monthly_hours != null ? Number(r.monthly_hours) : null,
       employmentRatio: Number(r.employment_ratio),
       union: r.union_agreement,
       status: r.status,

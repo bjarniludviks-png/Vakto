@@ -223,6 +223,8 @@ export async function addDepartment(input: { name: string; locationName?: string
     const { data: locs } = await locQ;
     if (!locs?.length) return { ok: false, error: "Búðu fyrst til stað (Staðir)" };
     const loc = input.locationName ? locs.find((l) => l.name === input.locationName) ?? locs[0] : locs[0];
+    const { data: dup } = await supabase.from("departments").select("id").eq("location_id", loc.id).eq("name", input.name.trim()).limit(1);
+    if (dup?.length) return { ok: false, error: "Deild með þessu nafni er þegar til á staðnum" };
     const { error } = await supabase.from("departments").insert({ location_id: loc.id, name: input.name.trim() });
     if (error) return { ok: false, error: error.message };
     await logAudit(supabase, ctx.company, ctx.userId, {
@@ -235,8 +237,42 @@ export async function addDepartment(input: { name: string; locationName?: string
   }
 }
 
+/** Save company-wide custom contract terms (appear on every new contract). */
+export async function saveContractTerms(terms: string): Promise<SettingsResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("companies").update({ contract_terms: terms.trim() || null }).eq("id", ctx.company);
+    if (error) return { ok: false, error: /contract_terms|column/i.test(error.message) ? "Keyrðu migration 0039 í Supabase fyrst." : error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "company.contract_terms", entity: "company", detail: "Sérskilmálar ráðningarsamninga uppfærðir",
+    });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Tolerant read of the company's contract terms. */
+export async function getContractTerms(): Promise<string> {
+  if (!isSupabaseConfigured()) return "";
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return "";
+    const { data, error } = await supabase.from("companies").select("contract_terms").eq("id", ctx.company).maybeSingle();
+    if (error) return "";
+    return (data?.contract_terms as string) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 /** Rename a department (company-scoped via its location). */
-export async function renameDepartment(id: string, name: string): Promise<SettingsResult> {
+export async function renameDepartment(id: string, name: string, color?: string | null): Promise<SettingsResult> {
   if (!name?.trim()) return { ok: false, error: "Nafn vantar" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -246,7 +282,10 @@ export async function renameDepartment(id: string, name: string): Promise<Settin
     const { data: dep } = await supabase.from("departments")
       .select("id, locations!inner(company_id)").eq("id", id).eq("locations.company_id", ctx.company).maybeSingle();
     if (!dep) return { ok: false, error: "Deild fannst ekki" };
-    const { error } = await supabase.from("departments").update({ name: name.trim() }).eq("id", id);
+    let { error } = await supabase.from("departments").update({ name: name.trim(), ...(color !== undefined ? { color } : {}) }).eq("id", id);
+    if (error && /color|column|schema/i.test(error.message)) {
+      ({ error } = await supabase.from("departments").update({ name: name.trim() }).eq("id", id));
+    }
     if (error) return { ok: false, error: error.message };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "department.rename", entity: "department", entityId: id, detail: `Deild endurskírð — ${name.trim()}`,

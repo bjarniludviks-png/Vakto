@@ -46,7 +46,7 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
     const company = profile?.company_id as string | undefined;
 
     const rowOf = (e: (typeof employees)[number]): Emp4 => [
-      initials(e.fullName), e.fullName.split(/\s+/)[0], e.department ?? "Stjórnun", e.avatarColor,
+      initials(e.fullName), e.fullName.split(/\s+/)[0], e.department ?? "", e.avatarColor,
     ];
 
     // shift types

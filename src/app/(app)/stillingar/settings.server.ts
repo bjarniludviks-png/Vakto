@@ -9,13 +9,13 @@ export type PositionRow = { name: string; staff: number; baseRate: string };
 export type UserRow = { name: string; initials: string; role: string; email: string };
 export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string; payPeriodStart?: number };
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
-export type DepartmentRow = { id: string; name: string; location: string; staff: number };
+export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
 export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; company: CompanyInfo | null; live: boolean };
 
 const DEMO: SettingsData = {
   departments: [
-    { id: "d1", name: "Eldhús", location: "Reykjavík Asian", staff: 6 },
-    { id: "d2", name: "Sal", location: "Reykjavík Asian", staff: 4 },
+    { id: "d1", name: "Eldhús", location: "Reykjavík Asian", staff: 6, color: "#e9700f", members: [] },
+    { id: "d2", name: "Sal", location: "Reykjavík Asian", staff: 4, color: "#1fb6a6", members: [] },
   ],
   locations: [
     { name: "Reykjavík Asian", staff: 14, timezone: "Atlantic/Reykjavik" },
@@ -64,14 +64,24 @@ export async function getSettingsData(): Promise<SettingsData> {
     ]);
     // API connections (tolerant of a not-yet-run 0029 migration).
     // Departments live under locations (0001 schema) — join for the company.
-    const depRes = await supabase.from("departments")
-      .select("id, name, locations!inner(name, company_id)")
+    // color column arrives with migration 0038 — tolerant retry without it.
+    const depRes0 = await supabase.from("departments")
+      .select("id, name, color, locations!inner(name, company_id)")
       .eq("locations.company_id", company).order("name");
-    const departments: DepartmentRow[] = (depRes.data ?? []).map((d) => {
-      const loc = d.locations as unknown as { name: string };
+    const depData: unknown[] = depRes0.error
+      ? ((await supabase.from("departments")
+          .select("id, name, locations!inner(name, company_id)")
+          .eq("locations.company_id", company).order("name")).data ?? [])
+      : (depRes0.data ?? []);
+    const departments: DepartmentRow[] = depData.map((d) => {
+      const row = d as Record<string, unknown>;
+      const loc = row.locations as { name: string } | null;
+      const inDept = employees.filter((e) => e.department === (row.name as string));
       return {
-        id: d.id as string, name: d.name as string, location: loc?.name ?? "",
-        staff: employees.filter((e) => e.department === (d.name as string)).length,
+        id: row.id as string, name: row.name as string, location: loc?.name ?? "",
+        staff: inDept.length,
+        color: (row.color as string | null) ?? null,
+        members: inDept.map((e) => e.fullName),
       };
     });
     const keysRes = await supabase.from("api_keys")

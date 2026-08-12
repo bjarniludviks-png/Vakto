@@ -8,7 +8,7 @@ import { nf, dec1 } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
 import { AsyncButton } from "@/components/app/async-button";
 import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, type ShiftInput } from "./actions";
-import { getCompanyDepartments } from "../starfsfolk/actions";
+import { getCompanyDepartments, getDepartmentColors } from "../starfsfolk/actions";
 import { getDashboardPeriod } from "../maelabord/actions";
 import { buildSchedulePdf, type PdfShift } from "./pdf";
 import type { ReqItem } from "./requests.server";
@@ -105,7 +105,11 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [clip, setClip] = useState<{ code: string; start?: string; end?: string } | null>(null);
   // Company departments for the filter (live sync with Settings).
   const [deptList, setDeptList] = useState<string[]>(["Eldhús", "Sal", "Stjórnun"]);
-  useEffect(() => { getCompanyDepartments().then((d) => { if (d.length) setDeptList(d); }).catch(() => {}); }, []);
+  const [deptColors, setDeptColors] = useState<Record<string, string>>({});
+  useEffect(() => {
+    getCompanyDepartments().then((d) => { if (d.length) setDeptList(d); }).catch(() => {});
+    getDepartmentColors().then(setDeptColors).catch(() => {});
+  }, []);
   // Unified right-click menu (week/day/month views).
   type CtxItem = { label: string; danger?: boolean; act: () => void };
   const [ctx, setCtx] = useState<{ x: number; y: number; items: CtxItem[] } | null>(null);
@@ -779,7 +783,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                     <tr key={r}>
                       <td className="nm">
                         <div style={{ display: "flex", alignItems: "center" }}>
-                          <span className="who"><span className="avt" style={{ background: e[3] }}>{e[0]}</span><span>{e[1]}<small>{t(e[2])}</small></span></span>
+                          <span className="who"><span className="avt" style={{ background: e[3] }}>{e[0]}</span><span>{e[1]}<small style={deptColors[e[2]] ? { color: deptColors[e[2]], fontWeight: 600 } : undefined}>{t(e[2])}</small></span></span>
                           <button className="rmemp" title={t("Fjarlægja af plani")} onClick={() => removeEmpRow(r)}>✕</button>
                         </div>
                       </td>
