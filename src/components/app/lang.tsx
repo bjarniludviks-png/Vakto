@@ -1155,6 +1155,7 @@ export const DICT: Dict = {
   "Vista drög": { is: "Vista drög", en: "Save draft", vi: "Lưu bản nháp" },
   "Yfirfarðu drögin og lagaðu að vild — línur á forminu **Heiti:** gildi verða að snyrtilegum reitum í PDF. Staðfestu svo og sendu til undirritunar.": { is: "Yfirfarðu drögin og lagaðu að vild — línur á forminu **Heiti:** gildi verða að snyrtilegum reitum í PDF. Staðfestu svo og sendu til undirritunar.", en: "Review the draft and edit freely — lines in the form **Label:** value become tidy fields in the PDF. Then confirm and send for signature.", vi: "Xem lại bản nháp và chỉnh sửa tùy ý — các dòng dạng **Nhãn:** giá trị sẽ thành các ô gọn gàng trong PDF. Sau đó xác nhận và gửi ký." },
   "drög": { is: "drög", en: "draft", vi: "nháp" },
+  "Sögulega yfirlitið byggist upp þegar þú keyrir launakeyrslur — engin keyrsla er enn vistuð fyrir": { is: "Sögulega yfirlitið byggist upp þegar þú keyrir launakeyrslur — engin keyrsla er enn vistuð fyrir", en: "The history builds up as you run payroll — no run is stored yet for", vi: "Lịch sử hình thành khi bạn chạy kỳ lương — chưa có kỳ nào được lưu cho" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

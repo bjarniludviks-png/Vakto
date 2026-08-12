@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { PeriodPicker } from "@/components/app/period-picker";
-import { dec1 } from "@/lib/format";
+import { dec1, nf } from "@/lib/format";
 import { getSettleCandidates, type SettleCandidate } from "./actions";
 import { toast } from "@/components/app/toast";
 import { Stacked } from "@/components/app/charts";
@@ -11,7 +11,7 @@ import { useLang } from "@/components/app/lang";
 import { PayslipModal, type PayslipData } from "@/components/app/payslip-modal";
 import { EmptyState } from "@/components/app/empty-state";
 import type { PayrollView } from "./payroll.server";
-import { runPayroll, getPayrollPeriod, type PeriodPayroll } from "./actions";
+import { runPayroll, getPayrollPeriod, getPayrollHistory, type PeriodPayroll, type PayrollHistory } from "./actions";
 
 const MO = ["jan", "feb", "mar", "apr", "maí", "jún", "júl", "ágú", "sep", "okt", "nóv", "des"];
 const BASE = [4.8, 5.8, 3.9, 5.7, 5.6, 4.46, 4.7, 3.4, 6.7, 6.3, 5.2, 5.4];
@@ -56,6 +56,14 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, cf, ct, view.live]);
+
+  // Real payroll history for the year chart (live companies only).
+  const [histYear, setHistYear] = useState(new Date().getFullYear());
+  const [hist, setHist] = useState<PayrollHistory | null>(null);
+  useEffect(() => {
+    if (!view.live) return;
+    getPayrollHistory(histYear).then(setHist).catch(() => {});
+  }, [view.live, histYear]);
 
   const usePp = view.live && pp;
   const ROWS = usePp ? pp.rows : view.rows;
@@ -172,25 +180,52 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
       </div>
 
       <div className="card" style={{ marginTop: 16 }}>
-        <div className="ch"><div><div className="ct">{t("Launakeyrslur — yfirlit")}</div><div className="cs">{t("sundurliðun eftir mánuðum")}</div></div><select className="badge" style={{ border: "1px solid var(--line)", padding: "5px 10px" }}><option>2026</option><option>2025</option></select></div>
+        <div className="ch"><div><div className="ct">{t("Launakeyrslur — yfirlit")}</div><div className="cs">{t("sundurliðun eftir mánuðum")}</div></div>
+          <select className="badge" style={{ border: "1px solid var(--line)", padding: "5px 10px" }} value={histYear} onChange={(e) => setHistYear(Number(e.target.value))}>
+            {[new Date().getFullYear(), new Date().getFullYear() - 1].map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
         <div className="cb">
-          <Stacked data={PAY} cols={MO} segs={["var(--good)", "var(--warn)", "var(--brand)", "var(--teal)", "#c9ccd6"]} segNames={[t("Útborgað"), t("Staðgreiðsla"), t("Lífeyrir"), t("Tryggingagjald"), t("Orlof")]} />
-          <div className="legend">
-            <span><i style={{ background: "var(--good)" }} />{t("Útborgað")}</span><span><i style={{ background: "var(--warn)" }} />{t("Staðgreiðsla")}</span>
-            <span><i style={{ background: "var(--brand)" }} />{t("Lífeyrir")}</span><span><i style={{ background: "var(--teal)" }} />{t("Tryggingagjald")}</span><span><i style={{ background: "#c9ccd6" }} />{t("Orlof")}</span>
-          </div>
+          {(() => {
+            // Live: real runs only. Demo (logged-out preview): illustrative data.
+            const liveMonths = hist?.months ?? [];
+            const hasData = liveMonths.some((m) => m.net > 0);
+            const mkr = (n: number) => Math.round(n / 100000) / 10;
+            const data = view.live
+              ? liveMonths.map((m) => [mkr(m.net), mkr(m.withholding), mkr(m.pension), mkr(m.insurance), mkr(m.orlof)])
+              : PAY;
+            if (view.live && !hasData) {
+              return <p className="muted" style={{ fontSize: 13, margin: 0 }}>{t("Sögulega yfirlitið byggist upp þegar þú keyrir launakeyrslur — engin keyrsla er enn vistuð fyrir")} {histYear}.</p>;
+            }
+            return (<>
+              <Stacked data={data} cols={MO} segs={["var(--good)", "var(--warn)", "var(--brand)", "var(--teal)", "#c9ccd6"]} segNames={[t("Útborgað"), t("Staðgreiðsla"), t("Lífeyrir"), t("Tryggingagjald"), t("Orlof")]} />
+              <div className="legend">
+                <span><i style={{ background: "var(--good)" }} />{t("Útborgað")}</span><span><i style={{ background: "var(--warn)" }} />{t("Staðgreiðsla")}</span>
+                <span><i style={{ background: "var(--brand)" }} />{t("Lífeyrir")}</span><span><i style={{ background: "var(--teal)" }} />{t("Tryggingagjald")}</span><span><i style={{ background: "#c9ccd6" }} />{t("Orlof")}</span>
+              </div>
+            </>);
+          })()}
         </div>
       </div>
 
       <div className="grid2b">
         <div className="card">
-          <div className="ch"><div className="ct">{t("Byrði — júní 2026")}</div></div>
+          <div className="ch"><div className="ct">{t("Byrði")} — {periodLabel}</div></div>
           <div className="cb">
-            <div className="statline"><span className="k">{t("Brúttólaun")}</span><span className="v">5.676.918 kr</span></div>
-            <div className="statline"><span className="k">{t("Orlof 10,17%")}</span><span className="v muted">+577.343 kr</span></div>
-            <div className="statline"><span className="k">{t("Mótframlag lífeyris 11,5%")}</span><span className="v muted">+652.846 kr</span></div>
-            <div className="statline"><span className="k">{t("Tryggingagjald 6,35%")}</span><span className="v muted">+397.146 kr</span></div>
-            <div className="statline"><span className="k" style={{ fontWeight: 650, color: "var(--ink)" }}>{t("Heildarkostnaður")}</span><span className="v" style={{ fontSize: 15 }}>7.389.405 kr</span></div>
+            {(() => {
+              const num = (x: string) => Number(String(x).replace(/[^\d]/g, "")) || 0;
+              const gross = num(T.gross);
+              const orlof = Math.round(gross * 0.1017);
+              const pens = Math.round(gross * 0.115);
+              const trygg = Math.round(gross * 0.0635);
+              return (<>
+                <div className="statline"><span className="k">{t("Brúttólaun")}</span><span className="v">{nf(gross)} kr</span></div>
+                <div className="statline"><span className="k">{t("Orlof 10,17%")}</span><span className="v muted">+{nf(orlof)} kr</span></div>
+                <div className="statline"><span className="k">{t("Mótframlag lífeyris 11,5%")}</span><span className="v muted">+{nf(pens)} kr</span></div>
+                <div className="statline"><span className="k">{t("Tryggingagjald 6,35%")}</span><span className="v muted">+{nf(trygg)} kr</span></div>
+                <div className="statline"><span className="k" style={{ fontWeight: 650, color: "var(--ink)" }}>{t("Heildarkostnaður")}</span><span className="v" style={{ fontSize: 15 }}>{nf(gross + orlof + pens + trygg)} kr</span></div>
+              </>);
+            })()}
           </div>
         </div>
         <div className="card">

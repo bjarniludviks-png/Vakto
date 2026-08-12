@@ -214,3 +214,47 @@ export async function getSettleCandidates(): Promise<{ ok: boolean; rows: Settle
     return { ok: false, rows: [] };
   }
 }
+
+
+export type PayrollHistory = {
+  live: boolean;
+  /** Per calendar month (0–11), in kr: net / withholding / pension+union / insurance / orlof. */
+  months: { net: number; withholding: number; pension: number; insurance: number; orlof: number }[];
+};
+
+/** Aggregate real payroll runs by month for the history chart. */
+export async function getPayrollHistory(year: number): Promise<PayrollHistory> {
+  const emptyMonths = () => Array.from({ length: 12 }, () => ({ net: 0, withholding: 0, pension: 0, insurance: 0, orlof: 0 }));
+  if (!isSupabaseConfigured()) return { live: false, months: emptyMonths() };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { live: false, months: emptyMonths() };
+    const { data: prof } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
+    const company = prof?.company_id as string | undefined;
+    if (!company) return { live: false, months: emptyMonths() };
+    const { data: runs } = await supabase.from("payroll_runs")
+      .select("id, period_start")
+      .eq("company_id", company)
+      .gte("period_start", `${year}-01-01`).lte("period_start", `${year}-12-31`);
+    if (!runs?.length) return { live: true, months: emptyMonths() };
+    const runMonth = new Map(runs.map((r) => [r.id as string, new Date(r.period_start as string).getMonth()]));
+    const { data: lines } = await supabase.from("payroll_lines")
+      .select("run_id, gross, net, withholding, pension, union_fee")
+      .in("run_id", runs.map((r) => r.id as string));
+    const months = emptyMonths();
+    for (const l of lines ?? []) {
+      const m = runMonth.get(l.run_id as string);
+      if (m == null) continue;
+      const gross = Number(l.gross) || 0;
+      months[m].net += Number(l.net) || 0;
+      months[m].withholding += Number(l.withholding) || 0;
+      months[m].pension += (Number(l.pension) || 0) + (Number(l.union_fee) || 0);
+      months[m].insurance += gross * 0.0635;
+      months[m].orlof += gross * 0.1017;
+    }
+    return { live: true, months };
+  } catch {
+    return { live: false, months: emptyMonths() };
+  }
+}
