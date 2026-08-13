@@ -709,7 +709,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>{t("Afrita síðustu viku")}
           </button>
         )}
-        <button className="btn sm" onClick={() => setModal("ai")}>
+        <button className="btn ghost sm" onClick={() => setModal("ai")}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4Z" /></svg>{t("Biðja AI")}
         </button>
         <div style={{ position: "relative" }}>
@@ -799,6 +799,12 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                         >
                           <div
                             className={`shift ${SH[s].c}`}
+                            style={(() => {
+                              if (s === "off") return undefined;
+                              const st = timeOf(r, c)?.start ?? `${SH[s].l.split("–")[0].padStart(2, "0")}:00`;
+                              const ty = types.find((x) => x.t.startsWith(st));
+                              return ty ? { background: ty.bg, borderColor: ty.bd, borderLeftColor: ty.fg, color: ty.fg } : undefined;
+                            })()}
                             title={isUnav ? (s === "off" ? t("Skráð ólaus þennan dag") : t("ATH: skráð ólaus þennan dag — árekstur")) : t("hægrismelltu fyrir aðgerðir")}
                             draggable
                             onDragStart={() => setDrag({ r, c })}
@@ -817,7 +823,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                               openCtx(ev, items);
                             }}
                           >
-                            {s === "off" ? t("Frí") : <>{cellLabel(r, c, s)}<small>{SH[s].s ? t("sh:" + SH[s].s) :" "}</small></>}
+                            {s === "off" ? "+" : <>{cellLabel(r, c, s)}<small>{SH[s].s ? t("sh:" + SH[s].s) :" "}</small></>}
                           </div>
                         </td>
                         );
@@ -993,6 +999,26 @@ type DayRow = { i: string; n: string; c: string; dep: string; l: string; h: numb
 function DayView({ day, col, rows, onAdd, onCtx, need = 0 }: { day: Date; col: number; rows: DayRow[]; onAdd: () => void; onCtx: (x: DayRow, ev: React.MouseEvent) => void; need?: number }) {
   const { t } = useLang();
   const tot = rows.reduce((a, x) => a + x.h, 0);
+  // Parse "08:00–16:00" / "08–16" labels into fractional hours.
+  const parse = (lbl: string): { s: number; e: number } | null => {
+    const m = lbl.match(/(\d{1,2})(?::(\d{2}))?\s*–\s*(\d{1,2})(?::(\d{2}))?/);
+    if (!m) return null;
+    const st = Number(m[1]) + Number(m[2] ?? 0) / 60;
+    let en = Number(m[3]) + Number(m[4] ?? 0) / 60;
+    if (en <= st) en += 24;
+    return { s: st, e: en };
+  };
+  const spans = rows.map((x) => ({ ...x, span: parse(x.l) }));
+  const withSpan = spans.filter((x) => x.span);
+  const hMin = withSpan.length ? Math.min(6, ...withSpan.map((x) => Math.floor(x.span!.s))) : 6;
+  const hMax = withSpan.length ? Math.max(24, ...withSpan.map((x) => Math.ceil(x.span!.e))) : 24;
+  const range = Math.max(1, hMax - hMin);
+  const pct = (h: number) => ((h - hMin) / range) * 100;
+  const today = new Date();
+  const isToday = day.toDateString() === today.toDateString();
+  const nowH = today.getHours() + today.getMinutes() / 60;
+  const ticks: number[] = [];
+  for (let h = hMin; h <= hMax; h += range > 14 ? 3 : 2) ticks.push(h);
   return (
     <div style={{ marginTop: 16 }}>
       <div className="kstrip">
@@ -1002,16 +1028,45 @@ function DayView({ day, col, rows, onAdd, onCtx, need = 0 }: { day: Date; col: n
         {need > 0 && <span className={rows.length < need ? "bad" : ""}>{t("Mönnunarþörf")} <b>{rows.length}</b> / {need}</span>}
       </div>
       <div className="card" style={{ marginTop: 16 }}>
-        <div className="ch"><div><div className="ct">{t(DAYNAMES[col])} {day.getDate()}. {t(MONTHS_IS[day.getMonth()])}</div><div className="cs">{t("smelltu á vakt til að færa eða breyta")}</div></div><button className="btn sm" onClick={onAdd}>{t("+ Bæta við vakt")}</button></div>
-        <div className="cb att">
-          {rows.length ? rows.map((x, i) => (
-            <div className="it rowlink" key={i} onClick={onAdd} onContextMenu={(ev) => onCtx(x, ev)}>
-              <span className="avt" style={{ background: x.c, width: 32, height: 32 }}>{x.i}</span>
-              <div className="tx"><b>{x.n}</b><span>{t(x.dep)}</span></div>
-              <span style={{ fontWeight: 650, fontVariantNumeric: "tabular-nums", marginLeft: "auto" }}>{x.l}</span>
-              <span className="tag mut" style={{ marginLeft: 12 }}>{dec1(x.h)} {t("klst")}</span>
+        <div className="ch"><div><div className="ct">{t(DAYNAMES[col])} {day.getDate()}. {t(MONTHS_IS[day.getMonth()])}</div><div className="cs">{t("tímalína dagsins — smelltu á vakt til að breyta, hægrismelltu fyrir aðgerðir")}</div></div><button className="btn sm" onClick={onAdd}>{t("+ Bæta við vakt")}</button></div>
+        <div className="cb" style={{ paddingTop: 6 }}>
+          {rows.length ? (
+            <div className="dtl-wrap">
+              <div className="dtl">
+                <div className="dtl-row dtl-head">
+                  <div className="dtl-who" />
+                  <div className="dtl-track" style={{ height: 26 }}>
+                    {ticks.map((h) => (
+                      <span key={h} className="dtl-tick" style={{ left: `${pct(h)}%` }}>{String(h % 24).padStart(2, "0")}:00</span>
+                    ))}
+                  </div>
+                </div>
+                {spans.map((x, i) => (
+                  <div className="dtl-row" key={i}>
+                    <div className="dtl-who">
+                      <span className="avt" style={{ background: x.c, width: 28, height: 28, fontSize: 11 }}>{x.i}</span>
+                      <span className="dtl-nm">{x.n}<small>{t(x.dep)}</small></span>
+                    </div>
+                    <div className="dtl-track">
+                      {ticks.map((h) => <i key={h} className="dtl-line" style={{ left: `${pct(h)}%` }} />)}
+                      {isToday && nowH >= hMin && nowH <= hMax && <i className="dtl-now" style={{ left: `${pct(nowH)}%` }} />}
+                      {x.span && (
+                        <div
+                          className={`dtl-bar ${x.type}`}
+                          style={{ left: `${pct(x.span.s)}%`, width: `${Math.max(4, pct(x.span.e) - pct(x.span.s))}%` }}
+                          onClick={onAdd}
+                          onContextMenu={(ev) => onCtx(x, ev)}
+                          title={`${x.n} · ${x.l} · ${t("hægrismelltu fyrir aðgerðir")}`}
+                        >
+                          <span>{x.l}</span><small>{dec1(x.h)} {t("klst")}</small>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-          )) : <div className="muted" style={{ padding: 16, textAlign: "center" }}>{t("Engar vaktir þennan dag.")}</div>}
+          ) : <div className="muted" style={{ padding: 16, textAlign: "center" }}>{t("Engar vaktir þennan dag.")}</div>}
         </div>
       </div>
     </div>
