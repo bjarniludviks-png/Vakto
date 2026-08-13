@@ -134,6 +134,41 @@ export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; gri
 }
 
 /** Save a single shift (from the shift-edit modal). */
+export type ShiftTypeInput = { nm: string; t: string; prem: string; fg: string; bg: string; bd: string };
+
+/** Persist the company's shift types (upsert by name; delete removed ones
+ * when no shift references them). */
+export async function saveShiftTypes(list: ShiftTypeInput[]): Promise<DecisionResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data: existing } = await supabase.from("shift_types").select("id, name").eq("company_id", ctx.company);
+    const byName = new Map((existing ?? []).map((x) => [(x.name as string).toLowerCase(), x.id as string]));
+    const keep = new Set<string>();
+    for (const ty of list) {
+      const [a, z] = ty.t.split("–");
+      const row = {
+        company_id: ctx.company, name: ty.nm, start_time: a?.trim(), end_time: z?.trim(),
+        premium_label: ty.prem, color: ty.fg, bg: ty.bg, border: ty.bd,
+      };
+      const id = byName.get(ty.nm.toLowerCase());
+      if (id) { keep.add(id); await supabase.from("shift_types").update(row).eq("id", id); }
+      else {
+        const { data: ins } = await supabase.from("shift_types").insert(row).select("id").maybeSingle();
+        if (ins?.id) keep.add(ins.id as string);
+      }
+    }
+    for (const x of existing ?? []) {
+      if (!keep.has(x.id as string)) await supabase.from("shift_types").delete().eq("id", x.id); // FK-guarded: fails silently if referenced
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 export async function saveShift(input: Omit<ShiftInput, "date"> & { date?: string }): Promise<DecisionResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -217,7 +252,7 @@ export async function deleteShift(input: { employeeName: string; dateISO: string
   }
 }
 
-export type ExportRow = { name: string; first: string; dept: string; date: string; start: string; end: string };
+export type ExportRow = { name: string; first: string; dept: string; date: string; start: string; end: string; type?: string };
 
 /** Real shift rows (with actual times) in a date range — for PDF export. */
 export async function getShiftsInRange(fromISO: string, toISO: string): Promise<{ ok: boolean; rows: ExportRow[] }> {
@@ -230,7 +265,7 @@ export async function getShiftsInRange(fromISO: string, toISO: string): Promise<
     if (!live) return { ok: false, rows: [] };
     const meta = new Map(employees.map((e) => [e.id, { full: e.fullName, first: e.fullName.split(/\s+/)[0], dept: e.department ?? "" }]));
     const { data: shifts } = await supabase
-      .from("shifts").select("employee_id, date, start_time, end_time")
+      .from("shifts").select("employee_id, date, start_time, end_time, shift_types(name)")
       .eq("company_id", ctx.company).gte("date", fromISO).lte("date", toISO)
       .order("date").order("start_time");
     const rows: ExportRow[] = (shifts ?? []).map((s) => {
@@ -240,6 +275,7 @@ export async function getShiftsInRange(fromISO: string, toISO: string): Promise<
         date: s.date as string,
         start: ((s.start_time as string) ?? "").slice(0, 5),
         end: ((s.end_time as string) ?? "").slice(0, 5),
+        type: ((s.shift_types as unknown as { name?: string } | null)?.name) ?? undefined,
       };
     });
     return { ok: true, rows };

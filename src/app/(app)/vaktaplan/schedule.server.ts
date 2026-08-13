@@ -7,7 +7,7 @@ import { dec1 } from "@/lib/format";
 
 export type Emp4 = [string, string, string, string]; // initials, first name, dept, color
 export type ShiftTypeView = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
-export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string; todayISO: string; targets: number[]; unavail: Record<string, number[]> };
+export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; cellTypes: Record<string, string>; types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string; todayISO: string; targets: number[]; unavail: Record<string, number[]> };
 
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 // 7 ISO dates for the (Mon-start) week containing `ref`.
@@ -69,9 +69,10 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
     const idById = new Map(employees.map((e, i) => [e.id, i]));
     const grid: string[][] = employees.map(() => Array(7).fill("off"));
     const times: Record<string, { start: string; end: string }> = {};
+    const cellTypesMap: Record<string, string> = {};
     if (company) {
       const { data: shifts } = await supabase
-        .from("shifts").select("employee_id, date, start_time, end_time")
+        .from("shifts").select("employee_id, date, start_time, end_time, shift_types(name)")
         .eq("company_id", company).in("date", WEEK_DATES);
       for (const s of shifts ?? []) {
         const r = idById.get(s.employee_id as string);
@@ -79,6 +80,8 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
         if (r !== undefined && c >= 0) {
           grid[r][c] = codeForStart(s.start_time as string);
           times[`${r}:${c}`] = { start: ((s.start_time as string) ?? "").slice(0, 5), end: ((s.end_time as string) ?? "").slice(0, 5) };
+          const tn = (s.shift_types as unknown as { name?: string } | null)?.name;
+          if (tn) cellTypesMap[`${r}:${c}`] = tn;
         }
       }
     }
@@ -99,6 +102,7 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
     const emp: Emp4[] = [];
     const gridOut: string[][] = [];
     const timesOut: Record<string, { start: string; end: string }> = {};
+    const cellTypesOut: Record<string, string> = {};
     const pool: Emp4[] = [];
     // Empty week (no shifts yet) → show the whole roster so scheduling can begin.
     const anyShift = grid.some((row) => row.some((s) => s !== "off"));
@@ -107,7 +111,7 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
         const nr = emp.length;
         emp.push(rowOf(e));
         gridOut.push(grid[i]);
-        grid[i].forEach((_, c) => { const k = `${i}:${c}`; if (times[k]) timesOut[`${nr}:${c}`] = times[k]; });
+        grid[i].forEach((_, c) => { const k = `${i}:${c}`; if (times[k]) timesOut[`${nr}:${c}`] = times[k]; if (cellTypesMap[k]) cellTypesOut[`${nr}:${c}`] = cellTypesMap[k]; });
       } else {
         pool.push(rowOf(e));
       }
@@ -115,7 +119,7 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
 
     const fte = dec1(employees.reduce((a, e) => a + e.employmentRatio, 0) / 100);
     const unavail = await getWeekUnavail(WEEK_DATES);
-    return { emp, grid: gridOut, times: timesOut, types, pool, fte, company: companyName, todayISO, targets, unavail };
+    return { emp, grid: gridOut, times: timesOut, cellTypes: cellTypesOut, types, pool, fte, company: companyName, todayISO, targets, unavail };
   } catch {
     return null;
   }

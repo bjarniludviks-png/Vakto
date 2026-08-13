@@ -212,7 +212,7 @@ export async function addPosition(input: { name: string; baseRate?: string }): P
 }
 
 /** Create a department under a location (departments hang off locations in the schema). */
-export async function addDepartment(input: { name: string; locationName?: string }): Promise<SettingsResult> {
+export async function addDepartment(input: { name: string; locationName?: string; color?: string | null }): Promise<SettingsResult> {
   if (!input.name?.trim()) return { ok: false, error: "Nafn vantar" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -225,7 +225,10 @@ export async function addDepartment(input: { name: string; locationName?: string
     const loc = input.locationName ? locs.find((l) => l.name === input.locationName) ?? locs[0] : locs[0];
     const { data: dup } = await supabase.from("departments").select("id").eq("location_id", loc.id).eq("name", input.name.trim()).limit(1);
     if (dup?.length) return { ok: false, error: "Deild með þessu nafni er þegar til á staðnum" };
-    const { error } = await supabase.from("departments").insert({ location_id: loc.id, name: input.name.trim() });
+    let { error } = await supabase.from("departments").insert({ location_id: loc.id, name: input.name.trim(), ...(input.color ? { color: input.color } : {}) });
+    if (error && /color|column/i.test(error.message)) {
+      ({ error } = await supabase.from("departments").insert({ location_id: loc.id, name: input.name.trim() }));
+    }
     if (error) return { ok: false, error: error.message };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "department.create", entity: "department", detail: `Ný deild — ${input.name.trim()} (${loc.name})`,

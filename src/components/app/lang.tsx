@@ -1158,6 +1158,9 @@ export const DICT: Dict = {
   "Sögulega yfirlitið byggist upp þegar þú keyrir launakeyrslur — engin keyrsla er enn vistuð fyrir": { is: "Sögulega yfirlitið byggist upp þegar þú keyrir launakeyrslur — engin keyrsla er enn vistuð fyrir", en: "The history builds up as you run payroll — no run is stored yet for", vi: "Lịch sử hình thành khi bạn chạy kỳ lương — chưa có kỳ nào được lưu cho" },
   "tímalína dagsins — smelltu á vakt til að breyta, hægrismelltu fyrir aðgerðir": { is: "tímalína dagsins — smelltu á vakt til að breyta, hægrismelltu fyrir aðgerðir", en: "day timeline — click a shift to edit, right-click for actions", vi: "dòng thời gian trong ngày — nhấp vào ca để sửa, chuột phải để thao tác" },
   "Vaktategund breytt": { is: "Vaktategund breytt", en: "Shift type changed", vi: "Đã đổi loại ca" },
+  "Vaktategund uppfærð": { is: "Vaktategund uppfærð", en: "Shift type updated", vi: "Đã cập nhật loại ca" },
+  "Hætta við breytingu": { is: "Hætta við breytingu", en: "Cancel edit", vi: "Hủy chỉnh sửa" },
+  "Smelltu á vaktategund til að breyta henni — heiti, tímum, álagi eða lit. Breytingar vistast og litirnir uppfærast í planinu.": { is: "Smelltu á vaktategund til að breyta henni — heiti, tímum, álagi eða lit. Breytingar vistast og litirnir uppfærast í planinu.", en: "Click a shift type to edit it — name, times, premium or color. Changes are saved and colors update across the schedule.", vi: "Nhấp vào loại ca để chỉnh sửa — tên, giờ, phụ cấp hoặc màu. Thay đổi được lưu và màu cập nhật trên lịch." },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

@@ -7,7 +7,7 @@ import { useLang } from "@/components/app/lang";
 import { nf, dec1 } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
 import { AsyncButton } from "@/components/app/async-button";
-import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, type ShiftInput } from "./actions";
+import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, type ShiftInput } from "./actions";
 import { getCompanyDepartments, getDepartmentColors } from "../starfsfolk/actions";
 import { getDashboardPeriod } from "../maelabord/actions";
 import { buildSchedulePdf, type PdfShift } from "./pdf";
@@ -89,6 +89,16 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [cellTimes, setCellTimes] = useState<Record<string, { start: string; end: string }>>(initial?.times ?? {});
   const [pool, setPool] = useState<Emp[]>(initial?.pool ?? INIT_POOL);
   const [types, setTypes] = useState<ShiftType[]>(initial?.types?.length ? initial.types : INIT_TYPES);
+  // Explicit shift-type per cell (overrides the time-based color match).
+  const [cellTypes, setCellTypes] = useState<Record<string, string>>(initial?.cellTypes ?? {});
+  // Persist type edits for live companies (types were client-only before).
+  const persistTypes = (f: (t: ShiftType[]) => ShiftType[]) => {
+    setTypes((prev) => {
+      const next = f(prev);
+      if (liveCompany) void saveShiftTypes(next);
+      return next;
+    });
+  };
   // A manager scoped to a single department lands on it; otherwise "all" (within scope).
   const [dept, setDept] = useState(scopeDepts.length === 1 ? scopeDepts[0] : "all");
   const [view, setView] = useState<"Vika" | "Dagur" | "Mánuður">("Vika");
@@ -540,6 +550,18 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         .then((res) => toast(res.ok ? "Vakt vistuð" : (res.error ?? "Villa")));
     } else toast("Vakt vistuð (demo)");
   }
+  /** Assign a shift TYPE (color/premium) to an existing shift WITHOUT touching
+   * its times — "helgin má öll vera rauð" without rescheduling anyone. */
+  function assignType(r: number, c: number, typeName: string) {
+    setCellTypes((m) => ({ ...m, [ckey(r, c)]: typeName }));
+    const tt = timeOf(r, c);
+    const st = tt?.start ?? `${SH[grid[r]?.[c] ?? "D"].l.split("–")[0].padStart(2, "0")}:00`;
+    const en = tt?.end ?? `${SH[grid[r]?.[c] ?? "D"].l.split("–")[1].padStart(2, "0")}:00`;
+    if (liveCompany) {
+      saveShift({ employeeName: emp[r][1], date: fmtISO(weekDays[c]), startTime: st, endTime: en, shiftTypeName: typeName })
+        .then((res) => toast(res.ok ? "Vaktategund breytt" : (res.error ?? "Villa")));
+    } else toast("Vaktategund breytt (demo)");
+  }
   function delCell(r: number, c: number) {
     setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = "off"; return ng; });
     setCellTimes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
@@ -802,7 +824,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                             style={(() => {
                               if (s === "off") return undefined;
                               const st = timeOf(r, c)?.start ?? `${SH[s].l.split("–")[0].padStart(2, "0")}:00`;
-                              const ty = types.find((x) => x.t.startsWith(st));
+                              const ty = types.find((x) => x.nm === cellTypes[ckey(r, c)]) ?? types.find((x) => x.t.startsWith(st));
                               return ty ? { background: ty.bg, borderColor: ty.bd, borderLeftColor: ty.fg, color: ty.fg } : undefined;
                             })()}
                             title={isUnav ? (s === "off" ? t("Skráð ólaus þennan dag") : t("ATH: skráð ólaus þennan dag — árekstur")) : t("hægrismelltu fyrir aðgerðir")}
@@ -821,15 +843,14 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                               if (clip) items.push({ label: t("Líma hér"), act: () => cellClick(r, c) });
                               if (s !== "off") {
                                 for (const ty of types) {
-                                  const [a, z] = ty.t.split("–");
-                                  items.push({ label: `${t(ty.nm)} ${ty.t}`, color: ty.fg, act: () => saveCell(r, c, norm(a), norm(z), ty.nm) });
+                                  items.push({ label: t(ty.nm), color: ty.fg, act: () => assignType(r, c, ty.nm) });
                                 }
                                 items.push({ label: t("Eyða vakt"), danger: true, act: () => delCell(r, c) });
                               }
                               openCtx(ev, items);
                             }}
                           >
-                            {s === "off" ? "+" : <>{cellLabel(r, c, s)}<small>{SH[s].s ? t("sh:" + SH[s].s) :" "}</small></>}
+                            {s === "off" ? "+" : <>{cellLabel(r, c, s)}<small>{cellTypes[ckey(r, c)] ? t(cellTypes[ckey(r, c)]) : SH[s].s ? t("sh:" + SH[s].s) :" "}</small></>}
                           </div>
                         </td>
                         );
@@ -882,7 +903,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         openCtx(ev, [
           { label: t("Breyta"), act: () => { setSel({ r, c: curCol }); setModal("shift"); } },
           { label: t("Afrita"), act: () => { setClip({ code, start: tt?.start, end: tt?.end }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } },
-          ...types.map((ty) => { const [a, z] = ty.t.split("–"); return { label: `${t(ty.nm)} ${ty.t}`, color: ty.fg, act: () => saveCell(r, curCol, norm(a), norm(z), ty.nm) }; }),
+          ...types.map((ty) => ({ label: t(ty.nm), color: ty.fg, act: () => assignType(r, curCol, ty.nm) })),
           { label: t("Eyða vakt"), danger: true, act: () => delCell(r, curCol) },
         ]);
       }} />}
@@ -896,10 +917,11 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         onEdit={(d) => { if (monthClip) { void pasteMonthShift(fmtISO(d)); } else setDayModal(d); }}
         onCtxBlock={(b, iso, ev) => openCtx(ev, [
           { label: t("Breyta"), act: () => setDayModal(parseISO(iso)) },
-          ...types.map((ty) => { const [a, z] = ty.t.split("–"); return { label: `${t(ty.nm)} ${ty.t}`, color: ty.fg, act: () => {
-            void saveShift({ employeeName: b.name, date: iso, startTime: norm(a), endTime: norm(z), shiftTypeName: ty.nm })
+          ...types.map((ty) => ({ label: t(ty.nm), color: ty.fg, act: () => {
+            const [a, z] = b.time.split("–");
+            void saveShift({ employeeName: b.name, date: iso, startTime: norm(a ?? "08:00"), endTime: norm(z ?? "16:00"), shiftTypeName: ty.nm })
               .then((res) => { setMonthVer((v) => v + 1); toast(res.ok ? t("Vaktategund breytt") : (res.error ?? "Villa")); });
-          } }; }),
+          } })),
           { label: t("Afrita"), act: () => { const [a, z] = b.time.split("–"); setMonthClip({ first: b.name, start: norm(a ?? "08:00"), end: norm(z ?? "16:00") }); toast(t("Vakt afrituð — smelltu á daga til að líma")); } },
           ...(monthClip ? [{ label: t("Líma hér"), act: () => { void pasteMonthShift(iso); } }] : []),
           { label: t("Eyða vakt"), danger: true, act: () => {
@@ -986,7 +1008,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       )}
 
       {modal === "staff" && <StaffNeedModal targets={targets} onClose={() => setModal(null)} onSave={(ts) => { setTargets(ts); setModal(null); setStaffingTargets(ts).then((r) => toast(r.ok ? "Mönnunarþörf vistuð" : (r.error ?? "Villa"))); }} />}
-      {modal === "types" && <ShiftTypesModal types={types} setTypes={setTypes} onClose={() => setModal(null)} />}
+      {modal === "types" && <ShiftTypesModal types={types} setTypes={persistTypes} onClose={() => setModal(null)} />}
       {modal === "addEmp" && <AddEmpModal pool={pool} onPick={pickEmp} onClose={() => setModal(null)} />}
       {ctx && (
         <>
@@ -1213,30 +1235,47 @@ function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOp
 
 function ShiftTypesModal({ types, setTypes, onClose }: { types: ShiftType[]; setTypes: (f: (t: ShiftType[]) => ShiftType[]) => void; onClose: () => void }) {
   const { t: tr } = useLang();
+  const [editIdx, setEditIdx] = useState<number | null>(null);
   const [nm, setNm] = useState(""); const [s, setS] = useState("00:00"); const [e, setE] = useState("08:00");
   const [prem, setPrem] = useState("Dagvinna"); const [color, setColor] = useState("#7c6ff2");
-  function add() {
+  function startEdit(i: number) {
+    const ty = types[i];
+    setEditIdx(i); setNm(ty.nm);
+    const [a, z] = ty.t.split("–");
+    setS(a ?? "00:00"); setE(z ?? "08:00");
+    setPrem(ty.prem); setColor(ty.fg);
+  }
+  function reset() { setEditIdx(null); setNm(""); setS("00:00"); setE("08:00"); setPrem("Dagvinna"); setColor("#7c6ff2"); }
+  function submit() {
     if (!nm) { toast("Sláðu inn heiti"); return; }
-    setTypes((t) => [...t, { nm, t: `${s}–${e}`, prem, bg: color + "1f", bd: color + "59", fg: color }]);
-    setNm(""); toast(`Vaktategund „${nm}" búin til`);
+    const row: ShiftType = { nm, t: `${s}–${e}`, prem, bg: color + "1f", bd: color + "59", fg: color };
+    if (editIdx !== null) {
+      setTypes((t) => t.map((x, j) => (j === editIdx ? row : x)));
+      toast(tr("Vaktategund uppfærð"));
+    } else {
+      setTypes((t) => [...t, row]);
+      toast(`Vaktategund „${nm}" búin til`);
+    }
+    reset();
   }
   function del(i: number) {
     setTypes((t) => (t.length <= 1 ? (toast("Þarf a.m.k. eina vaktategund"), t) : t.filter((_, j) => j !== i)));
+    if (editIdx === i) reset();
   }
   return (
     <Modal onClose={onClose} title={tr("Vaktategundir")}>
-      <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>{tr("Skilgreindu þínar eigin vaktategundir — heiti, tíma, álag og lit. Þær birtast í vaktaplaninu.")}</p>
+      <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>{tr("Smelltu á vaktategund til að breyta henni — heiti, tímum, álagi eða lit. Breytingar vistast og litirnir uppfærast í planinu.")}</p>
       <div className="att">
-        {types.map((t, i) => (
-          <div className="it" key={i}>
-            <span style={{ width: 26, height: 26, borderRadius: 7, background: t.bg, border: `1px solid ${t.bd}`, flexShrink: 0 }} />
-            <div className="tx"><b>{tr(t.nm)}</b><span>{t.t} · {tr(t.prem)}</span></div>
-            <button className="tag mut" style={{ background: "var(--line2)", color: "var(--ink3)", cursor: "pointer", border: "none" }} onClick={() => del(i)}>{tr("Eyða")}</button>
+        {types.map((ty, i) => (
+          <div className={`it rowlink`} key={i} onClick={() => startEdit(i)} style={editIdx === i ? { outline: "2px solid var(--brand)", outlineOffset: -2, borderRadius: 10 } : undefined}>
+            <span style={{ width: 26, height: 26, borderRadius: 7, background: ty.bg, border: `1px solid ${ty.bd}`, flexShrink: 0 }} />
+            <div className="tx"><b>{tr(ty.nm)}</b><span>{ty.t} · {tr(ty.prem)}</span></div>
+            <button className="tag mut" style={{ background: "var(--line2)", color: "var(--ink3)", cursor: "pointer", border: "none" }} onClick={(ev) => { ev.stopPropagation(); del(i); }}>{tr("Eyða")}</button>
           </div>
         ))}
       </div>
       <div style={{ borderTop: "1px solid var(--line)", marginTop: 16, paddingTop: 16 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 650, marginBottom: 12 }}>{tr("Búa til nýja vaktategund")}</div>
+        <div style={{ fontSize: 13.5, fontWeight: 650, marginBottom: 12 }}>{editIdx !== null ? `${tr("Breyta")}: ${tr(types[editIdx]?.nm ?? "")}` : tr("Búa til nýja vaktategund")}</div>
         <div className="field"><label>{tr("Heiti")}</label><input value={nm} onChange={(e) => setNm(e.target.value)} placeholder={tr("t.d. Næturvakt")} /></div>
         <div style={{ display: "flex", gap: 10 }}>
           <div className="field" style={{ flex: 1 }}><label>{tr("Upphaf")}</label><TimeField value={s} onChange={setS} style={{ width: "100%" }} /></div>
@@ -1251,7 +1290,8 @@ function ShiftTypesModal({ types, setTypes, onClose }: { types: ShiftType[]; set
           <div className="field" style={{ flex: 1 }}><label>{tr("Litur")}</label><input type="color" value={color} onChange={(e) => setColor(e.target.value)} style={{ height: 38, padding: 3, cursor: "pointer" }} /></div>
         </div>
         <div style={{ display: "flex", gap: 9, marginTop: 6 }}>
-          <button className="btn" onClick={add}>{tr("Bæta við")}</button>
+          <button className="btn" onClick={submit}>{editIdx !== null ? tr("Vista breytingar") : tr("Bæta við")}</button>
+          {editIdx !== null && <button className="btn ghost" onClick={reset}>{tr("Hætta við breytingu")}</button>}
           <button className="btn ghost" onClick={onClose}>{tr("Loka")}</button>
         </div>
       </div>

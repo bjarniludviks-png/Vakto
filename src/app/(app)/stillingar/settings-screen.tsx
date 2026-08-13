@@ -330,6 +330,7 @@ function SettingsFormModal({ modal, onClose, locations = [] }: { modal: Exclude<
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [week, setWeek] = useState<string[]>(["", "", "", "", "", "", ""]); // by getDay 0..6
   const [dept, setDept] = useState(locations[0] ?? "");
+  const [deptColor, setDeptColor] = useState<string | null>(null);
 
   useEffect(() => {
     if (modal !== "avgrevenue") return;
@@ -344,7 +345,7 @@ function SettingsFormModal({ modal, onClose, locations = [] }: { modal: Exclude<
     setBusy(true); setError(null);
     let res: { ok: boolean; demo?: boolean; error?: string } = { ok: true };
     if (modal === "location") res = await addLocation({ name });
-    else if (modal === "department") res = await addDepartment({ name, locationName: dept });
+    else if (modal === "department") res = await addDepartment({ name, locationName: dept, color: deptColor });
     else if (modal === "position") res = await addPosition({ name, baseRate: rate });
     else if (modal === "invite") res = await inviteUser({ email, role });
     else if (modal === "revenue") res = await addRevenue({ amount, date });
@@ -369,6 +370,15 @@ function SettingsFormModal({ modal, onClose, locations = [] }: { modal: Exclude<
           )}
           {modal === "department" && <>
             <div className="field"><label>{t("Heiti deildar")}</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("t.d. Eldhús")} autoFocus /></div>
+            <div className="field"><label>{t("Litur deildar")}</label>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {["#e9700f", "#5b50e6", "#1fb6a6", "#0891b2", "#e0356b", "#7c6ff2", "#16a34a", "#f59e0b"].map((c) => (
+                  <button key={c} type="button" onClick={() => setDeptColor(c)} aria-label={c}
+                    style={{ width: 26, height: 26, borderRadius: 8, background: c, cursor: "pointer",
+                      border: deptColor === c ? "2.5px solid var(--ink)" : "2.5px solid transparent" }} />
+                ))}
+              </div>
+            </div>
             {locations.length > 1 && (
               <div className="field"><label>{t("Staður")}</label>
                 <select value={dept} onChange={(e) => setDept(e.target.value)}>
