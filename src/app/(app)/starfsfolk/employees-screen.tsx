@@ -8,7 +8,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "./contract-pdf";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, type ContractRow } from "./actions";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getDepartmentColors, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, type ContractRow } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField } from "@/components/app/fields";
@@ -66,6 +66,8 @@ export default function EmployeesScreen({
   openNew?: boolean;
 }) {
   const router = useRouter();
+  const [deptColors, setDeptColors] = useState<Record<string, string>>({});
+  useEffect(() => { getDepartmentColors().then(setDeptColors).catch(() => {}); }, []);
   const { t } = useLang();
   const [showNew, setShowNew] = useState(!!openNew);
   const [importing, setImporting] = useState(false);
@@ -198,7 +200,7 @@ export default function EmployeesScreen({
                   <tr key={e.id} className="rowlink" onClick={() => openEmp(e)}>
                     <td>
                       <span className="who">
-                        <span className="avt" style={{ background: e.avatarColor }}>
+                        <span className="avt" style={{ background: (e.department && deptColors[e.department]) || e.avatarColor }}>
                           {initials(e.fullName)}
                         </span>
                         {e.title ? (

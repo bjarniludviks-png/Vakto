@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
@@ -9,7 +9,7 @@ import { useLang } from "@/components/app/lang";
 import { initials, type Employee } from "@/lib/employees";
 import { CUSTOM_UNION } from "@/lib/payrules";
 import { PERM_FIELDS } from "@/lib/permissions";
-import { updateEmployee, setEmployeeStatus } from "./actions";
+import { updateEmployee, setEmployeeStatus, getDepartmentColors } from "./actions";
 import { ProfileTabBody, PROFILE_TABS, type ProfileTab } from "./employees-screen";
 
 /** Full-page employee profile (replaces the cramped modal). Each section has room
@@ -19,7 +19,10 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
   const { t } = useLang();
   const [tab, setTab] = useState<ProfileTab>("Laun");
   const [saving, setSaving] = useState(false);
+  const [deptColors, setDeptColors] = useState<Record<string, string>>({});
+  useEffect(() => { getDepartmentColors().then(setDeptColors).catch(() => {}); }, []);
   const e = employee;
+  const avtBg = (e.department && deptColors[e.department]) || e.avatarColor;
 
   async function save(ev: React.FormEvent<HTMLFormElement>) {
     ev.preventDefault();
@@ -72,7 +75,7 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
 
       <div className="card" style={{ marginTop: 16, maxWidth: 760 }}>
         <div className="ch" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span className="avt" style={{ background: e.avatarColor, width: 42, height: 42, fontSize: 15 }}>{initials(e.fullName)}</span>
+          <span className="avt" style={{ background: avtBg, width: 42, height: 42, fontSize: 15 }}>{initials(e.fullName)}</span>
           <div>
             <div className="ct">{e.fullName}</div>
             <div className="cs">{[e.department, e.title].filter(Boolean).join(" · ") || t("Starfsmaður")}</div>
