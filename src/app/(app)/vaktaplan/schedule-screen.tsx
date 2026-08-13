@@ -608,7 +608,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       const s = grid[r]?.[c];
       if (s && s !== "off") {
         const tt = timeOf(r, c);
-        out.push({ i: e[0], n: e[1], c: e[3], dep: e[2], l: cellLabel(r, c, s), h: cellHrs(r, c, s), type: SH[s].c, start: tt ? parseInt(tt.start) : parseInt(SH[s].l) });
+        out.push({ i: e[0], n: e[1], c: deptColors[e[2]] ?? e[3], dep: e[2], l: cellLabel(r, c, s), h: cellHrs(r, c, s), type: SH[s].c, start: tt ? parseInt(tt.start) : parseInt(SH[s].l) });
       }
     });
     return out.sort((a, b) => a.start - b.start);
@@ -805,7 +805,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                     <tr key={r}>
                       <td className="nm">
                         <div style={{ display: "flex", alignItems: "center" }}>
-                          <span className="who"><span className="avt" style={{ background: e[3], ...(deptColors[e[2]] ? { boxShadow: `0 0 0 2px #fff, 0 0 0 4.5px ${deptColors[e[2]]}` } : {}) }}>{e[0]}</span><span>{e[1]}<small>{t(e[2])}</small></span></span>
+                          <span className="who"><span className="avt" style={{ background: deptColors[e[2]] ?? e[3] }}>{e[0]}</span><span>{e[1]}<small>{t(e[2])}</small></span></span>
                           <button className="rmemp" title={t("Fjarlægja af plani")} onClick={() => removeEmpRow(r)}>✕</button>
                         </div>
                       </td>
@@ -824,7 +824,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                             style={(() => {
                               if (s === "off") return undefined;
                               const st = timeOf(r, c)?.start ?? `${SH[s].l.split("–")[0].padStart(2, "0")}:00`;
-                              const ty = types.find((x) => x.nm === cellTypes[ckey(r, c)]) ?? types.find((x) => x.t.startsWith(st));
+                              const ty = types.find((x) => x.nm === cellTypes[ckey(r, c)]) ?? types.find((x) => !!x.t && x.t !== "–" && x.t.startsWith(st));
                               return ty ? { background: ty.bg, borderColor: ty.bd, borderLeftColor: ty.fg, color: ty.fg } : undefined;
                             })()}
                             title={isUnav ? (s === "off" ? t("Skráð ólaus þennan dag") : t("ATH: skráð ólaus þennan dag — árekstur")) : t("hægrismelltu fyrir aðgerðir")}
@@ -1237,18 +1237,21 @@ function ShiftTypesModal({ types, setTypes, onClose }: { types: ShiftType[]; set
   const { t: tr } = useLang();
   const [editIdx, setEditIdx] = useState<number | null>(null);
   const [nm, setNm] = useState(""); const [s, setS] = useState("00:00"); const [e, setE] = useState("08:00");
+  const [noTime, setNoTime] = useState(false);
   const [prem, setPrem] = useState("Dagvinna"); const [color, setColor] = useState("#7c6ff2");
   function startEdit(i: number) {
     const ty = types[i];
     setEditIdx(i); setNm(ty.nm);
-    const [a, z] = ty.t.split("–");
-    setS(a ?? "00:00"); setE(z ?? "08:00");
+    const unbound = !ty.t || ty.t === "–";
+    setNoTime(unbound);
+    const [a, z] = (ty.t || "").split("–");
+    setS(a || "00:00"); setE(z || "08:00");
     setPrem(ty.prem); setColor(ty.fg);
   }
-  function reset() { setEditIdx(null); setNm(""); setS("00:00"); setE("08:00"); setPrem("Dagvinna"); setColor("#7c6ff2"); }
+  function reset() { setEditIdx(null); setNm(""); setS("00:00"); setE("08:00"); setNoTime(false); setPrem("Dagvinna"); setColor("#7c6ff2"); }
   function submit() {
     if (!nm) { toast("Sláðu inn heiti"); return; }
-    const row: ShiftType = { nm, t: `${s}–${e}`, prem, bg: color + "1f", bd: color + "59", fg: color };
+    const row: ShiftType = { nm, t: noTime ? "" : `${s}–${e}`, prem, bg: color + "1f", bd: color + "59", fg: color };
     if (editIdx !== null) {
       setTypes((t) => t.map((x, j) => (j === editIdx ? row : x)));
       toast(tr("Vaktategund uppfærð"));
@@ -1269,7 +1272,7 @@ function ShiftTypesModal({ types, setTypes, onClose }: { types: ShiftType[]; set
         {types.map((ty, i) => (
           <div className={`it rowlink`} key={i} onClick={() => startEdit(i)} style={editIdx === i ? { outline: "2px solid var(--brand)", outlineOffset: -2, borderRadius: 10 } : undefined}>
             <span style={{ width: 26, height: 26, borderRadius: 7, background: ty.bg, border: `1px solid ${ty.bd}`, flexShrink: 0 }} />
-            <div className="tx"><b>{tr(ty.nm)}</b><span>{ty.t} · {tr(ty.prem)}</span></div>
+            <div className="tx"><b>{tr(ty.nm)}</b><span>{ty.t && ty.t !== "–" ? ty.t : tr("Enginn fastur tími")} · {tr(ty.prem)}</span></div>
             <button className="tag mut" style={{ background: "var(--line2)", color: "var(--ink3)", cursor: "pointer", border: "none" }} onClick={(ev) => { ev.stopPropagation(); del(i); }}>{tr("Eyða")}</button>
           </div>
         ))}
@@ -1277,10 +1280,16 @@ function ShiftTypesModal({ types, setTypes, onClose }: { types: ShiftType[]; set
       <div style={{ borderTop: "1px solid var(--line)", marginTop: 16, paddingTop: 16 }}>
         <div style={{ fontSize: 13.5, fontWeight: 650, marginBottom: 12 }}>{editIdx !== null ? `${tr("Breyta")}: ${tr(types[editIdx]?.nm ?? "")}` : tr("Búa til nýja vaktategund")}</div>
         <div className="field"><label>{tr("Heiti")}</label><input value={nm} onChange={(e) => setNm(e.target.value)} placeholder={tr("t.d. Næturvakt")} /></div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, marginBottom: 10, cursor: "pointer" }}>
+          <input type="checkbox" checked={noTime} onChange={(ev) => setNoTime(ev.target.checked)} style={{ width: 16, height: 16, accentColor: "var(--brand)" }} />
+          {tr("Enginn fastur tími — bara litur og álag (t.d. Helgarvakt óháð klukku)")}
+        </label>
+        {!noTime && (
         <div style={{ display: "flex", gap: 10 }}>
           <div className="field" style={{ flex: 1 }}><label>{tr("Upphaf")}</label><TimeField value={s} onChange={setS} style={{ width: "100%" }} /></div>
           <div className="field" style={{ flex: 1 }}><label>{tr("Lok")}</label><TimeField value={e} onChange={setE} style={{ width: "100%" }} /></div>
         </div>
+        )}
         <div style={{ display: "flex", gap: 10 }}>
           <div className="field" style={{ flex: 1.4 }}><label>{tr("Álag")}</label>
             <select value={prem} onChange={(e) => setPrem(e.target.value)}>

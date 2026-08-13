@@ -148,9 +148,11 @@ export async function saveShiftTypes(list: ShiftTypeInput[]): Promise<DecisionRe
     const byName = new Map((existing ?? []).map((x) => [(x.name as string).toLowerCase(), x.id as string]));
     const keep = new Set<string>();
     for (const ty of list) {
-      const [a, z] = ty.t.split("–");
+      const [a, z] = (ty.t || "").split("–");
+      const unbound = !ty.t || ty.t === "–";
       const row = {
-        company_id: ctx.company, name: ty.nm, start_time: a?.trim(), end_time: z?.trim(),
+        company_id: ctx.company, name: ty.nm,
+        start_time: unbound ? null : (a?.trim() || null), end_time: unbound ? null : (z?.trim() || null),
         premium_label: ty.prem, color: ty.fg, bg: ty.bg, border: ty.bd,
       };
       const id = byName.get(ty.nm.toLowerCase());

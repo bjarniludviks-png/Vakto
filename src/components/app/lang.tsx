@@ -1167,6 +1167,8 @@ export const DICT: Dict = {
   "Stað eytt": { is: "Stað eytt", en: "Location deleted", vi: "Đã xóa địa điểm" },
   "Eyða stöðunni? Starfsfólk með hana verður án stöðu (ekki eytt).": { is: "Eyða stöðunni? Starfsfólk með hana verður án stöðu (ekki eytt).", en: "Delete this position? Staff holding it will be left without a position (not deleted).", vi: "Xóa vị trí này? Nhân viên giữ vị trí sẽ không có vị trí (không bị xóa)." },
   "Eyða staðnum? Aðeins hægt ef engar deildir eða veltufærslur eru tengdar honum.": { is: "Eyða staðnum? Aðeins hægt ef engar deildir eða veltufærslur eru tengdar honum.", en: "Delete this location? Only possible when no departments or revenue entries are linked to it.", vi: "Xóa địa điểm này? Chỉ được khi không có bộ phận hoặc doanh thu liên kết." },
+  "Enginn fastur tími": { is: "Enginn fastur tími", en: "No fixed time", vi: "Không cố định giờ" },
+  "Enginn fastur tími — bara litur og álag (t.d. Helgarvakt óháð klukku)": { is: "Enginn fastur tími — bara litur og álag (t.d. Helgarvakt óháð klukku)", en: "No fixed time — just color and premium (e.g. a weekend shift regardless of hours)", vi: "Không cố định giờ — chỉ màu và phụ cấp (VD: ca cuối tuần bất kể giờ)" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

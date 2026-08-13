@@ -57,7 +57,7 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
         .eq("company_id", company);
       types = (st ?? []).map((s) => ({
         nm: s.name as string,
-        t: `${(s.start_time as string ?? "").slice(0, 5)}–${(s.end_time as string ?? "").slice(0, 5)}`,
+        t: s.start_time && s.end_time ? `${(s.start_time as string).slice(0, 5)}–${(s.end_time as string).slice(0, 5)}` : "",
         prem: (s.premium_label as string) ?? "Dagvinna",
         bg: (s.bg as string) ?? "#eef0ff",
         bd: (s.border as string) ?? "#e0e2fb",
