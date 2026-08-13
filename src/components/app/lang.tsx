@@ -1157,6 +1157,7 @@ export const DICT: Dict = {
   "drög": { is: "drög", en: "draft", vi: "nháp" },
   "Sögulega yfirlitið byggist upp þegar þú keyrir launakeyrslur — engin keyrsla er enn vistuð fyrir": { is: "Sögulega yfirlitið byggist upp þegar þú keyrir launakeyrslur — engin keyrsla er enn vistuð fyrir", en: "The history builds up as you run payroll — no run is stored yet for", vi: "Lịch sử hình thành khi bạn chạy kỳ lương — chưa có kỳ nào được lưu cho" },
   "tímalína dagsins — smelltu á vakt til að breyta, hægrismelltu fyrir aðgerðir": { is: "tímalína dagsins — smelltu á vakt til að breyta, hægrismelltu fyrir aðgerðir", en: "day timeline — click a shift to edit, right-click for actions", vi: "dòng thời gian trong ngày — nhấp vào ca để sửa, chuột phải để thao tác" },
+  "Vaktategund breytt": { is: "Vaktategund breytt", en: "Shift type changed", vi: "Đã đổi loại ca" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

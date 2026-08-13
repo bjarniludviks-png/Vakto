@@ -111,7 +111,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     getDepartmentColors().then(setDeptColors).catch(() => {});
   }, []);
   // Unified right-click menu (week/day/month views).
-  type CtxItem = { label: string; danger?: boolean; act: () => void };
+  type CtxItem = { label: string; danger?: boolean; color?: string; act: () => void };
   const [ctx, setCtx] = useState<{ x: number; y: number; items: CtxItem[] } | null>(null);
   function openCtx(ev: React.MouseEvent, items: CtxItem[]) {
     ev.preventDefault(); ev.stopPropagation();
@@ -811,7 +811,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                             onClick={() => cellClick(r, c)}
                             onContextMenu={(ev) => {
                               const tt = timeOf(r, c);
-                              const items: { label: string; danger?: boolean; act: () => void }[] = [];
+                              const items: { label: string; danger?: boolean; color?: string; act: () => void }[] = [];
                               if (s !== "off") {
                                 items.push({ label: t("Breyta"), act: () => { setSel({ r, c }); setModal("shift"); } });
                                 items.push({ label: t("Afrita"), act: () => { setClip({ code: s, start: tt?.start, end: tt?.end }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } });
@@ -819,7 +819,13 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                                 items.push({ label: t("Ný vakt"), act: () => { setSel({ r, c }); setModal("shift"); } });
                               }
                               if (clip) items.push({ label: t("Líma hér"), act: () => cellClick(r, c) });
-                              if (s !== "off") items.push({ label: t("Eyða vakt"), danger: true, act: () => delCell(r, c) });
+                              if (s !== "off") {
+                                for (const ty of types) {
+                                  const [a, z] = ty.t.split("–");
+                                  items.push({ label: `${t(ty.nm)} ${ty.t}`, color: ty.fg, act: () => saveCell(r, c, norm(a), norm(z), ty.nm) });
+                                }
+                                items.push({ label: t("Eyða vakt"), danger: true, act: () => delCell(r, c) });
+                              }
                               openCtx(ev, items);
                             }}
                           >
@@ -876,6 +882,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         openCtx(ev, [
           { label: t("Breyta"), act: () => { setSel({ r, c: curCol }); setModal("shift"); } },
           { label: t("Afrita"), act: () => { setClip({ code, start: tt?.start, end: tt?.end }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } },
+          ...types.map((ty) => { const [a, z] = ty.t.split("–"); return { label: `${t(ty.nm)} ${ty.t}`, color: ty.fg, act: () => saveCell(r, curCol, norm(a), norm(z), ty.nm) }; }),
           { label: t("Eyða vakt"), danger: true, act: () => delCell(r, curCol) },
         ]);
       }} />}
@@ -889,6 +896,10 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         onEdit={(d) => { if (monthClip) { void pasteMonthShift(fmtISO(d)); } else setDayModal(d); }}
         onCtxBlock={(b, iso, ev) => openCtx(ev, [
           { label: t("Breyta"), act: () => setDayModal(parseISO(iso)) },
+          ...types.map((ty) => { const [a, z] = ty.t.split("–"); return { label: `${t(ty.nm)} ${ty.t}`, color: ty.fg, act: () => {
+            void saveShift({ employeeName: b.name, date: iso, startTime: norm(a), endTime: norm(z), shiftTypeName: ty.nm })
+              .then((res) => { setMonthVer((v) => v + 1); toast(res.ok ? t("Vaktategund breytt") : (res.error ?? "Villa")); });
+          } }; }),
           { label: t("Afrita"), act: () => { const [a, z] = b.time.split("–"); setMonthClip({ first: b.name, start: norm(a ?? "08:00"), end: norm(z ?? "16:00") }); toast(t("Vakt afrituð — smelltu á daga til að líma")); } },
           ...(monthClip ? [{ label: t("Líma hér"), act: () => { void pasteMonthShift(iso); } }] : []),
           { label: t("Eyða vakt"), danger: true, act: () => {
@@ -982,7 +993,10 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
           <div style={{ position: "fixed", inset: 0, zIndex: 90 }} onClick={() => setCtx(null)} onContextMenu={(e) => { e.preventDefault(); setCtx(null); }} />
           <div className="tmenu show" style={{ position: "fixed", zIndex: 91, left: Math.min(ctx.x, (typeof window !== "undefined" ? window.innerWidth : 1200) - 190), top: Math.min(ctx.y, (typeof window !== "undefined" ? window.innerHeight : 800) - ctx.items.length * 42 - 10), right: "auto" }}>
             {ctx.items.map((it) => (
-              <div className="mi" key={it.label} style={it.danger ? { color: "var(--bad)" } : undefined} onClick={() => { setCtx(null); it.act(); }}>{it.label}</div>
+              <div className="mi" key={it.label} style={it.danger ? { color: "var(--bad)" } : undefined} onClick={() => { setCtx(null); it.act(); }}>
+                {it.color && <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: it.color, marginRight: 7, flexShrink: 0 }} />}
+                {it.label}
+              </div>
             ))}
           </div>
         </>
