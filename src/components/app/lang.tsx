@@ -1170,6 +1170,8 @@ export const DICT: Dict = {
   "Enginn fastur tími": { is: "Enginn fastur tími", en: "No fixed time", vi: "Không cố định giờ" },
   "Enginn fastur tími — bara litur og álag (t.d. Helgarvakt óháð klukku)": { is: "Enginn fastur tími — bara litur og álag (t.d. Helgarvakt óháð klukku)", en: "No fixed time — just color and premium (e.g. a weekend shift regardless of hours)", vi: "Không cố định giờ — chỉ màu và phụ cấp (VD: ca cuối tuần bất kể giờ)" },
   "Birta óvirka": { is: "Birta óvirka", en: "Show inactive", vi: "Hiện nhân viên ngừng" },
+  "óáætlað": { is: "óáætlað", en: "unscheduled", vi: "ngoài lịch" },
+  "Stimplaði sig inn án þess að vera á vaktaplani dagsins": { is: "Stimplaði sig inn án þess að vera á vaktaplani dagsins", en: "Clocked in without being on today's schedule", vi: "Chấm công vào mà không có trong lịch hôm nay" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

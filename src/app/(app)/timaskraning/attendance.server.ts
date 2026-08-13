@@ -6,7 +6,7 @@ import { initials } from "@/lib/employees";
 
 export type Attendance = { onShift: number; live: boolean };
 
-export type OnNowRow = { punchId: string; employeeId: string; name: string; av: string; c: string; dept: string; in: string; since: string; source: string };
+export type OnNowRow = { punchId: string; employeeId: string; name: string; av: string; c: string; dept: string; in: string; since: string; source: string; unscheduled?: boolean };
 export type RosterRow = { id: string; name: string; av: string; c: string; dept: string };
 // Scheduled today but not clocked in — late (past start) or still upcoming.
 export type MissingRow = { employeeId: string; name: string; av: string; c: string; dept: string; start: string; late: boolean; mins: number };
@@ -52,13 +52,19 @@ export async function getWhoIsOn(): Promise<{ rows: OnNowRow[]; missing: Missing
       .eq("company_id", company).is("clock_out", null)
       .gte("clock_in", back48.toISOString()).lt("clock_in", start.toISOString());
     const allPunches = [...(oldOpen ?? []), ...(todayPunches ?? [])];
+    // Who has a shift in today's plan — punches without one get flagged.
+    const { data: schedShifts } = await supabase
+      .from("shifts").select("employee_id").eq("company_id", company).eq("date", todayISO);
+    const scheduledIds = new Set((schedShifts ?? []).map((x) => x.employee_id as string));
     const rows: OnNowRow[] = allPunches.filter((p) => p.clock_out == null).map((p) => {
       const m = meta.get(p.employee_id as string);
       const ci = new Date(p.clock_in as string);
+      const fromToday = (p.clock_in as string) >= start.toISOString();
       return {
         punchId: p.id as string, employeeId: p.employee_id as string,
         name: m?.name ?? "?", av: m?.av ?? "?", c: m?.c ?? "#888", dept: m?.dept ?? "—",
         in: hhmm(ci), since: p.clock_in as string, source: (p.source as string) ?? "web",
+        unscheduled: fromToday && !scheduledIds.has(p.employee_id as string),
       };
     });
     const onIds = new Set(rows.map((r) => r.employeeId));

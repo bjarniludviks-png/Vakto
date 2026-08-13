@@ -85,7 +85,7 @@ function EmptyBody({ msg }: { msg: string }) {
 }
 
 type Onb = { show: boolean; hasLocation: boolean; hasStaff: boolean; hasSchedule: boolean; hasRevenue: boolean };
-type OnNow = { punchId: string; name: string; av: string; c: string; dept: string; in: string; since: string };
+type OnNow = { punchId: string; name: string; av: string; c: string; dept: string; in: string; since: string; unscheduled?: boolean };
 type Missing = { employeeId: string; name: string; av: string; c: string; dept: string; start: string; late: boolean; mins: number };
 
 const PRESETS: { k: string; label: string }[] = [
@@ -372,7 +372,8 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
                 <div className="it" key={r.punchId}>
                   <span className="avt" style={{ background: r.c, width: 32, height: 32 }}>{r.av}</span>
                   <div className="tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}</span></div>
-                  <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)", marginLeft: "auto" }}>{nowMs ? durSince(r.since, nowMs) : t("á vakt")}</span>
+                  {r.unscheduled && <span className="tag" style={{ background: "var(--warn-soft)", color: "var(--warn)", marginLeft: "auto" }} title={t("Stimplaði sig inn án þess að vera á vaktaplani dagsins")}>{t("óáætlað")}</span>}
+                  <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)", marginLeft: r.unscheduled ? 8 : "auto" }}>{nowMs ? durSince(r.since, nowMs) : t("á vakt")}</span>
                 </div>
               ))}
             </div>

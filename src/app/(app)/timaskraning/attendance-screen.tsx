@@ -231,6 +231,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
             <div className="it" key={r.punchId}>
               <span className="avt" style={{ background: r.c, width: 34, height: 34, cursor: "pointer" }} onClick={() => router.push(`/timaskraning/${r.employeeId}`)}>{r.av}</span>
               <div className="tx" style={{ cursor: "pointer" }} onClick={() => router.push(`/timaskraning/${r.employeeId}`)}><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : ""}</span></div>
+              {r.unscheduled && <span className="tag" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("óáætlað")}</span>}
               <div className="itact">
                 {openHrsOf(r.since) > 12
                   ? <span className="tag" style={{ background: "var(--bad-soft, #fbe9e5)", color: "var(--bad)" }} title={t("Opin stimplun í meira en 12 klst — gleymt að stimpla út?")}>⚠ {Math.round(openHrsOf(r.since))} {t("klst")}</span>
