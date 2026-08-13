@@ -1172,6 +1172,17 @@ export const DICT: Dict = {
   "Birta óvirka": { is: "Birta óvirka", en: "Show inactive", vi: "Hiện nhân viên ngừng" },
   "óáætlað": { is: "óáætlað", en: "unscheduled", vi: "ngoài lịch" },
   "Stimplaði sig inn án þess að vera á vaktaplani dagsins": { is: "Stimplaði sig inn án þess að vera á vaktaplani dagsins", en: "Clocked in without being on today's schedule", vi: "Chấm công vào mà không có trong lịch hôm nay" },
+  "Skjalasafn fyrirtækisins": { is: "Skjalasafn fyrirtækisins", en: "Company document library", vi: "Thư viện tài liệu công ty" },
+  "HACCP, starfsmannahandbók, öryggishandbók … — allt starfsfólk sér skjölin í Mitt svæði": { is: "HACCP, starfsmannahandbók, öryggishandbók … — allt starfsfólk sér skjölin í Mitt svæði", en: "HACCP, employee handbook, safety manual … — all staff see these in My area", vi: "HACCP, sổ tay nhân viên, sổ tay an toàn … — mọi nhân viên xem trong Khu vực của tôi" },
+  "+ Hlaða upp skjali": { is: "+ Hlaða upp skjali", en: "+ Upload document", vi: "+ Tải tài liệu lên" },
+  "Hleð upp…": { is: "Hleð upp…", en: "Uploading…", vi: "Đang tải…" },
+  "Skjal komið í skjalasafnið — allt starfsfólk sér það": { is: "Skjal komið í skjalasafnið — allt starfsfólk sér það", en: "Document added to the library — visible to all staff", vi: "Đã thêm tài liệu — mọi nhân viên đều thấy" },
+  "Eyða skjalinu úr skjalasafninu?": { is: "Eyða skjalinu úr skjalasafninu?", en: "Delete this document from the library?", vi: "Xóa tài liệu khỏi thư viện?" },
+  "Skjali eytt": { is: "Skjali eytt", en: "Document deleted", vi: "Đã xóa tài liệu" },
+  "Engin skjöl enn — hlaðið upp handbókum og leiðbeiningum sem allt starfsfólk á að hafa aðgang að.": { is: "Engin skjöl enn — hlaðið upp handbókum og leiðbeiningum sem allt starfsfólk á að hafa aðgang að.", en: "No documents yet — upload handbooks and guidelines every employee should have access to.", vi: "Chưa có tài liệu — hãy tải lên sổ tay và hướng dẫn mà mọi nhân viên cần." },
+  "Skjöl fyrirtækisins": { is: "Skjöl fyrirtækisins", en: "Company documents", vi: "Tài liệu công ty" },
+  "handbækur og leiðbeiningar frá vinnuveitanda": { is: "handbækur og leiðbeiningar frá vinnuveitanda", en: "handbooks and guidelines from your employer", vi: "sổ tay và hướng dẫn từ công ty" },
+  "Opna": { is: "Opna", en: "Open", vi: "Mở" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

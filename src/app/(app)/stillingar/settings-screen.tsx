@@ -6,7 +6,7 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { syncInventraRevenue, addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
+import { syncInventraRevenue, addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
 import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
@@ -214,6 +214,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
         </div>
       </div>
 
+      <CompanyDocsCard />
       </>}
 
       {section === "notendur" && (
@@ -282,6 +283,60 @@ function ContractTermsCard() {
           placeholder={t("t.d. Trúnaðarskylda gildir um öll viðskiptaleyndarmál. Starfsmaður skal tilkynna veikindi fyrir kl. 10:00. Einkennisfatnaður er lagður til af fyrirtækinu…")} />
         <button className="btn sm" disabled={busy} onClick={save} style={{ marginTop: 10 }}>{t("Vista skilmála")}</button>
         <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{t("Skilmálarnir bætast við alla nýja ráðningarsamninga sem kaflinn „Sérákvæði fyrirtækisins“. Eldri samningar breytast ekki.")}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Company document library — HACCP, handbooks etc., visible to all staff. */
+function CompanyDocsCard() {
+  const { t } = useLang();
+  const [docs, setDocs] = useState<CompanyDoc[]>([]);
+  const [busy, setBusy] = useState(false);
+  const load = () => listCompanyDocs().then((r) => setDocs(r.docs)).catch(() => {});
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  function pick() {
+    const inp = document.createElement("input");
+    inp.type = "file";
+    inp.onchange = async () => {
+      const f = inp.files?.[0];
+      if (!f) return;
+      setBusy(true);
+      const dataUrl = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = () => rej(r.error); r.readAsDataURL(f); });
+      const r = await uploadCompanyDoc({ fileName: f.name, dataUrl });
+      setBusy(false);
+      toast(r.ok ? (r.demo ? t("Vistað (demo)") : t("Skjal komið í skjalasafnið — allt starfsfólk sér það")) : (r.error ?? "Tókst ekki"));
+      load();
+    };
+    inp.click();
+  }
+  async function open(d: CompanyDoc) {
+    const r = await openCompanyDoc(d.id);
+    if (r.ok && r.url) window.open(r.url, "_blank");
+    else toast(r.error ?? "Villa");
+  }
+  async function del(d: CompanyDoc) {
+    if (!window.confirm(t("Eyða skjalinu úr skjalasafninu?"))) return;
+    const r = await deleteCompanyDoc(d.id);
+    toast(r.ok ? t("Skjali eytt") : (r.error ?? "Villa"));
+    load();
+  }
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="ch"><div><div className="ct">{t("Skjalasafn fyrirtækisins")}</div><div className="cs">{t("HACCP, starfsmannahandbók, öryggishandbók … — allt starfsfólk sér skjölin í Mitt svæði")}</div></div>
+        <button className="btn sm" disabled={busy} onClick={pick}>{busy ? t("Hleð upp…") : t("+ Hlaða upp skjali")}</button>
+      </div>
+      <div className="cb att">
+        {docs.map((d) => (
+          <div className="docrow" key={d.id}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /></svg>
+            <span style={{ cursor: "pointer" }} onClick={() => open(d)}>{d.name}</span>
+            <span className="dl">{d.created}</span>
+            <button className="btn ghost sm" type="button" onClick={() => open(d)}>{t("Opna")}</button>
+            <button className="x" type="button" title={t("Eyða")} style={{ color: "var(--bad)" }} onClick={() => del(d)}>✕</button>
+          </div>
+        ))}
+        {docs.length === 0 && <p className="muted" style={{ fontSize: 12.5 }}>{t("Engin skjöl enn — hlaðið upp handbókum og leiðbeiningum sem allt starfsfólk á að hafa aðgang að.")}</p>}
       </div>
     </div>
   );

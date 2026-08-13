@@ -6,6 +6,7 @@ import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
 import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, getMyContract, signMyContract, type LeaveType, type MyPunchRow, type MyContract } from "./actions";
+import { listCompanyDocs, openCompanyDoc, type CompanyDoc } from "../stillingar/actions";
 import { dec1, nf } from "@/lib/format";
 import { StaffCardModal, type StaffCardData } from "@/components/app/staff-card";
 import type { StaffCard } from "@/lib/mycard.server";
@@ -204,6 +205,32 @@ function ContractSignCard() {
 }
 
 /** Today's shift checklist — set by the manager on the shift, ticked here. */
+/** Shared company documents (HACCP, handbooks …) — read-only for staff. */
+function CompanyDocsCardMy() {
+  const { t } = useLang();
+  const [docs, setDocs] = useState<CompanyDoc[]>([]);
+  useEffect(() => { listCompanyDocs().then((r) => setDocs(r.docs)).catch(() => {}); }, []);
+  if (!docs.length) return null;
+  async function open(d: CompanyDoc) {
+    const r = await openCompanyDoc(d.id);
+    if (r.ok && r.url) window.open(r.url, "_blank");
+  }
+  return (
+    <div className="card" style={{ marginTop: 20 }}>
+      <div className="ch"><div><div className="ct">{t("Skjöl fyrirtækisins")}</div><div className="cs">{t("handbækur og leiðbeiningar frá vinnuveitanda")}</div></div></div>
+      <div className="cb att">
+        {docs.map((d) => (
+          <div className="it rowlink" key={d.id} onClick={() => open(d)}>
+            <div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /></svg></div>
+            <div className="tx"><b>{d.name}</b><span>{d.created}</span></div>
+            <span className="tag info">{t("Opna")}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TasksCard({ initial }: { initial: { id: string; title: string; done: boolean }[] }) {
   const { t } = useLang();
   const [tasks, setTasks] = useState(initial);
@@ -276,6 +303,7 @@ function Overview({ onReq, perms, my }: { onReq: (k: ReqKind) => void; perms: Pe
       )}
       {live && <ContractSignCard />}
       {live && my!.tasks.length > 0 && <TasksCard initial={my!.tasks} />}
+      <CompanyDocsCardMy />
       {perms.requests && <QuickActions onReq={onReq} />}
     </div>
   );

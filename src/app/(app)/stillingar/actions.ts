@@ -348,6 +348,108 @@ export async function deleteLocation(id: string): Promise<SettingsResult> {
   }
 }
 
+export type CompanyDoc = { id: string; name: string; path: string; created: string };
+
+/** Company-wide shared documents (HACCP, handbooks …) — visible to ALL staff. */
+async function docCompanyOf(supabase: Awaited<ReturnType<typeof createClient>>): Promise<{ company: string; userId: string; canManage: boolean } | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: profile } = await supabase.from("users").select("company_id, role").eq("id", user.id).maybeSingle();
+  if (profile?.company_id) return { company: profile.company_id as string, userId: user.id, canManage: profile.role === "owner" || profile.role === "manager" };
+  // Employee login without a users-row: resolve via employees.user_id.
+  const admin = createAdminClient();
+  const { data: emp } = await admin.from("employees").select("company_id").eq("user_id", user.id).maybeSingle();
+  if (emp?.company_id) return { company: emp.company_id as string, userId: user.id, canManage: false };
+  return null;
+}
+
+export async function listCompanyDocs(): Promise<{ docs: CompanyDoc[]; live: boolean; canManage: boolean }> {
+  if (!isSupabaseConfigured()) return { docs: [], live: false, canManage: false };
+  try {
+    const supabase = await createClient();
+    const who = await docCompanyOf(supabase);
+    if (!who) return { docs: [], live: false, canManage: false };
+    const ctx = { company: who.company };
+    const canManage = who.canManage;
+    // Admin read: employee storage/RLS visibility varies until 0040 runs everywhere.
+    const admin = createAdminClient();
+    const { data, error } = await admin.from("documents")
+      .select("id, name, url, created_at").eq("company_id", ctx.company).is("employee_id", null)
+      .order("created_at", { ascending: false });
+    if (error) return { docs: [], live: true, canManage };
+    return {
+      live: true, canManage,
+      docs: (data ?? []).map((d) => ({ id: d.id as string, name: d.name as string, path: (d.url as string) ?? "", created: String(d.created_at).slice(0, 10) })),
+    };
+  } catch {
+    return { docs: [], live: false, canManage: false };
+  }
+}
+
+export async function uploadCompanyDoc(input: { fileName: string; dataUrl: string }): Promise<SettingsResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const m = /^data:([^;]+);base64,(.+)$/.exec(input.dataUrl);
+    if (!m) return { ok: false, error: "Ógilt skjal" };
+    const bytes = Buffer.from(m[2], "base64");
+    if (bytes.length > 25 * 1024 * 1024) return { ok: false, error: "Skjal má mest vera 25 MB" };
+    const safe = input.fileName.replace(/[^\w.\-]+/g, "_");
+    const path = `${ctx.company}/shared/${Date.now()}-${safe}`;
+    const { error: upErr } = await supabase.storage.from("documents").upload(path, bytes, { contentType: m[1], upsert: false });
+    if (upErr) return { ok: false, error: upErr.message };
+    const { error } = await supabase.from("documents").insert({
+      company_id: ctx.company, employee_id: null, name: input.fileName, type: "shared", url: path,
+    });
+    if (error) return { ok: false, error: /null value|not-null/i.test(error.message) ? "Keyrðu migration 0040 í Supabase fyrst." : error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "companydoc.upload", entity: "documents", detail: `Skjal í skjalasafn — ${input.fileName}` });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+export async function deleteCompanyDoc(id: string): Promise<SettingsResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const admin = createAdminClient();
+    const { data: doc } = await admin.from("documents").select("url, company_id, employee_id").eq("id", id).maybeSingle();
+    if (!doc || doc.company_id !== ctx.company || doc.employee_id !== null) return { ok: false, error: "Skjal fannst ekki" };
+    if (doc.url) await admin.storage.from("documents").remove([doc.url as string]);
+    const { error } = await admin.from("documents").delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Open a shared doc — any employee of the company gets a short signed URL. */
+export async function openCompanyDoc(id: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
+  try {
+    const supabase = await createClient();
+    const who = await docCompanyOf(supabase);
+    if (!who) return { ok: false, error: "Ekki innskráð(ur)" };
+    const ctx = { company: who.company };
+    const admin = createAdminClient();
+    const { data: doc } = await admin.from("documents").select("url, company_id, employee_id").eq("id", id).maybeSingle();
+    if (!doc || doc.company_id !== ctx.company || doc.employee_id !== null || !doc.url) return { ok: false, error: "Skjal fannst ekki" };
+    const { data, error } = await admin.storage.from("documents").createSignedUrl(doc.url as string, 120);
+    if (error || !data?.signedUrl) return { ok: false, error: error?.message ?? "Villa" };
+    return { ok: true, url: data.signedUrl };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /** Rename a department (company-scoped via its location). */
 export async function renameDepartment(id: string, name: string, color?: string | null): Promise<SettingsResult> {
   if (!name?.trim()) return { ok: false, error: "Nafn vantar" };
