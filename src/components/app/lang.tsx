@@ -1169,6 +1169,7 @@ export const DICT: Dict = {
   "Eyða staðnum? Aðeins hægt ef engar deildir eða veltufærslur eru tengdar honum.": { is: "Eyða staðnum? Aðeins hægt ef engar deildir eða veltufærslur eru tengdar honum.", en: "Delete this location? Only possible when no departments or revenue entries are linked to it.", vi: "Xóa địa điểm này? Chỉ được khi không có bộ phận hoặc doanh thu liên kết." },
   "Enginn fastur tími": { is: "Enginn fastur tími", en: "No fixed time", vi: "Không cố định giờ" },
   "Enginn fastur tími — bara litur og álag (t.d. Helgarvakt óháð klukku)": { is: "Enginn fastur tími — bara litur og álag (t.d. Helgarvakt óháð klukku)", en: "No fixed time — just color and premium (e.g. a weekend shift regardless of hours)", vi: "Không cố định giờ — chỉ màu và phụ cấp (VD: ca cuối tuần bất kể giờ)" },
+  "Birta óvirka": { is: "Birta óvirka", en: "Show inactive", vi: "Hiện nhân viên ngừng" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

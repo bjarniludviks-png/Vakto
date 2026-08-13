@@ -67,6 +67,7 @@ export default function EmployeesScreen({
 }) {
   const router = useRouter();
   const [deptColors, setDeptColors] = useState<Record<string, string>>({});
+  const [showInactive, setShowInactive] = useState(false);
   useEffect(() => { getDepartmentColors().then(setDeptColors).catch(() => {}); }, []);
   const { t } = useLang();
   const [showNew, setShowNew] = useState(!!openNew);
@@ -177,8 +178,14 @@ export default function EmployeesScreen({
 
       <div className="card" style={{ marginTop: 16 }}>
         <div className="ch">
-          <div className="ct">{t("emp:card")}</div>
-          <div className="cs">{t("emp:card:sub")}</div>
+          <div><div className="ct">{t("emp:card")}</div>
+          <div className="cs">{t("emp:card:sub")}</div></div>
+          {employees.some((e) => e.status === "inactive") && (
+            <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, color: "var(--ink2)", cursor: "pointer", whiteSpace: "nowrap" }}>
+              <input type="checkbox" checked={showInactive} onChange={(ev) => setShowInactive(ev.target.checked)} style={{ width: 15, height: 15, accentColor: "var(--brand)" }} />
+              {t("Birta óvirka")} ({employees.filter((e) => e.status === "inactive").length})
+            </label>
+          )}
         </div>
         <div className="cb tbl" style={{ paddingTop: 8 }}>
           <table>
@@ -194,7 +201,7 @@ export default function EmployeesScreen({
               <th className="r"></th></tr>
             </thead>
             <tbody>
-              {employees.map((e) => {
+              {employees.filter((e) => showInactive || e.status !== "inactive").map((e) => {
                 const b = statusBadge(e);
                 return (
                   <tr key={e.id} className="rowlink" onClick={() => openEmp(e)}>
