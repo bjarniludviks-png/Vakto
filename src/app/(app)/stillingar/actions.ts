@@ -274,6 +274,80 @@ export async function getContractTerms(): Promise<string> {
   }
 }
 
+/** Edit or delete a position (starfsheiti). Employees keep working; on delete they lose the position link. */
+export async function updatePosition(id: string, input: { name: string; baseRate?: string }): Promise<SettingsResult> {
+  if (!input.name?.trim()) return { ok: false, error: "Nafn vantar" };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const patch: Record<string, unknown> = { name: input.name.trim() };
+    if (input.baseRate !== undefined) patch.base_rate = num(input.baseRate, 2900);
+    const { error } = await supabase.from("positions").update(patch).eq("id", id).eq("company_id", ctx.company);
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "position.update", entity: "position", entityId: id, detail: `Staða uppfærð — ${input.name.trim()}` });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+export async function deletePosition(id: string): Promise<SettingsResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    await supabase.from("employees").update({ position_id: null }).eq("position_id", id).eq("company_id", ctx.company);
+    const { error } = await supabase.from("positions").delete().eq("id", id).eq("company_id", ctx.company);
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "position.delete", entity: "position", entityId: id, detail: "Stöðu eytt" });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Edit or delete a location (starfsstöð). Delete is blocked while departments/revenue reference it. */
+export async function updateLocation(id: string, input: { name: string }): Promise<SettingsResult> {
+  if (!input.name?.trim()) return { ok: false, error: "Nafn vantar" };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("locations").update({ name: input.name.trim() }).eq("id", id).eq("company_id", ctx.company);
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "location.update", entity: "location", entityId: id, detail: `Staður uppfærður — ${input.name.trim()}` });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+export async function deleteLocation(id: string): Promise<SettingsResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data: deps } = await supabase.from("departments").select("id").eq("location_id", id).limit(1);
+    if (deps?.length) return { ok: false, error: "Staðurinn er með deildir — eyddu eða færðu þær fyrst." };
+    await supabase.from("employees").update({ location_id: null }).eq("location_id", id).eq("company_id", ctx.company);
+    const { error } = await supabase.from("locations").delete().eq("id", id).eq("company_id", ctx.company);
+    if (error) return { ok: false, error: /foreign key|violates/i.test(error.message) ? "Staðurinn er í notkun (velta/vaktir tengdar) — ekki hægt að eyða." : error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "location.delete", entity: "location", entityId: id, detail: "Stað eytt" });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /** Rename a department (company-scoped via its location). */
 export async function renameDepartment(id: string, name: string, color?: string | null): Promise<SettingsResult> {
   if (!name?.trim()) return { ok: false, error: "Nafn vantar" };

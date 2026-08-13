@@ -805,7 +805,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                     <tr key={r}>
                       <td className="nm">
                         <div style={{ display: "flex", alignItems: "center" }}>
-                          <span className="who"><span className="avt" style={{ background: e[3] }}>{e[0]}</span><span>{e[1]}<small style={deptColors[e[2]] ? { color: deptColors[e[2]], fontWeight: 600 } : undefined}>{t(e[2])}</small></span></span>
+                          <span className="who"><span className="avt" style={{ background: e[3], ...(deptColors[e[2]] ? { boxShadow: `0 0 0 2px #fff, 0 0 0 4.5px ${deptColors[e[2]]}` } : {}) }}>{e[0]}</span><span>{e[1]}<small>{t(e[2])}</small></span></span>
                           <button className="rmemp" title={t("Fjarlægja af plani")} onClick={() => removeEmpRow(r)}>✕</button>
                         </div>
                       </td>

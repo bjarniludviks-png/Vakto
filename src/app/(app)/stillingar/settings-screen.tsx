@@ -6,7 +6,7 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { syncInventraRevenue, addLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
+import { syncInventraRevenue, addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
 import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
@@ -44,6 +44,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
   const [keyModal, setKeyModal] = useState(false);
   const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
   const [deptEdit, setDeptEdit] = useState<{ id: string; name: string; location: string; staff: number; color: string | null; members: string[] } | null>(null);
+  const [rowEdit, setRowEdit] = useState<{ kind: "location" | "position"; id: string; name: string; rate?: number } | null>(null);
   const [posName, setPosName] = useState<string | null>(null);
   function posConnect(name: string) { setPosName(name === "POS" ? "" : name); }
   const [section, setSection] = useState<string>(initialModal === "revenue" || initialModal === "avgrevenue" ? "velta" : "fyrirtaeki");
@@ -175,7 +176,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
           <div className="ch"><div className="ct">{t("Staðir")}</div><button className="btn sm" onClick={() => setModal("location")}>{t("+ Bæta við stað")}</button></div>
           <div className="cb att">
             {data.locations.map((l) => (
-              <div className="it" key={l.name}>
+              <div className={l.id ? "it rowlink" : "it"} key={l.name} onClick={() => l.id && setRowEdit({ kind: "location", id: l.id, name: l.name })}>
                 <div className={`ic ${l.staff > 0 ? "info" : "mut"}`} style={l.staff > 0 ? undefined : { background: "var(--line2)" }}><Pin /></div>
                 <div className="tx"><b>{l.name}</b><span>{l.staff} {t("starfsmenn")} · {l.timezone}</span></div>
                 <span className={`tag ${l.staff > 0 ? "good" : "mut"}`}>{l.staff > 0 ? t("virkt") : t("nýtt")}</span>
@@ -188,7 +189,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
           <div className="ch"><div className="ct">{t("Stöður (positions)")}</div><button className="btn sm" onClick={() => setModal("position")}>{t("+ Ný staða")}</button></div>
           <div className="cb att">
             {data.positions.map((p) => (
-              <div className="it" key={p.name}>
+              <div className={p.id ? "it rowlink" : "it"} key={p.name} onClick={() => p.id && setRowEdit({ kind: "position", id: p.id, name: p.name, rate: p.rawRate })}>
                 <div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 14v5.5h12V14M6 14a4 4 0 0 1-1-7.8A4.5 4.5 0 0 1 12 4a4.5 4.5 0 0 1 7 2.2A4 4 0 0 1 18 14Z" /></svg></div>
                 <div className="tx"><b>{p.name}</b><span>{p.staff} {t("starfsmenn")} · {t("grunntaxti")} {p.baseRate} kr</span></div>
               </div>
@@ -253,6 +254,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
 
       {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} locations={data.locations.map((l) => l.name)} />}
       {deptEdit && <DeptEditModal dept={deptEdit} onClose={() => setDeptEdit(null)} />}
+      {rowEdit && <RowEditModal row={rowEdit} onClose={() => setRowEdit(null)} />}
       {keyModal && <ApiKeyModal onClose={() => setKeyModal(false)} />}
       {tplModal && <RuleTemplateModal tpl={tplModal === "new" ? null : tplModal} onClose={() => setTplModal(null)} />}
       {posName !== null && <PosConnectModal name={posName} onClose={() => setPosName(null)} />}
@@ -653,6 +655,52 @@ function DeptEditModal({ dept, onClose }: { dept: { id: string; name: string; lo
             <p className="muted" style={{ fontSize: 12.5 }}>{t("Enginn skráður í deildina — veldu deild á starfsmanni (Starfsfólk → Vinna).")}</p>
           )}
           <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{dept.location}</p>
+          <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
+            <button className="btn" disabled={busy} onClick={save}>{t("Vista")}</button>
+            <button className="btn ghost" disabled={busy} onClick={remove} style={{ color: "var(--bad)" }}>{t("Eyða")}</button>
+            <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Edit or delete a position / location. */
+function RowEditModal({ row, onClose }: { row: { kind: "location" | "position"; id: string; name: string; rate?: number }; onClose: () => void }) {
+  const { t } = useLang();
+  const isPos = row.kind === "position";
+  const [name, setName] = useState(row.name);
+  const [rate, setRate] = useState(row.rate ? String(row.rate) : "");
+  const [busy, setBusy] = useState(false);
+  async function save() {
+    setBusy(true);
+    const res = isPos ? await updatePosition(row.id, { name, baseRate: rate }) : await updateLocation(row.id, { name });
+    setBusy(false);
+    if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
+    onClose();
+    toast(res.demo ? t("Vistað (demo)") : (isPos ? t("Staða uppfærð") : t("Staður uppfærður")));
+  }
+  async function remove() {
+    const q = isPos
+      ? t("Eyða stöðunni? Starfsfólk með hana verður án stöðu (ekki eytt).")
+      : t("Eyða staðnum? Aðeins hægt ef engar deildir eða veltufærslur eru tengdar honum.");
+    if (!window.confirm(q)) return;
+    setBusy(true);
+    const res = isPos ? await deletePosition(row.id) : await deleteLocation(row.id);
+    setBusy(false);
+    if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
+    onClose();
+    toast(res.demo ? t("Eytt (demo)") : (isPos ? t("Stöðu eytt") : t("Stað eytt")));
+  }
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal">
+        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{row.name}</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="mb">
+          <div className="field"><label>{isPos ? t("Heiti stöðu") : t("Heiti staðar")}</label><input value={name} onChange={(e) => setName(e.target.value)} autoFocus /></div>
+          {isPos && <div className="field"><label>{t("Grunntaxti (kr/klst)")}</label><input value={rate} onChange={(e) => setRate(e.target.value)} placeholder="2.900" /></div>}
           <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
             <button className="btn" disabled={busy} onClick={save}>{t("Vista")}</button>
             <button className="btn ghost" disabled={busy} onClick={remove} style={{ color: "var(--bad)" }}>{t("Eyða")}</button>

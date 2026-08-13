@@ -1161,6 +1161,12 @@ export const DICT: Dict = {
   "Vaktategund uppfærð": { is: "Vaktategund uppfærð", en: "Shift type updated", vi: "Đã cập nhật loại ca" },
   "Hætta við breytingu": { is: "Hætta við breytingu", en: "Cancel edit", vi: "Hủy chỉnh sửa" },
   "Smelltu á vaktategund til að breyta henni — heiti, tímum, álagi eða lit. Breytingar vistast og litirnir uppfærast í planinu.": { is: "Smelltu á vaktategund til að breyta henni — heiti, tímum, álagi eða lit. Breytingar vistast og litirnir uppfærast í planinu.", en: "Click a shift type to edit it — name, times, premium or color. Changes are saved and colors update across the schedule.", vi: "Nhấp vào loại ca để chỉnh sửa — tên, giờ, phụ cấp hoặc màu. Thay đổi được lưu và màu cập nhật trên lịch." },
+  "Staða uppfærð": { is: "Staða uppfærð", en: "Position updated", vi: "Đã cập nhật vị trí" },
+  "Staður uppfærður": { is: "Staður uppfærður", en: "Location updated", vi: "Đã cập nhật địa điểm" },
+  "Stöðu eytt": { is: "Stöðu eytt", en: "Position deleted", vi: "Đã xóa vị trí" },
+  "Stað eytt": { is: "Stað eytt", en: "Location deleted", vi: "Đã xóa địa điểm" },
+  "Eyða stöðunni? Starfsfólk með hana verður án stöðu (ekki eytt).": { is: "Eyða stöðunni? Starfsfólk með hana verður án stöðu (ekki eytt).", en: "Delete this position? Staff holding it will be left without a position (not deleted).", vi: "Xóa vị trí này? Nhân viên giữ vị trí sẽ không có vị trí (không bị xóa)." },
+  "Eyða staðnum? Aðeins hægt ef engar deildir eða veltufærslur eru tengdar honum.": { is: "Eyða staðnum? Aðeins hægt ef engar deildir eða veltufærslur eru tengdar honum.", en: "Delete this location? Only possible when no departments or revenue entries are linked to it.", vi: "Xóa địa điểm này? Chỉ được khi không có bộ phận hoặc doanh thu liên kết." },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

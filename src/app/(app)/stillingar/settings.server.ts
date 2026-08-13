@@ -4,8 +4,8 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees } from "@/lib/employees.server";
 import { nf } from "@/lib/format";
 
-export type LocationRow = { name: string; staff: number; timezone: string };
-export type PositionRow = { name: string; staff: number; baseRate: string };
+export type LocationRow = { id?: string; name: string; staff: number; timezone: string };
+export type PositionRow = { id?: string; name: string; staff: number; baseRate: string; rawRate?: number };
 export type UserRow = { name: string; initials: string; role: string; email: string };
 export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string; payPeriodStart?: number };
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
@@ -57,8 +57,8 @@ export async function getSettingsData(): Promise<SettingsData> {
       employees.filter((e) => e[key] === name).length;
 
     const [{ data: locs }, { data: pos }, { data: usrs }, compRes] = await Promise.all([
-      supabase.from("locations").select("name, timezone").eq("company_id", company).order("name"),
-      supabase.from("positions").select("name, base_rate").eq("company_id", company).order("name"),
+      supabase.from("locations").select("id, name, timezone").eq("company_id", company).order("name"),
+      supabase.from("positions").select("id, name, base_rate").eq("company_id", company).order("name"),
       supabase.from("users").select("full_name, email, role").eq("company_id", company).order("role"),
       supabase.from("companies").select("name, kennitala, address, phone, email").eq("id", company).maybeSingle(),
     ]);
@@ -106,11 +106,13 @@ export async function getSettingsData(): Promise<SettingsData> {
     return {
       departments,
       locations: (locs ?? []).map((l) => ({
+        id: l.id as string,
         name: l.name as string, timezone: (l.timezone as string) ?? "Atlantic/Reykjavik",
         staff: countBy("location")(l.name as string),
       })),
       positions: (pos ?? []).map((p) => ({
-        name: p.name as string, baseRate: nf(Number(p.base_rate) || 0),
+        id: p.id as string,
+        name: p.name as string, baseRate: nf(Number(p.base_rate) || 0), rawRate: Number(p.base_rate) || 0,
         staff: countBy("position")(p.name as string),
       })),
       users: (usrs ?? []).map((u) => ({
