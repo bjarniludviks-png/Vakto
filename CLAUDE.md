@@ -183,6 +183,23 @@
   `setBillingStatus` (paying/unpaid/free/auto — handvirkt þar til Teya) + `extendTrial` (+14 d, þolið
   án 0027). Migration **0027** (`billing_status` á companies). „VAKTO Admin" hlekkur í account-valmynd
   (shield-íkon) fyrir admin. Sannreynt e2e á prod-gögnum (2 fyrirtæki, trial-framlenging virkar).
-  **Næsti fasi (ákveðið af eiganda):** mobile app (eigandi með ákveðna leið — SPYRJA hann), Apple
+  **Næsti fasi (ákveðið af eiganda):** mobile app (✅ hafinn — sjá að neðan), Apple
   Wallet skírteini (WalletButtons til), alvöru stuðningsspjall við eigandann, Teya-áskriftir tengdar
   Payday (mánaðarreikningar sjálfvirkt — kveikja þá á sjálfvirkri greiðslustöðu í /admin).
+- ✅ **Mobile app v1 (ág. 2026) — Expo/React Native í `mobile/`:** starfsmanna-appið sem eigandinn
+  valdi (Expo-leiðin, umfang: allt starfsmanna-flæðið + spjall + fréttaveita + skjalasafn +
+  ráðningarsamningur + skírteini). Expo SDK 57 / RN 0.86 / expo-router; talar BEINT við Supabase
+  (anon key + RLS, engar Next-server-actions): `mobile/src/lib/api/{me,punches,requests,chat,feed,docs}.ts`
+  spegla vefinn; `payroll.ts`+`payrules.ts` afrituð (launamat úr stimplunum eins og Mitt svæði).
+  Design: sömu tókar (General Sans OTF í assets, brand-appelsínugult, 14px kort) — `src/theme.ts`.
+  Skjáir: login, (tabs) Heim/Vaktir/Spjall/Fréttir/Meira + beidnir/skjol/samningur/skirteini/
+  profill/spjall/[id]. Store-klárt: `is.vakto.app` bundle id, VAKTO-íkonar (súlurnar), eas.json
+  (dev/preview/production) — sjá `mobile/README.md` fyrir `eas init/build/submit` þegar App Store
+  Connect + Play Console aðgangar eru komnir. **Migration 0041** (punches self insert/update,
+  employees self-read, documents-bucket lesheimild starfsmanna á shared/eigin möppu) er FORSENDA
+  stimplunar/skjala fyrir hreina starfsmannaaðganga — keyra á staging (og prod við release).
+  Sannreynt e2e á staging (Expo web + `mobile/scripts/verify-data.mjs`): innskráning, stimplun
+  inn/út, vikuplan, réttindi, spjall, fréttir (viðbrögð/athugasemdir), skjalasafn m. signed URL.
+  ATH: staging-prófunaraðgangurinn var tengdur starfsmanninum „Phong Ha" (employees.user_id) svo
+  starfsmannaflæðin séu prófanleg. Eftir í appinu: push-tilkynningar, myndataka prófílmyndar,
+  undirritun samnings, Wallet.
