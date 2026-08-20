@@ -45,6 +45,13 @@
       "expo-image",
       "expo-sharing",
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a558b863-f212-496f-b012-c848555946eb"
+      }
+    },
+    "owner": "bjarniludviks"
   }
 }
