@@ -5,8 +5,12 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { initials } from "@/lib/employees";
 import { notifyEmployee } from "@/lib/push";
 
-export type Conversation = { id: string; name: string; kind: string; av: string; color: string; last: string; lastAt: string | null; dm: boolean };
-export type ChatMessage = { id: string; sender: string; senderId: string; me: boolean; body: string; at: string; kind: string; url: string | null };
+export type Conversation = { id: string; name: string; kind: string; av: string; color: string; last: string; lastAt: string | null; dm: boolean; photo: string | null };
+export type ChatMessage = {
+  id: string; sender: string; senderId: string; me: boolean; body: string; at: string; kind: string; url: string | null;
+  reactions: { emoji: string; count: number; mine: boolean }[];
+  replyTo: { sender: string; body: string } | null;
+};
 export type Person = { userId: string; name: string; av: string; color: string };
 export type Members = { members: Person[]; adminId: string | null; meId: string };
 
@@ -23,6 +27,12 @@ async function ctxOf(supabase: Awaited<ReturnType<typeof createClient>>) {
   return { userId: user.id, company };
 }
 
+/** user_id → full_name from employees — fallback when a users row is missing. */
+async function empNameMap(supabase: Awaited<ReturnType<typeof createClient>>, company: string): Promise<Map<string, string>> {
+  const { data } = await supabase.from("employees").select("user_id, full_name").eq("company_id", company).not("user_id", "is", null);
+  return new Map((data ?? []).map((e) => [e.user_id as string, e.full_name as string]));
+}
+
 /** Conversations the user can see: general + their groups + their DMs. */
 export async function listConversations(): Promise<{ ok: boolean; items: Conversation[]; meId: string; needsMigration?: boolean }> {
   if (!isSupabaseConfigured()) return { ok: false, items: [], meId: "" };
@@ -31,9 +41,11 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, items: [], meId: "" };
 
-    const chRes = await supabase.from("channels").select("id, name, kind, created_by").eq("company_id", ctx.company).order("created_at");
+    // photo_url arrives with migration 0042 — fall back to the old shape before it runs
+    let chRes = await supabase.from("channels").select("id, name, kind, created_by, photo_url").eq("company_id", ctx.company).order("created_at");
+    if (chRes.error) chRes = (await supabase.from("channels").select("id, name, kind, created_by").eq("company_id", ctx.company).order("created_at")) as unknown as typeof chRes;
     if (chRes.error) return { ok: false, items: [], meId: ctx.userId, needsMigration: true };
-    let channels = chRes.data as { id: string; name: string; kind: string; created_by: string }[];
+    let channels = chRes.data as { id: string; name: string; kind: string; created_by: string; photo_url?: string | null }[];
     if (!channels.length) {
       const { data: created } = await supabase.from("channels")
         .insert({ company_id: ctx.company, name: "Almennt", kind: "general", created_by: ctx.userId })
@@ -43,15 +55,16 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
     const ids = channels.map((c) => c.id);
 
     // member names per channel (to resolve DM titles) + last message
-    const [{ data: mems }, { data: msgs }] = await Promise.all([
+    const [{ data: mems }, { data: msgs }, emps] = await Promise.all([
       supabase.from("channel_members").select("channel_id, user_id, users(full_name)").in("channel_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
       supabase.from("messages").select("channel_id, body, kind, created_at").in("channel_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).order("created_at", { ascending: false }).limit(400),
+      empNameMap(supabase, ctx.company),
     ]);
     const memByCh = new Map<string, { id: string; name: string }[]>();
     for (const m of mems ?? []) {
       const u = (Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null;
       if (!memByCh.has(m.channel_id as string)) memByCh.set(m.channel_id as string, []);
-      memByCh.get(m.channel_id as string)!.push({ id: m.user_id as string, name: u?.full_name ?? "?" });
+      memByCh.get(m.channel_id as string)!.push({ id: m.user_id as string, name: u?.full_name ?? emps.get(m.user_id as string) ?? "?" });
     }
     const lastByCh = new Map<string, string>();
     const lastAtByCh = new Map<string, string>();
@@ -68,7 +81,7 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
         : dm ? (others[0]?.name ?? "Bein skilaboð")
           : c.name;
       const first = name.split(/\s+/)[0];
-      return { id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: colorOf(first), last: lastByCh.get(c.id) ?? "", lastAt: lastAtByCh.get(c.id) ?? null, dm };
+      return { id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: colorOf(first), last: lastByCh.get(c.id) ?? "", lastAt: lastAtByCh.get(c.id) ?? null, dm, photo: c.photo_url ?? null };
     });
     // Newest activity on top; the company-wide "Almennt" channel stays pinned first.
     items.sort((a, b) => (a.kind === "general" ? -1 : b.kind === "general" ? 1 : (b.lastAt ?? "").localeCompare(a.lastAt ?? "")));
@@ -147,10 +160,13 @@ export async function listMembers(channelId: string): Promise<Members> {
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return empty;
     const { data: ch } = await supabase.from("channels").select("created_by").eq("id", channelId).maybeSingle();
-    const { data } = await supabase.from("channel_members").select("user_id, users(full_name)").eq("channel_id", channelId);
+    const [{ data }, emps] = await Promise.all([
+      supabase.from("channel_members").select("user_id, users(full_name)").eq("channel_id", channelId),
+      empNameMap(supabase, ctx.company),
+    ]);
     const members: Person[] = (data ?? []).map((m) => {
       const u = (Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null;
-      const name = u?.full_name ?? "?";
+      const name = u?.full_name ?? emps.get(m.user_id as string) ?? "?";
       return { userId: m.user_id as string, name, av: initials(name), color: colorOf(name.split(/\s+/)[0]) };
     });
     return { members, adminId: (ch?.created_by as string) ?? null, meId: ctx.userId };
@@ -209,15 +225,47 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, messages: [] };
-    const { data } = await supabase
-      .from("messages").select("id, body, kind, attachment_url, created_at, sender_id, users(full_name)")
+    // reply_to arrives with migration 0042 — fall back to the old shape before it runs
+    let res = await supabase
+      .from("messages").select("id, body, kind, attachment_url, created_at, sender_id, reply_to, users(full_name)")
       .eq("company_id", ctx.company).eq("channel_id", channelId).order("created_at").limit(300);
-    const messages: ChatMessage[] = (data ?? []).map((m) => {
+    if (res.error) {
+      res = (await supabase
+        .from("messages").select("id, body, kind, attachment_url, created_at, sender_id, users(full_name)")
+        .eq("company_id", ctx.company).eq("channel_id", channelId).order("created_at").limit(300)) as unknown as typeof res;
+    }
+    const data = res.data ?? [];
+
+    // reactions (table arrives with 0042 — tolerate its absence)
+    const reactByMsg = new Map<string, { emoji: string; count: number; mine: boolean }[]>();
+    try {
+      const ids = data.map((m) => m.id as string);
+      const { data: reacts } = await supabase.from("message_reactions")
+        .select("message_id, user_id, emoji")
+        .in("message_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+      for (const r of reacts ?? []) {
+        const list = reactByMsg.get(r.message_id as string) ?? [];
+        const hit = list.find((x) => x.emoji === r.emoji);
+        if (hit) { hit.count++; hit.mine = hit.mine || r.user_id === ctx.userId; }
+        else list.push({ emoji: r.emoji as string, count: 1, mine: r.user_id === ctx.userId });
+        reactByMsg.set(r.message_id as string, list);
+      }
+    } catch { /* pre-0042 */ }
+
+    const emps = await empNameMap(supabase, ctx.company);
+    const senderOf = (m: (typeof data)[number]) => {
       const u = (Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null;
+      return (u?.full_name ?? emps.get(m.sender_id as string) ?? "—").split(/\s+/)[0];
+    };
+    const byId = new Map(data.map((m) => [m.id as string, m]));
+    const messages: ChatMessage[] = data.map((m) => {
+      const rt = "reply_to" in m && m.reply_to ? byId.get(m.reply_to as string) : undefined;
       return {
-        id: m.id as string, sender: (u?.full_name ?? "—").split(/\s+/)[0], senderId: m.sender_id as string,
+        id: m.id as string, sender: senderOf(m), senderId: m.sender_id as string,
         me: m.sender_id === ctx.userId, body: (m.body as string) ?? "", at: hhmm(m.created_at as string),
         kind: (m.kind as string) ?? "text", url: (m.attachment_url as string) ?? null,
+        reactions: (reactByMsg.get(m.id as string) ?? []).sort((a, b) => b.count - a.count),
+        replyTo: rt ? { sender: senderOf(rt), body: rt.kind === "image" ? "📷 Mynd" : rt.kind === "audio" ? "🎤 Talskilaboð" : ((rt.body as string) ?? "") } : null,
       };
     });
     return { ok: true, messages };
@@ -226,7 +274,7 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
   }
 }
 
-export async function sendChatMessage(channelId: string, body: string, kind: "text" | "image" | "audio" = "text", attachmentUrl?: string): Promise<{ ok: boolean; error?: string }> {
+export async function sendChatMessage(channelId: string, body: string, kind: "text" | "image" | "audio" = "text", attachmentUrl?: string, replyTo?: string): Promise<{ ok: boolean; error?: string }> {
   if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
   const text = body.trim();
   if ((!text && kind === "text") || !channelId) return { ok: false };
@@ -234,12 +282,96 @@ export async function sendChatMessage(channelId: string, body: string, kind: "te
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    const { error } = await supabase.from("messages").insert({
+    const row = {
       company_id: ctx.company, channel_id: channelId, sender_id: ctx.userId,
       body: text || (kind === "image" ? "Mynd" : "Talskilaboð"), kind, attachment_url: attachmentUrl ?? null,
-    });
+    };
+    // reply_to column arrives with 0042 — retry without it if the insert rejects
+    let error: { message: string } | null;
+    if (replyTo) {
+      ({ error } = await supabase.from("messages").insert({ ...row, reply_to: replyTo } as never));
+      if (error) ({ error } = await supabase.from("messages").insert(row));
+    } else {
+      ({ error } = await supabase.from("messages").insert(row));
+    }
     if (error) return { ok: false, error: error.message };
     return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** One emoji reaction per user per message — emoji sets/updates, null removes. */
+export async function setMessageReaction(messageId: string, emoji: string | null): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    if (emoji) {
+      const { error } = await supabase.from("message_reactions").upsert({ message_id: messageId, user_id: ctx.userId, company_id: ctx.company, emoji });
+      if (error) return { ok: false, error: "Keyrðu migration 0042 fyrir viðbrögð" };
+    } else {
+      await supabase.from("message_reactions").delete().eq("message_id", messageId).eq("user_id", ctx.userId);
+    }
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Villa" };
+  }
+}
+
+/** Unsend: delete your own message (RLS-enforced, migration 0042). */
+export async function deleteMessage(messageId: string): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data, error } = await supabase.from("messages").delete().eq("id", messageId).eq("sender_id", ctx.userId).select("id");
+    if (error) return { ok: false, error: error.message };
+    if (!data?.length) return { ok: false, error: "Ekki tókst að eyða (migration 0042?)" };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Rename a group (any member — RLS `channels_member_update`, migration 0042). */
+export async function renameChannel(channelId: string, name: string): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
+  const nm = name.trim();
+  if (!nm) return { ok: false, error: "Sláðu inn heiti" };
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data, error } = await supabase.from("channels").update({ name: nm }).eq("id", channelId).eq("kind", "group").select("id");
+    if (error) return { ok: false, error: error.message };
+    if (!data?.length) return { ok: false, error: "Ekki tókst að breyta heiti" };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Set a group photo: upload (base64 data URL) to the chat bucket + save on the channel. */
+export async function setChannelPhoto(channelId: string, dataUrl: string, ext: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const comma = dataUrl.indexOf(",");
+    const contentType = dataUrl.slice(5, comma).split(";")[0] || "image/png";
+    const buf = Buffer.from(dataUrl.slice(comma + 1), "base64");
+    const path = `${ctx.company}/channel-${channelId}/${Date.now()}.${ext}`;
+    const up = await supabase.storage.from("chat").upload(path, buf, { contentType, upsert: false });
+    if (up.error) return { ok: false, error: up.error.message };
+    const { data: pub } = supabase.storage.from("chat").getPublicUrl(path);
+    const { data, error } = await supabase.from("channels").update({ photo_url: pub.publicUrl }).eq("id", channelId).select("id");
+    if (error) return { ok: false, error: "Keyrðu migration 0042 fyrir grúppumyndir" };
+    if (!data?.length) return { ok: false, error: "Ekki tókst að vista mynd" };
+    return { ok: true, url: pub.publicUrl };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }

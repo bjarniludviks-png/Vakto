@@ -171,6 +171,12 @@
   summar velta/laun% rétt; **AI-vaktaplan skilar nú `shifts`** (employee/day/start/end) sem
   `approveAiProposal` setur í gridið og birtir — samhengið inniheldur núverandi plan + raunveltu vikunnar.
   Öll ný UI-strengir í DICT (IS/EN). Migration 0025+0026 bætt í RUN_ALL.
+- ✅ **Messenger-spjall (ág. 2026):** hópamyndir (myndavélar-hnappur í upplýsinga-modal),
+  endurskírn grúppa (allir meðlimir, RLS `channels_member_update`), viðbrögð við skilaboðum
+  (❤️😂😮😢👍🔥 — `message_reactions`, eitt per notanda), svara-í-þráð (`messages.reply_to`,
+  tilvitnun í bólu + svar-borði yfir innslætti), eyða eigin skilaboðum, hover-aðgerðir á bólum,
+  nafna-fallback á `employees.full_name` þegar users-röð vantar. **Migration 0042** er forsenda
+  viðbragða/svara/hópamynda — spjallið sjálft þolir að hún vanti (fallback-fyrirspurnir).
 - ⚠️ **AI er EKKI virkt:** `ANTHROPIC_API_KEY` er tómur í `.env.local` og EKKI settur á Vercel —
   `/api/ai/schedule` fellur á demo-tillögu. Setja lykil (console.anthropic.com) + `vercel env add`.
 - **Still remaining:** contractor billable-vs-cost/GPS job tracking, a signed-URL viewer for the

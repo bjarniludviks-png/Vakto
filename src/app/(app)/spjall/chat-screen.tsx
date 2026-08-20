@@ -7,10 +7,21 @@ import { toast } from "@/components/app/toast";
 import {
   listConversations, listMessages, sendChatMessage, createGroup, startDM, searchPeople,
   listMembers, addMembers, removeMember, leaveChannel, uploadChatMedia,
+  renameChannel, setChannelPhoto, setMessageReaction, deleteMessage,
   type Conversation, type ChatMessage, type Person, type Members,
 } from "./actions";
 
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "🔥", "👏", "😅", "😮", "😢", "💪", "✅", "🤝", "☕", "🍕", "🚀"];
+const REACTIONS = ["❤️", "😂", "😮", "😢", "👍", "🔥"];
+
+/** Group/DM avatar — photo when set, else colored initials. */
+function ConvAvatar({ c, size = 40 }: { c: Conversation; size?: number }) {
+  if (c.photo) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className="avt-img" src={c.photo} alt="" style={{ width: size, height: size }} />;
+  }
+  return <span className="avt" style={{ background: c.color, width: size, height: size, fontSize: c.kind === "general" ? size * 0.45 : size * 0.33 }}>{c.av}</span>;
+}
 
 export default function ChatScreen({ initial }: { initial?: { ok: boolean; items: Conversation[]; meId: string } }) {
   if (!initial?.ok) return <DemoChat />;
@@ -42,11 +53,20 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
   const [rec, setRec] = useState(false);
   const [modal, setModal] = useState<null | "dm" | "group" | "info">(null);
   const [seen, setSeen] = useState<Record<string, string>>({});
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [reactFor, setReactFor] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
 
-  function reloadConvs() { listConversations().then((r) => { if (r.ok) setConvs(r.items); }); }
+  function reloadConvs() {
+    listConversations().then((r) => {
+      if (!r.ok) return;
+      setConvs(r.items);
+      // keep the open thread's name/photo fresh after rename or photo change
+      setActive((a) => (a ? r.items.find((x) => x.id === a.id) ?? a : a));
+    });
+  }
   function loadMsgs(id?: string) { if (id) listMessages(id).then((r) => { if (r.ok) setMsgs(r.messages); }); }
   function markSeen(id: string) {
     setSeen(() => {
@@ -71,9 +91,26 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
     if (kind === "text") setVal("");
     setEmoji(false);
     if (!active) return;
-    const res = await sendChatMessage(active.id, text, kind, url);
+    const reply = replyTo?.id;
+    setReplyTo(null);
+    const res = await sendChatMessage(active.id, text, kind, url, reply);
     if (!res.ok) toast(res.error ?? "Tókst ekki");
     loadMsgs(active.id); reloadConvs();
+  }
+
+  async function react(m: ChatMessage, emoji: string) {
+    setReactFor(null);
+    const mine = m.reactions.find((r) => r.mine);
+    const r = await setMessageReaction(m.id, mine?.emoji === emoji ? null : emoji);
+    if (!r.ok) toast(r.error ?? "Tókst ekki");
+    loadMsgs(active?.id);
+  }
+
+  async function unsend(m: ChatMessage) {
+    if (!window.confirm(t("Eyða skilaboðum?"))) return;
+    const r = await deleteMessage(m.id);
+    if (!r.ok) toast(r.error ?? "Tókst ekki");
+    loadMsgs(active?.id); reloadConvs();
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -127,7 +164,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
               const un = unread(c);
               return (
                 <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}`} onClick={() => { setActive(c); markSeen(c.id); }}>
-                  <span className="avt" style={{ background: c.color, width: 40, height: 40, fontSize: c.kind === "general" ? 18 : 13 }}>{c.av}</span>
+                  <ConvAvatar c={c} />
                   <div className="tx">
                     <b style={un ? { fontWeight: 800 } : undefined}>{c.kind === "general" ? "# " + c.name : c.name}</b>
                     <span style={un ? { color: "var(--ink)", fontWeight: 600 } : undefined}>{c.last || (c.dm ? t("Bein skilaboð") : t("Grúppa"))}</span>
@@ -148,24 +185,67 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
             <>
               <div className="msgr-head">
                 <button className="iconbtn mob-back" onClick={() => setActive(null)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6" /></svg></button>
-                <span className="avt" style={{ background: active.color, width: 34, height: 34, fontSize: 12 }}>{active.av}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>{active.kind === "general" ? "# " + active.name : active.name}</div>
+                <ConvAvatar c={active} size={34} />
+                <div
+                  style={{ flex: 1, minWidth: 0, cursor: active.dm ? undefined : "pointer" }}
+                  onClick={() => !active.dm && setModal("info")}
+                  title={active.dm ? undefined : t("Upplýsingar")}
+                >
+                  {active.kind === "general" ? "# " + active.name : active.name}
+                </div>
                 {!active.dm && <button className="iconbtn" title={t("Upplýsingar")} onClick={() => setModal("info")}><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></svg></button>}
               </div>
               <div className="msgr-msgs">
                 {msgs.length ? msgs.map((m) => (
-                  <div key={m.id} className={`mbub ${m.me ? "me" : "them"}`}>
-                    {!m.me && !active.dm && <span className="who" style={{ color: m.me ? "#fff" : "var(--brand)" }}>{m.sender}</span>}
-                    {m.kind === "image" && m.url
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={m.url} alt="" />
-                      : m.kind === "audio" && m.url ? <audio controls src={m.url} style={{ height: 36 }} />
-                        : m.body}
-                    <span className="tm">{m.at}</span>
+                  <div key={m.id} className={`mrow ${m.me ? "me" : "them"}${m.reactions.length ? " hasre" : ""}`}>
+                    <div className={`mbub ${m.me ? "me" : "them"}`}>
+                      {!m.me && !active.dm && <span className="who" style={{ color: m.me ? "#fff" : "var(--brand)" }}>{m.sender}</span>}
+                      {m.replyTo && (
+                        <span className="mreply"><b>{m.replyTo.sender}</b><span>{m.replyTo.body}</span></span>
+                      )}
+                      {m.kind === "image" && m.url
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={m.url} alt="" />
+                        : m.kind === "audio" && m.url ? <audio controls src={m.url} style={{ height: 36 }} />
+                          : m.body}
+                      <span className="tm">{m.at}</span>
+                      {m.reactions.length > 0 && (
+                        <span className="mreacts" onClick={() => react(m, m.reactions[0].emoji)}>
+                          {m.reactions.map((r) => <span key={r.emoji}>{r.emoji}{r.count > 1 ? <b>{r.count}</b> : null}</span>)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="mact">
+                      <button title={t("Bregðast við")} onClick={() => setReactFor(reactFor === m.id ? null : m.id)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" /></svg>
+                      </button>
+                      <button title={t("Svara")} onClick={() => { setReplyTo(m); setReactFor(null); }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 17l-5-5 5-5" /><path d="M4 12h11a5 5 0 0 1 5 5v2" /></svg>
+                      </button>
+                      {m.me && (
+                        <button title={t("Eyða")} onClick={() => unsend(m)}>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" /></svg>
+                        </button>
+                      )}
+                      {reactFor === m.id && (
+                        <div className="rpal" onMouseLeave={() => setReactFor(null)}>
+                          {REACTIONS.map((e) => <button key={e} onClick={() => react(m, e)}>{e}</button>)}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )) : <div className="muted" style={{ textAlign: "center", margin: "auto", fontSize: 13 }}>{t("Engin skilaboð enn — byrjaðu spjallið!")}</div>}
                 <div ref={endRef} />
               </div>
+              {replyTo && (
+                <div className="replybar">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 17l-5-5 5-5" /><path d="M4 12h11a5 5 0 0 1 5 5v2" /></svg>
+                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                    <b>{t("Svarar")} {replyTo.sender}:</b> {replyTo.kind === "image" ? "📷" : replyTo.kind === "audio" ? "🎤" : replyTo.body}
+                  </span>
+                  <button className="iconbtn" onClick={() => setReplyTo(null)} style={{ width: 24, height: 24 }}>✕</button>
+                </div>
+              )}
               {emoji && <div className="emojibar">{EMOJIS.map((e) => <button key={e} onClick={() => { setVal((v) => v + e); }}>{e}</button>)}</div>}
               <div className="msgr-input">
                 <button className="iconbtn" title={t("Tákn")} onClick={() => setEmoji((v) => !v)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" /></svg></button>
@@ -185,7 +265,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
 
       {modal === "dm" && <NewDMModal onClose={() => setModal(null)} onPick={async (p) => { const r = await startDM(p.userId); setModal(null); if (r.ok) { reloadConvs(); listConversations().then((c) => { const found = c.items.find((x) => x.id === r.id); if (found) setActive(found); }); } else toast(r.error ?? "Villa"); }} />}
       {modal === "group" && <NewGroupModal onClose={() => setModal(null)} onDone={(id) => { setModal(null); listConversations().then((c) => { if (c.ok) { setConvs(c.items); const f = c.items.find((x) => x.id === id); if (f) setActive(f); } }); }} />}
-      {modal === "info" && active && <InfoModal conv={active} onClose={() => setModal(null)} onLeft={() => { setModal(null); setActive(null); reloadConvs(); }} />}
+      {modal === "info" && active && <InfoModal conv={active} onClose={() => setModal(null)} onLeft={() => { setModal(null); setActive(null); reloadConvs(); }} onChanged={reloadConvs} />}
     </>
   );
 }
@@ -258,22 +338,68 @@ function NewGroupModal({ onClose, onDone }: { onClose: () => void; onDone: (id: 
   );
 }
 
-function InfoModal({ conv, onClose, onLeft }: { conv: Conversation; onClose: () => void; onLeft: () => void }) {
+function InfoModal({ conv, onClose, onLeft, onChanged }: { conv: Conversation; onClose: () => void; onLeft: () => void; onChanged: () => void }) {
   const { t } = useLang();
   const [m, setM] = useState<Members>({ members: [], adminId: null, meId: "" });
   const [adding, setAdding] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameVal, setNameVal] = useState(conv.name);
+  const photoRef = useRef<HTMLInputElement | null>(null);
   function reload() { listMembers(conv.id).then(setM); }
   useEffect(reload, [conv.id]);
   const admin = m.adminId === m.meId;
+  const group = conv.kind === "group";
   async function remove(p: Person) { const r = await removeMember(conv.id, p.userId); if (r.ok) reload(); else toast(r.error ?? "Villa"); }
   async function leave() { if (!window.confirm(`Hætta í „${conv.name}"?`)) return; const r = await leaveChannel(conv.id); if (r.ok) onLeft(); else toast(r.error ?? "Villa"); }
   async function add(p: Person) { const r = await addMembers(conv.id, [p.userId]); if (r.ok) { reload(); setAdding(false); } else toast(r.error ?? "Villa"); }
+  async function saveName() {
+    const r = await renameChannel(conv.id, nameVal);
+    if (r.ok) { setEditingName(false); onChanged(); toast(t("Heiti breytt")); } else toast(r.error ?? "Villa");
+  }
+  function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (!f) return;
+    if (photoRef.current) photoRef.current.value = "";
+    const r = new FileReader();
+    r.onload = async () => {
+      const ext = (f.name.split(".").pop() || "png").toLowerCase();
+      const up = await setChannelPhoto(conv.id, r.result as string, ext);
+      if (up.ok) { onChanged(); toast(t("Grúppumynd vistuð")); } else toast(up.error ?? "Villa");
+    };
+    r.readAsDataURL(f);
+  }
   return (
     <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="mbg" onClick={onClose} />
       <div className="modal">
         <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{conv.name}</div><button className="x" onClick={onClose}>✕</button></div>
         <div className="mb">
+          {group && !adding && (
+            <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
+              <button className="gphoto" title={t("Setja grúppumynd")} onClick={() => photoRef.current?.click()}>
+                <ConvAvatar c={conv} size={64} />
+                <span className="cam">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z" /><circle cx="12" cy="13" r="4" /></svg>
+                </span>
+              </button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {editingName ? (
+                  <div style={{ display: "flex", gap: 7 }}>
+                    <input autoFocus value={nameVal} onChange={(e) => setNameVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveName()} style={{ flex: 1, minWidth: 0 }} />
+                    <button className="btn sm" onClick={saveName}>{t("Vista")}</button>
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <b style={{ fontSize: 15 }}>{conv.name}</b>
+                    <button className="iconbtn" title={t("Breyta heiti")} onClick={() => { setNameVal(conv.name); setEditingName(true); }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9" /><path d="M16.5 3.5a2 2 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" /></svg>
+                    </button>
+                  </div>
+                )}
+                <span className="muted" style={{ fontSize: 12 }}>{t("Grúppa")} · {m.members.length} {t("meðlimir")}</span>
+              </div>
+              <input ref={photoRef} type="file" accept="image/*" hidden onChange={onPhoto} />
+            </div>
+          )}
           {adding ? (
             <>
               <PeoplePicker selected={new Set(m.members.map((x) => x.userId))} onToggle={add} />
