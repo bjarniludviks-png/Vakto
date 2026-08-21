@@ -565,6 +565,12 @@ export async function inviteUser(input: { email: string; role: string }): Promis
       await admin.from("users").update({ company_id: ctx.company, role }).eq("id", userId);
       // Record membership so the invited user can switch to this company (0023).
       await admin.from("company_members").upsert({ user_id: userId, company_id: ctx.company, role });
+      // Link the auth user to their employee profile (matched by email) so
+      // Mitt svæði, punches and the mobile app resolve auth_employee_id().
+      const { data: emp } = await admin.from("employees")
+        .select("id").eq("company_id", ctx.company).is("user_id", null)
+        .ilike("email", emailAddr).limit(1).maybeSingle();
+      if (emp) await admin.from("employees").update({ user_id: userId }).eq("id", emp.id);
     }
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "user.invite", entity: "user", detail: `Notanda boðið — ${input.email.trim()} (${role})`,
