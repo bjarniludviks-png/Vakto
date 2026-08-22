@@ -1,7 +1,7 @@
 // Heim — Mitt svæði: stimplun, vikuplan, næstu vaktir, launamat, réttindi.
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
-import { Clock, LogIn, LogOut } from "lucide-react-native";
+import { Clock, CalendarClock } from "lucide-react-native";
 import { Screen } from "../../src/components/screen";
 import { Card, Txt, Btn, Muted, Pill, SectionTitle } from "../../src/components/ui";
 import { colors } from "../../src/theme";
@@ -88,6 +88,22 @@ export default function Home() {
         setRefreshing(false);
       }}
     >
+      {/* Næsta vakt — Sling-style banner */}
+      {area?.upcoming?.[0] && !onShift ? (
+        <View style={{
+          flexDirection: "row", alignItems: "center", gap: 12,
+          backgroundColor: colors.brand, borderRadius: 14, padding: 14,
+        }}>
+          <CalendarClock color="#fff" size={22} />
+          <View style={{ flex: 1 }}>
+            <Txt size={12} color="#ffffffcc" weight="medium">Næsta vakt</Txt>
+            <Txt weight="semibold" size={15} color="#fff">
+              {area.upcoming[0].label} · {area.upcoming[0].time}
+            </Txt>
+          </View>
+        </View>
+      ) : null}
+
       {/* Stimplun */}
       <Card style={{ gap: 12 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
