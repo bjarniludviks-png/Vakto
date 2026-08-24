@@ -50,6 +50,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/ny") ||
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/nytt-lykilord") ||
+    pathname.startsWith("/adgangur-lokadur") ||
     pathname.startsWith("/kiosk") ||
     // PWA / icon assets must be reachable without auth (home-screen install).
     pathname === "/manifest.webmanifest" ||
@@ -74,7 +75,20 @@ export async function updateSession(request: NextRequest) {
   // Role-based access (brief §5). Only for authenticated, guarded app routes.
   if (user && !isPublic && !pathname.startsWith("/api") && !pathname.startsWith("/hjalp")) {
     const { data: profile } = await supabase
-      .from("users").select("role").eq("id", user.id).maybeSingle();
+      .from("users").select("role, companies(billing_status)").eq("id", user.id).maybeSingle();
+
+    // Suspended company → everyone locked out (except the VAKTO admin allowlist).
+    const co = (Array.isArray(profile?.companies) ? profile?.companies[0] : profile?.companies) as { billing_status?: string | null } | null;
+    if (co?.billing_status === "suspended" && pathname !== "/adgangur-lokadur") {
+      const adminList = (process.env.VAKTO_ADMIN_EMAILS || "bjarniludviks@icloud.com")
+        .split(",").map((s) => s.trim().toLowerCase());
+      if (!adminList.includes((user.email ?? "").toLowerCase())) {
+        const dest = request.nextUrl.clone();
+        dest.pathname = "/adgangur-lokadur";
+        return NextResponse.redirect(dest);
+      }
+    }
+
     const role = (profile?.role as Role) ?? "owner";
     if (!canAccess(role, pathname)) {
       const dest = request.nextUrl.clone();

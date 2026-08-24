@@ -16,7 +16,7 @@ export const PLAN_BASE = 9990;        // kr/mán m/VSK, 5 notendur innifaldir
 export const PLAN_INCLUDED_USERS = 5;
 export const PLAN_EXTRA_USER = 990;   // kr/mán per notanda umfram
 
-export type BillingStatus = "paying" | "trial" | "trial_expired" | "unpaid" | "free" | "none";
+export type BillingStatus = "paying" | "trial" | "trial_expired" | "unpaid" | "free" | "suspended" | "none";
 export type AdminCompany = {
   id: string;
   name: string;
@@ -54,8 +54,13 @@ export async function isVaktoAdmin(): Promise<boolean> {
   }
 }
 
+// STRIPE HOOK: when Stripe billing lands, resolve subscription state here —
+// read the company's stripe_customer/subscription (new table or column) and
+// let an active Stripe subscription mean "paying" before the manual override.
+// The webhook should write billing_status = 'paying'/'unpaid' so everything
+// below (MRR, gating, badges) keeps working unchanged.
 function deriveStatus(manual: string | null, trialEndsAt: string | null, plan: string | null): BillingStatus {
-  if (manual === "paying" || manual === "unpaid" || manual === "free") return manual;
+  if (manual === "paying" || manual === "unpaid" || manual === "free" || manual === "suspended") return manual;
   if (trialEndsAt) return new Date(trialEndsAt).getTime() > Date.now() ? "trial" : "trial_expired";
   return plan ? "trial_expired" : "none";
 }
@@ -145,5 +150,58 @@ export async function getAdminOverview(): Promise<AdminOverview> {
     return { ok: true, needsMigration, companies, totals };
   } catch {
     return EMPTY;
+  }
+}
+
+/* ---------- company drill-down (support view) ---------- */
+
+export type AdminCompanyDetail = {
+  ok: boolean;
+  users: { id: string; email: string | null; name: string | null; role: string | null; createdAt: string | null }[];
+  locations: string[];
+  employeesActive: number;
+  employeesInactive: number;
+  punches7d: number;
+  revenue30d: number;
+  audit: { action: string; detail: string | null; at: string }[];
+};
+
+/** Support drill-down over one company. Caller MUST have passed isVaktoAdmin(). */
+export async function getCompanyDetail(companyId: string): Promise<AdminCompanyDetail> {
+  const empty: AdminCompanyDetail = { ok: false, users: [], locations: [], employeesActive: 0, employeesInactive: 0, punches7d: 0, revenue30d: 0, audit: [] };
+  if (!(await isVaktoAdmin()) || !companyId) return empty;
+  try {
+    const db = createAdminClient();
+    const week = new Date(Date.now() - 7 * 86400000).toISOString();
+    const month = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const [usersRes, locRes, empRes, punchRes, audRes] = await Promise.all([
+      db.from("users").select("id, email, full_name, role, created_at").eq("company_id", companyId).order("created_at"),
+      db.from("locations").select("id, name").eq("company_id", companyId),
+      db.from("employees").select("status").eq("company_id", companyId),
+      db.from("punches").select("id", { count: "exact", head: true }).eq("company_id", companyId).gte("clock_in", week),
+      db.from("audit_log").select("action, detail, at").eq("company_id", companyId).order("at", { ascending: false }).limit(12),
+    ]);
+    const locIds = (locRes.data ?? []).map((l) => l.id as string);
+    let revenue30d = 0;
+    if (locIds.length) {
+      const { data: rev } = await db.from("revenue").select("amount").in("location_id", locIds).gte("date", month);
+      revenue30d = (rev ?? []).reduce((a, r) => a + Number(r.amount ?? 0), 0);
+    }
+    const emps = empRes.data ?? [];
+    return {
+      ok: true,
+      users: (usersRes.data ?? []).map((u) => ({
+        id: u.id as string, email: (u.email as string) ?? null, name: (u.full_name as string) ?? null,
+        role: (u.role as string) ?? null, createdAt: (u.created_at as string) ?? null,
+      })),
+      locations: (locRes.data ?? []).map((l) => String(l.name)),
+      employeesActive: emps.filter((e) => e.status === "active").length,
+      employeesInactive: emps.filter((e) => e.status !== "active").length,
+      punches7d: punchRes.count ?? 0,
+      revenue30d,
+      audit: (audRes.data ?? []).map((a) => ({ action: String(a.action), detail: (a.detail as string) ?? null, at: String(a.at) })),
+    };
+  } catch {
+    return empty;
   }
 }
