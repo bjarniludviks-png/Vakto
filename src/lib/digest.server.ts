@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, brandedReportHtml } from "@/lib/email";
 import { nf, dec1 } from "@/lib/format";
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -69,19 +69,22 @@ export async function sendDigests(now = new Date()): Promise<{ sent: number }> {
       }
       const top = [...perEmp.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
       const rowsHtml = top.map(([eid, h]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${nameOf.get(eid) ?? "?"}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">${dec1(h)} klst</td></tr>`).join("");
-      const html = `
-        <div style="font-family:sans-serif;max-width:560px">
-          <h2 style="color:#e9700f;margin:0 0 4px">VAKTO · ${co.name}</h2>
-          <h3 style="margin:0 0 16px">${p.label}</h3>
-          <table style="border-collapse:collapse;width:100%;margin-bottom:14px">
-            <tr><td style="padding:6px 10px"><b>Unnir tímar</b></td><td style="padding:6px 10px;text-align:right">${dec1(hours)} klst</td></tr>
-            <tr><td style="padding:6px 10px"><b>Áætlaður launakostnaður (m. gjöldum)</b></td><td style="padding:6px 10px;text-align:right">${nf(Math.round(cost))} kr</td></tr>
-            <tr><td style="padding:6px 10px"><b>Óáætlaðar stimplanir</b></td><td style="padding:6px 10px;text-align:right">${unsched}</td></tr>
-            <tr><td style="padding:6px 10px"><b>Opnar stimplanir</b></td><td style="padding:6px 10px;text-align:right">${open}</td></tr>
-          </table>
-          ${top.length ? `<p style="margin:0 0 6px"><b>Flestir tímar:</b></p><table style="border-collapse:collapse;width:100%">${rowsHtml}</table>` : ""}
-          <p style="color:#888;font-size:12px;margin-top:18px">Sjá nánar í Innsýn á <a href="https://vakto.is/innsyn" style="color:#e9700f">vakto.is</a> · VAKTO sendir þessa skýrslu sjálfkrafa.</p>
-        </div>`;
+      const stat = (label: string, value: string) =>
+        `<tr><td style="padding:8px 0;border-bottom:1px solid #eef0f3;color:#5f6470;font-size:14px">${label}</td>
+         <td style="padding:8px 0;border-bottom:1px solid #eef0f3;text-align:right;font-weight:700;font-variant-numeric:tabular-nums">${value}</td></tr>`;
+      const inner = `
+        <table style="border-collapse:collapse;width:100%;margin:4px 0 6px">
+          ${stat("Unnir tímar", `${dec1(hours)} klst`)}
+          ${stat("Áætlaður launakostnaður (m. gjöldum)", `${nf(Math.round(cost))} kr`)}
+          ${stat("Óáætlaðar stimplanir", String(unsched))}
+          ${stat("Opnar stimplanir", String(open))}
+        </table>
+        ${top.length ? `<div style="font-size:12px;font-weight:700;letter-spacing:.08em;color:#9296a6;margin:16px 0 4px">FLESTIR TÍMAR</div><table style="border-collapse:collapse;width:100%">${rowsHtml}</table>` : ""}`;
+      const html = brandedReportHtml({
+        preheader: `${co.name} · ${p.label}`,
+        heading: `${co.name} — ${p.label}`,
+        innerHtml: inner,
+      });
       for (const to of emails) {
         const res = await sendEmail({ to, subject: `${co.name} · ${p.label}`, html });
         if (res.ok && !res.skipped) sent++;

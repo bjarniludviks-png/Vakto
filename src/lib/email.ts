@@ -110,6 +110,20 @@ function template(o: Bilingual): string {
 </table></body></html>`;
 }
 
+/** Branded shell for automatic reports (digest emails) — same VAKTO design. */
+export function brandedReportHtml(o: { preheader: string; heading: string; innerHtml: string }): string {
+  return template({
+    preheader: o.preheader,
+    heading: o.heading,
+    body: o.innerHtml,
+    headingEn: "Automatic VAKTO report",
+    bodyEn: "This report was generated automatically by VAKTO. See details and charts in Insights on vakto.is.",
+    ctaLabel: "Opna Innsýn",
+    ctaLabelEn: "Open Insights",
+    ctaHref: `${APP_URL}/innsyn`,
+  });
+}
+
 /* ---------- the emails ---------- */
 
 export async function sendWelcomeEmail(to: string, name: string, company: string) {
