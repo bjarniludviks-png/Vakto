@@ -550,14 +550,14 @@ export async function inviteUser(input: { email: string; role: string }): Promis
     let userId: string | undefined;
     if (emailConfigured()) {
       // Branded VAKTO invite via Resend (generateLink doesn't send its own email).
-      // redirectTo lands the invitee on the set-password page (tokens would be
-      // lost on the marketing homepage otherwise).
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is";
-      const { data: gen, error } = await admin.auth.admin.generateLink({ type: "invite", email: emailAddr, options: { data: { role, company_id: ctx.company }, redirectTo: `${appUrl}/nytt-lykilord` } });
+      const { data: gen, error } = await admin.auth.admin.generateLink({ type: "invite", email: emailAddr, options: { data: { role, company_id: ctx.company } } });
       if (error) return { ok: false, error: error.message };
       userId = gen?.user?.id;
-      const link = gen?.properties?.action_link;
-      if (link) await sendInviteEmail(emailAddr, companyName, input.role, link);
+      // token_hash link → /nytt-lykilord verifies it itself and the invitee
+      // picks a password there (no fragile redirect chain).
+      const hash = gen?.properties?.hashed_token;
+      if (hash) await sendInviteEmail(emailAddr, companyName, input.role, `${appUrl}/nytt-lykilord?token_hash=${hash}&type=invite`);
     } else {
       // Supabase sends its default invite email.
       const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(emailAddr, { data: { role, company_id: ctx.company } });

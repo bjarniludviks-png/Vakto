@@ -14,13 +14,11 @@ export async function requestPasswordReset(email: string): Promise<{ ok: boolean
   try {
     const admin = createAdminClient();
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is";
-    const { data } = await admin.auth.admin.generateLink({
-      type: "recovery",
-      email: to,
-      options: { redirectTo: `${appUrl}/nytt-lykilord` },
-    });
-    const link = data?.properties?.action_link;
-    if (link) await sendResetEmail(to, link);
+    const { data } = await admin.auth.admin.generateLink({ type: "recovery", email: to });
+    // token_hash link → the set-password page verifies it itself (verifyOtp);
+    // no Supabase redirect chain, so it works in every browser/mail client.
+    const hash = data?.properties?.hashed_token;
+    if (hash) await sendResetEmail(to, `${appUrl}/nytt-lykilord?token_hash=${hash}&type=recovery`);
   } catch { /* swallow — same response either way */ }
   return { ok: true };
 }
