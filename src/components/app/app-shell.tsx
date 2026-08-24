@@ -290,7 +290,7 @@ export default function AppShell({
                   <Icon name="settings" className="ei" />{t("acct:settings")}
                 </div>
                 {account.vaktoAdmin && (
-                  <div className="mi" onClick={() => nav("/admin")}>
+                  <div className="mi" onClick={() => { window.location.assign(window.location.hostname.endsWith("vakto.is") ? "https://admin.vakto.is" : "/admin"); }}>
                     <Icon name="shield" className="ei" />VAKTO Admin
                   </div>
                 )}

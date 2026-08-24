@@ -43,6 +43,45 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+
+  // ---------- VAKTO Platform host (admin.vakto.is) ----------
+  // Its own surface with its own session (cookies are host-scoped, so a
+  // BM-Veitingar login on vakto.is never leaks over here — and vice versa).
+  const host = (request.headers.get("host") ?? "").toLowerCase();
+  const isAdminHost = host === "admin.vakto.is" || host.startsWith("admin.localhost");
+  const adminAllowlist = (process.env.VAKTO_ADMIN_EMAILS || "bjarniludviks@icloud.com")
+    .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (isAdminHost) {
+    const adminPublic = pathname.startsWith("/login") || pathname.startsWith("/auth/") ||
+      pathname.startsWith("/nytt-lykilord") || pathname.startsWith("/_next") ||
+      pathname === "/favicon.ico" || pathname.startsWith("/icon") || pathname.startsWith("/apple-icon") ||
+      pathname === "/manifest.webmanifest" || pathname === "/robots.txt";
+    if (user && !adminAllowlist.includes((user.email ?? "").toLowerCase())) {
+      // Signed in but not VAKTO staff → back to the customer product.
+      return NextResponse.redirect("https://vakto.is/maelabord");
+    }
+    if (!user && !adminPublic) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = "/login";
+      return NextResponse.redirect(loginUrl);
+    }
+    if (user && !pathname.startsWith("/admin") && !adminPublic) {
+      const dest = request.nextUrl.clone();
+      dest.pathname = "/admin";
+      return NextResponse.redirect(dest);
+    }
+    if (pathname === "/") {
+      const dest = request.nextUrl.clone();
+      dest.pathname = user ? "/admin" : "/login";
+      return NextResponse.redirect(dest);
+    }
+    return supabaseResponse;
+  }
+  // Production main host: the platform area lives on its own subdomain.
+  if (pathname.startsWith("/admin") && (host === "vakto.is" || host === "www.vakto.is")) {
+    return NextResponse.redirect("https://admin.vakto.is/admin");
+  }
+
   const isPublic =
     pathname === "/" ||
     pathname.startsWith("/login") ||
