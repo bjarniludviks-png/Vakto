@@ -156,7 +156,11 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
   }
 }
 
-export type ImportRow = { fullName: string; kennitala?: string; email?: string; phone?: string; hireDate?: string; active?: boolean };
+export type ImportRow = {
+  fullName: string; kennitala?: string; email?: string; phone?: string; hireDate?: string; active?: boolean;
+  role?: string; position?: string; department?: string; location?: string;
+  payType?: string; rate?: string; employmentRatio?: string; union?: string; bankAccount?: string;
+};
 export type ImportResult = { ok: boolean; demo?: boolean; inserted?: number; skipped?: number; error?: string };
 
 /** Bulk-import employees (e.g. from a Payday Excel export). Chunked for large teams. */
@@ -181,6 +185,20 @@ export async function importEmployees(rows: ImportRow[]): Promise<ImportResult> 
       }
     }
 
+    // Resolve department/position/location names once per unique value.
+    const uniq = (vals: (string | undefined)[]) => [...new Set(vals.map((v) => v?.trim()).filter(Boolean))] as string[];
+    const idMap = async (table: "departments" | "positions" | "locations", names: string[]) => {
+      const m = new Map<string, string | null>();
+      for (const n of names) m.set(n.toLowerCase(), await lookupId(supabase, table, n, company));
+      return m;
+    };
+    const [deps, poss, locs] = await Promise.all([
+      idMap("departments", uniq(valid.map((r) => r.department))),
+      idMap("positions", uniq(valid.map((r) => r.position))),
+      idMap("locations", uniq(valid.map((r) => r.location))),
+    ]);
+    const pick = (m: Map<string, string | null>, v?: string) => (v?.trim() ? (m.get(v.trim().toLowerCase()) ?? null) : null);
+
     const toInsert = valid
       .filter((r) => { const k = r.kennitala?.replace(/\D/g, ""); return !k || !existing.has(k); })
       .map((r) => ({
@@ -189,12 +207,17 @@ export async function importEmployees(rows: ImportRow[]): Promise<ImportResult> 
         kennitala: r.kennitala?.trim() || null,
         email: r.email?.trim() || null,
         phone: r.phone?.trim() || null,
+        bank_account: r.bankAccount?.trim() || null,
         hire_date: r.hireDate || null,
-        pay_type: "hourly" as const,
-        rate: 2900,
-        employment_ratio: 100,
-        union_agreement: "Efling",
-        role: "employee",
+        department_id: pick(deps, r.department),
+        position_id: pick(poss, r.position),
+        location_id: pick(locs, r.location),
+        title: r.position?.trim() || null,
+        pay_type: (r.payType ?? "").toLowerCase().startsWith("mán") ? ("monthly" as const) : ("hourly" as const),
+        rate: num(r.rate, 2900),
+        employment_ratio: num(r.employmentRatio, 100),
+        union_agreement: r.union?.trim() || "Efling",
+        role: roleEnum(r.role ?? "Starfsmaður"),
         status: r.active === false ? "inactive" : "active",
       }));
 

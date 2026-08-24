@@ -72,7 +72,35 @@ export default function EmployeesScreen({
   const { t } = useLang();
   const [showNew, setShowNew] = useState(!!openNew);
   const [importing, setImporting] = useState(false);
+  const [importInfo, setImportInfo] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
+
+  /** Payday-style: downloadable template that matches the import columns. */
+  async function downloadTemplate() {
+    const XLSX = await import("xlsx");
+    const headers = ["Nafn", "Kennitala", "Netfang", "Sími", "Hlutverk", "Starfsheiti", "Deild", "Staður", "Launategund", "Taxti", "Starfshlutfall %", "Stéttarfélag", "Bankareikningur", "Ráðningardagur", "Virkur"];
+    const example = [
+      ["Jóna Jónsdóttir", "0101902389", "jona@fyrirtaeki.is", "6901234", "Starfsmaður", "Þjónn", "Salur", "Aðalstöð", "Tímakaup", "2900", "100", "Efling", "0133-26-001234", "2026-09-01", "Já"],
+      ["Gunnar Gunnarsson", "1502853299", "gunnar@fyrirtaeki.is", "7705678", "Vaktstjóri", "Kokkur", "Eldhús", "Aðalstöð", "Mánaðarlaun", "650000", "100", "Matvís", "0301-13-005678", "2026-09-15", "Já"],
+    ];
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...example]);
+    ws["!cols"] = headers.map((h) => ({ wch: Math.max(h.length + 2, 14) }));
+    const help = XLSX.utils.aoa_to_sheet([
+      ["VAKTO — innflutningur starfsfólks"],
+      [""],
+      ["Aðeins 'Nafn' er skyldudálkur — allt annað má vanta og fær þá sjálfgefin gildi."],
+      ["Hlutverk: Starfsmaður, Vaktstjóri, Stjórnandi eða Verktaki."],
+      ["Launategund: Tímakaup eða Mánaðarlaun. Taxti er kr á tímann (eða á mánuði)."],
+      ["Deild, Starfsheiti og Staður tengjast sjálfkrafa ef nöfnin eru til í Stillingum."],
+      ["Kennitölur sem eru þegar til í kerfinu er sleppt (engin tvítök)."],
+      ["Eyddu sýnidæmunum tveimur áður en þú hleður skránni upp."],
+    ]);
+    help["!cols"] = [{ wch: 80 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Starfsfólk");
+    XLSX.utils.book_append_sheet(wb, help, "Leiðbeiningar");
+    XLSX.writeFile(wb, "VAKTO-starfsfolk-snidmat.xlsx");
+  }
 
   async function onImportFile(file: File | null | undefined) {
     if (!file) return;
@@ -92,6 +120,15 @@ export default function EmployeesScreen({
         email: col("tölvupóst", "tolvupost", "netfang", "email"),
         hire: col("ráðning", "radning", "hire"),
         active: col("virk", "active"),
+        role: col("hlutverk", "role"),
+        position: col("starfsheiti", "staða", "stada", "position"),
+        department: col("deild", "department"),
+        location: col("staður", "stadur", "starfsstöð", "location"),
+        payType: col("launateg", "pay type", "paytype"),
+        rate: col("taxti", "tímakaup", "timakaup", "laun", "rate"),
+        ratio: col("hlutfall", "ratio"),
+        union: col("stéttarfélag", "stettarfelag", "félag", "union"),
+        bank: col("bankareikning", "banka", "reikning", "bank"),
       };
       if (ci.name < 0) { toast("Fann ekki 'Nafn' dálk í skránni"); setImporting(false); return; }
       const val = (row: unknown[], i: number) => (i >= 0 && row[i] != null ? String(row[i]).trim() : "");
@@ -106,6 +143,15 @@ export default function EmployeesScreen({
             email: val(r, ci.email) || undefined,
             hireDate: ci.hire >= 0 && r[ci.hire] instanceof Date ? (r[ci.hire] as Date).toISOString().slice(0, 10) : (val(r, ci.hire) || undefined),
             active: a ? !["nei", "no", "false", "óvirkur", "ovirkur"].includes(a) : true,
+            role: val(r, ci.role) || undefined,
+            position: val(r, ci.position) || undefined,
+            department: val(r, ci.department) || undefined,
+            location: val(r, ci.location) || undefined,
+            payType: val(r, ci.payType) || undefined,
+            rate: val(r, ci.rate) || undefined,
+            employmentRatio: val(r, ci.ratio) || undefined,
+            union: val(r, ci.union) || undefined,
+            bankAccount: val(r, ci.bank) || undefined,
           };
         });
       if (!rows.length) { toast("Engir starfsmenn í skránni"); setImporting(false); return; }
@@ -146,10 +192,40 @@ export default function EmployeesScreen({
         actions={
           <div style={{ display: "flex", gap: 8 }}>
             <input ref={importRef} type="file" accept=".xlsx,.xls" hidden onChange={(e) => onImportFile(e.target.files?.[0])} />
-            <button className="btn ghost sm" disabled={importing} onClick={() => importRef.current?.click()}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 16V4m0 0L7 9m5-5l5 5M5 20h14" /></svg>
-              {importing ? t("Flyt inn…") : t("Flytja inn (Excel)")}
-            </button>
+            <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 4 }}>
+              <button className="btn ghost sm" disabled={importing} onClick={() => importRef.current?.click()}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 16V4m0 0L7 9m5-5l5 5M5 20h14" /></svg>
+                {importing ? t("Flyt inn…") : t("Flytja inn (Excel)")}
+              </button>
+              <button
+                className="iconbtn"
+                aria-label={t("Upplýsingar um innflutning")}
+                title={t("Upplýsingar um innflutning")}
+                style={{ width: 26, height: 26 }}
+                onClick={() => setImportInfo((v) => !v)}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></svg>
+              </button>
+              {importInfo && (
+                <div
+                  style={{
+                    position: "absolute", top: "calc(100% + 10px)", right: 0, zIndex: 80, width: 300,
+                    background: "#1f2026", color: "#f4f2ee", borderRadius: 14, padding: "14px 16px",
+                    boxShadow: "0 18px 50px -12px rgba(0,0,0,.5)", fontSize: 13.5, lineHeight: 1.55,
+                  }}
+                  onMouseLeave={() => setImportInfo(false)}
+                >
+                  {t("Þú getur lesið starfsfólk beint inn úr Excel. Sæktu sniðmátið, fylltu það út og hladdu því svo upp hér.")}
+                  <button
+                    className="btn sm"
+                    style={{ marginTop: 10, width: "100%", justifyContent: "center" }}
+                    onClick={() => { downloadTemplate(); setImportInfo(false); }}
+                  >
+                    {t("Sækja sniðmát (.xlsx)")}
+                  </button>
+                </div>
+              )}
+            </div>
             <button className="btn sm" onClick={() => setShowNew(true)}>
               {t("emp:new")}
             </button>
