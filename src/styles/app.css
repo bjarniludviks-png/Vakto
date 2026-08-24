@@ -289,6 +289,61 @@ body.kioskmode .cookie{display:none}
   .pp-nav{margin-top:52px}
 }
 
+/* ---------- Planið (read-only team schedule + coworkers) ---------- */
+.plan-weeknav{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:10px}
+.plan-weeknav b{font-size:14px}
+.plan-strip{display:flex;gap:6px;justify-content:space-between}
+.plan-day{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 0 5px;border:0;border-radius:12px;background:none;cursor:pointer;font:inherit;color:var(--ink)}
+.plan-day .dl{font-size:10.5px;font-weight:600;color:var(--ink3)}
+.plan-day .dn{font-size:16px;font-weight:600}
+.plan-day .dot{width:5px;height:5px;border-radius:3px;background:transparent;margin-top:2px}
+.plan-day .dot.on{background:var(--brand)}
+.plan-day.today{background:var(--brand-soft)}
+.plan-day.today .dn,.plan-day.today .dl{color:var(--brand-deep)}
+.plan-day.on{background:var(--brand)}
+.plan-day.on .dn,.plan-day.on .dl{color:#fff}
+.plan-day.on .dot.on{background:#fff}
+.plan-tabs{display:flex;gap:8px;margin-top:12px}
+.plan-tabs button{flex:1;font:inherit;font-size:13px;font-weight:650;padding:9px 0;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--ink2);cursor:pointer}
+.plan-tabs button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+.plan-myrow{display:flex;gap:12px;padding:6px 0;align-items:flex-start}
+.plan-date{width:40px;display:flex;flex-direction:column;align-items:center;flex-shrink:0}
+.plan-date b{font-size:16px;line-height:1.2}
+.plan-date span{font-size:9.5px;font-weight:700;color:var(--ink3);letter-spacing:.04em}
+.plan-date.today b,.plan-date.today span{color:var(--brand)}
+.plan-shift{display:flex;flex-direction:column;align-items:flex-start;gap:1px;font:inherit;text-align:left;border:0;border-left:4px solid var(--brand);border-radius:12px;padding:10px 12px;cursor:pointer;width:100%}
+.plan-shift b{font-size:13.5px;color:var(--ink)}
+.plan-shift>span{font-size:12px;color:var(--ink2)}
+.plan-shift.row{flex-direction:row;align-items:center;gap:11px;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--brand)}
+.plan-shift.row .tx{display:flex;flex-direction:column;min-width:0;flex:1}
+.plan-shift.row .tx b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.plan-shift.row .tx span{font-size:12px;color:var(--ink2)}
+.plan-shift.row .tm{display:flex;flex-direction:column;align-items:flex-end}
+.plan-shift.row .tm b{font-size:13px;font-variant-numeric:tabular-nums}
+.plan-shift.row .tm span{font-size:11px;color:var(--ink3)}
+.plan-shift.row.mineflag{border-color:transparent}
+.plan-people{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+.plan-person{display:flex;gap:12px;align-items:center;border:1px solid var(--line);border-radius:12px;padding:12px}
+.plan-person img{width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.plan-person .tx{display:flex;flex-direction:column;min-width:0}
+.plan-person .tx b{font-size:14px}
+.plan-person .tx .muted{font-size:12px}
+.plan-contact{font-size:12px;margin-top:2px}
+.plan-contact a{color:var(--brand-deep);text-decoration:none}
+.plan-contact a:hover{text-decoration:underline}
+.plan-dhead{display:flex;align-items:center;gap:14px;color:#fff;padding:16px 18px;margin:-1px -1px 0}
+.plan-dhead .dnum{display:flex;flex-direction:column;align-items:center;min-width:40px}
+.plan-dhead .dnum b{font-size:23px;line-height:1.1}
+.plan-dhead .dnum span{font-size:11px;opacity:.85}
+.plan-dhead .x{background:none;border:0;font-size:16px;cursor:pointer;opacity:.9}
+.plan-drow{display:flex;gap:14px;padding:10px 0;border-bottom:1px solid var(--line2);font-size:14px;align-items:center}
+.plan-drow>.muted{width:150px;flex-shrink:0;font-size:12.5px}
+.plan-drow:last-of-type{border-bottom:0}
+@media(max-width:640px){
+  .plan-drow>.muted{width:110px}
+  .plan-people{grid-template-columns:1fr}
+}
+
 /* ---------- Fréttaveita (company feed, Facebook-style) ---------- */
 .feedwrap{max-width:640px;margin:0 auto}
 .fc-input{width:100%;border:0;background:none;font:inherit;font-size:14px;resize:none;outline:none;color:var(--ink);padding:2px 0 6px}

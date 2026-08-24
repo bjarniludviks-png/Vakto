@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { LOGIN_I18N, type Lang } from "./login-i18n";
+import { requestPasswordReset } from "./actions";
 
 export default function LoginForm({ lang = "is" }: { lang?: Lang }) {
   const s = LOGIN_I18N[lang];
@@ -12,6 +13,22 @@ export default function LoginForm({ lang = "is" }: { lang?: Lang }) {
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function forgot() {
+    setError(null);
+    if (!email.trim()) {
+      setNotice(lang === "en" ? "Type your email above first, then tap this link again." : "Sláðu netfangið þitt inn fyrst — smelltu svo aftur á hlekkinn.");
+      return;
+    }
+    setNotice(lang === "en" ? "Sending…" : "Sendi…");
+    await requestPasswordReset(email);
+    setNotice(
+      lang === "en"
+        ? "If an account exists for that email, a reset link is on its way."
+        : "Ef aðgangur er til fyrir netfangið er póstur með hlekk á leiðinni."
+    );
+  }
 
   // Carry the marketing-site language choice into the app after login.
   useEffect(() => {
@@ -97,7 +114,7 @@ export default function LoginForm({ lang = "is" }: { lang?: Lang }) {
       <div className="field">
         <div className="lbl">
           <label htmlFor="password">{s.passwordLabel}</label>
-          <span className="forgot">{s.forgot}</span>
+          <span className="forgot" role="button" tabIndex={0} style={{ cursor: "pointer" }} onClick={forgot} onKeyDown={(e) => e.key === "Enter" && forgot()}>{s.forgot}</span>
         </div>
         <div className="pwwrap">
           <input
@@ -133,6 +150,11 @@ export default function LoginForm({ lang = "is" }: { lang?: Lang }) {
         </div>
       )}
 
+      {notice && (
+        <div style={{ background: "#e8f5ef", color: "#1f9d6b", borderRadius: 10, padding: "10px 14px", fontSize: 13.5, fontWeight: 600, marginBottom: 14 }}>
+          {notice}
+        </div>
+      )}
       <button className="btn" type="submit" disabled={busy}>
         {busy ? s.signingIn : s.signIn}
       </button>

@@ -6,7 +6,8 @@ import "server-only";
 // RESEND_API_KEY and EMAIL_FROM (e.g. "VAKTO <noreply@vakto.is>") in the env.
 
 const KEY = process.env.RESEND_API_KEY;
-const FROM = process.env.EMAIL_FROM || "VAKTO <noreply@vakto.is>";
+const FROM = process.env.EMAIL_FROM || "VAKTO <no-reply@vakto.is>";
+const REPLY_TO = process.env.EMAIL_REPLY_TO || "hjalp@vakto.is";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is";
 
 export function emailConfigured(): boolean {
@@ -22,7 +23,7 @@ export async function sendEmail(input: { to: string; subject: string; html: stri
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM, to: [input.to], subject: input.subject, html: input.html }),
+      body: JSON.stringify({ from: FROM, to: [input.to], reply_to: REPLY_TO, subject: input.subject, html: input.html }),
     });
     if (!r.ok) return { ok: false, error: `${r.status} ${await r.text()}` };
     return { ok: true };
@@ -146,6 +147,20 @@ export async function sendLeaveDecisionEmail(to: string, name: string, approved:
         : "Fríbeiðninni þinni var <b>hafnað</b> að þessu sinni. Talaðu við vaktstjórann þinn ef þú vilt ræða það — eða sendu nýja beiðni fyrir annað tímabil.",
       ctaLabel: "Opna Mitt svæði",
       ctaHref: `${APP_URL}/mitt-svaedi`,
+    }),
+  });
+}
+
+export async function sendResetEmail(to: string, link: string) {
+  return sendEmail({
+    to,
+    subject: "Endursetja lykilorð í VAKTO",
+    html: template({
+      heading: "Endursetja lykilorðið þitt",
+      body: "Þú (eða einhver annar) baðst um að endursetja lykilorðið þitt í VAKTO. Smelltu á hnappinn til að velja nýtt lykilorð. Ef þú baðst ekki um þetta máttu hunsa póstinn — lykilorðið þitt helst óbreytt.",
+      ctaLabel: "Velja nýtt lykilorð",
+      ctaHref: link,
+      preheader: "Endursetja lykilorð í VAKTO",
     }),
   });
 }
