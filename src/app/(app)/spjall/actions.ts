@@ -3,7 +3,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { initials } from "@/lib/employees";
-import { notifyEmployee } from "@/lib/push";
+import { notifyEmployee, sendPushToUser } from "@/lib/push";
 
 export type Conversation = { id: string; name: string; kind: string; av: string; color: string; last: string; lastAt: string | null; dm: boolean; photo: string | null };
 export type ChatMessage = {
@@ -295,6 +295,21 @@ export async function sendChatMessage(channelId: string, body: string, kind: "te
       ({ error } = await supabase.from("messages").insert(row));
     }
     if (error) return { ok: false, error: error.message };
+    // Push to the other channel members (best-effort; tag collapses per channel).
+    try {
+      const [{ data: mems }, { data: ch }, emps] = await Promise.all([
+        supabase.from("channel_members").select("user_id").eq("channel_id", channelId).limit(50),
+        supabase.from("channels").select("name, kind").eq("id", channelId).maybeSingle(),
+        empNameMap(supabase, ctx.company),
+      ]);
+      const sender = (emps.get(ctx.userId) ?? "").split(/\s+/)[0] || "Ný skilaboð";
+      const title = ch?.kind === "group" && ch.name ? `${sender} · ${ch.name}` : sender;
+      const preview = kind === "text" ? text.slice(0, 90) : kind === "image" ? "📷 Mynd" : "🎤 Talskilaboð";
+      for (const m of mems ?? []) {
+        if (m.user_id === ctx.userId) continue;
+        void sendPushToUser(m.user_id as string, { title, body: preview, url: "/spjall", tag: `chat-${channelId}` });
+      }
+    } catch { /* push is best-effort */ }
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
