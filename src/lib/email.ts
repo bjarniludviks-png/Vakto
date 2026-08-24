@@ -7,7 +7,7 @@ import "server-only";
 
 const KEY = process.env.RESEND_API_KEY;
 const FROM = process.env.EMAIL_FROM || "VAKTO <no-reply@vakto.is>";
-const REPLY_TO = process.env.EMAIL_REPLY_TO || "hjalp@vakto.is";
+const REPLY_TO = process.env.EMAIL_REPLY_TO || "help@vakto.is";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is";
 
 export function emailConfigured(): boolean {
