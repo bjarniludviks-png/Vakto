@@ -786,13 +786,19 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
   if (tab === "Samningur") {
     return <ContractTab employeeId={e.id} />;
   }
+  const pfld = (label: string, name: string, value: string | null, placeholder: string) => (
+    <div className="statline">
+      <span className="k">{label}</span>
+      <input name={name} defaultValue={value ?? ""} placeholder={placeholder} style={{ ...FLD, width: 200 }} />
+    </div>
+  );
   return (
     <>
       <Sec first>Persónulegt</Sec>
-      <Stat k="Netfang" v={e.email ?? "—"} />
-      <Stat k="Sími" v={e.phone ?? "—"} />
-      <Stat k="Kennitala" v={e.kennitala ?? "—"} />
-      <Stat k="Bankareikningur" v={e.bankAccount ?? "—"} />
+      {pfld("Netfang", "pEmail", e.email, "netfang@daemi.is")}
+      {pfld("Sími", "pPhone", e.phone, "+354 …")}
+      {pfld("Kennitala", "pKennitala", e.kennitala, "000000-0000")}
+      {pfld("Bankareikningur", "pBank", e.bankAccount, "0000-00-000000")}
       <Stat k="Tímabelti" v="Atlantic/Reykjavik" />
     </>
   );

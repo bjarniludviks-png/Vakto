@@ -322,6 +322,10 @@ export async function getDocumentSignedUrl(path: string): Promise<{ ok: boolean;
 }
 
 export type UpdateEmployeeInput = {
+  email?: string;
+  phone?: string;
+  kennitala?: string;
+  bankAccount?: string;
   rate?: string;
   employmentRatio?: string;
   union?: string;
@@ -451,6 +455,10 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
     const companyU = await companyId(supabase);
     if (!companyU) return { ok: false, error: "Fyrirtæki fannst ekki" };
     const patch: Record<string, unknown> = {};
+    if (input.email !== undefined) patch.email = input.email.trim() || null;
+    if (input.phone !== undefined) patch.phone = input.phone.trim() || null;
+    if (input.kennitala !== undefined) patch.kennitala = input.kennitala.trim() || null;
+    if (input.bankAccount !== undefined) patch.bank_account = input.bankAccount.trim() || null;
     if (input.rate) patch.rate = num(input.rate, 2900);
     if (input.employmentRatio) patch.employment_ratio = num(input.employmentRatio, 100);
     if (input.union) {
