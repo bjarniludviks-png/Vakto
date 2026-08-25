@@ -19,6 +19,7 @@ export default function FeedScreen() {
   const { t } = useLang();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [canPin, setCanPin] = useState(false);
+  const [mePhoto, setMePhoto] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [val, setVal] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,7 +30,7 @@ export default function FeedScreen() {
   const imgRef = useRef<HTMLInputElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  function reload() { listPosts().then((r) => { if (r.ok) { setPosts(r.posts); setCanPin(r.canPin); } setLoaded(true); }); }
+  function reload() { listPosts().then((r) => { if (r.ok) { setPosts(r.posts); setCanPin(r.canPin); setMePhoto(r.mePhoto); } setLoaded(true); }); }
   useEffect(() => { reload(); const iv = setInterval(reload, 10000); return () => clearInterval(iv); }, []);
 
   function pickFile(kind: "image" | "file") {
@@ -89,9 +90,14 @@ export default function FeedScreen() {
         {/* composer — FB-style: avatar + pill that grows into a textarea */}
         <div className="feed-post fc2" style={{ marginBottom: 16 }}>
           <div className="fc2-row">
-            <span className="avt fc2-me">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /><path d="M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7" /></svg>
-            </span>
+            {mePhoto ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="avt-img" src={mePhoto} alt="" style={{ width: 40, height: 40 }} />
+            ) : (
+              <span className="avt fc2-me">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /><path d="M5 21c0-3.9 3.1-7 7-7s7 3.1 7 7" /></svg>
+              </span>
+            )}
             <textarea className="fc-input" rows={val || attach ? 3 : 1} placeholder={t("Hvað er að frétta hjá þér?")} value={val} onChange={(e) => setVal(e.target.value)} />
           </div>
           {attach?.imageUrl && (
@@ -140,7 +146,12 @@ export default function FeedScreen() {
                 </div>
               )}
               <div className="fp-head">
-                <span className="avt" style={{ background: p.color, width: 42, height: 42, fontSize: p.system ? 19 : 14 }}>{p.av}</span>
+                {p.photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="avt-img" src={p.photo} alt="" style={{ width: 42, height: 42 }} />
+                ) : (
+                  <span className="avt" style={{ background: p.color, width: 42, height: 42, fontSize: p.system ? 19 : 14 }}>{p.av}</span>
+                )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <b style={{ fontSize: 14.5 }}>{p.sender}</b>
                   <span className="muted" style={{ fontSize: 12, display: "block", marginTop: 1 }}>{p.at}</span>
@@ -210,7 +221,12 @@ export default function FeedScreen() {
                 <div className="fp-comments">
                   {p.comments.map((cm) => (
                     <div className="fp-c" key={cm.id}>
-                      <span className="avt" style={{ background: cm.color, width: 28, height: 28, fontSize: 10.5 }}>{cm.av}</span>
+                      {cm.photo ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="avt-img" src={cm.photo} alt="" style={{ width: 28, height: 28 }} />
+                      ) : (
+                        <span className="avt" style={{ background: cm.color, width: 28, height: 28, fontSize: 10.5 }}>{cm.av}</span>
+                      )}
                       <div style={{ minWidth: 0 }}>
                         <div className="fp-cb"><b>{cm.sender}</b><span className="cm-body">{cm.body}</span></div>
                         <span className="muted" style={{ fontSize: 10.5, marginLeft: 12 }}>{cm.at}</span>

@@ -427,9 +427,9 @@ export async function uploadChatMedia(dataUrl: string, ext: string): Promise<{ o
 
 /* ---------- news feed (posts + likes + comments) ---------- */
 
-export type FeedComment = { id: string; sender: string; av: string; color: string; body: string; at: string };
+export type FeedComment = { id: string; sender: string; av: string; color: string; body: string; at: string; photo: string | null };
 export type FeedPost = {
-  id: string; sender: string; av: string; color: string; me: boolean;
+  id: string; sender: string; av: string; color: string; me: boolean; photo: string | null;
   body: string; at: string; pinned: boolean; system: boolean;
   imageUrl: string | null; fileUrl: string | null; fileName: string | null;
   reactions: { emoji: string; count: number }[];
@@ -438,12 +438,12 @@ export type FeedPost = {
 };
 
 /** Latest 50 posts with likes + comments, newest first. */
-export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meId: string; canPin: boolean }> {
-  if (!isSupabaseConfigured()) return { ok: false, posts: [], meId: "", canPin: false };
+export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meId: string; canPin: boolean; mePhoto: string | null }> {
+  if (!isSupabaseConfigured()) return { ok: false, posts: [], meId: "", canPin: false, mePhoto: null };
   try {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
-    if ("error" in ctx) return { ok: false, posts: [], meId: "", canPin: false };
+    if ("error" in ctx) return { ok: false, posts: [], meId: "", canPin: false, mePhoto: null };
     const { data: meRow } = await supabase.from("users").select("role").eq("id", ctx.userId).maybeSingle();
     const canPin = meRow?.role === "owner" || meRow?.role === "manager";
     const { data: rows } = await supabase
@@ -469,6 +469,7 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
       return {
         id: r.id as string, sender: name,
         av: system ? "🎂" : initials(name),
+        photo: system ? null : (empNames.get(String(r.sender_id))?.photo ?? null),
         color: system ? "#e9700f" : colorOf(name.split(/\s+/)[0] || name),
         pinned: !!r.pinned, system,
         me: r.sender_id === ctx.userId,
@@ -478,13 +479,13 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
         myReaction: (pLikes.find((l) => l.user_id === ctx.userId)?.reaction as string) ?? null,
         comments: (comments ?? []).filter((cm) => cm.post_id === r.id).map((cm) => {
           const cn = nameOf(cm.users, cm.sender_id);
-          return { id: cm.id as string, sender: cn, av: initials(cn), color: colorOf(cn.split(/\s+/)[0] || cn), body: cm.body as string, at: hhmm(cm.created_at as string) };
+          return { id: cm.id as string, sender: cn, av: initials(cn), color: colorOf(cn.split(/\s+/)[0] || cn), body: cm.body as string, at: hhmm(cm.created_at as string), photo: empNames.get(String(cm.sender_id))?.photo ?? null };
         }),
       };
     });
-    return { ok: true, posts, meId: ctx.userId, canPin };
+    return { ok: true, posts, meId: ctx.userId, canPin, mePhoto: empNames.get(ctx.userId)?.photo ?? null };
   } catch {
-    return { ok: false, posts: [], meId: "", canPin: false };
+    return { ok: false, posts: [], meId: "", canPin: false, mePhoto: null };
   }
 }
 
