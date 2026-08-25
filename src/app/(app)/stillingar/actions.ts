@@ -547,11 +547,16 @@ export async function inviteUser(input: { email: string; role: string }): Promis
     const { data: comp } = await admin.from("companies").select("name").eq("id", ctx.company).maybeSingle();
     const companyName = (comp?.name as string) ?? "VAKTO";
 
+    // The invitee's real name from their employee profile (feed/chat show it).
+    const { data: empByMail } = await admin.from("employees")
+      .select("full_name").eq("company_id", ctx.company).ilike("email", emailAddr).limit(1).maybeSingle();
+    const fullName = (empByMail?.full_name as string) ?? null;
+
     let userId: string | undefined;
     if (emailConfigured()) {
       // Branded VAKTO invite via Resend (generateLink doesn't send its own email).
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is";
-      const { data: gen, error } = await admin.auth.admin.generateLink({ type: "invite", email: emailAddr, options: { data: { role, company_id: ctx.company } } });
+      const { data: gen, error } = await admin.auth.admin.generateLink({ type: "invite", email: emailAddr, options: { data: { role, company_id: ctx.company, full_name: fullName } } });
       if (error) return { ok: false, error: error.message };
       userId = gen?.user?.id;
       // token_hash link → /nytt-lykilord verifies it itself and the invitee
@@ -565,7 +570,7 @@ export async function inviteUser(input: { email: string; role: string }): Promis
       userId = invited?.user?.id;
     }
     if (userId) {
-      await admin.from("users").update({ company_id: ctx.company, role }).eq("id", userId);
+      await admin.from("users").update({ company_id: ctx.company, role, ...(fullName ? { full_name: fullName } : {}) }).eq("id", userId);
       // Record membership so the invited user can switch to this company (0023).
       await admin.from("company_members").upsert({ user_id: userId, company_id: ctx.company, role });
       // Link the auth user to their employee profile (matched by email) so

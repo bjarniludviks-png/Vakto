@@ -113,22 +113,27 @@ export async function updateSession(request: NextRequest) {
 
   // Role-based access (brief §5). Only for authenticated, guarded app routes.
   if (user && !isPublic && !pathname.startsWith("/api") && !pathname.startsWith("/hjalp")) {
+    // No embed here (an embed error would nuke the whole row) — two cheap reads.
     const { data: profile } = await supabase
-      .from("users").select("role, companies(billing_status)").eq("id", user.id).maybeSingle();
+      .from("users").select("role, company_id").eq("id", user.id).maybeSingle();
 
     // Suspended company → everyone locked out (except the VAKTO admin allowlist).
-    const co = (Array.isArray(profile?.companies) ? profile?.companies[0] : profile?.companies) as { billing_status?: string | null } | null;
-    if (co?.billing_status === "suspended" && pathname !== "/adgangur-lokadur") {
-      const adminList = (process.env.VAKTO_ADMIN_EMAILS || "bjarniludviks@icloud.com")
-        .split(",").map((s) => s.trim().toLowerCase());
-      if (!adminList.includes((user.email ?? "").toLowerCase())) {
-        const dest = request.nextUrl.clone();
-        dest.pathname = "/adgangur-lokadur";
-        return NextResponse.redirect(dest);
+    if (profile?.company_id && pathname !== "/adgangur-lokadur") {
+      const { data: co } = await supabase
+        .from("companies").select("billing_status").eq("id", profile.company_id).maybeSingle();
+      if (co?.billing_status === "suspended") {
+        const adminList = (process.env.VAKTO_ADMIN_EMAILS || "bjarniludviks@icloud.com")
+          .split(",").map((s) => s.trim().toLowerCase());
+        if (!adminList.includes((user.email ?? "").toLowerCase())) {
+          const dest = request.nextUrl.clone();
+          dest.pathname = "/adgangur-lokadur";
+          return NextResponse.redirect(dest);
+        }
       }
     }
 
-    const role = (profile?.role as Role) ?? "owner";
+    // SAFE default: unknown role = employee (least privilege), never owner.
+    const role = (profile?.role as Role) ?? "employee";
     if (!canAccess(role, pathname)) {
       const dest = request.nextUrl.clone();
       dest.pathname = homeFor(role);

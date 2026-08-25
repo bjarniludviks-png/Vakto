@@ -64,7 +64,7 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
     for (const m of mems ?? []) {
       const u = (Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null;
       if (!memByCh.has(m.channel_id as string)) memByCh.set(m.channel_id as string, []);
-      memByCh.get(m.channel_id as string)!.push({ id: m.user_id as string, name: u?.full_name ?? emps.get(m.user_id as string) ?? "?" });
+      memByCh.get(m.channel_id as string)!.push({ id: m.user_id as string, name: emps.get(m.user_id as string) ?? u?.full_name ?? "?" });
     }
     const lastByCh = new Map<string, string>();
     const lastAtByCh = new Map<string, string>();
@@ -166,7 +166,7 @@ export async function listMembers(channelId: string): Promise<Members> {
     ]);
     const members: Person[] = (data ?? []).map((m) => {
       const u = (Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null;
-      const name = u?.full_name ?? emps.get(m.user_id as string) ?? "?";
+      const name = emps.get(m.user_id as string) ?? u?.full_name ?? "?";
       return { userId: m.user_id as string, name, av: initials(name), color: colorOf(name.split(/\s+/)[0]) };
     });
     return { members, adminId: (ch?.created_by as string) ?? null, meId: ctx.userId };
@@ -255,7 +255,7 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
     const emps = await empNameMap(supabase, ctx.company);
     const senderOf = (m: (typeof data)[number]) => {
       const u = (Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null;
-      return (u?.full_name ?? emps.get(m.sender_id as string) ?? "—").split(/\s+/)[0];
+      return (emps.get(m.sender_id as string) ?? u?.full_name ?? "—").split(/\s+/)[0];
     };
     const byId = new Map(data.map((m) => [m.id as string, m]));
     const messages: ChatMessage[] = data.map((m) => {
@@ -438,14 +438,19 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
       .from("posts").select("id, sender_id, body, created_at, image_url, file_url, file_name, pinned, users!posts_sender_id_fkey(full_name)")
       .eq("company_id", ctx.company).order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(50);
     const ids = (rows ?? []).map((r) => r.id as string);
-    const [{ data: likes }, { data: comments }] = await Promise.all([
+    const [{ data: likes }, { data: comments }, empNames] = await Promise.all([
       supabase.from("post_likes").select("post_id, user_id, reaction").in("post_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
       supabase.from("post_comments").select("id, post_id, sender_id, body, created_at, users!post_comments_sender_id_fkey(full_name)").in("post_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).order("created_at"),
+      empNameMap(supabase, ctx.company),
     ]);
-    const nameOf = (u: unknown) => ((Array.isArray(u) ? u[0] : u) as { full_name?: string } | null)?.full_name ?? "Notandi";
+    // Prefer the employee's real name — users.full_name can hold the email
+    // (or nothing) for invited accounts.
+    const nameOf = (u: unknown, senderId?: unknown) =>
+      (senderId ? empNames.get(String(senderId)) : undefined) ??
+      ((Array.isArray(u) ? u[0] : u) as { full_name?: string } | null)?.full_name ?? "Notandi";
     const posts: FeedPost[] = (rows ?? []).map((r) => {
       const system = !r.sender_id;
-      const name = system ? "VAKTO" : nameOf(r.users);
+      const name = system ? "VAKTO" : nameOf(r.users, r.sender_id);
       const pLikes = (likes ?? []).filter((l) => l.post_id === r.id);
       const byEmoji = new Map<string, number>();
       for (const l of pLikes) byEmoji.set((l.reaction as string) || "❤️", (byEmoji.get((l.reaction as string) || "❤️") ?? 0) + 1);
@@ -460,7 +465,7 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
         reactions: [...byEmoji.entries()].map(([emoji, count]) => ({ emoji, count })).sort((a, b) => b.count - a.count),
         myReaction: (pLikes.find((l) => l.user_id === ctx.userId)?.reaction as string) ?? null,
         comments: (comments ?? []).filter((cm) => cm.post_id === r.id).map((cm) => {
-          const cn = nameOf(cm.users);
+          const cn = nameOf(cm.users, cm.sender_id);
           return { id: cm.id as string, sender: cn, av: initials(cn), color: colorOf(cn.split(/\s+/)[0] || cn), body: cm.body as string, at: hhmm(cm.created_at as string) };
         }),
       };

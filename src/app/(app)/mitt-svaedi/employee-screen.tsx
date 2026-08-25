@@ -7,7 +7,7 @@ import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
 import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, getMyContract, signMyContract, type LeaveType, type MyPunchRow, type MyContract } from "./actions";
 import { listCompanyDocs, openCompanyDoc, type CompanyDoc } from "../stillingar/actions";
-import { dec1, nf } from "@/lib/format";
+import { dec1, nf, krCompact } from "@/lib/format";
 import { StaffCardModal, type StaffCardData } from "@/components/app/staff-card";
 import type { StaffCard } from "@/lib/mycard.server";
 import type { MyArea } from "./my.server";
@@ -258,12 +258,57 @@ function TasksCard({ initial }: { initial: { id: string; title: string; done: bo
 
 function QuickActions({ onReq }: { onReq: (k: ReqKind) => void }) {
   const { t } = useLang();
+  const S = { fill: "none", stroke: "currentColor", strokeWidth: 1.9 } as const;
   return (
-    <div className="emp-qa">
-      <button className="btn sm" onClick={() => onReq("leave")}>{t("Sækja um frí")}</button>
-      <button className="btn ghost sm" onClick={() => onReq("swap")}>{t("Skipta á vakt")}</button>
-      <button className="btn ghost sm" onClick={() => onReq("pickup")}>{t("Opnar vaktir")}</button>
-      <button className="btn ghost sm" onClick={() => onReq("avail")}>{t("Skrá framboð")}</button>
+    <div className="qa-grid">
+      <button className="qa-tile" onClick={() => onReq("leave")}>
+        <svg viewBox="0 0 24 24" {...S}><path d="M8 2v4M16 2v4M3 9h18" /><rect x="3" y="4" width="18" height="17" rx="2" /><path d="m9 15 2 2 4-4" /></svg>
+        {t("Sækja um frí")}
+      </button>
+      <button className="qa-tile" onClick={() => onReq("swap")}>
+        <svg viewBox="0 0 24 24" {...S}><path d="M16 3h5v5M21 3l-7 7M8 21H3v-5M3 21l7-7" /></svg>
+        {t("Skipta á vakt")}
+      </button>
+      <button className="qa-tile" onClick={() => onReq("pickup")}>
+        <svg viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" /></svg>
+        {t("Opnar vaktir")}
+      </button>
+      <button className="qa-tile" onClick={() => onReq("avail")}>
+        <svg viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+        {t("Skrá framboð")}
+      </button>
+    </div>
+  );
+}
+
+/** App-like overview numbers: week hours · month pay estimate · time bank. */
+function StatStrip({ my, perms }: { my?: MyArea; perms: Perms }) {
+  const { t } = useLang();
+  if (!my?.live) return null;
+  const bank = my.rights?.bank;
+  return (
+    <div className="emp-stats">
+      <div className="emp-stat">
+        <div className="v">{dec1(my.weekHours)} <small>{t("klst")}</small></div>
+        <div className="l">{t("Vikan mín")}</div>
+      </div>
+      {perms.pay && my.pay ? (
+        <div className="emp-stat">
+          <div className="v">{krCompact(my.pay.totalKr)}</div>
+          <div className="l">{t("Launamat")}</div>
+        </div>
+      ) : (
+        <div className="emp-stat">
+          <div className="v">{my.upcoming[0]?.time?.split("–")[0] ?? "—"}</div>
+          <div className="l">{t("Næsta vakt")}</div>
+        </div>
+      )}
+      <div className="emp-stat">
+        <div className="v" style={bank != null && bank < 0 ? { color: "var(--bad)" } : bank != null && bank > 0 ? { color: "var(--good)" } : undefined}>
+          {bank != null ? `${bank > 0 ? "+" : ""}${dec1(bank)}` : "—"} <small>{t("klst")}</small>
+        </div>
+        <div className="l">{t("Tímabanki")}</div>
+      </div>
     </div>
   );
 }
@@ -274,6 +319,8 @@ function Overview({ onReq, perms, my }: { onReq: (k: ReqKind) => void; perms: Pe
   return (
     <div className="emp-pane on">
       {perms.clock && <PunchCard live={live} openSince={my?.openSince ?? null} />}
+      <StatStrip my={my} perms={perms} />
+      {perms.requests && <div style={{ marginBottom: 12 }}><QuickActions onReq={onReq} /></div>}
       <div className="mini">
         <div className="mh">{t("Næsta vakt")}</div>
         {live ? (
@@ -304,7 +351,6 @@ function Overview({ onReq, perms, my }: { onReq: (k: ReqKind) => void; perms: Pe
       {live && <ContractSignCard />}
       {live && my!.tasks.length > 0 && <TasksCard initial={my!.tasks} />}
       <CompanyDocsCardMy />
-      {perms.requests && <QuickActions onReq={onReq} />}
     </div>
   );
 }
