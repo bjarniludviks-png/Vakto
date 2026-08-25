@@ -9,6 +9,7 @@ export type Conversation = { id: string; name: string; kind: string; av: string;
 export type ChatMessage = {
   id: string; sender: string; senderId: string; me: boolean; body: string; at: string; kind: string; url: string | null;
   reactions: { emoji: string; count: number; mine: boolean }[];
+  createdAt: string;
   replyTo: { sender: string; body: string } | null;
 };
 export type Person = { userId: string; name: string; av: string; color: string };
@@ -264,6 +265,7 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
         id: m.id as string, sender: senderOf(m), senderId: m.sender_id as string,
         me: m.sender_id === ctx.userId, body: (m.body as string) ?? "", at: hhmm(m.created_at as string),
         kind: (m.kind as string) ?? "text", url: (m.attachment_url as string) ?? null,
+        createdAt: m.created_at as string,
         reactions: (reactByMsg.get(m.id as string) ?? []).sort((a, b) => b.count - a.count),
         replyTo: rt ? { sender: senderOf(rt), body: rt.kind === "image" ? "📷 Mynd" : rt.kind === "audio" ? "🎤 Talskilaboð" : ((rt.body as string) ?? "") } : null,
       };

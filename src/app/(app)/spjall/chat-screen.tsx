@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { useLang } from "@/components/app/lang";
 import { toast } from "@/components/app/toast";
@@ -13,6 +13,30 @@ import {
 
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "🔥", "👏", "😅", "😮", "😢", "💪", "✅", "🤝", "☕", "🍕", "🚀"];
 const REACTIONS = ["❤️", "😂", "😮", "😢", "👍", "🔥"];
+
+/** "Í dag" / "Í gær" / "24. ágúst" day separators between messages. */
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const today = now.toDateString();
+  const yest = new Date(now.getTime() - 864e5).toDateString();
+  if (d.toDateString() === today) return "Í dag";
+  if (d.toDateString() === yest) return "Í gær";
+  const MO = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
+  return `${d.getDate()}. ${MO[d.getMonth()]}${d.getFullYear() !== now.getFullYear() ? " " + d.getFullYear() : ""}`;
+}
+
+/** Messenger-style grouping: consecutive messages from the same sender within
+ * 5 minutes merge — avatar/name only once, tighter radii inside the group. */
+function groupFlags(msgs: ChatMessage[], i: number): { first: boolean; last: boolean; newDay: boolean } {
+  const m = msgs[i], prev = msgs[i - 1], next = msgs[i + 1];
+  const near = (a?: ChatMessage, b?: ChatMessage) =>
+    !!a && !!b && a.senderId === b.senderId &&
+    Math.abs(new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) < 5 * 60e3 &&
+    new Date(a.createdAt).toDateString() === new Date(b.createdAt).toDateString();
+  const newDay = !prev || new Date(prev.createdAt).toDateString() !== new Date(m.createdAt).toDateString();
+  return { first: newDay || !near(prev, m), last: !near(m, next) || (!!next && new Date(next.createdAt).toDateString() !== new Date(m.createdAt).toDateString()), newDay };
+}
 
 /** Group/DM avatar — photo when set, else colored initials. */
 function ConvAvatar({ c, size = 40 }: { c: Conversation; size?: number }) {
@@ -196,10 +220,21 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
                 {!active.dm && <button className="iconbtn" title={t("Upplýsingar")} onClick={() => setModal("info")}><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></svg></button>}
               </div>
               <div className="msgr-msgs">
-                {msgs.length ? msgs.map((m) => (
-                  <div key={m.id} className={`mrow ${m.me ? "me" : "them"}${m.reactions.length ? " hasre" : ""}`}>
+                {msgs.length ? msgs.map((m, mi) => {
+                  const g = groupFlags(msgs, mi);
+                  return (
+                  <React.Fragment key={m.id}>
+                  {g.newDay && <div className="day-sep"><span>{dayLabel(m.createdAt)}</span></div>}
+                  <div className={`mrow ${m.me ? "me" : "them"}${m.reactions.length ? " hasre" : ""}${g.first ? " g-first" : ""}${g.last ? " g-last" : " g-mid"}`}>
+                    {!m.me && (
+                      <span className="m-ava" style={{ visibility: g.last ? "visible" : "hidden" }}>
+                        <span className="avt" style={{ background: "var(--brand-soft)", color: "var(--brand)", width: 28, height: 28, fontSize: 10.5, fontWeight: 700 }}>
+                          {m.sender.slice(0, 2).toUpperCase()}
+                        </span>
+                      </span>
+                    )}
                     <div className={`mbub ${m.me ? "me" : "them"}`}>
-                      {!m.me && !active.dm && <span className="who" style={{ color: m.me ? "#fff" : "var(--brand)" }}>{m.sender}</span>}
+                      {!m.me && !active.dm && g.first && <span className="who" style={{ color: "var(--brand)" }}>{m.sender}</span>}
                       {m.replyTo && (
                         <span className="mreply"><b>{m.replyTo.sender}</b><span>{m.replyTo.body}</span></span>
                       )}
@@ -208,7 +243,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
                         ? <img src={m.url} alt="" />
                         : m.kind === "audio" && m.url ? <audio controls src={m.url} style={{ height: 36 }} />
                           : m.body}
-                      <span className="tm">{m.at}</span>
+                      {g.last && <span className="tm">{m.at}</span>}
                       {m.reactions.length > 0 && (
                         <span className="mreacts" onClick={() => react(m, m.reactions[0].emoji)}>
                           {m.reactions.map((r) => <span key={r.emoji}>{r.emoji}{r.count > 1 ? <b>{r.count}</b> : null}</span>)}
@@ -234,7 +269,9 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
                       )}
                     </div>
                   </div>
-                )) : <div className="muted" style={{ textAlign: "center", margin: "auto", fontSize: 13 }}>{t("Engin skilaboð enn — byrjaðu spjallið!")}</div>}
+                  </React.Fragment>
+                  );
+                }) : <div className="muted" style={{ textAlign: "center", margin: "auto", fontSize: 13 }}>{t("Engin skilaboð enn — byrjaðu spjallið!")}</div>}
                 <div ref={endRef} />
               </div>
               {replyTo && (
@@ -255,7 +292,9 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
                     : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>}
                 </button>
                 <input className="txt" placeholder={rec ? t("Tek upp… smelltu til að stöðva") : t("chat:ph")} value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
-                <button className="btn sm" onClick={() => send()}>{t("chat:send")}</button>
+                <button className="msgr-send" disabled={!val.trim() && !rec} onClick={() => send()} aria-label={t("chat:send")}>
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
+                </button>
                 <input ref={fileRef} type="file" accept="image/*,image/gif" hidden onChange={onFile} />
               </div>
             </>
