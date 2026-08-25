@@ -1,5 +1,6 @@
 import "@/styles/app.css";
 import AppShell, { type Account } from "@/components/app/app-shell";
+import PullToRefresh from "@/components/app/pull-to-refresh";
 import { LangProvider } from "@/components/app/lang";
 import { CountryProvider } from "@/components/app/country";
 import type { Role } from "@/components/app/nav";
@@ -69,6 +70,7 @@ export default async function AppLayout({
   return (
     <LangProvider>
       <CountryProvider value={country}>
+        <PullToRefresh />
         <AppShell account={{ ...account, vaktoAdmin }}>{children}</AppShell>
       </CountryProvider>
     </LangProvider>
