@@ -39,6 +39,15 @@ function groupFlags(msgs: ChatMessage[], i: number): { first: boolean; last: boo
   return { first: newDay || !near(prev, m), last: !near(m, next) || (!!next && new Date(next.createdAt).toDateString() !== new Date(m.createdAt).toDateString()), newDay };
 }
 
+/** Person avatar — profile photo when set, else colored initials. */
+function PersonAvatar({ p, size }: { p: Person; size: number }) {
+  if (p.photo) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img className="avt-img" src={p.photo} alt="" style={{ width: size, height: size }} />;
+  }
+  return <span className="avt" style={{ background: p.color, width: size, height: size, fontSize: Math.round(size * 0.36) }}>{p.av}</span>;
+}
+
 /** Group/DM avatar — photo when set, else colored initials. */
 function ConvAvatar({ c, size = 40 }: { c: Conversation; size?: number }) {
   if (c.photo) {
@@ -177,6 +186,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
       body: text, at: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
       kind, url: url ?? null, reactions: [], createdAt: now.toISOString(),
       replyTo: reply ? { sender: reply.sender, body: reply.body } : null,
+      photo: null,
     }]);
     const res = await sendChatMessage(active.id, text, kind, url, reply?.id);
     if (!res.ok) { toast(res.error ?? "Tókst ekki"); }
@@ -273,7 +283,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
                   .filter((p) => !convs.some((c) => c.dm && c.name === p.name))
                   .map((p) => (
                     <div key={p.userId} className="conv" onClick={() => openDM(p)}>
-                      <span className="avt" style={{ background: p.color, width: 40, height: 40, fontSize: 13 }}>{p.av}</span>
+                      <PersonAvatar p={p} size={40} />
                       <div className="tx">
                         <b>{p.name}</b>
                         <span>{t("Senda skilaboð")}</span>
@@ -311,9 +321,14 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
                   <div className={`mrow ${m.me ? "me" : "them"}${m.reactions.length ? " hasre" : ""}${g.first ? " g-first" : ""}${g.last ? " g-last" : " g-mid"}`}>
                     {!m.me && (
                       <span className="m-ava" style={{ visibility: g.last ? "visible" : "hidden" }}>
-                        <span className="avt" style={{ background: "var(--brand-soft)", color: "var(--brand)", width: 28, height: 28, fontSize: 10.5, fontWeight: 700 }}>
-                          {m.sender.slice(0, 2).toUpperCase()}
-                        </span>
+                        {m.photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img className="avt-img" src={m.photo} alt="" style={{ width: 28, height: 28 }} />
+                        ) : (
+                          <span className="avt" style={{ background: "var(--brand-soft)", color: "var(--brand)", width: 28, height: 28, fontSize: 10.5, fontWeight: 700 }}>
+                            {m.sender.slice(0, 2).toUpperCase()}
+                          </span>
+                        )}
                       </span>
                     )}
                     <div className={`mbub ${m.me ? "me" : "them"}`}>
@@ -402,7 +417,7 @@ function PeoplePicker({ selected, onToggle }: { selected: Set<string>; onToggle:
       <div className="att" style={{ maxHeight: "44vh", overflowY: "auto" }}>
         {people.length ? people.map((p) => (
           <div className="it rowlink" key={p.userId} onClick={() => onToggle(p)}>
-            <span className="avt" style={{ background: p.color, width: 34, height: 34, fontSize: 12 }}>{p.av}</span>
+            <PersonAvatar p={p} size={34} />
             <div className="tx"><b>{p.name}</b></div>
             {selected.has(p.userId) ? <span className="tag" style={{ background: "var(--brand-soft)", color: "var(--brand)", marginLeft: "auto" }}>✓</span> : <span className="tag mut" style={{ marginLeft: "auto" }}>+</span>}
           </div>
@@ -519,7 +534,7 @@ function InfoModal({ conv, onClose, onLeft, onChanged }: { conv: Conversation; o
               <div className="att" style={{ maxHeight: "40vh", overflowY: "auto" }}>
                 {m.members.map((p) => (
                   <div className="it" key={p.userId}>
-                    <span className="avt" style={{ background: p.color, width: 32, height: 32, fontSize: 12 }}>{p.av}</span>
+                    <PersonAvatar p={p} size={32} />
                     <div className="tx"><b>{p.name}{p.userId === m.adminId ? ` · ${t("stofnandi")}` : ""}</b></div>
                     {admin && p.userId !== m.meId && <button className="btn ghost sm" style={{ marginLeft: "auto", color: "var(--bad)" }} onClick={() => remove(p)}>{t("Fjarlægja")}</button>}
                   </div>

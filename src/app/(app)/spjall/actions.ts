@@ -11,8 +11,9 @@ export type ChatMessage = {
   reactions: { emoji: string; count: number; mine: boolean }[];
   createdAt: string;
   replyTo: { sender: string; body: string } | null;
+  photo: string | null;
 };
-export type Person = { userId: string; name: string; av: string; color: string };
+export type Person = { userId: string; name: string; av: string; color: string; photo: string | null };
 export type Members = { members: Person[]; adminId: string | null; meId: string };
 
 const PALETTE = ["#5b50e6", "#18a06a", "#1fb6a6", "#e0533f", "#0891b2", "#ca8a04", "#9333ea", "#e11d48"];
@@ -28,10 +29,11 @@ async function ctxOf(supabase: Awaited<ReturnType<typeof createClient>>) {
   return { userId: user.id, company };
 }
 
-/** user_id → full_name from employees — fallback when a users row is missing. */
-async function empNameMap(supabase: Awaited<ReturnType<typeof createClient>>, company: string): Promise<Map<string, string>> {
-  const { data } = await supabase.from("employees").select("user_id, full_name").eq("company_id", company).not("user_id", "is", null);
-  return new Map((data ?? []).map((e) => [e.user_id as string, e.full_name as string]));
+/** user_id → {name, photo} from employees — names fall back here when a users
+ * row is missing (invited accounts may carry the email), photos only live here. */
+async function empNameMap(supabase: Awaited<ReturnType<typeof createClient>>, company: string): Promise<Map<string, { name: string; photo: string | null }>> {
+  const { data } = await supabase.from("employees").select("user_id, full_name, photo_url").eq("company_id", company).not("user_id", "is", null);
+  return new Map((data ?? []).map((e) => [e.user_id as string, { name: e.full_name as string, photo: (e.photo_url as string | null) ?? null }]));
 }
 
 /** Conversations the user can see: general + their groups + their DMs. */
@@ -61,11 +63,12 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
       supabase.from("messages").select("channel_id, body, kind, created_at").in("channel_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).order("created_at", { ascending: false }).limit(400),
       empNameMap(supabase, ctx.company),
     ]);
-    const memByCh = new Map<string, { id: string; name: string }[]>();
+    const memByCh = new Map<string, { id: string; name: string; photo: string | null }[]>();
     for (const m of mems ?? []) {
       const u = (Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null;
       if (!memByCh.has(m.channel_id as string)) memByCh.set(m.channel_id as string, []);
-      memByCh.get(m.channel_id as string)!.push({ id: m.user_id as string, name: emps.get(m.user_id as string) ?? u?.full_name ?? "?" });
+      const info = emps.get(m.user_id as string);
+      memByCh.get(m.channel_id as string)!.push({ id: m.user_id as string, name: info?.name ?? u?.full_name ?? "?", photo: info?.photo ?? null });
     }
     const lastByCh = new Map<string, string>();
     const lastAtByCh = new Map<string, string>();
@@ -82,7 +85,7 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
         : dm ? (others[0]?.name ?? "Bein skilaboð")
           : c.name;
       const first = name.split(/\s+/)[0];
-      return { id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: colorOf(first), last: lastByCh.get(c.id) ?? "", lastAt: lastAtByCh.get(c.id) ?? null, dm, photo: c.photo_url ?? null };
+      return { id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: colorOf(first), last: lastByCh.get(c.id) ?? "", lastAt: lastAtByCh.get(c.id) ?? null, dm, photo: dm ? (others[0]?.photo ?? null) : (c.photo_url ?? null) };
     });
     // Newest activity on top; the company-wide "Almennt" channel stays pinned first.
     items.sort((a, b) => (a.kind === "general" ? -1 : b.kind === "general" ? 1 : (b.lastAt ?? "").localeCompare(a.lastAt ?? "")));
@@ -99,12 +102,12 @@ export async function searchPeople(q: string): Promise<Person[]> {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return [];
-    let query = supabase.from("employees").select("user_id, full_name").eq("company_id", ctx.company).not("user_id", "is", null).limit(40);
+    let query = supabase.from("employees").select("user_id, full_name, photo_url").eq("company_id", ctx.company).not("user_id", "is", null).limit(40);
     if (q.trim()) query = query.ilike("full_name", `%${q.trim()}%`);
     const { data } = await query;
     return (data ?? [])
       .filter((e) => e.user_id && e.user_id !== ctx.userId)
-      .map((e) => ({ userId: e.user_id as string, name: e.full_name as string, av: initials(e.full_name as string), color: colorOf((e.full_name as string).split(/\s+/)[0]) }));
+      .map((e) => ({ userId: e.user_id as string, name: e.full_name as string, av: initials(e.full_name as string), color: colorOf((e.full_name as string).split(/\s+/)[0]), photo: (e.photo_url as string | null) ?? null }));
   } catch {
     return [];
   }
@@ -167,8 +170,9 @@ export async function listMembers(channelId: string): Promise<Members> {
     ]);
     const members: Person[] = (data ?? []).map((m) => {
       const u = (Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null;
-      const name = emps.get(m.user_id as string) ?? u?.full_name ?? "?";
-      return { userId: m.user_id as string, name, av: initials(name), color: colorOf(name.split(/\s+/)[0]) };
+      const info = emps.get(m.user_id as string);
+      const name = info?.name ?? u?.full_name ?? "?";
+      return { userId: m.user_id as string, name, av: initials(name), color: colorOf(name.split(/\s+/)[0]), photo: info?.photo ?? null };
     });
     return { members, adminId: (ch?.created_by as string) ?? null, meId: ctx.userId };
   } catch {
@@ -253,18 +257,14 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
       }
     } catch { /* pre-0042 */ }
 
-    // Only hit employees when some sender lacks a usable users.full_name
-    // (invited accounts may carry the email there) — saves a query per poll.
+    // employees carry both the real name (users.full_name may hold an email for
+    // invited accounts) and the profile photo shown next to bubbles.
     const usersName = (m: (typeof data)[number]) =>
       ((Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null)?.full_name;
-    const needsFallback = data.some((m) => {
-      const n = usersName(m);
-      return !n || n.includes("@");
-    });
-    const emps = needsFallback ? await empNameMap(supabase, ctx.company) : new Map<string, string>();
+    const emps = await empNameMap(supabase, ctx.company);
     const senderOf = (m: (typeof data)[number]) => {
       const u = usersName(m);
-      const best = !u || u.includes("@") ? (emps.get(m.sender_id as string) ?? u) : u;
+      const best = !u || u.includes("@") ? (emps.get(m.sender_id as string)?.name ?? u) : u;
       return (best ?? "—").split(/\s+/)[0];
     };
     const byId = new Map(data.map((m) => [m.id as string, m]));
@@ -277,6 +277,7 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
         createdAt: m.created_at as string,
         reactions: (reactByMsg.get(m.id as string) ?? []).sort((a, b) => b.count - a.count),
         replyTo: rt ? { sender: senderOf(rt), body: rt.kind === "image" ? "📷 Mynd" : rt.kind === "audio" ? "🎤 Talskilaboð" : ((rt.body as string) ?? "") } : null,
+        photo: emps.get(m.sender_id as string)?.photo ?? null,
       };
     });
     return { ok: true, messages };
@@ -313,7 +314,7 @@ export async function sendChatMessage(channelId: string, body: string, kind: "te
         supabase.from("channels").select("name, kind").eq("id", channelId).maybeSingle(),
         empNameMap(supabase, ctx.company),
       ]);
-      const sender = (emps.get(ctx.userId) ?? "").split(/\s+/)[0] || "Ný skilaboð";
+      const sender = (emps.get(ctx.userId)?.name ?? "").split(/\s+/)[0] || "Ný skilaboð";
       const title = ch?.kind === "group" && ch.name ? `${sender} · ${ch.name}` : sender;
       const preview = kind === "text" ? text.slice(0, 90) : kind === "image" ? "📷 Mynd" : "🎤 Talskilaboð";
       for (const m of mems ?? []) {
@@ -457,7 +458,7 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
     // Prefer the employee's real name — users.full_name can hold the email
     // (or nothing) for invited accounts.
     const nameOf = (u: unknown, senderId?: unknown) =>
-      (senderId ? empNames.get(String(senderId)) : undefined) ??
+      (senderId ? empNames.get(String(senderId))?.name : undefined) ??
       ((Array.isArray(u) ? u[0] : u) as { full_name?: string } | null)?.full_name ?? "Notandi";
     const posts: FeedPost[] = (rows ?? []).map((r) => {
       const system = !r.sender_id;
