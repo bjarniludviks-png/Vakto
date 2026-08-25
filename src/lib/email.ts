@@ -69,7 +69,7 @@ function template(o: Bilingual): string {
 <div style="display:none;max-height:0;overflow:hidden;opacity:0">${o.preheader}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f6;padding:32px 12px">
   <tr><td align="center">
-    <table role="presentation" width="540" cellpadding="0" cellspacing="0" style="max-width:540px;width:100%">
+    <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%">
 
       <!-- header card -->
       <tr><td style="background:linear-gradient(115deg,${brand},#f59331);border-radius:18px 18px 0 0;padding:22px 30px">

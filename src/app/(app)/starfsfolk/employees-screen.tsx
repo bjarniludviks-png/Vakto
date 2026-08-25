@@ -290,11 +290,11 @@ export default function EmployeesScreen({
                         </span>
                         {e.title ? (
                           <span>
-                            {e.fullName.split(" ")[0]}
+                            {e.fullName}
                             <small>{e.title}</small>
                           </span>
                         ) : (
-                          <span>{e.fullName.split(" ")[0]}</span>
+                          <span>{e.fullName}</span>
                         )}
                       </span>
                     </td>

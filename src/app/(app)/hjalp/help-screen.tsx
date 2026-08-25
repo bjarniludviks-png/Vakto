@@ -102,6 +102,20 @@ const GUIDES: Guide[] = [
     ],
   },
   {
+    id: "homescreen", icon: ic("M12 2 3 9h2v11h5v-6h4v6h5V9h2z"), img: "/help/mitt-svaedi.png",
+    title: { is: "VAKTO á heimaskjáinn + tilkynningar", en: "VAKTO on your home screen + notifications" },
+    intro: {
+      is: "Settu vakto.is á heimaskjá símans — þá er VAKTO eins og app með push-tilkynningum: ný skilaboð, nýtt vaktaplan, svör við beiðnum.",
+      en: "Add vakto.is to your phone's home screen — VAKTO then works like an app with push notifications: new messages, new schedules, request updates.",
+    },
+    steps: [
+      { is: "iPhone (Safari): opnaðu vakto.is → ýttu á Deila-hnappinn (ferningur með ör upp) → „Add to Home Screen“ / „Bæta á heimaskjá“ → Add.", en: "iPhone (Safari): open vakto.is → tap Share (square with arrow) → \"Add to Home Screen\" → Add." },
+      { is: "Android (Chrome): opnaðu vakto.is → ⋮ valmyndin → „Add to Home screen“ / „Setja á heimaskjá“ → Add.", en: "Android (Chrome): open vakto.is → the ⋮ menu → \"Add to Home screen\" → Add." },
+      { is: "MIKILVÆGT á iPhone: opnaðu VAKTO alltaf með nýja íkoninum á heimaskjánum (ekki inni í Safari) — annars leyfir Apple ekki tilkynningar.", en: "IMPORTANT on iPhone: always open VAKTO from the new home-screen icon (not inside Safari) — otherwise Apple blocks notifications." },
+      { is: "Kveiktu á tilkynningum: opnaðu appið af heimaskjánum → Mitt svæði → „Virkja tilkynningar“ → Leyfa. Búið — nú færðu push um skilaboð, nýtt vaktaplan og svör við beiðnum.", en: "Turn on notifications: open the app from the home screen → My area → \"Enable notifications\" → Allow. Done — you'll get pushes for messages, new schedules and request updates." },
+    ],
+  },
+  {
     id: "kiosk", icon: ic("M4 3h16v14H4z|M8 21h8M12 17v4"), img: "/help/kiosk.png",
     title: { is: "Kiosk stimpilklukka", en: "Kiosk time clock" },
     intro: { is: "Sameiginleg stimpilklukka á spjaldtölvu — starfsmenn stimpla sig með 4-stafa PIN, engin innskráning.", en: "A shared time clock on a tablet — staff clock in with a 4-digit PIN, no login." },

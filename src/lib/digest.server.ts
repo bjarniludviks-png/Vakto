@@ -43,7 +43,7 @@ export async function sendDigests(now = new Date()): Promise<{ sent: number }> {
     if (!emails.length) continue;
     const { data: emps } = await admin.from("employees").select("id, full_name, rate").eq("company_id", company);
     const rate = new Map((emps ?? []).map((e) => [e.id as string, Number(e.rate) || 0]));
-    const nameOf = new Map((emps ?? []).map((e) => [e.id as string, (e.full_name as string).split(/\s+/)[0]]));
+    const nameOf = new Map((emps ?? []).map((e) => [e.id as string, e.full_name as string]));
 
     for (const p of periods) {
       const fromTs = `${p.from}T00:00:00Z`, toTs = `${p.to}T23:59:59Z`;
@@ -52,11 +52,25 @@ export async function sendDigests(now = new Date()): Promise<{ sent: number }> {
         .eq("company_id", company).gte("clock_in", fromTs).lte("clock_in", toTs);
       if (!punches?.length) continue; // no activity → no email
       const { data: shifts } = await admin
-        .from("shifts").select("employee_id, date").eq("company_id", company)
+        .from("shifts").select("employee_id, date, start_time, end_time").eq("company_id", company)
         .gte("date", p.from).lte("date", p.to);
       const scheduled = new Set((shifts ?? []).map((x) => `${x.employee_id}:${x.date}`));
-      let hours = 0, cost = 0, open = 0, unsched = 0;
+
+      // planned hours per employee + total (from the published schedule)
+      const plannedBy = new Map<string, number>();
+      let planned = 0;
+      for (const s of shifts ?? []) {
+        if (!s.employee_id || !s.start_time || !s.end_time) continue;
+        const st = String(s.start_time), en = String(s.end_time);
+        let h = Number(en.slice(0, 2)) + Number(en.slice(3, 5)) / 60 - Number(st.slice(0, 2)) - Number(st.slice(3, 5)) / 60;
+        if (h < 0) h += 24;
+        planned += h;
+        plannedBy.set(s.employee_id as string, (plannedBy.get(s.employee_id as string) ?? 0) + h);
+      }
+
+      let hours = 0, cost = 0, open = 0;
       const perEmp = new Map<string, number>();
+      const unschedBy = new Map<string, number>(); // who clocked in off-plan
       for (const pu of punches) {
         const eid = pu.employee_id as string;
         if (!pu.clock_out) { open++; continue; }
@@ -65,21 +79,49 @@ export async function sendDigests(now = new Date()): Promise<{ sent: number }> {
         hours += h; cost += h * (rate.get(eid) ?? 0) * 1.302; // með launatengdum gjöldum
         perEmp.set(eid, (perEmp.get(eid) ?? 0) + h);
         const day = (pu.clock_in as string).slice(0, 10);
-        if (!scheduled.has(`${eid}:${day}`)) unsched++;
+        if (!scheduled.has(`${eid}:${day}`)) unschedBy.set(eid, (unschedBy.get(eid) ?? 0) + 1);
       }
-      const top = [...perEmp.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-      const rowsHtml = top.map(([eid, h]) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #eee">${nameOf.get(eid) ?? "?"}</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right">${dec1(h)} klst</td></tr>`).join("");
-      const stat = (label: string, value: string) =>
+      const unsched = [...unschedBy.values()].reduce((a, b) => a + b, 0);
+      const dev = hours - planned;
+      const devTxt = `${dev >= 0 ? "+" : "−"}${dec1(Math.abs(dev))} klst`;
+      const devCol = Math.abs(dev) < 0.05 ? "#5f6470" : dev > 0 ? "#d8483a" : "#1f9d6b";
+
+      // ALL employees who worked (or were scheduled), full names, planned/worked/deviation
+      const empIds = new Set<string>([...perEmp.keys(), ...plannedBy.keys()]);
+      const all = [...empIds]
+        .map((eid) => ({ eid, name: nameOf.get(eid) ?? "?", plan: plannedBy.get(eid) ?? 0, got: perEmp.get(eid) ?? 0 }))
+        .sort((a, b) => b.got - a.got);
+      const capped = all.slice(0, 30);
+      const cell = "padding:7px 8px;border-bottom:1px solid #eef0f3;font-size:13px";
+      const rowsHtml = capped.map((r) => {
+        const d = r.got - r.plan;
+        const dc = Math.abs(d) < 0.05 ? "#9296a6" : d > 0 ? "#d8483a" : "#1f9d6b";
+        return `<tr>
+          <td style="${cell}">${r.name}${(unschedBy.get(r.eid) ?? 0) > 0 ? ` <span style="color:#bf8f3a;font-size:11px;font-weight:700">· óáætl.</span>` : ""}</td>
+          <td style="${cell};text-align:right;color:#5f6470">${r.plan ? dec1(r.plan) : "—"}</td>
+          <td style="${cell};text-align:right;font-weight:700">${r.got ? dec1(r.got) : "—"}</td>
+          <td style="${cell};text-align:right;font-weight:700;color:${dc}">${r.plan || r.got ? `${d >= 0 ? "+" : "−"}${dec1(Math.abs(d))}` : "—"}</td>
+        </tr>`;
+      }).join("") + (all.length > capped.length ? `<tr><td colspan="4" style="${cell};color:#9296a6">+ ${all.length - capped.length} til viðbótar</td></tr>` : "");
+      const unschedNames = [...unschedBy.keys()].map((eid) => nameOf.get(eid) ?? "?").join(", ");
+      const stat = (label: string, value: string, color?: string) =>
         `<tr><td style="padding:8px 0;border-bottom:1px solid #eef0f3;color:#5f6470;font-size:14px">${label}</td>
-         <td style="padding:8px 0;border-bottom:1px solid #eef0f3;text-align:right;font-weight:700;font-variant-numeric:tabular-nums">${value}</td></tr>`;
+         <td style="padding:8px 0;border-bottom:1px solid #eef0f3;text-align:right;font-weight:700;font-variant-numeric:tabular-nums${color ? `;color:${color}` : ""}">${value}</td></tr>`;
+      const th = "padding:6px 8px;font-size:10.5px;font-weight:700;letter-spacing:.07em;color:#9296a6;text-transform:uppercase;border-bottom:2px solid #eef0f3";
       const inner = `
         <table style="border-collapse:collapse;width:100%;margin:4px 0 6px">
+          ${stat("Áætlaðir tímar (vaktaplan)", `${dec1(planned)} klst`)}
           ${stat("Unnir tímar", `${dec1(hours)} klst`)}
+          ${stat("Frávik", devTxt, devCol)}
           ${stat("Áætlaður launakostnaður (m. gjöldum)", `${nf(Math.round(cost))} kr`)}
-          ${stat("Óáætlaðar stimplanir", String(unsched))}
-          ${stat("Opnar stimplanir", String(open))}
+          ${stat("Óáætlaðar stimplanir", unsched ? `${unsched} — ${unschedNames}` : "0", unsched ? "#bf8f3a" : undefined)}
+          ${stat("Opnar stimplanir", String(open), open ? "#d8483a" : undefined)}
         </table>
-        ${top.length ? `<div style="font-size:12px;font-weight:700;letter-spacing:.08em;color:#9296a6;margin:16px 0 4px">FLESTIR TÍMAR</div><table style="border-collapse:collapse;width:100%">${rowsHtml}</table>` : ""}`;
+        ${all.length ? `<div style="font-size:12px;font-weight:700;letter-spacing:.08em;color:#9296a6;margin:18px 0 4px">TÍMAR PER STARFSMANN</div>
+        <table style="border-collapse:collapse;width:100%">
+          <tr><th style="${th};text-align:left">Nafn</th><th style="${th};text-align:right">Áætlað</th><th style="${th};text-align:right">Unnið</th><th style="${th};text-align:right">Frávik</th></tr>
+          ${rowsHtml}
+        </table>` : ""}`;
       const html = brandedReportHtml({
         preheader: `${co.name} · ${p.label}`,
         heading: `${co.name} — ${p.label}`,
