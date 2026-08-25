@@ -76,7 +76,7 @@ export default function EmployeeScreen({ card, my: myProp }: { card?: StaffCard;
         {tab === "sh" && perms.shifts && <MyShifts onReq={setReq} perms={perms} my={my} />}
         {tab === "pay" && perms.pay && <Pay my={my} />}
         {tab === "ri" && <Rights my={my} />}
-        {tab === "pr" && <Profile photo={photo} setPhoto={setPhoto} my={my} />}
+        {tab === "pr" && <Profile photo={photo} setPhoto={setPhoto} my={my} initials={cardData.initials} />}
       </div>
 
       {req && <ReqModal kind={req} onClose={() => setReq(null)} my={my} />}
@@ -577,7 +577,7 @@ function Rights({ my }: { my?: MyArea }) {
   );
 }
 
-function Profile({ photo, setPhoto, my }: { photo: string | null; setPhoto: (s: string) => void; my?: MyArea }) {
+function Profile({ photo, setPhoto, my, initials }: { photo: string | null; setPhoto: (s: string) => void; my?: MyArea; initials?: string }) {
   const { t } = useLang();
   const p = my?.live ? my.profile : null;
   const [phone, setPhone] = useState(p ? p.phone : "+354 691 2389");
@@ -593,7 +593,7 @@ function Profile({ photo, setPhoto, my }: { photo: string | null; setPhoto: (s: 
   return (
     <div className="emp-pane on">
       <div className="card"><div className="cb">
-        <PhotoAvatar photo={photo} setPhoto={setPhoto} big />
+        <PhotoAvatar photo={photo} setPhoto={setPhoto} big initials={initials} />
         <p style={{ textAlign: "center", fontSize: 12.5, color: "var(--ink3)", marginBottom: 18 }}>{t("Smelltu á myndina til að hlaða upp nýrri")}</p>
         <div className="emp-row2">
           <div className="emp-fld"><label>{t("Fullt nafn")}</label><input defaultValue={p ? p.name : "Mína Huong"} readOnly={!!p} /></div>
