@@ -980,3 +980,19 @@ create policy channels_member_update on channels
 drop policy if exists messages_own_delete on messages;
 create policy messages_own_delete on messages
   for delete using (sender_id = auth.uid());
+
+-- ===== 0043_realtime_chat.sql =====
+-- 0043: Realtime for chat — messages (and channel renames/photos) stream to
+-- clients instantly instead of 4s polling. RLS still governs what each
+-- subscriber may see (postgres_changes respects policies).
+do $$
+begin
+  alter publication supabase_realtime add table public.messages;
+exception when duplicate_object then null;
+end $$;
+
+do $$
+begin
+  alter publication supabase_realtime add table public.channels;
+exception when duplicate_object then null;
+end $$;

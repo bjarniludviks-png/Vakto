@@ -85,7 +85,10 @@ export function StaffCardModal({ card, onClose }: { card: StaffCardData; onClose
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="13" width="4" height="8" rx="1.2" fill="#fff" /><rect x="10" y="8" width="4" height="13" rx="1.2" fill="#fff" /><rect x="17" y="4" width="4" height="17" rx="1.2" fill="#fff" /></svg>
               VAKTO
             </div>
-            <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".02em", textTransform: "uppercase", maxWidth: 160, textAlign: "right", lineHeight: 1.15 }}>{card.company}</span>
+            <span style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", maxWidth: 170 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".02em", textTransform: "uppercase", textAlign: "right", lineHeight: 1.15 }}>{card.company}</span>
+              {card.companyKt && <span style={{ fontSize: 10.5, fontWeight: 600, color: "rgba(255,255,255,.75)", marginTop: 2, fontVariantNumeric: "tabular-nums" }}>kt. {card.companyKt}</span>}
+            </span>
           </div>
 
           {/* avatar */}
@@ -102,20 +105,13 @@ export function StaffCardModal({ card, onClose }: { card: StaffCardData; onClose
             <div style={{ fontSize: 27, fontWeight: 800, letterSpacing: "-.02em", marginTop: 2 }}>{card.name}</div>
           </div>
 
-          {/* fields: staða / deild / nr. */}
+          {/* fields: kennitala / staða / deild / nr. — employee kt always shown */}
           <div style={{ position: "relative", marginTop: 16, display: "flex", gap: 26, flexWrap: "wrap" }}>
+            <Field k={t("Kennitala")} v={card.employeeKt || "—"} />
             <Field k={t("Staða")} v={t(card.role)} />
             {card.department && <Field k={t("Deild")} v={card.department} />}
             <Field k={t("Nr.")} v={`#${no}`} />
           </div>
-
-          {/* fields: kennitölur */}
-          {(card.employeeKt || card.companyKt) && (
-            <div style={{ position: "relative", marginTop: 14, display: "flex", gap: 26, flexWrap: "wrap" }}>
-              {card.employeeKt && <Field k={t("Kennitala")} v={card.employeeKt} />}
-              {card.companyKt && <Field k={t("Kt. fyrirtækis")} v={card.companyKt} />}
-            </div>
-          )}
 
           {/* QR */}
           <div style={{ position: "relative", marginTop: 18, background: "#fff", borderRadius: 18, padding: 18, display: "flex", justifyContent: "center" }}>

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
+import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { useLang } from "@/components/app/lang";
 import { toast } from "@/components/app/toast";
 import {
@@ -75,8 +76,9 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
   const [search, setSearch] = useState("");
   const [emoji, setEmoji] = useState(false);
   const [rec, setRec] = useState(false);
-  const [modal, setModal] = useState<null | "dm" | "group" | "info">(null);
+  const [modal, setModal] = useState<null | "group" | "info">(null);
   const [seen, setSeen] = useState<Record<string, string>>({});
+  const [people, setPeople] = useState<Person[]>([]);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [reactFor, setReactFor] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -103,9 +105,53 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
   useEffect(() => {
     loadMsgs(active?.id);
     if (active?.id) markSeen(active.id);
-    const iv = setInterval(() => { loadMsgs(active?.id); reloadConvs(); if (active?.id) markSeen(active.id); }, 4000);
+    // Realtime does the heavy lifting; polling is only a 10s safety net.
+    const iv = setInterval(() => { loadMsgs(active?.id); reloadConvs(); if (active?.id) markSeen(active.id); }, 10000);
     return () => clearInterval(iv);
   }, [active?.id]);
+
+  const activeRef = useRef<string | null>(null);
+  useEffect(() => { activeRef.current = active?.id ?? null; }, [active?.id]);
+
+  // Instant delivery: subscribe to new messages (RLS-scoped) — reload the open
+  // thread and the list the moment anything lands, instead of waiting to poll.
+  useEffect(() => {
+    const supabase = createBrowserClient();
+    const ch = supabase
+      .channel("chat-live")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
+        const row = payload.new as { channel_id?: string };
+        if (row.channel_id && row.channel_id === activeRef.current) {
+          loadMsgs(activeRef.current ?? undefined);
+          if (activeRef.current) markSeen(activeRef.current);
+        }
+        reloadConvs();
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "channels" }, () => reloadConvs())
+      .subscribe();
+    return () => { void supabase.removeChannel(ch); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // People search — suggestions from the FIRST character (Messenger-style).
+  useEffect(() => {
+    const q = search.trim();
+    if (!q) { setPeople([]); return; }
+    const id = setTimeout(() => searchPeople(q).then(setPeople), 150);
+    return () => clearTimeout(id);
+  }, [search]);
+
+  async function openDM(p: Person) {
+    setSearch("");
+    const r = await startDM(p.userId);
+    if (!r.ok) { toast(r.error ?? "Villa"); return; }
+    const c = await listConversations();
+    if (c.ok) {
+      setConvs(c.items);
+      const found = c.items.find((x) => x.id === r.id);
+      if (found) { setActive(found); markSeen(found.id); }
+    }
+  }
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs]);
   const unread = (c: Conversation) => !!c.lastAt && c.id !== active?.id && (!seen[c.id] || c.lastAt > seen[c.id]);
 
@@ -115,10 +161,18 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
     if (kind === "text") setVal("");
     setEmoji(false);
     if (!active) return;
-    const reply = replyTo?.id;
+    const reply = replyTo;
     setReplyTo(null);
-    const res = await sendChatMessage(active.id, text, kind, url, reply);
-    if (!res.ok) toast(res.error ?? "Tókst ekki");
+    // Optimistic: show the message instantly; the reload reconciles the real row.
+    const now = new Date();
+    setMsgs((ms) => [...ms, {
+      id: `tmp-${now.getTime()}`, sender: "Ég", senderId: initial.meId, me: true,
+      body: text, at: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+      kind, url: url ?? null, reactions: [], createdAt: now.toISOString(),
+      replyTo: reply ? { sender: reply.sender, body: reply.body } : null,
+    }]);
+    const res = await sendChatMessage(active.id, text, kind, url, reply?.id);
+    if (!res.ok) { toast(res.error ?? "Tókst ekki"); }
     loadMsgs(active.id); reloadConvs();
   }
 
@@ -179,11 +233,16 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
         {/* conversation list */}
         <div className="msgr-list">
           <div className="msgr-head" style={{ gap: 8 }}>
-            <div className="srchbox" style={{ flex: 1 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.4-3.4" /></svg><input placeholder={t("Leita")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-            <button className="iconbtn" title={t("Nýtt spjall")} onClick={() => setModal("dm")}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9" /><path d="M16.5 3.5a2 2 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" /></svg></button>
+            <div className="srchbox" style={{ flex: 1 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.4-3.4" /></svg><input placeholder={t("Leitaðu að spjalli eða manneskju…")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
             <button className="iconbtn" title={t("Ný grúppa")} onClick={() => setModal("group")}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" /></svg></button>
           </div>
           <div style={{ flex: 1, overflowY: "auto" }}>
+            {search.trim() && (
+              <div className="chat-sec">{t("Samtöl")}</div>
+            )}
+            {search.trim() && shown.length === 0 && (
+              <div className="muted" style={{ fontSize: 12.5, padding: "4px 14px 10px" }}>{t("Ekkert samtal fannst")}</div>
+            )}
             {shown.map((c) => {
               const un = unread(c);
               return (
@@ -200,6 +259,23 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
                 </div>
               );
             })}
+            {search.trim() && people.length > 0 && (
+              <>
+                <div className="chat-sec">{t("Byrja nýtt spjall")}</div>
+                {people
+                  .filter((p) => !convs.some((c) => c.dm && c.name === p.name))
+                  .map((p) => (
+                    <div key={p.userId} className="conv" onClick={() => openDM(p)}>
+                      <span className="avt" style={{ background: p.color, width: 40, height: 40, fontSize: 13 }}>{p.av}</span>
+                      <div className="tx">
+                        <b>{p.name}</b>
+                        <span>{t("Senda skilaboð")}</span>
+                      </div>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink3)" strokeWidth="2" style={{ marginLeft: "auto", flexShrink: 0 }}><path d="M12 5v14M5 12h14" /></svg>
+                    </div>
+                  ))}
+              </>
+            )}
           </div>
         </div>
 
@@ -302,7 +378,6 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
         </div>
       </div>
 
-      {modal === "dm" && <NewDMModal onClose={() => setModal(null)} onPick={async (p) => { const r = await startDM(p.userId); setModal(null); if (r.ok) { reloadConvs(); listConversations().then((c) => { const found = c.items.find((x) => x.id === r.id); if (found) setActive(found); }); } else toast(r.error ?? "Villa"); }} />}
       {modal === "group" && <NewGroupModal onClose={() => setModal(null)} onDone={(id) => { setModal(null); listConversations().then((c) => { if (c.ok) { setConvs(c.items); const f = c.items.find((x) => x.id === id); if (f) setActive(f); } }); }} />}
       {modal === "info" && active && <InfoModal conv={active} onClose={() => setModal(null)} onLeft={() => { setModal(null); setActive(null); reloadConvs(); }} onChanged={reloadConvs} />}
     </>
@@ -327,19 +402,6 @@ function PeoplePicker({ selected, onToggle }: { selected: Set<string>; onToggle:
         )) : <div className="muted" style={{ padding: 14, textAlign: "center", fontSize: 13 }}>{t("Enginn starfsmaður fannst")}</div>}
       </div>
     </>
-  );
-}
-
-function NewDMModal({ onClose, onPick }: { onClose: () => void; onPick: (p: Person) => void }) {
-  const { t } = useLang();
-  return (
-    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="mbg" onClick={onClose} />
-      <div className="modal">
-        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Nýtt spjall")}</div><button className="x" onClick={onClose}>✕</button></div>
-        <div className="mb"><PeoplePicker selected={new Set()} onToggle={onPick} /></div>
-      </div>
-    </div>
   );
 }
 

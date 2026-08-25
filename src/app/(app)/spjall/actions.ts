@@ -253,10 +253,19 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
       }
     } catch { /* pre-0042 */ }
 
-    const emps = await empNameMap(supabase, ctx.company);
+    // Only hit employees when some sender lacks a usable users.full_name
+    // (invited accounts may carry the email there) — saves a query per poll.
+    const usersName = (m: (typeof data)[number]) =>
+      ((Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null)?.full_name;
+    const needsFallback = data.some((m) => {
+      const n = usersName(m);
+      return !n || n.includes("@");
+    });
+    const emps = needsFallback ? await empNameMap(supabase, ctx.company) : new Map<string, string>();
     const senderOf = (m: (typeof data)[number]) => {
-      const u = (Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null;
-      return (emps.get(m.sender_id as string) ?? u?.full_name ?? "—").split(/\s+/)[0];
+      const u = usersName(m);
+      const best = !u || u.includes("@") ? (emps.get(m.sender_id as string) ?? u) : u;
+      return (best ?? "—").split(/\s+/)[0];
     };
     const byId = new Map(data.map((m) => [m.id as string, m]));
     const messages: ChatMessage[] = data.map((m) => {
