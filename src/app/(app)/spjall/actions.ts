@@ -70,6 +70,9 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
       const info = emps.get(m.user_id as string);
       memByCh.get(m.channel_id as string)!.push({ id: m.user_id as string, name: info?.name ?? u?.full_name ?? "?", photo: info?.photo ?? null });
     }
+    // Only channels the user actually belongs to — "Almennt" is company-wide.
+    // Without this, a left/deleted group would linger in everyone's list.
+    channels = channels.filter((c) => c.kind === "general" || (memByCh.get(c.id) ?? []).some((m) => m.id === ctx.userId));
     const lastByCh = new Map<string, string>();
     const lastAtByCh = new Map<string, string>();
     for (const m of msgs ?? []) {
