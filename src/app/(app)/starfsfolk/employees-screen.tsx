@@ -1065,6 +1065,40 @@ function DocsTab({ employeeId }: { employeeId: string }) {
   );
 }
 
+/** Pay-type + rate pair for the new-employee form — the unit and example
+ * follow the chosen type (kr/klst for hourly, kr/mán for monthly). */
+function PayFields() {
+  const [kind, setKind] = useState("Tímakaup");
+  const [rate, setRate] = useState("2.900");
+  const monthly = kind === "Mánaðarlaun";
+  function switchKind(next: string) {
+    setKind(next);
+    // swap the untouched default so a stale hourly figure never becomes a monthly salary
+    if (next === "Mánaðarlaun" && (rate === "2.900" || !rate)) setRate("650.000");
+    if (next === "Tímakaup" && (rate === "650.000" || !rate)) setRate("2.900");
+  }
+  return (
+    <div className="emp-row2">
+      <div className="emp-fld">
+        <label>Tegund launa</label>
+        <select name="payType" value={kind} onChange={(e) => switchKind(e.target.value)}>
+          <option>Tímakaup</option>
+          <option>Mánaðarlaun</option>
+        </select>
+      </div>
+      <div className="emp-fld">
+        <label>{monthly ? "Mánaðarlaun (föst laun)" : "Tímakaup"}</label>
+        <div style={{ position: "relative" }}>
+          <input name="rate" value={rate} onChange={(e) => setRate(e.target.value)} placeholder={monthly ? "t.d. 650.000" : "t.d. 2.900"} style={{ width: "100%", boxSizing: "border-box", paddingRight: 64 }} />
+          <span className="muted" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 12.5, pointerEvents: "none" }}>
+            {monthly ? "kr/mán" : "kr/klst"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NewEmployeeModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [docs, setDocs] = useState<{ name: string; meta: string }[]>([]);
@@ -1104,7 +1138,7 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
       bankAccount: g("bankAccount"), role: g("role") ?? "Starfsmaður", position: g("position"),
       department: g("department"), location: g("location"), hireDate: g("hireDate"),
       employmentRatio: g("employmentRatio"), payType: g("payType"), rate: g("rate"), union: g("union"),
-      monthlyHours: g("monthlyHours"),
+      pensionFund: g("pensionFund"), monthlyHours: g("monthlyHours"),
       ruleTemplateId: g("ruleTemplateId"), contractType: g("contractType"), schedulePattern: g("schedulePattern"),
     });
     if (!res.ok) { setBusy(false); setError(res.error ?? "Tókst ekki að stofna"); return; }
@@ -1181,16 +1215,22 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <Sec>Laun</Sec>
+          <PayFields />
           <div className="emp-row2">
-            <div className="emp-fld"><label>Tegund launa</label><select name="payType"><option>Tímakaup</option><option>Mánaðarlaun</option></select></div>
-            <div className="emp-fld"><label>Taxti</label><input name="rate" defaultValue="2.900 kr/klst" /></div>
-          </div>
-          <div className="emp-fld">
-            <label>Stéttarfélag / samningur</label>
-            <input name="union" list="union-suggest" defaultValue="Efling" placeholder="Frjáls texti — hvaða félag sem er" />
-            <datalist id="union-suggest">
-              <option value="Efling" /><option value="Efling – veitingar/SGS" /><option value="VR" /><option value="Matvís" /><option value="Eigin reglur" />
-            </datalist>
+            <div className="emp-fld">
+              <label>Stéttarfélag / samningur</label>
+              <input name="union" list="union-suggest" defaultValue="Efling" placeholder="Frjáls texti — hvaða félag sem er" />
+              <datalist id="union-suggest">
+                <option value="Efling" /><option value="Efling – veitingar/SGS" /><option value="VR" /><option value="Matvís" /><option value="Eigin reglur" />
+              </datalist>
+            </div>
+            <div className="emp-fld">
+              <label>Lífeyrissjóður</label>
+              <input name="pensionFund" list="pension-suggest" placeholder="t.d. Gildi" />
+              <datalist id="pension-suggest">
+                <option value="Gildi" /><option value="Lífeyrissjóður verzlunarmanna" /><option value="Birta" /><option value="Festa" /><option value="Stapi" /><option value="Brú" /><option value="Almenni" /><option value="Frjálsi" /><option value="Lífsverk" /><option value="Söfnunarsjóður lífeyrisréttinda" />
+              </datalist>
+            </div>
           </div>
           <div className="emp-row2">
             <div className="emp-fld">

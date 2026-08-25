@@ -24,6 +24,7 @@ export type NewEmployeeInput = {
   payType?: string; // "Tímakaup" | "Mánaðarlaun"
   rate?: string;
   union?: string;
+  pensionFund?: string;
   monthlyHours?: string;
   // universal fields (0028) — written tolerantly until the migration runs
   ruleTemplateId?: string;
@@ -115,6 +116,7 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
       email: input.email || null,
       phone: input.phone || null,
       bank_account: input.bankAccount || null,
+      pension_fund: input.pensionFund?.trim() || null,
       role: roleEnum(input.role),
       department_id,
       position_id,
