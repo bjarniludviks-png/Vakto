@@ -110,13 +110,18 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
     if (!vv) return;
     const apply = () => {
       const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      if (wrapRef.current) wrapRef.current.style.bottom = `${kb}px`;
+      if (wrapRef.current) {
+        wrapRef.current.style.bottom = `${kb}px`;
+        wrapRef.current.classList.toggle("kb-open", kb > 0);
+      }
       if (kb > 0) window.scrollTo(0, 0); // stop iOS from panning the page instead
       endRef.current?.scrollIntoView({ block: "end" });
     };
-    vv.addEventListener("resize", apply);
+    // iOS fires several resizes while the keyboard animates — settle at the end too.
+    const late = () => { apply(); setTimeout(apply, 250); };
+    vv.addEventListener("resize", late);
     vv.addEventListener("scroll", apply);
-    return () => { vv.removeEventListener("resize", apply); vv.removeEventListener("scroll", apply); };
+    return () => { vv.removeEventListener("resize", late); vv.removeEventListener("scroll", apply); };
   }, []);
 
   function reloadConvs() {
