@@ -84,6 +84,13 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
   const endRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // Phone: land on the conversation LIST, not inside the first thread.
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 760px)").matches) setActive(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function reloadConvs() {
     listConversations().then((r) => {
@@ -149,7 +156,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
     if (c.ok) {
       setConvs(c.items);
       const found = c.items.find((x) => x.id === r.id);
-      if (found) { setActive(found); markSeen(found.id); }
+      if (found) { setActive(found); markSeen(found.id); requestAnimationFrame(() => inputRef.current?.focus()); }
     }
   }
   useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs]);
@@ -246,7 +253,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
             {shown.map((c) => {
               const un = unread(c);
               return (
-                <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}`} onClick={() => { setActive(c); markSeen(c.id); }}>
+                <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}`} onClick={() => { setActive(c); markSeen(c.id); requestAnimationFrame(() => inputRef.current?.focus()); }}>
                   <ConvAvatar c={c} />
                   <div className="tx">
                     <b style={un ? { fontWeight: 800 } : undefined}>{c.kind === "general" ? "# " + c.name : c.name}</b>
@@ -367,7 +374,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
                   {rec ? <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
                     : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>}
                 </button>
-                <input className="txt" placeholder={rec ? t("Tek upp… smelltu til að stöðva") : t("chat:ph")} value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
+                <input ref={inputRef} className="txt" placeholder={rec ? t("Tek upp… smelltu til að stöðva") : t("chat:ph")} value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
                 <button className="msgr-send" disabled={!val.trim() && !rec} onClick={() => send()} aria-label={t("chat:send")}>
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
                 </button>
