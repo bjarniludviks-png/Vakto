@@ -94,11 +94,29 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
   const fileRef = useRef<HTMLInputElement | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
 
   // Phone: land on the conversation LIST, not inside the first thread.
   useEffect(() => {
     if (window.matchMedia("(max-width: 760px)").matches) setActive(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Messenger-style keyboard handling: when the iOS keyboard opens it shrinks
+  // the visual viewport — raise the fixed panel's bottom by the keyboard height
+  // and keep the newest messages pinned right above the composer.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const apply = () => {
+      const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      if (wrapRef.current) wrapRef.current.style.bottom = `${kb}px`;
+      if (kb > 0) window.scrollTo(0, 0); // stop iOS from panning the page instead
+      endRef.current?.scrollIntoView({ block: "end" });
+    };
+    vv.addEventListener("resize", apply);
+    vv.addEventListener("scroll", apply);
+    return () => { vv.removeEventListener("resize", apply); vv.removeEventListener("scroll", apply); };
   }, []);
 
   function reloadConvs() {
@@ -246,7 +264,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
 
   return (
     <>
-      <div className={`msgr full${active ? " thread-open" : ""}`}>
+      <div ref={wrapRef} className={`msgr full${active ? " thread-open" : ""}`}>
         {/* conversation list */}
         <div className="msgr-list">
           <div className="msgr-head" style={{ gap: 8 }}>

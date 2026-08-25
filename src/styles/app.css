@@ -799,7 +799,7 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 .msgr-list{width:308px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
 .msgr-thread{flex:1;display:flex;flex-direction:column;min-width:0}
 .msgr-head{padding:11px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;font-weight:650;font-size:14.5px}
-.msgr-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:7px;background:var(--bg)}
+.msgr-msgs{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:16px;display:flex;flex-direction:column;gap:7px;background:var(--bg)}
 .msgr-input{border-top:1px solid var(--line);padding:9px 11px;display:flex;align-items:center;gap:6px}
 .msgr-input .txt{flex:1;border:1px solid var(--line);border-radius:999px;padding:9px 15px;font-size:14px;outline:none;background:var(--panel)}
 .conv{display:flex;gap:11px;padding:10px 13px;cursor:pointer;align-items:center}
