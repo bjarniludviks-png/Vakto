@@ -809,6 +809,13 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 .emojibar{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line2)}
 .emojibar button{font-size:21px;background:none;border:none;cursor:pointer;padding:2px;line-height:1}
 
+/* ---- autocomplete (type-ahead suggestions) ---- */
+.acp{position:relative;display:inline-block}
+.acp input{width:100%;box-sizing:border-box}
+.acp-list{position:absolute;top:calc(100% + 5px);left:0;right:0;min-width:230px;z-index:75;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 42px -10px rgba(20,22,28,.22);padding:5px;max-height:280px;overflow-y:auto}
+.acp-item{display:block;width:100%;text-align:left;font:inherit;font-size:13px;font-weight:550;color:var(--ink);background:none;border:0;border-radius:8px;padding:8px 11px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acp-item.on{background:var(--brand-soft);color:var(--brand-deep)}
+
 /* ---- Messenger-style extras: rows w/ hover actions, reactions, replies ---- */
 .day-sep{display:flex;justify-content:center;margin:10px 0 4px}
 .day-sep span{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--ink3);background:var(--line2);border-radius:999px;padding:4px 13px}

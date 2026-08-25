@@ -1,0 +1,48 @@
+// Icelandic reference lists for autocomplete fields (free text still allowed —
+// these are suggestions, not constraints).
+
+export const PENSION_FUNDS = [
+  "Gildi lífeyrissjóður",
+  "Lífeyrissjóður verzlunarmanna",
+  "Birta lífeyrissjóður",
+  "Frjálsi lífeyrissjóðurinn",
+  "Festa lífeyrissjóður",
+  "Stapi lífeyrissjóður",
+  "Brú lífeyrissjóður",
+  "Almenni lífeyrissjóðurinn",
+  "LSR — Lífeyrissjóður starfsmanna ríkisins",
+  "Lífsverk lífeyrissjóður",
+  "Söfnunarsjóður lífeyrisréttinda",
+  "Íslenski lífeyrissjóðurinn",
+  "Lífeyrissjóður bankamanna",
+  "Lífeyrissjóður Vestmannaeyja",
+  "Lífeyrissjóður Rangæinga",
+  "Eftirlaunasjóður FÍA",
+];
+
+export const UNIONS = [
+  "Efling",
+  "Efling – veitingar/SGS",
+  "VR",
+  "Matvís",
+  "Eining-Iðja",
+  "Framsýn stéttarfélag",
+  "AFL Starfsgreinafélag",
+  "Báran stéttarfélag",
+  "Drífandi stéttarfélag",
+  "Aldan stéttarfélag",
+  "Verkalýðsfélag Akraness",
+  "Verkalýðsfélag Vestfirðinga",
+  "Verkalýðsfélag Suðurlands",
+  "Verkalýðsfélagið Hlíf",
+  "Stéttarfélag Vesturlands",
+  "Félag verslunar- og skrifstofufólks Akureyrar",
+  "Samiðn",
+  "VM – Félag vélstjóra og málmtæknimanna",
+  "Rafiðnaðarsamband Íslands",
+  "FIT – Félag iðn- og tæknigreina",
+  "Grafía",
+  "Sameyki",
+  "Sjómannafélag Íslands",
+  "Eigin reglur",
+];

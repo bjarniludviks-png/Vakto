@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/app/page-header";
+import { Autocomplete } from "@/components/app/autocomplete";
+import { UNIONS, PENSION_FUNDS } from "@/lib/is-lists";
 import { toast } from "@/components/app/toast";
 import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
@@ -444,8 +446,8 @@ function LaunTab({ e }: { e: Employee }) {
   // Lífeyrissjóður — birtist á launaseðli og ráðningarsamningi.
   const [pension, setPension] = useState("");
   useEffect(() => { getEmployeePension(e.id).then((v) => setPension(v ?? "")); }, [e.id]);
-  function savePension() {
-    updateEmployee(e.id, { pensionFund: pension }).then((r) => toast(r.ok ? "Lífeyrissjóður vistaður" : (r.error ?? "Villa")));
+  function savePension(v?: string) {
+    updateEmployee(e.id, { pensionFund: v ?? pension }).then((r) => toast(r.ok ? "Lífeyrissjóður vistaður" : (r.error ?? "Villa")));
   }
   // Orlof (vacation) handling — accrue vs pay out, + orlofsprósenta.
   const [orlofMode, setOrlofMode] = useState<string>(DEFAULT_ORLOF.mode);
@@ -495,6 +497,11 @@ function LaunTab({ e }: { e: Employee }) {
               {Object.keys(UNION_PRESETS).map((u) => <option key={u}>{u}</option>)}
               <option>{CUSTOM_UNION}</option>
             </optgroup>
+            <optgroup label="Fleiri stéttarfélög (grunnreglur)">
+              {UNIONS.filter((u) => !(u in UNION_PRESETS) && u !== CUSTOM_UNION && !union.startsWith("tpl:") && u !== union)
+                .map((u) => <option key={u}>{u}</option>)}
+              {union && !union.startsWith("tpl:") && !(union in UNION_PRESETS) && union !== CUSTOM_UNION && <option key={union}>{union}</option>}
+            </optgroup>
           </select>
         </div>
       ) : (
@@ -503,11 +510,8 @@ function LaunTab({ e }: { e: Employee }) {
       )}
       <div className="statline">
         <span className="k">Lífeyrissjóður <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· á launaseðil & samning</span></span>
-        <input list="pension-funds" value={pension} onChange={(ev) => setPension(ev.target.value)} onBlur={savePension}
-          placeholder="t.d. Gildi" style={{ ...FLD, width: 190 }} />
-        <datalist id="pension-funds">
-          {["Gildi", "Lífeyrissjóður verzlunarmanna", "Birta", "Frjálsi lífeyrissjóðurinn", "Festa", "Stapi", "Brú", "Almenni lífeyrissjóðurinn", "LSR"].map((f) => <option key={f} value={f} />)}
-        </datalist>
+        <Autocomplete value={pension} onChange={setPension} onCommit={savePension} suggestions={PENSION_FUNDS}
+          placeholder="t.d. Gildi" style={{ width: 190 }} inputStyle={FLD} />
       </div>
       <div className="statline">
         <span className="k">Launagerð</span>
@@ -1099,6 +1103,24 @@ function PayFields() {
   );
 }
 
+/** Union + pension pair with real type-ahead (suggestions from char one). */
+function UnionPensionFields() {
+  const [union, setUnion] = useState("Efling");
+  const [pension, setPension] = useState("");
+  return (
+    <div className="emp-row2">
+      <div className="emp-fld">
+        <label>Stéttarfélag / samningur</label>
+        <Autocomplete name="union" value={union} onChange={setUnion} suggestions={UNIONS} placeholder="Byrjaðu að skrifa…" style={{ display: "block" }} />
+      </div>
+      <div className="emp-fld">
+        <label>Lífeyrissjóður</label>
+        <Autocomplete name="pensionFund" value={pension} onChange={setPension} suggestions={PENSION_FUNDS} placeholder="Byrjaðu að skrifa…" style={{ display: "block" }} />
+      </div>
+    </div>
+  );
+}
+
 function NewEmployeeModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [docs, setDocs] = useState<{ name: string; meta: string }[]>([]);
@@ -1216,22 +1238,7 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
 
           <Sec>Laun</Sec>
           <PayFields />
-          <div className="emp-row2">
-            <div className="emp-fld">
-              <label>Stéttarfélag / samningur</label>
-              <input name="union" list="union-suggest" defaultValue="Efling" placeholder="Frjáls texti — hvaða félag sem er" />
-              <datalist id="union-suggest">
-                <option value="Efling" /><option value="Efling – veitingar/SGS" /><option value="VR" /><option value="Matvís" /><option value="Eigin reglur" />
-              </datalist>
-            </div>
-            <div className="emp-fld">
-              <label>Lífeyrissjóður</label>
-              <input name="pensionFund" list="pension-suggest" placeholder="t.d. Gildi" />
-              <datalist id="pension-suggest">
-                <option value="Gildi" /><option value="Lífeyrissjóður verzlunarmanna" /><option value="Birta" /><option value="Festa" /><option value="Stapi" /><option value="Brú" /><option value="Almenni" /><option value="Frjálsi" /><option value="Lífsverk" /><option value="Söfnunarsjóður lífeyrisréttinda" />
-              </datalist>
-            </div>
-          </div>
+          <UnionPensionFields />
           <div className="emp-row2">
             <div className="emp-fld">
               <label>Reglusniðmát</label>
