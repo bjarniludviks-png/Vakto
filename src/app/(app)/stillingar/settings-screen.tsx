@@ -126,7 +126,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
         <div className="card" style={{ marginTop: 16 }}>
           <div className="ch"><div><div className="ct">{t("Tæki & tilkynningar")}</div><div className="cs">{t("stimpilklukkan á staðnum, push í símana og launaskil")}</div></div></div>
           <div className="cb att">
-            <div className="it"><div className="ic good">P</div><div className="tx"><b>Payday</b><span>{t("launakeyrsla & skil")}</span></div><span className="tag good">{t("tengt")}</span></div>
+            <div className="it"><div className="ic good">P</div><div className="tx"><b>Payday</b><span>{t("tímaskrá flutt út sem Excel — hlaðið upp í Payday")}</span></div><span className="tag info">{t("Excel")}</span></div>
             <div className="it"><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" /></svg></div><div className="tx"><b>{t("Push-tilkynningar")}</b><span>{t("vaktir, beiðnir og samþykki beint í símann")}</span></div><PushToggle /></div>
             <div className="it rowlink" onClick={() => copyKioskLink(data.companyId)}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><rect x="4" y="3" width="16" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg></div><div className="tx"><b>{t("Kiosk-stimpilklukka")}</b><span>{t("opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð")}</span></div><span className="tag info">{t("afrita slóð")}</span></div>
           </div>

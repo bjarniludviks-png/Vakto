@@ -232,7 +232,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
           <div className="ch"><div className="ct">{t("Útflutningur")}</div></div>
           <div className="cb">
             <div className="att">
-              <div className="it"><div className="ic good">P</div><div className="tx"><b>Payday</b><span>{t("launakeyrsla & skil — tilbúið")}</span></div><button className="btn sm" onClick={() => download("payday")}>{t("Flytja")}</button></div>
+              <div className="it"><div className="ic good">P</div><div className="tx"><b>Payday</b><span>{t("tímaskrá (Excel) — hlaðið upp undir Ný launakeyrsla → Hlaða upp tímaskrá")}</span></div><button className="btn sm" onClick={() => download("payday")}>{t("Flytja")}</button></div>
               <div className="it"><div className="ic info">XL</div><div className="tx"><b>Excel</b><span>{t("sundurliðun per starfsmann")}</span></div><button className="btn ghost sm" onClick={() => download("excel")}>{t("Sækja")}</button></div>
             </div>
             <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>{t("Vakto reiknar — Payday sér um skil, greiðslur og opinbera skýrslugerð.")}</p>
