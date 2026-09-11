@@ -10,5 +10,5 @@ export default async function EmployeeTimesheetPage({ params }: { params: Promis
   const from = iso(new Date(now.getFullYear(), now.getMonth(), 1));
   const to = iso(new Date(now.getFullYear(), now.getMonth() + 1, 0));
   const data = await getEmployeePunches(id, from, to);
-  return <EmployeeTimesheet id={id} name={data.name} initial={data.rows} needsMigration={data.needsMigration} from={from} to={to} />;
+  return <EmployeeTimesheet id={id} name={data.name} initial={data.rows} initialMissed={data.missed} needsMigration={data.needsMigration} from={from} to={to} />;
 }

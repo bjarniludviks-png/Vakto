@@ -122,26 +122,60 @@ export async function deletePunch(punchId: string): Promise<ApproveResult> {
   }
 }
 
-/** Manager adjusts a punch's clock-in and/or clock-out time (same day). */
-export async function adjustPunch(punchId: string, clockInHHMM?: string, clockOutHHMM?: string): Promise<ApproveResult> {
+/** Manager adjusts a punch's clock-in and/or clock-out. Times are HH:MM; the
+ * optional dates let a shift cross midnight (or fix a punch left open for days).
+ * Omitted dates keep the punch's existing day; an omitted out-date follows the
+ * in-date. */
+export async function adjustPunch(
+  punchId: string, clockInHHMM?: string, clockOutHHMM?: string,
+  dates?: { inDate?: string; outDate?: string },
+): Promise<ApproveResult> {
   if (!isSupabaseConfigured() || !punchId) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { data: punch } = await supabase.from("punches")
-      .select("id, clock_in").eq("id", punchId).eq("company_id", ctx.company).maybeSingle();
+      .select("id, clock_in, clock_out").eq("id", punchId).eq("company_id", ctx.company).maybeSingle();
     if (!punch) return { ok: false, error: "Stimplun fannst ekki" };
-    const day = (punch.clock_in as string).slice(0, 10);
+    const ci = punch.clock_in as string;
+    const co = punch.clock_out as string | null;
+    const curInDay = ci.slice(0, 10);
+    const inDay = dates?.inDate && ISO_DAY.test(dates.inDate) ? dates.inDate : curInDay;
+    const inTime = clockInHHMM || hhmm(ci);
+    const newIn = `${inDay}T${inTime}:00`;
+
     const patch: Record<string, string | null> = {};
-    if (clockInHHMM) patch.clock_in = `${day}T${clockInHHMM}:00`;
-    if (clockOutHHMM !== undefined) patch.clock_out = clockOutHHMM ? `${day}T${clockOutHHMM}:00` : null;
+    if (clockInHHMM || dates?.inDate) patch.clock_in = newIn;
+    let newOut: string | null | undefined; // undefined = untouched
+    if (clockOutHHMM !== undefined) {
+      if (!clockOutHHMM) newOut = null;
+      else {
+        const outDay = dates?.outDate && ISO_DAY.test(dates.outDate) ? dates.outDate : (co?.slice(0, 10) ?? inDay);
+        newOut = `${outDay}T${clockOutHHMM}:00`;
+      }
+      patch.clock_out = newOut;
+    } else if (co && dates?.outDate && ISO_DAY.test(dates.outDate)) {
+      newOut = `${dates.outDate}T${hhmm(co)}:00`;
+      patch.clock_out = newOut;
+    }
     if (!Object.keys(patch).length) return { ok: true };
+
+    // Sanity: out must follow in, and a single punch never spans more than a day.
+    const effOut = newOut === undefined ? co : newOut;
+    if (effOut) {
+      const span = (Date.parse(effOut.length > 19 ? effOut : effOut + "Z") - Date.parse(newIn + "Z")) / 3600e3;
+      if (span <= 0) return { ok: false, error: "Útstimplun verður að vera á eftir innstimplun" };
+      if (span > 24) return { ok: false, error: "Stimplun getur ekki verið lengri en 24 klst" };
+    }
+
     const { error } = await supabase.from("punches").update(patch).eq("id", punchId).eq("company_id", ctx.company);
     if (error) return { ok: false, error: error.message };
+    const dayNote = inDay !== curInDay ? ` · dags. ${inDay}` : "";
+    const outNote = newOut ? ` · út ${newOut.slice(0, 10) !== inDay ? newOut.slice(0, 10) + " " : ""}${newOut.slice(11, 16)}` : "";
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "punch.adjust", entity: "punch", entityId: punchId,
-      detail: `Tími leiðréttur${clockInHHMM ? ` · inn ${clockInHHMM}` : ""}${clockOutHHMM ? ` · út ${clockOutHHMM}` : ""}`,
+      detail: `Tími leiðréttur${patch.clock_in ? ` · inn ${inTime}` : ""}${dayNote}${outNote}`,
     });
     revalidatePath("/timaskraning"); revalidatePath("/maelabord");
     return { ok: true, count: 1 };
@@ -150,20 +184,76 @@ export async function adjustPunch(punchId: string, clockInHHMM?: string, clockOu
   }
 }
 
-export type PunchRow = { punchId: string; date: string; in: string; out: string | null; hours: number; source: string; approved: boolean; open: boolean };
+const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Something off about a punch vs. the plan — shown as a tag on the row. */
+export type PunchFlag =
+  | { kind: "bad"; code: "open_long"; n: number }     // open for n hours (forgot to clock out)
+  | { kind: "bad"; code: "long"; n: number }          // n hours, unusually long
+  | { kind: "warn"; code: "short"; n: number }        // n minutes, unusually short
+  | { kind: "warn"; code: "late"; n: number }         // clocked in n min after the shift start
+  | { kind: "warn"; code: "early"; n: number }        // clocked out n min before the shift end
+  | { kind: "warn"; code: "over"; n: number }         // n hours over the planned length
+  | { kind: "warn"; code: "unscheduled" };            // no shift planned that day
+
+export type PunchRow = {
+  punchId: string; date: string; in: string; out: string | null; hours: number; source: string; approved: boolean; open: boolean;
+  /** Calendar day of the clock-out when it differs from `date` (shift crossed midnight). */
+  outDate: string | null;
+  /** The planned shift that day, if any. */
+  sched: { start: string; end: string; hours: number } | null;
+  flags: PunchFlag[];
+};
+/** A planned shift on a past day with no punch at all. */
+export type MissedShift = { date: string; start: string; end: string; hours: number };
+
+const minsOf = (hm: string) => { const [h, m] = hm.split(":").map(Number); return h * 60 + (m || 0); };
+const LATE_TOL = 15, EARLY_TOL = 15; // minutes of grace before we flag
+function flagsFor(p: { open: boolean; in: string; hours: number; clockInMs: number }, sched: { start: string; end: string; hours: number } | null, nowMs: number): PunchFlag[] {
+  const f: PunchFlag[] = [];
+  if (p.open) {
+    const openH = (nowMs - p.clockInMs) / 3600e3;
+    if (openH > 14) f.push({ kind: "bad", code: "open_long", n: Math.round(openH) });
+    return f;
+  }
+  if (p.hours > 14) f.push({ kind: "bad", code: "long", n: Math.round(p.hours * 10) / 10 });
+  else if (p.hours < 0.5) f.push({ kind: "warn", code: "short", n: Math.round(p.hours * 60) });
+  if (!sched) { f.push({ kind: "warn", code: "unscheduled" }); return f; }
+  const inM = minsOf(p.in), outM = inM + p.hours * 60;
+  const sS = minsOf(sched.start); let sE = minsOf(sched.end); if (sE <= sS) sE += 1440;
+  const late = inM - sS, early = sE - outM, over = p.hours - sched.hours;
+  if (late > LATE_TOL) f.push({ kind: "warn", code: "late", n: Math.round(late) });
+  if (early > EARLY_TOL) f.push({ kind: "warn", code: "early", n: Math.round(early) });
+  if (over > 1) f.push({ kind: "warn", code: "over", n: Math.round(over * 10) / 10 });
+  return f;
+}
 
 const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
 
 /** All punches for one employee in a date range (per-employee detail view). */
-export async function getEmployeePunches(employeeId: string, fromISO: string, toISO: string): Promise<{ ok: boolean; name: string; rows: PunchRow[]; needsMigration: boolean }> {
-  if (!isSupabaseConfigured()) return { ok: false, name: "", rows: [], needsMigration: false };
+export async function getEmployeePunches(employeeId: string, fromISO: string, toISO: string): Promise<{ ok: boolean; name: string; rows: PunchRow[]; missed: MissedShift[]; needsMigration: boolean }> {
+  const empty = { ok: false, name: "", rows: [], missed: [], needsMigration: false };
+  if (!isSupabaseConfigured()) return empty;
   try {
     const supabase = await createClient();
     const ctx = await companyOf(supabase);
-    if ("error" in ctx) return { ok: false, name: "", rows: [], needsMigration: false };
-    const { data: emp } = await supabase.from("employees").select("full_name").eq("id", employeeId).maybeSingle();
+    if ("error" in ctx) return empty;
+    const [{ data: emp }, { data: shiftRows }] = await Promise.all([
+      supabase.from("employees").select("full_name").eq("id", employeeId).maybeSingle(),
+      supabase.from("shifts").select("date, start_time, end_time")
+        .eq("company_id", ctx.company).eq("employee_id", employeeId).gte("date", fromISO).lte("date", toISO),
+    ]);
     const name = (emp?.full_name as string) ?? "";
     const from = fromISO, to = toISO + "T23:59:59";
+    // Planned shifts per day, for comparing against what was actually punched.
+    const byDay = new Map<string, { start: string; end: string; hours: number }[]>();
+    for (const sh of shiftRows ?? []) {
+      const st = (sh.start_time as string | null)?.slice(0, 5), en = (sh.end_time as string | null)?.slice(0, 5);
+      if (!st || !en) continue;
+      let h = (minsOf(en) - minsOf(st)) / 60; if (h < 0) h += 24;
+      const d = sh.date as string;
+      byDay.set(d, [...(byDay.get(d) ?? []), { start: st, end: en, hours: Math.round(h * 100) / 100 }]);
+    }
 
     let needsMigration = false;
     let punches: Record<string, unknown>[] | null = null;
@@ -182,18 +272,36 @@ export async function getEmployeePunches(employeeId: string, fromISO: string, to
       punches = withApproved.data;
     }
 
+    const nowMs = Date.now();
+    const punchedDays = new Set<string>();
     const rows: PunchRow[] = (punches ?? []).map((p) => {
       const ci = p.clock_in as string;
       const co = p.clock_out as string | null;
       const hours = co ? Math.round(((new Date(co).getTime() - new Date(ci).getTime()) / 3600000) * 100) / 100 : 0;
+      const date = ci.slice(0, 10), inHM = hhmm(ci), open = !co;
+      punchedDays.add(date);
+      // Closest planned shift that day (by start time) is the one to compare with.
+      const cands = byDay.get(date) ?? [];
+      const sched = cands.length ? cands.reduce((a, b) => Math.abs(minsOf(b.start) - minsOf(inHM)) < Math.abs(minsOf(a.start) - minsOf(inHM)) ? b : a) : null;
+      const outDate = co ? co.slice(0, 10) : null;
       return {
-        punchId: p.id as string, date: ci.slice(0, 10), in: hhmm(ci), out: co ? hhmm(co) : null,
-        hours, source: (p.source as string) ?? "web", approved: !!p.approved, open: !co,
+        punchId: p.id as string, date, in: inHM, out: co ? hhmm(co) : null,
+        hours, source: (p.source as string) ?? "web", approved: !!p.approved, open,
+        outDate: outDate && outDate !== date ? outDate : null,
+        sched, flags: flagsFor({ open, in: inHM, hours, clockInMs: new Date(ci).getTime() }, sched, nowMs),
       };
     });
-    return { ok: true, name, rows, needsMigration };
+    // Past days with a planned shift but no punch at all — a deviation too.
+    const today = new Date(); const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    const missed: MissedShift[] = [];
+    for (const [d, list] of byDay) {
+      if (d >= todayISO || punchedDays.has(d)) continue;
+      for (const sh of list) missed.push({ date: d, ...sh });
+    }
+    missed.sort((a, b) => b.date.localeCompare(a.date) || a.start.localeCompare(b.start));
+    return { ok: true, name, rows, missed, needsMigration };
   } catch {
-    return { ok: false, name: "", rows: [], needsMigration: false };
+    return empty;
   }
 }
 

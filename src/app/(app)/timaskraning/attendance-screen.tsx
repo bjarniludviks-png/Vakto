@@ -10,6 +10,8 @@ import { useLang } from "@/components/app/lang";
 import { TimeField } from "@/components/app/fields";
 import { EmptyState } from "@/components/app/empty-state";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
+import { PunchFlags, rowSeverity, rowAccent, spanText } from "./punch-flags";
+import { PunchDateTimeFields } from "./[id]/timesheet-screen";
 import { dec1 } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
 import type { OnNowRow, RosterRow } from "./attendance.server";
@@ -210,6 +212,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
         search={search} onSearch={setSearch}
         filters={[{ value: deptF, onChange: setDeptF, options: depts.map((d) => ({ value: d, label: d === "all" ? "Allar deildir" : d })) }]}
         rangeLabel={`${niceISO(from)} – ${niceISO(to)}`}
+        storageKey="timaskraning"
       />
       <div className="kpis">
         <div className="kpi"><div className="lab">{t("Á vakt núna")}</div><div className="val">{onNow.length}</div></div>
@@ -370,13 +373,14 @@ function EmployeePunchesModal({ employeeId, name, from, to, onClose, onChanged }
           <div className="att" style={{ maxHeight: "52vh", overflowY: "auto" }}>
             {loading ? <div className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Hleð…")}</div>
               : rows.length ? rows.map((p) => (
-                <div className="it" key={p.punchId}>
+                <div className="it" key={p.punchId} style={rowAccent(rowSeverity(p))}>
                   <div className="tx">
                     <b>{niceISO(p.date)}</b>
-                    <span>{p.in} – {p.out ?? t("opin")}{p.open ? "" : ` · ${dec1(p.hours)} ${t("klst")}`}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>
+                    <span>{spanText(p, t("opin"))}{p.open ? "" : ` · ${dec1(p.hours)} ${t("klst")}`}{p.sched ? ` · ${t("áætl.")} ${p.sched.start}–${p.sched.end}` : ""}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>
                   </div>
                   <div className="itact">
-                    {p.open ? <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>
+                    <PunchFlags flags={p.flags} />
+                    {p.open ? (p.flags.length ? null : <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>)
                       : p.approved ? <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Samþykkt")}</span>
                         : <span className="tag" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Bíður")}</span>}
                     {!p.open && (p.approved
@@ -431,12 +435,16 @@ function ClockInModal({ roster, onClose, onDone }: { roster: RosterRow[]; onClos
 
 function AdjustPunchModal({ row, onClose, onDone }: { row: OnNowRow; onClose: () => void; onDone: () => void }) {
   const { t } = useLang();
+  const day = row.since.slice(0, 10);
+  const [dIn, setDIn] = useState(day);
   const [cin, setCin] = useState(row.in);
+  const [dOut, setDOut] = useState(day);
   const [cout, setCout] = useState("");
   const [busy, setBusy] = useState(false);
   async function save() {
+    if (!dIn) { toast("Veldu dagsetningu innstimplunar"); return; }
     setBusy(true);
-    const res = await adjustPunch(row.punchId, cin, cout || undefined);
+    const res = await adjustPunch(row.punchId, cin, cout || undefined, { inDate: dIn, outDate: cout ? (dOut || dIn) : undefined });
     setBusy(false);
     if (res.ok) { toast("Tími leiðréttur"); onDone(); } else toast(res.error ?? "Villa");
   }
@@ -450,11 +458,7 @@ function AdjustPunchModal({ row, onClose, onDone }: { row: OnNowRow; onClose: ()
           <button className="x" onClick={onClose}>✕</button>
         </div>
         <div className="mb">
-          <div style={{ display: "flex", gap: 10 }}>
-            <div className="field" style={{ flex: 1 }}><label>{t("Innstimplun")}</label><TimeField value={cin} onChange={setCin} style={{ width: "100%" }} /></div>
-            <div className="field" style={{ flex: 1 }}><label>{t("Útstimplun")}</label><TimeField value={cout} onChange={setCout} style={{ width: "100%" }} /></div>
-          </div>
-          <p className="muted" style={{ fontSize: 11.5, margin: "-4px 0 8px" }}>{t("Skildu útstimplun eftir auða til að halda vaktinni opinni.")}</p>
+          <PunchDateTimeFields dIn={dIn} cin={cin} dOut={dOut} cout={cout} onDIn={setDIn} onCin={setCin} onDOut={setDOut} onCout={setCout} />
           <div style={{ display: "flex", gap: 9, marginTop: 8 }}>
             <button className="btn" disabled={busy} onClick={save}>{t("Vista")}</button>
             <button className="btn ghost" onClick={onClose}>{t("Loka")}</button>

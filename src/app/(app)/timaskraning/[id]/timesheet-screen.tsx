@@ -5,10 +5,11 @@ import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { TimeField } from "@/components/app/fields";
+import { TimeField, DateField } from "@/components/app/fields";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
-import { getEmployeePunches, adjustPunch, deletePunch, setPunchApproved, approveEmployeePunches, approvePunchList, type PunchRow } from "../actions";
+import { getEmployeePunches, adjustPunch, deletePunch, setPunchApproved, approveEmployeePunches, approvePunchList, type PunchRow, type MissedShift } from "../actions";
+import { PunchFlags, rowSeverity, rowAccent, spanText } from "../punch-flags";
 import { exportTimeReportXlsx, exportTimeReportPdf } from "@/lib/export-report";
 import { AsyncButton } from "@/components/app/async-button";
 
@@ -24,12 +25,14 @@ function rangeFor(p: Period): { from: string; to: string } {
   return { from: isoOf(new Date(t.getFullYear(), t.getMonth(), 1)), to: isoOf(new Date(t.getFullYear(), t.getMonth() + 1, 0)) };
 }
 
-export default function EmployeeTimesheet({ id, name, initial, needsMigration, from: f0, to: t0 }: { id: string; name: string; initial: PunchRow[]; needsMigration: boolean; from: string; to: string }) {
+export default function EmployeeTimesheet({ id, name, initial, initialMissed, needsMigration, from: f0, to: t0 }: { id: string; name: string; initial: PunchRow[]; initialMissed: MissedShift[]; needsMigration: boolean; from: string; to: string }) {
   const { t } = useLang();
   const [period, setPeriod] = useState<Period>("Mánuður");
   const [from, setFrom] = useState(f0);
   const [to, setTo] = useState(t0);
   const [rows, setRows] = useState<PunchRow[]>(initial);
+  const [missed, setMissed] = useState<MissedShift[]>(initialMissed);
+  const [onlyDev, setOnlyDev] = useState(false);
   const [mig, setMig] = useState(needsMigration);
   const [loading, setLoading] = useState(false);
   const [edit, setEdit] = useState<PunchRow | null>(null);
@@ -46,7 +49,7 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
 
   function reload(fr = from, tt = to) {
     setLoading(true);
-    getEmployeePunches(id, fr, tt).then((r) => { if (r.ok) { setRows(r.rows); setMig(r.needsMigration); } }).finally(() => setLoading(false));
+    getEmployeePunches(id, fr, tt).then((r) => { if (r.ok) { setRows(r.rows); setMissed(r.missed); setMig(r.needsMigration); } }).finally(() => setLoading(false));
   }
   function changePeriod(p: Period) {
     setPeriod(p);
@@ -79,6 +82,16 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
   const total = rows.reduce((a, r) => a + r.hours, 0);
   const pending = rows.filter((r) => !r.approved && !r.open).length;
   const missing = rows.filter((r) => r.open).length;
+  const devCount = rows.filter((r) => r.flags.length).length + missed.length;
+  // One list, newest first: punches plus planned-but-unpunched days.
+  type Item = { kind: "punch"; p: PunchRow } | { kind: "missed"; m: MissedShift };
+  const items: Item[] = [
+    ...rows.filter((r) => !onlyDev || r.flags.length).map((p): Item => ({ kind: "punch", p })),
+    ...missed.map((m): Item => ({ kind: "missed", m })),
+  ].sort((a, b) => {
+    const da = a.kind === "punch" ? a.p.date : a.m.date, db = b.kind === "punch" ? b.p.date : b.m.date;
+    return db.localeCompare(da) || (a.kind === "punch" ? a.p.in : a.m.start).localeCompare(b.kind === "punch" ? b.p.in : b.m.start);
+  });
 
   return (
     <>
@@ -94,6 +107,7 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
         period={period} onPeriod={changePeriod}
         from={from} to={to} onRange={changeRange}
         rangeLabel={`${dec1(total)} ${t("klst")}`}
+        storageKey="timaskraning" defaultPreset="thisMonth"
       />
 
       <div className="kpis">
@@ -115,7 +129,14 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
             )}
             <div><div className="ct">{t("Allar skráningar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)}</div></div>
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {devCount > 0 && (
+              <button className="btn ghost sm" onClick={() => setOnlyDev((v) => !v)}
+                style={onlyDev ? { background: "var(--warn-soft)", color: "var(--warn)", borderColor: "transparent" } : undefined}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 5 }}><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></svg>
+                {t("Aðeins frávik")} ({devCount})
+              </button>
+            )}
             {selP.size > 0 && (
               <AsyncButton className="btn sm" onClick={async () => {
                 const res = await approvePunchList([...selP]);
@@ -129,18 +150,27 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
           </div>
         </div>
         <div className="cb att" style={{ opacity: loading ? 0.5 : 1 }}>
-          {rows.length ? rows.map((p) => (
-            <div className="it" key={p.punchId}>
+          {items.length ? items.map((it) => it.kind === "missed" ? (
+            <div className="it" key={`m-${it.m.date}-${it.m.start}`} style={rowAccent("bad")}>
+              <div className="tx">
+                <b>{niceISO(it.m.date)}</b>
+                <span>{t("Áætluð vakt")} {it.m.start} – {it.m.end} · {dec1(it.m.hours)} {t("klst")} · {t("engin stimplun")}</span>
+              </div>
+              <div className="itact"><span className="tag bad">{t("vantar stimplun")}</span></div>
+            </div>
+          ) : (() => { const p = it.p; return (
+            <div className="it" key={p.punchId} style={rowAccent(rowSeverity(p))}>
               {!p.open && !p.approved && (
                 <input type="checkbox" style={{ flexShrink: 0 }} checked={selP.has(p.punchId)}
                   onChange={(e) => setSelP((sv) => { const n = new Set(sv); if (e.target.checked) n.add(p.punchId); else n.delete(p.punchId); return n; })} />
               )}
               <div className="tx">
                 <b>{niceISO(p.date)}</b>
-                <span>{p.in} – {p.out ?? t("opin")}{p.open ? ` · ${openElapsed(p)}` : ` · ${dec1(p.hours)} ${t("klst")}`}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>
+                <span>{spanText(p, t("opin"))}{p.open ? ` · ${openElapsed(p)}` : ` · ${dec1(p.hours)} ${t("klst")}`}{p.sched ? ` · ${t("áætl.")} ${p.sched.start}–${p.sched.end}` : ""}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>
               </div>
               <div className="itact">
-                {p.open ? <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>
+                <PunchFlags flags={p.flags} />
+                {p.open ? (p.flags.length ? null : <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>)
                   : p.approved ? <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Samþykkt")}</span>
                     : <span className="tag" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Bíður")}</span>}
                 <button className="btn ghost sm" onClick={() => setEdit(p)}>{t("Leiðrétta")}</button>
@@ -149,7 +179,7 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
                   : <AsyncButton className="btn sm" onClick={() => toggle(p)}>{t("Samþykkja")}</AsyncButton>)}
               </div>
             </div>
-          )) : <div className="muted" style={{ textAlign: "center", padding: 30 }}>{t("Engar skráningar á þessu tímabili.")}</div>}
+          ); })()) : <div className="muted" style={{ textAlign: "center", padding: 30 }}>{onlyDev ? t("Engin frávik á þessu tímabili.") : t("Engar skráningar á þessu tímabili.")}</div>}
         </div>
       </div>
 
@@ -160,12 +190,15 @@ export default function EmployeeTimesheet({ id, name, initial, needsMigration, f
 
 function PunchEditModal({ row, onClose, onDone }: { row: PunchRow; onClose: () => void; onDone: () => void }) {
   const { t } = useLang();
+  const [dIn, setDIn] = useState(row.date);
   const [cin, setCin] = useState(row.in);
+  const [dOut, setDOut] = useState(row.outDate ?? row.date);
   const [cout, setCout] = useState(row.out ?? "");
   const [busy, setBusy] = useState(false);
   async function save() {
+    if (!dIn) { toast("Veldu dagsetningu innstimplunar"); return; }
     setBusy(true);
-    const res = await adjustPunch(row.punchId, cin, cout || undefined);
+    const res = await adjustPunch(row.punchId, cin, cout || undefined, { inDate: dIn, outDate: cout ? (dOut || dIn) : undefined });
     setBusy(false);
     if (res.ok) { toast("Tími leiðréttur"); onDone(); } else toast(res.error ?? "Villa");
   }
@@ -181,15 +214,11 @@ function PunchEditModal({ row, onClose, onDone }: { row: PunchRow; onClose: () =
       <div className="mbg" onClick={onClose} />
       <div className="modal">
         <div className="mh">
-          <div><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Leiðrétta tíma")}</div><div className="muted" style={{ fontSize: 12 }}>{niceISO(row.date)}</div></div>
+          <div><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Leiðrétta tíma")}</div><div className="muted" style={{ fontSize: 12 }}>{niceISO(row.date)}{row.sched ? ` · ${t("áætl.")} ${row.sched.start}–${row.sched.end}` : ""}</div></div>
           <button className="x" onClick={onClose}>✕</button>
         </div>
         <div className="mb">
-          <div style={{ display: "flex", gap: 10 }}>
-            <div className="field" style={{ flex: 1 }}><label>{t("Innstimplun")}</label><TimeField value={cin} onChange={setCin} style={{ width: "100%" }} /></div>
-            <div className="field" style={{ flex: 1 }}><label>{t("Útstimplun")}</label><TimeField value={cout} onChange={setCout} style={{ width: "100%" }} /></div>
-          </div>
-          <p className="muted" style={{ fontSize: 11.5, margin: "-4px 0 8px" }}>{t("Skildu útstimplun eftir auða til að halda vaktinni opinni.")}</p>
+          <PunchDateTimeFields dIn={dIn} cin={cin} dOut={dOut} cout={cout} onDIn={setDIn} onCin={setCin} onDOut={setDOut} onCout={setCout} />
           <div style={{ display: "flex", gap: 9, marginTop: 8, flexWrap: "wrap" }}>
             <button className="btn" disabled={busy} onClick={save}>{t("Vista")}</button>
             <button className="btn ghost" disabled={busy} style={{ color: "var(--bad)", marginLeft: "auto" }} onClick={remove}>
@@ -199,5 +228,37 @@ function PunchEditModal({ row, onClose, onDone }: { row: PunchRow; onClose: () =
         </div>
       </div>
     </div>
+  );
+}
+
+/** Date + time for clock-in and clock-out, so a shift may cross midnight. */
+export function PunchDateTimeFields({ dIn, cin, dOut, cout, onDIn, onCin, onDOut, onCout }: {
+  dIn: string; cin: string; dOut: string; cout: string;
+  onDIn: (v: string) => void; onCin: (v: string) => void; onDOut: (v: string) => void; onCout: (v: string) => void;
+}) {
+  const { t } = useLang();
+  const pair: React.CSSProperties = { display: "flex", gap: 6, alignItems: "center" };
+  return (
+    <>
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div className="field" style={{ flex: "1 1 220px" }}>
+          <label>{t("Innstimplun")}</label>
+          <div style={pair}>
+            <DateField value={dIn} onChange={onDIn} style={{ flex: 1, minWidth: 0 }} />
+            <TimeField value={cin} onChange={onCin} style={{ width: 84, flexShrink: 0 }} />
+          </div>
+        </div>
+        <div className="field" style={{ flex: "1 1 220px" }}>
+          <label>{t("Útstimplun")}</label>
+          <div style={pair}>
+            <DateField value={dOut} onChange={onDOut} min={dIn || undefined} style={{ flex: 1, minWidth: 0 }} />
+            <TimeField value={cout} onChange={onCout} style={{ width: 84, flexShrink: 0 }} />
+          </div>
+        </div>
+      </div>
+      <p className="muted" style={{ fontSize: 11.5, margin: "-4px 0 8px" }}>
+        {t("Skildu útstimplun eftir auða til að halda vaktinni opinni.")} {t("Vaktir yfir miðnætti: veldu næsta dag fyrir útstimplun.")}
+      </p>
+    </>
   );
 }
