@@ -242,6 +242,7 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
         .from("messages").select("id, body, kind, attachment_url, created_at, sender_id, users(full_name)")
         .eq("company_id", ctx.company).eq("channel_id", channelId).order("created_at").limit(300)) as unknown as typeof res;
     }
+    if (res.error) console.error("listMessages:", res.error.message);
     const data = res.data ?? [];
 
     // reactions (table arrives with 0042 — tolerate its absence)
@@ -284,7 +285,8 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
       };
     });
     return { ok: true, messages };
-  } catch {
+  } catch (e) {
+    console.error("listMessages failed:", e);
     return { ok: false, messages: [] };
   }
 }

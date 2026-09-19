@@ -66,7 +66,8 @@ export async function getDashboardPeriod(fromISO: string, toISO: string): Promis
       series: p.series.map((s) => ({ label: s.label, planned: s.planned, actual: s.actual })),
       staff: p.staff.map((s) => ({ name: s.name, av: s.av, c: s.c, dept: s.dept, planned: s.planned, actual: s.actual, deviation: s.deviation, over: s.over })),
     };
-  } catch {
+  } catch (e) {
+    console.error("getDashboardPeriod failed:", e);
     return EMPTY;
   }
 }

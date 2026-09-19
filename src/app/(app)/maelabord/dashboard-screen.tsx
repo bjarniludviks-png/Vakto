@@ -91,7 +91,11 @@ export default function DashboardScreen({ view, onNow = [], missing = [], pendin
     if (!view.live) return;
     let cancelled = false;
     const key = `${range.from}|${range.to}`;
-    getDashboardPeriod(range.from, range.to).then((r) => { if (!cancelled && r.ok) setLoaded({ key, data: r }); });
+    // One retry: the action can fail transiently while the server is busy.
+    const attempt = (n: number) => getDashboardPeriod(range.from, range.to)
+      .then((r) => { if (cancelled) return; if (r.ok) setLoaded({ key, data: r }); else if (n > 0) setTimeout(() => attempt(n - 1), 1500); })
+      .catch(() => { if (!cancelled && n > 0) setTimeout(() => attempt(n - 1), 1500); });
+    attempt(1);
     return () => { cancelled = true; };
   }, [range, view.live]);
   // Only show figures that belong to the CURRENT range (stale → "…" while loading).

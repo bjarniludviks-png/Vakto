@@ -148,6 +148,7 @@ export default function AppShell({
                     <Link
                       key={it.slug}
                       href={it.href}
+                      prefetch={false}
                       className={active(it.href) ? "on" : ""}
                       title={t("nav:" + it.slug)}
                       onClick={() => setNavOpen(false)}
@@ -164,6 +165,7 @@ export default function AppShell({
               <Link
                 key={it.slug}
                 href={it.href}
+                prefetch={false}
                 className={active(it.href) ? "on" : ""}
                 title={t("nav:" + it.slug)}
                 onClick={() => setNavOpen(false)}

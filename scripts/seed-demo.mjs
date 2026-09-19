@@ -115,3 +115,58 @@ await ins("revenue", revenue);
 await db.from("companies").update({ weekday_revenue: { 0: 640000, 1: 440000, 2: 450000, 3: 470000, 4: 480000, 5: 560000, 6: 660000 } }).eq("id", COMPANY);
 
 console.log(`${company.name}: ${shiftRows.length} vaktir, ${punchRows.length} stimplanir, ${revenue.length} veltudagar (${fromISO} → ${toISO}), ${staff.length} starfsmenn`);
+
+// ---------------------------------------------------------------------------
+// Team chat + news: link a few employees to demo auth users (so bubbles come
+// from real people) and seed a short, realistic conversation + one news post.
+// Idempotent: replaces this week's seeded messages/posts only.
+// ---------------------------------------------------------------------------
+const owner = (await db.from("users").select("id").eq("company_id", COMPANY).eq("role", "owner").limit(1)).data?.[0]?.id;
+const slug = (n) => n.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z]+/g, ".").replace(/^\.|\.$/g, "");
+const demoUsers = [];
+for (const e of staff.slice(0, 4)) {
+  let uid = (await db.from("employees").select("user_id").eq("id", e.id).maybeSingle()).data?.user_id;
+  if (!uid) {
+    const email = `demo.${slug(e.full_name)}@vakto.is`;
+    const found = (await db.auth.admin.listUsers({ perPage: 200 })).data?.users?.find((u) => u.email === email);
+    uid = found?.id;
+    if (!uid) {
+      const pw = "Demo-" + Math.random().toString(36).slice(2, 10) + "!";
+      const { data, error } = await db.auth.admin.createUser({ email, password: pw, email_confirm: true, user_metadata: { full_name: e.full_name, role: "employee", company_id: COMPANY } });
+      if (error) { console.error("createUser", email, error.message); continue; }
+      uid = data.user.id;
+    }
+    await db.from("users").upsert({ id: uid, email, full_name: e.full_name, role: "employee", company_id: COMPANY });
+    await db.from("employees").update({ user_id: uid }).eq("id", e.id);
+  }
+  demoUsers.push({ uid, name: e.full_name });
+}
+const chans = (await db.from("channels").select("id, name, kind").eq("company_id", COMPANY)).data ?? [];
+const general = chans.find((c) => c.kind === "general");
+const group = chans.find((c) => c.kind === "group");
+for (const c of chans) for (const u of demoUsers) await db.from("channel_members").upsert({ channel_id: c.id, user_id: u.uid });
+const at = (daysAgo, hm) => { const d = addDays(today, -daysAgo); const [h, m] = hm.split(":").map(Number); d.setHours(h, m, 0, 0); return d.toISOString(); };
+const u = (i) => demoUsers[i]?.uid ?? owner;
+const first = (i) => (demoUsers[i]?.name ?? "").split(" ")[0];
+const convo = [
+  [general, u(0), 1, "16:05", `Getur einhver tekið laugardagsvaktina mína 15–23? Er komin með flensu.`],
+  [general, u(1), 1, "16:09", `Ég get það — er laus á laugardaginn.`],
+  [general, u(0), 1, "16:10", `Takk ${first(1)}, þú ert bjargvættur!`],
+  [general, owner, 1, "16:22", `Búinn að samþykkja vaktaskiptin, planið er uppfært. Góðan bata ${first(0)}.`],
+  [general, u(2), 0, "08:14", `Mjólkin er að klárast — panta ég í dag?`],
+  [general, owner, 0, "08:16", `Já takk, tvo kassa. Og minnið á nýja matseðilinn sem fer í loftið á fimmtudag.`],
+  [group, u(2), 2, "14:40", `Súpan í dag er sætkartöflu — uppskriftin er í handbókinni undir „Súpur".`],
+  [group, u(3), 2, "14:41", `Frábært, hvað gerum við margar skammta?`],
+  [group, u(2), 2, "14:43", `40 skammta, það seldist upp síðast.`],
+];
+if (general) {
+  await db.from("messages").delete().eq("company_id", COMPANY).gte("created_at", addDays(today, -3).toISOString());
+  const rows = convo.filter(([c]) => c).map(([c, sender, dAgo, hm, body]) => ({ company_id: COMPANY, channel_id: c.id, sender_id: sender, body, kind: "text", created_at: at(dAgo, hm) }));
+  const { error } = await db.from("messages").insert(rows); if (error) console.error("messages", error.message);
+  await db.from("posts").delete().eq("company_id", COMPANY).gte("created_at", addDays(today, -3).toISOString());
+  const { error: pe } = await db.from("posts").insert([
+    { company_id: COMPANY, sender_id: owner, body: `Nýr matseðill fer í loftið á fimmtudag. Handbókin er uppfærð — lesið kaflann „Ofnæmisvaldar" og staðfestið lesturinn í appinu fyrir miðvikudag.`, pinned: true, created_at: at(1, "09:30") },
+    { company_id: COMPANY, sender_id: u(1), body: `Takk fyrir helgina öll — metsala á laugardag og laun % af veltu 29,4 %. Vel gert!`, pinned: false, created_at: at(2, "10:05") },
+  ]); if (pe) console.error("posts", pe.message);
+  console.log(`spjall: ${rows.length} skilaboð, 2 fréttir, ${demoUsers.length} demo-notendur tengdir`);
+}
