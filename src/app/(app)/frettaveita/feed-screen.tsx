@@ -12,6 +12,8 @@ import {
   listPosts, createPost, setPostReaction, addPostComment, uploadChatMedia, setPostPinned,
   type FeedPost,
 } from "../spjall/actions";
+import type { FeedComment } from "../spjall/actions";
+import { timeAgo } from "@/lib/time-ago";
 
 import { REACTIONS } from "@/lib/reactions";
 
@@ -21,6 +23,10 @@ export default function FeedScreen() {
   const [canPin, setCanPin] = useState(false);
   const [mePhoto, setMePhoto] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  // Relative times ("1 klst síðan") tick once a minute; 0 until mounted so SSR matches.
+  const [now, setNow] = useState(0);
+  useEffect(() => { const tick = () => setNow(Date.now()); tick(); const iv = setInterval(tick, 60000); return () => clearInterval(iv); }, []);
+  const ago = (iso: string, fallback: string) => (now ? timeAgo(iso, now) : fallback);
   const [val, setVal] = useState("");
   const [busy, setBusy] = useState(false);
   const [attach, setAttach] = useState<{ imageUrl?: string; fileUrl?: string; fileName?: string } | null>(null);
@@ -81,6 +87,35 @@ export default function FeedScreen() {
     setCVal((v) => ({ ...v, [p.id]: "" }));
     const r = await addPostComment(p.id, body);
     if (!r.ok) toast(r.error ?? "Villa"); else reload();
+  }
+  // Reply to a comment (one level deep, like Facebook): the reply box opens
+  // under the comment; replies to replies attach to the same top-level parent.
+  const [replyFor, setReplyFor] = useState<string | null>(null);
+  const [rVal, setRVal] = useState("");
+  async function reply(p: FeedPost, parentId: string) {
+    const body = rVal.trim();
+    if (!body) return;
+    setRVal(""); setReplyFor(null);
+    const r = await addPostComment(p.id, body, parentId);
+    if (!r.ok) toast(r.error ?? "Villa"); else reload();
+  }
+  function CommentRow({ p, cm, isReply }: { p: FeedPost; cm: FeedComment; isReply: boolean }) {
+    const parentId = cm.parentId ?? cm.id;
+    return (
+      <div className="fp-c" style={isReply ? { marginLeft: 36 } : undefined}>
+        {cm.photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img className="avt-img" src={cm.photo} alt="" style={{ width: isReply ? 24 : 28, height: isReply ? 24 : 28 }} />
+        ) : (
+          <span className="avt" style={{ background: cm.color, width: isReply ? 24 : 28, height: isReply ? 24 : 28, fontSize: 10.5 }}>{cm.av}</span>
+        )}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div className="fp-cb"><b>{cm.sender}</b><span className="cm-body">{cm.body}</span></div>
+          <span className="muted" style={{ fontSize: 10.5, marginLeft: 12 }} title={cm.at}>{ago(cm.atISO, cm.at)}</span>
+          <button className="fp-reply" onClick={() => { setReplyFor(replyFor === parentId ? null : parentId); setRVal(""); }}>{t("Svara")}</button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -154,7 +189,7 @@ export default function FeedScreen() {
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <b style={{ fontSize: 14.5 }}>{p.sender}</b>
-                  <span className="muted" style={{ fontSize: 12, display: "block", marginTop: 1 }}>{p.at}</span>
+                  <span className="muted" style={{ fontSize: 12, display: "block", marginTop: 1 }} title={p.at}>{ago(p.atISO, p.at)}</span>
                 </div>
                 {canPin && !p.system && (
                   <button className="fp-pin" title={p.pinned ? t("Losa tilkynningu") : t("Festa efst sem tilkynningu")}
@@ -219,20 +254,23 @@ export default function FeedScreen() {
 
               {showC && (
                 <div className="fp-comments">
-                  {p.comments.map((cm) => (
-                    <div className="fp-c" key={cm.id}>
-                      {cm.photo ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img className="avt-img" src={cm.photo} alt="" style={{ width: 28, height: 28 }} />
-                      ) : (
-                        <span className="avt" style={{ background: cm.color, width: 28, height: 28, fontSize: 10.5 }}>{cm.av}</span>
-                      )}
-                      <div style={{ minWidth: 0 }}>
-                        <div className="fp-cb"><b>{cm.sender}</b><span className="cm-body">{cm.body}</span></div>
-                        <span className="muted" style={{ fontSize: 10.5, marginLeft: 12 }}>{cm.at}</span>
+                  {p.comments.filter((cm) => !cm.parentId).map((top) => {
+                    const replies = p.comments.filter((cm) => cm.parentId === top.id);
+                    return (
+                      <div key={top.id} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        <CommentRow p={p} cm={top} isReply={false} />
+                        {replies.map((cm) => <CommentRow key={cm.id} p={p} cm={cm} isReply />)}
+                        {replyFor === top.id && (
+                          <div className="fp-cin" style={{ marginLeft: 36 }}>
+                            <input autoFocus placeholder={`${t("Svara")} ${top.sender.split(/\s+/)[0]}…`} value={rVal} onChange={(e) => setRVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") reply(p, top.id); if (e.key === "Escape") setReplyFor(null); }} />
+                            <button className="fp-send" disabled={!rVal.trim()} onClick={() => reply(p, top.id)} aria-label={t("Senda")}>
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
+                            </button>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   <div className="fp-cin">
                     <input placeholder={t("Skrifaðu athugasemd…")} value={cVal[p.id] ?? ""} onChange={(e) => setCVal((v) => ({ ...v, [p.id]: e.target.value }))} onKeyDown={(e) => e.key === "Enter" && comment(p)} />
                     <button className="fp-send" disabled={!(cVal[p.id] ?? "").trim()} onClick={() => comment(p)} aria-label={t("Senda")}>

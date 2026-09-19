@@ -414,6 +414,8 @@ body.kioskmode .cookie{display:none}
 .fp-c{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;line-height:1.45}
 .fp-c b{font-weight:650}
 .fp-cin{display:flex;gap:8px;margin-top:2px}
+.fp-reply{background:none;border:0;padding:0;margin-left:10px;font:inherit;font-size:10.5px;font-weight:650;color:var(--ink3);cursor:pointer;min-height:24px}
+.fp-reply:hover{color:var(--brand)}
 .fp-cin input{flex:1;border:1px solid var(--line);border-radius:10px;padding:7px 11px;font:inherit;font-size:12.5px;background:var(--panel);color:var(--ink);outline:none}
 
 /* schedule cells where the employee registered UN-availability */

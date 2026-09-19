@@ -638,10 +638,10 @@ export async function uploadChatMedia(dataUrl: string, ext: string): Promise<{ o
 
 /* ---------- news feed (posts + likes + comments) ---------- */
 
-export type FeedComment = { id: string; sender: string; av: string; color: string; body: string; at: string; photo: string | null };
+export type FeedComment = { id: string; sender: string; av: string; color: string; body: string; at: string; atISO: string; photo: string | null; parentId: string | null };
 export type FeedPost = {
   id: string; sender: string; av: string; color: string; me: boolean; photo: string | null;
-  body: string; at: string; pinned: boolean; system: boolean;
+  body: string; at: string; atISO: string; pinned: boolean; system: boolean;
   imageUrl: string | null; fileUrl: string | null; fileName: string | null;
   reactions: { emoji: string; count: number }[];
   myReaction: string | null;
@@ -663,7 +663,9 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
     const ids = (rows ?? []).map((r) => r.id as string);
     const [{ data: likes }, { data: comments }, empNames] = await Promise.all([
       supabase.from("post_likes").select("post_id, user_id, reaction").in("post_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
-      supabase.from("post_comments").select("id, post_id, sender_id, body, created_at, users!post_comments_sender_id_fkey(full_name)").in("post_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).order("created_at"),
+      supabase.from("post_comments").select("id, post_id, sender_id, body, created_at, parent_id, users!post_comments_sender_id_fkey(full_name)").in("post_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).order("created_at")
+        // parent_id arrives with 0048 — fall back to flat comments before it runs
+        .then(async (r) => r.error ? await supabase.from("post_comments").select("id, post_id, sender_id, body, created_at, users!post_comments_sender_id_fkey(full_name)").in("post_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).order("created_at") : r),
       empNameMap(supabase, ctx.company),
     ]);
     // Prefer the employee's real name — users.full_name can hold the email
@@ -684,13 +686,13 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
         color: system ? "#e9700f" : colorOf(name.split(/\s+/)[0] || name),
         pinned: !!r.pinned, system,
         me: r.sender_id === ctx.userId,
-        body: r.body as string, at: hhmm(r.created_at as string) + " · " + new Date(r.created_at as string).toLocaleDateString("de-DE").replace(/\./g, "."),
+        body: r.body as string, at: hhmm(r.created_at as string) + " · " + new Date(r.created_at as string).toLocaleDateString("de-DE").replace(/\./g, "."), atISO: String(r.created_at),
         imageUrl: (r.image_url as string) ?? null, fileUrl: (r.file_url as string) ?? null, fileName: (r.file_name as string) ?? null,
         reactions: [...byEmoji.entries()].map(([emoji, count]) => ({ emoji, count })).sort((a, b) => b.count - a.count),
         myReaction: (pLikes.find((l) => l.user_id === ctx.userId)?.reaction as string) ?? null,
         comments: (comments ?? []).filter((cm) => cm.post_id === r.id).map((cm) => {
           const cn = nameOf(cm.users, cm.sender_id);
-          return { id: cm.id as string, sender: cn, av: initials(cn), color: colorOf(cn.split(/\s+/)[0] || cn), body: cm.body as string, at: hhmm(cm.created_at as string), photo: empNames.get(String(cm.sender_id))?.photo ?? null };
+          return { id: cm.id as string, sender: cn, av: initials(cn), color: colorOf(cn.split(/\s+/)[0] || cn), body: cm.body as string, at: hhmm(cm.created_at as string), atISO: String(cm.created_at), photo: empNames.get(String(cm.sender_id))?.photo ?? null, parentId: ("parent_id" in cm ? (cm.parent_id as string | null) : null) ?? null };
         }),
       };
     });
@@ -759,15 +761,19 @@ export async function setPostReaction(postId: string, emoji: string | null): Pro
   }
 }
 
-export async function addPostComment(postId: string, body: string): Promise<{ ok: boolean; error?: string }> {
+export async function addPostComment(postId: string, body: string, parentId?: string | null): Promise<{ ok: boolean; error?: string }> {
   if (!body.trim()) return { ok: false, error: "Skrifaðu athugasemd" };
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    const { error } = await supabase.from("post_comments").insert({ post_id: postId, company_id: ctx.company, sender_id: ctx.userId, body: body.trim() });
-    return error ? { ok: false, error: error.message } : { ok: true };
+    const row: Record<string, string> = { post_id: postId, company_id: ctx.company, sender_id: ctx.userId, body: body.trim() };
+    let { error } = await supabase.from("post_comments").insert(parentId ? { ...row, parent_id: parentId } : row);
+    // parent_id column arrives with 0048 — post the reply as a plain comment before it runs
+    if (error && parentId && /parent_id/.test(error.message)) ({ error } = await supabase.from("post_comments").insert(row));
+    if (error) { console.error("addPostComment:", error.message); return { ok: false, error: "Tókst ekki að senda athugasemd" }; }
+    return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
