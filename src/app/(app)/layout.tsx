@@ -48,11 +48,19 @@ async function getAccount(): Promise<Account & { country: string }> {
 
     const name = profile?.full_name || user.email || "Notandi";
     const comp = profile?.companies as { name?: string; country?: string } | null;
+    const companyId = (profile as { company_id?: string } | null)?.company_id ?? undefined;
+    // Kiosk token (0044) — tolerant of the column not existing yet.
+    let kioskToken: string | undefined;
+    if (companyId) {
+      const kt = await supabase.from("companies").select("kiosk_token").eq("id", companyId).maybeSingle();
+      if (!kt.error && kt.data?.kiosk_token) kioskToken = kt.data.kiosk_token as string;
+    }
     return {
       initials: initials(name),
       name,
       company: comp?.name ?? "VAKTO",
-      companyId: (profile as { company_id?: string } | null)?.company_id ?? undefined,
+      companyId,
+      kioskToken,
       role: (profile?.role as Role) ?? "owner",
       country: comp?.country ?? "IS",
     };

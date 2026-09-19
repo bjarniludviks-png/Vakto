@@ -18,10 +18,11 @@ type SettingsModal = "location" | "department" | "position" | "invite" | "revenu
 const WEEKDAYS: [number, string][] = [[1, "Mánudagur"], [2, "Þriðjudagur"], [3, "Miðvikudagur"], [4, "Fimmtudagur"], [5, "Föstudagur"], [6, "Laugardagur"], [0, "Sunnudagur"]];
 
 const ROLE_LABEL: Record<string, string> = { owner: "Eigandi", manager: "Stjórnandi", employee: "role:employee", contractor: "Verktaki" };
-const DEMO_SETTINGS: SettingsData = { departments: [], locations: [], positions: [], users: [], apiKeys: [], companyId: null, company: null, live: false };
+const DEMO_SETTINGS: SettingsData = { departments: [], locations: [], positions: [], users: [], apiKeys: [], companyId: null, kioskToken: null, company: null, live: false };
 
-function copyKioskLink(companyId: string | null) {
-  const url = `${window.location.origin}/kiosk${companyId ? `?company=${companyId}` : ""}`;
+function copyKioskLink(kioskToken: string | null) {
+  if (!kioskToken) { toast("Kiosk-slóð er ekki tilbúin — keyrðu migration 0044"); return; }
+  const url = `${window.location.origin}/kiosk?k=${kioskToken}`;
   navigator.clipboard?.writeText(url).then(() => toast("Kiosk-slóð afrituð"), () => toast(url));
 }
 
@@ -128,7 +129,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
           <div className="cb att">
             <div className="it"><div className="ic good">P</div><div className="tx"><b>Payday</b><span>{t("tímaskrá flutt út sem Excel — hlaðið upp í Payday")}</span></div><span className="tag info">{t("Excel")}</span></div>
             <div className="it"><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" /></svg></div><div className="tx"><b>{t("Push-tilkynningar")}</b><span>{t("vaktir, beiðnir og samþykki beint í símann")}</span></div><PushToggle /></div>
-            <div className="it rowlink" onClick={() => copyKioskLink(data.companyId)}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><rect x="4" y="3" width="16" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg></div><div className="tx"><b>{t("Kiosk-stimpilklukka")}</b><span>{t("opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð")}</span></div><span className="tag info">{t("afrita slóð")}</span></div>
+            <div className="it rowlink" onClick={() => copyKioskLink(data.kioskToken)}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><rect x="4" y="3" width="16" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg></div><div className="tx"><b>{t("Kiosk-stimpilklukka")}</b><span>{t("opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð")}</span></div><span className="tag info">{t("afrita slóð")}</span></div>
           </div>
         </div>
       )}

@@ -60,7 +60,7 @@ const STR = {
   },
 } as const;
 
-export default function KioskClient({ companyId, data }: { companyId: string | null; data: KioskData | null }) {
+export default function KioskClient({ kioskKey, data }: { kioskKey: string | null; data: KioskData | null }) {
   const real = !!data;
   const emps: Emp[] = real
     ? data!.employees.map((e) => ({ id: e.id, initials: e.initials, name: e.name, color: e.color }))
@@ -116,7 +116,7 @@ export default function KioskClient({ companyId, data }: { companyId: string | n
   async function ktSubmit(nk: string) {
     if (!real) { setKtErr(lang === "is" ? "Virkar þegar kiosk er tengdur fyrirtæki" : "Works when the kiosk is linked to a company"); setKt(""); return; }
     setKtBusy(true);
-    const res = await kioskPunchByKennitala(companyId!, nk);
+    const res = await kioskPunchByKennitala(kioskKey!, nk);
     setKtBusy(false);
     if (!res.ok) { setKtErr(res.error ?? s.err); setKt(""); return; }
     setKt("");
@@ -149,7 +149,7 @@ export default function KioskClient({ companyId, data }: { companyId: string | n
     if (!cur) return;
     if (real) {
       setBusy(true);
-      const res = await kioskPunchByPin(companyId!, cur.id, np);
+      const res = await kioskPunchByPin(kioskKey!, cur.id, np);
       setBusy(false);
       if (!res.ok) { setErr(res.error ?? s.err); setShake(true); setTimeout(() => { setPin(""); setShake(false); }, 650); return; }
       finish(cur, !!res.into, res.time ?? nowHM());
@@ -178,7 +178,7 @@ export default function KioskClient({ companyId, data }: { companyId: string | n
           const codes = await detector.detect(videoRef.current);
           if (codes[0]?.rawValue) {
             done = true;
-            const res = await kioskPunchByToken(companyId!, codes[0].rawValue);
+            const res = await kioskPunchByToken(kioskKey!, codes[0].rawValue);
             if (res.ok) { setScan(false); finish({ id: res.name ?? "", initials: "", name: res.name ?? "", color: "#e9700f" }, !!res.into, res.time ?? nowHM()); return; }
             setScanErr(res.error ?? s.err); done = false;
           }
@@ -204,7 +204,7 @@ export default function KioskClient({ companyId, data }: { companyId: string | n
   const coName = data?.company ?? "Kaffi Krónan";
 
   // Bound to a company that wasn't found.
-  if (companyId && !data) {
+  if (kioskKey && !data) {
     return (
       <div className="wrap" style={{ textAlign: "center", paddingTop: 80 }}>
         <h1>{s.notFound}</h1>

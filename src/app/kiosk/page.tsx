@@ -7,9 +7,10 @@ export const metadata = { title: "VAKTO — Stimpilklukka" };
 export default async function KioskPage({
   searchParams,
 }: {
-  searchParams: Promise<{ company?: string }>;
+  searchParams: Promise<{ k?: string }>;
 }) {
-  const { company } = await searchParams;
-  const data = company ? await getKioskData(company) : null;
-  return <KioskClient companyId={company ?? null} data={data} />;
+  // The kiosk is addressed by the company's secret kiosk token (Stillingar → afrita slóð).
+  const { k } = await searchParams;
+  const data = k ? await getKioskData(k) : null;
+  return <KioskClient kioskKey={k ?? null} data={data} />;
 }
