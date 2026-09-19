@@ -10,16 +10,11 @@ export type PayrollRow = { n: string; av: string; c: string; h: string; g: strin
 export type PayrollTotalsView = { count: number; hours: string; gross: string; withholding: string; pensionUnion: string; net: string; cost: string; grossM: string; netM: string; costM: string; withholdingM: string; insuranceM: string };
 export type PayrollView = { rows: PayrollRow[]; totals: PayrollTotalsView; live: boolean };
 
-// Demo rows mirror the prototype (5 shown) — used before Supabase is connected.
-const DEMO: PayrollView = {
-  rows: [
-    { n: "Mína", av: "MÍ", c: "#5b50e6", h: "171,0", g: "651.000", w: "−142.300", p: "−32.550", net: "468.150" },
-    { n: "Bach", av: "BA", c: "#1fb6a6", h: "160,0", g: "496.000", w: "−96.400", p: "−24.800", net: "374.800" },
-    { n: "Phong", av: "PH", c: "#18a06a", h: "158,0", g: "489.800", w: "−94.900", p: "−24.490", net: "370.410" },
-    { n: "Jón", av: "JÓ", c: "#8b7bff", h: "160,0", g: "560.000", w: "−118.600", p: "−28.000", net: "413.400" },
-    { n: "Ómar", av: "ÓM", c: "#e0533f", h: "148,0", g: "528.700", w: "−110.300", p: "−26.435", net: "391.965" },
-  ],
-  totals: { count: 12, hours: "1.968", gross: "5.676.918", withholding: "−986.300", pensionUnion: "−283.846", net: "4.460.772", cost: "7.389.405", grossM: "5,68", netM: "4,46", costM: "7,39", withholdingM: "0,99", insuranceM: "0,36" },
+// Honest empty view — shown when Supabase is not connected / not signed in.
+// There is no demo payroll: numbers on this screen are always the company's own.
+const EMPTY: PayrollView = {
+  rows: [],
+  totals: { count: 0, hours: "0", gross: "0", withholding: "0", pensionUnion: "0", net: "0", cost: "0", grossM: "0", netM: "0", costM: "0", withholdingM: "0", insuranceM: "0" },
   live: false,
 };
 
@@ -40,10 +35,10 @@ function rowFrom(line: PayLine, color: string): PayrollRow {
 
 /** Payroll rows: latest persisted run if any, else computed from real employees. */
 export async function getPayroll(): Promise<PayrollView> {
-  if (!isSupabaseConfigured()) return DEMO;
+  if (!isSupabaseConfigured()) return EMPTY;
   try {
     const { employees, live } = await getEmployees();
-    if (!live) return DEMO;
+    if (!live) return EMPTY;
     const colorOf = (id: string) => employees.find((e) => e.id === id)?.avatarColor ?? "#5b50e6";
 
     const supabase = await createClient();
@@ -101,7 +96,8 @@ export async function getPayroll(): Promise<PayrollView> {
       },
       live: true,
     };
-  } catch {
-    return DEMO;
+  } catch (e) {
+    console.error("[launakeyrslur] getPayroll failed:", e);
+    return EMPTY;
   }
 }

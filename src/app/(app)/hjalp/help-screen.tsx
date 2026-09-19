@@ -9,7 +9,7 @@ type L = { is: string; en: string };
 const tx = (lang: string, v: L) => (lang === "en" ? v.en : v.is);
 const ic = (d: string) => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">{d.split("|").map((p, i) => <path key={i} d={p} />)}</svg>;
 
-type Guide = { id: string; icon: React.ReactNode; title: L; intro: L; img: string; steps: L[] };
+type Guide = { id: string; icon: React.ReactNode; title: L; intro: L; img?: string; steps: L[]; staff?: boolean };
 
 const GUIDES: Guide[] = [
   {
@@ -21,7 +21,6 @@ const GUIDES: Guide[] = [
       { is: "„Laun af tekjum“-hringurinn sýnir launakostnað ÷ veltu. Grænt er gott, rautt hátt. Undir honum sést veltan og hvort hún er handvirk eða úr Inventra.", en: "The labor-% ring shows labor cost ÷ revenue. Green is good, red is high. Below it you see the revenue and whether it's manual or from Inventra." },
       { is: "Yfirvinna og álag birtast bæði í klukkustundum og krónum. Yfirvinnan er reiknuð eftir raunreglum (t.d. yfir 40 klst/viku), ekki bara frávik.", en: "Overtime and premiums show in both hours and krónur. Overtime uses the real rules (e.g. over 40 hrs/week), not just deviation." },
       { is: "Línuritið sýnir alltaf síðustu 7 daga — áætlað vs raun. Farðu með músina yfir punkt til að sjá nákvæmar tölur.", en: "The line chart always shows the last 7 days — planned vs actual. Hover a point for exact numbers." },
-      { is: "Smelltu á „Sérsníða“ til að fela spjöld sem þú vilt ekki sjá (✕) og sýna þau aftur (+). Val vistast sjálfkrafa.", en: "Click \"Customize\" to hide cards you don't want (✕) and show them again (+). Saved automatically." },
     ],
   },
   {
@@ -72,23 +71,43 @@ const GUIDES: Guide[] = [
   },
   {
     id: "skyrslur", icon: ic("M4 20V10M10 20V4M16 20v-8M20 20H2"), img: "/help/reports.png",
-    title: { is: "Skýrslur & útflutningur", en: "Reports & export" },
-    intro: { is: "Sæktu tímaskýrslur í Excel eða PDF — með samþykktum og ósamþykktum tímum aðgreindum.", en: "Export time reports to Excel or PDF — with approved and pending hours separated." },
+    title: { is: "Innsýn & skýrslur", en: "Insights & reports" },
+    intro: { is: "Innsýn sýnir rekstur og framlegð (eigandi) og tíma & mætingu — og þrjár skýrslur sem þú sækir í Excel eða PDF.", en: "Insights shows operations & margin (owner) and time & attendance — plus three reports you download as Excel or PDF." },
     steps: [
-      { is: "Veldu tímabil (Dagur / Vika / Mánuður / Sérsniðið) og deild ef við á.", en: "Choose a period (Day / Week / Month / Custom) and a department if needed." },
-      { is: "Smelltu „Excel“ fyrir .xlsx eða „PDF“ fyrir prentvæna skýrslu. Skráin hleðst niður strax.", en: "Click \"Excel\" for .xlsx or \"PDF\" for a print-ready report. The file downloads immediately." },
-      { is: "Í skýrslunni er hver færsla merkt: grænt = samþykkt, rautt = bíður. Neðst er samtala samþykktra og óafgreiddra tíma.", en: "In the report each entry is marked: green = approved, red = pending. The bottom totals approved vs pending hours." },
+      { is: "Veldu tímabil efst á flipanum — allar tölur og skýrslur fylgja því.", en: "Pick a period at the top of the tab — every figure and report follows it." },
+      { is: "Skýrslusafnið hefur þrjár skýrslur: Arðsemi (laun % af veltu), Launakostnaður per starfsmaður og Mæting & frávik. Síaðu eftir deild eða starfsmanni og smelltu til að sækja.", en: "The report library has three reports: Profitability (labor % of revenue), Labor cost per employee and Attendance & deviations. Filter by department or employee and click to download." },
+      { is: "„Excel“ / „PDF“ efst sækir tímaskýrslu tímabilsins með samþykktum og óafgreiddum tímum aðgreindum.", en: "\"Excel\" / \"PDF\" at the top downloads the period's time report with approved and pending hours separated." },
     ],
   },
   {
     id: "mitt-svaedi", icon: ic("M3 12l9-9 9 9|M5 10v10h14V10"), img: "/help/myarea.png",
-    title: { is: "Mitt svæði (starfsmenn)", en: "My area (staff)" },
+    title: { is: "Mitt svæði — stimpla inn/út", en: "My area — clock in/out" }, staff: true,
     intro: { is: "Þarna stimpla starfsmenn sig inn/út, sjá vaktir og laun, senda beiðnir og opna stafrænt skírteini.", en: "Here staff clock in/out, see shifts and pay, send requests and open a digital ID card." },
     steps: [
       { is: "Stimpla inn/út með einum smelli efst. Tíminn telur í rauntíma á meðan vaktin stendur.", en: "Clock in/out with one tap at the top. The timer counts live while on shift." },
-      { is: "Valmyndin vinstra megin: Yfirlit, Mínar vaktir, Laun, Réttindi og Prófíll.", en: "The left menu: Overview, My shifts, Pay, Rights and Profile." },
-      { is: "Sendu beiðnir — frí, vaktaskipti, laust framboð eða leiðréttingu á tíma — og fylgstu með stöðu.", en: "Send requests — leave, shift swaps, availability or a time correction — and track their status." },
-      { is: "„Skírteini“ opnar stafrænt starfsmannaskírteini. (Apple/Google Wallet er á leiðinni.)", en: "\"ID card\" opens the digital staff ID. (Apple/Google Wallet is coming.)" },
+      { is: "Gleymdirðu að stimpla út? Sendu leiðréttingarbeiðni — stjórnandinn samþykkir og tíminn lagast.", en: "Forgot to clock out? Send a correction request — your manager approves it and the time is fixed." },
+      { is: "Launamat mánaðarins og réttindi (orlof, tímabanki) sjást á sama stað. Launaseðlar sækjast þar líka.", en: "The month's pay estimate and entitlements (leave, time bank) are in the same place. Payslips download there too." },
+      { is: "„Skírteini“ opnar stafrænt starfsmannaskírteini sem þú sýnir á vinnustaðnum.", en: "\"ID card\" opens the digital staff ID you show at work." },
+    ],
+  },
+  {
+    id: "vaktir", icon: ic("M8 2v4M16 2v4|M3 9h18|M3 5h18v16H3z"), staff: true,
+    title: { is: "Mínar vaktir & beiðnir", en: "My shifts & requests" },
+    intro: { is: "Sjáðu vaktirnar þínar viku fyrir viku, sæktu um lausar vaktir og sendu beiðnir um frí, vaktaskipti eða framboð.", en: "See your shifts week by week, apply for open shifts and send requests for leave, shift swaps or availability." },
+    steps: [
+      { is: "Næsta vakt birtist efst; flettu milli vikna með örvunum. Nýtt vaktaplan kemur sem tilkynning þegar það er gefið út.", en: "Your next shift is at the top; flip between weeks with the arrows. A new schedule arrives as a notification when published." },
+      { is: "„Lausar vaktir“ sýnir vaktir sem vantar fólk í — smelltu „Sækja um“ og stjórnandinn staðfestir.", en: "\"Open shifts\" lists shifts that need people — tap \"Apply\" and your manager confirms." },
+      { is: "Beiðnir: frí (dagsetningar + ástæða), vaktaskipti (veldu vakt og samstarfsmann) eða framboð (hvenær þú getur unnið). Staða beiðnar sést í listanum.", en: "Requests: leave (dates + reason), shift swap (pick the shift and a colleague) or availability (when you can work). Each request shows its status in the list." },
+    ],
+  },
+  {
+    id: "spjall", icon: ic("M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"), staff: true,
+    title: { is: "Spjall & fréttaveita", en: "Chat & news feed" },
+    intro: { is: "Spjallið er fyrir samskipti við samstarfsfólk og stjórnendur; fréttaveitan fyrir tilkynningar frá fyrirtækinu.", en: "Chat is for talking with colleagues and managers; the news feed is for company announcements." },
+    steps: [
+      { is: "„Almennt“ er rás fyrir allt fyrirtækið. Búðu til hópa eða skrifaðu beint á einn samstarfsmann með fólk-leitinni.", en: "\"General\" is the company-wide channel. Create groups or message one colleague directly via the people search." },
+      { is: "Svaraðu í þráð, bregstu við skilaboðum og eyddu eigin skilaboðum með hover-aðgerðunum á bólunni.", en: "Reply in a thread, react to messages and delete your own messages with the hover actions on the bubble." },
+      { is: "Fréttaveitan sýnir tilkynningar, afmæli og fréttir — bregstu við eða skrifaðu athugasemd.", en: "The news feed shows announcements, birthdays and news — react or leave a comment." },
     ],
   },
   {
@@ -97,12 +116,12 @@ const GUIDES: Guide[] = [
     intro: { is: "Staðir, stöður, notendaboð, veltuskráning og kiosk-slóð — allt á einum stað.", en: "Locations, positions, user invites, revenue entry and the kiosk link — all in one place." },
     steps: [
       { is: "Bættu við stöðum og stöðum (positions) og bjóddu notendum með hlutverki (stjórnandi / vaktstjóri / starfsmaður / verktaki).", en: "Add locations and positions, and invite users with a role (owner / manager / employee / contractor)." },
-      { is: "Ertu með Inventra? Smelltu til að sækja veltu í rauntíma. Annars „Skrá veltu handvirkt“ eða „Meðalvelta per vikudag“ til að áætla laun%.", en: "Have Inventra? Click to pull revenue live. Otherwise \"Enter revenue manually\" or \"Average revenue per weekday\" to estimate labor%." },
+      { is: "Velta: búðu til API-lykil undir Tengingar og láttu sölukerfið senda veltuna — eða „Skrá veltu handvirkt“ / „Meðalvelta per vikudag“ til að áætla laun%.", en: "Revenue: create an API key under Integrations and let your POS send revenue — or \"Enter revenue manually\" / \"Average revenue per weekday\" to estimate labor%." },
       { is: "„Kiosk-stimpilklukka“: afritaðu slóðina og opnaðu á spjaldtölvu á staðnum.", en: "\"Kiosk time clock\": copy the link and open it on a tablet at the workplace." },
     ],
   },
   {
-    id: "homescreen", icon: ic("M12 2 3 9h2v11h5v-6h4v6h5V9h2z"), img: "/help/mitt-svaedi.png",
+    id: "homescreen", icon: ic("M12 2 3 9h2v11h5v-6h4v6h5V9h2z"), staff: true,
     title: { is: "VAKTO á heimaskjáinn + tilkynningar", en: "VAKTO on your home screen + notifications" },
     intro: {
       is: "Settu vakto.is á heimaskjá símans — þá er VAKTO eins og app með push-tilkynningum: ný skilaboð, nýtt vaktaplan, svör við beiðnum.",
@@ -116,7 +135,7 @@ const GUIDES: Guide[] = [
     ],
   },
   {
-    id: "kiosk", icon: ic("M4 3h16v14H4z|M8 21h8M12 17v4"), img: "/help/kiosk.png",
+    id: "kiosk", icon: ic("M4 3h16v14H4z|M8 21h8M12 17v4"), img: "/help/kiosk.png", staff: true,
     title: { is: "Kiosk stimpilklukka", en: "Kiosk time clock" },
     intro: { is: "Sameiginleg stimpilklukka á spjaldtölvu — starfsmenn stimpla sig með 4-stafa PIN, engin innskráning.", en: "A shared time clock on a tablet — staff clock in with a 4-digit PIN, no login." },
     steps: [
@@ -127,20 +146,24 @@ const GUIDES: Guide[] = [
   },
 ];
 
-const FAQ: { q: L; a: L }[] = [
+const FAQ: { q: L; a: L; staff?: boolean }[] = [
   { q: { is: "Hvað er „laun af tekjum“ (laun%)?", en: "What is labor % of revenue?" }, a: { is: "Launakostnaður (með launatengdum gjöldum) deilt með veltu. Lægra er betra — VAKTO litakóðar það á mælaborðinu.", en: "Labor cost (incl. on-costs) divided by revenue. Lower is better — VAKTO color-codes it on the dashboard." } },
-  { q: { is: "Hver sér hvað?", en: "Who sees what?" }, a: { is: "Stjórnandi sér allt; vaktstjóri sér vaktir/tíma/starfsfólk/skýrslur; starfsmaður og verktaki sjá sitt svæði og spjall. Þú stýrir nánar per starfsmann á Vinna-flipanum.", en: "Owner sees everything; manager sees scheduling/time/staff/reports; employee and contractor see their own area and chat. You fine-tune per employee on the Work tab." } },
-  { q: { is: "Virkar AI-vaktaplanið?", en: "Does AI scheduling work?" }, a: { is: "Já — „Gervigreind (AI) bestun“ býr til tillögu sem þú samþykkir áður en hún birtist.", en: "Yes — \"AI optimize\" proposes a plan you approve before it's published." } },
+  { q: { is: "Hver sér hvað?", en: "Who sees what?" }, staff: true, a: { is: "Stjórnandi sér allt; vaktstjóri sér vaktir/tíma/starfsfólk/skýrslur; starfsmaður og verktaki sjá sitt svæði og spjall. Þú stýrir nánar per starfsmann á Vinna-flipanum.", en: "Owner sees everything; manager sees scheduling/time/staff/reports; employee and contractor see their own area and chat. You fine-tune per employee on the Work tab." } },
   { q: { is: "Get ég séð laun% án bókhaldstengingar?", en: "Can I see labor% without an accounting link?" }, a: { is: "Já — skráðu veltu handvirkt, eða settu inn meðalveltu per vikudag í Stillingum, þá áætlar kerfið laun%.", en: "Yes — enter revenue manually, or set an average revenue per weekday in Settings, and the system estimates labor%." } },
+  { q: { is: "Ég gleymdi að stimpla út — hvað geri ég?", en: "I forgot to clock out — what do I do?" }, staff: true, a: { is: "Sendu leiðréttingarbeiðni í Mitt svæði með réttum tíma; stjórnandinn samþykkir og tíminn lagast.", en: "Send a correction request from My area with the right time; your manager approves it and the entry is fixed." } },
 ];
 
-export default function HelpScreen() {
+export default function HelpScreen({ role = "owner" }: { role?: string }) {
   const { lang } = useLang();
-  const [active, setActive] = useState(GUIDES[0].id);
+  // Employees and contractors only see the guides they can act on.
+  const staffOnly = role === "employee" || role === "contractor";
+  const guides = staffOnly ? GUIDES.filter((g) => g.staff) : GUIDES;
+  const faq = staffOnly ? FAQ.filter((f) => f.staff) : FAQ;
+  const [active, setActive] = useState(guides[0].id);
   const [q, setQ] = useState("");
   const norm = (sr: string) => sr.toLowerCase();
-  const list = q ? GUIDES.filter((g) => norm(tx(lang, g.title) + tx(lang, g.intro) + g.steps.map((s) => tx(lang, s)).join(" ")).includes(norm(q))) : GUIDES;
-  const g = GUIDES.find((x) => x.id === active) ?? GUIDES[0];
+  const list = q ? guides.filter((g) => norm(tx(lang, g.title) + tx(lang, g.intro) + g.steps.map((s) => tx(lang, s)).join(" ")).includes(norm(q))) : guides;
+  const g = guides.find((x) => x.id === active) ?? guides[0];
 
   return (
     <>
@@ -150,7 +173,7 @@ export default function HelpScreen() {
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={lang === "en" ? "Search help…" : "Leita í hjálp…"}
             style={{ width: "100%", border: "1px solid var(--line)", borderRadius: 9, padding: "8px 11px", font: "inherit", fontSize: 13, background: "var(--panel)", color: "var(--ink)" }} />
           <select className="emp-navsel" value={active} onChange={(e) => setActive(e.target.value)}>
-            {GUIDES.map((guide) => (
+            {guides.map((guide) => (
               <option key={guide.id} value={guide.id}>{tx(lang, guide.title)}</option>
             ))}
           </select>
@@ -167,9 +190,11 @@ export default function HelpScreen() {
             <div className="cb">
               <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.02em" }}>{tx(lang, g.title)}</h2>
               <p className="muted" style={{ fontSize: 14, lineHeight: 1.55, margin: "6px 0 0" }}>{tx(lang, g.intro)}</p>
-              <div className="help-shot">
-                <Image src={g.img} alt={tx(lang, g.title)} width={1280} height={800} style={{ width: "100%", height: "auto" }} />
-              </div>
+              {g.img && (
+                <div className="help-shot">
+                  <Image src={g.img} alt={tx(lang, g.title)} width={1280} height={800} style={{ width: "100%", height: "auto" }} />
+                </div>
+              )}
               <ol className="help-steps">
                 {g.steps.map((s, i) => (
                   <li key={i}><span className="n">{i + 1}</span><span>{tx(lang, s)}</span></li>
@@ -181,7 +206,7 @@ export default function HelpScreen() {
           <div className="card" style={{ marginTop: 16 }}>
             <div className="ch"><div className="ct">{tx(lang, { is: "Algengar spurningar", en: "FAQ" })}</div></div>
             <div className="cb">
-              {FAQ.map((f, i) => (
+              {faq.map((f, i) => (
                 <details key={i} style={{ borderBottom: "1px solid var(--line2)", padding: "12px 0" }}>
                   <summary style={{ cursor: "pointer", fontWeight: 600, fontSize: 14 }}>{tx(lang, f.q)}</summary>
                   <p className="muted" style={{ fontSize: 13.5, marginTop: 8, lineHeight: 1.55 }}>{tx(lang, f.a)}</p>
@@ -197,10 +222,6 @@ export default function HelpScreen() {
                 <div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 7 9 6 9-6" /></svg></div>
                 <div className="tx"><b>hjalp@vakto.is</b><span>{tx(lang, { is: "sendu okkur línu — við svörum samdægurs", en: "email us — same-day reply" })}</span></div>
               </a>
-              <div className="it">
-                <div className="ic good"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg></div>
-                <div className="tx"><b>{tx(lang, { is: "Spjall við aðstoð", en: "Live chat" })}</b><span>{tx(lang, { is: "neðst í hægra horni", en: "bottom-right corner" })}</span></div>
-              </div>
             </div>
           </div>
         </main>

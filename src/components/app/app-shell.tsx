@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Icon, Logo } from "./icons";
 import { ToastHost, toast } from "./toast";
 import { visibleFor, type Role } from "./nav";
+import { homeFor } from "@/lib/access";
 import { useLang } from "./lang";
 import { createClient } from "@/lib/supabase/client";
 import { getMyCompanies, switchCompany, type CompanyOption } from "@/app/(app)/company-actions";
@@ -38,7 +39,7 @@ export default function AppShell({
   const { lang, setLang, t } = useLang();
   const [navOpen, setNavOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [menu, setMenu] = useState<null | "lang" | "new" | "notif" | "acct">(null);
+  const [menu, setMenu] = useState<null | "lang" | "new" | "acct">(null);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [picker, setPicker] = useState(false);
   useEffect(() => {
@@ -47,15 +48,11 @@ export default function AppShell({
   async function pickCompany(id: string) {
     setMenu(null); setPicker(false);
     const res = await switchCompany(id);
-    if (res.ok) { toast(t("Skipt um félag")); window.location.assign("/maelabord"); }
+    if (res.ok) { toast(t("Skipt um félag")); window.location.assign(homeFor(account.role)); }
     else toast(res.error ?? "Villa");
   }
   const [pos, setPos] = useState<MenuPos>(null);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatSeen, setChatSeen] = useState(true); // resolved on mount from localStorage
-  const [roleModal, setRoleModal] = useState(false);
-  // Owner can preview the app as another role (account menu → Skipta um hlutverk).
-  const [role, setRoleState] = useState<Role>(account.role);
+  const role: Role = account.role;
   const [dark, setDark] = useState(false);
   const [railed, setRailed] = useState(false);
 
@@ -66,11 +63,9 @@ export default function AppShell({
     const isDark = localStorage.getItem("vakto-theme") === "dark";
     if (isDark) document.documentElement.classList.add("dark");
     const rail = localStorage.getItem("vakto-rail") === "1";
-    const seen = localStorage.getItem("vakto-support-seen") === "1";
     requestAnimationFrame(() => {
       if (isDark) setDark(true);
       if (rail) setRailed(true);
-      if (!seen) setChatSeen(false);
     });
   }, []);
   function toggleRail() {
@@ -85,25 +80,13 @@ export default function AppShell({
     toast(next ? t("Dökkt útlit virkt") : t("Ljóst útlit virkt"));
   }
 
-  const ident = role === account.role ? account : ROLE_IDENTITY[role];
+  const ident = account;
   const { groups, foot } = visibleFor(role);
-
-  function switchRole(r: Role) {
-    setRoleState(r);
-    setRoleModal(false);
-    setMenu(null);
-    const allowed = visibleFor(r);
-    const first = allowed.groups[0]?.items[0]?.href ?? "/maelabord";
-    const current = [...allowed.groups.flatMap((g) => g.items), ...allowed.foot].some((i) =>
-      pathname.startsWith(i.href),
-    );
-    if (!current) router.push(first);
-    toast("Skoða sem " + ROLE_IDENTITY[r].name);
-  }
+  const canCreate = role === "owner" || role === "manager";
 
   function openMenu(
     e: React.MouseEvent<HTMLButtonElement>,
-    which: "lang" | "new" | "notif" | "acct",
+    which: "lang" | "new" | "acct",
   ) {
     const r = e.currentTarget.getBoundingClientRect();
     setPos({ top: r.bottom + 8, right: Math.max(12, window.innerWidth - r.right) });
@@ -207,21 +190,13 @@ export default function AppShell({
               >
                 <Icon name="globe" />
               </button>
-              <button
-                className="btn sm tnew"
-                onClick={(e) => openMenu(e, "new")}
-              >
-                <Icon name="plus" strokeWidth={2.2} />
-                <span className="tnew-label">{t("create")}</span>
-                <Icon name="chevron" className="chev" strokeWidth={2} />
-              </button>
-              <button
-                className="ticon"
-                title="Tilkynningar"
-                onClick={(e) => openMenu(e, "notif")}
-              >
-                <Icon name="bell" />
-              </button>
+              {canCreate && (
+                <button className="btn sm tnew" onClick={(e) => openMenu(e, "new")}>
+                  <Icon name="plus" strokeWidth={2.2} />
+                  <span className="tnew-label">{t("create")}</span>
+                  <Icon name="chevron" className="chev" strokeWidth={2} />
+                </button>
+              )}
               <button className="tacct" onClick={(e) => openMenu(e, "acct")}>
                 <span className="tav">{ident.initials}</span>
                 <span className="tacct-n">{ident.company}</span>
@@ -266,14 +241,6 @@ export default function AppShell({
                 <div className="mi" onClick={() => nav("/stillingar?new=location")}>{t("create:loc")}</div>
               </>
             )}
-            {menu === "notif" && (
-              <>
-                <div className="mhd"><b>{t("notifications")}</b></div>
-                <div style={{ padding: "18px 14px", textAlign: "center", color: "var(--ink3)", fontSize: 13 }}>
-                  {t("Engar nýjar tilkynningar")}
-                </div>
-              </>
-            )}
             {menu === "acct" && (
               <>
                 <div className="mhd">
@@ -288,9 +255,11 @@ export default function AppShell({
                 <div className="mi" onClick={() => nav(account.kioskToken ? `/kiosk?k=${account.kioskToken}` : "/kiosk")}>
                   <Icon name="kclock" className="ei" />{t("acct:kiosk")}
                 </div>
-                <div className="mi" onClick={() => nav("/stillingar")}>
-                  <Icon name="settings" className="ei" />{t("acct:settings")}
-                </div>
+                {canCreate && (
+                  <div className="mi" onClick={() => nav("/stillingar")}>
+                    <Icon name="settings" className="ei" />{t("acct:settings")}
+                  </div>
+                )}
                 {account.vaktoAdmin && (
                   <div className="mi" onClick={() => { window.location.assign(window.location.hostname.endsWith("vakto.is") ? "https://admin.vakto.is" : "/admin"); }}>
                     <Icon name="shield" className="ei" />VAKTO Admin
@@ -315,81 +284,13 @@ export default function AppShell({
         </>
       )}
 
-      {/* ---------- floating support chat ---------- */}
-      <div className={`cw${chatOpen ? " show" : ""}`}>
-        <div className="cwh">
-          <b>{t("chat:title")}</b>
-          <span>{t("chat:sub")}</span>
-          <button className="x" onClick={() => setChatOpen(false)}>✕</button>
-        </div>
-        <div className="cwb">
-          <div className="bub">{t("chat:hi")}</div>
-          <div className="bub">{t("chat:hint")}</div>
-        </div>
-        <div className="cwf">
-          <input placeholder={t("chat:ph")} />
-          <button onClick={() => toast("Skilaboð send")}>
-            <Icon name="chevron" />
-          </button>
-        </div>
-      </div>
-      <button
-        className={`fab${pathname.startsWith("/spjall") ? " fab-up" : ""}`}
-        title="Aðstoð"
-        onClick={() => { setChatOpen((o) => !o); setChatSeen(true); try { localStorage.setItem("vakto-support-seen", "1"); } catch {} }}
-      >
-        <Icon name="chat" />
-        {/* the dot invites a first visit — a permanent fake "1" trains users to ignore red badges */}
-        {!chatOpen && !chatSeen && <span className="fdot">1</span>}
-      </button>
-
       {/* ---------- company picker (Payday-style) ---------- */}
       {picker && <CompanyPicker companies={companies} onPick={pickCompany} onClose={() => setPicker(false)} />}
-
-      {/* ---------- role preview ---------- */}
-      {roleModal && (
-        <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && setRoleModal(false)}>
-          <div className="mbg" onClick={() => setRoleModal(false)} />
-          <div className="modal">
-            <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>Skipta um aðgang</div><button className="x" onClick={() => setRoleModal(false)}>✕</button></div>
-            <div className="mb">
-              <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>Sjáðu hvernig kerfið lítur út fyrir hvert hlutverk:</p>
-              <div className="att">
-                {([
-                  ["owner", "M4 18h16M4 18l-1.5-9 5 4L12 5l4.5 8 5-4L20 18", "Stjórnandi — Bjarni", "full yfirsýn, laun, áskrift, allar síður"],
-                  ["manager", "RECT", "Vaktstjóri — Jón", "vaktir, tímar, starfsfólk, skýrslur — ekki áskrift"],
-                  ["employee", "USER", "Starfsmaður — Mína", "aðeins eigin vaktir, tímar, laun og beiðnir"],
-                  ["contractor", "TRUCK", "Verktaki — verktaka-aðgangur", "eigin tímar & verk, útselt vs kostnaður (GPS-verkskráning)"],
-                ] as const).map(([r, icon, title, desc]) => (
-                  <div className="it rowlink" key={r} onClick={() => switchRole(r)}>
-                    <div className="ic info">
-                      <svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        {icon === "RECT" ? <><rect x="3" y="7.5" width="18" height="12" rx="2" /><path d="M8.5 7.5V6a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v1.5" /></>
-                          : icon === "USER" ? <><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></>
-                            : icon === "TRUCK" ? <><path d="M3 13l1.8-5h9.4l3 4H20v4h-2.2M3 13v4h2.2" /><circle cx="7.5" cy="17" r="1.7" /><circle cx="16.5" cy="17" r="1.7" /></>
-                              : <path d={icon} />}
-                      </svg>
-                    </div>
-                    <div className="tx"><b>{title}</b><span>{desc}</span></div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <ToastHost />
     </>
   );
 }
-
-const ROLE_IDENTITY: Record<Role, Account> = {
-  owner: { initials: "BL", name: "Bjarni Lúðvíksson", company: "Kaffi Krónan", role: "owner" },
-  manager: { initials: "JÓ", name: "Jón G.", company: "Kaffi Krónan", role: "manager" },
-  employee: { initials: "MÍ", name: "Mína Huong", company: "Kaffi Krónan", role: "employee" },
-  contractor: { initials: "VK", name: "Verktaki", company: "Kaffi Krónan", role: "contractor" },
-};
 
 /** Payday-style company picker: search + avatar list of the user's companies. */
 function CompanyPicker({ companies, onPick, onClose }: { companies: CompanyOption[]; onPick: (id: string) => void; onClose: () => void }) {

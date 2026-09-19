@@ -2,7 +2,7 @@
 
 // Innsýn — the merged analytics surface. One place to answer "how are we
 // doing": Rekstur (revenue/margin/labor%, owner only) and Tímar & mæting
-// (planned vs actual, time bank, exports). Each tab reuses the existing
+// (period summary, report library, time bank). Each tab reuses the existing
 // screen in embedded mode so nothing is duplicated.
 
 import { useState } from "react";
@@ -19,13 +19,14 @@ import type { TimeBank } from "../skyrslur/timebank.server";
 
 export type InnsynProps = {
   owner: boolean;
+  aiEnabled: boolean;
   initialTab: "rekstur" | "timar";
   empty: boolean;
   perf: { live: boolean; perf?: PerfView; staffing?: StaffingPattern; history?: PerfHistory; insights: Insight[] };
   reports: { live: boolean; rows: AttRow[]; timebank?: TimeBank };
 };
 
-export function InsightsTabs({ owner, initialTab, empty, perf, reports }: InnsynProps) {
+export function InsightsTabs({ owner, aiEnabled, initialTab, empty, perf, reports }: InnsynProps) {
   const { t } = useLang();
   const [tab, setTab] = useState<"rekstur" | "timar">(owner ? initialTab : "timar");
   const tabs: ["rekstur" | "timar", string][] = owner
@@ -42,8 +43,8 @@ export function InsightsTabs({ owner, initialTab, empty, perf, reports }: Innsyn
         </div>
       )}
       {tab === "rekstur" && owner
-        ? <PerformanceScreen embedded empty={empty} live={perf.live} perf={perf.perf} staffing={perf.staffing} history={perf.history} insights={perf.insights} />
-        : <ReportsScreen embedded empty={empty} live={reports.live} rows={reports.rows} timebank={reports.timebank} />}
+        ? <PerformanceScreen embedded empty={empty} live={perf.live} perf={perf.perf} staffing={perf.staffing} history={perf.history} insights={perf.insights} aiEnabled={aiEnabled} />
+        : <ReportsScreen embedded empty={empty} live={reports.live} rows={reports.rows} timebank={reports.timebank} aiEnabled={aiEnabled} />}
     </>
   );
 }

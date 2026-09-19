@@ -3,7 +3,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import * as XLSX from "xlsx";
 import { computeLine, computeFromPunches, classifyPay, type PayLine } from "@/lib/payroll";
 import { resolveRuleSet } from "@/lib/payrules";
-import { DEMO_EMPLOYEES, type Employee } from "@/lib/employees";
+import type { Employee } from "@/lib/employees";
 
 function csvCell(v: string | number): string {
   const s = String(v);
@@ -21,11 +21,7 @@ type HourBuckets = { dagvinna: number; yfirvinna: number };
 
 async function getLines(from?: string, to?: string): Promise<{ lines: PayLine[]; kt: Record<string, string>; hours: Map<string, HourBuckets>; live: boolean }> {
   const hours = new Map<string, HourBuckets>();
-  if (!isSupabaseConfigured()) {
-    const kt: Record<string, string> = {};
-    DEMO_EMPLOYEES.forEach((e) => { if (e.kennitala) kt[e.id] = e.kennitala; });
-    return { lines: DEMO_EMPLOYEES.map(computeLine), kt, hours, live: false };
-  }
+  if (!isSupabaseConfigured()) return { lines: [], kt: {}, hours, live: false };
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -36,11 +32,7 @@ async function getLines(from?: string, to?: string): Promise<{ lines: PayLine[];
     const { data: emps } = company
       ? await supabase.from("employees").select("id, full_name, kennitala, pay_type, rate, employment_ratio, union_agreement").eq("company_id", company)
       : { data: null };
-    if (!emps?.length) {
-      const kt: Record<string, string> = {};
-      DEMO_EMPLOYEES.forEach((e) => { if (e.kennitala) kt[e.id] = e.kennitala; });
-      return { lines: DEMO_EMPLOYEES.map(computeLine), kt, hours, live: false };
-    }
+    if (!emps?.length) return { lines: [], kt: {}, hours, live: true };
     const kt: Record<string, string> = {};
     emps.forEach((e) => { if (e.kennitala) kt[e.id as string] = e.kennitala as string; });
 
@@ -81,7 +73,7 @@ async function getLines(from?: string, to?: string): Promise<{ lines: PayLine[];
     const lines = emps.map((e) => computeLine(toEmp(e)));
     return { lines, kt, hours, live: true };
   } catch {
-    return { lines: DEMO_EMPLOYEES.map(computeLine), kt: {}, hours, live: false };
+    return { lines: [], kt: {}, hours, live: false };
   }
 }
 

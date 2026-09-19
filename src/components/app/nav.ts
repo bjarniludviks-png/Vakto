@@ -38,19 +38,21 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     title: "Mitt",
     items: [
-      // Owners and managers work shifts too, so everyone has Mitt svæði.
-      { slug: "employeeapp", href: "/mitt-svaedi", label: "Mitt svæði", roles: ALL, icon: "phone" },
-      // Read-only schedule for the whole team (Sling-style transparency).
-      { slug: "myplan", href: "/planid", label: "Planið", roles: ALL, icon: "schedule" },
-      { slug: "feed", href: "/frettaveita", label: "Fréttaveita", roles: ALL, icon: "megaphone" },
-      { slug: "chat", href: "/spjall", label: "Spjall", roles: ALL, icon: "chat" },
+      // The employee experience is exactly three things (everyone works shifts,
+      // so owners and managers get them too): clock, shifts, pay & chat.
+      { slug: "clock", href: "/stimpla", label: "Stimpla", roles: ALL, icon: "kclock" },
+      { slug: "myshifts", href: "/vaktir", label: "Vaktir", roles: ALL, icon: "schedule" },
+      { slug: "mine", href: "/mitt", label: "Laun & spjall", roles: ALL, icon: "chat" },
     ],
   },
 ];
 
 export const FOOT_ITEMS: NavItem[] = [
   { slug: "settings", href: "/stillingar", label: "Stillingar", roles: STAFF_MGMT, icon: "settings" },
-  { slug: "help", href: "/hjalp", label: "Hjálp", roles: ALL, icon: "help" },
+];
+// Routes that are not in the sidebar but still role-guarded (deep links from push etc.).
+export const EXTRA_ROUTES: { href: string; roles: Role[] }[] = [
+  { href: "/hjalp", roles: ALL }, { href: "/spjall", roles: ALL }, { href: "/frettaveita", roles: ALL },
 ];
 
 export function visibleFor(role: Role) {

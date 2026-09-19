@@ -522,8 +522,6 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
   }
 }
 
-const DEMO_DEPARTMENTS = ["Eldhús", "Sal", "Stjórnun"];
-
 export type CompanyOptions = { departments: string[]; positions: string[]; locations: string[] };
 
 /** Department name → color (for schedule/staff labels). Empty when 0038 hasn't run. */
@@ -545,14 +543,15 @@ export async function getDepartmentColors(): Promise<Record<string, string>> {
   }
 }
 
-/** Real select-options for the new-employee form (demo fallback). */
+/** Real select-options for the new-employee form. Empty lists (the forms show
+ * "stofnaðu í Stillingum" hints) when not connected — never canned names. */
 export async function getCompanyOptions(): Promise<CompanyOptions> {
-  const demo: CompanyOptions = { departments: DEMO_DEPARTMENTS, positions: ["Kokkur", "Þjónn / Sal", "Bílstjóri"], locations: ["Reykjavík Asian", "Hotel Umi"] };
-  if (!isSupabaseConfigured()) return demo;
+  const none: CompanyOptions = { departments: [], positions: [], locations: [] };
+  if (!isSupabaseConfigured()) return none;
   try {
     const supabase = await createClient();
     const company = await companyId(supabase);
-    if (!company) return demo;
+    if (!company) return none;
     const [deps, pos, locs] = await Promise.all([
       supabase.from("departments").select("name, locations!inner(company_id)").eq("locations.company_id", company).order("name"),
       supabase.from("positions").select("name").eq("company_id", company).order("name"),
@@ -564,27 +563,29 @@ export async function getCompanyOptions(): Promise<CompanyOptions> {
       positions: uniq((pos.data ?? []).map((d) => d.name as string)),
       locations: uniq((locs.data ?? []).map((d) => d.name as string)),
     };
-  } catch {
-    return demo;
+  } catch (e) {
+    console.error("[starfsfolk] getCompanyOptions failed:", e);
+    return none;
   }
 }
 
-/** List the company's department names (for the oversight picker + filters). */
+/** List the company's department names (for the oversight picker + filters).
+ * Empty when none exist — never canned names. */
 export async function getCompanyDepartments(): Promise<string[]> {
-  if (!isSupabaseConfigured()) return DEMO_DEPARTMENTS;
+  if (!isSupabaseConfigured()) return [];
   try {
     const supabase = await createClient();
     const company = await companyId(supabase);
-    if (!company) return DEMO_DEPARTMENTS;
+    if (!company) return [];
     const { data } = await supabase
       .from("departments")
       .select("name, locations!inner(company_id)")
       .eq("locations.company_id", company)
       .order("name");
-    const names = Array.from(new Set((data ?? []).map((d) => d.name as string).filter(Boolean)));
-    return names.length ? names : DEMO_DEPARTMENTS;
-  } catch {
-    return DEMO_DEPARTMENTS;
+    return Array.from(new Set((data ?? []).map((d) => d.name as string).filter(Boolean)));
+  } catch (e) {
+    console.error("[starfsfolk] getCompanyDepartments failed:", e);
+    return [];
   }
 }
 
@@ -608,7 +609,10 @@ export async function setOverseenDepartments(employeeId: string, names: string[]
     const supabase = await createClient();
     // Best-effort — column exists only after migration 0025.
     const { error } = await supabase.from("employees").update({ oversees_departments: names }).eq("id", employeeId);
-    if (error) return { ok: false, error: "Keyrðu migration 0025" };
+    if (error) {
+      console.error("[starfsfolk] setOverseenDepartments failed:", error.message);
+      return { ok: false, error: "Tókst ekki að vista umsjón deilda." };
+    }
     const { data: { user } } = await supabase.auth.getUser();
     const company = await companyId(supabase);
     if (company) await logAudit(supabase, company, user?.id ?? null, {
@@ -713,7 +717,10 @@ export async function generateContract(employeeId: string): Promise<ActionResult
       status: "draft",
       created_by: user?.id ?? null,
     }).select("id").maybeSingle();
-    if (error) return { ok: false, error: /contracts/.test(error.message) ? "Keyrðu migration 0028 í Supabase fyrst." : error.message, content };
+    if (error) {
+      console.error("[starfsfolk] generateContract failed:", error.message);
+      return { ok: false, error: "Tókst ekki að búa til samning.", content };
+    }
     await logAudit(supabase, company, user?.id ?? null, { action: "contract.create", entity: "contracts", detail: `Samningur búinn til — ${emp.full_name}` });
     revalidatePath("/starfsfolk");
     return { ok: true, id: created?.id as string | undefined, content };

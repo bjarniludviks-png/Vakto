@@ -1,8 +1,3 @@
-import EmployeeScreen from "./employee-screen";
-import { getMyCard } from "@/lib/mycard.server";
-import { getMyArea } from "./my.server";
-
-export default async function MittSvaediPage() {
-  const [card, my] = await Promise.all([getMyCard(), getMyArea()]);
-  return <EmployeeScreen card={card} my={my} />;
-}
+import { redirect } from "next/navigation";
+// Old route — the employee area is now /stimpla (clock), /vaktir (shifts) and /mitt (pay & chat).
+export default function Page() { redirect("/stimpla"); }

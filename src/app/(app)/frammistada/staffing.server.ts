@@ -16,21 +16,13 @@ function shiftHours(start?: string | null, end?: string | null): number {
   return h;
 }
 
-// Demo pattern: weekends over-staffed, midweek under (illustrative).
-const DEMO: WeekdayStat[] = [
-  { wd: 1, label: "Mánudagur", planned: 32, actual: 30, deviation: -2, rec: "ok" },
-  { wd: 2, label: "Þriðjudagur", planned: 30, actual: 27, deviation: -3, rec: "fewer" },
-  { wd: 3, label: "Miðvikudagur", planned: 34, actual: 33, deviation: -1, rec: "ok" },
-  { wd: 4, label: "Fimmtudagur", planned: 40, actual: 44, deviation: 4, rec: "more" },
-  { wd: 5, label: "Föstudagur", planned: 56, actual: 63, deviation: 7, rec: "more" },
-  { wd: 6, label: "Laugardagur", planned: 60, actual: 68, deviation: 8, rec: "more" },
-  { wd: 0, label: "Sunnudagur", planned: 44, actual: 38, deviation: -6, rec: "fewer" },
-];
+// No demo rows — an unconnected or empty company has no staffing pattern yet.
+const NONE: WeekdayStat[] = [];
 
 /** Average planned vs actual hours per weekday over a date range — reveals which
- * weekdays are consistently over/under-staffed. Demo fallback when unconfigured. */
+ * weekdays are consistently over/under-staffed. Empty when unconnected. */
 export async function getStaffingPattern(fromISO: string, toISO: string): Promise<StaffingPattern> {
-  if (!isSupabaseConfigured()) return { live: false, rows: DEMO, weeks: 4 };
+  if (!isSupabaseConfigured()) return { live: false, rows: NONE, weeks: 4 };
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -38,7 +30,7 @@ export async function getStaffingPattern(fromISO: string, toISO: string): Promis
       ? await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle()
       : { data: null };
     const company = profile?.company_id as string | undefined;
-    if (!company) return { live: false, rows: DEMO, weeks: 4 };
+    if (!company) return { live: false, rows: NONE, weeks: 4 };
 
     const [{ data: shifts }, { data: punches }] = await Promise.all([
       supabase.from("shifts").select("date, start_time, end_time").eq("company_id", company).gte("date", fromISO).lte("date", toISO),
@@ -70,8 +62,8 @@ export async function getStaffingPattern(fromISO: string, toISO: string): Promis
       return { wd, label: WD_IS[wd], planned: pl, actual: ac, deviation: dev, rec };
     });
     const anyData = rows.some((r) => r.planned > 0 || r.actual > 0);
-    return anyData ? { live: true, rows, weeks: Math.round(weeks) } : { live: false, rows: DEMO, weeks: 4 };
+    return anyData ? { live: true, rows, weeks: Math.round(weeks) } : { live: false, rows: NONE, weeks: 4 };
   } catch {
-    return { live: false, rows: DEMO, weeks: 4 };
+    return { live: false, rows: NONE, weeks: 4 };
   }
 }

@@ -13,7 +13,11 @@ import { notifyEmployee } from "@/lib/push";
 import type { PayrollView } from "./payroll.server";
 
 export type RunResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
-export type PeriodPayroll = PayrollView & { needsMigration: boolean; periodLabel: string; from: string; to: string };
+export type PeriodPayroll = PayrollView & {
+  needsMigration: boolean; periodLabel: string; from: string; to: string;
+  /** Closed punches in the period still awaiting approval (null = unknown, e.g. approval column missing). */
+  pendingPunches: number | null;
+};
 
 const MONTHS_IS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
 const niceISO = (s: string) => { const [y, m, d] = s.split("-").map(Number); return `${d}. ${MONTHS_IS[m - 1]} ${y}`; };
@@ -39,6 +43,7 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
     .eq("company_id", company).eq("approved", true).not("clock_out", "is", null)
     .gte("clock_in", from).lte("clock_in", to + "T23:59:59");
   if (approved.error) {
+    console.error("[launakeyrslur] punches.approved unavailable — counting all closed punches:", approved.error.message);
     needsMigration = true;
     const all = await supabase.from("punches")
       .select("employee_id, clock_in, clock_out")
@@ -74,9 +79,20 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
   return { lines, needsMigration };
 }
 
+/** Closed punches in the period that are NOT yet approved — drives the
+ * "Samþykktir tímar" badge. null when the approval column is unavailable. */
+async function pendingPunchCount(supabase: Awaited<ReturnType<typeof createClient>>, company: string, from: string, to: string): Promise<number | null> {
+  const { count, error } = await supabase.from("punches")
+    .select("id", { count: "exact", head: true })
+    .eq("company_id", company).eq("approved", false).not("clock_out", "is", null)
+    .gte("clock_in", from).lte("clock_in", to + "T23:59:59");
+  if (error) return null;
+  return count ?? 0;
+}
+
 /** Period payroll view from approved hours — drives the screen's period selector. */
 export async function getPayrollPeriod(from: string, to: string): Promise<PeriodPayroll> {
-  const empty: PeriodPayroll = { rows: [], totals: { count: 0, hours: "0", gross: "0", withholding: "0", pensionUnion: "0", net: "0", cost: "0", grossM: "0", netM: "0", costM: "0", withholdingM: "0", insuranceM: "0" }, live: false, needsMigration: false, periodLabel: `${niceISO(from)} – ${niceISO(to)}`, from, to };
+  const empty: PeriodPayroll = { rows: [], totals: { count: 0, hours: "0", gross: "0", withholding: "0", pensionUnion: "0", net: "0", cost: "0", grossM: "0", netM: "0", costM: "0", withholdingM: "0", insuranceM: "0" }, live: false, needsMigration: false, periodLabel: `${niceISO(from)} – ${niceISO(to)}`, from, to, pendingPunches: null };
   if (!isSupabaseConfigured()) return empty;
   try {
     const supabase = await createClient();
@@ -85,7 +101,10 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
     const { employees, live } = await getEmployees();
     if (!live) return empty;
     const colorOf = (id: string) => employees.find((e) => e.id === id)?.avatarColor ?? "#5b50e6";
-    const { lines, needsMigration } = await approvedLines(supabase, ctx.company, from, to);
+    const [{ lines, needsMigration }, pendingPunches] = await Promise.all([
+      approvedLines(supabase, ctx.company, from, to),
+      pendingPunchCount(supabase, ctx.company, from, to),
+    ]);
     const t = sumTotals(lines);
     return {
       rows: lines.map((l) => ({
@@ -97,9 +116,10 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
         pensionUnion: "−" + nf(t.pension + t.union), net: nf(t.net), cost: nf(t.cost),
         grossM: million(t.gross), netM: million(t.net), costM: million(t.cost), withholdingM: million(t.withholding), insuranceM: million(Math.round(t.gross * 0.0635)),
       },
-      live: true, needsMigration, periodLabel: `${niceISO(from)} – ${niceISO(to)}`, from, to,
+      live: true, needsMigration, periodLabel: `${niceISO(from)} – ${niceISO(to)}`, from, to, pendingPunches,
     };
-  } catch {
+  } catch (e) {
+    console.error("[launakeyrslur] getPayrollPeriod failed:", e);
     return empty;
   }
 }

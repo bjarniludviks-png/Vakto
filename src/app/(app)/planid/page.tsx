@@ -1,6 +1,3 @@
-import PlanScreen from "./plan-screen";
-
-// Planið — read-only team schedule + coworkers for every role (Sling-style).
-export default function Page() {
-  return <PlanScreen />;
-}
+import { redirect } from "next/navigation";
+// Old route — the team schedule now lives at /vaktir.
+export default function Page() { redirect("/vaktir"); }

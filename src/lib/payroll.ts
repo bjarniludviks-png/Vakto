@@ -8,7 +8,7 @@ export const BURDEN = 0.302; // launatengd gjöld ~30,2%
 const WITHHOLDING_RATE = 0.3162; // staðgreiðsla (samsett þrep, einföldun)
 const PENSION_RATE = 0.04; // lífeyrir
 const UNION_RATE = 0.01; // félagsgjald
-const MONTHLY_HOURS = 173.33;
+export const MONTHLY_HOURS = 173.33; // full-time hours per month (basis for monthly → hourly)
 
 export type PayLine = {
   employeeId: string;

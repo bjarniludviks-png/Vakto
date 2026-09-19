@@ -13,7 +13,7 @@ import {
   type FeedPost,
 } from "../spjall/actions";
 
-const REACTIONS = ["👍", "❤️", "😂", "🎉", "👏", "🔥"];
+import { REACTIONS } from "@/lib/reactions";
 
 export default function FeedScreen() {
   const { t } = useLang();

@@ -8,8 +8,8 @@ import { logAudit } from "@/lib/audit";
 import { nf } from "@/lib/format";
 import { emailConfigured, sendInviteEmail } from "@/lib/email";
 
-export type SyncResult = { ok: boolean; demo?: boolean; amount?: number; error?: string };
 export type SettingsResult = { ok: boolean; demo?: boolean; error?: string };
+export type SyncResult = SettingsResult & { amount?: number };
 
 /** Resolve the signed-in user's company + id. */
 async function companyCtx(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -22,44 +22,21 @@ async function companyCtx(supabase: Awaited<ReturnType<typeof createClient>>) {
   return { userId: user.id, company };
 }
 
+const SAVE_FAILED = "Tókst ekki að vista — reyndu aftur síðar.";
+/** Log the real database error server-side and hand the user a generic message. */
+function dbFail(where: string, error: { message: string }): SettingsResult {
+  console.error(`[stillingar] ${where}:`, error.message);
+  return { ok: false, error: SAVE_FAILED };
+}
+
 function num(s: string | undefined, fallback = 0): number {
   if (!s) return fallback;
   const n = Number(s.replace(/[^\d]/g, ""));
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
-/** Pull today's revenue from Inventra/POS into the revenue table. Mocked here as
- * a single revenue row; in production this calls the Inventra API. Feeds labor%. */
-export async function syncInventraRevenue(): Promise<SyncResult> {
-  if (!isSupabaseConfigured()) return { ok: true, demo: true, amount: 612000 };
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
-    const { data: profile } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
-    const company = profile?.company_id as string | undefined;
-    if (!company) return { ok: false, error: "Fyrirtæki fannst ekki" };
-
-    const { data: loc } = await supabase.from("locations").select("id").eq("company_id", company).limit(1).maybeSingle();
-    if (!loc) return { ok: false, error: "Staður fannst ekki" };
-
-    const amount = 612000;
-    const { error } = await supabase.from("revenue").insert({
-      location_id: loc.id,
-      date: new Date().toISOString().slice(0, 10),
-      amount,
-      source: "inventra",
-    });
-    if (error) return { ok: false, error: error.message };
-    await logAudit(supabase, company, user.id, {
-      action: "inventra.sync", entity: "revenue", detail: `Velta sótt frá Inventra — ${nf(amount)} kr`,
-    });
-    revalidatePath("/maelabord");
-    return { ok: true, amount };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
-  }
-}
+// INVENTRA: the mock revenue sync was removed — revenue arrives through a real
+// API key (/api/v1/revenue) or manual entry. Nothing fake is ever inserted.
 
 /** Manually record a revenue figure (for users without Inventra/POS). Feeds labor%. */
 export async function addRevenue(
@@ -121,7 +98,7 @@ export async function setWeekdayRevenue(map: Record<string, number>): Promise<Se
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("companies").update({ weekday_revenue: clean }).eq("id", ctx.company);
-    if (error) return { ok: false, error: error.message.includes("weekday_revenue") ? "Keyrðu migration 0018" : error.message };
+    if (error) return dbFail("setWeekdayRevenue", error);
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "revenue.weekday", entity: "company", detail: "Meðalvelta per vikudag uppfærð",
     });
@@ -154,9 +131,9 @@ export async function saveCompanyInfo(
       // 0026 not run yet — save what the schema has.
       ({ error } = await supabase.from("companies")
         .update({ name: patch.name, kennitala: patch.kennitala }).eq("id", ctx.company));
-      if (!error) error = { message: "Vistað að hluta — keyrðu migration 0026 fyrir heimilisfang/síma/netfang" } as never;
+      if (!error) console.error("[stillingar] saveCompanyInfo: migration 0026 missing — address/phone/email not saved");
     }
-    if (error) return { ok: false, error: error.message };
+    if (error) return dbFail("saveCompanyInfo", error);
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "company.update", entity: "company", detail: `Fyrirtækjaupplýsingar uppfærðar — ${patch.name}`,
     });
@@ -219,7 +196,7 @@ export async function addDepartment(input: { name: string; locationName?: string
     const supabase = await createClient();
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    let locQ = supabase.from("locations").select("id, name").eq("company_id", ctx.company).order("name");
+    const locQ = supabase.from("locations").select("id, name").eq("company_id", ctx.company).order("name");
     const { data: locs } = await locQ;
     if (!locs?.length) return { ok: false, error: "Búðu fyrst til stað (Staðir)" };
     const loc = input.locationName ? locs.find((l) => l.name === input.locationName) ?? locs[0] : locs[0];
@@ -248,7 +225,7 @@ export async function saveContractTerms(terms: string): Promise<SettingsResult> 
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("companies").update({ contract_terms: terms.trim() || null }).eq("id", ctx.company);
-    if (error) return { ok: false, error: /contract_terms|column/i.test(error.message) ? "Keyrðu migration 0039 í Supabase fyrst." : error.message };
+    if (error) return dbFail("saveContractTerms", error);
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "company.contract_terms", entity: "company", detail: "Sérskilmálar ráðningarsamninga uppfærðir",
     });
@@ -403,7 +380,7 @@ export async function uploadCompanyDoc(input: { fileName: string; dataUrl: strin
     const { error } = await supabase.from("documents").insert({
       company_id: ctx.company, employee_id: null, name: input.fileName, type: "shared", url: path,
     });
-    if (error) return { ok: false, error: /null value|not-null/i.test(error.message) ? "Keyrðu migration 0040 í Supabase fyrst." : error.message };
+    if (error) return dbFail("uploadCompanyDoc", error);
     await logAudit(supabase, ctx.company, ctx.userId, { action: "companydoc.upload", entity: "documents", detail: `Skjal í skjalasafn — ${input.fileName}` });
     revalidatePath("/stillingar");
     return { ok: true };
@@ -649,7 +626,7 @@ export async function saveRuleTemplate(input: RuleTemplateInput): Promise<Settin
     const res = input.id
       ? await supabase.from("rule_templates").update(row).eq("id", input.id).eq("company_id", ctx.company).select("id").maybeSingle()
       : await supabase.from("rule_templates").insert(row).select("id").maybeSingle();
-    if (res.error) return { ok: false, error: res.error.message.includes("rule_templates") ? "Keyrðu migration 0028 í Supabase fyrst." : res.error.message };
+    if (res.error) return dbFail("saveRuleTemplate", res.error);
     await logAudit(supabase, ctx.company, ctx.userId, { action: "rules.save", entity: "rule_templates", detail: `Reglusniðmát: ${row.name}` });
     revalidatePath("/stillingar");
     return { ok: true, id: res.data?.id as string | undefined };
@@ -809,7 +786,7 @@ export async function savePayPeriodStart(day: number): Promise<SettingsResult> {
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("companies").update({ pay_period_start: d }).eq("id", ctx.company);
-    if (error) return { ok: false, error: /pay_period_start/.test(error.message) ? "Keyrðu migration 0036 í Supabase fyrst." : error.message };
+    if (error) return dbFail("savePayPeriodStart", error);
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "company.pay_period", entity: "companies", detail: `Launatímabil stillt — byrjar ${d}.`,
     });

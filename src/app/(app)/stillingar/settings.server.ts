@@ -12,30 +12,8 @@ export type ApiKeyView = { id: string; name: string; prefix: string; created: st
 export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
 export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean };
 
-const DEMO: SettingsData = {
-  departments: [
-    { id: "d1", name: "Eldhús", location: "Reykjavík Asian", staff: 6, color: "#e9700f", members: [] },
-    { id: "d2", name: "Sal", location: "Reykjavík Asian", staff: 4, color: "#1fb6a6", members: [] },
-  ],
-  locations: [
-    { name: "Reykjavík Asian", staff: 14, timezone: "Atlantic/Reykjavik" },
-    { name: "Hotel Umi", staff: 0, timezone: "Atlantic/Reykjavik" },
-  ],
-  positions: [
-    { name: "Kokkur", staff: 6, baseRate: "2.900" },
-    { name: "Þjónn / Sal", staff: 4, baseRate: "2.750" },
-    { name: "Bílstjóri", staff: 2, baseRate: "2.650" },
-  ],
-  users: [
-    { name: "Bjarni L.", initials: "BL", role: "owner", email: "Eigandi — fullur aðgangur" },
-    { name: "Jón", initials: "JÓ", role: "manager", email: "Rekstrarstjóri — vaktir, laun, skýrslur" },
-  ],
-  apiKeys: [],
-  companyId: null,
-  kioskToken: null,
-  company: null,
-  live: false,
-};
+// Honest empty state (unconfigured / signed out) — never demo rows.
+const DEMO: SettingsData = { departments: [], locations: [], positions: [], users: [], apiKeys: [], companyId: null, kioskToken: null, company: null, live: false };
 
 const ini = (s: string) => s.trim().split(/\s+/)[0].slice(0, 2).toUpperCase();
 

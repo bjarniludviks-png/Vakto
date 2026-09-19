@@ -1,21 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { kioskPunch, kioskPunchByPin, kioskPunchByToken, kioskPunchByKennitala, type KioskData } from "./actions";
+import { kioskPunchByPin, kioskPunchByToken, kioskPunchByKennitala, type KioskData } from "./actions";
 
 type Emp = { id: string; initials: string; name: string; color: string };
 
-// Demo employees (with PINs) — only used for the unbound /kiosk preview.
-const DEMO: [string, string, string, boolean, string, string][] = [
-  ["MÍ", "Mína Huong", "#e9700f", true, "08:02", "4731"],
-  ["BA", "Bach Luu", "#1f9d6b", false, "—", "2208"],
-  ["PH", "Phong Ha", "#0891b2", true, "07:56", "9054"],
-  ["ÓM", "Ómar S.", "#d8483a", false, "—", "1190"],
-  ["HA", "Ha Vu", "#7c6ff2", true, "09:01", "6677"],
-  ["JÓ", "Jón G.", "#db2777", false, "—", "8080"],
-];
-
-const DEMO_PIN: Record<string, string> = Object.fromEntries(DEMO.map((e) => [e[1], e[5]]));
 const z = (n: number) => String(n).padStart(2, "0");
 
 type Lang = "is" | "en";
@@ -64,15 +53,13 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
   const real = !!data;
   const emps: Emp[] = real
     ? data!.employees.map((e) => ({ id: e.id, initials: e.initials, name: e.name, color: e.color }))
-    : DEMO.map((e) => ({ id: e[1], initials: e[0], name: e[1], color: e[2] }));
+    : [];
 
   const [now, setNow] = useState<Date | null>(null);
   const [on, setOn] = useState<Record<string, boolean>>(() =>
-    real ? Object.fromEntries(data!.employees.map((e) => [e.id, e.on]))
-      : Object.fromEntries(DEMO.map((e) => [e[1], e[3]])));
+    real ? Object.fromEntries(data!.employees.map((e) => [e.id, e.on])) : {});
   const [inTime, setInTime] = useState<Record<string, string>>(() =>
-    real ? Object.fromEntries(data!.employees.map((e) => [e.id, e.inTime]))
-      : Object.fromEntries(DEMO.map((e) => [e[1], e[4]])));
+    real ? Object.fromEntries(data!.employees.map((e) => [e.id, e.inTime])) : {});
   const [cur, setCur] = useState<Emp | null>(null);
   const [pin, setPin] = useState("");
   const [err, setErr] = useState("");
@@ -153,10 +140,7 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
       setBusy(false);
       if (!res.ok) { setErr(res.error ?? s.err); setShake(true); setTimeout(() => { setPin(""); setShake(false); }, 650); return; }
       finish(cur, !!res.into, res.time ?? nowHM());
-    } else {
-      if (np === DEMO_PIN[cur.name]) finish(cur, !on[cur.id], nowHM());
-      else wrong();
-    }
+    } else wrong();
   }
   function nowHM() { const t = new Date(); return `${z(t.getHours())}:${z(t.getMinutes())}`; }
 
@@ -190,7 +174,6 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
     return () => { done = true; cancelAnimationFrame(raf); stream?.getTracks().forEach((t) => t.stop()); };
   }, [scan]); // eslint-disable-line react-hooks/exhaustive-deps
   function finish(e: Emp, into: boolean, tm: string) {
-    if (!real) void kioskPunch(e.name, into);
     setOn((s) => ({ ...s, [e.id]: into }));
     if (into) setInTime((s) => ({ ...s, [e.id]: tm }));
     close();
@@ -204,7 +187,8 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
   const coName = data?.company ?? "Kaffi Krónan";
 
   // Bound to a company that wasn't found.
-  if (kioskKey && !data) {
+  // No key at all (someone typed /kiosk) or a key that matches no company.
+  if (!data) {
     return (
       <div className="wrap" style={{ textAlign: "center", paddingTop: 80 }}>
         <h1>{s.notFound}</h1>
@@ -307,7 +291,7 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
             <div className="hint">
               {real
                 ? s.hintReal
-                : <>{s.demoFor(cur.name.split(" ")[0])}<b>{DEMO_PIN[cur.name]}</b></>}
+                : null}
             </div>
           </div>
         </div>

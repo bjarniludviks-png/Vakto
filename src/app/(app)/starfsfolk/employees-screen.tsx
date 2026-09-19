@@ -8,6 +8,7 @@ import { UNIONS, PENSION_FUNDS } from "@/lib/is-lists";
 import { toast } from "@/components/app/toast";
 import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
+import { computeLine } from "@/lib/payroll";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "./contract-pdf";
 import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getDepartmentColors, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, type ContractRow } from "./actions";
@@ -26,26 +27,6 @@ function detectDocType(name: string): string {
   if (n.includes("vottorð") || n.includes("námskeið") || n.includes("skírteini")) return "vottorð";
   return "skjal";
 }
-
-/** Lightweight Icelandic kjarasamninga preview (brief §9). */
-function payrollPreview(e: Employee) {
-  const PERSONAL = 68691;
-  let gross: number;
-  if (e.payType === "monthly") {
-    gross = e.rate;
-  } else {
-    const hours = Math.round(173 * (e.employmentRatio / 100));
-    gross = hours * e.rate * 1.18; // dagvinna + álög uplift
-  }
-  const pension = gross * 0.04;
-  const unionFee = gross * 0.01;
-  const taxable = Math.max(0, gross - pension);
-  const withholding = Math.max(0, taxable * 0.3162 - PERSONAL);
-  const net = gross - pension - unionFee - withholding;
-  const cost = gross * 1.302; // +30,2% byrði
-  return { gross, net, cost };
-}
-
 
 function statusBadge(e: Employee) {
   if (e.employmentRatio > 120)
@@ -378,7 +359,6 @@ const daysLabel = (days: number[]) =>
 function LaunTab({ e }: { e: Employee }) {
   const { t } = useLang();
   const { isIS } = useCountry();
-  const pay = payrollPreview(e);
   // International companies always use the standardized rule engine (custom rules).
   const [union, setUnion] = useState<string>(isIS ? (e.union ?? "Efling") : CUSTOM_UNION);
   const [tpls, setTpls] = useState<RuleTemplate[]>([]);
@@ -419,6 +399,11 @@ function LaunTab({ e }: { e: Employee }) {
   const baseMonthly = isMonthly ? rate : Math.round(rate * monthlyHrs);   // grunnlaun 100%
   const hourly = isMonthly ? Math.round(rate / monthlyHrs) : rate;        // kr/klst (grunnur álaga)
   const actualMonthly = Math.round(baseMonthly * ratio / 100);           // áætluð mánaðarlaun v. starfshlutfall
+  // "Reiknaður mánaðarkostnaður" — the ONE payroll engine (lib/payroll.ts),
+  // fed the values as currently edited so the preview follows the form.
+  const pay = computeLine({ id: e.id, fullName: e.fullName, payType: isMonthly ? "monthly" : "hourly", rate, employmentRatio: ratio });
+  // Advanced editors live behind "Sérreglur" — open by default only for „Eigin reglur".
+  const [serOpen, setSerOpen] = useState(union === CUSTOM_UNION);
 
   const [benefits, setBenefits] = useState<Benefit[]>(e.benefits ?? []);
   const [bName, setBName] = useState(BENEFIT_PRESETS[0].name);
@@ -588,7 +573,16 @@ function LaunTab({ e }: { e: Employee }) {
       {/* The full custom rule object is submitted with the main form (parsed in save). */}
       {custom && <input type="hidden" name="payRuleJson" value={JSON.stringify({ ...rules, otWeekly, otMonthly, bands })} readOnly />}
 
-      {custom && (<>
+      {/* Sérreglur — OT thresholds, premium bands and benefits. Collapsed unless
+          the employee is on „Eigin reglur"; state lives above so nothing is lost. */}
+      <button type="button" onClick={() => setSerOpen((v) => !v)} aria-expanded={serOpen}
+        style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", padding: "14px 0 4px", marginTop: 18, cursor: "pointer", font: "inherit", color: "var(--ink)", textAlign: "left" }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ transform: serOpen ? "rotate(90deg)" : "none", transition: "transform .15s" }}><path d="M9 6l6 6-6 6" /></svg>
+        <span style={{ fontSize: 13.5, fontWeight: 650 }}>{t("Sérreglur")}</span>
+        <span className="muted" style={{ fontSize: 11.5, fontWeight: 400 }}>· {custom ? t("yfirvinnumörk, sérálög og hlunnindi") : t("hlunnindi — reglur koma úr kjarasamningi")}</span>
+      </button>
+
+      {serOpen && custom && (<>
         <Sec>{t("Yfirvinna tekur við")}</Sec>
         <div className="statline">
           <span className="k">{t("Eftir klst/viku")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("t.d. 40")}</span></span>
@@ -669,6 +663,7 @@ function LaunTab({ e }: { e: Employee }) {
             : t("Orlof safnast upp og birtist á launaseðli sem inneign.")}
       </p>
 
+      {serOpen && (<>
       <Sec>Hlunnindi & styrkir</Sec>
       {benefits.length === 0 && <p className="muted" style={{ fontSize: 12, margin: "2px 0 6px" }}>{t("Engin hlunnindi skráð — bættu við einu eða fleiri hér að neðan.")}</p>}
       {benefits.map((b, i) => (
@@ -701,6 +696,7 @@ function LaunTab({ e }: { e: Employee }) {
         <button type="button" className="btn ghost sm" onClick={addBenefit}>{t("Bæta við")}</button>
       </div>
       <p className="muted" style={{ fontSize: 11.5, margin: "6px 0 0" }}>{t("Föst hlunnindi bætast við laun. Per-km (t.d. ökutækjastyrkur) reiknast af skráðum km.")}</p>
+      </>)}
 
       <Sec>Reiknaður mánaðarkostnaður</Sec>
       <Stat k="Brúttólaun" v={kr(pay.gross)} />
@@ -803,7 +799,6 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
       {pfld("Sími", "pPhone", e.phone, "+354 …")}
       {pfld("Kennitala", "pKennitala", e.kennitala, "000000-0000")}
       {pfld("Bankareikningur", "pBank", e.bankAccount, "0000-00-000000")}
-      <Stat k="Tímabelti" v="Atlantic/Reykjavik" />
     </>
   );
 }
@@ -867,19 +862,10 @@ function FriTab({ e }: { e: Employee }) {
         ))}
         <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("Heildaryfirlit allra starfsmanna er í Innsýn → Tímar & mæting. Jöfnun fer fram í launakeyrslu.")}</p>
       </>}
-      <Sec>{t("Orlof & frí")}</Sec>
-      <Stat k={t("Áunninn orlofsréttur")} v="—" />
-      <Stat k={t("Frí tekið 2026")} v="—" />
-      <p className="muted" style={{ fontSize: 12 }}>{t("Orlofsyfirlit byggist á launakeyrslum ársins.")}</p>
     </>
   );
 }
 
-const DEMO_DOCS: { name: string; meta: string; path?: string }[] = [
-  { name: "Ráðningarsamningur.pdf", meta: "undirritað 8.10.2025" },
-  { name: "Skattkort_2026.pdf", meta: "PDF · 88 KB" },
-  { name: "Matvælanámskeið.pdf", meta: "gildir til 2027" },
-];
 function docDate(iso: string): string { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`; }
 
 const CONTRACT_STATUS: Record<string, { label: string; tag: string }> = {
@@ -925,7 +911,7 @@ function ContractTab({ employeeId }: { employeeId: string }) {
       <Sec first>Ráðningarsamningur</Sec>
       {contracts.length === 0 && (
         <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
-          {live ? t("Enginn samningur til — búðu hann til úr gögnum starfsmannsins með einum smelli.") : t("Samningar birtast hér þegar migration 0028 hefur verið keyrð í Supabase.")}
+          {live ? t("Enginn samningur til — búðu hann til úr gögnum starfsmannsins með einum smelli.") : t("Ekki tókst að sækja samninga að svo stöddu.")}
         </p>
       )}
       <div className="docs">
@@ -1003,14 +989,17 @@ function ContractViewModal({ view, onClose, onChanged }: { view: ContractRow; on
 
 function DocsTab({ employeeId }: { employeeId: string }) {
   const { t } = useLang();
-  const [docs, setDocs] = useState<{ name: string; meta: string; path?: string }[]>(DEMO_DOCS);
-  const [live, setLive] = useState(false);
+  // Real documents only — starts empty until the list loads.
+  const [docs, setDocs] = useState<{ name: string; meta: string; path?: string }[]>([]);
+  const [loaded, setLoaded] = useState(false);
   const [opening, setOpening] = useState(false);
-  async function load() {
-    const r = await getDocuments(employeeId);
-    if (r.live) { setLive(true); setDocs(r.rows.map((d) => ({ name: d.name, meta: docDate(d.created), path: d.path }))); }
+  function load() {
+    return getDocuments(employeeId).then((r) => {
+      if (r.live) setDocs(r.rows.map((d) => ({ name: d.name, meta: docDate(d.created), path: d.path })));
+      setLoaded(true);
+    }).catch(() => setLoaded(true));
   }
-  useEffect(() => { load(); }, [employeeId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { void load(); }, [employeeId]); // eslint-disable-line react-hooks/exhaustive-deps
   function readAsDataUrl(f: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const r = new FileReader();
@@ -1022,18 +1011,17 @@ function DocsTab({ employeeId }: { employeeId: string }) {
   async function onFiles(files: FileList | null) {
     if (!files) return;
     const list = [...files];
-    if (!live) setDocs((d) => [...d, ...list.map((f) => ({ name: f.name, meta: `${Math.max(1, Math.round(f.size / 1024))} KB` }))]);
     let okCount = 0;
     for (const f of list) {
       const dataUrl = await readAsDataUrl(f);
       const res = await uploadDocument({ employeeId, fileName: f.name, dataUrl, type: detectDocType(f.name) });
       if (res.ok) okCount++;
     }
-    toast(okCount > 1 ? "Skjöl hlaðin upp" : "Skjal hlaðið upp");
-    if (live || okCount) load();
+    toast(okCount === 0 ? t("Tókst ekki að hlaða upp skjali") : okCount > 1 ? t("Skjöl hlaðin upp") : t("Skjal hlaðið upp"));
+    if (okCount) load();
   }
   async function openDoc(path?: string) {
-    if (!path) { toast("Skjal opnast þegar Supabase er tengt"); return; }
+    if (!path) return;
     setOpening(true);
     const r = await getDocumentSignedUrl(path);
     setOpening(false);
@@ -1042,7 +1030,7 @@ function DocsTab({ employeeId }: { employeeId: string }) {
   return (
     <>
       <Sec first>Skjöl starfsmanns</Sec>
-      {docs.length === 0 && <p className="muted" style={{ fontSize: 12.5, margin: "0 0 8px" }}>{t("Engin skjöl enn — hladdu upp hér að neðan.")}</p>}
+      {loaded && docs.length === 0 && <p className="muted" style={{ fontSize: 12.5, margin: "0 0 8px" }}>{t("Engin skjöl enn — hladdu upp hér að neðan.")}</p>}
       <div className="docs">
         {docs.map((d, i) => (
           <div className={`docrow${d.path ? " rowlink" : ""}`} key={i} onClick={() => d.path && openDoc(d.path)} title={d.path ? t("Opna skjal") : undefined} style={{ opacity: opening ? 0.6 : 1 }}>

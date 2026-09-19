@@ -22,3 +22,20 @@ export async function requestPasswordReset(email: string): Promise<{ ok: boolean
   } catch { /* swallow — same response either way */ }
   return { ok: true };
 }
+
+
+/** "Prófa demo": signs the visitor into the ONE seeded demo company. Enabled
+ * only when DEMO_LOGIN_EMAIL + DEMO_LOGIN_PASSWORD are set on the server. */
+export async function demoLogin(): Promise<{ ok: boolean; next?: string; error?: string }> {
+  const email = process.env.DEMO_LOGIN_EMAIL, password = process.env.DEMO_LOGIN_PASSWORD;
+  if (!email || !password) return { ok: false, error: "Demo er ekki í boði" };
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) return { ok: false, error: "Demo-innskráning tókst ekki" };
+    return { ok: true, next: "/maelabord" };
+  } catch {
+    return { ok: false, error: "Demo-innskráning tókst ekki" };
+  }
+}

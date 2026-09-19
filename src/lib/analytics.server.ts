@@ -3,7 +3,6 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees, getCompanyData } from "@/lib/employees.server";
 import { getLaborMetrics } from "@/lib/revenue.server";
-import { computeLine, totals as sumTotals } from "@/lib/payroll";
 import { initials } from "@/lib/employees";
 
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -90,28 +89,28 @@ export async function getWeekAttendance(fromISO?: string, toISO?: string): Promi
 }
 
 export type PerfView = {
-  revenueM: string; laborCostM: string; laborPct: number; marginM: string; live: boolean;
+  revenueM: string; laborCostM: string;
+  laborPct: number; // 0 = not computable yet (no revenue or no labor cost) — never a placeholder
+  marginM: string; live: boolean;
 };
 
-/** Performance headline (this month) from real revenue + computed labor cost. */
+/** Performance headline (month to date) — delegates to the single shared
+ * laun% calculation (src/lib/labor.ts). Zeros when there is no data. */
 export async function getPerformance(): Promise<PerfView> {
-  const demo: PerfView = { revenueM: "0", laborCostM: "0", laborPct: 0, marginM: "0", live: false };
-  if (!isSupabaseConfigured()) return demo;
+  const empty: PerfView = { revenueM: "0", laborCostM: "0", laborPct: 0, marginM: "0", live: false };
+  if (!isSupabaseConfigured()) return empty;
   try {
-    const { empty } = await getCompanyData();
+    const { empty: noStaff } = await getCompanyData();
     const metrics = await getLaborMetrics();
-    const { employees } = await getEmployees();
-    const cost = sumTotals(employees.map((e) => computeLine(e))).cost;
-    const revenue = metrics.live ? metrics.revenue : 0;
     const m = (n: number) => (Math.round(n / 100000) / 10).toFixed(1).replace(".", ",");
     return {
-      revenueM: m(revenue),
-      laborCostM: m(cost),
-      laborPct: revenue > 0 ? Math.round((cost / revenue) * 1000) / 10 : 0,
-      marginM: m(Math.max(0, revenue - cost)),
-      live: !empty,
+      revenueM: m(metrics.revenue),
+      laborCostM: m(metrics.laborCost),
+      laborPct: metrics.laborPct ?? 0,
+      marginM: m(Math.max(0, metrics.revenue - metrics.laborCost)),
+      live: metrics.live && !noStaff,
     };
   } catch {
-    return demo;
+    return empty;
   }
 }

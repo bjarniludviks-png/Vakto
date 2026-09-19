@@ -340,7 +340,7 @@ export async function setMessageReaction(messageId: string, emoji: string | null
     if ("error" in ctx) return { ok: false, error: ctx.error };
     if (emoji) {
       const { error } = await supabase.from("message_reactions").upsert({ message_id: messageId, user_id: ctx.userId, company_id: ctx.company, emoji });
-      if (error) return { ok: false, error: "Keyrðu migration 0042 fyrir viðbrögð" };
+      if (error) return { ok: false, error: "Viðbrögð eru ekki virk" };
     } else {
       await supabase.from("message_reactions").delete().eq("message_id", messageId).eq("user_id", ctx.userId);
     }
@@ -359,7 +359,7 @@ export async function deleteMessage(messageId: string): Promise<{ ok: boolean; e
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { data, error } = await supabase.from("messages").delete().eq("id", messageId).eq("sender_id", ctx.userId).select("id");
     if (error) return { ok: false, error: error.message };
-    if (!data?.length) return { ok: false, error: "Ekki tókst að eyða (migration 0042?)" };
+    if (!data?.length) return { ok: false, error: "Ekki tókst að eyða skilaboðunum" };
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
@@ -399,7 +399,7 @@ export async function setChannelPhoto(channelId: string, dataUrl: string, ext: s
     if (up.error) return { ok: false, error: up.error.message };
     const { data: pub } = supabase.storage.from("chat").getPublicUrl(path);
     const { data, error } = await supabase.from("channels").update({ photo_url: pub.publicUrl }).eq("id", channelId).select("id");
-    if (error) return { ok: false, error: "Keyrðu migration 0042 fyrir grúppumyndir" };
+    if (error) return { ok: false, error: "Ekki tókst að vista mynd" };
     if (!data?.length) return { ok: false, error: "Ekki tókst að vista mynd" };
     return { ok: true, url: pub.publicUrl };
   } catch (e) {
@@ -471,7 +471,7 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
       for (const l of pLikes) byEmoji.set((l.reaction as string) || "❤️", (byEmoji.get((l.reaction as string) || "❤️") ?? 0) + 1);
       return {
         id: r.id as string, sender: name,
-        av: system ? "🎂" : initials(name),
+        av: system ? "VK" : initials(name),
         photo: system ? null : (empNames.get(String(r.sender_id))?.photo ?? null),
         color: system ? "#e9700f" : colorOf(name.split(/\s+/)[0] || name),
         pinned: !!r.pinned, system,

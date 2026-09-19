@@ -307,18 +307,10 @@ export async function getEmployeePunches(employeeId: string, fromISO: string, to
 
 export type TimeReportRow = { name: string; date: string; in: string; out: string | null; hours: number; approved: boolean };
 
-const DEMO_TIME_REPORT: TimeReportRow[] = [
-  { name: "Mína Huong", date: "2026-06-29", in: "08:00", out: "16:12", hours: 8.2, approved: true },
-  { name: "Mína Huong", date: "2026-06-30", in: "08:03", out: "17:30", hours: 9.45, approved: false },
-  { name: "Bach Luu", date: "2026-06-29", in: "12:00", out: "20:00", hours: 8, approved: true },
-  { name: "Bach Luu", date: "2026-06-30", in: "12:05", out: "18:40", hours: 6.58, approved: false },
-  { name: "Phong Ha", date: "2026-06-30", in: "07:56", out: null, hours: 0, approved: false },
-];
-
 /** Company-wide punch report for a date range — one row per punch, with the
- * approval status, for Excel/PDF export. Demo fallback when unconfigured. */
+ * approval status, for Excel/PDF export. */
 export async function getTimeReport(fromISO: string, toISO: string): Promise<{ ok: boolean; rows: TimeReportRow[]; company: string; demo?: boolean; needsMigration?: boolean }> {
-  if (!isSupabaseConfigured()) return { ok: true, demo: true, rows: DEMO_TIME_REPORT, company: "Kaffi Krónan" };
+  if (!isSupabaseConfigured()) return { ok: false, rows: [], company: "" };
   try {
     const supabase = await createClient();
     const ctx = await companyOf(supabase);
@@ -364,7 +356,7 @@ export async function setPunchApproved(punchId: string, approved: boolean): Prom
     const { error } = await supabase.from("punches")
       .update({ approved, approved_by: approved ? ctx.userId : null, approved_at: approved ? new Date().toISOString() : null })
       .eq("id", punchId).eq("company_id", ctx.company);
-    if (error) return { ok: false, error: "Keyrðu migration 0008 í Supabase til að virkja samþykki." };
+    if (error) return { ok: false, error: "Samþykki tókst ekki — reyndu aftur" };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: approved ? "punch.approve" : "punch.unapprove", entity: "punch", entityId: punchId,
       detail: approved ? "Vakt samþykkt" : "Samþykki afturkallað",
@@ -388,7 +380,7 @@ export async function approveEmployeePunches(employeeId: string, fromISO: string
       .eq("company_id", ctx.company).eq("employee_id", employeeId)
       .gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59")
       .not("clock_out", "is", null).select("id");
-    if (error) return { ok: false, error: "Keyrðu migration 0008 í Supabase til að virkja samþykki." };
+    if (error) return { ok: false, error: "Samþykki tókst ekki — reyndu aftur" };
     const count = data?.length ?? 0;
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "punch.approve_range", entity: "punch", detail: `Vaktir samþykktar — ${count}`,
@@ -505,7 +497,7 @@ export async function approvePunchList(ids: string[]): Promise<ApproveResult> {
       .update({ approved: true, approved_by: ctx.userId, approved_at: new Date().toISOString() })
       .in("id", ids).eq("company_id", ctx.company)
       .not("clock_out", "is", null).select("id");
-    if (error) return { ok: false, error: "Keyrðu migration 0008 í Supabase til að virkja samþykki." };
+    if (error) return { ok: false, error: "Samþykki tókst ekki — reyndu aftur" };
     const count = data?.length ?? 0;
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "punch.approve_selected", entity: "punch", detail: `Valdar stimplanir samþykktar — ${count}`,

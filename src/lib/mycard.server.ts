@@ -19,10 +19,11 @@ export type StaffCard = {
   live: boolean;
 };
 
-const DEMO: StaffCard = {
-  name: "Mína Huong", role: "Kokkur", department: "Eldhús", company: "Kaffi Krónan",
-  photoUrl: null, idCode: "demo", initials: "MÍ", color: "#5b50e6",
-  employeeKt: "010190-2389", companyKt: "550101-2210", perms: resolvePerms(), live: false,
+// Honest empty card (signed out / unconfigured) — never fake data.
+const EMPTY: StaffCard = {
+  name: "", role: "", department: null, company: "VAKTO",
+  photoUrl: null, idCode: "", initials: "VK", color: "#e9700f",
+  employeeKt: null, companyKt: null, perms: resolvePerms(), live: false,
 };
 
 const ROLE_IS: Record<string, string> = {
@@ -31,11 +32,11 @@ const ROLE_IS: Record<string, string> = {
 
 /** The current user's digital staff card (Mitt svæði → Wallet). */
 export async function getMyCard(): Promise<StaffCard> {
-  if (!isSupabaseConfigured()) return DEMO;
+  if (!isSupabaseConfigured()) return EMPTY;
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return DEMO;
+    if (!user) return EMPTY;
 
     const { data: profile } = await supabase
       .from("users").select("full_name, role, email, company_id, companies(name)").eq("id", user.id).maybeSingle();
@@ -81,6 +82,6 @@ export async function getMyCard(): Promise<StaffCard> {
       live: true,
     };
   } catch {
-    return DEMO;
+    return EMPTY;
   }
 }

@@ -6,8 +6,7 @@ import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { nf, dec1 } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
-import { AsyncButton } from "@/components/app/async-button";
-import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, type ShiftInput } from "./actions";
+import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, type ShiftInput } from "./actions";
 import { getCompanyDepartments, getDepartmentColors } from "../starfsfolk/actions";
 import { getDashboardPeriod } from "../maelabord/actions";
 import { buildSchedulePdf, type PdfShift } from "./pdf";
@@ -19,10 +18,15 @@ type ShiftDef = { l: string; s: string; h: number; c: "day" | "eve" | "off" };
 type ShiftType = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
 type AiItem = { kind: "good" | "info" | "warn" | "bad"; title: string; detail: string; tag: string };
 type AiShift = { employee: string; day: number; start: string; end: string };
-type AiProposal = { summary: string; items: AiItem[]; laborPct: string; shifts?: AiShift[]; live: boolean; error?: string };
+/** Response of /api/ai/schedule — either a proposal (ok) or an error (never a canned proposal). */
+type AiProposal = { ok: boolean; error?: string; summary?: string; items?: AiItem[]; laborPct?: string; shifts?: AiShift[] };
 type MonthBlock = { name: string; time: string; hrs: number; type: string };
+type View = "Vika" | "Dagur" | "Mánuður";
 
-const COST_HR = 3752, BASE_HRS = 116;
+// HIDDEN — Dagur/Mánuður: week view is the product. Re-enable by adding them to
+// VIEWS; the DayView/MonthView components + MonthShiftModal are kept below.
+const VIEWS: readonly View[] = ["Vika"];
+
 const SH: Record<string, ShiftDef> = {
   D: { l: "08–16", s: "Dagvakt", h: 8, c: "day" },
   M: { l: "07–13", s: "Morgun", h: 6, c: "day" },
@@ -31,32 +35,7 @@ const SH: Record<string, ShiftDef> = {
   L: { l: "16–24", s: "Kvöld", h: 8, c: "eve" },
   off: { l: "Frí", s: "", h: 0, c: "off" },
 };
-const INIT_EMP: Emp[] = [
-  ["MÍ", "Mína", "Vaktstjóri", "#5b50e6"], ["BA", "Bach", "Sal", "#1fb6a6"],
-  ["PH", "Phong", "Eldhús", "#18a06a"], ["ÓM", "Ómar", "Sal", "#e0533f"],
-  ["HA", "Ha Vu", "Eldhús", "#0891b2"], ["JÓ", "Jón", "Vakt", "#8b7bff"],
-];
-const INIT_GRID: string[][] = [
-  ["D", "D", "D", "D", "L", "off", "off"],
-  ["E", "E", "off", "E", "E", "D", "D"],
-  ["M", "D", "D", "M", "off", "Mi", "Mi"],
-  ["D", "Mi", "L", "Mi", "L", "L", "off"],
-  ["off", "M", "M", "D", "D", "off", "D"],
-  ["M", "off", "D", "off", "M", "D", "D"],
-];
-const INIT_POOL: Emp[] = [
-  ["TR", "Truong", "Eldhús", "#0f766e"], ["MO", "Moon", "Sal", "#2563eb"],
-  ["NG", "Ngoan", "Eldhús", "#16a34a"], ["DA", "Dalya", "Sal", "#ca8a04"],
-  ["FA", "Fannar", "Stjórnun", "#9333ea"], ["LO", "Lóa", "Sal", "#e11d48"],
-];
-const INIT_TYPES: ShiftType[] = [
-  { nm: "Dagvakt", t: "08:00–16:00", prem: "Dagvinna", bg: "#eef0ff", bd: "#e0e2fb", fg: "#4338ca" },
-  { nm: "Morgunvakt", t: "07:00–13:00", prem: "+33% fyrir 07:00", bg: "#e7f6ef", bd: "#cdeede", fg: "#1f9d6b" },
-  { nm: "Kvöldvakt", t: "16:00–24:00", prem: "+33% álag", bg: "#fff2e2", bd: "#fbe2c4", fg: "#b06a12" },
-  { nm: "Helgarvakt", t: "12:00–20:00", prem: "+45% helgarálag", bg: "#fde9e6", bd: "#f8d2cb", fg: "#c0392b" },
-];
 const DAYS = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
-const DEMO_TODAY = "2026-06-24"; // fallback "today" for the logged-out demo
 const MONTHS_IS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
 const fmtISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const parseISO = (s: string) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
@@ -75,7 +54,13 @@ const codeForStart = (start: string) => {
   return "D";
 };
 const DAYNAMES = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
-const deptOf = (d: string) => (d === "Eldhús" ? "Eldhús" : d === "Sal" ? "Sal" : "Stjórnun");
+
+// Canned AI goals — reachable from the "…" overflow menu when AI is configured.
+const AI_PRESETS: [string, string][] = [
+  ["Lækka launakostnað um 10%", "haltu mönnun en lægri launum"],
+  ["Minnka yfirvinnu", "dreifa tímum, laga hvíld"],
+  ["Halda launum undir 30% af veltu", "stilla mönnun að veltuspá"],
+];
 
 const REQ_ICON: Record<ReqItem["kind"], React.ReactNode> = {
   leave: <><circle cx="12" cy="12" r="4" /><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5M5 5l1.7 1.7M17.3 17.3 19 19M19 5l-1.7 1.7M6.7 17.3 5 19" /></>,
@@ -83,45 +68,62 @@ const REQ_ICON: Record<ReqItem["kind"], React.ReactNode> = {
   avail: <><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></>,
 };
 
-export default function ScheduleScreen({ requests = [], initial = null, scopeDepts = [] }: { requests?: ReqItem[]; initial?: ScheduleInitial | null; scopeDepts?: string[] }) {
-  const [emp, setEmp] = useState<Emp[]>(initial?.emp ?? INIT_EMP);
-  const [grid, setGrid] = useState<string[][]>(initial?.grid ?? INIT_GRID);
-  const [cellTimes, setCellTimes] = useState<Record<string, { start: string; end: string }>>(initial?.times ?? {});
-  const [pool, setPool] = useState<Emp[]>(initial?.pool ?? INIT_POOL);
-  const [types, setTypes] = useState<ShiftType[]>(initial?.types?.length ? initial.types : INIT_TYPES);
+type ScreenProps = { requests?: ReqItem[]; initial?: ScheduleInitial | null; scopeDepts?: string[]; aiEnabled?: boolean };
+
+export default function ScheduleScreen({ requests = [], initial = null, scopeDepts = [], aiEnabled = false }: ScreenProps) {
+  const { t } = useLang();
+  if (!initial) {
+    return (
+      <>
+        <PageHeader title="Vaktaplan" />
+        <div className="card" style={{ marginTop: 16, maxWidth: 520 }}>
+          <div className="cb">
+            <div className="ct">{t("Supabase er ekki tengt")}</div>
+            <p className="muted" style={{ fontSize: 13, margin: "6px 0 0" }}>{t("Vaktaplanið birtist þegar gagnagrunnurinn er tengdur og þú ert innskráð(ur).")}</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+  return <ScheduleBody requests={requests} initial={initial} scopeDepts={scopeDepts} aiEnabled={aiEnabled} />;
+}
+
+function ScheduleBody({ requests, initial, scopeDepts, aiEnabled }: { requests: ReqItem[]; initial: ScheduleInitial; scopeDepts: string[]; aiEnabled: boolean }) {
+  const [emp, setEmp] = useState<Emp[]>(initial.emp);
+  const [grid, setGrid] = useState<string[][]>(initial.grid);
+  const [cellTimes, setCellTimes] = useState<Record<string, { start: string; end: string }>>(initial.times);
+  const [pool, setPool] = useState<Emp[]>(initial.pool);
+  const [types, setTypes] = useState<ShiftType[]>(initial.types);
   // Explicit shift-type per cell (overrides the time-based color match).
-  const [cellTypes, setCellTypes] = useState<Record<string, string>>(initial?.cellTypes ?? {});
-  // Persist type edits for live companies (types were client-only before).
+  const [cellTypes, setCellTypes] = useState<Record<string, string>>(initial.cellTypes);
   const persistTypes = (f: (t: ShiftType[]) => ShiftType[]) => {
     setTypes((prev) => {
       const next = f(prev);
-      if (liveCompany) void saveShiftTypes(next);
+      void saveShiftTypes(next);
       return next;
     });
   };
   // A manager scoped to a single department lands on it; otherwise "all" (within scope).
   const [dept, setDept] = useState(scopeDepts.length === 1 ? scopeDepts[0] : "all");
-  const [view, setView] = useState<"Vika" | "Dagur" | "Mánuður">("Vika");
-  const todayISO = initial?.todayISO ?? DEMO_TODAY;
-  const [cur, setCur] = useState(() => parseISO(initial?.todayISO ?? DEMO_TODAY)); // anchor day
+  const [view, setView] = useState<View>("Vika");
+  const todayISO = initial.todayISO;
+  const [cur, setCur] = useState(() => parseISO(initial.todayISO)); // anchor day
   const [sel, setSel] = useState<{ r: number; c: number }>({ r: 0, c: 0 });
+  // HIDDEN (month view) — state kept for MonthView/MonthShiftModal below.
   const [monthShifts, setMonthShifts] = useState<Record<string, { first: string; start: string; end: string }[]>>({});
   const [monthVer, setMonthVer] = useState(0);
   const [dayModal, setDayModal] = useState<Date | null>(null);
   const monthDragRef = useRef<{ first: string; start: string; end: string; fromISO: string } | null>(null);
-  const [monthClip, setMonthClip] = useState<{ first: string; start: string; end: string } | null>(null);
   const [drag, setDrag] = useState<{ r: number; c: number } | null>(null);
-  // Copied shift: code + real times, so pasting preserves them and saves.
-  const [clip, setClip] = useState<{ code: string; start?: string; end?: string } | null>(null);
   // Company departments for the filter (live sync with Settings).
-  const [deptList, setDeptList] = useState<string[]>(["Eldhús", "Sal", "Stjórnun"]);
+  const [deptList, setDeptList] = useState<string[]>([]);
   const [deptColors, setDeptColors] = useState<Record<string, string>>({});
   useEffect(() => {
     getCompanyDepartments().then((d) => { if (d.length) setDeptList(d); }).catch(() => {});
     getDepartmentColors().then(setDeptColors).catch(() => {});
   }, []);
-  // Unified right-click menu (week/day/month views).
-  type CtxItem = { label: string; danger?: boolean; color?: string; act: () => void };
+  // Right-click menu (opens the one ShiftEditModal).
+  type CtxItem = { label: string; danger?: boolean; act: () => void };
   const [ctx, setCtx] = useState<{ x: number; y: number; items: CtxItem[] } | null>(null);
   function openCtx(ev: React.MouseEvent, items: CtxItem[]) {
     ev.preventDefault(); ev.stopPropagation();
@@ -131,8 +133,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [modal, setModal] = useState<null | "types" | "addEmp" | "shift" | "ai" | "aiResult" | "staff">(null);
   const [moreOpen, setMoreOpen] = useState(false);
   // Registered UN-availability (first name, lowercase → day indices) for the visible week.
-  const [unavail, setUnavail] = useState<Record<string, number[]>>(initial?.unavail ?? {});
-  const [targets, setTargets] = useState<number[]>(initial?.targets?.length ? initial.targets : []);
+  const [unavail, setUnavail] = useState<Record<string, number[]>>(initial.unavail);
+  const [targets, setTargets] = useState<number[]>(initial.targets.length ? initial.targets : []);
   const [aiQuery, setAiQuery] = useState("");
   const [aiProposal, setAiProposal] = useState<AiProposal | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -142,14 +144,14 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     () => emp.map((_, r) => r).filter((r) => {
       const dn = emp[r][2];
       // Managers only see the departments assigned to them (empty = all).
-      const inScope = scopeDepts.length === 0 || scopeDepts.includes(dn) || scopeDepts.includes(deptOf(dn));
-      const inSel = dept === "all" || dn === dept || deptOf(dn) === dept;
+      const inScope = scopeDepts.length === 0 || scopeDepts.includes(dn);
+      const inSel = dept === "all" || dn === dept;
       return inScope && inSel;
     }),
     [emp, dept, scopeDepts],
   );
-  // Real (signed-in) companies start at 0 — BASE_HRS is only demo padding.
-  const liveCompany = !!initial;
+  // Planning rate (kr/klst) per grid row — null when the employee has no rate.
+  const rateOf = (r: number): number | null => initial.rates[`${emp[r]?.[0]}|${emp[r]?.[1]}`] ?? null;
 
   // Per-cell real times (override the coarse SH label/hours when present).
   const ckey = (r: number, c: number) => `${r}:${c}`;
@@ -165,9 +167,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   // [startHour, endHour] for a cell (real times, else the SH label like "07–15").
   const cellSpan = (r: number, c: number, code: string): [number, number] | null => {
     const tt = cellTimes[ckey(r, c)];
-    if (tt) { const [sh, sm] = tt.start.split(":").map(Number); const [eh, em] = tt.end.split(":").map(Number); let s = sh + (sm || 0) / 60, e = eh + (em || 0) / 60; if (e <= s) e += 24; return [s, e]; }
+    if (tt) { const [sh, sm] = tt.start.split(":").map(Number); const [eh, em] = tt.end.split(":").map(Number); const s = sh + (sm || 0) / 60; let e = eh + (em || 0) / 60; if (e <= s) e += 24; return [s, e]; }
     const m = (SH[code]?.l ?? "").match(/(\d{1,2})\D+(\d{1,2})/);
-    if (m) { let s = +m[1], e = +m[2]; if (e <= s) e += 24; return [s, e]; }
+    if (m) { const s = +m[1]; let e = +m[2]; if (e <= s) e += 24; return [s, e]; }
     return null;
   };
   // Premium hours in a cell (outside 08–17 on weekdays, or any weekend hour) —
@@ -183,18 +185,6 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     return prem;
   };
 
-  // Sum only the visible rows so the KPI matches the grid's own Σ column + day
-  // totals (which also iterate `vis`). Iterating the whole grid double-counts
-  // rows hidden by the department filter / scope.
-  const visHrs = useMemo(() => {
-    let h = 0;
-    vis.forEach((r) => grid[r]?.forEach((s, c) => { if (s && s !== "off") h += cellHrs(r, c, s); }));
-    return h;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vis, grid, cellTimes]);
-  const totalHrs = visHrs + (liveCompany ? 0 : BASE_HRS);
-  const cost = totalHrs * COST_HR;
-
   // Monday of the anchor day's week → the 7 visible week dates.
   const mondayOf = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
   const weekDays = useMemo(() => {
@@ -204,6 +194,27 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const weekMonISO = fmtISO(weekDays[0]);
   const curCol = (cur.getDay() + 6) % 7; // selected day's column within the week
   const todayCol = weekDays.findIndex((d) => fmtISO(d) === todayISO);
+
+  // Week plan totals over the VISIBLE rows (matches the grid's Σ column and day
+  // totals). Cost = Σ row hours × that employee's real rate; "—" when any
+  // scheduled employee has no rate — never a made-up figure.
+  const plan = useMemo(() => {
+    let hours = 0, shifts = 0, premium = 0, overtime = 0, cost = 0, missingRate = false;
+    vis.forEach((r) => {
+      let rh = 0;
+      grid[r]?.forEach((s, c) => { if (s && s !== "off") { rh += cellHrs(r, c, s); shifts++; premium += cellPremiumHrs(r, c, s); } });
+      hours += rh;
+      overtime += Math.max(0, rh - 40); // weekly > 40 klst
+      if (rh > 0) { const rate = rateOf(r); if (rate == null) missingRate = true; else cost += rh * rate; }
+    });
+    return {
+      hours, shifts,
+      premium: Math.round(premium * 10) / 10,
+      overtime: Math.round(overtime * 10) / 10,
+      cost: missingRate ? null : Math.round(cost),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vis, grid, cellTimes]);
 
   // Period navigation follows the active view (day / week / month).
   function shiftPeriod(dir: number) {
@@ -255,53 +266,40 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     setCellTimes(t2);
   }
 
-  // Live companies: load the visible week's shifts from the DB when the week
-  // changes. The base week is already in `initial` (SSR), so skip first run.
+  // Load the visible week's shifts from the DB when the week changes. The base
+  // week is already in `initial` (SSR), so skip first run.
   const firstWeekRun = useRef(true);
   useEffect(() => {
-    if (!liveCompany) return;
     if (firstWeekRun.current) { firstWeekRun.current = false; return; }
     let cancelled = false;
     getWeekShifts(weekMonISO).then((res) => {
       if (!cancelled && res?.ok) applyWeek(res);
     });
     return () => { cancelled = true; };
-  }, [weekMonISO, liveCompany]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [weekMonISO]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Copy the previous week's plan into the current week (review, then publish).
-  /** "Eyða öllu": wipe the open week (grid + published shifts) to start fresh. */
+  /** "Eyða viku": wipe the open week (grid + published shifts) to start fresh. */
   async function clearWeek() {
     if (!window.confirm(t("Eyða ÖLLUM vöktum þessarar viku og byrja upp á nýtt? Þetta fjarlægir líka birtar vaktir."))) return;
     setGrid((g) => g.map((row) => row.map(() => "off")));
     setCellTimes({});
-    if (liveCompany) {
-      const dates = weekDays.map((d) => fmtISO(d));
-      const res = await deleteWeekShifts(dates);
-      toast(res.ok ? `${t("Vika hreinsuð")}${res.count ? ` — ${res.count} ${t("vöktum eytt")}` : ""}` : (res.error ?? "Villa"));
-    } else {
-      toast(t("Vika hreinsuð"));
-    }
+    const res = await deleteWeekShifts(weekDays.map((d) => fmtISO(d)));
+    toast(res.ok ? `${t("Vika hreinsuð")}${res.count ? ` — ${res.count} ${t("vöktum eytt")}` : ""}` : (res.error ?? t("Villa")));
   }
 
+  // Copy the previous week's plan into the current week (review, then publish).
   async function copyLastWeek() {
     const prevMon = new Date(mondayOf(cur)); prevMon.setDate(prevMon.getDate() - 7);
-    const prevISO = fmtISO(prevMon);
-    if (liveCompany) {
-      const res = await getWeekShifts(prevISO);
-      if (res?.ok && res.grid.some((row) => row.some((s) => s && s !== "off"))) {
-        applyWeek(res);
-        toast(t("Síðasta vika afrituð — yfirfarðu og birtu"));
-      } else toast(t("Engar vaktir í síðustu viku til að afrita"));
-    } else {
-      // Demo: just clone the current visible grid as an illustrative copy.
-      setGrid((g) => g.map((row) => [...row]));
+    const res = await getWeekShifts(fmtISO(prevMon));
+    if (res?.ok && res.grid.some((row) => row.some((s) => s && s !== "off"))) {
+      applyWeek(res);
       toast(t("Síðasta vika afrituð — yfirfarðu og birtu"));
-    }
+    } else toast(t("Engar vaktir í síðustu viku til að afrita"));
   }
 
-  // Live companies: load the whole month when in month view.
+  // HIDDEN (month view) — loads the whole month when in month view.
   useEffect(() => {
-    if (!liveCompany || view !== "Mánuður") return;
+    if (view !== "Mánuður") return;
     const y = cur.getFullYear(), m = cur.getMonth();
     // Cover the whole calendar grid: leading + trailing adjacent-month days too.
     const lead = (new Date(y, m, 1).getDay() + 6) % 7;
@@ -316,7 +314,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       setMonthShifts(map);
     });
     return () => { cancelled = true; };
-  }, [liveCompany, view, cur, monthVer]);
+  }, [view, cur, monthVer]);
 
   const d0 = weekDays[0], d6 = weekDays[6];
   const wklbl = d0.getMonth() === d6.getMonth()
@@ -337,78 +335,40 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const totDayHrs = dayStats.reduce((a, d) => a + d[2], 0);
   const totDayShifts = dayStats.reduce((a, d) => a + d[3], 0);
 
-  // KPI tölur fylgja sýninni (vika / dagur / mánuður).
-  const dayHrs = useMemo(() => {
-    let h = 0; vis.forEach((r) => { const s = grid[r]?.[curCol]; if (s && s !== "off") h += cellHrs(r, curCol, s); }); return h;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vis, grid, cellTimes, curCol]);
-  const weekShifts = useMemo(() => {
-    let n = 0; vis.forEach((r) => grid[r]?.forEach((s) => { if (s && s !== "off") n++; })); return n;
-  }, [vis, grid]);
-  const dayShiftCount = useMemo(() => {
-    let n = 0; vis.forEach((r) => { const s = grid[r]?.[curCol]; if (s && s !== "off") n++; }); return n;
-  }, [vis, grid, curCol]);
-  // Estimated premium (álag) + overtime hours from the planned grid.
-  const est = useMemo(() => {
-    let premium = 0; const rowHrs: number[] = [];
-    vis.forEach((r) => {
-      let rh = 0;
-      grid[r]?.forEach((s, c) => { if (s && s !== "off") { rh += cellHrs(r, c, s); premium += cellPremiumHrs(r, c, s); } });
-      rowHrs.push(rh);
-    });
-    const overtime = rowHrs.reduce((a, h) => a + Math.max(0, h - 40), 0); // weekly > 40 klst
-    return { premium: Math.round(premium * 10) / 10, overtime: Math.round(overtime * 10) / 10 };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vis, grid, cellTimes]);
-  const dayPremium = useMemo(() => {
-    let p = 0; vis.forEach((r) => { const s = grid[r]?.[curCol]; if (s && s !== "off") p += cellPremiumHrs(r, curCol, s); }); return Math.round(p * 10) / 10;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vis, grid, cellTimes, curCol]);
-  const estHrs = view === "Dagur" ? { premium: dayPremium, overtime: 0 }
-    : view === "Mánuður" ? { premium: Math.round(est.premium * 4.33), overtime: Math.round(est.overtime * 4.33) }
-      : est;
-
-  const kpi = view === "Dagur"
-    ? { hl: "Tímar dagsins", hrs: dayHrs, sl: "Vaktir í dag", shifts: dayShiftCount, open: false }
-    : view === "Mánuður"
-      ? { hl: "Tímar mánaðar", hrs: Math.round(totalHrs * 4.33), sl: "Vaktir í mánuði", shifts: weekShifts * 4, open: false }
-      : { hl: "Tímar vikunnar", hrs: totalHrs, sl: "Vaktir í viku", shifts: weekShifts, open: true };
-
   async function decideLeave(id: string | null, approved: boolean) {
-    if (!id) { toast(approved ? "Samþykkt" : "Hafnað"); return; }
+    if (!id) return;
     const res = await updateLeaveRequest(id, approved);
-    toast(res.ok ? (approved ? "Samþykkt" : "Hafnað") : (res.error ?? "Villa"));
+    toast(res.ok ? (approved ? t("Samþykkt") : t("Hafnað")) : (res.error ?? t("Villa")));
   }
   async function decideSwap(id: string | null) {
-    if (!id) { toast("Samþykkt"); return; }
+    if (!id) return;
     const res = await approveShiftSwap(id);
-    toast(res.ok ? "Samþykkt" : (res.error ?? "Villa"));
+    toast(res.ok ? t("Samþykkt") : (res.error ?? t("Villa")));
   }
 
-  function buildShiftPayload(): ShiftInput[] {
+  function payloadFrom(g: string[][], times: Record<string, { start: string; end: string }>): ShiftInput[] {
     const out: ShiftInput[] = [];
     emp.forEach((e, r) => {
-      grid[r]?.forEach((code, c) => {
-        if (code && code !== "off") {
-          const o = SH[code];
-          const tt = timeOf(r, c);
-          const [a, b] = o.l.split("–");
-          out.push({
-            employeeName: e[1],
-            date: fmtISO(weekDays[c]),
-            startTime: tt ? tt.start : `${a.padStart(2, "0")}:00`,
-            endTime: tt ? tt.end : `${b.padStart(2, "0")}:00`,
-            shiftTypeName: o.s || "Dagvakt",
-          });
-        }
+      g[r]?.forEach((code, c) => {
+        if (!code || code === "off") return;
+        const o = SH[code];
+        const tt = times[ckey(r, c)];
+        const [a, b] = o.l.split("–");
+        out.push({
+          employeeName: e[1],
+          date: fmtISO(weekDays[c]),
+          startTime: tt ? tt.start : `${a.padStart(2, "0")}:00`,
+          endTime: tt ? tt.end : `${b.padStart(2, "0")}:00`,
+          shiftTypeName: cellTypes[ckey(r, c)] || o.s || "Dagvakt",
+        });
       });
     });
     return out;
   }
   async function publish() {
-    const res = await publishSchedule(buildShiftPayload());
-    if (!res.ok) { toast(res.error ?? "Tókst ekki að birta"); return; }
-    toast(res.demo ? `Plan birt (demo — ${res.count} vaktir)` : `Plan birt — ${res.count} vaktir vistaðar`);
+    const res = await publishSchedule(payloadFrom(grid, cellTimes));
+    if (!res.ok) { toast(res.error ?? t("Tókst ekki að birta")); return; }
+    toast(`${t("Plan birt")} — ${res.count} ${t("vaktir vistaðar")}`);
   }
 
   async function runAi(prompt: string) {
@@ -427,35 +387,31 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       }).filter(Boolean).join(", ");
       return `- ${e[1]} (${e[2]}): ${cells || "engar vaktir"}`;
     }).join("\n");
-    // Real weekly revenue when available (real rows + weekday averages), else demo figure.
-    let velta = liveCompany ? "" : "Áætluð velta vikunnar: 4.300.000 kr. ";
-    if (liveCompany) {
-      try {
-        const pd = await getDashboardPeriod(fmtISO(weekDays[0]), fmtISO(weekDays[6]));
-        if (pd.ok && pd.revenue > 0) velta = `Áætluð velta vikunnar: ${nf(pd.revenue)} kr. `;
-      } catch { /* velta line omitted */ }
-    }
+    // Real weekly revenue when available (real rows + weekday averages).
+    let velta = "";
+    try {
+      const pd = await getDashboardPeriod(fmtISO(weekDays[0]), fmtISO(weekDays[6]));
+      if (pd.ok && pd.revenue > 0) velta = `Áætluð velta vikunnar: ${nf(pd.revenue)} kr. `;
+    } catch { /* velta line omitted */ }
     const context = `Vikan sem er opin: ${wklbl} ${weekDays[0].getFullYear()} (mánudagur = ${weekMonISO}, day 0=mán … 6=sun).\n`
       + `Starfsmenn á plani: ${vis.map((r) => `${emp[r][1]} (${emp[r][2]})`).join(", ")}.\n`
       + `Núverandi plan vikunnar:\n${planLines}\n`
-      + `Tímar vikunnar: ${totalHrs} klst. Launakostnaður: ${nf(cost)} kr. ${velta}`
-      + `Vaktategundir: ${types.map((t) => `${t.nm} ${t.t} ${t.prem}`).join("; ")}.`;
+      + `Tímar vikunnar: ${plan.hours} klst. Launakostnaður: ${plan.cost != null ? `${nf(plan.cost)} kr` : "óþekktur (taxta vantar)"}. ${velta}`
+      + `Vaktategundir: ${types.map((x) => `${x.nm} ${x.t} ${x.prem}`).join("; ")}.`;
     try {
       const res = await fetch("/api/ai/schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt, context }),
       });
-      const data = (await res.json()) as AiProposal;
-      setAiProposal(data);
+      const data = (await res.json().catch(() => null)) as AiProposal | null;
+      if (!res.ok || !data || !data.ok) {
+        setAiProposal({ ok: false, error: data?.error ?? `${t("Tókst ekki að ná í AI")} (${res.status})` });
+      } else {
+        setAiProposal(data);
+      }
     } catch {
-      setAiProposal({
-        summary: prompt ? `„${prompt}"` : "Bestun vaktaplans",
-        laborPct: "31,8%",
-        shifts: [],
-        live: false,
-        items: [{ kind: "info", title: "Tókst ekki að ná í AI", detail: "Sýni demo-tillögu.", tag: "demo" }],
-      });
+      setAiProposal({ ok: false, error: t("Tókst ekki að ná í AI — athugaðu nettengingu.") });
     } finally {
       setAiLoading(false);
     }
@@ -464,8 +420,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   /** Apply the AI's proposed shifts to the visible week's grid, then publish.
    * Rows of employees the proposal names are replaced in full; others untouched. */
   async function approveAiProposal() {
+    if (!aiProposal?.ok) return;
     setModal(null);
-    const shifts = (aiProposal?.shifts ?? []).filter((s) => s.day >= 0 && s.day <= 6 && /^\d{1,2}:\d{2}$/.test(s.start) && /^\d{1,2}:\d{2}$/.test(s.end));
+    const shifts = (aiProposal.shifts ?? []).filter((s) => s.day >= 0 && s.day <= 6 && /^\d{1,2}:\d{2}$/.test(s.start) && /^\d{1,2}:\d{2}$/.test(s.end));
     if (!shifts.length) { await publish(); return; }
     const rowOf = (name: string) => {
       const n = name.trim().toLowerCase();
@@ -489,24 +446,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     }
     setGrid(ng); setCellTimes(nt);
     // Publish from the NEW grid (state is async — build the payload directly).
-    const payload: ShiftInput[] = [];
-    emp.forEach((e, r) => {
-      ng[r]?.forEach((code, c) => {
-        if (!code || code === "off") return;
-        const tt = nt[ckey(r, c)];
-        const [a, b] = SH[code].l.split("–");
-        payload.push({
-          employeeName: e[1],
-          date: fmtISO(weekDays[c]),
-          startTime: tt ? tt.start : `${a.padStart(2, "0")}:00`,
-          endTime: tt ? tt.end : `${b.padStart(2, "0")}:00`,
-          shiftTypeName: SH[code].s || "Dagvakt",
-        });
-      });
-    });
-    const res = await publishSchedule(payload);
-    if (!res.ok) { toast(res.error ?? "Tókst ekki að birta"); return; }
-    toast(res.demo ? `AI-plan sett í grid (${applied} vaktir, demo)` : `AI-plan samþykkt — ${applied} vaktir settar og planið birt`);
+    const res = await publishSchedule(payloadFrom(ng, nt));
+    if (!res.ok) { toast(res.error ?? t("Tókst ekki að birta")); return; }
+    toast(`${t("AI-plan samþykkt")} — ${applied} ${t("vaktir settar og planið birt")}`);
   }
 
   function dropOn(tr: number, tc: number) {
@@ -522,18 +464,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     setCellTimes((m) => { const n = { ...m }; const a = n[from], b = n[to]; if (b) n[from] = b; else delete n[from]; if (a) n[to] = a; else delete n[to]; return n; });
     setDrag(null);
   }
-  function cellClick(r: number, c: number) {
-    if (clip !== null) {
-      setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = clip.code; return ng; });
-      if (clip.code !== "off" && clip.start && clip.end) {
-        setCellTimes((m) => ({ ...m, [ckey(r, c)]: { start: clip.start!, end: clip.end! } }));
-        if (liveCompany) void saveShift({ employeeName: emp[r][1], date: fmtISO(weekDays[c]), startTime: clip.start, endTime: clip.end, shiftTypeName: "" });
-      } else if (clip.code !== "off") {
-        setCellTimes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
-      }
-      toast(t("Vakt límd"));
-      return;
-    }
+  // The ONE way to create/edit a shift: open ShiftEditModal on the cell.
+  function openCell(r: number, c: number) {
     setSel({ r, c });
     setModal("shift");
   }
@@ -544,54 +476,39 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   function saveCell(r: number, c: number, start: string, end: string, typeName: string) {
     setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = codeForStart(start); return ng; });
     setCellTimes((m) => ({ ...m, [ckey(r, c)]: { start, end } }));
+    setCellTypes((m) => { const n = { ...m }; if (types.some((x) => x.nm === typeName)) n[ckey(r, c)] = typeName; else delete n[ckey(r, c)]; return n; });
     setModal(null);
-    if (liveCompany) {
-      saveShift({ employeeName: emp[r][1], date: fmtISO(weekDays[c]), startTime: start, endTime: end, shiftTypeName: typeName })
-        .then((res) => toast(res.ok ? "Vakt vistuð" : (res.error ?? "Villa")));
-    } else toast("Vakt vistuð (demo)");
-  }
-  /** Assign a shift TYPE (color/premium) to an existing shift WITHOUT touching
-   * its times — "helgin má öll vera rauð" without rescheduling anyone. */
-  function assignType(r: number, c: number, typeName: string) {
-    setCellTypes((m) => ({ ...m, [ckey(r, c)]: typeName }));
-    const tt = timeOf(r, c);
-    const st = tt?.start ?? `${SH[grid[r]?.[c] ?? "D"].l.split("–")[0].padStart(2, "0")}:00`;
-    const en = tt?.end ?? `${SH[grid[r]?.[c] ?? "D"].l.split("–")[1].padStart(2, "0")}:00`;
-    if (liveCompany) {
-      saveShift({ employeeName: emp[r][1], date: fmtISO(weekDays[c]), startTime: st, endTime: en, shiftTypeName: typeName })
-        .then((res) => toast(res.ok ? "Vaktategund breytt" : (res.error ?? "Villa")));
-    } else toast("Vaktategund breytt (demo)");
+    saveShift({ employeeName: emp[r][1], date: fmtISO(weekDays[c]), startTime: start, endTime: end, shiftTypeName: typeName })
+      .then((res) => toast(res.ok ? t("Vakt vistuð") : (res.error ?? t("Tókst ekki að vista vakt"))));
   }
   function delCell(r: number, c: number) {
     setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = "off"; return ng; });
     setCellTimes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
+    setCellTypes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
     setModal(null);
-    if (liveCompany) {
-      deleteShift({ employeeName: emp[r][1], dateISO: fmtISO(weekDays[c]) })
-        .then((res) => toast(res.ok ? "Vakt eydd" : (res.error ?? "Villa")));
-    } else toast("Vakt eydd (demo)");
+    deleteShift({ employeeName: emp[r][1], dateISO: fmtISO(weekDays[c]) })
+      .then((res) => toast(res.ok ? t("Vakt eydd") : (res.error ?? t("Tókst ekki að eyða vakt"))));
   }
   function removeEmpRow(r: number) {
     const nm = emp[r][1];
-    // Persist: delete the employee's shifts for the visible week so they don't
-    // reappear on refresh (live companies only).
-    if (liveCompany) {
-      weekDays.forEach((d, c) => { if (grid[r]?.[c] && grid[r][c] !== "off") void deleteShift({ employeeName: nm, dateISO: fmtISO(d) }); });
-    }
+    // Persist: delete the employee's shifts for the visible week so they don't reappear on refresh.
+    weekDays.forEach((d, c) => { if (grid[r]?.[c] && grid[r][c] !== "off") void deleteShift({ employeeName: nm, dateISO: fmtISO(d) }); });
     setPool((p) => [...p, emp[r]]);
     setEmp((e) => e.filter((_, i) => i !== r));
     setGrid((g) => g.filter((_, i) => i !== r));
-    // Reindex per-cell times after the removed row.
-    setCellTimes((m) => {
-      const n: Record<string, { start: string; end: string }> = {};
+    // Reindex per-cell state after the removed row.
+    const reindex = <T,>(m: Record<string, T>) => {
+      const n: Record<string, T> = {};
       Object.entries(m).forEach(([k, v]) => {
         const [rr, cc] = k.split(":").map(Number);
         if (rr === r) return;
         n[`${rr > r ? rr - 1 : rr}:${cc}`] = v;
       });
       return n;
-    });
-    toast(nm + " fjarlægð(ur) af plani");
+    };
+    setCellTimes(reindex);
+    setCellTypes(reindex);
+    toast(`${nm} ${t("fjarlægð(ur) af plani")}`);
   }
   function pickEmp(i: number) {
     const p = pool[i];
@@ -599,11 +516,11 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     setGrid((g) => [...g, ["off", "off", "off", "off", "off", "off", "off"]]);
     setPool((pp) => pp.filter((_, j) => j !== i));
     setModal(null);
-    toast(p[1] + " bætt á plan");
+    toast(`${p[1]} ${t("bætt á plan")}`);
   }
-  // Shifts on a given week column (for Day view).
+  // HIDDEN (day view) — shifts on a given week column.
   function colShifts(c: number) {
-    const out: { i: string; n: string; c: string; dep: string; l: string; h: number; type: string; start: number }[] = [];
+    const out: DayRow[] = [];
     emp.forEach((e, r) => {
       const s = grid[r]?.[c];
       if (s && s !== "off") {
@@ -613,48 +530,28 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     });
     return out.sort((a, b) => a.start - b.start);
   }
-  // Blocks for a month-calendar day (live → real month data; demo → week pattern).
-  function monthBlocks(iso: string, wd: number) {
-    if (liveCompany) {
-      return (monthShifts[iso] ?? []).slice().sort((a, b) => a.start.localeCompare(b.start))
-        .map((s) => ({ name: s.first, time: `${s.start.slice(0, 5)}–${s.end.slice(0, 5)}`, hrs: hrsBetween(s.start, s.end), type: SH[codeForStart(s.start)].c }));
-    }
-    const out: MonthBlock[] = [];
-    vis.forEach((r) => { const s = grid[r]?.[wd]; if (s && s !== "off") { const tt = timeOf(r, wd); out.push({ name: emp[r][1], time: tt ? `${tt.start}–${tt.end}` : SH[s].l, hrs: cellHrs(r, wd, s), type: SH[s].c }); } });
-    return out;
+  // HIDDEN (month view) — blocks for a month-calendar day from the loaded month.
+  function monthBlocks(iso: string): MonthBlock[] {
+    return (monthShifts[iso] ?? []).slice().sort((a, b) => a.start.localeCompare(b.start))
+      .map((s) => ({ name: s.first, time: `${s.start.slice(0, 5)}–${s.end.slice(0, 5)}`, hrs: hrsBetween(s.start, s.end), type: SH[codeForStart(s.start)].c }));
   }
-
-  // Entries (with real times) for one day — used by the month popup editor.
   const norm = (x: string) => (x.length === 2 ? x + ":00" : x.slice(0, 5));
   function entriesFor(date: Date): { first: string; start: string; end: string }[] {
-    const iso = fmtISO(date);
-    if (liveCompany) return (monthShifts[iso] ?? []).map((x) => ({ first: x.first, start: norm(x.start), end: norm(x.end) }));
-    return monthBlocks(iso, (date.getDay() + 6) % 7).map((b) => {
-      const [a, z] = b.time.split("–");
-      return { first: b.name, start: norm(a ?? "08:00"), end: norm(z ?? "16:00") };
-    });
+    return (monthShifts[fmtISO(date)] ?? []).map((x) => ({ first: x.first, start: norm(x.start), end: norm(x.end) }));
   }
   const typeGuessFor = (start: string) => types.find((x) => x.t.startsWith(start))?.nm ?? types[0]?.nm ?? "Dagvakt";
-  async function pasteMonthShift(toISO: string) {
-    if (!monthClip) return;
-    const res = await saveShift({ employeeName: monthClip.first, date: toISO, startTime: monthClip.start, endTime: monthClip.end, shiftTypeName: typeGuessFor(monthClip.start) });
-    if (!res.ok) { toast(res.error ?? "Villa"); return; }
-    setMonthVer((v) => v + 1);
-    toast(res.demo ? t("Vakt límd (demo)") : t("Vakt límd"));
-  }
-
   async function moveMonthShift(toISO: string) {
     const d = monthDragRef.current; monthDragRef.current = null;
     if (!d || d.fromISO === toISO) return;
     const r1 = await saveShift({ employeeName: d.first, date: toISO, startTime: d.start, endTime: d.end, shiftTypeName: typeGuessFor(d.start) });
-    if (!r1.ok) { toast(r1.error ?? "Villa"); return; }
-    if (!r1.demo) await deleteShift({ employeeName: d.first, dateISO: d.fromISO });
+    if (!r1.ok) { toast(r1.error ?? t("Villa")); return; }
+    await deleteShift({ employeeName: d.first, dateISO: d.fromISO });
     setMonthVer((v) => v + 1);
-    toast(r1.demo ? t("Vakt færð (demo)") : t("Vakt færð"));
+    toast(t("Vakt færð"));
   }
 
   async function exportPdf() {
-    toast("Bý til PDF…");
+    toast(t("Bý til PDF…"));
     let dates: string[] = [], dayLabels: string[] = [], subtitle = "";
     if (view === "Dagur") { dates = [fmtISO(cur)]; dayLabels = [periodLabel]; subtitle = periodLabel; }
     else if (view === "Vika") {
@@ -668,38 +565,26 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     }
 
     const byDate: Record<string, PdfShift[]> = {};
-    if (liveCompany) {
-      const res = await getShiftsInRange(dates[0], dates[dates.length - 1]);
-      if (res.ok) for (const row of res.rows) {
-        (byDate[row.date] ??= []).push({ first: row.first, full: row.name, dept: row.dept, time: `${row.start}–${row.end}`, hours: hrsBetween(row.start, row.end) });
-      }
-    } else {
-      const pushCell = (iso: string, r: number, c: number) => {
-        const code = grid[r]?.[c];
-        if (!code || code === "off") return;
-        const tt = timeOf(r, c);
-        const [a, b] = SH[code].l.split("–");
-        const time = tt ? `${tt.start}–${tt.end}` : `${a}:00–${b}:00`;
-        (byDate[iso] ??= []).push({ first: emp[r][1], full: emp[r][1], dept: emp[r][2], time, hours: cellHrs(r, c, code) });
-      };
-      if (view === "Vika") weekDays.forEach((d, c) => vis.forEach((r) => pushCell(fmtISO(d), r, c)));
-      else if (view === "Dagur") vis.forEach((r) => pushCell(fmtISO(cur), r, curCol));
-      else dates.forEach((iso) => { const wd = (new Date(iso + "T00:00:00").getDay() + 6) % 7; vis.forEach((r) => pushCell(iso, r, wd)); });
+    const res = await getShiftsInRange(dates[0], dates[dates.length - 1]);
+    if (res.ok) for (const row of res.rows) {
+      (byDate[row.date] ??= []).push({ first: row.first, full: row.name, dept: row.dept, time: `${row.start}–${row.end}`, hours: hrsBetween(row.start, row.end) });
     }
 
     const now = new Date();
     const generated = `${t("Búið til")} ${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()}`;
     try {
       await buildSchedulePdf({
-        view, company: initial?.company ?? "VAKTO — Vaktaplan", title: t("Vaktaplan"),
+        view, company: initial.company, title: t("Vaktaplan"),
         subtitle, generated, dates, dayLabels, byDate,
         weekdayLabels: DAYS.map((d) => t(d)), monthName: subtitle,
       });
-      toast("PDF tilbúið");
+      toast(t("PDF tilbúið"));
     } catch {
-      toast("Tókst ekki að búa til PDF");
+      toast(t("Tókst ekki að búa til PDF"));
     }
   }
+
+  const sparkle = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4Z" /></svg>;
 
   return (
     <>
@@ -714,11 +599,13 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
           <span className="lbl">{periodLabel}</span>
           <button onClick={() => shiftPeriod(1)}>›</button>
         </div>
-        <div className="seg" style={{ marginLeft: 4 }}>
-          {(["Vika", "Dagur", "Mánuður"] as const).map((v) => (
-            <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{t(v)}</button>
-          ))}
-        </div>
+        {VIEWS.length > 1 && (
+          <div className="seg" style={{ marginLeft: 4 }}>
+            {VIEWS.map((v) => (
+              <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{t(v)}</button>
+            ))}
+          </div>
+        )}
         <select className="badge" style={{ border: "1px solid var(--line)", padding: "7px 11px" }} value={dept} onChange={(e) => setDept(e.target.value)}>
           <option value="all">{scopeDepts.length ? t("Allar mínar deildir") : t("Allar deildir")}</option>
           {(scopeDepts.length ? scopeDepts : deptList).map((d) => (
@@ -731,9 +618,11 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>{t("Afrita síðustu viku")}
           </button>
         )}
-        <button className="btn ghost sm" onClick={() => setModal("ai")}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4Z" /></svg>{t("Biðja AI")}
-        </button>
+        {aiEnabled && (
+          <button className="btn ghost sm" onClick={() => setModal("ai")}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4Z" /></svg>{t("Biðja AI")}
+          </button>
+        )}
         <div style={{ position: "relative" }}>
           <button className="btn ghost sm" aria-label={t("Fleiri aðgerðir")} aria-expanded={moreOpen} onClick={() => setMoreOpen((v) => !v)}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
@@ -748,9 +637,22 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                 <div className="mi" onClick={openNewShift}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 5v14M5 12h14" /></svg>{t("Vakt")}
                 </div>
+                <div className="mi" onClick={() => setModal("staff")}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4.5-6.2" /></svg>{t("Stilla þörf")}
+                </div>
                 <div className="mi" onClick={exportPdf}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3v5h5" /><path d="M7 3h7l5 5v11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" /></svg>{t("Sækja PDF")}
                 </div>
+                {aiEnabled && (
+                  <>
+                    <div className="sep" />
+                    {AI_PRESETS.map((x) => (
+                      <div className="mi" key={x[0]} title={t(x[1])} onClick={() => runAi(x[0])}>
+                        {sparkle}{t(x[0])}
+                      </div>
+                    ))}
+                  </>
+                )}
                 {view === "Vika" && (
                   <>
                     <div className="sep" />
@@ -765,23 +667,16 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         </div>
       </div>
 
-      {clip !== null && (
-        <div id="pastebar" style={{ display: "flex" }}>
-          <span className="pbtxt"><b>{t("Líma-hamur:")}</b> {t("smelltu á reiti til að líma")} {clip.code !== "off" ? `„${clip.start && clip.end ? `${clip.start}–${clip.end}` : SH[clip.code].l}"` : t("frí")}</span>
-          <button className="btn ghost sm" onClick={() => setClip(null)}>{t("Hætta")}</button>
-        </div>
-      )}
-
       {/* Slim one-line summary so the grid itself stays at the top of the
-          screen — the schedule is the point, the numbers just ride along.
-          Day view has its own strip with the same figures, so skip here. */}
+          screen. Figures are the visible week's real plan; cost uses each
+          employee's own rate and shows "—" when a rate is missing. */}
       {view !== "Dagur" && (
       <div className="kstrip">
-        <span>{t(kpi.hl)} <b>{dec1(kpi.hrs)}</b> {t("klst")}</span>
-        <span>{t("Áætl. launakostnaður")} <b>{nf(Math.round(kpi.hrs * COST_HR))}</b> kr</span>
-        <span>{t("Áætl. álagstímar")} <b>{dec1(estHrs.premium)}</b> {t("klst")}</span>
-        <span className={estHrs.overtime > 0 ? "bad" : ""}>{t("Áætl. yfirvinna")} <b>{dec1(estHrs.overtime)}</b> {t("klst")}</span>
-        <span>{t(kpi.sl)} <b>{kpi.shifts}</b>{kpi.open && !liveCompany ? <> · 2 {t("opnar")}</> : null}</span>
+        <span>{t("Tímar vikunnar")} <b>{dec1(plan.hours)}</b> {t("klst")}</span>
+        <span title={plan.cost == null ? t("Taxta vantar hjá starfsmanni á plani") : undefined}>{t("Áætl. launakostnaður")} <b>{plan.cost == null ? "—" : nf(plan.cost)}</b>{plan.cost == null ? "" : " kr"}</span>
+        <span>{t("Áætl. álagstímar")} <b>{dec1(plan.premium)}</b> {t("klst")}</span>
+        <span className={plan.overtime > 0 ? "bad" : ""}>{t("Áætl. yfirvinna")} <b>{dec1(plan.overtime)}</b> {t("klst")}</span>
+        <span>{t("Vaktir í viku")} <b>{plan.shifts}</b></span>
       </div>
       )}
 
@@ -827,30 +722,13 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                               const ty = types.find((x) => x.nm === cellTypes[ckey(r, c)]) ?? types.find((x) => !!x.t && x.t !== "–" && x.t.startsWith(st));
                               return ty ? { background: ty.bg, borderColor: ty.bd, borderLeftColor: ty.fg, color: ty.fg } : undefined;
                             })()}
-                            title={isUnav ? (s === "off" ? t("Skráð ólaus þennan dag") : t("ATH: skráð ólaus þennan dag — árekstur")) : t("hægrismelltu fyrir aðgerðir")}
+                            title={isUnav ? (s === "off" ? t("Skráð ólaus þennan dag") : t("ATH: skráð ólaus þennan dag — árekstur")) : t("smelltu til að breyta")}
                             draggable
                             onDragStart={() => setDrag({ r, c })}
-                            onClick={() => cellClick(r, c)}
-                            onContextMenu={(ev) => {
-                              const tt = timeOf(r, c);
-                              const items: { label: string; danger?: boolean; color?: string; act: () => void }[] = [];
-                              if (s !== "off") {
-                                items.push({ label: t("Breyta"), act: () => { setSel({ r, c }); setModal("shift"); } });
-                                items.push({ label: t("Afrita"), act: () => { setClip({ code: s, start: tt?.start, end: tt?.end }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } });
-                              } else {
-                                items.push({ label: t("Ný vakt"), act: () => { setSel({ r, c }); setModal("shift"); } });
-                              }
-                              if (clip) items.push({ label: t("Líma hér"), act: () => cellClick(r, c) });
-                              if (s !== "off") {
-                                for (const ty of types) {
-                                  items.push({ label: t(ty.nm), color: ty.fg, act: () => assignType(r, c, ty.nm) });
-                                }
-                                items.push({ label: t("Eyða vakt"), danger: true, act: () => delCell(r, c) });
-                              }
-                              openCtx(ev, items);
-                            }}
+                            onClick={() => openCell(r, c)}
+                            onContextMenu={(ev) => openCtx(ev, [{ label: s !== "off" ? t("Breyta") : t("Ný vakt"), act: () => openCell(r, c) }])}
                           >
-                            {s === "off" ? "+" : <>{cellLabel(r, c, s)}<small>{cellTypes[ckey(r, c)] ? t(cellTypes[ckey(r, c)]) : SH[s].s ? t("sh:" + SH[s].s) :" "}</small></>}
+                            {s === "off" ? "+" : <>{cellLabel(r, c, s)}<small>{cellTypes[ckey(r, c)] ? t(cellTypes[ckey(r, c)]) : SH[s].s ? t("sh:" + SH[s].s) :" "}</small></>}
                           </div>
                         </td>
                         );
@@ -870,7 +748,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                 </tr>
                 <tr className="addrow">
                   <td colSpan={9}>
-                    <button className="addemp" onClick={() => (pool.length ? setModal("addEmp") : toast("Allt starfsfólk er þegar á plani"))}>
+                    <button className="addemp" onClick={() => (pool.length ? setModal("addEmp") : toast(t("Allt starfsfólk er þegar á plani")))}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>{t("Bæta starfsmanni á plan")}
                     </button>
                   </td>
@@ -890,103 +768,59 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
             <button className="btn ghost sm" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => setModal("types")}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>{t("Vaktategundir")}
             </button>
-            <span className="muted">{t("Dragðu vaktir milli reita — kostnaður uppfærist strax.")}</span>
+            <span className="muted">{t("Smelltu á reit til að breyta — dragðu vaktir milli reita.")}</span>
           </div>
         </div>
       )}
 
+      {/* HIDDEN — DayView/MonthView are unreachable while VIEWS = ["Vika"]. */}
       {view === "Dagur" && <DayView day={cur} col={curCol} rows={colShifts(curCol)} need={targets[curCol] ?? 0} onAdd={openNewShift} onCtx={(x, ev) => {
         const r = emp.findIndex((e) => e[1] === x.n);
         if (r < 0) return;
-        const code = grid[r]?.[curCol] ?? "off";
-        const tt = timeOf(r, curCol);
-        openCtx(ev, [
-          { label: t("Breyta"), act: () => { setSel({ r, c: curCol }); setModal("shift"); } },
-          { label: t("Afrita"), act: () => { setClip({ code, start: tt?.start, end: tt?.end }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } },
-          ...types.map((ty) => ({ label: t(ty.nm), color: ty.fg, act: () => assignType(r, curCol, ty.nm) })),
-          { label: t("Eyða vakt"), danger: true, act: () => delCell(r, curCol) },
-        ]);
+        openCtx(ev, [{ label: t("Breyta"), act: () => openCell(r, curCol) }]);
       }} />}
-      {view === "Mánuður" && monthClip && (
-        <div id="pastebar" style={{ display: "flex", marginTop: 12 }}>
-          <span className="pbtxt"><b>{t("Líma-hamur:")}</b> {monthClip.first} · {monthClip.start}–{monthClip.end} — {t("smelltu á daga til að líma")}</span>
-          <button className="btn ghost sm" onClick={() => setMonthClip(null)}>{t("Hætta")}</button>
-        </div>
-      )}
       {view === "Mánuður" && <MonthView monthDate={cur} todayISO={todayISO} blocks={monthBlocks}
-        onEdit={(d) => { if (monthClip) { void pasteMonthShift(fmtISO(d)); } else setDayModal(d); }}
+        onEdit={(d) => setDayModal(d)}
         onCtxBlock={(b, iso, ev) => openCtx(ev, [
           { label: t("Breyta"), act: () => setDayModal(parseISO(iso)) },
-          ...types.map((ty) => ({ label: t(ty.nm), color: ty.fg, act: () => {
-            const [a, z] = b.time.split("–");
-            void saveShift({ employeeName: b.name, date: iso, startTime: norm(a ?? "08:00"), endTime: norm(z ?? "16:00"), shiftTypeName: ty.nm })
-              .then((res) => { setMonthVer((v) => v + 1); toast(res.ok ? t("Vaktategund breytt") : (res.error ?? "Villa")); });
-          } })),
-          { label: t("Afrita"), act: () => { const [a, z] = b.time.split("–"); setMonthClip({ first: b.name, start: norm(a ?? "08:00"), end: norm(z ?? "16:00") }); toast(t("Vakt afrituð — smelltu á daga til að líma")); } },
-          ...(monthClip ? [{ label: t("Líma hér"), act: () => { void pasteMonthShift(iso); } }] : []),
           { label: t("Eyða vakt"), danger: true, act: () => {
-            if (!liveCompany) { toast("Vakt eydd (demo)"); return; }
-            void deleteShift({ employeeName: b.name, dateISO: iso }).then((res) => { setMonthVer((v) => v + 1); toast(res.ok ? "Vakt eydd" : (res.error ?? "Villa")); });
+            void deleteShift({ employeeName: b.name, dateISO: iso }).then((res) => { setMonthVer((v) => v + 1); toast(res.ok ? t("Vakt eydd") : (res.error ?? t("Villa"))); });
           } },
         ])}
-        onCtxDay={(d, ev) => openCtx(ev, [
-          { label: t("Ný vakt"), act: () => setDayModal(d) },
-          ...(monthClip ? [{ label: t("Líma hér"), act: () => { void pasteMonthShift(fmtISO(d)); } }] : []),
-        ])}
+        onCtxDay={(d, ev) => openCtx(ev, [{ label: t("Ný vakt"), act: () => setDayModal(d) }])}
         onDragBlock={(b, iso) => { const [a, z] = b.time.split("–"); monthDragRef.current = { first: b.name, start: norm(a ?? "08:00"), end: norm(z ?? "16:00"), fromISO: iso }; }}
         onDropDay={(iso) => moveMonthShift(iso)} />}
       {dayModal && <MonthShiftModal date={dayModal} entries={entriesFor(dayModal)} names={[...emp, ...pool].map((x) => x[1])} types={types}
-        onClose={() => setDayModal(null)} onChanged={() => setMonthVer((v) => v + 1)}
-        onOpenDayView={() => { setCur(dayModal); setView("Dagur"); setDayModal(null); }} />}
+        onClose={() => setDayModal(null)} onChanged={() => setMonthVer((v) => v + 1)} />}
 
-      <div className="grid2b">
-        <div className="card">
-          <div className="ch"><div className="ct"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 6 }}><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6Z" /></svg>{t("AI-vaktaplan")}</div><div className="cs">{t("segðu markmið — Vakto endurraðar")}</div></div>
-          <div className="cb att">
-            {[
-              ["Lækka launakostnað um 10%", "haltu mönnun en lægri launum"],
-              ["Minnka yfirvinnu", "dreifa tímum, laga hvíld"],
-              ["Halda launum undir 30% af veltu", "stilla mönnun að veltuspá"],
-            ].map((x) => (
-              <div className="it" key={x[0]} style={{ cursor: "pointer" }} onClick={() => runAi(x[0])}>
-                <div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 8l5 5 4-3 6 7" /><path d="M16 17h4v-4" /></svg></div>
-                <div className="tx"><b>{t(x[0])}</b><span>{t(x[1])}</span></div><span className="tag info">{t("keyra")}</span>
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="ch"><div><div className="ct"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 6 }}><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>{t("Mönnun & þörf")}</div><div className="cs">{t("á vakt á móti mönnunarþörf · þessi vika")}</div></div></div>
+        <div className="cb">
+          {dayStats.map((r) => {
+            const need = targets[r[0]] ?? 0;
+            const short = need > 0 && r[3] < need;
+            return (
+              <div className="statline" key={r[1]}>
+                <span className="k">{t(DAYNAMES[r[0]])} {r[1]}.</span>
+                <span className="v">
+                  <span style={{ color: short ? "var(--bad)" : need > 0 ? "var(--good)" : undefined, fontWeight: short ? 700 : 600 }}>{r[3]}{need > 0 ? `/${need}` : ""}</span> {t("á vakt")}
+                  {short ? <span className="tag" style={{ background: "var(--bad-soft)", color: "var(--bad)", marginLeft: 8 }}>{t("vantar")} {need - r[3]}</span> : null}
+                </span>
               </div>
-            ))}
+            );
+          })}
+          <div className="statline" style={{ borderTop: "1px solid var(--line)", marginTop: 5, paddingTop: 8 }}>
+            <span className="k" style={{ fontWeight: 650, color: "var(--ink)" }}>{t("Samtals")}</span><span className="v" style={{ fontWeight: 700 }}>{dec1(totDayHrs)} {t("klst")} · {totDayShifts} {t("vaktir")}</span>
           </div>
-        </div>
-        <div className="card">
-          <div className="ch"><div><div className="ct"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 6 }}><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>{t("Mönnun & þörf")}</div><div className="cs">{t("á vakt á móti mönnunarþörf · þessi vika")}</div></div><button className="btn ghost sm" onClick={() => setModal("staff")}>{t("Stilla þörf")}</button></div>
-          <div className="cb">
-            {dayStats.map((r) => {
-              const need = targets[r[0]] ?? 0;
-              const short = need > 0 && r[3] < need;
-              return (
-                <div className="statline" key={r[1]}>
-                  <span className="k">{t(DAYNAMES[r[0]])} {r[1]}.</span>
-                  <span className="v">
-                    <span style={{ color: short ? "var(--bad)" : need > 0 ? "var(--good)" : undefined, fontWeight: short ? 700 : 600 }}>{r[3]}{need > 0 ? `/${need}` : ""}</span> {t("á vakt")}
-                    {short ? <span className="tag" style={{ background: "var(--bad-soft)", color: "var(--bad)", marginLeft: 8 }}>{t("vantar")} {need - r[3]}</span> : null}
-                  </span>
-                </div>
-              );
-            })}
-            <div className="statline" style={{ borderTop: "1px solid var(--line)", marginTop: 5, paddingTop: 8 }}>
-              <span className="k" style={{ fontWeight: 650, color: "var(--ink)" }}>{t("Samtals")}</span><span className="v" style={{ fontWeight: 700 }}>{dec1(totDayHrs)} {t("klst")} · {totDayShifts} {t("vaktir")}</span>
-            </div>
-            {totDayHrs > 0 && !liveCompany && (
-              <div className="ai" style={{ marginTop: 12 }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4Z" /></svg>
-                <div className="x">{t("Þriðjudagur er þyngstur (62 klst) en laugardagur undirmannaður um hádegi — færðu eina vakt af þriðjudegi á laugardag.")}</div>
-              </div>
-            )}
-          </div>
+          {!targets.some((n) => n > 0) && (
+            <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>{t("Engin mönnunarþörf skráð — veldu „Stilla þörf“ í valmyndinni til að sjá vöntun.")}</p>
+          )}
         </div>
       </div>
 
-      {(!liveCompany || requests.length > 0) && (
+      {requests.length > 0 && (
       <div className="card" style={{ marginTop: 16 }}>
-        <div className="ch"><div><div className="ct">{t("Beiðnir & opnar vaktir")}</div><div className="cs">{t("frá starfsfólki — samþykktu eða úthlutaðu")}</div></div><span className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{requests.length + (liveCompany ? 0 : 1)} {t("ný")}</span></div>
+        <div className="ch"><div><div className="ct">{t("Beiðnir & opnar vaktir")}</div><div className="cs">{t("frá starfsfólki — samþykktu eða úthlutaðu")}</div></div><span className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{requests.length} {t("ný")}</span></div>
         <div className="cb att">
           {requests.map((r, i) => (
             <div className="it" key={r.id ?? i}>
@@ -1002,12 +836,11 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
               {r.kind === "avail" && <span className="tag mut">{t("skráð")}</span>}
             </div>
           ))}
-          {!liveCompany && <div className="it"><div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 2.5v4M16 2.5v4" /></svg></div><div className="tx"><b>{t("Opin vakt: laugardag 12–20")}</b><span>{t("2 starfsmenn sóttu um — Ha Vu, Dalya")}</span></div><AsyncButton className="btn sm" onClick={async () => { const res = await assignOpenShift({ employeeName: "Ha Vu", note: "laugardag 12–20" }); toast(res.ok ? "Úthlutað" : (res.error ?? "Villa")); }}>{t("Úthluta")}</AsyncButton></div>}
         </div>
       </div>
       )}
 
-      {modal === "staff" && <StaffNeedModal targets={targets} onClose={() => setModal(null)} onSave={(ts) => { setTargets(ts); setModal(null); setStaffingTargets(ts).then((r) => toast(r.ok ? "Mönnunarþörf vistuð" : (r.error ?? "Villa"))); }} />}
+      {modal === "staff" && <StaffNeedModal targets={targets} onClose={() => setModal(null)} onSave={(ts) => { setTargets(ts); setModal(null); setStaffingTargets(ts).then((r) => toast(r.ok ? t("Mönnunarþörf vistuð") : (r.error ?? t("Villa")))); }} />}
       {modal === "types" && <ShiftTypesModal types={types} setTypes={persistTypes} onClose={() => setModal(null)} />}
       {modal === "addEmp" && <AddEmpModal pool={pool} onPick={pickEmp} onClose={() => setModal(null)} />}
       {ctx && (
@@ -1016,19 +849,23 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
           <div className="tmenu show" style={{ position: "fixed", zIndex: 91, left: Math.min(ctx.x, (typeof window !== "undefined" ? window.innerWidth : 1200) - 190), top: Math.min(ctx.y, (typeof window !== "undefined" ? window.innerHeight : 800) - ctx.items.length * 42 - 10), right: "auto" }}>
             {ctx.items.map((it) => (
               <div className="mi" key={it.label} style={it.danger ? { color: "var(--bad)" } : undefined} onClick={() => { setCtx(null); it.act(); }}>
-                {it.color && <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: 3, background: it.color, marginRight: 7, flexShrink: 0 }} />}
                 {it.label}
               </div>
             ))}
           </div>
         </>
       )}
-      {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
-      {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} names={emp.map((e) => e[1])} depts={[...new Set(emp.map((e) => e[2]).filter(Boolean))]} />}
+      {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} typeOf={(r, c) => cellTypes[ckey(r, c)]} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onTypes={() => setModal("types")} />}
+      {modal === "ai" && aiEnabled && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} names={emp.map((e) => e[1])} depts={[...new Set(emp.map((e) => e[2]).filter(Boolean))]} />}
       {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={approveAiProposal} />}
     </>
   );
 }
+
+// ---------------------------------------------------------------------------
+// HIDDEN — DayView / MonthView / MonthShiftModal. Unreachable while VIEWS is
+// ["Vika"]; kept so day/month can be re-enabled by adding them to VIEWS.
+// ---------------------------------------------------------------------------
 
 type DayRow = { i: string; n: string; c: string; dep: string; l: string; h: number; type: string; start: number };
 
@@ -1060,7 +897,6 @@ function DayView({ day, col, rows, onAdd, onCtx, need = 0 }: { day: Date; col: n
       <div className="kstrip">
         <span>{t("Á vakt")} <b>{rows.length}</b></span>
         <span>{t("Tímar dagsins")} <b>{dec1(tot)}</b> {t("klst")}</span>
-        <span>{t("Kostnaður dagsins")} <b>{nf(Math.round(tot * COST_HR))}</b> kr</span>
         {need > 0 && <span className={rows.length < need ? "bad" : ""}>{t("Mönnunarþörf")} <b>{rows.length}</b> / {need}</span>}
       </div>
       <div className="card" style={{ marginTop: 16 }}>
@@ -1109,7 +945,7 @@ function DayView({ day, col, rows, onAdd, onCtx, need = 0 }: { day: Date; col: n
   );
 }
 
-function MonthView({ monthDate, todayISO, blocks, onEdit, onCtxBlock, onCtxDay, onDragBlock, onDropDay }: { monthDate: Date; todayISO: string; blocks: (iso: string, wd: number) => MonthBlock[]; onEdit: (d: Date) => void; onCtxBlock: (b: MonthBlock, iso: string, ev: React.MouseEvent) => void; onCtxDay: (d: Date, ev: React.MouseEvent) => void; onDragBlock: (b: MonthBlock, iso: string) => void; onDropDay: (iso: string) => void }) {
+function MonthView({ monthDate, todayISO, blocks, onEdit, onCtxBlock, onCtxDay, onDragBlock, onDropDay }: { monthDate: Date; todayISO: string; blocks: (iso: string) => MonthBlock[]; onEdit: (d: Date) => void; onCtxBlock: (b: MonthBlock, iso: string, ev: React.MouseEvent) => void; onCtxDay: (d: Date, ev: React.MouseEvent) => void; onDragBlock: (b: MonthBlock, iso: string) => void; onDropDay: (iso: string) => void }) {
   const { t } = useLang();
   const hd = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
   const y = monthDate.getFullYear(), m = monthDate.getMonth();
@@ -1128,7 +964,7 @@ function MonthView({ monthDate, todayISO, blocks, onEdit, onCtxBlock, onCtxDay, 
               const adj = d < 1 || d > days;
               const wd = (date.getDay() + 6) % 7, we = wd >= 5;
               const tod = fmtISO(date) === todayISO;
-              const sh = blocks(fmtISO(date), wd);
+              const sh = blocks(fmtISO(date));
               return (
                 <div key={d} className={`cell mcell ${we ? "we" : ""} ${tod ? "tod" : ""}${adj ? " adj" : ""}`} onClick={() => onEdit(date)}
                   onContextMenu={(ev) => onCtxDay(date, ev)}
@@ -1159,14 +995,16 @@ function MonthView({ monthDate, todayISO, blocks, onEdit, onCtxBlock, onCtxDay, 
 }
 
 /** Month-view popup: the day's shifts inline-editable + add a new one. */
-function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOpenDayView }: {
+function MonthShiftModal({ date, entries, names, types, onClose, onChanged }: {
   date: Date; entries: { first: string; start: string; end: string }[]; names: string[]; types: ShiftType[];
-  onClose: () => void; onChanged: () => void; onOpenDayView: () => void;
+  onClose: () => void; onChanged: () => void;
 }) {
   const { t: tr } = useLang();
   const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   const [rows, setRows] = useState(entries);
-  useEffect(() => { setRows(entries); }, [entries]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Re-sync the editable rows when the day's entries reload (derived-state pattern, no effect).
+  const [seenEntries, setSeenEntries] = useState(entries);
+  if (seenEntries !== entries) { setSeenEntries(entries); setRows(entries); }
   const [nName, setNName] = useState(names[0] ?? "");
   const t0 = (types[0]?.t ?? "08:00–16:00").split("–");
   const [nStart, setNStart] = useState(t0[0]?.slice(0, 5) ?? "08:00");
@@ -1178,11 +1016,11 @@ function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOp
 
   async function saveRow(i: number) {
     const r = rows[i];
-    if (r.start >= r.end) { toast("Lok verða að vera eftir upphaf"); return; }
+    if (r.start >= r.end) { toast(tr("Lok verða að vera eftir upphaf")); return; }
     setBusy(true);
     const res = await saveShift({ employeeName: r.first, date: iso, startTime: r.start, endTime: r.end, shiftTypeName: typeOf(r.start) });
     setBusy(false);
-    toast(res.ok ? (res.demo ? "Vistað (demo)" : tr("Vakt vistuð")) : (res.error ?? "Villa"));
+    toast(res.ok ? tr("Vakt vistuð") : (res.error ?? tr("Villa")));
     if (res.ok) onChanged();
   }
   async function delRow(i: number) {
@@ -1190,16 +1028,16 @@ function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOp
     setBusy(true);
     const res = await deleteShift({ employeeName: r.first, dateISO: iso });
     setBusy(false);
-    toast(res.ok ? (res.demo ? "Eytt (demo)" : tr("Vakt eytt")) : (res.error ?? "Villa"));
+    toast(res.ok ? tr("Vakt eydd") : (res.error ?? tr("Villa")));
     if (res.ok) { setRows((rs) => rs.filter((_, j) => j !== i)); onChanged(); }
   }
   async function addRow() {
     if (!nName) return;
-    if (nStart >= nEnd) { toast("Lok verða að vera eftir upphaf"); return; }
+    if (nStart >= nEnd) { toast(tr("Lok verða að vera eftir upphaf")); return; }
     setBusy(true);
     const res = await saveShift({ employeeName: nName, date: iso, startTime: nStart, endTime: nEnd, shiftTypeName: typeOf(nStart) });
     setBusy(false);
-    toast(res.ok ? (res.demo ? "Vistað (demo)" : tr("Vakt vistuð")) : (res.error ?? "Villa"));
+    toast(res.ok ? tr("Vakt vistuð") : (res.error ?? tr("Villa")));
     if (res.ok) onChanged();
   }
 
@@ -1226,12 +1064,15 @@ function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOp
         <button className="btn sm" disabled={busy} onClick={addRow}>{tr("Bæta við")}</button>
       </div>
       <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
-        <button className="btn ghost" onClick={onOpenDayView}>{tr("Opna dagsýn")}</button>
         <button className="btn ghost" onClick={onClose}>{tr("Loka")}</button>
       </div>
     </Modal>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Modals in use
+// ---------------------------------------------------------------------------
 
 function ShiftTypesModal({ types, setTypes, onClose }: { types: ShiftType[]; setTypes: (f: (t: ShiftType[]) => ShiftType[]) => void; onClose: () => void }) {
   const { t: tr } = useLang();
@@ -1250,24 +1091,25 @@ function ShiftTypesModal({ types, setTypes, onClose }: { types: ShiftType[]; set
   }
   function reset() { setEditIdx(null); setNm(""); setS("00:00"); setE("08:00"); setNoTime(false); setPrem("Dagvinna"); setColor("#7c6ff2"); }
   function submit() {
-    if (!nm) { toast("Sláðu inn heiti"); return; }
+    if (!nm) { toast(tr("Sláðu inn heiti")); return; }
     const row: ShiftType = { nm, t: noTime ? "" : `${s}–${e}`, prem, bg: color + "1f", bd: color + "59", fg: color };
     if (editIdx !== null) {
       setTypes((t) => t.map((x, j) => (j === editIdx ? row : x)));
       toast(tr("Vaktategund uppfærð"));
     } else {
       setTypes((t) => [...t, row]);
-      toast(`Vaktategund „${nm}" búin til`);
+      toast(`${tr("Vaktategund")} „${nm}" ${tr("búin til")}`);
     }
     reset();
   }
   function del(i: number) {
-    setTypes((t) => (t.length <= 1 ? (toast("Þarf a.m.k. eina vaktategund"), t) : t.filter((_, j) => j !== i)));
+    setTypes((t) => (t.length <= 1 ? (toast(tr("Þarf a.m.k. eina vaktategund")), t) : t.filter((_, j) => j !== i)));
     if (editIdx === i) reset();
   }
   return (
     <Modal onClose={onClose} title={tr("Vaktategundir")}>
       <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>{tr("Smelltu á vaktategund til að breyta henni — heiti, tímum, álagi eða lit. Breytingar vistast og litirnir uppfærast í planinu.")}</p>
+      {types.length === 0 && <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>{tr("Engin vaktategund skráð enn — búðu til þá fyrstu hér fyrir neðan.")}</p>}
       <div className="att">
         {types.map((ty, i) => (
           <div className={`it rowlink`} key={i} onClick={() => startEdit(i)} style={editIdx === i ? { outline: "2px solid var(--brand)", outlineOffset: -2, borderRadius: 10 } : undefined}>
@@ -1349,26 +1191,28 @@ function StaffNeedModal({ targets, onClose, onSave }: { targets: number[]; onClo
   );
 }
 
+/** The one shift editor: employee, day, type, times, checklist, delete. */
 function ShiftEditModal({
-  types, emp, weekDays, sel, gridCode, timeOf, onSave, onDelete, onClose, onCopy, onTypes,
+  types, emp, weekDays, sel, gridCode, timeOf, typeOf, onSave, onDelete, onClose, onTypes,
 }: {
   types: ShiftType[]; emp: Emp[]; weekDays: Date[]; sel: { r: number; c: number };
   gridCode: (r: number, c: number) => string;
   timeOf: (r: number, c: number) => { start: string; end: string } | undefined;
+  typeOf: (r: number, c: number) => string | undefined;
   onSave: (r: number, c: number, start: string, end: string, typeName: string) => void;
   onDelete: (r: number, c: number) => void;
-  onClose: () => void; onCopy: () => void; onTypes: () => void;
+  onClose: () => void; onTypes: () => void;
 }) {
   const { t: tr } = useLang();
   const [ri, setRi] = useState(sel.r < emp.length ? sel.r : 0);
   const [ci, setCi] = useState(sel.c);
   const tt0 = timeOf(sel.r, sel.c);
-  const [type, setType] = useState(types[0]?.nm ?? "Dagvakt");
+  const [type, setType] = useState(typeOf(sel.r, sel.c) ?? types[0]?.nm ?? "Sérsniðin vakt");
   const [start, setStart] = useState(tt0?.start ?? "08:00");
   const [end, setEnd] = useState(tt0?.end ?? "16:00");
   const filled = gridCode(ri, ci) !== "off";
   const DNAMES = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
-  // Checklist for this employee+day (Sling-parity "shift tasks").
+  // Checklist for this employee+day ("shift tasks").
   const [tasks, setTasks] = useState<string[]>([]);
   const [newTask, setNewTask] = useState("");
   const dateISOOf = (c: number) => {
@@ -1417,11 +1261,10 @@ function ShiftEditModal({
         <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>{tr("Starfsmaðurinn hakar við verkefnin í Mitt svæði á vaktinni.")}</p>
       </div>
       <div style={{ display: "flex", gap: 9, marginTop: 8, flexWrap: "wrap" }}>
-        <button className="btn" onClick={async () => { if (start >= end) { toast("Lok verða að vera eftir upphaf"); return; } await persistTasks(); onSave(ri, ci, start, end, type); }}>{tr("Vista")}</button>
+        <button className="btn" onClick={async () => { if (start >= end) { toast(tr("Lok verða að vera eftir upphaf")); return; } await persistTasks(); onSave(ri, ci, start, end, type); }}>{tr("Vista")}</button>
         {filled && <button className="btn ghost" style={{ color: "var(--bad)", borderColor: "var(--bad-soft, #f3c7c0)" }} onClick={() => onDelete(ri, ci)}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>{tr("Eyða vakt")}
         </button>}
-        <button className="btn ghost" onClick={onCopy}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M4 16V5a1 1 0 0 1 1-1h11" /></svg>{tr("Afrita")}</button>
         <button className="btn ghost" onClick={onClose}>{tr("Loka")}</button>
       </div>
     </Modal>
@@ -1430,35 +1273,6 @@ function ShiftEditModal({
 
 function AiPromptModal({ query, setQuery, onClose, onGen, names = [], depts = [] }: { query: string; setQuery: (s: string) => void; onClose: () => void; onGen: () => void; names?: string[]; depts?: string[] }) {
   const { t: tr } = useLang();
-  const [listening, setListening] = useState(false);
-  const recRef = useRef<{ stop: () => void } | null>(null);
-  const speechOk = typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window);
-
-  /** Voice input: dictate the instruction (is-IS), appended into the textarea. */
-  function toggleVoice() {
-    if (listening) { recRef.current?.stop(); return; }
-    const Ctor = (window as unknown as { webkitSpeechRecognition?: new () => unknown; SpeechRecognition?: new () => unknown }).SpeechRecognition
-      ?? (window as unknown as { webkitSpeechRecognition?: new () => unknown }).webkitSpeechRecognition;
-    if (!Ctor) return;
-    const rec = new Ctor() as {
-      lang: string; interimResults: boolean; continuous: boolean;
-      onresult: (e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void;
-      onend: () => void; onerror: () => void; start: () => void; stop: () => void;
-    };
-    rec.lang = "is-IS";
-    rec.interimResults = false;
-    rec.continuous = true;
-    rec.onresult = (e) => {
-      const text = Array.from({ length: e.results.length }, (_, i) => e.results[i][0]?.transcript ?? "").join(" ").trim();
-      if (text) setQuery(query ? `${query} ${text}` : text);
-    };
-    rec.onend = () => setListening(false);
-    rec.onerror = () => setListening(false);
-    recRef.current = rec;
-    setListening(true);
-    rec.start();
-  }
-
   // Relevant examples built from the REAL roster (names + departments).
   const ex = [
     names[0] ? `Settu ${names[0]} á morgunvaktir 05:00–12:00 alla virka daga` : "Morgunvaktir 05:00–12:00 alla virka daga",
@@ -1470,24 +1284,7 @@ function AiPromptModal({ query, setQuery, onClose, onGen, names = [], depts = []
     <Modal onClose={onClose} title={<><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 7, verticalAlign: -3 }}><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6Z" /></svg>{tr("Biðja AI um vaktaplan")}</>}>
       <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>{tr("Lýstu því sem þú vilt á venjulegri íslensku — VAKTO býr til vaktirnar og þú samþykkir.")}</p>
       <p className="muted" style={{ fontSize: 11.5, marginBottom: 12 }}>{tr("Tillagan gildir fyrir vikuna sem er opin í planinu — flettu fyrst á réttu vikuna (t.d. næstu viku) með örvunum efst.")}</p>
-      <div style={{ position: "relative" }}>
-        <textarea className="lf-ta" rows={3} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr("sched:aiph")} style={speechOk ? { paddingRight: 44 } : undefined} />
-        {speechOk && (
-          <button
-            type="button"
-            onClick={toggleVoice}
-            title={listening ? tr("Stöðva upptöku") : tr("Tala inn fyrirmæli")}
-            style={{
-              position: "absolute", right: 8, top: 8, width: 32, height: 32, borderRadius: "50%",
-              border: "1px solid var(--line)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-              background: listening ? "var(--bad)" : "var(--line2)", color: listening ? "#fff" : "var(--ink2)",
-            }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="9" y="2.5" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3.5" /></svg>
-          </button>
-        )}
-      </div>
-      {listening && <p className="muted" style={{ fontSize: 12, margin: "6px 0 0", color: "var(--bad)" }}>{tr("Hlusta… talaðu fyrirmælin og smelltu svo aftur á hljóðnemann.")}</p>}
+      <textarea className="lf-ta" rows={3} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={tr("sched:aiph")} />
       <div className="chips">{ex.map((c) => <button className="chip" key={c} onClick={() => setQuery(c)}>{c}</button>)}</div>
       <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
         <button className="btn" onClick={onGen}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6Z" /></svg>{tr("Búa til með AI")}</button>
@@ -1506,6 +1303,7 @@ const KIND_ICON: Record<AiItem["kind"], React.ReactNode> = {
 
 function AiResultModal({ query, proposal, loading, onClose, onEdit, onApprove }: { query: string; proposal: AiProposal | null; loading: boolean; onClose: () => void; onEdit: () => void; onApprove: () => void }) {
   const { t: tr } = useLang();
+  const failed = !loading && !!proposal && !proposal.ok;
   return (
     <Modal onClose={onClose} title={tr("Tillaga AI")}>
       <div className="ai" style={{ margin: "0 0 14px" }}>
@@ -1513,12 +1311,19 @@ function AiResultModal({ query, proposal, loading, onClose, onEdit, onApprove }:
         <div className="x">
           {loading
             ? `${query ? `„${query}" — ` : ""}${tr("VAKTO hugsar…")}`
-            : (proposal?.summary ?? (query ? `„${query}"` : tr("Bestun vaktaplans")))}
+            : (proposal?.ok && proposal.summary) ? proposal.summary : (query ? `„${query}"` : tr("Bestun vaktaplans"))}
         </div>
       </div>
       {loading ? (
         <div className="muted" style={{ fontSize: 13, padding: "18px 4px", textAlign: "center" }}>
           {tr("sched:ailoading")}
+        </div>
+      ) : failed ? (
+        <div className="att">
+          <div className="it">
+            <div className="ic bad"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor">{KIND_ICON.bad}</svg></div>
+            <div className="tx"><b>{tr("Tillaga tókst ekki")}</b><span>{proposal?.error ?? tr("Óþekkt villa")}</span></div>
+          </div>
         </div>
       ) : (
         <div className="att">
@@ -1533,19 +1338,14 @@ function AiResultModal({ query, proposal, loading, onClose, onEdit, onApprove }:
           ))}
         </div>
       )}
-      {!loading && proposal && (proposal.shifts?.length ?? 0) > 0 && (
+      {!loading && proposal?.ok && (proposal.shifts?.length ?? 0) > 0 && (
         <p className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>
           <b style={{ color: "var(--brand)" }}>{proposal.shifts!.length}</b> {tr("vaktir í tillögunni — við samþykki eru þær settar í planið og það birt.")}
         </p>
       )}
-      {!loading && proposal && !proposal.live && (
-        <p className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>
-          {tr("Demo-tillaga — settu ANTHROPIC_API_KEY í .env.local fyrir alvöru AI-vaktaplan.")}
-        </p>
-      )}
       <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
-        <button className="btn" disabled={loading} onClick={onApprove}>{tr("Samþykkja & birta")}</button>
-        <button className="btn ghost" onClick={onEdit}>{tr("Breyta beiðni")}</button>
+        {!failed && <button className="btn" disabled={loading} onClick={onApprove}>{tr("Samþykkja & birta")}</button>}
+        <button className="btn ghost" onClick={onEdit}>{failed ? tr("Reyna aftur") : tr("Breyta beiðni")}</button>
         <button className="btn ghost" onClick={onClose}>{tr("Hætta við")}</button>
       </div>
     </Modal>

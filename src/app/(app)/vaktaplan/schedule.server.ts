@@ -4,10 +4,17 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees, } from "@/lib/employees.server";
 import { initials } from "@/lib/employees";
 import { dec1 } from "@/lib/format";
+import { MONTHLY_HOURS } from "@/lib/payroll";
 
 export type Emp4 = [string, string, string, string]; // initials, first name, dept, color
 export type ShiftTypeView = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
-export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; cellTypes: Record<string, string>; types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string; todayISO: string; targets: number[]; unavail: Record<string, number[]> };
+export type ScheduleInitial = {
+  emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; cellTypes: Record<string, string>;
+  types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string; todayISO: string; targets: number[]; unavail: Record<string, number[]>;
+  /** Planning rate per employee (kr/klst), keyed `initials|firstName`. Monthly
+   * staff → rate ÷ MONTHLY_HOURS. null when no rate is set (cost shows "—"). */
+  rates: Record<string, number | null>;
+};
 
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 // 7 ISO dates for the (Mon-start) week containing `ref`.
@@ -119,8 +126,14 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
 
     const fte = dec1(employees.reduce((a, e) => a + e.employmentRatio, 0) / 100);
     const unavail = await getWeekUnavail(WEEK_DATES);
-    return { emp, grid: gridOut, times: timesOut, cellTypes: cellTypesOut, types, pool, fte, company: companyName, todayISO, targets, unavail };
-  } catch {
+    const rates: Record<string, number | null> = {};
+    for (const e of employees) {
+      const r = Number(e.rate) || 0;
+      rates[`${initials(e.fullName)}|${e.fullName.split(/\s+/)[0]}`] = r > 0 ? (e.payType === "monthly" ? r / MONTHLY_HOURS : r) : null;
+    }
+    return { emp, grid: gridOut, times: timesOut, cellTypes: cellTypesOut, types, pool, fte, company: companyName, todayISO, targets, unavail, rates };
+  } catch (e) {
+    console.error("[vaktaplan] getSchedule failed:", e);
     return null;
   }
 }

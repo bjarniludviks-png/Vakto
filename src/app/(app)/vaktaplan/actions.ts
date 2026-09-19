@@ -218,7 +218,10 @@ export async function setStaffingTargets(targets: number[]): Promise<DecisionRes
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const clean = Array.from({ length: 7 }, (_, i) => Math.max(0, Math.round(Number(targets[i]) || 0)));
     const { error } = await supabase.from("companies").update({ staffing_targets: clean }).eq("id", ctx.company);
-    if (error) return { ok: false, error: "Keyrðu migration 0011 í Supabase til að vista mönnunarþörf." };
+    if (error) {
+      console.error("[vaktaplan] setStaffingTargets failed:", error.message);
+      return { ok: false, error: "Tókst ekki að vista mönnunarþörf." };
+    }
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "staffing.set", entity: "company", detail: `Mönnunarþörf uppfærð — ${clean.join("/")}`,
     });
@@ -283,23 +286,6 @@ export async function getShiftsInRange(fromISO: string, toISO: string): Promise<
     return { ok: true, rows };
   } catch {
     return { ok: false, rows: [] };
-  }
-}
-
-/** Assign an applicant to an open shift. */
-export async function assignOpenShift(input: { employeeName: string; note?: string }): Promise<DecisionResult> {
-  if (!isSupabaseConfigured()) return { ok: true, demo: true };
-  try {
-    const supabase = await createClient();
-    const ctx = await companyOf(supabase);
-    if ("error" in ctx) return { ok: false, error: ctx.error };
-    await logAudit(supabase, ctx.company, ctx.userId, {
-      action: "shift.assign", entity: "shift", detail: `Opin vakt úthlutað — ${input.employeeName}${input.note ? ` (${input.note})` : ""}`,
-    });
-    revalidatePath("/vaktaplan");
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
 

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export type ReqItem = {
-  id: string | null; // null = demo entry (no DB row to act on)
+  id: string | null; // null = no DB row to act on (never rendered as actionable)
   kind: "leave" | "swap" | "avail";
   title: string;
   detail: string;
@@ -12,20 +12,14 @@ export type Requests = { items: ReqItem[]; live: boolean };
 
 const LEAVE_LABEL: Record<string, string> = { orlof: "orlof", veikindi: "veikindi", olaunad: "ólaunað" };
 
-const DEMO: ReqItem[] = [
-  { id: null, kind: "leave", title: "Frí-beiðni: Bach", detail: "27.–28. júní · orlof" },
-  { id: null, kind: "swap", title: "Vaktaskipti: Mína ↔ Phong", detail: "laugardagur 12–20 — báðir samþykktu" },
-  { id: null, kind: "avail", title: "Óframboð: Ómar", detail: "getur ekki unnið fimmtudaga í júlí" },
-];
-
-/** Pending leave + swap requests and recorded unavailability, with demo fallback. */
+/** Pending leave + swap requests and recorded unavailability. Empty (never
+ * canned) when Supabase is not connected, not signed in, or on failure. */
 export async function getPendingRequests(): Promise<Requests> {
-  if (!isSupabaseConfigured()) return { items: DEMO, live: false };
+  if (!isSupabaseConfigured()) return { items: [], live: false };
   try {
     const supabase = await createClient();
-    // Demo only before sign-in; a signed-in company shows its real (maybe empty) requests.
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { items: DEMO, live: false };
+    if (!user) return { items: [], live: false };
     const [leave, swaps, avail] = await Promise.all([
       supabase.from("leave_requests")
         .select("id, type, from_date, to_date, employees(full_name)")
@@ -66,7 +60,8 @@ export async function getPendingRequests(): Promise<Requests> {
       });
     }
     return { items, live: true };
-  } catch {
-    return { items: DEMO, live: false };
+  } catch (e) {
+    console.error("[vaktaplan] getPendingRequests failed:", e);
+    return { items: [], live: false };
   }
 }

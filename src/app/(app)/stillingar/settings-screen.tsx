@@ -6,11 +6,10 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { syncInventraRevenue, addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
 import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
-import { dec1 } from "@/lib/format";
 
 type SettingsModal = "location" | "department" | "position" | "invite" | "revenue" | "avgrevenue" | null;
 
@@ -21,20 +20,11 @@ const ROLE_LABEL: Record<string, string> = { owner: "Eigandi", manager: "Stjórn
 const DEMO_SETTINGS: SettingsData = { departments: [], locations: [], positions: [], users: [], apiKeys: [], companyId: null, kioskToken: null, company: null, live: false };
 
 function copyKioskLink(kioskToken: string | null) {
-  if (!kioskToken) { toast("Kiosk-slóð er ekki tilbúin — keyrðu migration 0044"); return; }
+  if (!kioskToken) { toast("Kiosk-slóð er ekki tilbúin enn — reyndu aftur síðar"); return; }
   const url = `${window.location.origin}/kiosk?k=${kioskToken}`;
   navigator.clipboard?.writeText(url).then(() => toast("Kiosk-slóð afrituð"), () => toast(url));
 }
 
-async function syncInventra() {
-  const res = await syncInventraRevenue();
-  if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
-  toast(res.demo ? "Velta sótt frá Inventra (demo)" : "Velta sótt frá Inventra — laun% uppfært");
-}
-
-const Globe = () => (
-  <svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M3.2 9h17.6M3.2 15h17.6M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg>
-);
 const Pin = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z" /><circle cx="12" cy="9" r="2.5" /></svg>
 );
@@ -46,16 +36,15 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
   const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
   const [deptEdit, setDeptEdit] = useState<{ id: string; name: string; location: string; staff: number; color: string | null; members: string[] } | null>(null);
   const [rowEdit, setRowEdit] = useState<{ kind: "location" | "position"; id: string; name: string; rate?: number } | null>(null);
-  const [posName, setPosName] = useState<string | null>(null);
-  function posConnect(name: string) { setPosName(name === "POS" ? "" : name); }
-  const [section, setSection] = useState<string>(initialModal === "revenue" || initialModal === "avgrevenue" ? "velta" : "fyrirtaeki");
+  const [section, setSection] = useState<string>(initialModal === "revenue" || initialModal === "avgrevenue" ? "tengingar" : "fyrirtaeki");
+  // Four tabs: Fyrirtæki · Launareglur · Tengingar · Notendur.
+  // STRIPE: subscription tab returns here (as a fifth tab) when billing is real.
   const SECTIONS: [string, string][] = [
-    ["fyrirtaeki", "Fyrirtæki"], ["tengingar", "Samþættingar"], ["velta", "Veltuskráning"],
-    ["launareglur", "Launareglur"], ["notendur", "Notendur"], ["askrift", "Áskrift"],
+    ["fyrirtaeki", "Fyrirtæki"], ["launareglur", "Launareglur"], ["tengingar", "Tengingar"], ["notendur", "Notendur"],
   ];
   return (
     <>
-      <PageHeader title="Stillingar" subtitle="Fyrirtæki, tengingar, notendur og áskrift" />
+      <PageHeader title="Stillingar" subtitle="Fyrirtæki, launareglur, tengingar og notendur" />
       <div className="settabs">
         {SECTIONS.map(([id, label]) => (
           <button key={id} className={`etab2${section === id ? " on" : ""}`} onClick={() => setSection(id)}>{t(label)}</button>
@@ -67,16 +56,8 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
       <div className="grid2b">
         <CompanyCard info={data.company} />
         <div className="card">
-          <div className="ch"><div className="ct">{t("Land & launareglur")}</div></div>
+          <div className="ch"><div><div className="ct">{t("Launatímabil")}</div><div className="cs">{t("hvaða dag mánaðar launatímabilið byrjar — launakeyrslur fylgja því")}</div></div></div>
           <div className="cb">
-            <div className="att">
-              <div className="it"><div className="ic info"><Globe /></div><div className="tx"><b>{t("Ísland (virkt)")}</b><span>{t("staðgreiðsla, tryggingagjald, lífeyrir, orlof")}</span></div><span className="tag good">{t("virkt")}</span></div>
-              <div className="it" style={{ opacity: 0.6 }}><div className="ic mut" style={{ background: "var(--line2)" }}><Globe /></div><div className="tx"><b>{t("Fleiri lönd")}</b><span>{t("Noregur, Danmörk, Bretland")}</span></div><span className="tag mut">{t("væntanlegt")}</span></div>
-            </div>
-            <div className="hr" />
-            <div className="statline"><span className="k">{t("Tryggingagjald")}</span><span className="v">6,35%</span></div>
-            <div className="statline"><span className="k">{t("Mótframlag lífeyris")}</span><span className="v">11,5%</span></div>
-            <div className="statline"><span className="k">{t("Orlof")}</span><span className="v">10,17%</span></div>
             <div className="statline"><span className="k">{t("Launatímabil")}</span>
               <select className="badge" style={{ border: "1px solid var(--line)", padding: "5px 9px", font: "inherit", fontSize: 12.5 }}
                 defaultValue={String(data.company && "payPeriodStart" in (data.company as object) ? (data.company as unknown as { payPeriodStart?: number }).payPeriodStart ?? 1 : 1)}
@@ -125,23 +106,22 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
 
       {section === "tengingar" && (
         <div className="card" style={{ marginTop: 16 }}>
+          <div className="ch"><div><div className="ct">{t("Velta & sölutölur")}</div><div className="cs">{t("fóðraðu laun%-útreikninginn — sjálfvirkt gegnum samþættingu eða handvirkt")}</div></div></div>
+          <div className="cb att">
+            <div className="it rowlink" onClick={() => setKeyModal(true)}><div className="ic mut" style={{ background: "var(--line2)" }}>IN</div><div className="tx"><b>INVENTRA</b><span>{t("sendu veltu sjálfkrafa með API-lykli · smelltu til að búa til tengingu")}</span></div><span className="tag mut">{t("ekki tengt")}</span></div>
+            <div className="it rowlink" onClick={() => setModal("revenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div><div className="tx"><b>{t("Skrá veltu handvirkt")}</b><span>{t("án tengingar — sláðu inn veltu til að sjá laun vs velta")}</span></div><span className="tag info">{t("slá inn")}</span></div>
+            <div className="it rowlink" onClick={() => setModal("avgrevenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M3 3v18h18M7 15l4-4 3 3 5-6" /></svg></div><div className="tx"><b>{t("Meðalvelta per vikudag")}</b><span>{t("áætluð velta per vikudag — laun% án tengingar")}</span></div><span className="tag info">{t("slá inn")}</span></div>
+          </div>
+        </div>
+      )}
+
+      {section === "tengingar" && (
+        <div className="card" style={{ marginTop: 16 }}>
           <div className="ch"><div><div className="ct">{t("Tæki & tilkynningar")}</div><div className="cs">{t("stimpilklukkan á staðnum, push í símana og launaskil")}</div></div></div>
           <div className="cb att">
             <div className="it"><div className="ic good">P</div><div className="tx"><b>Payday</b><span>{t("tímaskrá flutt út sem Excel — hlaðið upp í Payday")}</span></div><span className="tag info">{t("Excel")}</span></div>
             <div className="it"><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" /></svg></div><div className="tx"><b>{t("Push-tilkynningar")}</b><span>{t("vaktir, beiðnir og samþykki beint í símann")}</span></div><PushToggle /></div>
             <div className="it rowlink" onClick={() => copyKioskLink(data.kioskToken)}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><rect x="4" y="3" width="16" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg></div><div className="tx"><b>{t("Kiosk-stimpilklukka")}</b><span>{t("opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð")}</span></div><span className="tag info">{t("afrita slóð")}</span></div>
-          </div>
-        </div>
-      )}
-
-      {section === "velta" && (
-        <div className="card">
-          <div className="ch"><div><div className="ct">{t("Velta & sölutölur")}</div><div className="cs">{t("fóðraðu laun%-útreikninginn — sjálfvirkt gegnum samþættingu eða handvirkt")}</div></div></div>
-          <div className="cb att">
-            <div className="it rowlink" onClick={syncInventra}><div className="ic info">IN</div><div className="tx"><b>INVENTRA</b><span>{t("framleiðsluvelta í rauntíma · smelltu til að sækja veltu")}</span></div><span className="tag good">{t("tengt")}</span></div>
-            <div className="it rowlink" onClick={() => setModal("revenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div><div className="tx"><b>{t("Skrá veltu handvirkt")}</b><span>{t("án Inventra — sláðu inn veltu til að sjá laun vs velta")}</span></div><span className="tag info">{t("slá inn")}</span></div>
-            <div className="it rowlink" onClick={() => setModal("avgrevenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M3 3v18h18M7 15l4-4 3 3 5-6" /></svg></div><div className="tx"><b>{t("Meðalvelta per vikudag")}</b><span>{t("áætluð velta per vikudag — laun% án tengingar")}</span></div><span className="tag info">{t("slá inn")}</span></div>
-            <div className="it rowlink" onClick={() => setSection("tengingar")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M21 2l-9.6 9.6M15.5 7.5l3 3L22 7l-3-3zM11.4 11.6a5 5 0 1 0 1 1z" /></svg></div><div className="tx"><b>{t("Sjálfvirkt gegnum API")}</b><span>{t("búðu til samþættingu — sölukerfið þitt sendir þá veltuna sjálft")}</span></div><span className="tag info">{t("opna Samþættingar")}</span></div>
           </div>
         </div>
       )}
@@ -233,24 +213,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
       </div>
       )}
 
-      {section === "askrift" && (
-      <div className="card owner-only">
-        <div className="ch"><div><div className="ct">{t("Áskrift & greiðslur")}</div><div className="cs">{t("VAKTO · mánaðarlega")}</div></div><span className="badge" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("virk")}</span></div>
-        <div className="cb">
-          <div className="statline"><span className="k">{t("Mánaðargjald")}</span><span className="v">9.990 kr {t("m/VSK")}</span></div>
-          <div className="statline"><span className="k">{t("Notendur innifaldir")}</span><span className="v">5</span></div>
-          <div className="statline"><span className="k">{t("Umfram notendur")}</span><span className="v">990 kr/{t("notanda")}</span></div>
-          <div className="statline"><span className="k">{t("Næsta greiðsla")}</span><span className="v">13. júlí 2026</span></div>
-          <div className="hr" />
-          <div className="statline"><span className="k">{t("Greiðslumáti")}</span><span className="v" style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: "#1a1f71", fontSize: 12, letterSpacing: ".5px" }}>VISA</span> •••• 1817 · 04/28</span></div>
-          <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
-            <button className="btn ghost sm" onClick={() => toast("Opna kortastillingar")}>{t("Uppfæra kort")}</button>
-            <button className="btn ghost sm" onClick={() => toast("Sæki reikninga")}>{t("Reikningar")}</button>
-          </div>
-          <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>{t("Fast mánaðarverð með VSK, 5 notendur innifaldir og 990 kr fyrir hvern til viðbótar. Engin binding.")}</p>
-        </div>
-      </div>
-      )}
+      {/* STRIPE: subscription tab returns here */}
 
       </div>
 
@@ -259,7 +222,6 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
       {rowEdit && <RowEditModal row={rowEdit} onClose={() => setRowEdit(null)} />}
       {keyModal && <ApiKeyModal onClose={() => setKeyModal(false)} />}
       {tplModal && <RuleTemplateModal tpl={tplModal === "new" ? null : tplModal} onClose={() => setTplModal(null)} />}
-      {posName !== null && <PosConnectModal name={posName} onClose={() => setPosName(null)} />}
     </>
   );
 }
@@ -570,7 +532,8 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
   const addPrem = () => setRules((r) => ({ ...r, premiums: [...(r.premiums ?? []), { label: "", pct: 0 }] }));
   const delPrem = (i: number) => setRules((r) => ({ ...r, premiums: (r.premiums ?? []).filter((_, j) => j !== i) }));
 
-  const N = ({ label, value, onChange }: { label: string; value: number | undefined; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) => (
+  // Plain render helper (not a component) so the inputs keep focus across re-renders.
+  const numField = (label: string, value: number | undefined, onChange: (e: React.ChangeEvent<HTMLInputElement>) => void) => (
     <div className="field" style={{ flex: 1, minWidth: 0 }}><label>{label}</label><input inputMode="decimal" value={numVal(value)} onChange={onChange} placeholder="—" /></div>
   );
 
@@ -630,18 +593,18 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
           <div className="hr" />
           <label style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--ink3)", display: "block", marginBottom: 6 }}>{t("Grunnstillingar")}</label>
           <div style={{ display: "flex", gap: 10 }}>
-            <N label={t("Yfirvinna eftir klst/viku")} value={rules.overtime?.afterHoursPerWeek} onChange={setNum((r, n) => { r.overtime = { ...r.overtime, afterHoursPerWeek: n }; })} />
-            <N label={t("Yfirvinna eftir klst/mánuði")} value={rules.overtime?.afterHoursPerMonth} onChange={setNum((r, n) => { r.overtime = { ...r.overtime, afterHoursPerMonth: n }; })} />
-            <N label={t("Yfirvinnuálag %")} value={rules.overtime?.pct} onChange={setNum((r, n) => { r.overtime = { ...r.overtime, pct: n }; })} />
+            {numField(t("Yfirvinna eftir klst/viku"), rules.overtime?.afterHoursPerWeek, setNum((r, n) => { r.overtime = { ...r.overtime, afterHoursPerWeek: n }; }))}
+            {numField(t("Yfirvinna eftir klst/mánuði"), rules.overtime?.afterHoursPerMonth, setNum((r, n) => { r.overtime = { ...r.overtime, afterHoursPerMonth: n }; }))}
+            {numField(t("Yfirvinnuálag %"), rules.overtime?.pct, setNum((r, n) => { r.overtime = { ...r.overtime, pct: n }; }))}
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <N label={t("Lágm. hvíld milli vakta (klst)")} value={rules.rest?.minHoursBetweenShifts} onChange={setNum((r, n) => { r.rest = { ...r.rest, minHoursBetweenShifts: n }; })} />
-            <N label={t("Hámark samfelldir dagar")} value={rules.rest?.maxConsecutiveDays} onChange={setNum((r, n) => { r.rest = { ...r.rest, maxConsecutiveDays: n }; })} />
+            {numField(t("Lágm. hvíld milli vakta (klst)"), rules.rest?.minHoursBetweenShifts, setNum((r, n) => { r.rest = { ...r.rest, minHoursBetweenShifts: n }; }))}
+            {numField(t("Hámark samfelldir dagar"), rules.rest?.maxConsecutiveDays, setNum((r, n) => { r.rest = { ...r.rest, maxConsecutiveDays: n }; }))}
           </div>
           <div style={{ display: "flex", gap: 10 }}>
-            <N label={t("Orlofsdagar á ári")} value={rules.vacation?.daysPerYear} onChange={setNum((r, n) => { r.vacation = { ...r.vacation, daysPerYear: n }; })} />
-            <N label={t("Veikindadagar á ári")} value={rules.sick?.daysPerYear} onChange={setNum((r, n) => { r.sick = { ...r.sick, daysPerYear: n }; })} />
-            <N label={t("Launatengd gjöld %")} value={rules.levies?.pct} onChange={setNum((r, n) => { r.levies = { pct: n }; })} />
+            {numField(t("Orlofsdagar á ári"), rules.vacation?.daysPerYear, setNum((r, n) => { r.vacation = { ...r.vacation, daysPerYear: n }; }))}
+            {numField(t("Veikindadagar á ári"), rules.sick?.daysPerYear, setNum((r, n) => { r.sick = { ...r.sick, daysPerYear: n }; }))}
+            {numField(t("Launatengd gjöld %"), rules.levies?.pct, setNum((r, n) => { r.levies = { pct: n }; }))}
           </div>
           <div className="field"><label>{t("Aðrar reglur (frjáls texti)")}</label>
             <textarea className="lf-ta" rows={3} value={rules.notes ?? ""} onChange={(e) => setRules((r) => ({ ...r, notes: e.target.value }))} placeholder={t("t.d. matartími, ferðakostnaður, sérreglur samnings…")} />
@@ -761,41 +724,6 @@ function RowEditModal({ row, onClose }: { row: { kind: "location" | "position"; 
             <button className="btn" disabled={busy} onClick={save}>{t("Vista")}</button>
             <button className="btn ghost" disabled={busy} onClick={remove} style={{ color: "var(--bad)" }}>{t("Eyða")}</button>
             <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PosConnectModal({ name, onClose }: { name: string; onClose: () => void }) {
-  const { t } = useLang();
-  const [busy, setBusy] = useState(false);
-  const title = name || t("Sölukerfi");
-  async function request() {
-    setBusy(true);
-    await new Promise((r) => setTimeout(r, 300));
-    setBusy(false);
-    onClose();
-    toast(t("Takk! Við höfum samband um tengingu."));
-  }
-  return (
-    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="mbg" onClick={onClose} />
-      <div className="modal">
-        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Tengja")} {title}</div><button className="x" onClick={onClose}>✕</button></div>
-        <div className="mb">
-          <p className="muted" style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>
-            {t("VAKTO les veltu í rauntíma úr sölukerfinu þínu og reiknar launahlutfall jafnóðum. Veldu hvað þú vilt fylgjast með:")}
-          </p>
-          <div className="att" style={{ marginBottom: 12 }}>
-            <div className="it"><div className="ic good">$</div><div className="tx"><b>{t("Söluvelta")}</b><span>{t("t.d. Dineout, SalesCloud, POS — sala til viðskiptavina")}</span></div></div>
-            <div className="it"><div className="ic info">IN</div><div className="tx"><b>{t("Framleiðsluvelta")}</b><span>{t("t.d. Inventra — framleitt/afgreitt magn")}</span></div></div>
-          </div>
-          <p className="muted" style={{ fontSize: 12, lineHeight: 1.55 }}>{t("Tengingin krefst aðgangs frá þjónustuaðilanum. Sláðu inn áhuga og við setjum hana upp með þér.")}</p>
-          <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
-            <button className="btn" disabled={busy} onClick={request}>{busy ? t("Sendi…") : t("Óska eftir tengingu")}</button>
-            <button className="btn ghost" onClick={onClose}>{t("Loka")}</button>
           </div>
         </div>
       </div>

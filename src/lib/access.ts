@@ -2,13 +2,14 @@
 // Source of truth = the sidebar nav roles (prototype wins over the brief where
 // they differ, per CLAUDE.md). Owner is a superuser (also enables the owner's
 // "view as role" preview to reach employee/contractor screens).
-import { NAV_GROUPS, FOOT_ITEMS, type Role } from "@/components/app/nav";
+import { NAV_GROUPS, FOOT_ITEMS, EXTRA_ROUTES, type Role } from "@/components/app/nav";
 
 // Build href -> allowed-roles from the nav definition.
 const ROUTE_ROLES: Record<string, Role[]> = (() => {
   const map: Record<string, Role[]> = {};
   for (const g of NAV_GROUPS) for (const i of g.items) map[i.href] = i.roles;
   for (const i of FOOT_ITEMS) map[i.href] = i.roles;
+  for (const i of EXTRA_ROUTES) map[i.href] = i.roles;
   return map;
 })();
 
@@ -24,5 +25,5 @@ export function canAccess(role: Role, pathname: string): boolean {
 
 /** Where to send a role that hits a route it may not access. */
 export function homeFor(role: Role): string {
-  return role === "employee" || role === "contractor" ? "/mitt-svaedi" : "/maelabord";
+  return role === "employee" || role === "contractor" ? "/stimpla" : "/maelabord";
 }

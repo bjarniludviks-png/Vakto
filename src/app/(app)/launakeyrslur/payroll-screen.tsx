@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { PeriodPicker } from "@/components/app/period-picker";
-import { dec1, nf } from "@/lib/format";
+import { dec1 } from "@/lib/format";
+import { BURDEN } from "@/lib/payroll";
 import { getSettleCandidates, type SettleCandidate } from "./actions";
 import { toast } from "@/components/app/toast";
 import { Stacked } from "@/components/app/charts";
@@ -14,13 +16,15 @@ import type { PayrollView } from "./payroll.server";
 import { runPayroll, getPayrollPeriod, getPayrollHistory, type PeriodPayroll, type PayrollHistory } from "./actions";
 
 const MO = ["jan", "feb", "mar", "apr", "maí", "jún", "júl", "ágú", "sep", "okt", "nóv", "des"];
-const BASE = [4.8, 5.8, 3.9, 5.7, 5.6, 4.46, 4.7, 3.4, 6.7, 6.3, 5.2, 5.4];
-const PAY = BASE.map((b) => [b, b * 0.22, b * 0.2, b * 0.12, b * 0.08]);
+const MONTHS_IS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
+// "+30,2% byrði" comes from the payroll engine — never a literal.
+const BURDEN_PCT = (Math.round(BURDEN * 1000) / 10).toString().replace(".", ",");
 
 const PRESETS: { k: string; label: string }[] = [
   { k: "this", label: "Þessi mánuður" }, { k: "last", label: "Síðasti mánuður" }, { k: "custom", label: "Sérsniðið" },
 ];
 const isoD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+const niceISO = (s: string) => { const [y, m, d] = s.split("-").map(Number); return `${d}. ${MONTHS_IS[m - 1]} ${y}`; };
 function payRange(k: string, cf: string, ct: string, startDay = 1): { from: string; to: string } {
   if (k === "custom") return { from: cf, to: ct };
   const t = new Date();
@@ -46,6 +50,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
   const [pp, setPp] = useState<PeriodPayroll | null>(null);
   const [settleIds, setSettleIds] = useState<string[]>([]);
   const [tbModal, setTbModal] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const range = payRange(period, cf, ct, periodStart);
   useEffect(() => {
@@ -57,7 +62,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period, cf, ct, view.live]);
 
-  // Real payroll history for the year chart (live companies only).
+  // Real payroll history for the year chart.
   const [histYear, setHistYear] = useState(new Date().getFullYear());
   const [hist, setHist] = useState<PayrollHistory | null>(null);
   useEffect(() => {
@@ -68,15 +73,17 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
   const usePp = view.live && pp;
   const ROWS = usePp ? pp.rows : view.rows;
   const T = usePp ? pp.totals : view.totals;
-  const periodLabel = usePp ? pp.periodLabel : "21. maí – 20. júní 2026";
+  const periodLabel = usePp ? pp.periodLabel : `${niceISO(range.from)} – ${niceISO(range.to)}`;
+  const pending = usePp ? pp.pendingPunches : null;
   const qs = `?format=$F&from=${range.from}&to=${range.to}`;
   function download(format: "payday" | "excel" | "dk") {
+    setExportOpen(false);
     window.location.href = `/api/payroll/export${qs.replace("$F", format)}`;
   }
   async function keyra() {
-    const res = await runPayroll(view.live ? range.from : undefined, view.live ? range.to : undefined, settleIds);
-    if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
-    toast(res.demo ? `Launakeyrsla keyrð (demo — ${res.count} starfsm.)` : `Launakeyrsla keyrð & vistuð — ${res.count} starfsmenn`);
+    const res = await runPayroll(range.from, range.to, settleIds);
+    if (!res.ok) { toast(res.error ?? t("Tókst ekki")); return; }
+    toast(`${t("Launakeyrsla keyrð & vistuð")} — ${res.count} ${t("starfsmenn")}`);
   }
   if (empty) {
     return (
@@ -91,17 +98,50 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
       </>
     );
   }
+  if (!view.live) {
+    return (
+      <>
+        <PageHeader title="Launakeyrslur" subtitle="Launagreiðslur · 2026" />
+        <div className="card" style={{ marginTop: 16, maxWidth: 520 }}>
+          <div className="cb">
+            <div className="ct">{t("Supabase er ekki tengt")}</div>
+            <p className="muted" style={{ fontSize: 13, margin: "6px 0 0" }}>{t("Launakeyrslur birtast þegar gagnagrunnurinn er tengdur og þú ert innskráð(ur).")}</p>
+          </div>
+        </div>
+      </>
+    );
+  }
   return (
     <>
       <PageHeader
         title="Launakeyrslur"
         subtitle="Launagreiðslur · 2026"
         actions={
-          <span style={{ display: "inline-flex", gap: 8 }}>
-            <button className="btn ghost sm" onClick={() => download("payday")}>{t("↗ Payday")}</button>
-            <button className="btn ghost sm" onClick={() => download("dk")}>{t("↗ DK")}</button>
-            <button className="btn ghost sm" onClick={() => download("excel")}>Excel</button>
-          </span>
+          <div style={{ position: "relative" }}>
+            <button className="btn ghost sm" aria-haspopup="menu" aria-expanded={exportOpen} onClick={() => setExportOpen((v) => !v)}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Flytja út")}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginLeft: 4 }}><path d="M6 9l6 6 6-6" /></svg>
+            </button>
+            {exportOpen && (
+              <>
+                <div style={{ position: "fixed", inset: 0, zIndex: 55 }} onClick={() => setExportOpen(false)} />
+                <div className="tmenu show" role="menu" style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", left: "auto", minWidth: 230 }}>
+                  <div className="mi" role="menuitem" onClick={() => download("payday")}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 10h18M9 4v16" /></svg>
+                    <span>Payday <span className="muted" style={{ fontSize: 11.5 }}>· {t("tímaskrá")} (.xlsx)</span></span>
+                  </div>
+                  <div className="mi" role="menuitem" onClick={() => download("dk")}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 3v5h5" /><path d="M7 3h7l5 5v11a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" /></svg>
+                    <span>DK <span className="muted" style={{ fontSize: 11.5 }}>· (.csv)</span></span>
+                  </div>
+                  <div className="mi" role="menuitem" onClick={() => download("excel")}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 9h18M3 14h18M9 4v16M15 4v16" /></svg>
+                    <span>Excel <span className="muted" style={{ fontSize: 11.5 }}>· {t("sundurliðun per starfsmann")}</span></span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         }
       />
 
@@ -119,7 +159,15 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
       <div className="dhero" style={{ marginBottom: 20 }}>
         <div className="dhero-head">
           <span className="dhero-badge">{t("Launatímabil")} · {periodLabel}</span>
-          <span className="badge" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Samþykktir tímar")}</span>
+          {/* Real approval state: green only when every closed punch in the period is approved. */}
+          {pending === 0 && (
+            <span className="badge" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Samþykktir tímar")}</span>
+          )}
+          {pending != null && pending > 0 && (
+            <Link href="/timaskraning" className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)", textDecoration: "none" }} title={t("Opna tímaskráningu til að samþykkja")}>
+              {pending} {pending === 1 ? t("óafgreidd stimplun") : t("óafgreiddar stimplanir")}
+            </Link>
+          )}
         </div>
         <div className="dhero-body">
           <div className="dflow">
@@ -130,7 +178,6 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
             <div className="fs"><div className="l">{t("Brúttó")}</div><div className="v">{T.grossM} <small style={{ fontSize: 14, color: "var(--ink3)", fontWeight: 600 }}>m.kr.</small></div></div>
           </div>
           <div className="payacts">
-            <button className="btn ghost sm" onClick={() => toast("Forskoða launakeyrslu")}>{t("Forskoða")}</button>
             <button className="btn ghost sm" style={settleIds.length ? { borderColor: "var(--brand)", color: "var(--brand)" } : undefined}
               title={t("Jafnar mínus-stöðu tímabanka á GRUNNTAXTA — yfirvinnuálagið helst alltaf hjá starfsmanninum")}
               onClick={() => setTbModal(true)}>
@@ -142,18 +189,18 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
       </div>
 
       {usePp && pp.needsMigration && (
-        <div className="ai" style={{ marginBottom: 16 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg><div className="x">{t("Keyrðu migration 0008 — núna teljast allir lokaðir tímar, ekki bara samþykktir.")}</div></div>
+        <div className="ai" style={{ marginBottom: 16 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg><div className="x">{t("Samþykkt tíma er ekki virk í þessum gagnagrunni — allir lokaðir tímar teljast með.")}</div></div>
       )}
 
       <div className="kpis">
         <div className="kpi"><div className="lab">{t("Útborgað")}</div><div className="val">{T.netM} <small>m.kr.</small></div></div>
-        <div className="kpi"><div className="lab">{t("Heildarkostnaður")}</div><div className="val">{T.costM} <small>m.kr.</small></div><div className="d mut">+30,2% {t("byrði")}</div></div>
+        <div className="kpi"><div className="lab">{t("Heildarkostnaður")}</div><div className="val">{T.costM} <small>m.kr.</small></div><div className="d mut">+{BURDEN_PCT}% {t("byrði")}</div></div>
         <div className="kpi"><div className="lab">{t("Staðgreiðsla")}</div><div className="val">{T.withholdingM} <small>m.kr.</small></div></div>
         <div className="kpi"><div className="lab">{t("Tryggingagjald")}</div><div className="val">{T.insuranceM} <small>m.kr.</small></div></div>
       </div>
 
       <div className="card" style={{ marginTop: 20 }}>
-        <div className="ch"><div><div className="ct">{t("Launakeyrsla — sundurliðun per starfsmann")}</div><div className="cs">{periodLabel} · {t("aðeins samþykktir tímar")}</div></div><button className="btn ghost sm" onClick={() => download("excel")}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Allir seðlar")}</button></div>
+        <div className="ch"><div><div className="ct">{t("Launakeyrsla — sundurliðun per starfsmann")}</div><div className="cs">{periodLabel} · {t("aðeins samþykktir tímar")}</div></div></div>
         <div className="cb tbl" style={{ paddingTop: 8 }}>
           <table>
             <thead><tr><th>{t("Starfsmaður")}</th><th className="r">{t("Tímar")}</th><th className="r">{t("Brúttó")}</th><th className="r">{t("Staðgreiðsla")}</th><th className="r">{t("Lífeyrir+félag")}</th><th className="r">{t("Útborgað")}</th></tr></thead>
@@ -187,16 +234,14 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
         </div>
         <div className="cb">
           {(() => {
-            // Live: real runs only. Demo (logged-out preview): illustrative data.
+            // Real runs only — the chart builds up as payroll runs are saved.
             const liveMonths = hist?.months ?? [];
             const hasData = liveMonths.some((m) => m.net > 0);
             const mkr = (n: number) => Math.round(n / 100000) / 10;
-            const data = view.live
-              ? liveMonths.map((m) => [mkr(m.net), mkr(m.withholding), mkr(m.pension), mkr(m.insurance), mkr(m.orlof)])
-              : PAY;
-            if (view.live && !hasData) {
+            if (!hasData) {
               return <p className="muted" style={{ fontSize: 13, margin: 0 }}>{t("Sögulega yfirlitið byggist upp þegar þú keyrir launakeyrslur — engin keyrsla er enn vistuð fyrir")} {histYear}.</p>;
             }
+            const data = liveMonths.map((m) => [mkr(m.net), mkr(m.withholding), mkr(m.pension), mkr(m.insurance), mkr(m.orlof)]);
             return (<>
               <Stacked data={data} cols={MO} segs={["var(--good)", "var(--warn)", "var(--brand)", "var(--teal)", "#c9ccd6"]} segNames={[t("Útborgað"), t("Staðgreiðsla"), t("Lífeyrir"), t("Tryggingagjald"), t("Orlof")]} />
               <div className="legend">
@@ -208,37 +253,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
         </div>
       </div>
 
-      <div className="grid2b">
-        <div className="card">
-          <div className="ch"><div className="ct">{t("Byrði")} — {periodLabel}</div></div>
-          <div className="cb">
-            {(() => {
-              const num = (x: string) => Number(String(x).replace(/[^\d]/g, "")) || 0;
-              const gross = num(T.gross);
-              const orlof = Math.round(gross * 0.1017);
-              const pens = Math.round(gross * 0.115);
-              const trygg = Math.round(gross * 0.0635);
-              return (<>
-                <div className="statline"><span className="k">{t("Brúttólaun")}</span><span className="v">{nf(gross)} kr</span></div>
-                <div className="statline"><span className="k">{t("Orlof 10,17%")}</span><span className="v muted">+{nf(orlof)} kr</span></div>
-                <div className="statline"><span className="k">{t("Mótframlag lífeyris 11,5%")}</span><span className="v muted">+{nf(pens)} kr</span></div>
-                <div className="statline"><span className="k">{t("Tryggingagjald 6,35%")}</span><span className="v muted">+{nf(trygg)} kr</span></div>
-                <div className="statline"><span className="k" style={{ fontWeight: 650, color: "var(--ink)" }}>{t("Heildarkostnaður")}</span><span className="v" style={{ fontSize: 15 }}>{nf(gross + orlof + pens + trygg)} kr</span></div>
-              </>);
-            })()}
-          </div>
-        </div>
-        <div className="card">
-          <div className="ch"><div className="ct">{t("Útflutningur")}</div></div>
-          <div className="cb">
-            <div className="att">
-              <div className="it"><div className="ic good">P</div><div className="tx"><b>Payday</b><span>{t("tímaskrá (Excel) — hlaðið upp undir Ný launakeyrsla → Hlaða upp tímaskrá")}</span></div><button className="btn sm" onClick={() => download("payday")}>{t("Flytja")}</button></div>
-              <div className="it"><div className="ic info">XL</div><div className="tx"><b>Excel</b><span>{t("sundurliðun per starfsmann")}</span></div><button className="btn ghost sm" onClick={() => download("excel")}>{t("Sækja")}</button></div>
-            </div>
-            <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>{t("Vakto reiknar — Payday sér um skil, greiðslur og opinbera skýrslugerð.")}</p>
-          </div>
-        </div>
-      </div>
+      <p className="muted" style={{ fontSize: 12, marginTop: 14 }}>{t("Vakto reiknar — Payday sér um skil, greiðslur og opinbera skýrslugerð.")}</p>
 
       {tbModal && <SettleModal selected={settleIds} onSave={(ids) => { setSettleIds(ids); setTbModal(false); }} onClose={() => setTbModal(false)} />}
       {slip && <PayslipModal data={slip} onClose={() => setSlip(null)} />}

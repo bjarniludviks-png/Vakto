@@ -4,7 +4,7 @@ import Anthropic from "@anthropic-ai/sdk";
 export type AiItem = { kind: "good" | "info" | "warn" | "bad"; title: string; detail: string; tag: string };
 /** One proposed shift: day 0=mánudagur … 6=sunnudagur, times HH:MM. */
 export type AiShift = { employee: string; day: number; start: string; end: string };
-export type AiProposal = { summary: string; items: AiItem[]; laborPct: string; shifts: AiShift[]; live: boolean };
+export type AiProposal = { summary: string; items: AiItem[]; laborPct: string; shifts: AiShift[] };
 
 const SCHEMA = {
   type: "object",
@@ -59,25 +59,15 @@ sem hlutur {employee, day, start, end} þar sem day er 0=mánudagur … 6=sunnud
 Notaðu fornöfnin nákvæmlega eins og þau birtast í samhenginu. Ef starfsmaður í tillögunni á að halda
 núverandi vakt skaltu samt hafa hana með (planið fyrir viðkomandi er skipt út í heild).`;
 
-const DEMO: AiProposal = {
-  summary: "VAKTO bjó til eftirfarandi tillögu:",
-  laborPct: "31,8%",
-  shifts: [],
-  live: false,
-  items: [
-    { kind: "good", title: "14 vaktir búnar til", detail: "Ómar · 2-2-3 mynstur · 11:00–22:00 · maí 2026", tag: "+128 klst" },
-    { kind: "info", title: "Hvíldartími virtur", detail: "11 klst milli vakta — engin brot", tag: "ok" },
-    { kind: "warn", title: "Yfirvinna", detail: "4 klst yfir starfshlutfalli — staðfestu eða dreifðu", tag: "+9.800 kr" },
-    { kind: "info", title: "Laun af tekjum", detail: "helst í 31,8% — undir 33% viðmiði", tag: "31,8%" },
-  ],
-};
-
+/** True when ANTHROPIC_API_KEY is set — the AI schedule UI is hidden otherwise. */
 export function isAiConfigured() {
   return Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
+/** Ask Claude for a schedule proposal. Throws on any failure — there is no
+ * canned fallback; the caller surfaces the error to the user. */
 export async function getAiScheduleProposal(prompt: string, context: string): Promise<AiProposal> {
-  if (!isAiConfigured()) return { ...DEMO, summary: prompt ? `„${prompt}" — ${DEMO.summary}` : DEMO.summary };
+  if (!isAiConfigured()) throw new Error("AI er ekki virkt");
 
   const client = new Anthropic();
   const response = await client.messages.create({
@@ -99,6 +89,5 @@ export async function getAiScheduleProposal(prompt: string, context: string): Pr
   }
   const text = response.content.find((b) => b.type === "text");
   if (!text || text.type !== "text") throw new Error("Ekkert svar frá AI");
-  const parsed = JSON.parse(text.text) as Omit<AiProposal, "live">;
-  return { ...parsed, live: true };
+  return JSON.parse(text.text) as AiProposal;
 }

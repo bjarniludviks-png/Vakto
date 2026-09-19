@@ -12,8 +12,8 @@ import {
   type Conversation, type ChatMessage, type Person, type Members,
 } from "./actions";
 
+import { REACTIONS } from "@/lib/reactions";
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "🔥", "👏", "😅", "😮", "😢", "💪", "✅", "🤝", "☕", "🍕", "🚀"];
-const REACTIONS = ["❤️", "😂", "😮", "😢", "👍", "🔥"];
 
 /** "Í dag" / "Í gær" / "24. ágúst" day separators between messages. */
 function dayLabel(iso: string): string {
@@ -57,9 +57,11 @@ function ConvAvatar({ c, size = 40 }: { c: Conversation; size?: number }) {
   return <span className="avt" style={{ background: c.color, width: size, height: size, fontSize: c.kind === "general" ? size * 0.45 : size * 0.33 }}>{c.av}</span>;
 }
 
-export default function ChatScreen({ initial }: { initial?: { ok: boolean; items: Conversation[]; meId: string } }) {
+/** `embedded`: rendered inside another page (Laun & spjall tabs) — inline
+ * instead of the fixed full-bleed panel, so the page's own chrome stays visible. */
+export default function ChatScreen({ initial, embedded = false }: { initial?: { ok: boolean; items: Conversation[]; meId: string }; embedded?: boolean }) {
   if (!initial?.ok) return <DemoChat />;
-  return <Messenger initial={initial} />;
+  return <Messenger initial={initial} embedded={embedded} />;
 }
 
 // Last-seen timestamps per conversation (client-side unread markers).
@@ -76,7 +78,7 @@ function convTime(iso: string | null): string {
   return `${d.getDate()}.${d.getMonth() + 1}.`;
 }
 
-function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[]; meId: string } }) {
+function Messenger({ initial, embedded = false }: { initial: { ok: boolean; items: Conversation[]; meId: string }; embedded?: boolean }) {
   const { t } = useLang();
   const [convs, setConvs] = useState<Conversation[]>(initial.items);
   const [active, setActive] = useState<Conversation | null>(initial.items[0] ?? null);
@@ -269,7 +271,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
 
   return (
     <>
-      <div ref={wrapRef} className={`msgr full${active ? " thread-open" : ""}`}>
+      <div ref={wrapRef} className={`msgr${embedded ? "" : " full"}${active ? " thread-open" : ""}`} style={embedded ? { height: "calc(100dvh - 215px)" } : undefined}>
         {/* conversation list */}
         <div className="msgr-list">
           <div className="msgr-head" style={{ gap: 8 }}>
@@ -578,7 +580,7 @@ function DemoChat() {
     <>
       <PageHeader title="Spjall" subtitle="Innra spjall fyrirtækisins" />
       <div className="card" style={{ marginTop: 16 }}>
-        <div className="cb"><p className="muted" style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}>{t("Spjallið virkjast þegar þú ert innskráð/ur og Supabase er tengt (migrations 0012 + 0014).")}</p></div>
+        <div className="cb"><p className="muted" style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}>{t("Spjallið er ekki tiltækt núna — reyndu að endurhlaða síðuna.")}</p></div>
       </div>
     </>
   );

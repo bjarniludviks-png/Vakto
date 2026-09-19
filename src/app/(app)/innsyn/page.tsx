@@ -20,9 +20,12 @@ export default async function InnsynPage({ searchParams }: { searchParams: Promi
   ]);
   const d = scope.departments;
   const owner = scope.role === "owner";
+  // The AI card only exists when the key is set — never a canned fallback.
+  const aiEnabled = !!process.env.ANTHROPIC_API_KEY;
   return (
     <InsightsTabs
       owner={owner}
+      aiEnabled={aiEnabled}
       initialTab={tab === "timar" ? "timar" : "rekstur"}
       empty={empty}
       perf={{ live: perf.live, perf, staffing, history, insights }}

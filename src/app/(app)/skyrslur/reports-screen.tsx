@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CustomSections, CustomizeButton } from "@/components/app/section-prefs";
+import Link from "next/link";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
@@ -29,48 +29,17 @@ function rangeFor(period: Period): { from: string; to: string } {
   return { from: isoOf(mon), to: isoOf(sun) };
 }
 
-// Period factors relative to the weekly baseline (demo analytics scale by period).
-const PERIODS: Period[] = ["Dagur", "Vika", "Mánuður", "Ársfj.", "Ár", "Sérsniðið"];
-const FACTOR: Record<string, number> = { "Dagur": 1 / 5, "Vika": 1, "Mánuður": 4.33, "Ársfj.": 13, "Ár": 52 };
-const daysBetween = (a: string, b: string) => a && b ? Math.max(1, Math.round((Date.parse(b) - Date.parse(a)) / 86400000) + 1) : 7;
+const ExportIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>;
 
-/** Scale an Icelandic-formatted number string by a factor, preserving sign + decimals. */
-function sc(s: string, f: number): string {
-  const t = s.trim();
-  const lead = t[0] === "+" ? "+" : "";
-  const neg = t[0] === "−" || t[0] === "-";
-  const body = t.replace(/^[+−-]/, "");
-  const hadDec = body.includes(",");
-  let n = parseFloat(body.replace(/\./g, "").replace(",", ".")) * f;
-  if (neg) n = -n;
-  const abs = hadDec ? dec1(Math.abs(n)) : nf(Math.round(Math.abs(n)));
-  return (n < 0 ? "−" : lead) + abs;
-}
-
-const PVA = [
-  { n: "Mína", d: "Eldhús", pl: "47,0", ac: "49,2", fr: "+2,2", frC: "var(--bad)", pw: "+1,8", cost: "207.700" },
-  { n: "Bach", d: "Sal", pl: "40,0", ac: "39,1", fr: "−0,9", frC: "var(--good)", pw: "−0,4", cost: "165.100" },
-  { n: "Phong", d: "Eldhús", pl: "39,0", ac: "39,4", fr: "+0,4", frC: "", pw: "+0,2", cost: "166.400" },
-  { n: "Ómar", d: "Sal", pl: "40,0", ac: "48,0", fr: "+8,0", frC: "var(--bad)", pw: "+6,5", pwC: "var(--bad)", cost: "202.700" },
-];
-const BANK = [
-  { n: "Mína", req: "162", w: "171", b: "+9,0", c: "var(--good)" },
-  { n: "Ómar", req: "130", w: "148", b: "+18,0", c: "var(--bad)" },
-  { n: "Ha Vu", req: "120", w: "112", b: "−8,0", c: "var(--warn)" },
-  { n: "Bach", req: "162", w: "160", b: "−2,0", c: "" },
-];
+// The three manager reports that matter: profitability, labor cost, attendance.
 const LIB: { kind: ReportKind; title: string; sub: string; fmt: "Excel" | "PDF"; icon: string }[] = [
-  { kind: "hours", title: "Launatímar per starfsmaður", sub: "dagvinna, álag og yfirvinna fyrir launakeyrslu", fmt: "Excel", icon: "M4 6h16M4 12h16M4 18h10" },
-  { kind: "overtime", title: "Yfirvinna & álög", sub: "sundurliðun á álagstímum og aukakostnaði", fmt: "PDF", icon: "M3 17l5-5 4 3 6-7" },
-  { kind: "attendance", title: "Mæting & frávik", sub: "áætlað vs raun, vantar útstimplun", fmt: "PDF", icon: "CLOCK" },
-  { kind: "timebank", title: "Orlof & tímabanki", sub: "áunnið orlof og staða tímabanka per starfsmann", fmt: "Excel", icon: "M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5" },
+  { kind: "profit", title: "Arðsemi (laun % af veltu)", sub: "velta, launakostnaður og laun% per mánuð", fmt: "Excel", icon: "M3 17l5-5 4 3 6-7" },
   { kind: "cost", title: "Launakostnaður per starfsmaður", sub: "grunnlaun, álag, yfirvinna, gjöld og heild", fmt: "Excel", icon: "M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" },
-  { kind: "costDept", title: "Kostnaður per deild", sub: "samanburður á deildum — klst, kostnaður og hlutfall", fmt: "PDF", icon: "M3 21h18M5 21V7l5-4v18M14 21V11l5-3v13" },
-  { kind: "absence", title: "Fjarvistir & veikindi", sub: "veikindadagar, orlof og aðrar fjarvistir", fmt: "Excel", icon: "M8 2v4M16 2v4M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" },
+  { kind: "attendance", title: "Mæting & frávik", sub: "áætlað vs raun, vantar útstimplun", fmt: "PDF", icon: "CLOCK" },
 ];
 
-/** Downloadable manager reports — filter-first (period, department, employee),
- * then pick the metric. Real data, Excel/PDF. */
+/** Downloadable manager reports — filter-first (department, employee), then
+ * pick the report. Real data only, Excel/PDF. */
 function ReportLibrary({ from, to, departments }: { from: string; to: string; departments: string[] }) {
   const { t } = useLang();
   const [busy, setBusy] = useState<ReportKind | null>(null);
@@ -88,11 +57,11 @@ function ReportLibrary({ from, to, departments }: { from: string; to: string; de
       if (!rep.rows.length) { toast("Engin gögn á tímabilinu"); return; }
       const payload = { title: rep.title, company: rep.company, from, to, columns: rep.columns, numeric: rep.numeric, rows: rep.rows };
       if (item.fmt === "Excel") await exportTableXlsx(payload); else await exportTablePdf(payload);
-      toast(rep.demo ? `${rep.title} — sýnigögn (tengdu Supabase)` : `${rep.title} sótt`);
+      toast(`${rep.title} sótt`);
     } catch { toast("Villa við útflutning"); } finally { setBusy(null); }
   }
   return (
-    <div className="card">
+    <div className="card" style={{ marginTop: 16 }}>
       <div className="ch"><div><div className="ct">{t("Skýrslusafn")}</div><div className="cs">{t("veldu fyrst síur — svo skýrsluna sem þú vilt sækja")}</div></div></div>
       <div className="cb" style={{ paddingBottom: 0 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
@@ -120,37 +89,23 @@ function ReportLibrary({ from, to, departments }: { from: string; to: string; de
   );
 }
 
-export default function ReportsScreen({ empty = false, live = false, embedded = false, rows = [], timebank }: { empty?: boolean; live?: boolean; embedded?: boolean; rows?: AttRow[]; timebank?: TimeBank }) {
+/** Small honest notice when the app runs without a database connection. */
+export function NotConnectedCard() {
   const { t } = useLang();
+  return (
+    <div className="card" style={{ marginTop: 20 }}>
+      <div className="cb">
+        <b style={{ fontSize: 14 }}>{t("Supabase er ekki tengt")}</b>
+        <p className="muted" style={{ fontSize: 13, margin: "6px 0 0", lineHeight: 1.55 }}>{t("Gögn birtast hér þegar gagnagrunnurinn er tengdur — sjá supabase/README.md.")}</p>
+      </div>
+    </div>
+  );
+}
+
+export default function ReportsScreen({ empty = false, live = false, embedded = false, rows = [], timebank, aiEnabled = false }: { empty?: boolean; live?: boolean; embedded?: boolean; rows?: AttRow[]; timebank?: TimeBank; aiEnabled?: boolean }) {
   const head = (actions?: React.ReactNode) => embedded
     ? (actions ? <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>{actions}</div> : null)
     : <PageHeader title="Skýrslur" subtitle="Greiningar og frammistaða" actions={actions} />;
-  const [period, setPeriod] = useState<Period>("Vika");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [search, setSearch] = useState("");
-  const [deptF, setDeptF] = useState("all");
-  const [compare, setCompare] = useState("prev");
-  const [exporting, setExporting] = useState(false);
-  async function doExport(kind: "xlsx" | "pdf") {
-    const range = period === "Sérsniðið" && from && to ? { from, to } : rangeFor(period);
-    setExporting(true);
-    const rep = await getTimeReport(range.from, range.to);
-    setExporting(false);
-    if (!rep.ok) { toast("Tókst ekki að sækja gögn"); return; }
-    if (!rep.rows.length) { toast("Engar tímafærslur á tímabilinu"); return; }
-    try {
-      if (kind === "xlsx") await exportTimeReportXlsx(rep.rows, rep.company || "VAKTO", range.from, range.to);
-      else await exportTimeReportPdf(rep.rows, rep.company || "VAKTO", range.from, range.to);
-      toast(rep.needsMigration ? "Skýrsla sótt (staða óviss — keyrðu migration 0008)" : (kind === "xlsx" ? "Excel-skýrsla sótt" : "PDF-skýrsla sótt"));
-    } catch { toast("Villa við útflutning"); }
-  }
-  const f = period === "Sérsniðið" ? daysBetween(from, to) / 7 : FACTOR[period];
-  const cmpCol = compare === "year" ? "Í fyrra" : compare === "none" ? "—" : "Fyrri tímabil";
-  const cmpBadge = compare === "none" ? "Án samanburðar" : compare === "year" ? `${t("vs í fyrra")}` : `${t("vs fyrri")} ${period === "Sérsniðið" ? t("tímabil") : t(period)}`;
-  const matchName = (n: string) => !search || n.toLowerCase().includes(search.toLowerCase());
-  const shownPVA = PVA.filter((r) => (deptF === "all" || r.d === deptF) && matchName(r.n));
-  const shownBANK = BANK.filter((r) => matchName(r.n));
   if (empty) {
     return (
       <>
@@ -164,76 +119,11 @@ export default function ReportsScreen({ empty = false, live = false, embedded = 
       </>
     );
   }
-  // Live company: real planned vs actual + time-bank, with period/range/search.
-  if (live) return <LiveReports initial={rows} timebank={timebank} embedded={embedded} />;
-  return (
-    <>
-      {head(
-        <>
-          <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
-          <button className="btn ghost sm" style={{ marginLeft: 8 }} disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
-        </>
-      )}
-
-      <FilterBar
-        periods={PERIODS} period={period} onPeriod={setPeriod}
-        from={from} to={to} onRange={(a, b) => { setFrom(a); setTo(b); }}
-        search={search} onSearch={setSearch}
-        filters={[{ value: deptF, onChange: setDeptF, options: [{ value: "all", label: "Allar deildir" }, { value: "Eldhús", label: "Eldhús" }, { value: "Sal", label: "Sal" }] }]}
-        compare={compare} onCompare={setCompare}
-        rangeLabel={cmpBadge}
-      />
-
-      <div className="kpis">
-        <div className="kpi"><div className="lab">{t("Velta á starfsmann")}</div><div className="val">{sc("358", f)} <small>þ kr</small></div><div className="d up">▲ 3,2%</div></div>
-        <div className="kpi"><div className="lab">{t("Velta á launatíma")}</div><div className="val">11.685 <small>kr</small></div><div className="d up">▲ 2,3%</div></div>
-        <div className="kpi"><div className="lab">{t("Yfirvinna % af tímum")}</div><div className="val" style={{ color: "var(--warn)" }}>4,8%</div><div className="d dn">▲ 0,7 {t("stig")}</div></div>
-        <div className="kpi"><div className="lab">{t("Mætingahlutfall")}</div><div className="val" style={{ color: "var(--good)" }}>96,2%</div><div className="d up">▲ 1,1 {t("stig")}</div></div>
-      </div>
-
-      <div className="card" style={{ marginTop: 20 }}>
-        <div className="ch"><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{t("áætlað á móti klukknuðum tímum — þessi vika vs fyrri vika")}</div></div>
-        <div className="cb tbl" style={{ paddingTop: 8 }}>
-          <table>
-            <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th>{compare !== "none" && <th className="r">{t(cmpCol)}</th>}<th className="r">{t("Raun kostn.")}</th></tr></thead>
-            <tbody>
-              {shownPVA.map((r) => (
-                <tr key={r.n}>
-                  <td>{r.n}</td><td>{r.d}</td><td className="r">{sc(r.pl, f)}</td><td className="r">{sc(r.ac, f)}</td>
-                  <td className="r" style={r.frC ? { color: r.frC } : undefined}>{sc(r.fr, f)}</td>
-                  {compare !== "none" && <td className={`r${r.pwC ? "" : " muted"}`} style={r.pwC ? { color: r.pwC } : undefined}>{sc(r.pw, f)}</td>}
-                  <td className="r">{sc(r.cost, f)}</td>
-                </tr>
-              ))}
-              {!shownPVA.length && <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 18 }}>{t("Enginn starfsmaður fannst")}</td></tr>}
-              {shownPVA.length > 0 && <tr className="foot"><td style={{ textAlign: "left" }}>{t("Samtals")} · {shownPVA.length} {t("starfsm.")}</td><td></td><td className="r">{sc("368,0", f)}</td><td className="r">{sc("374,6", f)}</td><td className="r">{sc("+6,6", f)}</td>{compare !== "none" && <td className="r">{sc("+5,1", f)}</td>}<td className="r">{sc("1.401.900", f)}</td></tr>}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div className="grid2">
-        <div className="card">
-          <div className="ch"><div className="ct">{t("Tímabanki starfsfólks")}</div><div className="cs">{t("uppsafnað +/− vs vinnuskylda")}</div></div>
-          <div className="cb tbl" style={{ paddingTop: 8 }}>
-            <table>
-              <thead><tr><th>{t("th:Starfsm.")}</th><th className="r">{t("Vinnuskylda")}</th><th className="r">{t("Unnið")}</th><th className="r">{t("Staða banka")}</th></tr></thead>
-              <tbody>
-                {shownBANK.map((r) => (
-                  <tr key={r.n}><td>{r.n}</td><td className="r">{sc(r.req, f)}</td><td className="r">{sc(r.w, f)}</td><td className={`r${r.c ? "" : " muted"}`} style={r.c ? { color: r.c } : undefined}>{sc(r.b, f)}</td></tr>
-                ))}
-                {!shownBANK.length && <tr><td colSpan={4} className="muted" style={{ textAlign: "center", padding: 18 }}>{t("Enginn starfsmaður fannst")}</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        <ReportLibrary from={period === "Sérsniðið" && from && to ? from : rangeFor(period).from} to={period === "Sérsniðið" && from && to ? to : rangeFor(period).to} departments={["Eldhús", "Sal", "Stjórnun"]} />
-      </div>
-    </>
-  );
+  if (!live) return <>{head()}<NotConnectedCard /></>;
+  return <LiveReports initial={rows} timebank={timebank} embedded={embedded} aiEnabled={aiEnabled} />;
 }
 
-function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[]; timebank?: TimeBank; embedded?: boolean }) {
+function LiveReports({ initial, timebank, embedded = false, aiEnabled }: { initial: AttRow[]; timebank?: TimeBank; embedded?: boolean; aiEnabled: boolean }) {
   const { t } = useLang();
   const [period, setPeriod] = useState<Period>("Vika");
   const init0 = rangeFor("Vika");
@@ -253,7 +143,6 @@ function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[
     if (p !== "Sérsniðið") { const r = rangeFor(p); setFrom(r.from); setTo(r.to); load(r.from, r.to); }
   }
   function changeRange(f: string, tt: string) { setFrom(f); setTo(tt); if (f && tt && f <= tt) load(f, tt); }
-  const [customizing, setCustomizing] = useState(false);
   const [exporting, setExporting] = useState(false);
   async function doExport(kind: "xlsx" | "pdf") {
     setExporting(true);
@@ -264,7 +153,7 @@ function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[
     try {
       if (kind === "xlsx") await exportTimeReportXlsx(rep.rows, rep.company || "VAKTO", from, to);
       else await exportTimeReportPdf(rep.rows, rep.company || "VAKTO", from, to);
-      toast(rep.needsMigration ? "Skýrsla sótt (staða óviss — keyrðu migration 0008)" : (kind === "xlsx" ? "Excel-skýrsla sótt" : "PDF-skýrsla sótt"));
+      toast(kind === "xlsx" ? "Excel-skýrsla sótt" : "PDF-skýrsla sótt");
     } catch { toast("Villa við útflutning"); }
   }
 
@@ -272,75 +161,51 @@ function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[
   const shown = data.filter((r) => (deptF === "all" || r.dept === deptF) && (!search || r.name.toLowerCase().includes(search.toLowerCase())));
   const planned = shown.reduce((a, r) => a + r.planned, 0);
   const actual = shown.reduce((a, r) => a + r.actual, 0);
+  const estC = shown.reduce((a, r) => a + r.estCost, 0);
+  const actC = shown.reduce((a, r) => a + r.actCost, 0);
+  const devC = actC - estC;
+  const worst = [...shown].sort((a, b) => Math.abs(b.actCost - b.estCost) - Math.abs(a.actCost - a.estCost))[0];
+
+  const actions = (
+    <>
+      <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><ExportIcon />Excel</button>
+      <button className="btn ghost sm" style={{ marginLeft: 8 }} disabled={exporting} onClick={() => doExport("pdf")}><ExportIcon />PDF</button>
+    </>
+  );
 
   return (
     <>
-      {!embedded && <PageHeader title="Skýrslur" subtitle="Greiningar og frammistaða" actions={
-        <>
-          <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}>Excel</button>
-          <button className="btn ghost sm" style={{ marginLeft: 8 }} disabled={exporting} onClick={() => doExport("pdf")}>PDF</button>
-        </>
-      } />}
+      {embedded
+        ? <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>{actions}</div>
+        : <PageHeader title="Skýrslur" subtitle="Greiningar og frammistaða" actions={actions} />}
       <FilterBar
         periods={["Dagur", "Vika", "Mánuður", "Sérsniðið"]}
         period={period} onPeriod={changePeriod}
         from={from} to={to} onRange={changeRange}
         search={search} onSearch={setSearch}
         filters={[{ value: deptF, onChange: setDeptF, options: depts.map((d) => ({ value: d, label: d === "all" ? "Allar deildir" : d })) }]}
-        right={
-          <span style={{ display: "inline-flex", gap: 8 }}>
-            <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
-            <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
-            <CustomizeButton on={customizing} setOn={setCustomizing} />
-          </span>
-        }
       />
-      <CustomSections storageKey="vakto-innsyn-timar" customizing={customizing} defs={[
-        { id: "summary", title: "Samantekt tímabils", node: (<>
-      {(() => {
-        const estC = shown.reduce((a, r) => a + r.estCost, 0);
-        const actC = shown.reduce((a, r) => a + r.actCost, 0);
-        const devC = actC - estC;
-        const worst = [...shown].sort((a, b) => Math.abs(b.actCost - b.estCost) - Math.abs(a.actCost - a.estCost))[0];
-        return shown.length > 0 && (
-        <div className="kstrip" style={{ margin: "16px 2px 0" }}>
-          <span>{t("Tímabilið kostaði")} <b>{nf(actC)}</b> kr</span>
-          <span className={devC > 0 ? "bad" : ""}>{devC >= 0 ? "+" : "−"}<b>{nf(Math.abs(devC))}</b> kr {t("miðað við plan")}</span>
-          {worst && Math.abs(worst.actCost - worst.estCost) > 0 && <span>{t("mesta frávik hjá")} <b>{worst.name}</b></span>}
+
+      {/* Planned vs actual lives in Tímaskráning — here only the period summary + a link. */}
+      <div className="card" style={{ marginTop: 16, opacity: loading ? 0.5 : 1 }}>
+        <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)} · {t("kostnaður m. byrði")}</div></div>
+          <Link className="btn ghost sm" href="/timaskraning" style={{ textDecoration: "none" }}>{t("Opna Tímaskráningu")}</Link>
         </div>
-        );
-      })()}
-        </>) },
-        { id: "table", title: "Vaktaplan vs raun-tímar", node: (<>
-      <div className="card" style={{ marginTop: 12 }}>
-        <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)} · {t("kostnaður m. byrði")}</div></div></div>
-        <div className="cb tbl" style={{ paddingTop: 8, opacity: loading ? 0.5 : 1 }}>
-          <table>
-            <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th><th className="r">{t("Áætl. kostn.")}</th><th className="r">{t("Raun kostn.")}</th></tr></thead>
-            <tbody>
-              {shown.length ? shown.map((r) => (
-                <tr key={r.id}>
-                  <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.name}</span></td>
-                  <td>{r.dept}</td><td className="r">{dec1(r.planned)}</td><td className="r">{dec1(r.actual)}</td>
-                  <td className="r" style={{ color: r.deviation > 0 ? "var(--warn)" : r.deviation < 0 ? "var(--bad)" : undefined }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>
-                  <td className="r">{nf(r.estCost)}</td>
-                  <td className="r" style={r.actCost > r.estCost ? { color: "var(--bad)", fontWeight: 650 } : undefined}>{nf(r.actCost)}</td>
-                </tr>
-              )) : <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
-              {shown.length > 0 && <tr className="foot"><td style={{ textAlign: "left" }}>{t("Samtals")} · {shown.length} {t("starfsm.")}</td><td></td><td className="r">{dec1(planned)}</td><td className="r">{dec1(actual)}</td><td className="r">{actual >= planned ? "+" : ""}{dec1(actual - planned)}</td><td className="r">{nf(shown.reduce((a, r) => a + r.estCost, 0))}</td><td className="r">{nf(shown.reduce((a, r) => a + r.actCost, 0))}</td></tr>}
-            </tbody>
-          </table>
+        <div className="cb">
+          {shown.length > 0 ? (
+            <div className="kstrip" style={{ margin: 0 }}>
+              <span>{t("Áætl. klst")} <b>{dec1(planned)}</b> · {t("Raun klst")} <b>{dec1(actual)}</b></span>
+              <span>{t("Tímabilið kostaði")} <b>{nf(actC)}</b> kr</span>
+              <span className={devC > 0 ? "bad" : ""}>{devC >= 0 ? "+" : "−"}<b>{nf(Math.abs(devC))}</b> kr {t("miðað við plan")}</span>
+              {worst && Math.abs(worst.actCost - worst.estCost) > 0 && <span>{t("mesta frávik hjá")} <b>{worst.name}</b></span>}
+            </div>
+          ) : <p className="muted" style={{ fontSize: 13, margin: 0 }}>{t("Engin gögn á þessu tímabili.")}</p>}
         </div>
       </div>
-        </>) },
-        { id: "ai", title: "AI greining", node: <AiReportCard /> },
-        { id: "library", title: "Skýrslusafn", node: (<>
-      <div style={{ marginTop: 16 }}>
-        <ReportLibrary from={from} to={to} departments={depts.filter((d) => d !== "all")} />
-      </div>
-        </>) },
-        { id: "timebank", title: "Tímabanki", node: timebank ? <TimeBankCard rows={timebank.rows} live={timebank.live} monthLabels={timebank.monthLabels} /> : null },
-      ]} />
+
+      <ReportLibrary from={from} to={to} departments={depts.filter((d) => d !== "all")} />
+      {aiEnabled && <AiReportCard from={from} to={to} />}
+      {timebank && timebank.live && <TimeBankCard rows={timebank.rows} live={timebank.live} monthLabels={timebank.monthLabels} />}
     </>
   );
 }

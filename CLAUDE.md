@@ -44,11 +44,13 @@
 - **Avatar initials:** first two letters of the first name (Mína→MÍ, Bach→BA). Account/topbar
   avatar uses first+last (Bjarni Lúðvíksson→BL).
 - **Supabase:** `src/lib/supabase/{client,server,admin,middleware,config}.ts`. Server-only data
-  fetchers end in `.server.ts` and must not be imported by Client Components. Before real keys are
-  set, `isSupabaseConfigured()` is false → screens render demo data (`DEMO_EMPLOYEES`) and auth is
-  not enforced, so the UI stays previewable. See `supabase/README.md` to connect.
-- Routes (Icelandic slugs): `/maelabord /vaktaplan /timaskraning /launakeyrslur /starfsfolk
-  /skyrslur /frammistada /mitt-svaedi /spjall /stillingar /hjalp` + public `/login` `/kiosk`.
+  fetchers end in `.server.ts` and must not be imported by Client Components. **There is no demo
+  data in the UI** (sept. 2026): unconfigured/signed-out renders honest empty states; the demo
+  experience is the ONE seeded demo company (`scripts/seed-demo.mjs`, login → „Prófa demo-fyrirtæki"
+  when `DEMO_LOGIN_EMAIL/PASSWORD` are set). See `supabase/README.md` to connect.
+- Routes (Icelandic slugs): owner/manager `/maelabord /vaktaplan /timaskraning /launakeyrslur
+  /starfsfolk /innsyn /stillingar`; everyone `/stimpla /vaktir /mitt` (+ `/spjall` `/frettaveita`
+  `/hjalp` reachable by deep link); public `/login` `/kiosk?k=<token>`.
 
 ## Status
 
@@ -209,3 +211,14 @@
   ATH: staging-prófunaraðgangurinn var tengdur starfsmanninum „Phong Ha" (employees.user_id) svo
   starfsmannaflæðin séu prófanleg. Eftir í appinu: push-tilkynningar, myndataka prófílmyndar,
   undirritun samnings, Wallet.
+
+- ✅ **UX-einföldun & „ekkert falskt" (19. sept 2026 — sjá `VAKTO-WASTE-LISTI.md`):** öll demo-viðmótstré
+  og fölsk gögn fjarlægð (fast 32,1 %, falskt VISA-kort, Forskoða, INVENTRA-mock, aðstoðar-FAB,
+  tilkynningabjalla, hlutverks-forskoðun, AI-demo-tillaga). **Laun % af veltu reiknast á EINN hátt:**
+  `src/lib/labor.ts` `getLaborPct()` — allir skjáir kalla í það; `companies.labor_target` (0045) er
+  markmiðið. Mælaborð = ein tala (í gær + þessi vika, grænt/gult/rautt) + 3 KPI + „Þarf athygli".
+  Starfsmaður sér 3 hluti: `/stimpla` (heimaskjár), `/vaktir` (Planið + ein „Beiðni"), `/mitt`
+  (Spjall · Fréttir · Laun & réttindi). Vaktaplan: aðeins vikusýn (Dag/Mánuð falið, `VIEWS`).
+  Innsýn: 3 skýrslur. Stillingar: 4 flipar. Villur leka aldrei migration-texta (generic + console.error).
+  Öryggi (0044): chat-bucket afmarkað per fyrirtæki, kiosk með leynilykli, nýir notendur = employee.
+  Kiosk-spjaldtölvur þurfa nýja slóð úr Stillingum eftir release.

@@ -15,22 +15,18 @@ function initials(name: string) {
   return (first + second).toUpperCase() || "VK";
 }
 
-// Demo identity used before Supabase is connected so screens stay viewable.
-const DEMO: Account = {
-  initials: "BL",
-  name: "Bjarni Lúðvíksson",
-  company: "Kaffi Krónan",
-  role: "owner",
-};
+// Neutral identity for the (dev-only) unconfigured case — the middleware sends
+// signed-out users to /login before this renders in production.
+const EMPTY: Account = { initials: "VK", name: "", company: "VAKTO", role: "employee" };
 
 async function getAccount(): Promise<Account & { country: string }> {
-  if (!isSupabaseConfigured()) return { ...DEMO, country: "IS" };
+  if (!isSupabaseConfigured()) return { ...EMPTY, country: "IS" };
   try {
     const supabase = await createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) return { ...DEMO, country: "IS" };
+    if (!user) return { ...EMPTY, country: "IS" };
 
     // country column added in migration 0022 — fall back to name-only if absent.
     let profile = (await supabase
@@ -61,11 +57,11 @@ async function getAccount(): Promise<Account & { country: string }> {
       company: comp?.name ?? "VAKTO",
       companyId,
       kioskToken,
-      role: (profile?.role as Role) ?? "owner",
+      role: (profile?.role as Role) ?? "employee",
       country: comp?.country ?? "IS",
     };
   } catch {
-    return { ...DEMO, country: "IS" };
+    return { ...EMPTY, country: "IS" };
   }
 }
 

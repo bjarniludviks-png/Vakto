@@ -5,8 +5,14 @@ import { getPendingRequests } from "../vaktaplan/requests.server";
 import { getMyScope, scopeRows } from "@/lib/scope.server";
 
 export default async function MaelabordPage() {
-  const scope = await getMyScope();
-  const [view, board, reqs] = await Promise.all([getDashboard(scope.departments), getWhoIsOn(), getPendingRequests()]);
+  const [scope, view, board, reqs] = await Promise.all([getMyScope(), getDashboard(), getWhoIsOn(), getPendingRequests()]);
   const d = scope.departments;
-  return <DashboardScreen laborPct={view.laborPct} laborCostWeek={view.laborCostWeek} hoursWeek={view.hoursWeek} onboarding={view.onboarding} live={view.live} onNow={scopeRows(d, board.rows)} missing={scopeRows(d, board.missing)} pending={reqs.items.length} />;
+  return (
+    <DashboardScreen
+      view={{ ...view, openPunches: scopeRows(d, view.openPunches) }}
+      onNow={scopeRows(d, board.rows)}
+      missing={scopeRows(d, board.missing)}
+      pending={reqs.live ? reqs.items.length : 0}
+    />
+  );
 }

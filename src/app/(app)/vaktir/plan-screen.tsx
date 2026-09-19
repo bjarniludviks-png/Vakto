@@ -10,6 +10,9 @@ import { useLang } from "@/components/app/lang";
 import { toast } from "@/components/app/toast";
 import { applyForShift } from "@/app/(app)/mitt-svaedi/actions";
 import { getPlan, getCoworkers, type PlanShift, type Coworker } from "./actions";
+import type { MyArea } from "../mitt-svaedi/my.server";
+import { resolvePerms, type Perms } from "@/lib/permissions";
+import { RequestButton, ReqModal, type ReqKind } from "../mitt-svaedi/parts";
 
 const DAY_L = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
 const DAY_FULL = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
@@ -41,8 +44,10 @@ function coworkersOf(all: PlanShift[], shift: PlanShift): PlanShift[] {
 
 type Tab = "mine" | "all" | "open" | "people";
 
-export default function PlanScreen() {
+export default function PlanScreen({ my, perms: permsIn }: { my?: MyArea; perms?: Perms }) {
   const { t } = useLang();
+  const perms = permsIn ?? resolvePerms();
+  const [req, setReq] = useState<ReqKind | null>(null);
   const todayISO = iso(new Date());
   const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
   const [selDate, setSelDate] = useState(todayISO);
@@ -99,7 +104,9 @@ export default function PlanScreen() {
 
   return (
     <>
-      <PageHeader title="Planið" subtitle="Vaktir vikunnar — þínar og alls teymisins" />
+      <PageHeader title={t("Vaktir")} subtitle={t("Vaktir vikunnar — þínar og alls teymisins")}
+        actions={my?.live && perms.requests ? <RequestButton onReq={setReq} /> : undefined} />
+      {req && my && <ReqModal kind={req} onClose={() => setReq(null)} my={my} />}
 
       {/* week nav + day strip */}
       <div className="card" style={{ marginTop: 14 }}>

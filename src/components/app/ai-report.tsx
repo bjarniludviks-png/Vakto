@@ -1,58 +1,44 @@
 "use client";
 
-// AI report assistant card — used on Skýrslur and Frammistaða.
-// Ask in plain language about YOUR data for a chosen period; get a
-// plain-language summary + table + chart. Save queries as living reports
-// (re-run on every open, so figures are always fresh) and export.
+// AI report assistant card — used inside Innsýn (both tabs). Only rendered
+// when ANTHROPIC_API_KEY is set on the server. Ask in plain language about
+// YOUR data for the period the tab already has selected; get a plain-language
+// summary + table + chart. Saved questions re-run against the current period.
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "@/components/app/toast";
 import { nf, dec1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { Bars } from "@/components/app/charts";
-import { DateField } from "@/components/app/fields";
 import { aiReportQuery, type AiReportResult } from "@/app/(app)/skyrslur/ai-report";
 import { exportTableXlsx, exportTablePdf } from "@/lib/export-report";
 
-type SavedReport = { id: string; question: string; period: PeriodKey; from?: string; to?: string; created: string };
-type PeriodKey = "7d" | "30d" | "month" | "custom";
+type SavedReport = { id: string; question: string; created: string };
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-
-/** Resolve a (possibly relative) period into concrete dates — saved reports
- * store the RULE, so "síðustu 30 dagar" is always fresh. */
-function resolvePeriod(p: PeriodKey, from?: string, to?: string): { from: string; to: string } {
-  const t = new Date(); t.setHours(0, 0, 0, 0);
-  if (p === "custom" && from && to) return { from, to };
-  if (p === "month") return { from: iso(new Date(t.getFullYear(), t.getMonth(), 1)), to: iso(t) };
-  const days = p === "7d" ? 6 : 29;
-  const f = new Date(t); f.setDate(f.getDate() - days);
-  return { from: iso(f), to: iso(t) };
-}
 
 const LS_KEY = "vakto-ai-reports";
 const loadSaved = (): SavedReport[] => { try { return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]"); } catch { return []; } };
 const storeSaved = (r: SavedReport[]) => { try { localStorage.setItem(LS_KEY, JSON.stringify(r)); } catch {} };
 
-export function AiReportCard({ examples }: { examples?: string[] }) {
+export function AiReportCard({ from, to, examples }: { from: string; to: string; examples?: string[] }) {
   const { t } = useLang();
   const [q, setQ] = useState("");
-  const [period, setPeriod] = useState<PeriodKey>("30d");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<AiReportResult | null>(null);
   const [saved, setSaved] = useState<SavedReport[]>([]);
   const [listening, setListening] = useState(false);
   const recRef = useRef<{ stop: () => void } | null>(null);
-  useEffect(() => { setSaved(loadSaved()); }, []);
-
-  // Detected after mount — a window-only check at render time breaks hydration.
   const [speechOk, setSpeechOk] = useState(false);
+  // Both values only exist client-side (localStorage, window.SpeechRecognition);
+  // reading them during render would break hydration, so they load once after mount.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
+    setSaved(loadSaved());
     setSpeechOk("webkitSpeechRecognition" in window || "SpeechRecognition" in window);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
   function toggleVoice() {
     if (listening) { recRef.current?.stop(); return; }
     const Ctor = (window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown }).SpeechRecognition
@@ -66,26 +52,25 @@ export function AiReportCard({ examples }: { examples?: string[] }) {
     recRef.current = rec; setListening(true); rec.start();
   }
 
-  async function run(question?: string, p?: PeriodKey, f?: string, tt?: string) {
+  async function run(question?: string) {
     const qq = (question ?? q).trim();
     if (!qq) { toast(t("Skrifaðu spurningu fyrst")); return; }
-    const pk = p ?? period;
-    const range = resolvePeriod(pk, f ?? from, tt ?? to);
+    if (!from || !to) { toast(t("Veldu tímabil fyrst")); return; }
     setBusy(true);
     setRes(null);
-    const r = await aiReportQuery(qq, range.from, range.to);
+    const r = await aiReportQuery(qq, from, to);
     setBusy(false);
     if (!r.ok) { toast(r.error ?? "Villa"); return; }
     setRes(r);
-    if (question) { setQ(question); setPeriod(pk); }
+    if (question) setQ(question);
   }
 
   function save() {
     if (!q.trim()) return;
-    const item: SavedReport = { id: String(Date.now()), question: q.trim(), period, from: from || undefined, to: to || undefined, created: iso(new Date()) };
-    const next = [item, ...saved].slice(0, 12);
+    const item: SavedReport = { id: String(Date.now()), question: q.trim(), created: iso(new Date()) };
+    const next = [item, ...saved.filter((s) => s.question !== item.question)].slice(0, 12);
     setSaved(next); storeSaved(next);
-    toast(t("Skýrsla vistuð — endurreiknast í hvert sinn sem hún er opnuð"));
+    toast(t("Spurning vistuð — keyrist á valið tímabil í hvert sinn"));
   }
   function removeSaved(id: string) {
     const next = saved.filter((s) => s.id !== id);
@@ -94,17 +79,14 @@ export function AiReportCard({ examples }: { examples?: string[] }) {
 
   async function doExport(fmt: "xlsx" | "pdf") {
     if (!res?.rows?.length) { toast(t("Engin tafla til að flytja út")); return; }
-    const range = resolvePeriod(period, from, to);
-    const payload = { title: res.title, company: "VAKTO", from: range.from, to: range.to, columns: res.columns ?? [], numeric: res.numeric ?? [], rows: res.rows };
+    const payload = { title: res.title, company: "VAKTO", from, to, columns: res.columns ?? [], numeric: res.numeric ?? [], rows: res.rows };
     if (fmt === "xlsx") await exportTableXlsx(payload); else await exportTablePdf(payload);
     toast(fmt === "xlsx" ? "Excel sótt" : "PDF sótt");
   }
 
-  const PERIODS: [PeriodKey, string][] = [["7d", "Síðustu 7 dagar"], ["30d", "Síðustu 30 dagar"], ["month", "Þessi mánuður"], ["custom", "Sérsnið"]];
   const ex = examples ?? [
     "Hver er heildarlaunakostnaðurinn og hvernig skiptist hann?",
-    "Berðu saman deildirnar — hvar er kostnaðurinn mestur?",
-    "Hver vann mesta yfirvinnu og hvað kostaði hún?",
+    "Hvernig þróast laun% af veltu milli mánaða?",
     "Hvernig er mætingin miðað við plan?",
   ];
 
@@ -116,24 +98,10 @@ export function AiReportCard({ examples }: { examples?: string[] }) {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="1.8"><path d="M12 3l1.8 4.6L18.5 9l-4.7 1.4L12 15l-1.8-4.6L5.5 9l4.7-1.4Z" /><path d="M19 15l.9 2.3 2.3.7-2.3.9L19 21l-.9-2.1-2.1-.9 2.1-.7Z" /></svg>
             {t("AI greining")}
           </div>
-          <div className="cs">{t("spurðu um gögnin þín á mannamáli — fáðu yfirlit, töflu og graf fyrir valið tímabil")}</div>
+          <div className="cs">{t("spurðu um gögnin þín á mannamáli — svarið miðast við valið tímabil")}</div>
         </div>
       </div>
       <div className="cb">
-        {/* period filter — always available */}
-        <div className="pchips" style={{ alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
-          {PERIODS.map(([k, label]) => (
-            <button key={k} className={`pchip${period === k ? " on" : ""}`} onClick={() => setPeriod(k)}>{t(label)}</button>
-          ))}
-          {period === "custom" && (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <DateField value={from} onChange={(v) => { setFrom(v); if (to && v > to) setTo(v); }} />
-              <span className="muted">–</span>
-              <DateField value={to} onChange={(v) => { setTo(v); if (from && v < from) setFrom(v); }} />
-            </span>
-          )}
-        </div>
-
         <div style={{ position: "relative" }}>
           <textarea
             className="lf-ta" rows={2} value={q} onChange={(e) => setQ(e.target.value)}
@@ -155,7 +123,7 @@ export function AiReportCard({ examples }: { examples?: string[] }) {
           <button className="btn sm" disabled={busy} onClick={() => run()}>
             {busy ? t("Greini…") : t("Greina")}
           </button>
-          <button className="btn ghost sm" disabled={!q.trim()} onClick={save}>{t("Vista skýrslu")}</button>
+          <button className="btn ghost sm" disabled={!q.trim()} onClick={save}>{t("Vista spurningu")}</button>
         </div>
 
         {/* result */}
@@ -163,7 +131,6 @@ export function AiReportCard({ examples }: { examples?: string[] }) {
           <div style={{ marginTop: 18, borderTop: "1px solid var(--line)", paddingTop: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <b style={{ fontSize: 15 }}>{res.title}</b>
-              {!res.live && <span className="tag mut">{t("innbyggð greining")}</span>}
               <span style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
                 <button className="btn ghost sm" onClick={() => doExport("xlsx")}>Excel</button>
                 <button className="btn ghost sm" onClick={() => doExport("pdf")}>PDF</button>
@@ -191,17 +158,17 @@ export function AiReportCard({ examples }: { examples?: string[] }) {
           </div>
         )}
 
-        {/* saved living reports */}
+        {/* saved questions — re-run against whatever period the tab has selected */}
         {saved.length > 0 && (
           <div style={{ marginTop: 18, borderTop: "1px solid var(--line)", paddingTop: 14 }}>
-            <div className="cs" style={{ marginBottom: 8 }}>{t("Vistaðar skýrslur — endurreiknast með nýjustu gögnum")}</div>
+            <div className="cs" style={{ marginBottom: 8 }}>{t("Vistaðar spurningar — keyrast á valið tímabil")}</div>
             <div className="att">
               {saved.map((s) => (
                 <div className="it" key={s.id}>
                   <div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 15, height: 15 }}><path d="M9 12h6M9 16h4M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" /></svg></div>
-                  <div className="tx" style={{ cursor: "pointer" }} onClick={() => run(s.question, s.period, s.from, s.to)}>
+                  <div className="tx" style={{ cursor: "pointer" }} onClick={() => run(s.question)}>
                     <b>{s.question}</b>
-                    <span>{t(PERIODS.find(([k]) => k === s.period)?.[1] ?? "")} · {t("vistuð")} {s.created}</span>
+                    <span>{t("vistuð")} {s.created}</span>
                   </div>
                   <button className="tag mut" style={{ border: "none", cursor: "pointer", background: "var(--line2)", color: "var(--ink3)" }} onClick={() => removeSaved(s.id)}>{t("Eyða")}</button>
                 </div>

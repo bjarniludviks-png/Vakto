@@ -11,27 +11,22 @@ export type TbMonth = { label: string; required: number; actual: number; delta: 
 export type TbRow = { id: string; name: string; av: string; c: string; dept: string; months: TbMonth[]; balance: number };
 export type TimeBank = { live: boolean; rows: TbRow[]; monthLabels: string[] };
 
-// Demo: illustrative accumulated balances.
-const DEMO: TbRow[] = [
-  { id: "e1", name: "Mína", av: "MÍ", c: "#5b50e6", dept: "Eldhús", balance: 12.5, months: [] },
-  { id: "e2", name: "Bach", av: "BA", c: "#1fb6a6", dept: "Sal", balance: -8.0, months: [] },
-  { id: "e3", name: "Phong", av: "PH", c: "#0891b2", dept: "Eldhús", balance: 3.2, months: [] },
-  { id: "e4", name: "Ha", av: "HA", c: "#7c6ff2", dept: "Eldhús", balance: -14.5, months: [] },
-];
+// No demo rows — an unconnected or empty company simply has no time bank yet.
+const NONE: TbRow[] = [];
 
 /** Accumulated time bank per employee: (actual − contracted) summed over the last
  * `months` completed months. Positive = worked over contract (owed to them);
- * negative = under contract (company has hours "inni" with them). Demo fallback. */
+ * negative = under contract (company has hours "inni" with them). Empty when unconnected. */
 export async function getTimeBank(months = 6): Promise<TimeBank> {
-  if (!isSupabaseConfigured()) return { live: false, rows: DEMO, monthLabels: [] };
+  if (!isSupabaseConfigured()) return { live: false, rows: NONE, monthLabels: [] };
   try {
     const { employees, live } = await getEmployees();
-    if (!live) return { live: false, rows: DEMO, monthLabels: [] };
+    if (!live) return { live: false, rows: NONE, monthLabels: [] };
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const { data: profile } = user ? await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle() : { data: null };
     const company = profile?.company_id as string | undefined;
-    if (!company) return { live: false, rows: DEMO, monthLabels: [] };
+    if (!company) return { live: false, rows: NONE, monthLabels: [] };
 
     const now = new Date();
     // Month windows (oldest → newest), each a completed calendar month up to current.
@@ -94,8 +89,8 @@ export async function getTimeBank(months = 6): Promise<TimeBank> {
       return { id: e.id, name: e.fullName.split(/\s+/)[0], av: initials(e.fullName), c: e.avatarColor, dept: e.department ?? "—", months: monthsOut, balance };
     });
     const anyData = rows.some((r) => r.months.some((m) => m.actual > 0));
-    return anyData ? { live: true, rows: rows.sort((a, b) => a.balance - b.balance), monthLabels: windows.map((w) => w.label) } : { live: false, rows: DEMO, monthLabels: [] };
+    return anyData ? { live: true, rows: rows.sort((a, b) => a.balance - b.balance), monthLabels: windows.map((w) => w.label) } : { live: false, rows: NONE, monthLabels: [] };
   } catch {
-    return { live: false, rows: DEMO, monthLabels: [] };
+    return { live: false, rows: NONE, monthLabels: [] };
   }
 }
