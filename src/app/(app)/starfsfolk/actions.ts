@@ -608,7 +608,7 @@ export async function setOverseenDepartments(employeeId: string, names: string[]
     const supabase = await createClient();
     // Best-effort — column exists only after migration 0025.
     const { error } = await supabase.from("employees").update({ oversees_departments: names }).eq("id", employeeId);
-    if (error) return { ok: false, error: "Keyrðu migration 0025" };
+    if (error) return { ok: false, error: "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." };
     const { data: { user } } = await supabase.auth.getUser();
     const company = await companyId(supabase);
     if (company) await logAudit(supabase, company, user?.id ?? null, {
@@ -713,7 +713,7 @@ export async function generateContract(employeeId: string): Promise<ActionResult
       status: "draft",
       created_by: user?.id ?? null,
     }).select("id").maybeSingle();
-    if (error) return { ok: false, error: /contracts/.test(error.message) ? "Keyrðu migration 0028 í Supabase fyrst." : error.message, content };
+    if (error) return { ok: false, error: /contracts/.test(error.message) ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : error.message, content };
     await logAudit(supabase, company, user?.id ?? null, { action: "contract.create", entity: "contracts", detail: `Samningur búinn til — ${emp.full_name}` });
     revalidatePath("/starfsfolk");
     return { ok: true, id: created?.id as string | undefined, content };

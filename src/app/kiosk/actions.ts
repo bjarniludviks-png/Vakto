@@ -3,7 +3,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
-const DEMO_COMPANY = "00000000-0000-0000-0000-0000000000c0"; // Kaffi Krónan (seed)
 
 export type PunchResult = { ok: boolean; demo?: boolean; error?: string };
 export type KioskEmp = { id: string; initials: string; name: string; color: string; on: boolean; inTime: string };
@@ -154,28 +153,6 @@ export async function kioskPunchByToken(
     const { error } = await admin.from("punches").insert({ company_id: companyId, employee_id: emp.id, clock_in: now, source: "kiosk" });
     if (error) return { ok: false, error: error.message };
     return { ok: true, into: true, time: hm(now), name };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
-  }
-}
-
-/** Legacy demo punch (name-based, Kaffi Krónan) — used only in the unbound demo kiosk. */
-export async function kioskPunch(fullName: string, into: boolean): Promise<PunchResult> {
-  if (!isSupabaseConfigured()) return { ok: true, demo: true };
-  try {
-    const admin = createAdminClient();
-    const { data: emp } = await admin
-      .from("employees").select("id").eq("company_id", DEMO_COMPANY).eq("full_name", fullName).maybeSingle();
-    if (!emp) return { ok: false, error: "Starfsmaður fannst ekki" };
-    const now = new Date().toISOString();
-    if (into) {
-      const { error } = await admin.from("punches").insert({ company_id: DEMO_COMPANY, employee_id: emp.id, clock_in: now, source: "kiosk" });
-      if (error) return { ok: false, error: error.message };
-    } else {
-      const { data: open } = await admin.from("punches").select("id").eq("employee_id", emp.id).is("clock_out", null).order("clock_in", { ascending: false }).limit(1).maybeSingle();
-      if (open) { const { error } = await admin.from("punches").update({ clock_out: now }).eq("id", open.id); if (error) return { ok: false, error: error.message }; }
-    }
-    return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }

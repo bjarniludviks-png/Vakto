@@ -117,7 +117,7 @@ export default function EmployeeTimesheet({ id, name, initial, initialMissed, ne
         <div className="kpi"><div className="lab">{t("Vantar útstimplun")}</div><div className="val" style={{ color: missing ? "var(--bad)" : undefined }}>{missing}</div></div>
       </div>
 
-      {mig && <div className="ai" style={{ margin: "16px 0 0" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg><div className="x">{t("Keyrðu migration 0008 í Supabase til að virkja samþykki.")}</div></div>}
+      {mig && <div className="ai" style={{ margin: "16px 0 0" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg><div className="x">{t("Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO.")}</div></div>}
 
       <div className="card" style={{ marginTop: 16 }}>
         <div className="ch">

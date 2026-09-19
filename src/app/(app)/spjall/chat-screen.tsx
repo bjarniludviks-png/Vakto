@@ -5,15 +5,20 @@ import { PageHeader } from "@/components/app/page-header";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { useLang } from "@/components/app/lang";
 import { toast } from "@/components/app/toast";
+import { CHAT_READ_EVENT } from "@/components/app/chat-badge";
 import {
   listConversations, listMessages, sendChatMessage, createGroup, startDM, searchPeople,
   listMembers, addMembers, removeMember, leaveChannel, uploadChatMedia,
   renameChannel, setChannelPhoto, setMessageReaction, deleteMessage,
-  type Conversation, type ChatMessage, type Person, type Members,
+  markChannelRead, listChannelReads,
+  type Conversation, type ChatMessage, type Person, type Members, type ChannelRead,
 } from "./actions";
 
+import { REACTIONS } from "@/lib/reactions";
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "🔥", "👏", "😅", "😮", "😢", "💪", "✅", "🤝", "☕", "🍕", "🚀"];
-const REACTIONS = ["❤️", "😂", "😮", "😢", "👍", "🔥"];
+
+type ChatInitial = { ok: boolean; items: Conversation[]; meId: string; meName?: string };
+type SupabaseBrowser = ReturnType<typeof createBrowserClient>;
 
 /** "Í dag" / "Í gær" / "24. ágúst" day separators between messages. */
 function dayLabel(iso: string): string {
@@ -57,16 +62,13 @@ function ConvAvatar({ c, size = 40 }: { c: Conversation; size?: number }) {
   return <span className="avt" style={{ background: c.color, width: size, height: size, fontSize: c.kind === "general" ? size * 0.45 : size * 0.33 }}>{c.av}</span>;
 }
 
-export default function ChatScreen({ initial }: { initial?: { ok: boolean; items: Conversation[]; meId: string } }) {
+/** `embedded`: rendered inside another page (Laun & spjall tabs) — inline
+ * instead of the fixed full-bleed panel, so the page's own chrome stays visible. */
+export default function ChatScreen({ initial, embedded = false }: { initial?: ChatInitial; embedded?: boolean }) {
   if (!initial?.ok) return <DemoChat />;
-  return <Messenger initial={initial} />;
+  return <Messenger initial={initial} embedded={embedded} />;
 }
 
-// Last-seen timestamps per conversation (client-side unread markers).
-const SEEN_KEY = "vakto-chat-seen";
-function readSeen(): Record<string, string> {
-  try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "{}"); } catch { return {}; }
-}
 /** "13:45" today, else "24.6." */
 function convTime(iso: string | null): string {
   if (!iso) return "";
@@ -75,18 +77,28 @@ function convTime(iso: string | null): string {
   if (d.toDateString() === now.toDateString()) return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
   return `${d.getDate()}.${d.getMonth() + 1}.`;
 }
+const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+const firstName = (s: string) => s.split(/\s+/)[0] || s;
+const visible = () => typeof document === "undefined" || document.visibilityState === "visible";
 
-function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[]; meId: string } }) {
+const TYPING_SEND_EVERY = 2000; // throttle: at most one "typing" broadcast per 2 s
+const TYPING_IDLE_STOP = 3000;  // "stop" after 3 s without a keystroke
+const TYPING_EXPIRE = 4500;     // drop a typer we have not heard from in 4.5 s
+
+type Typer = { name: string; at: number };
+
+function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedded?: boolean }) {
   const { t } = useLang();
   const [convs, setConvs] = useState<Conversation[]>(initial.items);
   const [active, setActive] = useState<Conversation | null>(initial.items[0] ?? null);
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
+  const [reads, setReads] = useState<ChannelRead[]>([]);
+  const [typers, setTypers] = useState<Record<string, Typer>>({});
   const [val, setVal] = useState("");
   const [search, setSearch] = useState("");
   const [emoji, setEmoji] = useState(false);
   const [rec, setRec] = useState(false);
   const [modal, setModal] = useState<null | "group" | "info">(null);
-  const [seen, setSeen] = useState<Record<string, string>>({});
   const [people, setPeople] = useState<Person[]>([]);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [reactFor, setReactFor] = useState<string | null>(null);
@@ -95,6 +107,13 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
   const recRef = useRef<MediaRecorder | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  // Thread cache: clicking a conversation paints its last-known messages
+  // instantly, the network refresh reconciles in the background.
+  const cacheRef = useRef<Map<string, ChatMessage[]>>(new Map());
+  const activeRef = useRef<string | null>(null);
+  const sbRef = useRef<SupabaseBrowser | null>(null);
+  const sb = () => { if (!sbRef.current) sbRef.current = createBrowserClient(); return sbRef.current; };
+  const meName = initial.meName || t("Einhver");
 
   // Phone: land on the conversation LIST, not inside the first thread.
   useEffect(() => {
@@ -127,50 +146,153 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
   function reloadConvs() {
     listConversations().then((r) => {
       if (!r.ok) return;
-      setConvs(r.items);
+      // The open thread is being read right now — never flash a count on it.
+      const openId = visible() ? activeRef.current : null;
+      const items = r.items.map((x) => (x.id === openId ? { ...x, unread: 0 } : x));
+      setConvs(items);
       // keep the open thread's name/photo fresh after rename or photo change
-      setActive((a) => (a ? r.items.find((x) => x.id === a.id) ?? a : a));
+      setActive((a) => (a ? items.find((x) => x.id === a.id) ?? a : a));
     });
   }
-  function loadMsgs(id?: string) { if (id) listMessages(id).then((r) => { if (r.ok) setMsgs(r.messages); }); }
-  function markSeen(id: string) {
-    setSeen(() => {
-      const next = { ...readSeen(), [id]: new Date().toISOString() };
-      try { localStorage.setItem(SEEN_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
+  /** Fetch a thread into the cache; paint it only if it is still the open one. */
+  function loadMsgs(id?: string) {
+    if (!id) return;
+    listMessages(id).then((r) => {
+      if (!r.ok) return;
+      cacheRef.current.set(id, r.messages);
+      if (activeRef.current === id) { setMsgs(r.messages); setReads(r.reads); }
     });
   }
-  useEffect(() => { setSeen(readSeen()); }, []);
+  /** Advance my read cursor (only while the tab is actually visible). */
+  function read(id?: string | null) {
+    if (!id || !visible()) return;
+    setConvs((cs) => cs.map((x) => (x.id === id && x.unread ? { ...x, unread: 0 } : x)));
+    markChannelRead(id).then((r) => { if (r.ok) window.dispatchEvent(new Event(CHAT_READ_EVENT)); });
+  }
+  /** Open a thread: paint the cached messages in the same render; the
+   * `active?.id` effect below does the network refresh + read cursor. */
+  function open(c: Conversation) {
+    activeRef.current = c.id;
+    setActive(c);
+    setMsgs(cacheRef.current.get(c.id) ?? []);
+    setReads([]);
+    setTypers({});
+    setReplyTo(null);
+    setReactFor(null);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
+
+  useEffect(() => { activeRef.current = active?.id ?? null; }, [active?.id]);
+
   useEffect(() => {
-    loadMsgs(active?.id);
-    if (active?.id) markSeen(active.id);
-    // Realtime does the heavy lifting; polling is only a 10s safety net.
-    const iv = setInterval(() => { loadMsgs(active?.id); reloadConvs(); if (active?.id) markSeen(active.id); }, 10000);
+    if (active?.id) { setMsgs(cacheRef.current.get(active.id) ?? []); loadMsgs(active.id); read(active.id); }
+    // Realtime does the heavy lifting; polling is only a 10s safety net — and
+    // a hidden tab does not poll at all (it catches up on visibilitychange).
+    const iv = setInterval(() => {
+      if (!visible()) return;
+      loadMsgs(active?.id); reloadConvs();
+    }, 10000);
     return () => clearInterval(iv);
   }, [active?.id]);
 
-  const activeRef = useRef<string | null>(null);
-  useEffect(() => { activeRef.current = active?.id ?? null; }, [active?.id]);
+  // Coming back to the tab: refresh + mark the open thread read.
+  useEffect(() => {
+    const onVis = () => {
+      if (!visible()) return;
+      loadMsgs(activeRef.current ?? undefined); reloadConvs(); read(activeRef.current);
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, []);
+
+  // Prefetch the three most recent threads so they open instantly.
+  useEffect(() => {
+    for (const c of initial.items.slice(0, 3)) {
+      if (cacheRef.current.has(c.id)) continue;
+      listMessages(c.id).then((r) => { if (r.ok && !cacheRef.current.has(c.id)) cacheRef.current.set(c.id, r.messages); });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Instant delivery: subscribe to new messages (RLS-scoped) — reload the open
   // thread and the list the moment anything lands, instead of waiting to poll.
+  // Read cursors stream too, so "Séð" appears the moment the other side looks.
   useEffect(() => {
-    const supabase = createBrowserClient();
+    const supabase = sb();
     const ch = supabase
       .channel("chat-live")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
         const row = payload.new as { channel_id?: string };
         if (row.channel_id && row.channel_id === activeRef.current) {
           loadMsgs(activeRef.current ?? undefined);
-          if (activeRef.current) markSeen(activeRef.current);
+          read(activeRef.current);
         }
         reloadConvs();
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "channels" }, () => reloadConvs())
+      .on("postgres_changes", { event: "*", schema: "public", table: "channel_reads" }, (payload) => {
+        const row = (payload.new ?? payload.old) as { channel_id?: string; user_id?: string };
+        if (row.user_id === initial.meId) return;
+        if (row.channel_id && row.channel_id === activeRef.current) listChannelReads(row.channel_id).then(setReads);
+      })
       .subscribe();
     return () => { void supabase.removeChannel(ch); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Typing indicator: Realtime broadcast on `typing:<channelId>` — no DB.
+  const typingRef = useRef<{ ch: ReturnType<SupabaseBrowser["channel"]> | null; lastSent: number; stop: ReturnType<typeof setTimeout> | null }>({ ch: null, lastSent: 0, stop: null });
+  useEffect(() => {
+    const id = active?.id;
+    if (!id) return;
+    const supabase = sb();
+    const ch = supabase.channel(`typing:${id}`, { config: { broadcast: { self: false } } });
+    ch.on("broadcast", { event: "typing" }, ({ payload }) => {
+      const p = payload as { userId?: string; name?: string; stop?: boolean };
+      if (!p.userId || p.userId === initial.meId) return;
+      setTypers((tp) => {
+        const next = { ...tp };
+        if (p.stop) delete next[p.userId!]; else next[p.userId!] = { name: p.name || t("Einhver"), at: Date.now() };
+        return next;
+      });
+    }).subscribe();
+    typingRef.current = { ch, lastSent: 0, stop: null };
+    // expire typers we stopped hearing from (lost "stop" packets)
+    const iv = setInterval(() => {
+      setTypers((tp) => {
+        const now = Date.now();
+        const keep = Object.entries(tp).filter(([, v]) => now - v.at < TYPING_EXPIRE);
+        return keep.length === Object.keys(tp).length ? tp : Object.fromEntries(keep);
+      });
+    }, 1000);
+    return () => {
+      clearInterval(iv);
+      const cur = typingRef.current;
+      if (cur.stop) clearTimeout(cur.stop);
+      if (cur.lastSent) void ch.send({ type: "broadcast", event: "typing", payload: { userId: initial.meId, stop: true } });
+      typingRef.current = { ch: null, lastSent: 0, stop: null };
+      void supabase.removeChannel(ch);
+      setTypers({});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active?.id]);
+  function sendTyping(stop = false) {
+    const cur = typingRef.current;
+    if (!cur.ch) return;
+    if (cur.stop) { clearTimeout(cur.stop); cur.stop = null; }
+    if (stop) {
+      if (!cur.lastSent) return;
+      cur.lastSent = 0;
+      void cur.ch.send({ type: "broadcast", event: "typing", payload: { userId: initial.meId, stop: true } });
+      return;
+    }
+    const now = Date.now();
+    if (now - cur.lastSent >= TYPING_SEND_EVERY) {
+      cur.lastSent = now;
+      void cur.ch.send({ type: "broadcast", event: "typing", payload: { userId: initial.meId, name: firstName(meName) } });
+    }
+    cur.stop = setTimeout(() => sendTyping(true), TYPING_IDLE_STOP);
+  }
 
   // People search — suggestions from the FIRST character (Messenger-style).
   useEffect(() => {
@@ -188,11 +310,10 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
     if (c.ok) {
       setConvs(c.items);
       const found = c.items.find((x) => x.id === r.id);
-      if (found) { setActive(found); markSeen(found.id); requestAnimationFrame(() => inputRef.current?.focus()); }
+      if (found) open(found);
     }
   }
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs]);
-  const unread = (c: Conversation) => !!c.lastAt && c.id !== active?.id && (!seen[c.id] || c.lastAt > seen[c.id]);
+  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs, typers]);
 
   async function send(kind: "text" | "image" | "audio" = "text", url?: string, body?: string) {
     const text = body ?? val;
@@ -200,6 +321,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
     if (kind === "text") setVal("");
     setEmoji(false);
     if (!active) return;
+    sendTyping(true);
     const reply = replyTo;
     setReplyTo(null);
     // Optimistic: show the message instantly; the reload reconciles the real row.
@@ -266,10 +388,22 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
   }
 
   const shown = convs.filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()));
+  const teamLabel = (c: Conversation) => (c.autoKind === "dept" ? t("Deild") : c.autoKind === "loc" ? t("Staður") : null);
+
+  // Read receipt goes under the LAST message I sent (a real row, not the optimistic one).
+  let lastMineIdx = -1;
+  for (let i = msgs.length - 1; i >= 0; i--) if (msgs[i].me && !msgs[i].id.startsWith("tmp-")) { lastMineIdx = i; break; }
+  const seenBy = lastMineIdx >= 0 ? reads.filter((r) => r.lastReadAt >= msgs[lastMineIdx].createdAt) : [];
+  const seenText = seenBy.length === 0 ? null
+    : active?.dm ? `${t("Séð")} ${hhmm(seenBy[0].lastReadAt)}`
+      : `${t("Séð")} · ${seenBy.slice(0, 3).map((r) => firstName(r.name)).join(", ")}${seenBy.length > 3 ? ` +${seenBy.length - 3}` : ""}`;
+
+  const typerNames = Object.values(typers).map((x) => x.name);
+  const typingText = typerNames.length === 0 ? "" : typerNames.length === 1 ? `${typerNames[0]} ${t("er að skrifa…")}` : `${typerNames.length} ${t("eru að skrifa…")}`;
 
   return (
     <>
-      <div ref={wrapRef} className={`msgr full${active ? " thread-open" : ""}`}>
+      <div ref={wrapRef} className={`msgr${embedded ? "" : " full"}${active ? " thread-open" : ""}`} style={embedded ? { height: "calc(100dvh - 215px)" } : undefined}>
         {/* conversation list */}
         <div className="msgr-list">
           <div className="msgr-head" style={{ gap: 8 }}>
@@ -284,17 +418,25 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
               <div className="muted" style={{ fontSize: 12.5, padding: "4px 14px 10px" }}>{t("Ekkert samtal fannst")}</div>
             )}
             {shown.map((c) => {
-              const un = unread(c);
+              const un = c.id !== active?.id && c.unread > 0;
+              const label = teamLabel(c);
               return (
-                <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}`} onClick={() => { setActive(c); markSeen(c.id); requestAnimationFrame(() => inputRef.current?.focus()); }}>
+                <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}`} onClick={() => open(c)}>
                   <ConvAvatar c={c} />
                   <div className="tx">
                     <b style={un ? { fontWeight: 800 } : undefined}>{c.kind === "general" ? "# " + c.name : c.name}</b>
-                    <span style={un ? { color: "var(--ink)", fontWeight: 600 } : undefined}>{c.last || (c.dm ? t("Bein skilaboð") : t("Grúppa"))}</span>
+                    <span style={un ? { color: "var(--ink)", fontWeight: 600 } : undefined}>
+                      {label && <span style={{ color: "var(--ink3)", fontWeight: 600, fontSize: 11, letterSpacing: ".03em", textTransform: "uppercase" }}>{label}{c.last ? " · " : ""}</span>}
+                      {c.last || (label ? "" : c.dm ? t("Bein skilaboð") : t("Grúppa"))}
+                    </span>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, marginLeft: "auto", flexShrink: 0 }}>
                     <span className="muted" style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{convTime(c.lastAt)}</span>
-                    {un && <span style={{ width: 9, height: 9, borderRadius: "50%", background: "var(--brand)", display: "inline-block" }} />}
+                    {un && (
+                      <span style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, background: "var(--brand)", color: "#fff", fontSize: 11, fontWeight: 700, lineHeight: "18px", textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
+                        {c.unread > 99 ? "99+" : c.unread}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
@@ -327,11 +469,12 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
                 <button className="iconbtn mob-back" onClick={() => setActive(null)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6" /></svg></button>
                 <ConvAvatar c={active} size={34} />
                 <div
-                  style={{ flex: 1, minWidth: 0, cursor: active.dm ? undefined : "pointer" }}
+                  style={{ flex: 1, minWidth: 0, cursor: active.dm ? undefined : "pointer", display: "flex", flexDirection: "column", lineHeight: 1.2 }}
                   onClick={() => !active.dm && setModal("info")}
                   title={active.dm ? undefined : t("Upplýsingar")}
                 >
-                  {active.kind === "general" ? "# " + active.name : active.name}
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{active.kind === "general" ? "# " + active.name : active.name}</span>
+                  {teamLabel(active) && <span className="muted" style={{ fontSize: 11, fontWeight: 500 }}>{active.autoKind === "dept" ? t("Deildarrás") : t("Staðarrás")}</span>}
                 </div>
                 {!active.dm && <button className="iconbtn" title={t("Upplýsingar")} onClick={() => setModal("info")}><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></svg></button>}
               </div>
@@ -390,10 +533,17 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
                       )}
                     </div>
                   </div>
+                  {mi === lastMineIdx && seenText && (
+                    <div className="muted" style={{ alignSelf: "flex-end", fontSize: 11, marginTop: m.reactions.length ? 6 : -2, paddingRight: 4 }}>{seenText}</div>
+                  )}
                   </React.Fragment>
                   );
                 }) : <div className="muted" style={{ textAlign: "center", margin: "auto", fontSize: 13 }}>{t("Engin skilaboð enn — byrjaðu spjallið!")}</div>}
                 <div ref={endRef} />
+              </div>
+              {/* typing indicator — fixed height so the composer never jumps */}
+              <div className="muted" aria-live="polite" style={{ height: 18, lineHeight: "18px", fontSize: 12, padding: "0 16px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", background: "var(--bg)" }}>
+                {typingText}
               </div>
               {replyTo && (
                 <div className="replybar">
@@ -404,7 +554,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
                   <button className="iconbtn" onClick={() => setReplyTo(null)} style={{ width: 24, height: 24 }}>✕</button>
                 </div>
               )}
-              {emoji && <div className="emojibar">{EMOJIS.map((e) => <button key={e} onClick={() => { setVal((v) => v + e); }}>{e}</button>)}</div>}
+              {emoji && <div className="emojibar">{EMOJIS.map((e) => <button key={e} onClick={() => { setVal((v) => v + e); sendTyping(); }}>{e}</button>)}</div>}
               <div className="msgr-input">
                 <button className="iconbtn" title={t("Tákn")} onClick={() => setEmoji((v) => !v)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" /></svg></button>
                 <button className="iconbtn" title={t("Mynd")} onClick={() => fileRef.current?.click()}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg></button>
@@ -412,7 +562,12 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
                   {rec ? <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
                     : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>}
                 </button>
-                <input ref={inputRef} className="txt" placeholder={rec ? t("Tek upp… smelltu til að stöðva") : t("chat:ph")} value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && send()} />
+                <input
+                  ref={inputRef} className="txt" placeholder={rec ? t("Tek upp… smelltu til að stöðva") : t("chat:ph")} value={val}
+                  onChange={(e) => { setVal(e.target.value); if (e.target.value) sendTyping(); else sendTyping(true); }}
+                  onBlur={() => sendTyping(true)}
+                  onKeyDown={(e) => e.key === "Enter" && send()}
+                />
                 <button className="msgr-send" disabled={!val.trim() && !rec} onClick={() => send()} aria-label={t("chat:send")}>
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
                 </button>
@@ -423,7 +578,7 @@ function Messenger({ initial }: { initial: { ok: boolean; items: Conversation[];
         </div>
       </div>
 
-      {modal === "group" && <NewGroupModal onClose={() => setModal(null)} onDone={(id) => { setModal(null); listConversations().then((c) => { if (c.ok) { setConvs(c.items); const f = c.items.find((x) => x.id === id); if (f) setActive(f); } }); }} />}
+      {modal === "group" && <NewGroupModal onClose={() => setModal(null)} onDone={(id) => { setModal(null); listConversations().then((c) => { if (c.ok) { setConvs(c.items); const f = c.items.find((x) => x.id === id); if (f) open(f); } }); }} />}
       {modal === "info" && active && <InfoModal conv={active} onClose={() => setModal(null)} onLeft={() => { setModal(null); setActive(null); reloadConvs(); }} onChanged={reloadConvs} />}
     </>
   );
@@ -493,8 +648,11 @@ function InfoModal({ conv, onClose, onLeft, onChanged }: { conv: Conversation; o
   const photoRef = useRef<HTMLInputElement | null>(null);
   function reload() { listMembers(conv.id).then(setM); }
   useEffect(reload, [conv.id]);
-  const admin = m.adminId === m.meId;
+  const admin = !!m.adminId && m.adminId === m.meId;
   const group = conv.kind === "group";
+  // Department/location channels mirror settings: no rename, no leaving.
+  const team = !!conv.autoKind;
+  const kindLabel = conv.autoKind === "dept" ? t("Deildarrás") : conv.autoKind === "loc" ? t("Staðarrás") : t("Grúppa");
   async function remove(p: Person) { const r = await removeMember(conv.id, p.userId); if (r.ok) reload(); else toast(r.error ?? "Villa"); }
   async function leave() { if (!window.confirm(`Hætta í „${conv.name}"?`)) return; const r = await leaveChannel(conv.id); if (r.ok) onLeft(); else toast(r.error ?? "Villa"); }
   async function add(p: Person) { const r = await addMembers(conv.id, [p.userId]); if (r.ok) { reload(); setAdding(false); } else toast(r.error ?? "Villa"); }
@@ -528,7 +686,7 @@ function InfoModal({ conv, onClose, onLeft, onChanged }: { conv: Conversation; o
                 </span>
               </button>
               <div style={{ flex: 1, minWidth: 0 }}>
-                {editingName ? (
+                {editingName && !team ? (
                   <div style={{ display: "flex", gap: 7 }}>
                     <input autoFocus value={nameVal} onChange={(e) => setNameVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveName()} style={{ flex: 1, minWidth: 0 }} />
                     <button className="btn sm" onClick={saveName}>{t("Vista")}</button>
@@ -536,12 +694,14 @@ function InfoModal({ conv, onClose, onLeft, onChanged }: { conv: Conversation; o
                 ) : (
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <b style={{ fontSize: 15 }}>{conv.name}</b>
-                    <button className="iconbtn" title={t("Breyta heiti")} onClick={() => { setNameVal(conv.name); setEditingName(true); }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9" /><path d="M16.5 3.5a2 2 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" /></svg>
-                    </button>
+                    {!team && (
+                      <button className="iconbtn" title={t("Breyta heiti")} onClick={() => { setNameVal(conv.name); setEditingName(true); }}>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9" /><path d="M16.5 3.5a2 2 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" /></svg>
+                      </button>
+                    )}
                   </div>
                 )}
-                <span className="muted" style={{ fontSize: 12 }}>{t("Grúppa")} · {m.members.length} {t("meðlimir")}</span>
+                <span className="muted" style={{ fontSize: 12 }}>{kindLabel} · {m.members.length} {t("meðlimir")}</span>
               </div>
               <input ref={photoRef} type="file" accept="image/*" hidden onChange={onPhoto} />
             </div>
@@ -563,7 +723,9 @@ function InfoModal({ conv, onClose, onLeft, onChanged }: { conv: Conversation; o
                   </div>
                 ))}
               </div>
-              <button className="btn ghost" style={{ marginTop: 14, color: "var(--bad)" }} onClick={leave}>{t("Hætta í grúppu")}</button>
+              {team
+                ? <p className="muted" style={{ fontSize: 12, marginTop: 14, marginBottom: 0 }}>{t("Meðlimir fylgja starfsmannaskránni — rásin uppfærist sjálfkrafa.")}</p>
+                : <button className="btn ghost" style={{ marginTop: 14, color: "var(--bad)" }} onClick={leave}>{t("Hætta í grúppu")}</button>}
             </>
           )}
         </div>
@@ -578,7 +740,7 @@ function DemoChat() {
     <>
       <PageHeader title="Spjall" subtitle="Innra spjall fyrirtækisins" />
       <div className="card" style={{ marginTop: 16 }}>
-        <div className="cb"><p className="muted" style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}>{t("Spjallið virkjast þegar þú ert innskráð/ur og Supabase er tengt (migrations 0012 + 0014).")}</p></div>
+        <div className="cb"><p className="muted" style={{ fontSize: 14, lineHeight: 1.6, margin: 0 }}>{t("Spjallið er ekki tiltækt núna — reyndu að endurhlaða síðuna.")}</p></div>
       </div>
     </>
   );

@@ -1,51 +1,33 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { BURDEN } from "@/lib/payroll";
+import { getCompanyId, getLaborPct, type RevenueSource } from "@/lib/labor";
 
-export type LaborMetrics = { laborPct: number; revenue: number; laborCost: number; live: boolean };
+export type LaborMetrics = {
+  laborPct: number | null; // null = no revenue or no labor cost yet — never a placeholder
+  revenue: number;
+  laborCost: number;
+  revenueSource: RevenueSource;
+  live: boolean;
+};
 
-const DEMO: LaborMetrics = { laborPct: 32.1, revenue: 4_300_000, laborCost: 1_380_736, live: false };
+const EMPTY: LaborMetrics = { laborPct: null, revenue: 0, laborCost: 0, revenueSource: "none", live: false };
 
-/** Labor % of revenue (VAKTO signature metric) computed from the revenue table
- * (fed by Inventra/POS) and current labor cost. Falls back to demo numbers. */
+const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/** Month-to-date laun % af veltu for the signed-in company. Thin wrapper over
+ * the single shared calculation in src/lib/labor.ts. */
 export async function getLaborMetrics(): Promise<LaborMetrics> {
-  if (!isSupabaseConfigured()) return DEMO;
+  if (!isSupabaseConfigured()) return EMPTY;
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return DEMO;
-    const { data: profile } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
-    const company = profile?.company_id as string | undefined;
-    if (!company) return DEMO;
-
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
-    const from = monthStart.toISOString().slice(0, 10);
-
-    const { data: locs } = await supabase.from("locations").select("id").eq("company_id", company);
-    const locIds = (locs ?? []).map((l) => l.id as string);
-    let revenue = 0;
-    if (locIds.length) {
-      const { data: rev } = await supabase
-        .from("revenue").select("amount").in("location_id", locIds).gte("date", from);
-      revenue = (rev ?? []).reduce((a, r) => a + Number(r.amount), 0);
-    }
-
-    // Labor cost from the latest payroll run (gross + burden).
-    const { data: run } = await supabase
-      .from("payroll_runs").select("id").eq("company_id", company)
-      .order("created_at", { ascending: false }).limit(1).maybeSingle();
-    let laborCost = 0;
-    if (run) {
-      const { data: lines } = await supabase.from("payroll_lines").select("gross").eq("run_id", run.id);
-      laborCost = (lines ?? []).reduce((a, l) => a + Number(l.gross), 0) * (1 + BURDEN);
-    }
-
-    if (revenue <= 0 || laborCost <= 0) return DEMO;
-    return { laborPct: Math.round((laborCost / revenue) * 1000) / 10, revenue, laborCost, live: true };
+    const company = await getCompanyId(supabase);
+    if (!company) return EMPTY;
+    const now = new Date();
+    const from = isoOf(new Date(now.getFullYear(), now.getMonth(), 1));
+    const m = await getLaborPct(supabase, company, from, isoOf(now));
+    return { laborPct: m.pct, revenue: m.revenue, laborCost: m.cost, revenueSource: m.revenueSource, live: true };
   } catch {
-    return DEMO;
+    return EMPTY;
   }
 }

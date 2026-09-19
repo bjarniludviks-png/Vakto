@@ -196,7 +196,7 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
   // Live company (signed in): the standard dashboard layout, always — filled
   // with real numbers where we have them, clean empty-states where we don't.
   if (live) {
-    const lp = pd?.ok ? pd.laborPct : laborPct;
+    const lp = pd?.ok ? (pd.laborPct ?? 0) : laborPct;
     const lpColor = lp === 0 ? "var(--ink3)" : lp <= 30 ? "var(--good)" : lp <= 33 ? "var(--warn)" : "var(--bad)";
     const plannedH = pd?.ok ? dec1(pd.planned) : hoursWeek;
     const actualH = pd?.ok ? dec1(pd.actual) : "—";

@@ -23,7 +23,7 @@ export async function checkBirthdays(): Promise<number> {
       const kt = (e.kennitala as string).replace(/\D/g, "");
       if (kt.slice(0, 4) !== ddmm) continue;
       const first = (e.full_name as string).split(/\s+/)[0];
-      const body = `🎂 ${first} á afmæli í dag — til hamingju! 🎉`;
+      const body = `${first} á afmæli í dag — til hamingju!`;
       const { data: dup } = await admin
         .from("posts").select("id").eq("company_id", e.company_id).eq("body", body)
         .gte("created_at", dayStart.toISOString()).limit(1);
@@ -35,7 +35,7 @@ export async function checkBirthdays(): Promise<number> {
       const { data: team } = await admin.from("employees").select("id").eq("company_id", e.company_id).eq("status", "active").limit(100);
       for (const m of team ?? []) {
         if (m.id === e.id) continue;
-        void notifyEmployee(m.id as string, { title: "🎂 Afmæli í dag", body: `${first} á afmæli í dag — sendu kveðju á fréttaveitunni!`, url: "/frettaveita", tag: "birthday" });
+        void notifyEmployee(m.id as string, { title: "Afmæli í dag", body: `${first} á afmæli í dag — sendu kveðju á fréttaveitunni!`, url: "/frettaveita", tag: "birthday" });
       }
     }
     return n;

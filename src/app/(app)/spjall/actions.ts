@@ -2,10 +2,20 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { initials } from "@/lib/employees";
 import { notifyEmployee, sendPushToUser } from "@/lib/push";
 
-export type Conversation = { id: string; name: string; kind: string; av: string; color: string; last: string; lastAt: string | null; dm: boolean; photo: string | null };
+export type Conversation = {
+  id: string; name: string; kind: string; av: string; color: string; last: string; lastAt: string | null; dm: boolean; photo: string | null;
+  /** Unread messages from others (server-side, `channel_reads`). */
+  unread: number;
+  /** Automatic team channel: 'dept' (department) | 'loc' (location) | null (manual). */
+  autoKind: "dept" | "loc" | null;
+};
+/** Another member's read cursor in a channel (read receipts). */
+export type ChannelRead = { userId: string; name: string; lastReadAt: string };
+export type UnreadCounts = { counts: Record<string, number>; total: number };
 export type ChatMessage = {
   id: string; sender: string; senderId: string; me: boolean; body: string; at: string; kind: string; url: string | null;
   reactions: { emoji: string; count: number; mine: boolean }[];
@@ -36,19 +46,192 @@ async function empNameMap(supabase: Awaited<ReturnType<typeof createClient>>, co
   return new Map((data ?? []).map((e) => [e.user_id as string, { name: e.full_name as string, photo: (e.photo_url as string | null) ?? null }]));
 }
 
-/** Conversations the user can see: general + their groups + their DMs. */
-export async function listConversations(): Promise<{ ok: boolean; items: Conversation[]; meId: string; needsMigration?: boolean }> {
-  if (!isSupabaseConfigured()) return { ok: false, items: [], meId: "" };
+type Sb = Awaited<ReturnType<typeof createClient>>;
+
+/** Unread-per-channel for the caller via the `chat_unread_counts` RPC — {} when
+ * the RPC is not there yet (schema not up to date). */
+async function unreadMap(supabase: Sb): Promise<Record<string, number>> {
+  try {
+    const { data, error } = await supabase.rpc("chat_unread_counts");
+    if (error || !data) return {};
+    const out: Record<string, number> = {};
+    for (const r of data as { channel_id: string; n: number | string }[]) out[r.channel_id] = Number(r.n) || 0;
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+/** Unread counts for the sidebar badge + conversation list: { counts, total }. */
+export async function getUnreadCounts(): Promise<UnreadCounts> {
+  if (!isSupabaseConfigured()) return { counts: {}, total: 0 };
   try {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
-    if ("error" in ctx) return { ok: false, items: [], meId: "" };
+    if ("error" in ctx) return { counts: {}, total: 0 };
+    const counts = await unreadMap(supabase);
+    return { counts, total: Object.values(counts).reduce((a, b) => a + b, 0) };
+  } catch {
+    return { counts: {}, total: 0 };
+  }
+}
 
-    // photo_url arrives with migration 0042 — fall back to the old shape before it runs
-    let chRes = await supabase.from("channels").select("id, name, kind, created_by, photo_url").eq("company_id", ctx.company).order("created_at");
+/** "I have seen everything in this channel up to now" — upsert my read cursor. */
+export async function markChannelRead(channelId: string): Promise<{ ok: boolean }> {
+  if (!isSupabaseConfigured() || !channelId) return { ok: false };
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false };
+    const { error } = await supabase.from("channel_reads")
+      .upsert({ channel_id: channelId, user_id: ctx.userId, last_read_at: new Date().toISOString() }, { onConflict: "channel_id,user_id" });
+    if (error) { console.error("markChannelRead:", error.message); return { ok: false }; }
+    return { ok: true };
+  } catch (e) {
+    console.error("markChannelRead failed:", e);
+    return { ok: false };
+  }
+}
+
+/** Other members' read cursors in a channel (for "Séð" under my last message). */
+export async function listChannelReads(channelId: string): Promise<ChannelRead[]> {
+  if (!isSupabaseConfigured() || !channelId) return [];
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return [];
+    return await channelReadsOf(supabase, ctx, channelId);
+  } catch {
+    return [];
+  }
+}
+
+async function channelReadsOf(supabase: Sb, ctx: { userId: string; company: string }, channelId: string): Promise<ChannelRead[]> {
+  try {
+    const [{ data, error }, emps] = await Promise.all([
+      supabase.from("channel_reads").select("user_id, last_read_at, users(full_name)").eq("channel_id", channelId).neq("user_id", ctx.userId),
+      empNameMap(supabase, ctx.company),
+    ]);
+    if (error || !data) return [];
+    return data.map((r) => {
+      const u = (Array.isArray(r.users) ? r.users[0] : r.users) as { full_name?: string } | null;
+      const name = emps.get(r.user_id as string)?.name ?? u?.full_name ?? "?";
+      return { userId: r.user_id as string, name, lastReadAt: r.last_read_at as string };
+    });
+  } catch {
+    return [];
+  }
+}
+
+// ensureTeamChannels runs on every list load — cap it to once a minute per
+// company per server instance (it is idempotent, so a cold start is harmless).
+const teamSyncAt = new Map<string, number>();
+
+/** Automatic team channels: one group per department and per location that has
+ * at least one employee with a linked account. Members = that team's employees
+ * + every manager/owner. Adds missing members, never removes anyone (manual
+ * additions stick). Requires `channels.auto_key` — silently no-op before it. */
+export async function ensureTeamChannels(): Promise<{ ok: boolean }> {
+  if (!isSupabaseConfigured()) return { ok: false };
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false };
+    await syncTeamChannels(ctx, true);
+    return { ok: true };
+  } catch (e) {
+    console.error("ensureTeamChannels failed:", e);
+    return { ok: false };
+  }
+}
+
+async function syncTeamChannels(ctx: { userId: string; company: string }, force = false): Promise<void> {
+  const last = teamSyncAt.get(ctx.company) ?? 0;
+  if (!force && Date.now() - last < 60_000) return;
+  teamSyncAt.set(ctx.company, Date.now());
+
+  // Service role: the sync must create channels the CALLER is not a member of
+  // (another department's room) without the caller ever gaining access to them
+  // — with the user's client the creator would stay visible via `created_by`.
+  // Everything below is still scoped to the caller's own company.
+  const db = createAdminClient();
+
+  const { data: locs, error: locErr } = await db.from("locations").select("id, name").eq("company_id", ctx.company);
+  if (locErr) return;
+  const locIds = (locs ?? []).map((l) => l.id as string);
+  const [{ data: deps }, { data: emps }] = await Promise.all([
+    locIds.length ? db.from("departments").select("id, name").in("location_id", locIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    db.from("employees").select("user_id, department_id, location_id, role").eq("company_id", ctx.company).not("user_id", "is", null).neq("status", "inactive"),
+  ]);
+  const staff = (emps ?? []) as { user_id: string; department_id: string | null; location_id: string | null; role: string }[];
+  if (!staff.length) return;
+
+  // Managers/owners belong to every team channel (employees.role + users.role).
+  const { data: mgrUsers } = await db.from("users").select("id, role").eq("company_id", ctx.company).in("role", ["owner", "manager"]);
+  const managers = new Set<string>([
+    ...staff.filter((e) => e.role === "owner" || e.role === "manager").map((e) => e.user_id),
+    ...((mgrUsers ?? []) as { id: string }[]).map((u) => u.id),
+  ]);
+
+  type Want = { key: string; name: string; members: Set<string> };
+  const wanted: Want[] = [];
+  for (const d of (deps ?? []) as { id: string; name: string }[]) {
+    const m = staff.filter((e) => e.department_id === d.id).map((e) => e.user_id);
+    if (m.length) wanted.push({ key: `dept:${d.id}`, name: d.name, members: new Set([...m, ...managers]) });
+  }
+  for (const l of (locs ?? []) as { id: string; name: string }[]) {
+    const m = staff.filter((e) => e.location_id === l.id).map((e) => e.user_id);
+    if (m.length) wanted.push({ key: `loc:${l.id}`, name: l.name, members: new Set([...m, ...managers]) });
+  }
+  if (!wanted.length) return;
+
+  // Existing auto channels — the select fails (and we bail) before auto_key exists.
+  const { data: existing, error: exErr } = await db.from("channels").select("id, name, auto_key").eq("company_id", ctx.company).not("auto_key", "is", null);
+  if (exErr) return;
+  const byKey = new Map(((existing ?? []) as { id: string; name: string; auto_key: string }[]).map((c) => [c.auto_key, c]));
+
+  const missing = wanted.filter((w) => !byKey.has(w.key));
+  if (missing.length) {
+    // created_by stays null: nobody is the "founder" of a team channel.
+    await db.from("channels")
+      .upsert(missing.map((w) => ({ company_id: ctx.company, name: w.name, kind: "group", auto_key: w.key, created_by: null })), { onConflict: "auto_key", ignoreDuplicates: true });
+    const { data: again } = await db.from("channels").select("id, name, auto_key").eq("company_id", ctx.company).not("auto_key", "is", null);
+    for (const c of (again ?? []) as { id: string; name: string; auto_key: string }[]) byKey.set(c.auto_key, c);
+  }
+
+  // Keep names in step with the department/location + add missing members.
+  const chIds = wanted.map((w) => byKey.get(w.key)?.id).filter(Boolean) as string[];
+  const { data: memRows } = await db.from("channel_members").select("channel_id, user_id").in("channel_id", chIds.length ? chIds : ["00000000-0000-0000-0000-000000000000"]);
+  const have = new Set(((memRows ?? []) as { channel_id: string; user_id: string }[]).map((m) => `${m.channel_id}:${m.user_id}`));
+  const inserts: { channel_id: string; user_id: string }[] = [];
+  const renames: { id: string; name: string }[] = [];
+  for (const w of wanted) {
+    const ch = byKey.get(w.key);
+    if (!ch) continue;
+    if (ch.name !== w.name) renames.push({ id: ch.id, name: w.name });
+    for (const u of w.members) if (!have.has(`${ch.id}:${u}`)) inserts.push({ channel_id: ch.id, user_id: u });
+  }
+  if (inserts.length) await db.from("channel_members").upsert(inserts, { onConflict: "channel_id,user_id", ignoreDuplicates: true });
+  for (const r of renames) await db.from("channels").update({ name: r.name }).eq("id", r.id);
+}
+
+/** Conversations the user can see: general + their groups + their DMs. */
+export async function listConversations(): Promise<{ ok: boolean; items: Conversation[]; meId: string; meName: string; needsMigration?: boolean }> {
+  if (!isSupabaseConfigured()) return { ok: false, items: [], meId: "", meName: "" };
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false, items: [], meId: "", meName: "" };
+
+    // Team channels per department/location (idempotent, throttled per company).
+    try { await syncTeamChannels(ctx); } catch (e) { console.error("syncTeamChannels:", e); }
+
+    // auto_key arrives with 0046, photo_url with 0042 — fall back to older shapes
+    let chRes = await supabase.from("channels").select("id, name, kind, created_by, photo_url, auto_key").eq("company_id", ctx.company).order("created_at");
+    if (chRes.error) chRes = (await supabase.from("channels").select("id, name, kind, created_by, photo_url").eq("company_id", ctx.company).order("created_at")) as unknown as typeof chRes;
     if (chRes.error) chRes = (await supabase.from("channels").select("id, name, kind, created_by").eq("company_id", ctx.company).order("created_at")) as unknown as typeof chRes;
-    if (chRes.error) return { ok: false, items: [], meId: ctx.userId, needsMigration: true };
-    let channels = chRes.data as { id: string; name: string; kind: string; created_by: string; photo_url?: string | null }[];
+    if (chRes.error) return { ok: false, items: [], meId: ctx.userId, meName: "", needsMigration: true };
+    let channels = chRes.data as { id: string; name: string; kind: string; created_by: string; photo_url?: string | null; auto_key?: string | null }[];
     if (!channels.length) {
       const { data: created } = await supabase.from("channels")
         .insert({ company_id: ctx.company, name: "Almennt", kind: "general", created_by: ctx.userId })
@@ -57,11 +240,12 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
     }
     const ids = channels.map((c) => c.id);
 
-    // member names per channel (to resolve DM titles) + last message
-    const [{ data: mems }, { data: msgs }, emps] = await Promise.all([
+    // member names per channel (to resolve DM titles) + last message + unread
+    const [{ data: mems }, { data: msgs }, emps, unread] = await Promise.all([
       supabase.from("channel_members").select("channel_id, user_id, users(full_name)").in("channel_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
       supabase.from("messages").select("channel_id, body, kind, created_at").in("channel_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).order("created_at", { ascending: false }).limit(400),
       empNameMap(supabase, ctx.company),
+      unreadMap(supabase),
     ]);
     const memByCh = new Map<string, { id: string; name: string; photo: string | null }[]>();
     for (const m of mems ?? []) {
@@ -88,13 +272,20 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
         : dm ? (others[0]?.name ?? "Bein skilaboð")
           : c.name;
       const first = name.split(/\s+/)[0];
-      return { id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: colorOf(first), last: lastByCh.get(c.id) ?? "", lastAt: lastAtByCh.get(c.id) ?? null, dm, photo: dm ? (others[0]?.photo ?? null) : (c.photo_url ?? null) };
+      const autoKind = c.auto_key?.startsWith("dept:") ? "dept" : c.auto_key?.startsWith("loc:") ? "loc" : null;
+      return {
+        id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: colorOf(first),
+        last: lastByCh.get(c.id) ?? "", lastAt: lastAtByCh.get(c.id) ?? null, dm, photo: dm ? (others[0]?.photo ?? null) : (c.photo_url ?? null),
+        unread: unread[c.id] ?? 0, autoKind,
+      };
     });
     // Newest activity on top; the company-wide "Almennt" channel stays pinned first.
     items.sort((a, b) => (a.kind === "general" ? -1 : b.kind === "general" ? 1 : (b.lastAt ?? "").localeCompare(a.lastAt ?? "")));
-    return { ok: true, items, meId: ctx.userId };
-  } catch {
-    return { ok: false, items: [], meId: "" };
+    const meName = emps.get(ctx.userId)?.name ?? (await supabase.from("users").select("full_name").eq("id", ctx.userId).maybeSingle()).data?.full_name ?? "";
+    return { ok: true, items, meId: ctx.userId, meName: meName.includes("@") ? "" : meName };
+  } catch (e) {
+    console.error("listConversations failed:", e);
+    return { ok: false, items: [], meId: "", meName: "" };
   }
 }
 
@@ -167,6 +358,7 @@ export async function listMembers(channelId: string): Promise<Members> {
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return empty;
     const { data: ch } = await supabase.from("channels").select("created_by").eq("id", channelId).maybeSingle();
+    const team = await isAutoChannel(supabase, channelId);
     const [{ data }, emps] = await Promise.all([
       supabase.from("channel_members").select("user_id, users(full_name)").eq("channel_id", channelId),
       empNameMap(supabase, ctx.company),
@@ -177,7 +369,7 @@ export async function listMembers(channelId: string): Promise<Members> {
       const name = info?.name ?? u?.full_name ?? "?";
       return { userId: m.user_id as string, name, av: initials(name), color: colorOf(name.split(/\s+/)[0]), photo: info?.photo ?? null };
     });
-    return { members, adminId: (ch?.created_by as string) ?? null, meId: ctx.userId };
+    return { members, adminId: team ? null : ((ch?.created_by as string) ?? null), meId: ctx.userId };
   } catch {
     return empty;
   }
@@ -205,6 +397,7 @@ export async function removeMember(channelId: string, userId: string): Promise<{
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { data: ch } = await supabase.from("channels").select("created_by").eq("id", channelId).maybeSingle();
     if ((ch?.created_by as string) !== ctx.userId) return { ok: false, error: "Aðeins stofnandi getur fjarlægt" };
+    if (await isAutoChannel(supabase, channelId)) return { ok: false, error: "Meðlimir deildar- og staðarrása fylgja starfsmannaskránni" };
     const { error } = await supabase.from("channel_members").delete().eq("channel_id", channelId).eq("user_id", userId);
     if (error) return { ok: false, error: error.message };
     return { ok: true };
@@ -219,6 +412,7 @@ export async function leaveChannel(channelId: string): Promise<{ ok: boolean; er
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
+    if (await isAutoChannel(supabase, channelId)) return { ok: false, error: "Ekki er hægt að hætta í deildar- eða staðarrás" };
     const { error } = await supabase.from("channel_members").delete().eq("channel_id", channelId).eq("user_id", ctx.userId);
     if (error) return { ok: false, error: error.message };
     return { ok: true };
@@ -227,13 +421,14 @@ export async function leaveChannel(channelId: string): Promise<{ ok: boolean; er
   }
 }
 
-export async function listMessages(channelId: string): Promise<{ ok: boolean; messages: ChatMessage[] }> {
-  if (!isSupabaseConfigured() || !channelId) return { ok: false, messages: [] };
+export async function listMessages(channelId: string): Promise<{ ok: boolean; messages: ChatMessage[]; reads: ChannelRead[] }> {
+  if (!isSupabaseConfigured() || !channelId) return { ok: false, messages: [], reads: [] };
   try {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
-    if ("error" in ctx) return { ok: false, messages: [] };
-    // reply_to arrives with migration 0042 — fall back to the old shape before it runs
+    if ("error" in ctx) return { ok: false, messages: [], reads: [] };
+    const readsP = channelReadsOf(supabase, ctx, channelId);
+    // reply_to arrives with 0042 — fall back to the old shape before it runs
     let res = await supabase
       .from("messages").select("id, body, kind, attachment_url, created_at, sender_id, reply_to, users(full_name)")
       .eq("company_id", ctx.company).eq("channel_id", channelId).order("created_at").limit(300);
@@ -242,6 +437,7 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
         .from("messages").select("id, body, kind, attachment_url, created_at, sender_id, users(full_name)")
         .eq("company_id", ctx.company).eq("channel_id", channelId).order("created_at").limit(300)) as unknown as typeof res;
     }
+    if (res.error) console.error("listMessages:", res.error.message);
     const data = res.data ?? [];
 
     // reactions (table arrives with 0042 — tolerate its absence)
@@ -283,9 +479,10 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
         photo: emps.get(m.sender_id as string)?.photo ?? null,
       };
     });
-    return { ok: true, messages };
-  } catch {
-    return { ok: false, messages: [] };
+    return { ok: true, messages, reads: await readsP };
+  } catch (e) {
+    console.error("listMessages failed:", e);
+    return { ok: false, messages: [], reads: [] };
   }
 }
 
@@ -340,7 +537,7 @@ export async function setMessageReaction(messageId: string, emoji: string | null
     if ("error" in ctx) return { ok: false, error: ctx.error };
     if (emoji) {
       const { error } = await supabase.from("message_reactions").upsert({ message_id: messageId, user_id: ctx.userId, company_id: ctx.company, emoji });
-      if (error) return { ok: false, error: "Keyrðu migration 0042 fyrir viðbrögð" };
+      if (error) return { ok: false, error: "Viðbrögð eru ekki virk" };
     } else {
       await supabase.from("message_reactions").delete().eq("message_id", messageId).eq("user_id", ctx.userId);
     }
@@ -350,7 +547,7 @@ export async function setMessageReaction(messageId: string, emoji: string | null
   }
 }
 
-/** Unsend: delete your own message (RLS-enforced, migration 0042). */
+/** Unsend: delete your own message (RLS-enforced). */
 export async function deleteMessage(messageId: string): Promise<{ ok: boolean; error?: string }> {
   if (!isSupabaseConfigured()) return { ok: true };
   try {
@@ -359,14 +556,24 @@ export async function deleteMessage(messageId: string): Promise<{ ok: boolean; e
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { data, error } = await supabase.from("messages").delete().eq("id", messageId).eq("sender_id", ctx.userId).select("id");
     if (error) return { ok: false, error: error.message };
-    if (!data?.length) return { ok: false, error: "Ekki tókst að eyða (migration 0042?)" };
+    if (!data?.length) return { ok: false, error: "Ekki tókst að eyða skilaboðunum" };
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
 
-/** Rename a group (any member — RLS `channels_member_update`, migration 0042). */
+/** Team channels (department/location) are named after their team — not renamable, not leavable. */
+async function isAutoChannel(supabase: Sb, channelId: string): Promise<boolean> {
+  try {
+    const { data } = await supabase.from("channels").select("auto_key").eq("id", channelId).maybeSingle();
+    return !!(data as { auto_key?: string | null } | null)?.auto_key;
+  } catch {
+    return false;
+  }
+}
+
+/** Rename a group (any member — RLS `channels_member_update`). */
 export async function renameChannel(channelId: string, name: string): Promise<{ ok: boolean; error?: string }> {
   if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
   const nm = name.trim();
@@ -375,6 +582,7 @@ export async function renameChannel(channelId: string, name: string): Promise<{ 
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
+    if (await isAutoChannel(supabase, channelId)) return { ok: false, error: "Deildar- og staðarrásir fá heiti sitt úr stillingum" };
     const { data, error } = await supabase.from("channels").update({ name: nm }).eq("id", channelId).eq("kind", "group").select("id");
     if (error) return { ok: false, error: error.message };
     if (!data?.length) return { ok: false, error: "Ekki tókst að breyta heiti" };
@@ -399,7 +607,7 @@ export async function setChannelPhoto(channelId: string, dataUrl: string, ext: s
     if (up.error) return { ok: false, error: up.error.message };
     const { data: pub } = supabase.storage.from("chat").getPublicUrl(path);
     const { data, error } = await supabase.from("channels").update({ photo_url: pub.publicUrl }).eq("id", channelId).select("id");
-    if (error) return { ok: false, error: "Keyrðu migration 0042 fyrir grúppumyndir" };
+    if (error) return { ok: false, error: "Ekki tókst að vista mynd" };
     if (!data?.length) return { ok: false, error: "Ekki tókst að vista mynd" };
     return { ok: true, url: pub.publicUrl };
   } catch (e) {
@@ -471,7 +679,7 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
       for (const l of pLikes) byEmoji.set((l.reaction as string) || "❤️", (byEmoji.get((l.reaction as string) || "❤️") ?? 0) + 1);
       return {
         id: r.id as string, sender: name,
-        av: system ? "🎂" : initials(name),
+        av: system ? "VK" : initials(name),
         photo: system ? null : (empNames.get(String(r.sender_id))?.photo ?? null),
         color: system ? "#e9700f" : colorOf(name.split(/\s+/)[0] || name),
         pinned: !!r.pinned, system,

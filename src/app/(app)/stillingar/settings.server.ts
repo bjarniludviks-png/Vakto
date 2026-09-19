@@ -7,7 +7,7 @@ import { nf } from "@/lib/format";
 export type LocationRow = { id?: string; name: string; staff: number; timezone: string };
 export type PositionRow = { id?: string; name: string; staff: number; baseRate: string; rawRate?: number };
 export type UserRow = { name: string; initials: string; role: string; email: string };
-export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string; payPeriodStart?: number };
+export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string; payPeriodStart?: number; plan?: string | null; trialEndsAt?: string | null; billingStatus?: string | null };
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
 export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
 export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean };
@@ -106,6 +106,15 @@ export async function getSettingsData(): Promise<SettingsData> {
       ? (await supabase.from("companies").select("name, kennitala").eq("id", company).maybeSingle()).data
       : compRes.data;
     const c = (comp ?? {}) as Record<string, string | null>;
+    // Subscription state (0020 / 0027) — tolerant of missing columns.
+    let plan: string | null = null, trialEndsAt: string | null = null, billingStatus: string | null = null;
+    const sub = await supabase.from("companies").select("plan, trial_ends_at, billing_status").eq("id", company).maybeSingle();
+    if (!sub.error && sub.data) {
+      plan = (sub.data.plan as string | null) ?? null;
+      billingStatus = (sub.data.billing_status as string | null) ?? null;
+      const te = sub.data.trial_ends_at as string | null;
+      if (te) { const d = new Date(te); trialEndsAt = `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`; }
+    }
 
     return {
       departments,
@@ -128,7 +137,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       apiKeys,
       companyId: company,
       kioskToken,
-      company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", phone: c.phone ?? "", email: c.email ?? "", payPeriodStart: ppd },
+      company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", phone: c.phone ?? "", email: c.email ?? "", payPeriodStart: ppd, plan, trialEndsAt, billingStatus },
       live: true,
     };
   } catch {

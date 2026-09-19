@@ -121,7 +121,7 @@ export async function setWeekdayRevenue(map: Record<string, number>): Promise<Se
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("companies").update({ weekday_revenue: clean }).eq("id", ctx.company);
-    if (error) return { ok: false, error: error.message.includes("weekday_revenue") ? "Keyrðu migration 0018" : error.message };
+    if (error) return { ok: false, error: error.message.includes("weekday_revenue") ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : error.message };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "revenue.weekday", entity: "company", detail: "Meðalvelta per vikudag uppfærð",
     });
@@ -248,7 +248,7 @@ export async function saveContractTerms(terms: string): Promise<SettingsResult> 
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("companies").update({ contract_terms: terms.trim() || null }).eq("id", ctx.company);
-    if (error) return { ok: false, error: /contract_terms|column/i.test(error.message) ? "Keyrðu migration 0039 í Supabase fyrst." : error.message };
+    if (error) return { ok: false, error: /contract_terms|column/i.test(error.message) ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : error.message };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "company.contract_terms", entity: "company", detail: "Sérskilmálar ráðningarsamninga uppfærðir",
     });
@@ -403,7 +403,7 @@ export async function uploadCompanyDoc(input: { fileName: string; dataUrl: strin
     const { error } = await supabase.from("documents").insert({
       company_id: ctx.company, employee_id: null, name: input.fileName, type: "shared", url: path,
     });
-    if (error) return { ok: false, error: /null value|not-null/i.test(error.message) ? "Keyrðu migration 0040 í Supabase fyrst." : error.message };
+    if (error) return { ok: false, error: /null value|not-null/i.test(error.message) ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : error.message };
     await logAudit(supabase, ctx.company, ctx.userId, { action: "companydoc.upload", entity: "documents", detail: `Skjal í skjalasafn — ${input.fileName}` });
     revalidatePath("/stillingar");
     return { ok: true };
@@ -649,7 +649,7 @@ export async function saveRuleTemplate(input: RuleTemplateInput): Promise<Settin
     const res = input.id
       ? await supabase.from("rule_templates").update(row).eq("id", input.id).eq("company_id", ctx.company).select("id").maybeSingle()
       : await supabase.from("rule_templates").insert(row).select("id").maybeSingle();
-    if (res.error) return { ok: false, error: res.error.message.includes("rule_templates") ? "Keyrðu migration 0028 í Supabase fyrst." : res.error.message };
+    if (res.error) return { ok: false, error: res.error.message.includes("rule_templates") ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : res.error.message };
     await logAudit(supabase, ctx.company, ctx.userId, { action: "rules.save", entity: "rule_templates", detail: `Reglusniðmát: ${row.name}` });
     revalidatePath("/stillingar");
     return { ok: true, id: res.data?.id as string | undefined };
@@ -809,7 +809,7 @@ export async function savePayPeriodStart(day: number): Promise<SettingsResult> {
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("companies").update({ pay_period_start: d }).eq("id", ctx.company);
-    if (error) return { ok: false, error: /pay_period_start/.test(error.message) ? "Keyrðu migration 0036 í Supabase fyrst." : error.message };
+    if (error) return { ok: false, error: /pay_period_start/.test(error.message) ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : error.message };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "company.pay_period", entity: "companies", detail: `Launatímabil stillt — byrjar ${d}.`,
     });

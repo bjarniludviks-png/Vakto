@@ -65,7 +65,7 @@ export async function requestCorrection(input: { punchId?: string; date: string;
       date: input.date, requested_in: input.requestedIn || null, requested_out: input.requestedOut || null,
       reason: input.reason, status: "pending",
     });
-    if (error) return { ok: false, error: "Keyrðu migration 0010 í Supabase til að virkja leiðréttingabeiðnir." };
+    if (error) return { ok: false, error: "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." };
     void notifyManagers(ctx.company, { title: "Leiðréttingabeiðni", body: "Starfsmaður bað um leiðréttingu á tíma.", url: "/timaskraning", tag: "requests" });
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "correction.request", entity: "punch_correction", detail: `Leiðréttingabeiðni — ${input.date}${input.reason ? ` (${input.reason})` : ""}`,

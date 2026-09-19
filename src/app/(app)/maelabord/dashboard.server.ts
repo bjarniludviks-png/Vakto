@@ -16,7 +16,8 @@ export type DashboardView = {
 
 const WEEKS_PER_MONTH = 4.33;
 const NO_ONBOARD: Onboarding = { show: false, hasLocation: true, hasStaff: true, hasSchedule: true, hasRevenue: true };
-const DEMO: DashboardView = { laborPct: 32.1, laborCostWeek: "1,40", hoursWeek: "374", live: false, onboarding: NO_ONBOARD };
+// Unconfigured/signed-out fallback — zeros, never placeholder figures.
+const DEMO: DashboardView = { laborPct: 0, laborCostWeek: "0", hoursWeek: "0", live: false, onboarding: NO_ONBOARD };
 
 /** Dashboard headline KPIs + new-company onboarding status.
  *  `scopeDepts` (a scoped manager's departments; empty = all) limits the labor
@@ -28,7 +29,7 @@ export async function getDashboard(scopeDepts: string[] = []): Promise<Dashboard
   const employees = scopeDepts.length
     ? allEmployees.filter((e) => !!e.department && scopeDepts.includes(e.department))
     : allEmployees;
-  if (!live) return { ...DEMO, laborPct: metrics.live ? metrics.laborPct : DEMO.laborPct, live: metrics.live };
+  if (!live) return { ...DEMO, laborPct: metrics.live ? (metrics.laborPct ?? 0) : DEMO.laborPct, live: metrics.live };
 
   // Signed-in company. Compute onboarding completion from real tables.
   let hasLocation = false, hasSchedule = false, hasRevenue = false;
@@ -60,12 +61,12 @@ export async function getDashboard(scopeDepts: string[] = []): Promise<Dashboard
   const onboarding: Onboarding = { show: !allDone, hasLocation, hasStaff, hasSchedule, hasRevenue };
 
   if (!hasStaff) {
-    return { laborPct: metrics.live ? metrics.laborPct : 0, laborCostWeek: "0", hoursWeek: "0", live: true, onboarding };
+    return { laborPct: metrics.live ? (metrics.laborPct ?? 0) : 0, laborCostWeek: "0", hoursWeek: "0", live: true, onboarding };
   }
 
   const tot = sumTotals(employees.map((e) => computeLine(e)));
   return {
-    laborPct: metrics.live ? metrics.laborPct : 0,
+    laborPct: metrics.live ? (metrics.laborPct ?? 0) : 0,
     laborCostWeek: dec1(Math.round((tot.cost / WEEKS_PER_MONTH) / 100000) / 10),
     hoursWeek: nf(Math.round(tot.hours / WEEKS_PER_MONTH)),
     live: true,

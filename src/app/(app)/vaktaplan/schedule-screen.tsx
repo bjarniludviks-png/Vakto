@@ -446,16 +446,12 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt, context }),
       });
-      const data = (await res.json()) as AiProposal;
+      const data = (await res.json()) as AiProposal & { ok?: boolean; error?: string };
+      if (!res.ok || data.ok === false) { toast(t("Tókst ekki að ná í AI — reyndu aftur.")); setAiProposal(null); return; }
       setAiProposal(data);
     } catch {
-      setAiProposal({
-        summary: prompt ? `„${prompt}"` : "Bestun vaktaplans",
-        laborPct: "31,8%",
-        shifts: [],
-        live: false,
-        items: [{ kind: "info", title: "Tókst ekki að ná í AI", detail: "Sýni demo-tillögu.", tag: "demo" }],
-      });
+      toast(t("Tókst ekki að ná í AI — reyndu aftur."));
+      setAiProposal(null);
     } finally {
       setAiLoading(false);
     }

@@ -19,7 +19,7 @@ export default async function LoginPage({
   return (
     <div className="wrap">
       <div className="left">
-        <LoginForm lang={lang} />
+        <LoginForm lang={lang} demo={!!(process.env.DEMO_LOGIN_EMAIL && process.env.DEMO_LOGIN_PASSWORD)} />
       </div>
 
       <div className="right">

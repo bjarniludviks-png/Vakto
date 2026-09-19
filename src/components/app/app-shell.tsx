@@ -10,6 +10,8 @@ import { useLang } from "./lang";
 import { createClient } from "@/lib/supabase/client";
 import { getMyCompanies, switchCompany, type CompanyOption } from "@/app/(app)/company-actions";
 import { TopSearch } from "./top-search";
+import { ChatBadge } from "./chat-badge";
+import { ImpersonationBar } from "./impersonation-bar";
 
 export type Account = {
   initials: string;
@@ -38,7 +40,7 @@ export default function AppShell({
   const { lang, setLang, t } = useLang();
   const [navOpen, setNavOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [menu, setMenu] = useState<null | "lang" | "new" | "notif" | "acct">(null);
+  const [menu, setMenu] = useState<null | "lang" | "new" | "acct">(null);
   const [companies, setCompanies] = useState<CompanyOption[]>([]);
   const [picker, setPicker] = useState(false);
   useEffect(() => {
@@ -51,8 +53,6 @@ export default function AppShell({
     else toast(res.error ?? "Villa");
   }
   const [pos, setPos] = useState<MenuPos>(null);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatSeen, setChatSeen] = useState(true); // resolved on mount from localStorage
   const [roleModal, setRoleModal] = useState(false);
   // Owner can preview the app as another role (account menu → Skipta um hlutverk).
   const [role, setRoleState] = useState<Role>(account.role);
@@ -66,11 +66,9 @@ export default function AppShell({
     const isDark = localStorage.getItem("vakto-theme") === "dark";
     if (isDark) document.documentElement.classList.add("dark");
     const rail = localStorage.getItem("vakto-rail") === "1";
-    const seen = localStorage.getItem("vakto-support-seen") === "1";
     requestAnimationFrame(() => {
       if (isDark) setDark(true);
       if (rail) setRailed(true);
-      if (!seen) setChatSeen(false);
     });
   }, []);
   function toggleRail() {
@@ -103,7 +101,7 @@ export default function AppShell({
 
   function openMenu(
     e: React.MouseEvent<HTMLButtonElement>,
-    which: "lang" | "new" | "notif" | "acct",
+    which: "lang" | "new" | "acct",
   ) {
     const r = e.currentTarget.getBoundingClientRect();
     setPos({ top: r.bottom + 8, right: Math.max(12, window.innerWidth - r.right) });
@@ -131,6 +129,7 @@ export default function AppShell({
 
   return (
     <>
+      <ImpersonationBar />
       <div
         className={`backdrop${navOpen ? " show" : ""}`}
         onClick={() => setNavOpen(false)}
@@ -165,12 +164,14 @@ export default function AppShell({
                     <Link
                       key={it.slug}
                       href={it.href}
+                      prefetch={false}
                       className={active(it.href) ? "on" : ""}
                       title={t("nav:" + it.slug)}
                       onClick={() => setNavOpen(false)}
                     >
                       <Icon name={it.icon} />
                       <span className="nlbl">{t("nav:" + it.slug)}</span>
+                      {it.slug === "chat" && <ChatBadge />}
                     </Link>
                   ))}
               </div>
@@ -181,6 +182,7 @@ export default function AppShell({
               <Link
                 key={it.slug}
                 href={it.href}
+                prefetch={false}
                 className={active(it.href) ? "on" : ""}
                 title={t("nav:" + it.slug)}
                 onClick={() => setNavOpen(false)}
@@ -207,21 +209,14 @@ export default function AppShell({
               >
                 <Icon name="globe" />
               </button>
-              <button
+              {(role === "owner" || role === "manager") && <button
                 className="btn sm tnew"
                 onClick={(e) => openMenu(e, "new")}
               >
                 <Icon name="plus" strokeWidth={2.2} />
                 <span className="tnew-label">{t("create")}</span>
                 <Icon name="chevron" className="chev" strokeWidth={2} />
-              </button>
-              <button
-                className="ticon"
-                title="Tilkynningar"
-                onClick={(e) => openMenu(e, "notif")}
-              >
-                <Icon name="bell" />
-              </button>
+              </button>}
               <button className="tacct" onClick={(e) => openMenu(e, "acct")}>
                 <span className="tav">{ident.initials}</span>
                 <span className="tacct-n">{ident.company}</span>
@@ -266,14 +261,6 @@ export default function AppShell({
                 <div className="mi" onClick={() => nav("/stillingar?new=location")}>{t("create:loc")}</div>
               </>
             )}
-            {menu === "notif" && (
-              <>
-                <div className="mhd"><b>{t("notifications")}</b></div>
-                <div style={{ padding: "18px 14px", textAlign: "center", color: "var(--ink3)", fontSize: 13 }}>
-                  {t("Engar nýjar tilkynningar")}
-                </div>
-              </>
-            )}
             {menu === "acct" && (
               <>
                 <div className="mhd">
@@ -314,34 +301,6 @@ export default function AppShell({
           </div>
         </>
       )}
-
-      {/* ---------- floating support chat ---------- */}
-      <div className={`cw${chatOpen ? " show" : ""}`}>
-        <div className="cwh">
-          <b>{t("chat:title")}</b>
-          <span>{t("chat:sub")}</span>
-          <button className="x" onClick={() => setChatOpen(false)}>✕</button>
-        </div>
-        <div className="cwb">
-          <div className="bub">{t("chat:hi")}</div>
-          <div className="bub">{t("chat:hint")}</div>
-        </div>
-        <div className="cwf">
-          <input placeholder={t("chat:ph")} />
-          <button onClick={() => toast("Skilaboð send")}>
-            <Icon name="chevron" />
-          </button>
-        </div>
-      </div>
-      <button
-        className={`fab${pathname.startsWith("/spjall") ? " fab-up" : ""}`}
-        title="Aðstoð"
-        onClick={() => { setChatOpen((o) => !o); setChatSeen(true); try { localStorage.setItem("vakto-support-seen", "1"); } catch {} }}
-      >
-        <Icon name="chat" />
-        {/* the dot invites a first visit — a permanent fake "1" trains users to ignore red badges */}
-        {!chatOpen && !chatSeen && <span className="fdot">1</span>}
-      </button>
 
       {/* ---------- company picker (Payday-style) ---------- */}
       {picker && <CompanyPicker companies={companies} onPick={pickCompany} onClose={() => setPicker(false)} />}

@@ -6,7 +6,7 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { syncInventraRevenue, addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
 import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
@@ -21,15 +21,9 @@ const ROLE_LABEL: Record<string, string> = { owner: "Eigandi", manager: "Stjórn
 const DEMO_SETTINGS: SettingsData = { departments: [], locations: [], positions: [], users: [], apiKeys: [], companyId: null, kioskToken: null, company: null, live: false };
 
 function copyKioskLink(kioskToken: string | null) {
-  if (!kioskToken) { toast("Kiosk-slóð er ekki tilbúin — keyrðu migration 0044"); return; }
+  if (!kioskToken) { toast("Kiosk-slóð er ekki tilbúin enn — hafðu samband við VAKTO"); return; }
   const url = `${window.location.origin}/kiosk?k=${kioskToken}`;
   navigator.clipboard?.writeText(url).then(() => toast("Kiosk-slóð afrituð"), () => toast(url));
-}
-
-async function syncInventra() {
-  const res = await syncInventraRevenue();
-  if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
-  toast(res.demo ? "Velta sótt frá Inventra (demo)" : "Velta sótt frá Inventra — laun% uppfært");
 }
 
 const Globe = () => (
@@ -46,8 +40,6 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
   const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
   const [deptEdit, setDeptEdit] = useState<{ id: string; name: string; location: string; staff: number; color: string | null; members: string[] } | null>(null);
   const [rowEdit, setRowEdit] = useState<{ kind: "location" | "position"; id: string; name: string; rate?: number } | null>(null);
-  const [posName, setPosName] = useState<string | null>(null);
-  function posConnect(name: string) { setPosName(name === "POS" ? "" : name); }
   const [section, setSection] = useState<string>(initialModal === "revenue" || initialModal === "avgrevenue" ? "velta" : "fyrirtaeki");
   const SECTIONS: [string, string][] = [
     ["fyrirtaeki", "Fyrirtæki"], ["tengingar", "Samþættingar"], ["velta", "Veltuskráning"],
@@ -138,7 +130,7 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
         <div className="card">
           <div className="ch"><div><div className="ct">{t("Velta & sölutölur")}</div><div className="cs">{t("fóðraðu laun%-útreikninginn — sjálfvirkt gegnum samþættingu eða handvirkt")}</div></div></div>
           <div className="cb att">
-            <div className="it rowlink" onClick={syncInventra}><div className="ic info">IN</div><div className="tx"><b>INVENTRA</b><span>{t("framleiðsluvelta í rauntíma · smelltu til að sækja veltu")}</span></div><span className="tag good">{t("tengt")}</span></div>
+            <div className="it rowlink" onClick={() => setKeyModal(true)}><div className="ic info">IN</div><div className="tx"><b>{t("Sölukerfi (INVENTRA, Dineout, SalesCloud …)")}</b><span>{t("sendu veltu sjálfkrafa með API-lykli · smelltu til að búa til tengingu")}</span></div><span className="tag mut">{t("ekki tengt")}</span></div>
             <div className="it rowlink" onClick={() => setModal("revenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div><div className="tx"><b>{t("Skrá veltu handvirkt")}</b><span>{t("án Inventra — sláðu inn veltu til að sjá laun vs velta")}</span></div><span className="tag info">{t("slá inn")}</span></div>
             <div className="it rowlink" onClick={() => setModal("avgrevenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M3 3v18h18M7 15l4-4 3 3 5-6" /></svg></div><div className="tx"><b>{t("Meðalvelta per vikudag")}</b><span>{t("áætluð velta per vikudag — laun% án tengingar")}</span></div><span className="tag info">{t("slá inn")}</span></div>
             <div className="it rowlink" onClick={() => setSection("tengingar")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M21 2l-9.6 9.6M15.5 7.5l3 3L22 7l-3-3zM11.4 11.6a5 5 0 1 0 1 1z" /></svg></div><div className="tx"><b>{t("Sjálfvirkt gegnum API")}</b><span>{t("búðu til samþættingu — sölukerfið þitt sendir þá veltuna sjálft")}</span></div><span className="tag info">{t("opna Samþættingar")}</span></div>
@@ -235,19 +227,15 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
 
       {section === "askrift" && (
       <div className="card owner-only">
-        <div className="ch"><div><div className="ct">{t("Áskrift & greiðslur")}</div><div className="cs">{t("VAKTO · mánaðarlega")}</div></div><span className="badge" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("virk")}</span></div>
+        <div className="ch"><div><div className="ct">{t("Áskrift & greiðslur")}</div><div className="cs">{t("staða áskriftarinnar þinnar")}</div></div>
+          <span className="badge" style={data.company?.billingStatus === "paying" ? { background: "var(--good-soft)", color: "var(--good)" } : { background: "var(--warn-soft)", color: "var(--warn)" }}>
+            {data.company?.billingStatus === "paying" ? t("virk") : data.company?.billingStatus === "suspended" ? t("lokað") : data.company?.billingStatus === "free" ? t("frí") : t("prufa")}
+          </span>
+        </div>
         <div className="cb">
-          <div className="statline"><span className="k">{t("Mánaðargjald")}</span><span className="v">9.990 kr {t("m/VSK")}</span></div>
-          <div className="statline"><span className="k">{t("Notendur innifaldir")}</span><span className="v">5</span></div>
-          <div className="statline"><span className="k">{t("Umfram notendur")}</span><span className="v">990 kr/{t("notanda")}</span></div>
-          <div className="statline"><span className="k">{t("Næsta greiðsla")}</span><span className="v">13. júlí 2026</span></div>
-          <div className="hr" />
-          <div className="statline"><span className="k">{t("Greiðslumáti")}</span><span className="v" style={{ display: "flex", alignItems: "center", gap: 8 }}><span style={{ fontWeight: 700, color: "#1a1f71", fontSize: 12, letterSpacing: ".5px" }}>VISA</span> •••• 1817 · 04/28</span></div>
-          <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
-            <button className="btn ghost sm" onClick={() => toast("Opna kortastillingar")}>{t("Uppfæra kort")}</button>
-            <button className="btn ghost sm" onClick={() => toast("Sæki reikninga")}>{t("Reikningar")}</button>
-          </div>
-          <p className="muted" style={{ fontSize: 12, marginTop: 12 }}>{t("Fast mánaðarverð með VSK, 5 notendur innifaldir og 990 kr fyrir hvern til viðbótar. Engin binding.")}</p>
+          <div className="statline"><span className="k">{t("Áskriftarleið")}</span><span className="v">{data.company?.plan ? data.company.plan : "—"}</span></div>
+          {data.company?.trialEndsAt && <div className="statline"><span className="k">{t("Prufa gildir til")}</span><span className="v">{data.company.trialEndsAt}</span></div>}
+          <p className="muted" style={{ fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>{t("Greiðslur eru afgreiddar handvirkt þar til sjálfvirk kortagreiðsla kemur. Reikningar og breytingar á áskrift: hallo@vakto.is.")}</p>
         </div>
       </div>
       )}
@@ -259,7 +247,6 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
       {rowEdit && <RowEditModal row={rowEdit} onClose={() => setRowEdit(null)} />}
       {keyModal && <ApiKeyModal onClose={() => setKeyModal(false)} />}
       {tplModal && <RuleTemplateModal tpl={tplModal === "new" ? null : tplModal} onClose={() => setTplModal(null)} />}
-      {posName !== null && <PosConnectModal name={posName} onClose={() => setPosName(null)} />}
     </>
   );
 }
@@ -768,40 +755,6 @@ function RowEditModal({ row, onClose }: { row: { kind: "location" | "position"; 
   );
 }
 
-function PosConnectModal({ name, onClose }: { name: string; onClose: () => void }) {
-  const { t } = useLang();
-  const [busy, setBusy] = useState(false);
-  const title = name || t("Sölukerfi");
-  async function request() {
-    setBusy(true);
-    await new Promise((r) => setTimeout(r, 300));
-    setBusy(false);
-    onClose();
-    toast(t("Takk! Við höfum samband um tengingu."));
-  }
-  return (
-    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="mbg" onClick={onClose} />
-      <div className="modal">
-        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Tengja")} {title}</div><button className="x" onClick={onClose}>✕</button></div>
-        <div className="mb">
-          <p className="muted" style={{ fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>
-            {t("VAKTO les veltu í rauntíma úr sölukerfinu þínu og reiknar launahlutfall jafnóðum. Veldu hvað þú vilt fylgjast með:")}
-          </p>
-          <div className="att" style={{ marginBottom: 12 }}>
-            <div className="it"><div className="ic good">$</div><div className="tx"><b>{t("Söluvelta")}</b><span>{t("t.d. Dineout, SalesCloud, POS — sala til viðskiptavina")}</span></div></div>
-            <div className="it"><div className="ic info">IN</div><div className="tx"><b>{t("Framleiðsluvelta")}</b><span>{t("t.d. Inventra — framleitt/afgreitt magn")}</span></div></div>
-          </div>
-          <p className="muted" style={{ fontSize: 12, lineHeight: 1.55 }}>{t("Tengingin krefst aðgangs frá þjónustuaðilanum. Sláðu inn áhuga og við setjum hana upp með þér.")}</p>
-          <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
-            <button className="btn" disabled={busy} onClick={request}>{busy ? t("Sendi…") : t("Óska eftir tengingu")}</button>
-            <button className="btn ghost" onClick={onClose}>{t("Loka")}</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /** Create a named API connection — shows the full key ONCE with copy + a
  * ready-to-paste curl example, then it only exists as a hash server-side. */

@@ -14,7 +14,7 @@ export async function savePushSubscription(sub: { endpoint: string; keys: { p256
       { user_id: user.id, company_id: profile?.company_id ?? null, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth },
       { onConflict: "endpoint" },
     );
-    if (error) return { ok: false, error: /push_subscriptions|relation/i.test(error.message) ? "Keyrðu migration 0019" : error.message };
+    if (error) return { ok: false, error: /push_subscriptions|relation/i.test(error.message) ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : error.message };
     return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };

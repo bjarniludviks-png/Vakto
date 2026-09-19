@@ -13,6 +13,13 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const next = url.searchParams.get("next") || "/maelabord";
   const origin = url.origin;
+  // Magic links (admin "Skrá inn sem", login links) arrive as token_hash.
+  const tokenHash = url.searchParams.get("token_hash");
+  if (tokenHash && isSupabaseConfigured()) {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: "magiclink" });
+    return NextResponse.redirect(`${origin}${error ? "/login?error=link" : next}`);
+  }
   if (!code || !isSupabaseConfigured()) return NextResponse.redirect(`${origin}${next}`);
 
   const supabase = await createClient();

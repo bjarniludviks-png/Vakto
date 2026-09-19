@@ -130,7 +130,6 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
             <div className="fs"><div className="l">{t("Brúttó")}</div><div className="v">{T.grossM} <small style={{ fontSize: 14, color: "var(--ink3)", fontWeight: 600 }}>m.kr.</small></div></div>
           </div>
           <div className="payacts">
-            <button className="btn ghost sm" onClick={() => toast("Forskoða launakeyrslu")}>{t("Forskoða")}</button>
             <button className="btn ghost sm" style={settleIds.length ? { borderColor: "var(--brand)", color: "var(--brand)" } : undefined}
               title={t("Jafnar mínus-stöðu tímabanka á GRUNNTAXTA — yfirvinnuálagið helst alltaf hjá starfsmanninum")}
               onClick={() => setTbModal(true)}>
@@ -142,7 +141,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
       </div>
 
       {usePp && pp.needsMigration && (
-        <div className="ai" style={{ marginBottom: 16 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg><div className="x">{t("Keyrðu migration 0008 — núna teljast allir lokaðir tímar, ekki bara samþykktir.")}</div></div>
+        <div className="ai" style={{ marginBottom: 16 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg><div className="x">{t("Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO.")}</div></div>
       )}
 
       <div className="kpis">

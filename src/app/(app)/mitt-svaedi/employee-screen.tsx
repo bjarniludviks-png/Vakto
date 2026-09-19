@@ -547,7 +547,6 @@ function Rights({ my }: { my?: MyArea }) {
         <div className="mini">
           <div className="mh">{t("Réttindi")}</div>
           <div className="mr"><span>{t("Kjarasamningur")}</span><b>{r.union}</b></div>
-          <div className="mr"><span>{t("Hvíldartími (11 klst)")}</span><b style={{ color: "var(--good)" }}>{t("Í lagi")}</b></div>
         </div>
       </div>
     );
@@ -570,7 +569,6 @@ function Rights({ my }: { my?: MyArea }) {
         <div className="mh">{t("Veikindi & réttindi")}</div>
         <div className="mr"><span>{t("Veikindadagar nýttir")}</span><b>3 af 24</b></div>
         <div className="mr"><span>{t("Starfshlutfall")}</span><b style={{ color: "var(--warn)" }}>118%</b></div>
-        <div className="mr"><span>{t("Hvíldartími (11 klst)")}</span><b style={{ color: "var(--good)" }}>{t("Í lagi")}</b></div>
         <div className="mr"><span>{t("Kjarasamningur")}</span><b>Efling</b></div>
       </div>
     </div>

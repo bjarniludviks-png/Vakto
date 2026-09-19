@@ -4,9 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { LOGIN_I18N, type Lang } from "./login-i18n";
-import { requestPasswordReset } from "./actions";
+import { requestPasswordReset, demoLogin } from "./actions";
 
-export default function LoginForm({ lang = "is" }: { lang?: Lang }) {
+export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; demo?: boolean }) {
   const s = LOGIN_I18N[lang];
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -178,18 +178,17 @@ export default function LoginForm({ lang = "is" }: { lang?: Lang }) {
         </span>{" "}
         {s.withMicrosoft}
       </button>
-      <button
-        className="soc"
-        type="button"
-        onClick={() => setError(s.errAudkenni)}
-      >
-        <span className="ic">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M5 8h14M5 12h14M5 16h9" />
-          </svg>
-        </span>{" "}
-        {s.withAudkenni}
-      </button>
+      {demo && (
+        <button className="soc" type="button" disabled={busy} onClick={async () => {
+          setBusy(true); setError(null);
+          const r = await demoLogin();
+          if (!r.ok) { setBusy(false); setError(r.error ?? s.errConnect); return; }
+          window.location.assign(r.next ?? "/maelabord");
+        }}>
+          <span className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 3l14 9-14 9z" /></svg></span>{" "}
+          {lang === "en" ? "Try the demo company" : "Prófa demo-fyrirtæki"}
+        </button>
+      )}
 
       <div className="foot">
         {s.noAccount} <Link href={signupHref}>{s.createAccount}</Link>

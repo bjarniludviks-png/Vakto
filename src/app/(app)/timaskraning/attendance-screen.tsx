@@ -368,7 +368,7 @@ function EmployeePunchesModal({ employeeId, name, from, to, onClose, onChanged }
           <button className="x" onClick={onClose}>✕</button>
         </div>
         <div className="mb">
-          {needsMig && <div className="ai" style={{ margin: "0 0 12px" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg><div className="x">{t("Keyrðu migration 0008 í Supabase til að virkja samþykki.")}</div></div>}
+          {needsMig && <div className="ai" style={{ margin: "0 0 12px" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg><div className="x">{t("Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO.")}</div></div>}
           {pending > 0 && <div style={{ marginBottom: 6 }}><button className="btn sm" onClick={approveAll}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Samþykkja allar")}</button></div>}
           <div className="att" style={{ maxHeight: "52vh", overflowY: "auto" }}>
             {loading ? <div className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Hleð…")}</div>

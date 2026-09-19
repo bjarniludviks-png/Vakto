@@ -218,7 +218,7 @@ export async function setStaffingTargets(targets: number[]): Promise<DecisionRes
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const clean = Array.from({ length: 7 }, (_, i) => Math.max(0, Math.round(Number(targets[i]) || 0)));
     const { error } = await supabase.from("companies").update({ staffing_targets: clean }).eq("id", ctx.company);
-    if (error) return { ok: false, error: "Keyrðu migration 0011 í Supabase til að vista mönnunarþörf." };
+    if (error) return { ok: false, error: "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "staffing.set", entity: "company", detail: `Mönnunarþörf uppfærð — ${clean.join("/")}`,
     });
