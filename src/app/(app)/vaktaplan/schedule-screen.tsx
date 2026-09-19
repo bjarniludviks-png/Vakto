@@ -821,7 +821,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                               if (s === "off") return undefined;
                               const st = timeOf(r, c)?.start ?? `${SH[s].l.split("–")[0].padStart(2, "0")}:00`;
                               const ty = types.find((x) => x.nm === cellTypes[ckey(r, c)]) ?? types.find((x) => !!x.t && x.t !== "–" && x.t.startsWith(st));
-                              return ty ? { background: ty.bg, borderColor: ty.bd, borderLeftColor: ty.fg, color: ty.fg } : undefined;
+                              return ty ? { background: ty.bg, borderColor: ty.bd, color: ty.fg } : undefined;
                             })()}
                             title={isUnav ? (s === "off" ? t("Skráð ólaus þennan dag") : t("ATH: skráð ólaus þennan dag — árekstur")) : t("hægrismelltu fyrir aðgerðir")}
                             draggable
