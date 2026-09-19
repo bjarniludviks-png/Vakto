@@ -13,13 +13,23 @@ const ini = (s: string) => s.trim().split(/\s+/)[0].slice(0, 2).toUpperCase();
 const hm = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
 const last4 = (kt: string | null) => (kt ?? "").replace(/\D/g, "").slice(-4);
 
+/** The kiosk is addressed by a secret per-company token (companies.kiosk_token),
+ * never by the company id — so a guessed/leaked UUID reveals nothing. */
+async function companyByKey(admin: ReturnType<typeof createAdminClient>, kioskKey: string): Promise<{ id: string; name: string } | null> {
+  const key = (kioskKey ?? "").trim();
+  if (!/^[a-f0-9]{32}$/.test(key)) return null;
+  const { data } = await admin.from("companies").select("id, name").eq("kiosk_token", key).maybeSingle();
+  return data ? { id: data.id as string, name: data.name as string } : null;
+}
+
 /** Load a company's employees for the shared kiosk tablet (no kennitala leaves the server). */
-export async function getKioskData(companyId: string): Promise<KioskData | null> {
+export async function getKioskData(kioskKey: string): Promise<KioskData | null> {
   if (!isSupabaseConfigured()) return null;
   try {
     const admin = createAdminClient();
-    const { data: company } = await admin.from("companies").select("name").eq("id", companyId).maybeSingle();
+    const company = await companyByKey(admin, kioskKey);
     if (!company) return null;
+    const companyId = company.id;
     const { data: emps } = await admin
       .from("employees").select("id, full_name, avatar_color")
       .eq("company_id", companyId).in("status", ["active", "over_ratio"]).order("full_name");
@@ -46,11 +56,14 @@ export async function getKioskData(companyId: string): Promise<KioskData | null>
 
 /** Clock in/out via PIN = last 4 digits of kennitala. Toggles based on open punch. */
 export async function kioskPunchByPin(
-  companyId: string, employeeId: string, pin: string,
+  kioskKey: string, employeeId: string, pin: string,
 ): Promise<PunchResult & { into?: boolean; time?: string }> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const admin = createAdminClient();
+    const co = await companyByKey(admin, kioskKey);
+    if (!co) return { ok: false, error: "Kiosk-slóðin er ógild" };
+    const companyId = co.id;
     const { data: emp } = await admin
       .from("employees").select("id, kennitala").eq("id", employeeId).eq("company_id", companyId).maybeSingle();
     if (!emp) return { ok: false, error: "Starfsmaður fannst ekki" };
@@ -80,13 +93,16 @@ export async function kioskPunchByPin(
 /** Punch by typing the full kennitala — scales to 100+ staff where the
  * name grid doesn't. Same toggle logic; 10 digits ≥ the 4-digit PIN. */
 export async function kioskPunchByKennitala(
-  companyId: string, kt: string,
+  kioskKey: string, kt: string,
 ): Promise<PunchResult & { into?: boolean; time?: string; name?: string; employeeId?: string }> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   const digits = kt.replace(/\D/g, "");
   if (digits.length !== 10) return { ok: false, error: "Sláðu inn 10 stafa kennitölu" };
   try {
     const admin = createAdminClient();
+    const co = await companyByKey(admin, kioskKey);
+    if (!co) return { ok: false, error: "Kiosk-slóðin er ógild" };
+    const companyId = co.id;
     const { data: emps } = await admin
       .from("employees").select("id, full_name, kennitala")
       .eq("company_id", companyId).in("status", ["active", "over_ratio"]);
@@ -113,14 +129,17 @@ export async function kioskPunchByKennitala(
 
 /** Punch by scanning the staff Wallet QR (clock_token). Company-scoped. */
 export async function kioskPunchByToken(
-  companyId: string, token: string,
+  kioskKey: string, token: string,
 ): Promise<PunchResult & { into?: boolean; time?: string; name?: string }> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const admin = createAdminClient();
+    const co = await companyByKey(admin, kioskKey);
+    if (!co) return { ok: false, error: "Kiosk-slóðin er ógild" };
+    const companyId = co.id;
     const { data: emp, error: e0 } = await admin
       .from("employees").select("id, full_name").eq("clock_token", token.trim()).eq("company_id", companyId).maybeSingle();
-    if (e0) return { ok: false, error: "Keyrðu migration 0024" };
+    if (e0) return { ok: false, error: "QR-stimplun er ekki virk" };
     if (!emp) return { ok: false, error: "Skírteini fannst ekki" };
     const name = (emp.full_name as string)?.split(/\s+/)[0] ?? "";
     const { data: open } = await admin

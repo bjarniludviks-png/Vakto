@@ -10,7 +10,7 @@ export type UserRow = { name: string; initials: string; role: string; email: str
 export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string; payPeriodStart?: number };
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
 export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
-export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; company: CompanyInfo | null; live: boolean };
+export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean };
 
 const DEMO: SettingsData = {
   departments: [
@@ -32,6 +32,7 @@ const DEMO: SettingsData = {
   ],
   apiKeys: [],
   companyId: null,
+  kioskToken: null,
   company: null,
   live: false,
 };
@@ -97,6 +98,9 @@ export async function getSettingsData(): Promise<SettingsData> {
     let ppd = 1;
     const ppdRes = await supabase.from("companies").select("pay_period_start").eq("id", company).maybeSingle();
     if (!ppdRes.error) { const n = Number(ppdRes.data?.pay_period_start); if (Number.isFinite(n) && n >= 1 && n <= 28) ppd = n; }
+    // Secret kiosk token (0044) — the only thing that opens /kiosk for this company.
+    const ktRes = await supabase.from("companies").select("kiosk_token").eq("id", company).maybeSingle();
+    const kioskToken = ktRes.error ? null : ((ktRes.data?.kiosk_token as string | null) ?? null);
     // Tolerant of missing 0026 columns — fall back to name+kennitala only.
     const comp = compRes.error
       ? (await supabase.from("companies").select("name, kennitala").eq("id", company).maybeSingle()).data
@@ -123,6 +127,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       })),
       apiKeys,
       companyId: company,
+      kioskToken,
       company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", phone: c.phone ?? "", email: c.email ?? "", payPeriodStart: ppd },
       live: true,
     };
