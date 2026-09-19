@@ -167,7 +167,7 @@ export default function PlanScreen() {
                   </div>
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
                     {mine.length ? mine.map((s) => (
-                      <button key={s.id} className="plan-shift mine" style={{ background: soft(s.color), borderLeftColor: s.color }} onClick={() => setDetail(s)}>
+                      <button key={s.id} className="plan-shift mine" style={{ background: soft(s.color) }} onClick={() => setDetail(s)}>
                         <b>{s.start}–{s.end} · {dec1i(s.hours)} {t("klst")}</b>
                         <span>{[s.typeName, s.dept].filter(Boolean).join(" · ") || t("plan:vakt")}</span>
                       </button>
@@ -194,7 +194,7 @@ export default function PlanScreen() {
           <div className="cb" style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 4 }}>
             {allOnSel.length === 0 && <span className="muted" style={{ fontSize: 13 }}>{t("Engar vaktir á plani þennan dag.")}</span>}
             {allOnSel.map((s) => (
-              <button key={s.id} className={`plan-shift row${s.mine ? " mineflag" : ""}`} style={{ borderLeftColor: s.color, background: s.mine ? soft(s.color) : undefined }} onClick={() => setDetail(s)}>
+              <button key={s.id} className={`plan-shift row${s.mine ? " mineflag" : ""}`} style={{ background: s.mine ? soft(s.color) : undefined }} onClick={() => setDetail(s)}>
                 <span className="avt" style={{ background: soft(s.color), color: s.color, width: 34, height: 34, fontSize: 12, fontWeight: 700 }}>
                   {(s.empName ?? "?").trim().split(/\s+/)[0].slice(0, 2).toUpperCase()}
                 </span>
@@ -218,7 +218,7 @@ export default function PlanScreen() {
             {openShifts.map((s) => {
               const d = new Date(s.date + "T12:00:00");
               return (
-                <div key={s.id} className="plan-shift row" style={{ borderLeftColor: s.color, cursor: "default" }}>
+                <div key={s.id} className="plan-shift row" style={{ cursor: "default" }}>
                   <span className="tx" style={{ flex: 1 }}>
                     <b>{t(DAY_L[(d.getDay() + 6) % 7])} {d.getDate()}.{d.getMonth() + 1} · {s.start ?? "?"}–{s.end ?? "?"}</b>
                     <span>{[s.typeName, s.dept, s.hours ? `${dec1i(s.hours)} ${t("klst")}` : null].filter(Boolean).join(" · ") || t("Opin vakt")}</span>
