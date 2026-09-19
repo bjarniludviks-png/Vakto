@@ -68,7 +68,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
   const usePp = view.live && pp;
   const ROWS = usePp ? pp.rows : view.rows;
   const T = usePp ? pp.totals : view.totals;
-  const periodLabel = usePp ? pp.periodLabel : "21. maí – 20. júní 2026";
+  const periodLabel = usePp ? pp.periodLabel : `${range.from} – ${range.to}`;
   const qs = `?format=$F&from=${range.from}&to=${range.to}`;
   function download(format: "payday" | "excel" | "dk") {
     window.location.href = `/api/payroll/export${qs.replace("$F", format)}`;
