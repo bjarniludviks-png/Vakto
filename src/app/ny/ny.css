@@ -146,19 +146,6 @@
   box-shadow:0 -20px 80px -20px rgba(233,112,15,.35),0 40px 120px -30px rgba(0,0,0,.8);
   -webkit-mask-image:linear-gradient(to bottom,#000 55%,transparent 98%);
   mask-image:linear-gradient(to bottom,#000 55%,transparent 98%)}
-/* the floating "live" labor-% pill over the top-right of the screenshot */
-.ny-livewrap{position:absolute;top:-20px;right:-14px;z-index:3;display:flex;flex-direction:column;align-items:flex-end;gap:5px;pointer-events:none}
-.ny-livepill{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:500;color:var(--ink);white-space:nowrap;
-  background:rgba(12,12,14,.62);border:1px solid rgba(245,147,49,.42);border-radius:999px;padding:8px 15px 8px 12px;
-  backdrop-filter:blur(16px) saturate(150%);box-shadow:0 14px 34px -12px rgba(0,0,0,.75),0 0 26px -8px var(--glow),inset 0 1px 0 rgba(255,255,255,.1)}
-.ny-livepill .lbl{color:var(--dim)}
-.ny-livepill .sep{color:var(--dim2)}
-.ny-livepill b{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-weight:700;font-size:13.5px;color:#fff;font-variant-numeric:tabular-nums;min-width:5.2ch;text-align:center}
-.ny-livepill .dot{position:relative;width:8px;height:8px;border-radius:50%;background:var(--brand2);box-shadow:0 0 10px var(--glow);flex:0 0 auto}
-.ny-livepill .dot::after{content:"";position:absolute;inset:-4px;border-radius:50%;border:1.5px solid rgba(245,147,49,.7);animation:nylive 2.5s var(--ease) infinite}
-@keyframes nylive{0%{transform:scale(.6);opacity:.9}100%{transform:scale(1.9);opacity:0}}
-.ny-livenote{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);padding-right:10px}
-@media(prefers-reduced-motion:reduce){.ny-livepill .dot::after{animation:none;opacity:0}}
 
 /* ---------- customers ---------- */
 .ny-trust{padding:36px 24px 8px;text-align:center}
@@ -219,7 +206,7 @@
 .ny-card-vis::before{content:"";position:absolute;inset:-40%;background:radial-gradient(40% 40% at 65% 30%,rgba(233,112,15,.3),transparent 70%);filter:blur(20px)}
 /* mini visuals */
 .ny-gauge{position:relative;text-align:center}
-.ny-gring{position:relative;width:132px;height:132px;border-radius:50%;background:conic-gradient(var(--good) 0 31.6%,rgba(255,255,255,.12) 31.6% 100%);display:flex;align-items:center;justify-content:center;box-shadow:0 0 42px -8px rgba(46,194,126,.5)}
+.ny-gring{position:relative;width:132px;height:132px;border-radius:50%;background:conic-gradient(var(--good) 0 28.4%,rgba(255,255,255,.12) 28.4% 100%);display:flex;align-items:center;justify-content:center;box-shadow:0 0 42px -8px rgba(46,194,126,.5)}
 .ny-gring::after{content:"";position:absolute;width:98px;height:98px;border-radius:50%;background:#101012}
 .ny-gring span{position:relative;z-index:1;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-weight:700;font-size:21px;color:var(--good)}
 .ny-gauge small{display:block;margin-top:12px;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:9.5px;letter-spacing:.14em;color:var(--dim2)}
@@ -237,16 +224,6 @@
 @media(prefers-reduced-motion:reduce){.ny-clock .ring{animation:none}}
 .ny-rows{display:flex;flex-direction:column;gap:10px;width:64%}
 .ny-rows i{height:9px;border-radius:5px;background:linear-gradient(90deg,rgba(245,147,49,.8),rgba(245,147,49,.15))}
-/* document rows variants: contract (signed check) and handbook (read tag) */
-.ny-rows.book{gap:9px}
-.ny-rows.book i{background:linear-gradient(90deg,rgba(244,242,238,.55),rgba(244,242,238,.08))}
-.ny-rows.book i:first-child{height:11px;background:linear-gradient(90deg,rgba(245,147,49,.85),rgba(245,147,49,.2))}
-.ny-vis-check{position:absolute;right:22px;bottom:18px;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--good);
-  background:rgba(46,194,126,.14);border:1px solid rgba(46,194,126,.4);box-shadow:0 0 20px -4px rgba(46,194,126,.55)}
-.ny-vis-check svg{width:16px;height:16px}
-.ny-vis-tag{position:absolute;right:16px;top:14px;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;letter-spacing:.02em;padding:5px 11px;border-radius:999px;
-  color:var(--good);background:rgba(46,194,126,.14);border:1px solid rgba(46,194,126,.3)}
-.ny-vis-tag svg{width:11px;height:11px}
 /* mini staff ID card */
 .ny-idcard{width:252px;border-radius:14px;overflow:hidden;background:#141518;border:1px solid rgba(255,255,255,.16);box-shadow:0 20px 44px -14px rgba(0,0,0,.65);transform:rotate(-3deg);animation:nyfloat 6s ease-in-out infinite}
 .ny-idcard .top{display:flex;justify-content:space-between;align-items:center;background:linear-gradient(120deg,#e9700f,#f59331);padding:8px 12px;color:#fff}
@@ -261,20 +238,18 @@
 .ny-idcard .qr i.on{background:#fff}
 @media(prefers-reduced-motion:reduce){.ny-idcard{animation:none}}
 /* mini team chat */
-.ny-chat{display:flex;flex-direction:column;gap:7px;width:min(300px,86%)}
-.ny-chat .bub{font-size:12px;padding:7px 12px;border-radius:13px;line-height:1.35}
+.ny-chat{display:flex;flex-direction:column;gap:9px;width:min(300px,86%)}
+.ny-chat .bub{font-size:12.5px;padding:8px 13px;border-radius:13px;line-height:1.4}
 .ny-chat .them{background:rgba(255,255,255,.1);color:#fff;align-self:flex-start;border-bottom-left-radius:4px}
 .ny-chat .me{background:var(--brand);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
 .ny-chat .tag{align-self:center;background:rgba(46,194,126,.14);color:var(--good);font-size:11px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid rgba(46,194,126,.3)}
 
-/* ---------- the basics: glass chip list ---------- */
-.ny-chips{list-style:none;margin:0 auto;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:10px;max-width:860px}
-.ny-chip{display:inline-flex;align-items:center;gap:9px;font-size:14.5px;font-weight:500;color:var(--ink);white-space:nowrap;
-  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));border:1px solid var(--line);border-radius:999px;padding:11px 18px 11px 14px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08);transition:background .15s,border-color .15s}
-.ny-chip svg{width:15px;height:15px;color:var(--brand2);flex-shrink:0}
-@media(hover:hover) and (pointer:fine){.ny-chip:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.16)}}
-.ny-chip.more{padding:11px 20px;font-weight:600;color:#fff;border-color:rgba(245,147,49,.55);background:rgba(233,112,15,.14);box-shadow:0 0 22px -6px var(--glow),inset 0 1px 0 rgba(255,255,255,.1)}
+/* ---------- steps ---------- */
+.ny-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;max-width:1060px;margin:0 auto}
+.ny-step{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));border:1px solid var(--line);border-radius:20px;padding:30px 28px}
+.ny-step .n{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:13px;color:var(--brand2);letter-spacing:.1em}
+.ny-step h3{font-size:19px;color:#fff;margin-top:14px}
+.ny-step p{font-size:14.5px;color:var(--dim);margin-top:9px;line-height:1.6}
 
 /* ---------- voices (testimonials) ---------- */
 .ny-voices{padding-top:80px}
@@ -295,31 +270,15 @@
 .ny-voice .who b{display:block;font-size:13.5px;color:#fff}
 .ny-voice .who span{font-size:12px;color:var(--dim2)}
 
-/* ---------- pricing: Free + Pro side by side, monthly/yearly toggle ---------- */
-.ny-billing{display:flex;justify-content:center;gap:8px;margin:-26px auto 36px}
-.ny-billing button{display:inline-flex;align-items:center;gap:8px;font:inherit;font-size:13px;font-weight:600;color:var(--dim);cursor:pointer;
-  background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:999px;padding:9px 18px;transition:color .15s,border-color .15s,background .15s}
-.ny-billing button.on{color:#fff;border-color:rgba(245,147,49,.55);background:rgba(233,112,15,.14);box-shadow:0 0 18px -6px var(--glow)}
-.ny-billing .save{font-size:11px;font-weight:600;color:var(--good);background:rgba(46,194,126,.14);border:1px solid rgba(46,194,126,.3);border-radius:999px;padding:2px 8px}
-.ny-plans{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:920px;margin:0 auto;align-items:stretch}
-.ny-plan{position:relative;overflow:hidden;display:flex;flex-direction:column;text-align:left;
-  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid var(--line);border-radius:24px;padding:36px 32px 32px;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
-.ny-plan.pro{border-color:rgba(245,147,49,.4);box-shadow:0 0 60px -18px var(--glow),inset 0 1px 0 rgba(255,255,255,.09)}
+/* ---------- pricing ---------- */
+.ny-price{position:relative;overflow:hidden;max-width:520px;margin:0 auto;text-align:center;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(245,147,49,.35);border-radius:24px;padding:44px 36px 36px;box-shadow:0 0 60px -18px var(--glow),inset 0 1px 0 rgba(255,255,255,.09)}
 .ny-price-glow{position:absolute;left:50%;top:-130px;width:420px;height:260px;transform:translateX(-50%);background:radial-gradient(50% 50% at 50% 50%,rgba(233,112,15,.4),transparent 70%);filter:blur(30px);pointer-events:none}
-.ny-plan-name{position:relative;font-size:12.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
-.ny-plan-badge{position:absolute;top:22px;right:22px;font-size:11.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--brand2);background:rgba(233,112,15,.14);border:1px solid rgba(245,147,49,.4);border-radius:999px;padding:5px 12px}
-.ny-amt{position:relative;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:46px;font-weight:700;color:#fff;letter-spacing:-.02em;margin-top:14px;line-height:1.1}
-.ny-amt small{font-family:'General Sans',sans-serif;font-size:14px;font-weight:500;color:var(--dim);letter-spacing:-.01em}
-.ny-plan-desc{position:relative;font-size:14.5px;color:var(--dim);margin-top:8px}
-.ny-plan ul{position:relative;list-style:none;margin:24px 0 30px;padding:0;display:flex;flex-direction:column;gap:12px}
-.ny-plan li{position:relative;font-size:14.5px;color:var(--ink);padding-left:26px}
-.ny-plan li::before{content:"";position:absolute;left:0;top:7px;width:7px;height:7px;border-radius:50%;background:rgba(244,242,238,.4)}
-.ny-plan.pro li::before{background:var(--brand2);box-shadow:0 0 10px var(--glow)}
-.ny-plan .ny-btn{position:relative;margin-top:auto;justify-content:center}
+.ny-amt{position:relative;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:52px;font-weight:700;color:#fff;letter-spacing:-.02em}
+.ny-amt small{font-family:'General Sans',sans-serif;font-size:14px;font-weight:500;color:var(--dim)}
+.ny-price ul{list-style:none;margin:26px 0 30px;padding:0;display:flex;flex-direction:column;gap:12px;text-align:left}
+.ny-price li{position:relative;font-size:14.5px;color:var(--ink);padding-left:26px}
+.ny-price li::before{content:"";position:absolute;left:0;top:7px;width:7px;height:7px;border-radius:50%;background:var(--brand2);box-shadow:0 0 10px var(--glow)}
 .ny-fine{display:block;margin-top:14px;font-size:12.5px;color:var(--dim2)}
-.ny-plans-fine{text-align:center;margin-top:22px}
 
 /* ---------- CTA + giant wordmark footer ---------- */
 .ny-cta{padding:120px 24px 90px;text-align:center}
@@ -332,7 +291,7 @@
     radial-gradient(30% 64% at 55% 40%,rgba(245,147,49,.14),transparent 70%),
     radial-gradient(32% 70% at 76% 50%,rgba(80,124,220,.24),transparent 70%);
   filter:blur(42px)}
-.ny-foot-grid{position:relative;display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr;gap:36px;max-width:1060px;margin:0 auto 44px}
+.ny-foot-grid{position:relative;display:grid;grid-template-columns:1.6fr 1fr 1fr 1fr 1fr;gap:36px;max-width:1060px;margin:0 auto 44px}
 .ny-foot-brand p{font-size:13.5px;color:var(--dim2);line-height:1.6;margin-top:14px;max-width:30ch}
 .ny-foot-col h4{font-size:14px;font-weight:600;color:#fff;margin:0 0 14px}
 .ny-foot-col a{display:block;font-size:13.5px;color:var(--dim);margin-bottom:10px}
@@ -352,7 +311,7 @@
   .ny-card.big,.ny-card.wide{grid-template-columns:1fr}
   .ny-card.big .ny-card-vis{order:0}
   .ny-state-grid{flex-direction:column-reverse;gap:36px;text-align:center}
-  .ny-plans{grid-template-columns:1fr;max-width:520px}
+  .ny-steps{grid-template-columns:1fr}
   .ny-cards{grid-template-columns:1fr}
   .ny-sec{padding:80px 20px}
   .ny-voice-main{grid-template-columns:1fr}
@@ -365,12 +324,6 @@
   .ny-horizon{top:640px}
   .ny-ctas .ny-btn{flex:1;justify-content:center}
   .ny-foot-links{flex-direction:column;align-items:flex-start}
-  .ny-livewrap{top:-16px;right:6px}
-  .ny-livepill{font-size:11px;padding:6px 12px 6px 10px;gap:6px}
-  .ny-livepill b{font-size:12px}
-  .ny-chip{font-size:13.5px;white-space:normal}
-  .ny-plan{padding:30px 22px 26px}
-  .ny-amt{font-size:40px}
 }
 
 /* ---------- product showcase slider ---------- */
