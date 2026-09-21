@@ -953,3 +953,5 @@ html.dark .wallet-btn.google{background:var(--panel);color:var(--ink)}
 .dtl-bar.day{background:#eef0ff;color:#4338ca;border-color:#e0e2fb}
 .dtl-bar.eve{background:#fff2e2;color:#b06a12;border-color:#fbe2c4}
 @media (max-width:760px){.dtl-row{grid-template-columns:120px 1fr}.dtl-nm{font-size:12px}}
+/* dark mode: "ink" is light there, so ink-filled pills need dark text */
+html.dark .etab2.on{color:#0f0f12}

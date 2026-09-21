@@ -488,7 +488,7 @@ function HeroTour({ t }: { t: (typeof T)["is"] }) {
           <img key={s.key} src={SHOT(s.key)} alt={i === idx ? `${t.shotAlt} — ${t.tour[i].title}` : ""} className={`ny-tour-img${i === idx ? " on" : ""}`} loading={i === 0 ? "eager" : "lazy"} />
         ))}
         <span className={`ny-cursor${click ? " click" : ""}`} style={{ left: `${pos.x}%`, top: `${pos.y}%` }} aria-hidden="true">
-          <svg viewBox="0 0 24 24"><path d="M5 3l14 8.5-6.2 1.6 3.6 6.6-2.6 1.4-3.6-6.6L5 19z" fill="#fff" stroke="#111" strokeWidth="1.4" strokeLinejoin="round" /></svg>
+          <svg viewBox="0 0 24 24"><path d="M5.5 2.5v17.2l4.6-4.4 3 6.7 2.9-1.3-3-6.6 6.3-.7z" fill="#000" stroke="#fff" strokeWidth="1.5" strokeLinejoin="round" /></svg>
         </span>
       </div>
       <div className="ny-tour-tabs" role="tablist">

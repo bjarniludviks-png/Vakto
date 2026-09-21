@@ -52,8 +52,8 @@ for (const [name, path] of pages) {
 }
 await owner.close();
 
-// ---- starfsmaður: sími (iPhone 15 stærð), ljóst þema eins og appið
-const emp = await ctx(browser, { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, "light");
+// ---- starfsmaður: sími (iPhone 15 stærð), dökkt þema eins og heimasíðan
+const emp = await ctx(browser, { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true }, "dark");
 const m = await emp.newPage();
 // Dalya á vakt á meðan myndin er tekin (opin stimplun sett inn og fjarlægð aftur)
 const dalya = (await admin.from("employees").select("id, company_id").eq("user_id", "098aa6ce-c452-4a9a-88c8-235951540288").single()).data;
