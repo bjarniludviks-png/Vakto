@@ -529,7 +529,7 @@
 @media(max-width:560px){
   .ny-basics{grid-template-columns:1fr}
   .ny-tour-tabs{display:none}
-  .ny-hero h1{font-size:clamp(34px,9vw,44px)}
+  .ny-hero h1{font-size:clamp(36px,9.5vw,46px)}
 }
 
 /* ---------- homepage assistant (spjallgaur) ---------- */

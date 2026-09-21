@@ -56,8 +56,8 @@ const T: Record<Lang, {
     nav: ["Eiginleikar", "Skjámyndir", "Verð"],
     login: "Innskráning", start: "Byrja frítt",
     pill: "Vaktaplan · stimpilklukka · laun · laun% af veltu",
-    h1: ["Eitt einfaldasta vaktakerfið sem til er.", "Með meiru en hin."],
-    sub: "Allt sem hin kerfin gera — vaktaplan, stimpilklukka, beiðnir — og það sem þau gera ekki: laun sem hlutfall af veltu í rauntíma, frávik sem sýna hvað þau kosta, launaútreikningur eftir kjarasamningi, skírteini, spjall og ráðningarsamningar. Einfaldara líf fyrir atvinnurekandann og starfsfólkið.",
+    h1: ["Einfaldasta vaktakerfið.", "Sem gerir meira."],
+    sub: "Allt sem hin kerfin gera. Og það sem þau gera ekki: laun% af veltu í rauntíma, frávik með krónutölu, laun eftir kjarasamningi, skírteini, spjall og ráðningarsamningar í símanum.",
     ctaSee: "Sjá hvernig",
     shotAlt: "VAKTO — alvöru skjámyndir úr kerfinu",
     tour: [
@@ -182,8 +182,8 @@ const T: Record<Lang, {
     nav: ["Features", "Screenshots", "Pricing"],
     login: "Sign in", start: "Start free",
     pill: "Scheduling · time clock · payroll · labor % of revenue",
-    h1: ["One of the simplest scheduling systems out there.", "With more than the rest."],
-    sub: "Everything the other systems do — scheduling, a time clock, requests — and what they don't: labor as a share of revenue in real time, deviations that show what they cost, payroll by union agreement, ID cards, chat and employment contracts. A simpler life for the owner and the team.",
+    h1: ["The simplest scheduling system.", "That does more."],
+    sub: "Everything the other systems do. And what they don't: labor % of revenue in real time, deviations in króna, payroll by union agreement, ID cards, chat and employment contracts on the phone.",
     ctaSee: "See how",
     shotAlt: "VAKTO — real screenshots from the app",
     tour: [
