@@ -11,6 +11,8 @@ for (const [name, vp] of [["site-desktop", { width: 1440, height: 900 }], ["site
   // láta öll Rise-svæði birtast
   await p.evaluate(async () => { for (let y = 0; y < document.body.scrollHeight; y += 600) { window.scrollTo(0, y); await new Promise((r) => setTimeout(r, 120)); } window.scrollTo(0, 0); });
   await p.waitForTimeout(1200);
+  // til yfirferðar: sýna öll svæði (scroll-reveal) og fela AI-spjallhnappinn
+  await p.addStyleTag({ content: ".ny-rise{opacity:1!important;transform:none!important}" });
   await p.screenshot({ path: `${out}/${name}.jpg`, type: "jpeg", quality: 70, fullPage: true });
   console.log("✓", name);
   await c.close();
