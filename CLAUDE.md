@@ -209,3 +209,18 @@
   ATH: staging-prófunaraðgangurinn var tengdur starfsmanninum „Phong Ha" (employees.user_id) svo
   starfsmannaflæðin séu prófanleg. Eftir í appinu: push-tilkynningar, myndataka prófílmyndar,
   undirritun samnings, Wallet.
+
+- ✅ **Sept. 2026 (live-fixes → main):** öryggi 0044 (kiosk-lykill `/kiosk?k=`, chat-bucket per fyrirtæki), einn
+  laun%-útreikningur `src/lib/labor.ts` + `companies.labor_target` (0045), Messenger-spjall m. ólesið/„séð"/rásir
+  per deild og stað (0046), VAKTO Admin m. „Skrá inn sem" + platform_audit (0047), svör við athugasemdum í
+  fréttaveitu + FB-tímastimplar (0048). **Spjall-hraði:** `vercel.json` `regions: ["dub1"]` (Supabase er í
+  eu-west-1 — föllin voru í iad1 og hver aðgerð fór 4–6 sinnum yfir Atlantshafið), móttekin skilaboð máluð beint
+  úr Realtime-atburðinum, push sent með `after()` eftir svar. **Heimasíðan** (`src/app/ny`): sama miðnætursólar-
+  útlit, nýtt innihald; ALLAR skjámyndir eru alvöru (`scripts/shots-homepage.mjs` tekur þær af preview-inu með
+  demo-fyrirtækinu, dökkt þema, síðasta heila vika) — hetjan er sjálfvirk „mús" sem flettir milli síðna.
+  **Spjallgaur** á heimasíðunni: `/api/home-chat` (Claude, þekkingargrunnur `src/lib/ai/vakto-knowledge.ts` —
+  uppfæra þegar varan breytist), „Tala við manneskju" → póstur á eiganda + `/admin/spjall` þar sem eigandi
+  svarar (gestur fær svarið í widgetinu og í pósti). Migration **0049** (support_threads/messages, service-role
+  eingöngu). **Verð:** Frítt (≤10 notendur) / Pro 590 kr/notanda/mán (500 árlega), 14 daga prufa, ekkert kort —
+  nýskráning velur `free`/`pro` (ekkert kortaform lengur), engar OAuth-þjónustur eru virkjaðar í Supabase svo
+  Apple/Google/Microsoft-hnappar voru fjarlægðir. Eiginleikaþrep (Free vs Pro) eru EKKI enn læst í kerfinu.

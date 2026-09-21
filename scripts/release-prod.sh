@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# VAKTO — release live-fixes → main + migrations 0044–0048 á prod-grunninn.
+# VAKTO — release live-fixes → main + migrations sem vantar á prod-grunninn.
+# Uppfærðu MIGRATIONS-listann hér að neðan við hvert release (það sem er nýtt síðan síðast).
 # Keyrist úr ~/vakto-live:   bash scripts/release-prod.sh
 # Röð: 1) migrations á prod (kóðinn gerir ráð fyrir dálkunum), 2) push á main → Vercel deploy.
 set -euo pipefail
@@ -26,13 +27,14 @@ EOF
 echo "== Prod-grunnur: staða fyrir"
 run_sql "select (select count(*) from companies) companies, (select count(*) from employees) employees"
 
-for f in 0044_security.sql 0045_labor_target.sql 0046_chat_messenger.sql 0047_platform_admin.sql 0048_comment_replies.sql; do
+MIGRATIONS="0049_support_chat.sql"
+for f in $MIGRATIONS; do
   echo "== $f"
   run_sql "$(cat supabase/migrations/$f)"
 done
 
 echo "== Staðfesting"
-run_sql "select (select count(*) filter (where kiosk_token ~ '^[a-f0-9]{32}$') from companies) kiosk_ok, (select count(*) from companies where labor_target is not null) target_ok, to_regclass('public.channel_reads') reads, to_regclass('public.platform_audit') pa, (select count(*) from information_schema.columns where table_name='post_comments' and column_name='parent_id') parent"
+run_sql "select to_regclass('public.support_threads') support_threads, to_regclass('public.support_messages') support_messages, to_regclass('public.channel_reads') reads, to_regclass('public.platform_audit') pa"
 
 echo "== Push live-fixes → main"
 git push origin live-fixes:main
