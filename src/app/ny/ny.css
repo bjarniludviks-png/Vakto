@@ -446,10 +446,12 @@
 .ny-tour-img{display:block;width:100%;height:auto;opacity:0;transition:opacity .55s var(--ease)}
 .ny-tour-img:not(:first-child){position:absolute;inset:0}
 .ny-tour-img.on{opacity:1}
-.ny-cursor{position:absolute;width:24px;height:24px;margin:-4px 0 0 -5px;z-index:3;pointer-events:none;
-  transition:left .95s var(--ease),top .95s var(--ease);filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
-.ny-cursor svg{width:100%;height:100%}
-.ny-cursor::after{content:"";position:absolute;left:-9px;top:-9px;width:30px;height:30px;border-radius:50%;border:2px solid rgba(245,147,49,.9);opacity:0;transform:scale(.4)}
+.ny-cursor{position:absolute;width:clamp(9px,1.7%,20px);aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);z-index:3;pointer-events:none;
+  background:radial-gradient(circle at 40% 35%,#fff 0,#ffd9b8 25%,var(--brand2) 60%,rgba(245,147,49,.85) 100%);
+  box-shadow:0 0 0 2px rgba(255,255,255,.35),0 0 14px 2px rgba(245,147,49,.55);
+  transition:left .95s var(--ease),top .95s var(--ease)}
+.ny-cursor::after{content:"";position:absolute;inset:-60%;border-radius:50%;border:2px solid rgba(245,147,49,.9);opacity:0;transform:scale(.5)}
+.ny-cursor.click{transform:translate(-50%,-50%) scale(.8)}
 .ny-cursor.click::after{animation:nyclick .5s var(--ease) forwards}
 @keyframes nyclick{0%{opacity:.9;transform:scale(.4)}100%{opacity:0;transform:scale(1.6)}}
 .ny-tour-tabs{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:18px}
