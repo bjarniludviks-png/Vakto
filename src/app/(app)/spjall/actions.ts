@@ -1,5 +1,7 @@
 "use server";
 
+import { after } from "next/server";
+
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -486,7 +488,7 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
   }
 }
 
-export async function sendChatMessage(channelId: string, body: string, kind: "text" | "image" | "audio" = "text", attachmentUrl?: string, replyTo?: string): Promise<{ ok: boolean; error?: string }> {
+export async function sendChatMessage(channelId: string, body: string, kind: "text" | "image" | "audio" = "text", attachmentUrl?: string, replyTo?: string): Promise<{ ok: boolean; id?: string; error?: string }> {
   if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
   const text = body.trim();
   if ((!text && kind === "text") || !channelId) return { ok: false };
@@ -500,29 +502,31 @@ export async function sendChatMessage(channelId: string, body: string, kind: "te
     };
     // reply_to column arrives with 0042 — retry without it if the insert rejects
     let error: { message: string } | null;
+    let inserted: { id: string } | null = null;
     if (replyTo) {
-      ({ error } = await supabase.from("messages").insert({ ...row, reply_to: replyTo } as never));
-      if (error) ({ error } = await supabase.from("messages").insert(row));
+      ({ data: inserted, error } = await supabase.from("messages").insert({ ...row, reply_to: replyTo } as never).select("id").single());
+      if (error) ({ data: inserted, error } = await supabase.from("messages").insert(row).select("id").single());
     } else {
-      ({ error } = await supabase.from("messages").insert(row));
+      ({ data: inserted, error } = await supabase.from("messages").insert(row).select("id").single());
     }
     if (error) return { ok: false, error: error.message };
-    // Push to the other channel members (best-effort; tag collapses per channel).
-    try {
-      const [{ data: mems }, { data: ch }, emps] = await Promise.all([
-        supabase.from("channel_members").select("user_id").eq("channel_id", channelId).limit(50),
-        supabase.from("channels").select("name, kind").eq("id", channelId).maybeSingle(),
-        empNameMap(supabase, ctx.company),
-      ]);
-      const sender = (emps.get(ctx.userId)?.name ?? "").split(/\s+/)[0] || "Ný skilaboð";
-      const title = ch?.kind === "group" && ch.name ? `${sender} · ${ch.name}` : sender;
-      const preview = kind === "text" ? text.slice(0, 90) : kind === "image" ? "📷 Mynd" : "🎤 Talskilaboð";
-      for (const m of mems ?? []) {
-        if (m.user_id === ctx.userId) continue;
-        void sendPushToUser(m.user_id as string, { title, body: preview, url: "/spjall", tag: `chat-${channelId}` });
-      }
-    } catch { /* push is best-effort */ }
-    return { ok: true };
+    // Push to the other channel members AFTER the response is sent — the sender
+    // never waits for the member lookup or the push provider.
+    after(async () => {
+      try {
+        const [{ data: mems }, { data: ch }, emps] = await Promise.all([
+          supabase.from("channel_members").select("user_id").eq("channel_id", channelId).limit(50),
+          supabase.from("channels").select("name, kind").eq("id", channelId).maybeSingle(),
+          empNameMap(supabase, ctx.company),
+        ]);
+        const sender = (emps.get(ctx.userId)?.name ?? "").split(/\s+/)[0] || "Ný skilaboð";
+        const title = ch?.kind === "group" && ch.name ? `${sender} · ${ch.name}` : sender;
+        const preview = kind === "text" ? text.slice(0, 90) : kind === "image" ? "📷 Mynd" : "🎤 Talskilaboð";
+        await Promise.all((mems ?? []).filter((m) => m.user_id !== ctx.userId)
+          .map((m) => sendPushToUser(m.user_id as string, { title, body: preview, url: "/spjall", tag: `chat-${channelId}` })));
+      } catch { /* push is best-effort */ }
+    });
+    return { ok: true, id: inserted?.id };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }

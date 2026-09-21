@@ -182,7 +182,15 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
     requestAnimationFrame(() => inputRef.current?.focus());
   }
 
-  useEffect(() => { activeRef.current = active?.id ?? null; }, [active?.id]);
+  useEffect(() => { activeRef.current = active?.id ?? null; activeConvRef.current = active; }, [active]);
+  const activeConvRef = useRef<Conversation | null>(null);
+  // Coalesce the reconcile fetch after a burst of realtime events (names,
+  // reply quotes and read cursors arrive with it; the bubble is already painted).
+  const reloadT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function scheduleReload(id: string) {
+    if (reloadT.current) clearTimeout(reloadT.current);
+    reloadT.current = setTimeout(() => loadMsgs(id), 400);
+  }
 
   useEffect(() => {
     if (active?.id) { setMsgs(cacheRef.current.get(active.id) ?? []); loadMsgs(active.id); read(active.id); }
@@ -222,9 +230,28 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
     const ch = supabase
       .channel("chat-live")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-        const row = payload.new as { channel_id?: string };
+        const row = payload.new as { id: string; channel_id?: string; sender_id?: string; body?: string; kind?: string; attachment_url?: string | null; created_at?: string };
         if (row.channel_id && row.channel_id === activeRef.current) {
-          loadMsgs(activeRef.current ?? undefined);
+          // Paint straight from the event — the bubble shows before any round trip.
+          setMsgs((ms) => {
+            if (ms.some((m) => m.id === row.id)) return ms;
+            const mine = row.sender_id === initial.meId;
+            if (mine) {
+              const i = ms.findIndex((m) => m.id.startsWith("tmp-") && m.body === (row.body ?? ""));
+              if (i >= 0) { const c = ms.slice(); c[i] = { ...c[i], id: row.id }; return c; }
+            }
+            const known = ms.find((m) => m.senderId === row.sender_id && !m.id.startsWith("tmp-"));
+            const conv = activeConvRef.current;
+            const d = new Date(row.created_at ?? Date.now());
+            return [...ms, {
+              id: row.id, senderId: row.sender_id ?? "", me: mine,
+              sender: mine ? "Ég" : (known?.sender ?? (conv?.dm ? conv.name.split(/\s+/)[0] : "…")),
+              body: row.body ?? "", at: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+              kind: row.kind ?? "text", url: row.attachment_url ?? null, reactions: [],
+              createdAt: row.created_at ?? d.toISOString(), replyTo: null, photo: known?.photo ?? null,
+            }];
+          });
+          scheduleReload(row.channel_id);
           read(activeRef.current);
         }
         reloadConvs();
@@ -334,8 +361,12 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
       photo: null,
     }]);
     const res = await sendChatMessage(active.id, text, kind, url, reply?.id);
-    if (!res.ok) { toast(res.error ?? "Tókst ekki"); }
-    loadMsgs(active.id); reloadConvs();
+    if (!res.ok) { toast(res.error ?? "Tókst ekki"); loadMsgs(active.id); return; }
+    // Swap the optimistic id for the real one so the realtime echo dedups;
+    // the debounced reconcile brings names/reads without a second full fetch.
+    const realId = res.id;
+    if (realId) setMsgs((ms) => ms.map((m) => (m.id === `tmp-${now.getTime()}` ? { ...m, id: realId } : m)));
+    scheduleReload(active.id);
   }
 
   async function react(m: ChatMessage, emoji: string) {
