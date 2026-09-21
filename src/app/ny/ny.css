@@ -438,3 +438,138 @@
   .ny-app-txt ul{align-items:flex-start;text-align:left;margin-inline:auto;width:fit-content}
   .ny-app-vis{padding:16px}
 }
+
+/* ---------- 2026-09: hero tour (real screenshots + a cursor that walks the sidebar) ---------- */
+.ny-tour-wrap{position:relative}
+.ny-tour{position:relative;border-radius:16px 16px 0 0;overflow:hidden;border:1px solid rgba(255,255,255,.14);border-bottom:0;
+  box-shadow:0 -10px 80px -20px rgba(233,112,15,.45),0 40px 80px -30px rgba(0,0,0,.8);background:#0b0b0d}
+.ny-tour-img{display:block;width:100%;height:auto;opacity:0;transition:opacity .55s var(--ease)}
+.ny-tour-img:not(:first-child){position:absolute;inset:0}
+.ny-tour-img.on{opacity:1}
+.ny-cursor{position:absolute;width:26px;height:26px;margin:-3px 0 0 -3px;z-index:3;pointer-events:none;
+  transition:left .95s var(--ease),top .95s var(--ease);filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
+.ny-cursor svg{width:100%;height:100%}
+.ny-cursor::after{content:"";position:absolute;left:-9px;top:-9px;width:30px;height:30px;border-radius:50%;border:2px solid rgba(245,147,49,.9);opacity:0;transform:scale(.4)}
+.ny-cursor.click::after{animation:nyclick .5s var(--ease) forwards}
+@keyframes nyclick{0%{opacity:.9;transform:scale(.4)}100%{opacity:0;transform:scale(1.6)}}
+.ny-tour-tabs{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+.ny-tour-tabs button{font:inherit;font-size:12.5px;font-weight:500;color:var(--dim);background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;transition:.15s}
+.ny-tour-tabs button.on{color:#fff;border-color:rgba(245,147,49,.6);background:rgba(233,112,15,.16)}
+@media(hover:hover) and (pointer:fine){.ny-tour-tabs button:hover{color:var(--ink)}}
+.ny-tour-cap{margin:12px auto 0;font-size:14px;color:var(--dim);max-width:640px;min-height:22px}
+.ny-tour-cap b{color:var(--ink);font-weight:600}
+.ny-shot{max-width:1100px}
+@media(prefers-reduced-motion:reduce){.ny-cursor{display:none}.ny-tour-img{transition:none}}
+
+/* the basics list */
+.ny-basicsec{padding-bottom:40px}
+.ny-basics{list-style:none;margin:0 auto;padding:0;max-width:1060px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.ny-basics li{display:flex;align-items:center;gap:11px;font-size:15px;color:var(--ink);background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.ny-basics li svg{width:17px;height:17px;color:var(--brand2);flex-shrink:0}
+.ny-featsec{padding-top:60px}
+
+/* feature visuals added 2026-09 */
+.ny-dev{display:flex;flex-direction:column;align-items:center;gap:12px}
+.ny-devtag{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:11px;color:#f2b28a;background:rgba(233,112,15,.14);border:1px solid rgba(245,147,49,.35);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.ny-pva{display:flex;flex-direction:column;gap:12px;width:100%;max-width:250px}
+.ny-pva .row{display:grid;grid-template-columns:32px 1fr 44px;grid-template-rows:auto auto;gap:4px 10px;align-items:center;font-size:12px;color:var(--dim)}
+.ny-pva .row span{grid-row:1/3}
+.ny-pva .row i{height:7px;border-radius:4px;display:block}
+.ny-pva .row i.plan{background:rgba(255,255,255,.16)}
+.ny-pva .row i.real{background:var(--good)}
+.ny-pva .row i.real.over{background:var(--brand2)}
+.ny-pva .row b{grid-row:1/3;text-align:right;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:12px;color:var(--ink)}
+.ny-pva .row b.over{color:var(--brand2)}
+.ny-pay{width:100%;max-width:250px;display:flex;flex-direction:column;gap:8px}
+.ny-pay>div{display:flex;justify-content:space-between;font-size:12.5px;color:var(--dim);padding:7px 10px;border-radius:9px;background:rgba(255,255,255,.05);border:1px solid var(--line)}
+.ny-pay>div b{color:var(--ink);font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:12px}
+.ny-pay .sum{border-color:rgba(245,147,49,.45);color:#f2b28a}
+.ny-pay .sum b{color:var(--brand2)}
+.ny-doc{display:flex;flex-direction:column;align-items:center;gap:10px}
+.ny-doc .pg{position:relative;width:120px;padding:14px 12px 30px;border-radius:8px;background:#fbfaf7;display:flex;flex-direction:column;gap:6px;box-shadow:0 10px 30px -10px rgba(0,0,0,.7)}
+.ny-doc .pg i{height:4px;border-radius:2px;background:#d9d6cf;display:block}
+.ny-doc .pg .sig{position:absolute;right:12px;bottom:8px;font-family:Georgia,serif;font-style:italic;font-size:12px;color:#1a1a1f;transform:rotate(-4deg)}
+.ny-doc .tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--good);background:rgba(46,194,126,.12);border:1px solid rgba(46,194,126,.35);border-radius:999px;padding:4px 10px}
+.ny-doc .tag svg{width:13px;height:13px}
+.ny-doc small{font-size:11px;color:var(--dim2)}
+
+/* simpler for both */
+.ny-twosec{padding-top:40px}
+.ny-two{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:1000px;margin:0 auto}
+.ny-two-col{background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));border:1px solid var(--line);border-radius:20px;padding:30px 28px}
+.ny-two-col h3{font-size:20px;color:#fff}
+.ny-two-col ul{list-style:none;margin:18px 0 0;padding:0;display:flex;flex-direction:column;gap:12px}
+.ny-two-col li{display:flex;align-items:flex-start;gap:11px;font-size:15px;color:var(--ink);line-height:1.45}
+.ny-two-col li svg{width:17px;height:17px;color:var(--brand2);flex-shrink:0;margin-top:3px}
+
+/* real phone screenshots inside the frame */
+.ny-face.shot{padding:0;background:#f4f4f6}
+.ny-face.shot img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
+
+/* pricing: Free + Pro */
+.ny-bill{display:flex;justify-content:center;gap:4px;margin:0 auto 26px;width:max-content;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:999px;padding:4px}
+.ny-bill button{font:inherit;font-size:13.5px;font-weight:500;color:var(--dim);background:transparent;border:0;border-radius:999px;padding:8px 16px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
+.ny-bill button.on{color:#fff;background:rgba(255,255,255,.1)}
+.ny-bill em{font-style:normal;font-size:11px;font-weight:600;color:var(--brand2);background:rgba(233,112,15,.16);border-radius:999px;padding:2px 7px}
+.ny-plans{display:grid;grid-template-columns:1fr 1fr;gap:18px;max-width:900px;margin:0 auto}
+.ny-plan{position:relative;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));border:1px solid var(--line);border-radius:24px;padding:36px 32px 32px;display:flex;flex-direction:column}
+.ny-plan.pro{border-color:rgba(245,147,49,.4);box-shadow:0 0 60px -18px var(--glow),inset 0 1px 0 rgba(255,255,255,.09)}
+.ny-plan h3{font-size:22px;color:#fff}
+.ny-plan .pd{font-size:14px;color:var(--dim);margin-top:6px}
+.ny-plan .ny-amt{margin-top:18px;font-size:46px}
+.ny-plan ul{list-style:none;margin:22px 0 28px;padding:0;display:flex;flex-direction:column;gap:11px;text-align:left;flex:1}
+.ny-plan li{position:relative;font-size:14.5px;color:var(--ink);padding-left:24px}
+.ny-plan li::before{content:"";position:absolute;left:0;top:8px;width:7px;height:7px;border-radius:50%;background:var(--brand2);box-shadow:0 0 10px var(--glow)}
+.ny-plan .ny-btn{justify-content:center}
+.ny-plan-badge{position:absolute;top:18px;right:18px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--brand2);background:rgba(233,112,15,.16);border:1px solid rgba(245,147,49,.4);border-radius:999px;padding:4px 10px}
+@media(max-width:900px){
+  .ny-basics{grid-template-columns:1fr 1fr}
+  .ny-two,.ny-plans{grid-template-columns:1fr}
+}
+@media(max-width:560px){
+  .ny-basics{grid-template-columns:1fr}
+  .ny-tour-tabs{display:none}
+  .ny-hero h1{font-size:clamp(34px,9vw,44px)}
+}
+
+/* ---------- homepage assistant (spjallgaur) ---------- */
+.ny-chatfab{position:fixed;right:22px;bottom:22px;z-index:60;display:inline-flex;align-items:center;gap:9px;font:inherit;font-size:14px;font-weight:600;color:#fff;cursor:pointer;
+  background:linear-gradient(180deg,#1c1c1f,#0c0c0e);border:1px solid rgba(245,147,49,.55);border-radius:999px;padding:12px 18px 12px 14px;
+  box-shadow:0 0 26px -4px var(--glow),0 14px 30px -12px rgba(0,0,0,.8);transition:transform .16s var(--ease),opacity .2s}
+.ny-chatfab svg{width:19px;height:19px;color:var(--brand2)}
+.ny-chatfab.hide{opacity:0;pointer-events:none;transform:translateY(8px)}
+@media(hover:hover) and (pointer:fine){.ny-chatfab:hover{transform:translateY(-1px)}}
+.ny-chatbox{position:fixed;right:22px;bottom:22px;z-index:61;width:min(380px,calc(100vw - 32px));height:min(600px,calc(100dvh - 44px));display:flex;flex-direction:column;
+  background:#0f0f12;border:1px solid rgba(255,255,255,.12);border-radius:20px;box-shadow:0 0 60px -18px var(--glow),0 30px 60px -20px rgba(0,0,0,.9);overflow:hidden;
+  animation:nyin .35s var(--ease)}
+.ny-chatbox .hd{display:flex;align-items:center;gap:11px;padding:14px 14px 12px;border-bottom:1px solid var(--line);background:rgba(255,255,255,.03)}
+.ny-chatbox .hd .av{width:34px;height:34px;border-radius:10px;background:rgba(233,112,15,.14);border:1px solid rgba(245,147,49,.35);display:flex;align-items:center;justify-content:center}
+.ny-chatbox .hd .av svg{width:18px;height:18px}
+.ny-chatbox .hd b{display:block;font-size:14.5px;color:#fff}
+.ny-chatbox .hd small{display:block;font-size:12px;color:var(--dim)}
+.ny-chatbox .hd .x{margin-left:auto;width:32px;height:32px;border-radius:9px;background:transparent;border:1px solid var(--line);color:var(--dim);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.ny-chatbox .hd .x svg{width:15px;height:15px}
+.ny-chatbox .log{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:9px}
+.ny-chatbox .m{max-width:86%;font-size:14px;line-height:1.5;padding:9px 12px;border-radius:14px;white-space:pre-wrap;word-break:break-word}
+.ny-chatbox .m.a{align-self:flex-start;background:rgba(255,255,255,.06);color:var(--ink);border-bottom-left-radius:5px}
+.ny-chatbox .m.o{align-self:flex-start;background:rgba(233,112,15,.16);border:1px solid rgba(245,147,49,.35);color:#fff;border-bottom-left-radius:5px}
+.ny-chatbox .m.u{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:5px}
+.ny-chatbox .m .who{display:block;font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--dim2);margin-bottom:3px}
+.ny-chatbox .m.o .who{color:var(--brand2)}
+.ny-chatbox .m.typing{color:var(--dim);letter-spacing:.2em}
+.ny-chatbox .note{font-size:12.5px;color:var(--dim);background:rgba(46,194,126,.1);border:1px solid rgba(46,194,126,.3);border-radius:12px;padding:9px 12px}
+.ny-chatbox .note.err{background:rgba(224,83,63,.1);border-color:rgba(224,83,63,.35);color:#f0a79b}
+.ny-chatbox .hand{display:flex;flex-direction:column;gap:8px;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:14px;padding:12px}
+.ny-chatbox .hand input,.ny-chatbox .hand textarea{font:inherit;font-size:14px;color:#fff;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:10px;padding:9px 11px;width:100%;resize:none}
+.ny-chatbox .hand .row{display:flex;gap:8px;justify-content:flex-end}
+.ny-chatbox .hand button{font:inherit;font-size:13px;font-weight:600;color:#fff;background:var(--brand);border:0;border-radius:10px;padding:9px 14px;cursor:pointer}
+.ny-chatbox .hand button.ghost{background:transparent;border:1px solid var(--line);color:var(--dim)}
+.ny-chatbox .ft{border-top:1px solid var(--line);padding:10px 12px 12px;display:flex;flex-direction:column;gap:8px;background:rgba(255,255,255,.02)}
+.ny-chatbox .human{align-self:flex-start;font:inherit;font-size:12.5px;font-weight:500;color:var(--brand2);background:rgba(233,112,15,.1);border:1px solid rgba(245,147,49,.3);border-radius:999px;padding:5px 11px;cursor:pointer}
+.ny-chatbox .in{display:flex;gap:8px}
+.ny-chatbox .in input{flex:1;font:inherit;font-size:14px;color:#fff;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:12px;padding:10px 13px;min-width:0}
+.ny-chatbox .in input:focus{outline:none;border-color:rgba(245,147,49,.6)}
+.ny-chatbox .in button{width:42px;border-radius:12px;background:var(--brand);border:0;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ny-chatbox .in button:disabled{opacity:.4;cursor:default}
+.ny-chatbox .in button svg{width:17px;height:17px}
+@media(max-width:560px){.ny-chatfab span{display:none}.ny-chatfab{padding:13px}.ny-chatbox{right:12px;bottom:12px;left:12px;width:auto}}

@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { createOwnerAccount, setCompanyPlan } from "./actions";
 
 const PLANS = [
-  { id: "vakto", name: "VAKTO", price: "9.990", per: "kr/mán · VSK innifalið", blurb: "Allt innifalið — 5 notendur, +990 kr á notanda umfram" },
+  { id: "free", name: "Frítt", price: "0", per: "kr · allt að 10 notendur", blurb: "Vaktaplan, stimpilklukka, beiðnir, spjall og fréttaveita." },
+  { id: "pro", name: "Pro", price: "590", per: "kr/notanda/mán", blurb: "Laun% af veltu, tímafrávik, launaútreikningur, skírteini, samningar, Payday." },
 ];
 
 const Bars = () => (
@@ -17,23 +18,18 @@ const Bars = () => (
   </svg></div>
 );
 
-export default function SignupForm({ initialPlan = "vakto" }: { initialPlan?: string }) {
+export default function SignupForm({ initialPlan = "pro" }: { initialPlan?: string }) {
   const [step, setStep] = useState<"account" | "card">("account");
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [plan, setPlan] = useState(initialPlan || "vakto");
+  const [plan, setPlan] = useState(PLANS.some((p) => p.id === initialPlan) ? initialPlan : "pro");
   const [country, setCountry] = useState<"IS" | "OTHER">("IS");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // card (Teya-ready — not charged until Teya is connected)
-  const [cardName, setCardName] = useState("");
-  const [cardNo, setCardNo] = useState("");
-  const [exp, setExp] = useState("");
-  const [cvc, setCvc] = useState("");
 
   async function submitAccount(e: React.FormEvent) {
     e.preventDefault();
@@ -51,27 +47,14 @@ export default function SignupForm({ initialPlan = "vakto" }: { initialPlan?: st
     } finally { setBusy(false); }
   }
 
-  async function oauth(provider: "google" | "azure" | "apple") {
-    setError(null);
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithOAuth({ provider, options: { redirectTo: `${window.location.origin}/auth/callback?next=/maelabord` } });
-      if (error) setError(error.message);
-    } catch {
-      setError("Innskráning með þessari þjónustu er ekki stillt enn.");
-    }
-  }
-
   async function finish(e: React.FormEvent) {
     e.preventDefault();
-    // Teya is not connected yet — card details are collected but not charged.
-    // Record the chosen plan + start the 14-day trial, then enter the app.
+    // No card at signup: Free stays free, Pro starts a 14-day trial. Billing is
+    // set up in Stillingar → Áskrift when the trial ends.
+    setBusy(true);
     await setCompanyPlan(plan);
     window.location.assign("/maelabord");
   }
-
-  const fmtCard = (v: string) => v.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
-  const fmtExp = (v: string) => { const d = v.replace(/\D/g, "").slice(0, 4); return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d; };
 
   if (step === "card") {
     const p = PLANS.find((x) => x.id === plan) ?? PLANS[0];
@@ -81,8 +64,8 @@ export default function SignupForm({ initialPlan = "vakto" }: { initialPlan?: st
         <div className="steps2">
           <span className="done">1 · Aðgangur</span><span className="sep">→</span><span className="cur">2 · Áskrift</span>
         </div>
-        <h1>Veldu áskrift</h1>
-        <div className="sub">14 daga frí prufa — engin greiðsla fyrr en þú ert viss.</div>
+        <h1>Veldu leið</h1>
+        <div className="sub">Ekkert kort. Frítt er frítt — Pro er 14 daga frí prufa.</div>
 
         <div className="planpick">
           {PLANS.map((pl) => (
@@ -94,17 +77,9 @@ export default function SignupForm({ initialPlan = "vakto" }: { initialPlan?: st
           ))}
         </div>
 
-        <div className="field"><div className="lbl"><label>Nafn á korti</label></div><input value={cardName} onChange={(e) => setCardName(e.target.value)} placeholder="Nafn Nafnsson" autoComplete="cc-name" /></div>
-        <div className="field"><div className="lbl"><label>Kortanúmer</label></div><input value={cardNo} onChange={(e) => setCardNo(fmtCard(e.target.value))} inputMode="numeric" placeholder="1234 5678 9012 3456" autoComplete="cc-number" /></div>
-        <div style={{ display: "flex", gap: 12 }}>
-          <div className="field" style={{ flex: 1 }}><div className="lbl"><label>Gildir til</label></div><input value={exp} onChange={(e) => setExp(fmtExp(e.target.value))} inputMode="numeric" placeholder="MM/ÁÁ" autoComplete="cc-exp" /></div>
-          <div className="field" style={{ flex: 1 }}><div className="lbl"><label>CVC</label></div><input value={cvc} onChange={(e) => setCvc(e.target.value.replace(/\D/g, "").slice(0, 4))} inputMode="numeric" placeholder="123" autoComplete="cc-csc" /></div>
-        </div>
-
         {error && <div style={{ color: "var(--bad)", fontSize: 13, fontWeight: 600, marginBottom: 14 }}>{error}</div>}
-        <button className="btn" type="submit">Byrja frí prufu — {p.name}</button>
-        <p className="pcy">Greitt með Teya · örugg greiðsla · uppsögn hvenær sem er</p>
-        <div className="foot"><a onClick={() => window.location.assign("/maelabord")} style={{ cursor: "pointer" }}>Sleppa í bili</a></div>
+        <button className="btn" type="submit" disabled={busy}>{busy ? "Opna…" : p.id === "pro" ? "Byrja 14 daga prufu á Pro" : "Byrja frítt"}</button>
+        <p className="pcy">Engin binding · skiptu um leið hvenær sem er í Stillingum</p>
       </form>
     );
   }
@@ -140,11 +115,6 @@ export default function SignupForm({ initialPlan = "vakto" }: { initialPlan?: st
 
       {error && <div style={{ color: "var(--bad)", fontSize: 13, fontWeight: 600, marginBottom: 14 }}>{error}</div>}
       <button className="btn" type="submit" disabled={busy}>{busy ? "Stofna…" : "Halda áfram"}</button>
-
-      <div className="divider">eða</div>
-      <button className="soc" type="button" onClick={() => oauth("apple")}><span className="ic"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.9c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.8-3-.8-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .7 1.1 1.6 2.3 2.8 2.3 1.1 0 1.5-.7 2.9-.7 1.3 0 1.7.7 2.9.7 1.2 0 2-1.1 2.7-2.2.9-1.3 1.2-2.5 1.2-2.6-.1 0-2.3-.9-2.3-3.5zM14.2 5.9c.6-.8 1-1.8.9-2.9-.9 0-2 .6-2.6 1.3-.6.7-1.1 1.7-.9 2.7 1 .1 2-.5 2.6-1.1z" /></svg></span> Halda áfram með Apple</button>
-      <button className="soc" type="button" onClick={() => oauth("google")}><span className="ic">G</span> Halda áfram með Google</button>
-      <button className="soc" type="button" onClick={() => oauth("azure")}><span className="ic"><svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" /><rect x="13" y="3" width="8" height="8" /><rect x="3" y="13" width="8" height="8" /><rect x="13" y="13" width="8" height="8" /></svg></span> Halda áfram með Microsoft</button>
 
       <div className="foot">Ertu með aðgang? <Link href="/login">Skrá inn</Link></div>
     </form>

@@ -25,6 +25,11 @@ export default function AdminShell({ email, children }: { email: string; childre
           fontSize: 10.5, fontWeight: 700, letterSpacing: ".12em", color: "#f59331",
           border: "1px solid rgba(245,147,49,.4)", borderRadius: 999, padding: "3px 10px",
         }}>PLATFORM</span>
+        <nav style={{ display: "flex", gap: 4, marginLeft: 18 }}>
+          {[["/admin", "Fyrirtæki"], ["/admin/spjall", "Spjall"]].map(([href, label]) => (
+            <a key={href} href={href} style={{ fontSize: 13, fontWeight: 600, color: "rgba(244,242,238,.8)", padding: "6px 10px", borderRadius: 8, textDecoration: "none" }}>{label}</a>
+          ))}
+        </nav>
         <span style={{ marginLeft: "auto", fontSize: 12.5, color: "rgba(244,242,238,.55)" }}>{email}</span>
         <button
           onClick={signOut}

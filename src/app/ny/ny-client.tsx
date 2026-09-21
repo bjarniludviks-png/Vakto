@@ -3,43 +3,46 @@
 // The "miðnætursól" homepage — deep black with a glowing orange aurora horizon.
 // Bilingual (IS/EN): all copy lives in T below, toggled by the nav globe and
 // persisted in localStorage("vakto-lang") — the same key the app shell uses.
+// Every screenshot on the page is a real capture of the app (scripts/shots-homepage.mjs).
 
 import { useEffect, useRef, useState } from "react";
 import { CUSTOMERS, type Brand } from "../home-data";
+import HomeChat from "./home-chat";
 
 type Lang = "is" | "en";
 
-/* ---------- copy (VAKTO-TEXTAR-NYR.md) ---------- */
+/* ---------- copy ---------- */
+
+type Plan = { name: string; price: string; unit: string; desc: string; items: string[]; cta: string; badge?: string; priceY?: string; yearNote?: string };
 
 const T: Record<Lang, {
   nav: [string, string, string];
   login: string; start: string;
   pill: string; h1: [string, string]; sub: string; ctaSee: string;
   shotAlt: string;
+  tour: { title: string; desc: string }[];
   trust: string;
   st1: string; stEm: string; st2: string;
   industries: [string, string, string, string, string, string];
+  basicsHead: string; basicsSub: string; basics: string[];
   featHead: string; featSub: string;
   features: { title: string; desc: string }[];
-  gaugeTarget: string;
+  gaugeTarget: string; devTag: string; pvaRows: [string, string, string][]; payRows: [string, string][];
   chat: [string, string, string];
-  idLabel: string; idRole: string;
+  idLabel: string; idRole: string; signedTag: string; signedName: string;
+  twoHead: string; twoSub: string;
+  owner: { title: string; items: string[] };
+  staff: { title: string; items: string[] };
   stepsHead: string;
   steps: { title: string; desc: string }[];
   showHead: string; showSub: string;
   slides: { title: string; desc: string }[];
   appBadge: string; appHead: string; appSub: string;
   appPoints: string[];
-  phNext: string; phSince: string; phClockOut: string;
-  phRows: [string, string][];
-  phSum: string; phSumRows: [string, string][];
-  phLeave: string; phSwap: string;
   phoneTabs: [string, string];
-  skRole: string; skRoleV: string; skNo: string; skScan: string;
-  voicesHead: string; voicesSub: string;
-  voices: { quote: string; role: string }[];
-  priceHead: string; priceSub: string; priceAmt: string; priceUnit: string;
-  priceItems: [string, string, string, string];
+  priceHead: string; priceSub: string;
+  billMonthly: string; billYearly: string; billSave: string;
+  planFree: Plan; planPro: Plan;
   priceFine: string;
   ctaEnd: string; ctaDemo: string;
   footBlurb: string;
@@ -50,83 +53,125 @@ const T: Record<Lang, {
   footCopy: string; footMade: string;
 }> = {
   is: {
-    nav: ["Eiginleikar", "Svona virkar það", "Verð"],
+    nav: ["Eiginleikar", "Skjámyndir", "Verð"],
     login: "Innskráning", start: "Byrja frítt",
-    pill: "Loksins — einfalt vakta- og launakerfi",
-    h1: ["Vaktaplan og laun.", "Loksins einfalt."],
-    sub: "Vaktaplan, stimpilklukka og launaútreikningur í einu þægilegu kerfi. Þú raðar vikunni á mínútum, launin stemma við kjarasamninga — og Excel fær loksins frí.",
+    pill: "Vaktaplan · stimpilklukka · laun · laun% af veltu",
+    h1: ["Eitt einfaldasta vaktakerfið sem til er.", "Með meiru en hin."],
+    sub: "Allt sem hin kerfin gera — vaktaplan, stimpilklukka, beiðnir — og það sem þau gera ekki: laun sem hlutfall af veltu í rauntíma, frávik sem sýna hvað þau kosta, launaútreikningur eftir kjarasamningi, skírteini, spjall og ráðningarsamningar. Einfaldara líf fyrir atvinnurekandann og starfsfólkið.",
     ctaSee: "Sjá hvernig",
-    shotAlt: "VAKTO mælaborð í dökkri stillingu — launahlutfall í rauntíma",
-    trust: "Vinnustaðir um allt Ísland keyra á VAKTO",
-    st1: "Vaktaplan á ekki að taka sunnudagskvöldið þitt. Í VAKTO raðar þú vikunni á nokkrum mínútum, sérð launakostnaðinn ",
-    stEm: "áður en þú birtir",
-    st2: " og launin reiknast rétt. Þú rekur staðinn — ekki Excel-skjalið.",
-    industries: ["Veitingastaðir", "Kaffihús", "Verslanir", "Hótel & gisting", "Bakarí", "Keðjur & útibú"],
-    featHead: "Allt á einum stað. Loksins.",
-    featSub: "Frá fyrsta plani að greiddum launum — eitt fallegt kerfi sem fólkið þitt elskar að nota.",
-    features: [
-      { title: "Sjáðu reksturinn í rauntíma", desc: "Laun sem hlutfall af veltu, lifandi yfir daginn. Grænt þegar þú ert á markmiði, rautt áður en það verður dýrt. Betri ákvarðanir á meðan þær eru enn ódýrar." },
-      { title: "Vaktaplan án vesens", desc: "Dragðu vaktir á sinn stað á mínútum — eða láttu AI stinga upp á plani. Fínstilltu, birtu — búið." },
-      { title: "Mæting sem skráir sig sjálf", desc: "PIN, GPS eða QR-skírteini — inn og út á sekúndu. Yfirvinnan birtist í rauntíma, ekki eftir mánuð." },
-      { title: "Skírteinið býr í veskinu", desc: "Stafrænt starfsmannaskírteini í Apple Wallet og Google Wallet — mynd, staða og QR-kóði sem stimplar inn og út. Plast heyrir sögunni til." },
-      { title: "Laun sem bara stemma", desc: "Dagvinna, álög, yfirvinna og uppbætur — rétt eftir kjarasamningum, beint í Payday eða DK. Núll handavinna." },
-      { title: "Appið sem starfsfólkið elskar", desc: "Vaktir, laun, vaktaskipti, fríbeiðnir og spjall — allt í símanum. Ein tilkynning í stað tuttugu skilaboða. Fólkið þitt veit alltaf hvað er næst og miðarnir á kaffistofunni heyra sögunni til." },
+    shotAlt: "VAKTO — alvöru skjámyndir úr kerfinu",
+    tour: [
+      { title: "Mælaborð", desc: "Laun% af veltu, tímar og kostnaður — í rauntíma." },
+      { title: "Vaktaplan", desc: "Vikan á nokkrum mínútum, kostnaðurinn sést áður en þú birtir." },
+      { title: "Tímaskráning", desc: "Áætlað á móti raun — og frávikin merkt um leið." },
+      { title: "Launakeyrslur", desc: "Reiknað eftir kjarasamningi, beint í Payday eða DK." },
+      { title: "Spjall", desc: "Rásir per deild og stað, bein skilaboð, myndir og viðbrögð." },
+      { title: "Fréttaveita", desc: "Tilkynningar sem allir sjá — með athugasemdum og svörum." },
+      { title: "Innsýn", desc: "Velta, launakostnaður og laun% mánuð fyrir mánuð." },
     ],
-    gaugeTarget: "MARKMIÐ 30%",
-    chat: ["Getur einhver tekið laugardaginn?", "Ég tek hana!", "Vaktaskipti samþykkt ✓"],
-    idLabel: "STARFSMANNASKÍRTEINI", idRole: "Kokkur · Eldhús",
+    trust: "Vinnustaðir um allt Ísland keyra á VAKTO",
+    st1: "Vaktaplan er ekki vandamálið. Að vita hvað það kostar er það. VAKTO sýnir þér launin sem hlutfall af veltu ",
+    stEm: "áður en mánuðurinn er búinn",
+    st2: " — og starfsfólkið fær app sem það nennir að nota.",
+    industries: ["Veitingastaðir", "Kaffihús", "Verslanir", "Hótel & gisting", "Bakarí", "Keðjur & útibú"],
+    basicsHead: "Allt sem þú átt að venjast.",
+    basicsSub: "Grunnurinn sem hvert vaktakerfi þarf — og hann er einfaldari hér en annars staðar.",
+    basics: [
+      "Vaktaplan með drag & drop",
+      "Stimpilklukka — sími og kiosk með PIN eða QR",
+      "Frí- og leyfisbeiðnir",
+      "Vaktaskipti og opnar vaktir",
+      "Launaútreikningur og launakeyrslur",
+      "Skýrslur í Excel og PDF",
+      "Starfsfólk lesið inn úr Excel",
+      "Útflutningur í Payday og DK",
+      "Íslenska og enska",
+    ],
+    featHead: "…og það sem hin gera ekki.",
+    featSub: "Þetta er ástæðan fyrir því að fólk skiptir yfir í VAKTO.",
+    features: [
+      { title: "Laun sem % af veltu — í rauntíma", desc: "Skráðu veltuna eða tengdu sölukerfið og sjáðu launahlutfallið um leið og stimplað er inn. Grænt þegar þú ert á markmiði, gult þegar það nálgast, rautt áður en það verður dýrt." },
+      { title: "Frávik og hvað þau kosta", desc: "Of seint, fór fyrr, yfirvinna, gleymd útstimplun. Merkt um leið og það gerist — með krónutölu, ekki bara mínútum." },
+      { title: "Áætlun á móti raun", desc: "Áætlaðir tímar á móti stimpluðum, per dag og per starfsmann. Starfsmaðurinn sér sitt líka." },
+      { title: "Laun eftir kjarasamningi", desc: "Dagvinna, álög, yfirvinna, uppbætur, staðgreiðsla og tryggingagjald — reiknað rétt og flutt beint í Payday eða DK." },
+      { title: "Starfsmannaskírteini í símanum", desc: "Mynd, staða, deild og QR-kóði sem stimplar inn á kiosknum. Fer í Apple Wallet og Google Wallet." },
+      { title: "Ráðningarsamningar undirritaðir í appinu", desc: "Samningurinn verður til úr starfsmannagögnunum, starfsmaðurinn les og samþykkir rafrænt í símanum. Enginn pappír, ekkert prentað." },
+      { title: "Spjall og fréttaveita innbyggð", desc: "Messenger-legt spjall með rásum per deild og stað, beinum skilaboðum, myndum og viðbrögðum — og fréttaveita þar sem tilkynningar ná til allra. Ekkert Slack, engin Facebook-grúppa." },
+    ],
+    gaugeTarget: "MARKMIÐ 30%", devTag: "kostar 4.350 kr",
+    pvaRows: [["Mán", "8,0", "8,4"], ["Þri", "8,0", "7,6"], ["Mið", "8,0", "9,1"]],
+    payRows: [["Dagvinna", "146,0 klst"], ["Kvöldálag 33%", "22,0 klst"], ["Yfirvinna", "2,3 klst"]],
+    chat: ["Getur einhver tekið laugardaginn?", "Ég tek hana!", "Vaktaskipti samþykkt"],
+    idLabel: "STARFSMANNASKÍRTEINI", idRole: "Þjónn · Salur", signedTag: "Undirritað rafrænt", signedName: "Ráðningarsamningur · Dalya R.",
+    twoHead: "Einfaldara fyrir báða.",
+    twoSub: "Atvinnurekandinn sér reksturinn. Starfsfólkið sér sitt. Enginn þarf að spyrja.",
+    owner: { title: "Fyrir atvinnurekandann", items: [
+      "Vaktaplan sem sýnir kostnaðinn áður en þú birtir",
+      "Laun% af veltu, í dag og þessa viku",
+      "Frávik með krónutölu — samþykkt í einu",
+      "Launakeyrsla á nokkrum mínútum, beint í Payday",
+      "Skýrslur, innsýn og samanburður milli mánaða",
+      "Ráðningarsamningar og skjöl á einum stað",
+    ] },
+    staff: { title: "Fyrir starfsfólkið", items: [
+      "Vaktirnar og næsta vakt í símanum",
+      "Stimpla inn og út með einni snertingu",
+      "Launin áætluð jafnóðum — og áætlun á móti raun",
+      "Fríbeiðnir, vaktaskipti og opnar vaktir",
+      "Spjall og fréttir frá vinnustaðnum",
+      "Skírteinið og ráðningarsamningurinn í appinu",
+    ] },
     stepsHead: "Þrjú skref. Korter. Búið.",
     steps: [
-      { title: "Stofnaðu aðgang", desc: "Fyrirtækið, fólkið og kjarasamningarnir — inn á korteri, ekki viku." },
-      { title: "Raðaðu vikunni", desc: "Dragðu vaktir á sinn stað á mínútum — eða láttu AI stinga upp á plani og samþykktu. Planið lendir beint í símum starfsfólksins, með skírteini og öllu." },
-      { title: "Sjáðu kostnaðinn fyrirfram", desc: "Launakostnaðurinn birtist áður en þú birtir planið og frávikin dag frá degi. Mánaðamótin verða bara dagsetning." },
+      { title: "Stofnaðu aðgang", desc: "Fyrirtækið, fólkið (lesið inn úr Excel) og kjarasamningarnir — inn á korteri. Ekkert kort." },
+      { title: "Raðaðu vikunni", desc: "Dragðu vaktir á sinn stað — eða láttu AI stinga upp á plani og samþykktu. Planið lendir í símum starfsfólksins." },
+      { title: "Sjáðu kostnaðinn fyrirfram", desc: "Launakostnaðurinn birtist áður en þú birtir planið, laun% um leið og veltan er skráð. Mánaðamótin verða bara dagsetning." },
     ],
     showHead: "Sjáðu kerfið í alvöru",
     showSub: "Alvöru skjámyndir úr VAKTO — flettu á milli.",
     slides: [
-      { title: "Mælaborð", desc: "Reksturinn í rauntíma: tímar, kostnaður og laun% á einum skjá." },
+      { title: "Mælaborð", desc: "Laun% af veltu, tímar, kostnaður og frávik á einum skjá." },
       { title: "Vaktaplan", desc: "Full vika á nokkrum mínútum — kostnaðurinn sést áður en þú birtir." },
-      { title: "Tímaskráning", desc: "Áætlað vs raun, yfirvinna og frávik — lifandi yfir daginn." },
-      { title: "Starfsfólk", desc: "Prófílar, réttindi, skjöl og skírteini á einum stað." },
-      { title: "Skýrslur", desc: "Tímar, kostnaður og samanburður — sótt sem Excel eða PDF." },
-      { title: "Stimpilklukka", desc: "Sameiginleg spjaldtölva á staðnum — inn og út með einni snertingu." },
+      { title: "Tímaskráning", desc: "Áætlað á móti raun, per starfsmann — frávikin merkt." },
+      { title: "Launakeyrslur", desc: "Reiknað eftir kjarasamningi — Payday, DK eða Excel." },
+      { title: "Starfsfólk", desc: "Launaprófílar, kjarasamningar, skjöl og samningar." },
+      { title: "Innsýn", desc: "Velta, launakostnaður og laun% mánuð fyrir mánuð." },
+      { title: "Spjall", desc: "Rásir, bein skilaboð, myndir og viðbrögð — eins og Messenger." },
+      { title: "Fréttaveita", desc: "Tilkynningar með viðbrögðum, athugasemdum og svörum." },
     ],
-    appBadge: "Væntanlegt",
+    appBadge: "Í vasanum",
     appHead: "Appið sem fylgir fólkinu heim",
-    appSub: "VAKTO appið er á leiðinni — allt sem starfsfólkið þarf, í vasanum.",
+    appSub: "Starfsmaðurinn sér bara það sem skiptir hann máli — og þú sleppur við tuttugu skilaboð á dag.",
     appPoints: [
+      "Stimpla inn og út — ein snerting",
       "Vaktirnar og næsta vakt",
-      "Stimpla inn og út",
-      "Skírteinið í Apple Wallet og Google Wallet",
-      "Fríbeiðnir og vaktaskipti",
-      "Tilkynningar um leið og eitthvað breytist",
+      "Launin áætluð jafnóðum, áætlun á móti raun",
+      "Beiðnir: frí, vaktaskipti, opnar vaktir",
+      "Spjall og fréttir í rauntíma",
+      "Skírteinið í Apple og Google Wallet",
+      "Ráðningarsamningur undirritaður rafrænt",
     ],
-    phNext: "Næsta vakt", phSince: "Á vakt síðan 08:01", phClockOut: "Stimpla út",
-    phRows: [["Í dag · Fim 9. júlí", "08:00–16:00"], ["Fös 10. júlí", "10:00–18:00"], ["Lau 11. júlí", "12:00–20:00 · +45%"]],
-    phSum: "Samantekt", phSumRows: [["Tímar vikunnar", "32,0 klst"], ["Næsta útborgun", "1. ágúst"]],
-    phLeave: "Sækja um frí", phSwap: "Skipta á vakt",
     phoneTabs: ["Mitt svæði", "Skírteinið"],
-    skRole: "Staða", skRoleV: "Kokkur", skNo: "Nr.", skScan: "Skannaðu á stimpilklukkunni",
-    voicesHead: "Rekstrarfólk elskar VAKTO",
-    voicesSub: "Og starfsfólkið líka. Það er allur galdurinn.",
-    voices: [
-      { quote: "Vaktaplanið sem tók tvo tíma á sunnudagskvöldum tekur núna fimm mínútur. AI raðar, ég samþykki og fólkið fær það beint í símann. Ég hef aldrei séð launakostnaðinn jafn skýrt og núna.", role: "Eigandi, kaffihús í Reykjavík" },
-      { quote: "Starfsfólkið tók appinu samstundis. Vaktaskipti sem enduðu áður í tuttugu skilaboðum gerast núna með einum smelli — og ég sé frávikin samdægurs.", role: "Rekstrarstjóri veitingahúss" },
-      { quote: "Við sáum strax hvaða dagar voru ofmannaðir. Launahlutfallið fór úr 36% í 31% á tveimur mánuðum.", role: "Verslunarstjóri" },
-    ],
-    priceHead: "Eitt verð. Allt innifalið.",
-    priceSub: "Engin þrep. Ekkert falið. Engin binding.",
-    priceAmt: "9.990", priceUnit: "kr/mán · VSK innifalið",
-    priceItems: [
-      "5 notendur innifaldir — +990 kr á notanda umfram",
-      "Vaktaplan, stimpilklukka og laun% í rauntíma",
-      "App, skírteini, spjall og skýrslur",
-      "Payday, DK og sölukerfin þín",
-    ],
-    priceFine: "14 daga frí prufa. Ekkert kort.",
-    ctaEnd: "Reksturinn þinn. Í rauntíma. Frá og með deginum í dag.",
-    ctaDemo: "Bóka kynningu",
-    footBlurb: "Loksins einfalt vakta- og launakerfi: vaktaplan, stimpilklukka og laun sem stemma — í einu fallegu kerfi.",
+    priceHead: "Byrjaðu frítt. Uppfærðu þegar þú vilt sjá reksturinn.",
+    priceSub: "Frítt fyrir litla staði. Pro þegar þú vilt sjá launin á móti veltunni.",
+    billMonthly: "Mánaðarlega", billYearly: "Árlega", billSave: "15% afsláttur",
+    planFree: {
+      name: "Frítt", price: "0", unit: "kr · allt að 10 notendur",
+      desc: "Grunnurinn sem allir þurfa — án kostnaðar.",
+      items: ["Vaktaplan með drag & drop", "Stimpilklukka — sími og kiosk", "Frí- og leyfisbeiðnir", "Vaktaskipti og opnar vaktir", "Spjall og fréttaveita"],
+      cta: "Byrja frítt",
+    },
+    planPro: {
+      name: "Pro", badge: "Vinsælast",
+      price: "590", priceY: "500", unit: "kr/notanda/mán", yearNote: "greitt árlega",
+      desc: "Allt sem hin kerfin gera ekki.",
+      items: ["Laun sem % af veltu í rauntíma", "Frávik með krónutölu", "Launaútreikningur eftir kjarasamningi", "Ráðningarsamningar og rafræn undirritun", "Skírteini í Apple og Google Wallet", "Skýrslur, innsýn og útflutningur í Payday og DK", "Ótakmarkaður fjöldi notenda"],
+      cta: "Prófa Pro frítt í 14 daga",
+    },
+    priceFine: "Verð án VSK. 14 daga frí prufa á Pro, ekkert kort. Keðjur með marga staði: hafðu samband.",
+    ctaEnd: "Sjáðu hvað vaktin kostar — áður en hún klárast.",
+    ctaDemo: "Hafa samband",
+    footBlurb: "Eitt einfaldasta vaktakerfið sem til er: vaktaplan, stimpilklukka, laun — og launin sem % af veltu í rauntíma. Hannað fyrir íslenska vinnustaði.",
     footProduct: "Vara", footHow: "Svona virkar það", footPrice: "Verð",
     footCompany: "Fyrirtækið", footContact: "Hafa samband", footKiosk: "Stimpilklukka",
     footLegal: "Lögfræði", footPrivacy: "Persónuvernd", footTerms: "Skilmálar", footCookies: "Vafrakökur",
@@ -134,83 +179,125 @@ const T: Record<Lang, {
     footCopy: "© 2026 VAKTO ehf.", footMade: "Hannað og þróað á Íslandi",
   },
   en: {
-    nav: ["Features", "How it works", "Pricing"],
+    nav: ["Features", "Screenshots", "Pricing"],
     login: "Sign in", start: "Start free",
-    pill: "Finally — a simple scheduling & payroll system",
-    h1: ["Scheduling and payroll.", "Finally simple."],
-    sub: "Scheduling, a time clock and payroll in one simple, friendly system. Build your week in minutes, pay matches the union agreements — and the spreadsheet finally retires.",
+    pill: "Scheduling · time clock · payroll · labor % of revenue",
+    h1: ["One of the simplest scheduling systems out there.", "With more than the rest."],
+    sub: "Everything the other systems do — scheduling, a time clock, requests — and what they don't: labor as a share of revenue in real time, deviations that show what they cost, payroll by union agreement, ID cards, chat and employment contracts. A simpler life for the owner and the team.",
     ctaSee: "See how",
-    shotAlt: "VAKTO dashboard in dark mode — labor ratio in real time",
-    trust: "Workplaces across Iceland run on VAKTO",
-    st1: "A schedule shouldn't cost you your Sunday night. In VAKTO you build the week in minutes, see the labor cost ",
-    stEm: "before you publish",
-    st2: " and pay comes out right. You run the place — not the spreadsheet.",
-    industries: ["Restaurants", "Cafés", "Retail", "Hotels & stays", "Bakeries", "Chains & branches"],
-    featHead: "Everything in one place. Finally.",
-    featSub: "From the first schedule to paid salaries — one beautiful platform your people love to use.",
-    features: [
-      { title: "See your business in real time", desc: "Labor as a share of revenue, live through the day. Green when you're on target, red before it gets expensive. Better decisions while they're still cheap." },
-      { title: "Scheduling without the hassle", desc: "Drag shifts into place in minutes — or let AI suggest a draft. Tweak, publish — done." },
-      { title: "Attendance that tracks itself", desc: "PIN, GPS or QR badge — in and out in a second. Overtime shows up in real time, not next month." },
-      { title: "An ID that lives in the wallet", desc: "A digital employee ID in Apple Wallet and Google Wallet — photo, role and a QR code that clocks in and out. Plastic is history." },
-      { title: "Payroll that just adds up", desc: "Base pay, premiums, overtime and bonuses — correct per union agreements, straight into Payday or DK. Zero manual work." },
-      { title: "The app your team loves", desc: "Shifts, pay, swaps, time off and chat — all on their phone. One notification instead of twenty messages. Your people always know what's next, and the break-room notes are history." },
+    shotAlt: "VAKTO — real screenshots from the app",
+    tour: [
+      { title: "Dashboard", desc: "Labor % of revenue, hours and cost — in real time." },
+      { title: "Schedule", desc: "A week in minutes; the cost shows before you publish." },
+      { title: "Time tracking", desc: "Planned vs actual — deviations flagged as they happen." },
+      { title: "Payroll", desc: "Calculated by union agreement, straight into Payday or DK." },
+      { title: "Chat", desc: "Channels per department and site, DMs, photos and reactions." },
+      { title: "News feed", desc: "Announcements everyone sees — with comments and replies." },
+      { title: "Insights", desc: "Revenue, labor cost and labor % month by month." },
     ],
-    gaugeTarget: "TARGET 30%",
-    chat: ["Can anyone take Saturday?", "I got it!", "Swap approved ✓"],
-    idLabel: "EMPLOYEE ID", idRole: "Chef · Kitchen",
+    trust: "Workplaces across Iceland run on VAKTO",
+    st1: "The schedule isn't the problem. Knowing what it costs is. VAKTO shows you labor as a share of revenue ",
+    stEm: "before the month is over",
+    st2: " — and your team gets an app they actually want to use.",
+    industries: ["Restaurants", "Cafés", "Retail", "Hotels & stays", "Bakeries", "Chains & branches"],
+    basicsHead: "Everything you're used to.",
+    basicsSub: "The foundation every scheduling system needs — simpler here than anywhere else.",
+    basics: [
+      "Drag & drop scheduling",
+      "Time clock — phone and kiosk with PIN or QR",
+      "Time-off and leave requests",
+      "Shift swaps and open shifts",
+      "Payroll calculation and pay runs",
+      "Reports in Excel and PDF",
+      "Import staff from Excel",
+      "Export to Payday and DK",
+      "Icelandic and English",
+    ],
+    featHead: "…and what the others don't do.",
+    featSub: "This is why people switch to VAKTO.",
+    features: [
+      { title: "Labor as % of revenue — in real time", desc: "Enter revenue or connect your POS and see the labor ratio the moment someone clocks in. Green on target, amber when it's close, red before it gets expensive." },
+      { title: "Deviations and what they cost", desc: "Late, left early, overtime, forgot to clock out. Flagged the moment it happens — in króna, not just minutes." },
+      { title: "Planned vs actual", desc: "Scheduled hours against clocked hours, per day and per person. Your team sees theirs too." },
+      { title: "Payroll by union agreement", desc: "Base pay, premiums, overtime, bonuses, withholding and insurance levy — calculated correctly and exported straight to Payday or DK." },
+      { title: "Employee ID on the phone", desc: "Photo, role, department and a QR code that clocks in at the kiosk. Goes into Apple Wallet and Google Wallet." },
+      { title: "Employment contracts signed in the app", desc: "The contract is generated from the employee's data; they read and accept it electronically on their phone. No paper, nothing printed." },
+      { title: "Chat and news feed built in", desc: "Messenger-style chat with channels per department and site, DMs, photos and reactions — and a news feed where announcements reach everyone. No Slack, no Facebook group." },
+    ],
+    gaugeTarget: "TARGET 30%", devTag: "costs 4,350 ISK",
+    pvaRows: [["Mon", "8.0", "8.4"], ["Tue", "8.0", "7.6"], ["Wed", "8.0", "9.1"]],
+    payRows: [["Base hours", "146.0 h"], ["Evening +33%", "22.0 h"], ["Overtime", "2.3 h"]],
+    chat: ["Can anyone take Saturday?", "I got it!", "Swap approved"],
+    idLabel: "EMPLOYEE ID", idRole: "Server · Floor", signedTag: "Signed electronically", signedName: "Employment contract · Dalya R.",
+    twoHead: "Simpler for both.",
+    twoSub: "The owner sees the business. The team sees their own. Nobody has to ask.",
+    owner: { title: "For the owner", items: [
+      "A schedule that shows the cost before you publish",
+      "Labor % of revenue, today and this week",
+      "Deviations in króna — approved in one go",
+      "Payroll in minutes, straight into Payday",
+      "Reports, insights and month-to-month comparison",
+      "Contracts and documents in one place",
+    ] },
+    staff: { title: "For the team", items: [
+      "Shifts and what's next, on the phone",
+      "Clock in and out with one tap",
+      "Pay estimated as you go — planned vs actual",
+      "Time off, swaps and open shifts",
+      "Chat and news from work",
+      "ID card and employment contract in the app",
+    ] },
     stepsHead: "Three steps. Fifteen minutes. Done.",
     steps: [
-      { title: "Create your account", desc: "Your company, your people, your agreements — set up in fifteen minutes, not a week." },
-      { title: "Build your week", desc: "Drag shifts into place in minutes — or let AI suggest a plan and approve it. The schedule lands on your team's phones, badge included." },
-      { title: "See the cost up front", desc: "Labor cost shows before you publish, and deviations day by day. Month-end becomes just a date." },
+      { title: "Create your account", desc: "Your company, your people (imported from Excel) and your agreements — set up in fifteen minutes. No card." },
+      { title: "Build your week", desc: "Drag shifts into place — or let AI suggest a plan and approve it. The schedule lands on your team's phones." },
+      { title: "See the cost up front", desc: "Labor cost shows before you publish, labor % the moment revenue is entered. Month-end becomes just a date." },
     ],
     showHead: "See the real thing",
     showSub: "Actual screenshots from VAKTO — swipe through.",
     slides: [
-      { title: "Dashboard", desc: "Your business in real time: hours, cost and labor % on one screen." },
-      { title: "Scheduling", desc: "A full week in minutes — see the cost before you publish." },
-      { title: "Time tracking", desc: "Planned vs actual, overtime and deviations — live through the day." },
-      { title: "People", desc: "Profiles, entitlements, documents and IDs in one place." },
-      { title: "Reports", desc: "Hours, cost and comparisons — exported as Excel or PDF." },
-      { title: "Time clock", desc: "A shared tablet on site — in and out with one tap." },
+      { title: "Dashboard", desc: "Labor % of revenue, hours, cost and deviations on one screen." },
+      { title: "Schedule", desc: "A full week in minutes — see the cost before you publish." },
+      { title: "Time tracking", desc: "Planned vs actual per person — deviations flagged." },
+      { title: "Payroll", desc: "Calculated by union agreement — Payday, DK or Excel." },
+      { title: "People", desc: "Pay profiles, agreements, documents and contracts." },
+      { title: "Insights", desc: "Revenue, labor cost and labor % month by month." },
+      { title: "Chat", desc: "Channels, DMs, photos and reactions — like Messenger." },
+      { title: "News feed", desc: "Announcements with reactions, comments and replies." },
     ],
-    appBadge: "Coming soon",
+    appBadge: "In your pocket",
     appHead: "The app that goes home with your people",
-    appSub: "The VAKTO app is on its way — everything your team needs, in their pocket.",
+    appSub: "Your team sees only what matters to them — and you skip twenty messages a day.",
     appPoints: [
+      "Clock in and out — one tap",
       "Shifts and what's next",
-      "Clock in and out",
-      "ID in Apple Wallet and Google Wallet",
-      "Time off and shift swaps",
-      "Notifications the moment anything changes",
+      "Pay estimated as you go, planned vs actual",
+      "Requests: time off, swaps, open shifts",
+      "Chat and news in real time",
+      "ID in Apple and Google Wallet",
+      "Employment contract signed electronically",
     ],
-    phNext: "Next shift", phSince: "On shift since 08:01", phClockOut: "Clock out",
-    phRows: [["Today · Thu 9 July", "08:00–16:00"], ["Fri 10 July", "10:00–18:00"], ["Sat 11 July", "12:00–20:00 · +45%"]],
-    phSum: "Summary", phSumRows: [["Hours this week", "32.0 h"], ["Next payday", "1 August"]],
-    phLeave: "Request time off", phSwap: "Swap a shift",
     phoneTabs: ["My area", "ID card"],
-    skRole: "Role", skRoleV: "Chef", skNo: "No.", skScan: "Scan at the time clock",
-    voicesHead: "Owners love VAKTO",
-    voicesSub: "So do their teams. That's the whole trick.",
-    voices: [
-      { quote: "The schedule that ate two hours of my Sunday nights now takes five minutes. AI drafts it, I approve, and it lands on everyone's phone. I've never seen my labor cost this clearly.", role: "Owner, café in Reykjavík" },
-      { quote: "The team adopted the app instantly. Swaps that used to end in twenty messages now happen in one tap — and I see deviations the same day.", role: "Restaurant operations manager" },
-      { quote: "We saw immediately which days were overstaffed. Our labor ratio went from 36% to 31% in two months.", role: "Store manager" },
-    ],
-    priceHead: "One price. Everything included.",
-    priceSub: "No tiers. No fine print. No lock-in.",
-    priceAmt: "9,990", priceUnit: "ISK/mo · VAT included",
-    priceItems: [
-      "5 users included — +990 ISK per extra user",
-      "Scheduling, time clock and real-time labor %",
-      "App, digital IDs, chat and reports",
-      "Payday, DK and your POS systems",
-    ],
-    priceFine: "14-day free trial. No card.",
-    ctaEnd: "Your business. In real time. Starting today.",
-    ctaDemo: "Book a demo",
-    footBlurb: "Finally a simple scheduling & payroll system: shifts, a time clock and pay that adds up — in one beautiful platform.",
+    priceHead: "Start free. Upgrade when you want to see the business.",
+    priceSub: "Free for small places. Pro when you want labor against revenue.",
+    billMonthly: "Monthly", billYearly: "Yearly", billSave: "15% off",
+    planFree: {
+      name: "Free", price: "0", unit: "ISK · up to 10 users",
+      desc: "The foundation everyone needs — at no cost.",
+      items: ["Drag & drop scheduling", "Time clock — phone and kiosk", "Time-off and leave requests", "Shift swaps and open shifts", "Chat and news feed"],
+      cta: "Start free",
+    },
+    planPro: {
+      name: "Pro", badge: "Most popular",
+      price: "590", priceY: "500", unit: "ISK/user/mo", yearNote: "billed yearly",
+      desc: "Everything the others don't do.",
+      items: ["Labor as % of revenue in real time", "Deviations in króna", "Payroll by union agreement", "Employment contracts and e-signing", "ID in Apple and Google Wallet", "Reports, insights and export to Payday and DK", "Unlimited users"],
+      cta: "Try Pro free for 14 days",
+    },
+    priceFine: "Prices excl. VAT. 14-day free trial of Pro, no card. Chains with many sites: get in touch.",
+    ctaEnd: "See what the shift costs — before it's over.",
+    ctaDemo: "Contact us",
+    footBlurb: "One of the simplest scheduling systems out there: shifts, a time clock, payroll — and labor as % of revenue in real time. Built for Icelandic workplaces.",
     footProduct: "Product", footHow: "How it works", footPrice: "Pricing",
     footCompany: "Company", footContact: "Contact", footKiosk: "Time clock",
     footLegal: "Legal", footPrivacy: "Privacy", footTerms: "Terms", footCookies: "Cookies",
@@ -291,6 +378,10 @@ function BrandWm({ b }: { b: Brand }) {
   );
 }
 
+const Check = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12.5l4 4 10-10" /></svg>
+);
+
 /** Gentle fade-up on viewport entry. Reduced motion renders instantly. */
 function Rise({ children, delay = 0, className = "" }: { children: React.ReactNode; delay?: number; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -344,16 +435,76 @@ function IndustryOrb({ names }: { names: string[] }) {
   );
 }
 
-/* ---------- feature-card visuals (static mockups) ---------- */
+/* ---------- real screenshots ---------- */
 
-// Screenshots exist in both languages; the EN set lives under dark/en/.
-const SLIDE_KEYS = ["maelabord", "vaktaplan", "timaskraning", "starfsfolk", "skyrslur", "kiosk"];
-const slideImg = (key: string, lang: Lang) =>
-  lang === "en" ? `/showcase/dark/en/${key}.png`
-    : key === "maelabord" ? "/showcase/maelabord-dark.png" : `/showcase/dark/${key}.png`;
+const SHOT = (key: string) => `/showcase/2026/${key}.jpg`;
+
+/** Hero: an automatic tour of the app. A cursor glides to the next sidebar
+    item, "clicks", and the real screenshot of that page fades in — the
+    positions are the sidebar links in the 1600×900 captures. */
+const TOUR: { key: string; x: number; y: number }[] = [
+  { key: "maelabord", x: 5.6, y: 15.2 },
+  { key: "vaktaplan", x: 5.6, y: 19.8 },
+  { key: "timafravik", x: 6.4, y: 24.4 },
+  { key: "launakeyrslur", x: 6.5, y: 33.6 },
+  { key: "spjall", x: 5.6, y: 70.4 },
+  { key: "frettaveita", x: 5.8, y: 65.8 },
+  { key: "innsyn", x: 4.9, y: 47.3 },
+];
+
+function HeroTour({ t }: { t: (typeof T)["is"] }) {
+  const [idx, setIdx] = useState(0);
+  const [target, setTarget] = useState(0);
+  const [click, setClick] = useState(false);
+  const [run, setRun] = useState(0);
+  const paused = useRef(false);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let cur = idx;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const later = (fn: () => void, ms: number) => { timers.push(setTimeout(fn, ms)); };
+    const step = () => {
+      if (paused.current) { later(step, 1200); return; }
+      const next = (cur + 1) % TOUR.length;
+      setTarget(next);
+      later(() => setClick(true), 950);
+      later(() => { setClick(false); setIdx(next); cur = next; }, 1150);
+      later(step, 4200);
+    };
+    later(step, 3200);
+    return () => timers.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run]);
+  const pick = (i: number) => { setIdx(i); setTarget(i); setRun((r) => r + 1); };
+  const pos = TOUR[target];
+  return (
+    <div className="ny-tour-wrap">
+      <div
+        className="ny-tour"
+        onMouseEnter={() => { paused.current = true; }}
+        onMouseLeave={() => { paused.current = false; }}
+      >
+        {TOUR.map((s, i) => (
+          <img key={s.key} src={SHOT(s.key)} alt={i === idx ? `${t.shotAlt} — ${t.tour[i].title}` : ""} className={`ny-tour-img${i === idx ? " on" : ""}`} loading={i === 0 ? "eager" : "lazy"} />
+        ))}
+        <span className={`ny-cursor${click ? " click" : ""}`} style={{ left: `${pos.x}%`, top: `${pos.y}%` }} aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M5 3l14 8.5-6.2 1.6 3.6 6.6-2.6 1.4-3.6-6.6L5 19z" fill="#fff" stroke="#111" strokeWidth="1.4" strokeLinejoin="round" /></svg>
+        </span>
+      </div>
+      <div className="ny-tour-tabs" role="tablist">
+        {TOUR.map((s, i) => (
+          <button key={s.key} role="tab" aria-selected={i === idx} className={i === idx ? "on" : ""} onClick={() => pick(i)}>{t.tour[i].title}</button>
+        ))}
+      </div>
+      <p className="ny-tour-cap" aria-live="polite"><b>{t.tour[idx].title}</b> — {t.tour[idx].desc}</p>
+    </div>
+  );
+}
+
+const SLIDE_KEYS = ["maelabord", "vaktaplan", "timafravik", "launakeyrslur", "starfsfolk", "innsyn", "spjall", "frettaveita"];
 
 /** Horizontal product showcase — scroll-snap slider with arrows + dots. */
-function Showcase({ slides, head, sub, lang }: { slides: { title: string; desc: string }[]; head: string; sub: string; lang: Lang }) {
+function Showcase({ slides, head, sub }: { slides: { title: string; desc: string }[]; head: string; sub: string }) {
   const track = useRef<HTMLDivElement>(null);
   const [idx, setIdx] = useState(0);
   const go = (d: number) => {
@@ -384,7 +535,7 @@ function Showcase({ slides, head, sub, lang }: { slides: { title: string; desc: 
           <div className="ny-show-track" ref={track} onScroll={onScroll}>
             {slides.map((s, i) => (
               <figure className="ny-slide" key={i}>
-                <img src={slideImg(SLIDE_KEYS[i], lang)} alt={s.title} loading="lazy" />
+                <img src={SHOT(SLIDE_KEYS[i])} alt={s.title} loading="lazy" />
                 <figcaption><b>{s.title}</b><span>{s.desc}</span></figcaption>
               </figure>
             ))}
@@ -401,31 +552,8 @@ function Showcase({ slides, head, sub, lang }: { slides: { title: string; desc: 
   );
 }
 
-/** Pseudo-QR for the badge preview — deterministic pattern with real-looking
-    finder squares in three corners, no actual payload. */
-function MiniQr() {
-  const n = 13;
-  const rnd = mulberry32(0x51c0de);
-  const inFinder = (r: number, c: number) => {
-    const zones: [number, number][] = [[0, 0], [0, n - 5], [n - 5, 0]];
-    for (const [zr, zc] of zones) {
-      const lr = r - zr, lc = c - zc;
-      if (lr >= 0 && lr < 5 && lc >= 0 && lc < 5) {
-        return lr === 0 || lr === 4 || lc === 0 || lc === 4 || (lr === 2 && lc === 2) ? "on" : "off";
-      }
-    }
-    return null;
-  };
-  const cells: boolean[] = [];
-  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
-    const f = inFinder(r, c);
-    cells.push(f ? f === "on" : rnd() < 0.44);
-  }
-  return <span className="sk-qr">{cells.map((v, i) => <i key={i} className={v ? "on" : ""} />)}</span>;
-}
-
-/** The future mobile app — real iPhone frame whose screen flips between a
-    faithful Mitt svæði mini-replica and the employee ID card (tap or wait). */
+/** The employee app — a real iPhone frame whose screen flips between the actual
+    Mitt svæði screen and the actual ID card (tap or wait). */
 function AppPreview({ t }: { t: (typeof T)["is"] }) {
   const [face, setFace] = useState(0);
   const manual = useRef(false);
@@ -444,10 +572,7 @@ function AppPreview({ t }: { t: (typeof T)["is"] }) {
           <p>{t.appSub}</p>
           <ul>
             {t.appPoints.map((pt) => (
-              <li key={pt}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M5 12.5l4 4 10-10" /></svg>
-                {pt}
-              </li>
+              <li key={pt}><Check />{pt}</li>
             ))}
           </ul>
         </div>
@@ -457,55 +582,14 @@ function AppPreview({ t }: { t: (typeof T)["is"] }) {
             <img className="frame" src="/app/phone-frame.png" alt="" width={551} height={1137} loading="lazy" />
             <div className="ny-phone-ui">
               <div className={`ny-flip${face === 1 ? " flipped" : ""}`}>
-
-                {/* front: Mitt svæði as it actually looks in the app (light theme) */}
-                <div className="ny-face front">
+                <div className="ny-face front shot">
                   <span className="isl" />
-                  <div className="mv-top"><Logo w={13} /><b>VAKTO</b><span className="av">MÍ</span></div>
-                  <div className="mv-punch">
-                    <small>{t.phSince}</small>
-                    <b>04:36:12</b>
-                    <span className="pbtn">{t.phClockOut}</span>
-                  </div>
-                  <div className="mv-mini">
-                    <div className="mh">{t.phNext}</div>
-                    {t.phRows.map(([d, h]) => (
-                      <div className="mr" key={d}><span>{d}</span><b className={h.includes("+") ? "warn" : ""}>{h}</b></div>
-                    ))}
-                  </div>
-                  <div className="mv-mini">
-                    <div className="mh">{t.phSum}</div>
-                    {t.phSumRows.map(([k, v]) => (
-                      <div className="mr" key={k}><span>{k}</span><b>{v}</b></div>
-                    ))}
-                  </div>
-                  <div className="mv-qa"><span>{t.phLeave}</span><span className="alt">{t.phSwap}</span></div>
+                  <img src="/showcase/2026/phone-mitt.png" alt="" loading="lazy" />
                 </div>
-
-                {/* back: the staff ID card exactly like StaffCardModal renders it */}
-                <div className="ny-face back">
+                <div className="ny-face back shot">
                   <span className="isl" />
-                  <div className="sk-card">
-                    <div className="sk-top">
-                      <span className="sk-brand"><svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="3" y="13" width="4" height="8" rx="1.2" fill="#fff" /><rect x="10" y="8" width="4" height="13" rx="1.2" fill="#fff" /><rect x="17" y="4" width="4" height="17" rx="1.2" fill="#fff" /></svg>VAKTO</span>
-                      <span className="sk-co">Kaffi Krónan</span>
-                    </div>
-                    <span className="sk-av">MÍ</span>
-                    <small className="sk-lbl">{t.idLabel}</small>
-                    <b className="sk-nm">Mína Huong</b>
-                    <div className="sk-flds">
-                      <div><small>{t.skRole}</small><b>{t.skRoleV}</b></div>
-                      <div><small>{t.skNo}</small><b>#4821</b></div>
-                    </div>
-                    <span className="sk-qrbox"><MiniQr /></span>
-                    <span className="sk-ft">VAKTO-4821-KK · {t.skScan}</span>
-                  </div>
-                  <div className="sk-wallet">
-                    <span className="apple"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M16.4 12.9c0-2.3 1.9-3.4 2-3.4-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.8-3-.8-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.2 9.3.8 1.1 1.7 2.3 2.9 2.3 1.2 0 1.6-.7 3-.7 1.4 0 1.8.7 3 .7 1.2 0 2-1.1 2.8-2.2.9-1.3 1.2-2.5 1.3-2.6-.1 0-2.5-.9-2.5-3.5zM14.2 6c.6-.8 1.1-1.9.9-3-1 0-2.1.7-2.8 1.5-.6.7-1.1 1.8-1 2.8 1.1.1 2.2-.5 2.9-1.3z" /></svg>Apple Wallet</span>
-                    <span className="goog">Google Wallet</span>
-                  </div>
+                  <img src="/showcase/2026/phone-skirteini.png" alt="" loading="lazy" />
                 </div>
-
               </div>
             </div>
           </div>
@@ -520,11 +604,48 @@ function AppPreview({ t }: { t: (typeof T)["is"] }) {
   );
 }
 
-const FEATURE_VISUALS = ["gauge", "grid", "pulse", "card", "rows", "chat"] as const;
-const FEATURE_LAYOUT = [{ big: true }, {}, {}, {}, {}, { wide: true }] as const;
+/* ---------- feature cards ---------- */
 
-const VOICE_IMGS = ["/folk/gudrun.jpg", "/folk/stefan.jpg", "/folk/elisabet.jpg"];
-const VOICE_NAMES = ["Guðrún Ósk", "Stefán Örn", "Elísabet Anna"];
+const FEATURE_VISUALS = ["gauge", "dev", "pva", "pay", "card", "signed", "chat"] as const;
+const FEATURE_LAYOUT = [{ big: true }, {}, {}, {}, {}, { wide: true }, { wide: true }] as const;
+
+function Pricing({ t, q }: { t: (typeof T)["is"]; q: string }) {
+  const [yearly, setYearly] = useState(false);
+  const pro = t.planPro;
+  return (
+    <section className="ny-sec" id="verd">
+      <Rise><div className="ny-head">
+        <h2>{t.priceHead}</h2>
+        <p>{t.priceSub}</p>
+      </div></Rise>
+      <Rise delay={60}>
+        <div className="ny-bill" role="group">
+          <button className={!yearly ? "on" : ""} onClick={() => setYearly(false)}>{t.billMonthly}</button>
+          <button className={yearly ? "on" : ""} onClick={() => setYearly(true)}>{t.billYearly} <em>{t.billSave}</em></button>
+        </div>
+        <div className="ny-plans">
+          <div className="ny-plan">
+            <h3>{t.planFree.name}</h3>
+            <p className="pd">{t.planFree.desc}</p>
+            <div className="ny-amt">{t.planFree.price} <small>{t.planFree.unit}</small></div>
+            <ul>{t.planFree.items.map((it) => <li key={it}>{it}</li>)}</ul>
+            <a className="ny-btn ghost lg" href={`/nyskraning?plan=free${q ? "&lang=en" : ""}`}>{t.planFree.cta}</a>
+          </div>
+          <div className="ny-plan pro">
+            <div className="ny-price-glow" aria-hidden="true" />
+            {pro.badge && <span className="ny-plan-badge">{pro.badge}</span>}
+            <h3>{pro.name}</h3>
+            <p className="pd">{pro.desc}</p>
+            <div className="ny-amt">{yearly ? pro.priceY : pro.price} <small>{pro.unit}{yearly ? ` · ${pro.yearNote}` : ""}</small></div>
+            <ul>{pro.items.map((it) => <li key={it}>{it}</li>)}</ul>
+            <a className="ny-btn glow lg" href={`/nyskraning?plan=pro${q ? "&lang=en" : ""}`}>{pro.cta}</a>
+          </div>
+        </div>
+        <span className="ny-fine" style={{ textAlign: "center" }}>{t.priceFine}</span>
+      </Rise>
+    </section>
+  );
+}
 
 export default function NyClient() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -556,7 +677,7 @@ export default function NyClient() {
         <a className="ny-logo" href="/"><Logo w={24} />VAKTO</a>
         <div className="ny-links">
           <a href="#eiginleikar">{t.nav[0]}</a>
-          <a href="#skref">{t.nav[1]}</a>
+          <a href="#kerfid">{t.nav[1]}</a>
           <a href="#verd">{t.nav[2]}</a>
         </div>
         <div className="ny-navcta">
@@ -575,7 +696,7 @@ export default function NyClient() {
         {menuOpen && (
           <div className="ny-menu" onClick={() => setMenuOpen(false)}>
             <a href="#eiginleikar">{t.nav[0]}</a>
-            <a href="#skref">{t.nav[1]}</a>
+            <a href="#kerfid">{t.nav[1]}</a>
             <a href="#verd">{t.nav[2]}</a>
             <div className="ny-menu-sep" />
             <div onClick={(e) => e.stopPropagation()}>{langBtn}</div>
@@ -608,7 +729,7 @@ export default function NyClient() {
             <a className="ny-btn ghost lg" href="#eiginleikar">{t.ctaSee}</a>
           </div>
           <div className="ny-shot ny-hin" style={{ animationDelay: "900ms" }}>
-            <img src={slideImg("maelabord", lang)} alt={t.shotAlt} />
+            <HeroTour t={t} />
           </div>
         </div>
       </header>
@@ -636,8 +757,21 @@ export default function NyClient() {
         </Rise>
       </section>
 
-      {/* ---------- features: glass cards with glow ---------- */}
-      <section className="ny-sec" id="eiginleikar">
+      {/* ---------- the basics everyone has ---------- */}
+      <section className="ny-sec ny-basicsec" id="eiginleikar">
+        <Rise><div className="ny-head">
+          <h2>{t.basicsHead}</h2>
+          <p>{t.basicsSub}</p>
+        </div></Rise>
+        <Rise delay={60}>
+          <ul className="ny-basics">
+            {t.basics.map((b) => <li key={b}><Check />{b}</li>)}
+          </ul>
+        </Rise>
+      </section>
+
+      {/* ---------- what the others don't do: glass cards with glow ---------- */}
+      <section className="ny-sec ny-featsec">
         <Rise><div className="ny-head">
           <h2>{t.featHead}</h2>
           <p>{t.featSub}</p>
@@ -650,32 +784,60 @@ export default function NyClient() {
               <Rise className={`ny-card${layout.big ? " big" : ""}${layout.wide ? " wide" : ""}`} delay={(i % 2) * 80} key={visual}>
                 <div className="ny-card-vis" aria-hidden="true">
                   {visual === "gauge" && (
-                    <div className="ny-gauge"><div className="ny-gring"><span>28,4%</span></div><small>{t.gaugeTarget}</small></div>
+                    <div className="ny-gauge"><div className="ny-gring"><span>26,2%</span></div><small>{t.gaugeTarget}</small></div>
                   )}
-                  {visual === "grid" && (
-                    <div className="ny-minigrid">{Array.from({ length: 28 }, (_, j) => <i key={j} className={[3, 4, 9, 12, 17, 18, 24].includes(j) ? "on" : [6, 20, 26].includes(j) ? "eve" : ""} />)}</div>
+                  {visual === "dev" && (
+                    <div className="ny-dev">
+                      <div className="ny-clock"><span className="ring" /><span className="ring r2" /><b>07:52</b></div>
+                      <span className="ny-devtag">+52 min · {t.devTag}</span>
+                    </div>
                   )}
-                  {visual === "pulse" && (
-                    <div className="ny-clock"><span className="ring" /><span className="ring r2" /><b>08:02</b></div>
+                  {visual === "pva" && (
+                    <div className="ny-pva">
+                      {t.pvaRows.map(([d, a, b]) => {
+                        const over = parseFloat(b.replace(",", ".")) > parseFloat(a.replace(",", "."));
+                        return (
+                          <div className="row" key={d}>
+                            <span>{d}</span>
+                            <i className="plan" style={{ width: "62%" }} />
+                            <i className={over ? "real over" : "real"} style={{ width: `${Math.round(62 * parseFloat(b.replace(",", ".")) / 8)}%` }} />
+                            <b className={over ? "over" : ""}>{b}</b>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
-                  {visual === "rows" && (
-                    <div className="ny-rows"><i style={{ width: "72%" }} /><i style={{ width: "54%" }} /><i style={{ width: "84%" }} /><i style={{ width: "40%" }} /></div>
-                  )}
-                  {visual === "chat" && (
-                    <div className="ny-chat">
-                      <span className="bub them">{t.chat[0]}</span>
-                      <span className="bub me">{t.chat[1]}</span>
-                      <span className="bub tag">{t.chat[2]}</span>
+                  {visual === "pay" && (
+                    <div className="ny-pay">
+                      {t.payRows.map(([k, v]) => <div key={k}><span>{k}</span><b>{v}</b></div>)}
+                      <div className="sum"><span>Payday</span><b>→</b></div>
                     </div>
                   )}
                   {visual === "card" && (
                     <div className="ny-idcard">
                       <div className="top"><b>VAKTO</b><span>{t.idLabel}</span></div>
                       <div className="body">
-                        <span className="av">MÍ</span>
-                        <div className="tx"><b>Mína Huong</b><span>{t.idRole}</span></div>
+                        <span className="av">DA</span>
+                        <div className="tx"><b>Dalya R.</b><span>{t.idRole}</span></div>
                         <span className="qr">{Array.from({ length: 25 }, (_, j) => <i key={j} className={[0, 2, 3, 4, 6, 8, 10, 12, 14, 16, 18, 20, 21, 22, 24].includes(j) ? "on" : ""} />)}</span>
                       </div>
+                    </div>
+                  )}
+                  {visual === "signed" && (
+                    <div className="ny-doc">
+                      <div className="pg">
+                        <i style={{ width: "70%" }} /><i style={{ width: "88%" }} /><i style={{ width: "58%" }} /><i style={{ width: "80%" }} /><i style={{ width: "40%" }} />
+                        <span className="sig">Dalya R.</span>
+                      </div>
+                      <span className="tag"><Check />{t.signedTag}</span>
+                      <small>{t.signedName}</small>
+                    </div>
+                  )}
+                  {visual === "chat" && (
+                    <div className="ny-chat">
+                      <span className="bub them">{t.chat[0]}</span>
+                      <span className="bub me">{t.chat[1]}</span>
+                      <span className="bub tag">{t.chat[2]}</span>
                     </div>
                   )}
                 </div>
@@ -686,6 +848,22 @@ export default function NyClient() {
               </Rise>
             );
           })}
+        </div>
+      </section>
+
+      {/* ---------- simpler for both ---------- */}
+      <section className="ny-sec ny-twosec">
+        <Rise><div className="ny-head">
+          <h2>{t.twoHead}</h2>
+          <p>{t.twoSub}</p>
+        </div></Rise>
+        <div className="ny-two">
+          {[t.owner, t.staff].map((col, i) => (
+            <Rise className="ny-two-col" delay={i * 90} key={col.title}>
+              <h3>{col.title}</h3>
+              <ul>{col.items.map((it) => <li key={it}><Check />{it}</li>)}</ul>
+            </Rise>
+          ))}
         </div>
       </section>
 
@@ -706,53 +884,13 @@ export default function NyClient() {
       </section>
 
       {/* product showcase — real screenshots in a slider */}
-      <Showcase slides={t.slides} head={t.showHead} sub={t.showSub} lang={lang} />
+      <Showcase slides={t.slides} head={t.showHead} sub={t.showSub} />
 
-      {/* voices: featured card + two smaller (photos generated for the preview) */}
-      <section className="ny-sec ny-voices">
-        <Rise><div className="ny-head">
-          <h2>{t.voicesHead}</h2>
-          <p>{t.voicesSub}</p>
-        </div></Rise>
-        <Rise delay={70}><div className="ny-voice-main">
-          <img src={VOICE_IMGS[0]} alt={VOICE_NAMES[0]} loading="lazy" />
-          <div className="vx">
-            <blockquote>„{t.voices[0].quote}"</blockquote>
-            <div className="who"><b>{VOICE_NAMES[0]}</b><span>{t.voices[0].role}</span></div>
-          </div>
-        </div></Rise>
-        <div className="ny-voice-grid">
-          {t.voices.slice(1).map((v, i) => (
-            <Rise className="ny-voice" delay={i * 90} key={VOICE_NAMES[i + 1]}>
-              <blockquote>„{v.quote}"</blockquote>
-              <div className="who">
-                <img src={VOICE_IMGS[i + 1]} alt={VOICE_NAMES[i + 1]} loading="lazy" />
-                <div><b>{VOICE_NAMES[i + 1]}</b><span>{v.role}</span></div>
-              </div>
-            </Rise>
-          ))}
-        </div>
-      </section>
-
-      {/* the future mobile app */}
+      {/* the employee app */}
       <AppPreview t={t} />
 
       {/* ---------- pricing ---------- */}
-      <section className="ny-sec" id="verd">
-        <Rise><div className="ny-head">
-          <h2>{t.priceHead}</h2>
-          <p>{t.priceSub}</p>
-        </div></Rise>
-        <Rise delay={80}><div className="ny-price">
-          <div className="ny-price-glow" aria-hidden="true" />
-          <div className="ny-amt">{t.priceAmt} <small>{t.priceUnit}</small></div>
-          <ul>
-            {t.priceItems.map((it) => <li key={it}>{it}</li>)}
-          </ul>
-          <a className="ny-btn glow lg" href={`/nyskraning${q}`}>{t.start}</a>
-          <span className="ny-fine">{t.priceFine}</span>
-        </div></Rise>
-      </section>
+      <Pricing t={t} q={q} />
 
       {/* CTA + giant wordmark footer */}
       <section className="ny-cta">
@@ -787,15 +925,15 @@ export default function NyClient() {
           </div>
           <div className="ny-foot-col">
             <h4>{t.footLegal}</h4>
-            <a href="#">{t.footPrivacy}</a>
-            <a href="#">{t.footTerms}</a>
-            <a href="#">{t.footCookies}</a>
+            <a href="mailto:hallo@vakto.is?subject=Pers%C3%B3nuvernd">{t.footPrivacy}</a>
+            <a href="mailto:hallo@vakto.is?subject=Skilm%C3%A1lar">{t.footTerms}</a>
+            <a href="mailto:hallo@vakto.is?subject=Vafrak%C3%B6kur">{t.footCookies}</a>
           </div>
           <div className="ny-foot-col">
             <h4>{t.footFollow}</h4>
-            <a href="#">Instagram</a>
-            <a href="#">Facebook</a>
-            <a href="#">LinkedIn</a>
+            <a href="https://www.instagram.com/vakto.is" target="_blank" rel="noreferrer">Instagram</a>
+            <a href="https://www.facebook.com/vakto.is" target="_blank" rel="noreferrer">Facebook</a>
+            <a href="https://www.linkedin.com/company/vakto" target="_blank" rel="noreferrer">LinkedIn</a>
           </div>
         </div>
         <div className="ny-foot-bot">
@@ -804,6 +942,8 @@ export default function NyClient() {
         </div>
         <div className="ny-mark" aria-hidden="true">VAKTO</div>
       </footer>
+
+      <HomeChat lang={lang} />
     </div>
   );
 }

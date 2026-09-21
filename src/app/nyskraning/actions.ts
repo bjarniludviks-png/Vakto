@@ -18,7 +18,8 @@ export async function setCompanyPlan(plan: string): Promise<{ ok: boolean }> {
     if (!user) return { ok: false };
     const { data: profile } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
     if (!profile?.company_id) return { ok: false };
-    const trialEnds = new Date(Date.now() + 14 * 86400000).toISOString();
+    // Free has no trial clock; Pro gets 14 days.
+    const trialEnds = plan === "free" ? null : new Date(Date.now() + 14 * 86400000).toISOString();
     await supabase.from("companies").update({ plan, trial_ends_at: trialEnds }).eq("id", profile.company_id);
     return { ok: true };
   } catch {

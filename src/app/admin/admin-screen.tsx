@@ -55,7 +55,7 @@ const ACTION_IS: Record<string, string> = {
   "note.save": "Athugasemd",
   "login_link.send": "Innskráningarhlekkur",
 };
-const PLAN_IS: Record<string, string> = { standard: "Standard", pro: "Pro", starter: "Starter" };
+const PLAN_IS: Record<string, string> = { free: "Frítt", pro: "Pro", vakto: "VAKTO (eldra verð)", standard: "Standard", starter: "Starter" };
 const planLabel = (p: string | null) => (p ? PLAN_IS[p] ?? p : "Ekkert plan");
 
 function StatusBadge({ s }: { s: BillingStatus }) {
