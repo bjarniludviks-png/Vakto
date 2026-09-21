@@ -51,7 +51,7 @@ export const VAKTO_KNOWLEDGE = `
 - Skilmálar: vakto.is/skilmalar (m.a. vinnslusamningur/DPA, engin binding, 14 daga prufa). Persónuverndarstefna: vakto.is/personuvernd. Vafrakökur: vakto.is/vafrakokur (engar greiningar- eða auglýsingakökur).
 
 ## Samband
-- Netfang: hallo@vakto.is. VAKTO ehf., Ísland.
+- Netfang: hallo@vakto.is. VAKTO ehf., kt. 490806-0400, Ísland.
 - Ef spurningin snýst um tilboð fyrir keðjur, sérþarfir, tengingar við sölukerfi eða eitthvað sem er ekki hér að ofan: bjóða að tengja við manneskju (eigandi VAKTO svarar).
 `;
 

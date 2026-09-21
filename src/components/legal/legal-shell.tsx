@@ -20,7 +20,7 @@ export default function LegalShell({ title, updated, children }: { title: string
       </header>
       <main className="lg-main">
         <h1>{title}</h1>
-        <p className="lg-upd">Síðast uppfært {updated} · VAKTO ehf. · <a href="mailto:hallo@vakto.is">hallo@vakto.is</a></p>
+        <p className="lg-upd">Síðast uppfært {updated} · VAKTO ehf., kt. 490806-0400 · <a href="mailto:hallo@vakto.is">hallo@vakto.is</a></p>
         {children}
       </main>
       <footer className="lg-foot">

@@ -6,7 +6,7 @@ export const metadata: Metadata = { title: "VAKTO — Persónuvernd", descriptio
 export default function PrivacyPage() {
   return (
     <LegalShell title="Persónuverndarstefna" updated="21. september 2026">
-      <p>VAKTO er vakta- og launakerfi fyrir vinnustaði. Þessi stefna lýsir því hvaða persónuupplýsingar VAKTO ehf. („VAKTO“, „við“) vinnur, í hvaða tilgangi, hversu lengi og hvaða réttindi þú hefur. Hún byggir á lögum nr. 90/2018 um persónuvernd og vinnslu persónuupplýsinga og almennu persónuverndarreglugerðinni (GDPR).</p>
+      <p>VAKTO er vakta- og launakerfi fyrir vinnustaði. Þessi stefna lýsir því hvaða persónuupplýsingar VAKTO ehf., kt. 490806-0400 („VAKTO“, „við“) vinnur, í hvaða tilgangi, hversu lengi og hvaða réttindi þú hefur. Hún byggir á lögum nr. 90/2018 um persónuvernd og vinnslu persónuupplýsinga og almennu persónuverndarreglugerðinni (GDPR).</p>
 
       <h2>1. Tvö hlutverk: ábyrgðaraðili og vinnsluaðili</h2>
       <p><b>Ábyrgðaraðili.</b> Þegar þú stofnar aðgang, heimsækir vakto.is, notar spjallið á heimasíðunni eða hefur samband við okkur er VAKTO ehf. ábyrgðaraðili þeirra upplýsinga.</p>
@@ -78,7 +78,7 @@ export default function PrivacyPage() {
       <p>Við getum uppfært þessa stefnu. Efnislegar breytingar eru tilkynntar viðskiptavinum með tölvupósti eða í kerfinu áður en þær taka gildi. Gildandi útgáfa er alltaf á vakto.is/personuvernd.</p>
 
       <h2>11. Samband</h2>
-      <p>VAKTO ehf., Ísland · <a href="mailto:hallo@vakto.is">hallo@vakto.is</a></p>
+      <p>VAKTO ehf., kt. 490806-0400, Ísland · <a href="mailto:hallo@vakto.is">hallo@vakto.is</a></p>
     </LegalShell>
   );
 }
