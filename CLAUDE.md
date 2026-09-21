@@ -221,6 +221,7 @@
   **Spjallgaur** á heimasíðunni: `/api/home-chat` (Claude, þekkingargrunnur `src/lib/ai/vakto-knowledge.ts` —
   uppfæra þegar varan breytist), „Tala við manneskju" → póstur á eiganda + `/admin/spjall` þar sem eigandi
   svarar (gestur fær svarið í widgetinu og í pósti). Migration **0049** (support_threads/messages, service-role
-  eingöngu). **Verð:** Frítt (≤10 notendur) / Pro 590 kr/notanda/mán (500 árlega), 14 daga prufa, ekkert kort —
-  nýskráning velur `free`/`pro` (ekkert kortaform lengur), engar OAuth-þjónustur eru virkjaðar í Supabase svo
-  Apple/Google/Microsoft-hnappar voru fjarlægðir. Eiginleikaþrep (Free vs Pro) eru EKKI enn læst í kerfinu.
+  eingöngu). **Verð (ákveðið 21.9.2026):** eitt verð, allt innifalið — 5.990 kr/mán m. 5 notendum + 590 kr á
+  notanda umfram (árlega 5.090 + 500), 14 daga prufa, ekkert kort; nýskráning setur `plan = "vakto"` + prufu
+  (ekkert kortaform lengur). Engin eiginleikaþrep. Engar OAuth-þjónustur eru virkjaðar í Supabase svo
+  Apple/Google/Microsoft-hnappar voru fjarlægðir.

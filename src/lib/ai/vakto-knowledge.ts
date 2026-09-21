@@ -32,13 +32,14 @@ export const VAKTO_KNOWLEDGE = `
 - Handbækur/skjöl: hægt að hlaða upp skjölum fyrirtækisins og starfsmanna (t.d. handbók) sem starfsfólk sér í appinu.
 
 ## Verð (án VSK)
-- Frítt: 0 kr, allt að 10 notendur. Vaktaplan, stimpilklukka, beiðnir, vaktaskipti, spjall og fréttaveita.
-- Pro: 590 kr á notanda á mánuði (500 kr ef greitt árlega, ~15% afsláttur). Allt í Frítt + laun% af veltu, tímafrávik, launaútreikningur eftir kjarasamningi, ráðningarsamningar, skírteini í Wallet, skýrslur/innsýn, Payday/DK, ótakmarkaður fjöldi notenda.
-- 14 daga frí prufa á Pro. Ekkert kort við skráningu. Engin binding. Keðjur með marga staði: hafa samband.
-- Greiðslur eru afgreiddar handvirkt í augnablikinu (reikningur); sjálfvirk kortagreiðsla er í vinnslu.
+- Eitt verð, allt innifalið: 5.990 kr á mánuði fyrir fyrirtækið með 5 notendur innifalda, og 590 kr á mánuði fyrir hvern notanda umfram 5. Engin þrep, ekkert læst.
+- Árleg greiðsla: um 15% afsláttur (5.090 kr/mán + 500 kr á auka notanda).
+- Dæmi: 12 manna staður = 5.990 + 7 × 590 = 10.120 kr/mán.
+- 14 daga frí prufa með öllu. Ekkert kort við skráningu. Engin binding, hægt að hætta hvenær sem er.
+- Greiðslur eru afgreiddar með reikningi í augnablikinu; sjálfvirk kortagreiðsla er í vinnslu. Keðjur með marga staði: hafa samband um tilboð.
 
 ## Að byrja
-- Skráning á vakto.is/nyskraning: nafn, fyrirtæki, netfang, lykilorð → velja Frítt eða Pro-prufu → inn í kerfið. Tekur um korter að setja upp fyrirtækið, staðina, deildirnar og starfsfólkið (Excel-innlestur).
+- Skráning á vakto.is/nyskraning: nafn, fyrirtæki, netfang, lykilorð → 14 daga prufan byrjar → inn í kerfið. Tekur um korter að setja upp fyrirtækið, staðina, deildirnar og starfsfólkið (Excel-innlestur).
 - Innskráning: vakto.is/login. Gleymt lykilorð: hlekkur á innskráningarsíðu.
 - Stimpilklukka á spjaldtölvu: stillingar → samþættingar → afrita kiosk-slóð.
 

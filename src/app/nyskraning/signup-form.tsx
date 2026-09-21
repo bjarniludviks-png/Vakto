@@ -5,10 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { createOwnerAccount, setCompanyPlan } from "./actions";
 
-const PLANS = [
-  { id: "free", name: "Frítt", price: "0", per: "kr · allt að 10 notendur", blurb: "Vaktaplan, stimpilklukka, beiðnir, spjall og fréttaveita." },
-  { id: "pro", name: "Pro", price: "590", per: "kr/notanda/mán", blurb: "Laun% af veltu, tímafrávik, launaútreikningur, skírteini, samningar, Payday." },
-];
+const PLAN = { id: "vakto", price: "5.990", per: "kr/mán · 5 notendur innifaldir", extra: "+590 kr á hvern notanda umfram · árlega 5.090 + 500" };
 
 const Bars = () => (
   <div className="m"><svg viewBox="0 0 28 28" fill="none">
@@ -18,14 +15,13 @@ const Bars = () => (
   </svg></div>
 );
 
-export default function SignupForm({ initialPlan = "pro" }: { initialPlan?: string }) {
+export default function SignupForm() {
   const [step, setStep] = useState<"account" | "card">("account");
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [plan, setPlan] = useState(PLANS.some((p) => p.id === initialPlan) ? initialPlan : "pro");
   const [country, setCountry] = useState<"IS" | "OTHER">("IS");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,37 +45,35 @@ export default function SignupForm({ initialPlan = "pro" }: { initialPlan?: stri
 
   async function finish(e: React.FormEvent) {
     e.preventDefault();
-    // No card at signup: Free stays free, Pro starts a 14-day trial. Billing is
-    // set up in Stillingar → Áskrift when the trial ends.
+    // No card at signup: the 14-day trial starts here. Billing is set up in
+    // Stillingar → Áskrift when the trial ends.
     setBusy(true);
-    await setCompanyPlan(plan);
+    await setCompanyPlan(PLAN.id);
     window.location.assign("/maelabord");
   }
 
   if (step === "card") {
-    const p = PLANS.find((x) => x.id === plan) ?? PLANS[0];
     return (
       <form className="form" onSubmit={finish}>
         <div className="brand"><Bars /><b>VAKTO</b></div>
         <div className="steps2">
-          <span className="done">1 · Aðgangur</span><span className="sep">→</span><span className="cur">2 · Áskrift</span>
+          <span className="done">1 · Aðgangur</span><span className="sep">→</span><span className="cur">2 · Prufa</span>
         </div>
-        <h1>Veldu leið</h1>
-        <div className="sub">Ekkert kort. Frítt er frítt — Pro er 14 daga frí prufa.</div>
+        <h1>14 daga frí prufa</h1>
+        <div className="sub">Allt innifalið frá fyrsta degi. Ekkert kort, engin binding.</div>
 
-        <div className="planpick">
-          {PLANS.map((pl) => (
-            <button type="button" key={pl.id} className={`planopt${plan === pl.id ? " on" : ""}`} onClick={() => setPlan(pl.id)}>
-              <div className="pn">{pl.name}</div>
-              <div className="pp">{pl.price} kr <small>{pl.per}</small></div>
-              <div className="pb">{pl.blurb}</div>
-            </button>
-          ))}
+        <div className="planpick" style={{ gridTemplateColumns: "1fr" }}>
+          <div className="planopt on" style={{ cursor: "default" }}>
+            <div className="pn">VAKTO</div>
+            <div className="pp">{PLAN.price} kr <small>{PLAN.per}</small></div>
+            <div className="pb">{PLAN.extra}</div>
+            <div className="pb">Verð án VSK · reikningur eftir prufuna ef þú heldur áfram</div>
+          </div>
         </div>
 
         {error && <div style={{ color: "var(--bad)", fontSize: 13, fontWeight: 600, marginBottom: 14 }}>{error}</div>}
-        <button className="btn" type="submit" disabled={busy}>{busy ? "Opna…" : p.id === "pro" ? "Byrja 14 daga prufu á Pro" : "Byrja frítt"}</button>
-        <p className="pcy">Engin binding · skiptu um leið hvenær sem er í Stillingum</p>
+        <button className="btn" type="submit" disabled={busy}>{busy ? "Opna…" : "Byrja prufuna"}</button>
+        <p className="pcy">Þú færð póst áður en prufan rennur út · hættu hvenær sem er í Stillingum</p>
       </form>
     );
   }

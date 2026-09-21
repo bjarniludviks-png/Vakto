@@ -13,7 +13,7 @@ type Lang = "is" | "en";
 
 /* ---------- copy ---------- */
 
-type Plan = { name: string; price: string; unit: string; desc: string; items: string[]; cta: string; badge?: string; priceY?: string; yearNote?: string };
+type Plan = { price: string; priceY: string; unit: string; extra: string; extraY: string; extraUnit: string; yearNote: string; items: string[]; cta: string };
 
 const T: Record<Lang, {
   nav: [string, string, string];
@@ -42,7 +42,7 @@ const T: Record<Lang, {
   phoneTabs: [string, string];
   priceHead: string; priceSub: string;
   billMonthly: string; billYearly: string; billSave: string;
-  planFree: Plan; planPro: Plan;
+  plan: Plan;
   priceFine: string;
   ctaEnd: string; ctaDemo: string;
   footBlurb: string;
@@ -152,23 +152,23 @@ const T: Record<Lang, {
       "Ráðningarsamningur undirritaður rafrænt",
     ],
     phoneTabs: ["Mitt svæði", "Skírteinið"],
-    priceHead: "Byrjaðu frítt. Uppfærðu þegar þú vilt sjá reksturinn.",
-    priceSub: "Frítt fyrir litla staði. Pro þegar þú vilt sjá launin á móti veltunni.",
+    priceHead: "Eitt verð. Allt innifalið.",
+    priceSub: "Engin þrep. Ekkert læst. Engin binding.",
     billMonthly: "Mánaðarlega", billYearly: "Árlega", billSave: "15% afsláttur",
-    planFree: {
-      name: "Frítt", price: "0", unit: "kr · allt að 10 notendur",
-      desc: "Grunnurinn sem allir þurfa — án kostnaðar.",
-      items: ["Vaktaplan með drag & drop", "Stimpilklukka — sími og kiosk", "Frí- og leyfisbeiðnir", "Vaktaskipti og opnar vaktir", "Spjall og fréttaveita"],
-      cta: "Byrja frítt",
+    plan: {
+      price: "5.990", priceY: "5.090", unit: "kr/mán · 5 notendur innifaldir", yearNote: "greitt árlega",
+      extra: "590", extraY: "500", extraUnit: "kr á hvern notanda umfram",
+      items: [
+        "Vaktaplan, stimpilklukka, beiðnir og vaktaskipti",
+        "Laun sem % af veltu í rauntíma og frávik með krónutölu",
+        "Launaútreikningur eftir kjarasamningi — Payday, DK og Excel",
+        "Skírteini í Apple og Google Wallet, ráðningarsamningar með rafrænni undirritun",
+        "Spjall, fréttaveita, skýrslur og innsýn",
+        "Ótakmarkaður fjöldi staða og deilda",
+      ],
+      cta: "Prófa frítt í 14 daga",
     },
-    planPro: {
-      name: "Pro", badge: "Vinsælast",
-      price: "590", priceY: "500", unit: "kr/notanda/mán", yearNote: "greitt árlega",
-      desc: "Allt sem hin kerfin gera ekki.",
-      items: ["Laun sem % af veltu í rauntíma", "Frávik með krónutölu", "Launaútreikningur eftir kjarasamningi", "Ráðningarsamningar og rafræn undirritun", "Skírteini í Apple og Google Wallet", "Skýrslur, innsýn og útflutningur í Payday og DK", "Ótakmarkaður fjöldi notenda"],
-      cta: "Prófa Pro frítt í 14 daga",
-    },
-    priceFine: "Verð án VSK. 14 daga frí prufa á Pro, ekkert kort. Keðjur með marga staði: hafðu samband.",
+    priceFine: "Verð án VSK. 14 daga frí prufa, ekkert kort. Keðjur með marga staði: hafðu samband.",
     ctaEnd: "Sjáðu hvað vaktin kostar — áður en hún klárast.",
     ctaDemo: "Hafa samband",
     footBlurb: "Eitt einfaldasta vaktakerfið sem til er: vaktaplan, stimpilklukka, laun — og launin sem % af veltu í rauntíma. Hannað fyrir íslenska vinnustaði.",
@@ -278,23 +278,23 @@ const T: Record<Lang, {
       "Employment contract signed electronically",
     ],
     phoneTabs: ["My area", "ID card"],
-    priceHead: "Start free. Upgrade when you want to see the business.",
-    priceSub: "Free for small places. Pro when you want labor against revenue.",
+    priceHead: "One price. Everything included.",
+    priceSub: "No tiers. Nothing locked. No lock-in.",
     billMonthly: "Monthly", billYearly: "Yearly", billSave: "15% off",
-    planFree: {
-      name: "Free", price: "0", unit: "ISK · up to 10 users",
-      desc: "The foundation everyone needs — at no cost.",
-      items: ["Drag & drop scheduling", "Time clock — phone and kiosk", "Time-off and leave requests", "Shift swaps and open shifts", "Chat and news feed"],
-      cta: "Start free",
+    plan: {
+      price: "5,990", priceY: "5,090", unit: "ISK/mo · 5 users included", yearNote: "billed yearly",
+      extra: "590", extraY: "500", extraUnit: "ISK per additional user",
+      items: [
+        "Scheduling, time clock, requests and shift swaps",
+        "Labor as % of revenue in real time and deviations in króna",
+        "Payroll by union agreement — Payday, DK and Excel",
+        "ID in Apple and Google Wallet, employment contracts with e-signing",
+        "Chat, news feed, reports and insights",
+        "Unlimited sites and departments",
+      ],
+      cta: "Try free for 14 days",
     },
-    planPro: {
-      name: "Pro", badge: "Most popular",
-      price: "590", priceY: "500", unit: "ISK/user/mo", yearNote: "billed yearly",
-      desc: "Everything the others don't do.",
-      items: ["Labor as % of revenue in real time", "Deviations in króna", "Payroll by union agreement", "Employment contracts and e-signing", "ID in Apple and Google Wallet", "Reports, insights and export to Payday and DK", "Unlimited users"],
-      cta: "Try Pro free for 14 days",
-    },
-    priceFine: "Prices excl. VAT. 14-day free trial of Pro, no card. Chains with many sites: get in touch.",
+    priceFine: "Prices excl. VAT. 14-day free trial, no card. Chains with many sites: get in touch.",
     ctaEnd: "See what the shift costs — before it's over.",
     ctaDemo: "Contact us",
     footBlurb: "One of the simplest scheduling systems out there: shifts, a time clock, payroll — and labor as % of revenue in real time. Built for Icelandic workplaces.",
@@ -611,7 +611,7 @@ const FEATURE_LAYOUT = [{ big: true }, {}, {}, {}, {}, { wide: true }, { wide: t
 
 function Pricing({ t, q }: { t: (typeof T)["is"]; q: string }) {
   const [yearly, setYearly] = useState(false);
-  const pro = t.planPro;
+  const pl = t.plan;
   return (
     <section className="ny-sec" id="verd">
       <Rise><div className="ny-head">
@@ -623,25 +623,16 @@ function Pricing({ t, q }: { t: (typeof T)["is"]; q: string }) {
           <button className={!yearly ? "on" : ""} onClick={() => setYearly(false)}>{t.billMonthly}</button>
           <button className={yearly ? "on" : ""} onClick={() => setYearly(true)}>{t.billYearly} <em>{t.billSave}</em></button>
         </div>
-        <div className="ny-plans">
-          <div className="ny-plan">
-            <h3>{t.planFree.name}</h3>
-            <p className="pd">{t.planFree.desc}</p>
-            <div className="ny-amt">{t.planFree.price} <small>{t.planFree.unit}</small></div>
-            <ul>{t.planFree.items.map((it) => <li key={it}>{it}</li>)}</ul>
-            <a className="ny-btn ghost lg" href={`/nyskraning?plan=free${q ? "&lang=en" : ""}`}>{t.planFree.cta}</a>
-          </div>
-          <div className="ny-plan pro">
-            <div className="ny-price-glow" aria-hidden="true" />
-            {pro.badge && <span className="ny-plan-badge">{pro.badge}</span>}
-            <h3>{pro.name}</h3>
-            <p className="pd">{pro.desc}</p>
-            <div className="ny-amt">{yearly ? pro.priceY : pro.price} <small>{pro.unit}{yearly ? ` · ${pro.yearNote}` : ""}</small></div>
-            <ul>{pro.items.map((it) => <li key={it}>{it}</li>)}</ul>
-            <a className="ny-btn glow lg" href={`/nyskraning?plan=pro${q ? "&lang=en" : ""}`}>{pro.cta}</a>
-          </div>
+        <div className="ny-price">
+          <div className="ny-price-glow" aria-hidden="true" />
+          <div className="ny-amt">{yearly ? pl.priceY : pl.price} <small>{pl.unit}{yearly ? ` · ${pl.yearNote}` : ""}</small></div>
+          <div className="ny-extra">+ <b>{yearly ? pl.extraY : pl.extra}</b> {pl.extraUnit}</div>
+          <ul>
+            {pl.items.map((it) => <li key={it}>{it}</li>)}
+          </ul>
+          <a className="ny-btn glow lg" href={`/nyskraning${q}`}>{pl.cta}</a>
+          <span className="ny-fine">{t.priceFine}</span>
         </div>
-        <span className="ny-fine" style={{ textAlign: "center" }}>{t.priceFine}</span>
       </Rise>
     </section>
   );

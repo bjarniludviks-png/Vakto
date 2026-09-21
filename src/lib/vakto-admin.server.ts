@@ -25,8 +25,9 @@ export const IMPERSONATION_UI_COOKIE = "vakto-impersonating-ui";
 export const IMPERSONATION_MAX_AGE = 8 * 3600; // seconds
 
 // VAKTO pricing (same as the signup + Settings subscription card).
-export const PLAN_PRO_PER_USER = 590; // kr/notanda/mán án VSK (Pro); Frítt = 0 kr, allt að 10 notendur
-export const PLAN_FREE_MAX_USERS = 10;
+export const PLAN_BASE = 5990;        // kr/mán án VSK, 5 notendur innifaldir
+export const PLAN_INCLUDED_USERS = 5;
+export const PLAN_EXTRA_USER = 590;   // kr/mán per notanda umfram
 
 export type BillingStatus = "paying" | "trial" | "trial_expired" | "unpaid" | "free" | "suspended" | "none";
 export type AdminCompany = {
@@ -121,7 +122,7 @@ function deriveStatus(manual: string | null, trialEndsAt: string | null, plan: s
 
 function mrrOf(status: BillingStatus, users: number): number {
   if (status !== "paying") return 0;
-  return Math.max(1, users) * PLAN_PRO_PER_USER;
+  return PLAN_BASE + Math.max(0, users - PLAN_INCLUDED_USERS) * PLAN_EXTRA_USER;
 }
 
 function daysLeft(trialEndsAt: string | null): number | null {

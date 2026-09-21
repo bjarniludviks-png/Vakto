@@ -4,15 +4,14 @@ import SignupForm from "./signup-form";
 
 export const metadata: Metadata = { title: "VAKTO — Stofna aðgang" };
 
-export default async function SignupPage({ searchParams }: { searchParams: Promise<{ plan?: string }> }) {
-  const sp = await searchParams;
+export default async function SignupPage() {
   return (
     <div className="wrap">
       <div className="left">
-        <SignupForm initialPlan={sp.plan ?? "vakto"} />
+        <SignupForm />
       </div>
       <div className="right">
-        <div className="tag">Byrjaðu frítt</div>
+        <div className="tag">14 daga frí prufa</div>
         <div className="mid">
           <h2>Stofnaðu aðgang <span className="arr">→</span> sjáðu laun% í dag.</h2>
           <p className="desc">
@@ -20,8 +19,8 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
             starfsfólkið má lesa inn úr Excel.
           </p>
           <div className="bullets">
-            <div className="bullet"><span className="ck"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" /></svg></span> Frítt fyrir allt að 10 notendur</div>
-            <div className="bullet"><span className="ck"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" /></svg></span> Pro: 590 kr á notanda á mánuði — 14 daga frí prufa</div>
+            <div className="bullet"><span className="ck"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" /></svg></span> Eitt verð, allt innifalið: 5.990 kr/mán fyrir 5 notendur</div>
+            <div className="bullet"><span className="ck"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" /></svg></span> +590 kr á hvern notanda umfram — engin þrep, ekkert læst</div>
             <div className="bullet"><span className="ck"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" /></svg></span> Engin binding — hættu hvenær sem er</div>
           </div>
         </div>
