@@ -955,3 +955,4 @@ html.dark .wallet-btn.google{background:var(--panel);color:var(--ink)}
 @media (max-width:760px){.dtl-row{grid-template-columns:120px 1fr}.dtl-nm{font-size:12px}}
 /* dark mode: "ink" is light there, so ink-filled pills need dark text */
 html.dark .etab2.on{color:#0f0f12}
+html.dark .plan-tabs button.on{color:#0f0f12}
