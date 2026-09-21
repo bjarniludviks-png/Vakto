@@ -573,3 +573,10 @@
 .ny-chatbox .in button:disabled{opacity:.4;cursor:default}
 .ny-chatbox .in button svg{width:17px;height:17px}
 @media(max-width:560px){.ny-chatfab span{display:none}.ny-chatfab{padding:13px}.ny-chatbox{right:12px;bottom:12px;left:12px;width:auto}}
+/* fit inside the 130px visual */
+.ny-dev{gap:6px}
+.ny-dev .ny-clock{width:78px;height:78px}
+.ny-dev .ny-clock b{font-size:15px}
+.ny-pay{gap:4px;max-width:230px}
+.ny-pay>div{padding:4px 9px;font-size:11.5px}
+.ny-pay>div b{font-size:11px}
