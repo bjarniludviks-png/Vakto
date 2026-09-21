@@ -110,6 +110,7 @@ export default function SignupForm() {
       {error && <div style={{ color: "var(--bad)", fontSize: 13, fontWeight: 600, marginBottom: 14 }}>{error}</div>}
       <button className="btn" type="submit" disabled={busy}>{busy ? "Stofna…" : "Halda áfram"}</button>
 
+      <p className="pcy" style={{ marginTop: 14 }}>Með því að stofna aðgang samþykkir þú <a href="/skilmalar" target="_blank" rel="noreferrer">skilmála</a> og <a href="/personuvernd" target="_blank" rel="noreferrer">persónuverndarstefnu</a> VAKTO.</p>
       <div className="foot">Ertu með aðgang? <Link href="/login">Skrá inn</Link></div>
     </form>
   );

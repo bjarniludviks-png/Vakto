@@ -54,7 +54,7 @@ const T: Record<Lang, {
 }> = {
   is: {
     nav: ["Eiginleikar", "Skjámyndir", "Verð"],
-    login: "Innskráning", start: "Byrja frítt",
+    login: "Innskráning", start: "Prófa frítt",
     pill: "Vaktaplan · stimpilklukka · laun · laun% af veltu",
     h1: ["Einfaldasta vaktakerfið.", "Sem gerir meira."],
     sub: "Allt sem hin kerfin gera. Og það sem þau gera ekki: laun% af veltu í rauntíma, frávik með krónutölu, laun eftir kjarasamningi, skírteini, spjall og ráðningarsamningar í símanum.",
@@ -180,7 +180,7 @@ const T: Record<Lang, {
   },
   en: {
     nav: ["Features", "Screenshots", "Pricing"],
-    login: "Sign in", start: "Start free",
+    login: "Sign in", start: "Try free",
     pill: "Scheduling · time clock · payroll · labor % of revenue",
     h1: ["The simplest scheduling system.", "That does more."],
     sub: "Everything the other systems do. And what they don't: labor % of revenue in real time, deviations in króna, payroll by union agreement, ID cards, chat and employment contracts on the phone.",
@@ -912,13 +912,12 @@ export default function NyClient() {
             <h4>{t.footCompany}</h4>
             <a href="mailto:hallo@vakto.is">{t.footContact}</a>
             <a href={`/login${q}`}>{t.login}</a>
-            <a href="/kiosk">{t.footKiosk}</a>
           </div>
           <div className="ny-foot-col">
             <h4>{t.footLegal}</h4>
-            <a href="mailto:hallo@vakto.is?subject=Pers%C3%B3nuvernd">{t.footPrivacy}</a>
-            <a href="mailto:hallo@vakto.is?subject=Skilm%C3%A1lar">{t.footTerms}</a>
-            <a href="mailto:hallo@vakto.is?subject=Vafrak%C3%B6kur">{t.footCookies}</a>
+            <a href="/personuvernd">{t.footPrivacy}</a>
+            <a href="/skilmalar">{t.footTerms}</a>
+            <a href="/vafrakokur">{t.footCookies}</a>
           </div>
           <div className="ny-foot-col">
             <h4>{t.footFollow}</h4>

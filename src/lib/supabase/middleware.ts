@@ -90,6 +90,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/auth/") ||
     pathname.startsWith("/nytt-lykilord") ||
     pathname.startsWith("/adgangur-lokadur") ||
+    pathname.startsWith("/personuvernd") || pathname.startsWith("/skilmalar") || pathname.startsWith("/vafrakokur") ||
     pathname.startsWith("/kiosk") ||
     // PWA / icon assets must be reachable without auth (home-screen install).
     pathname === "/manifest.webmanifest" ||

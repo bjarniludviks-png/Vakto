@@ -7,5 +7,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE}/`, changeFrequency: "weekly", priority: 1 },
     { url: `${BASE}/nyskraning`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${BASE}/login`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${BASE}/personuvernd`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${BASE}/skilmalar`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${BASE}/vafrakokur`, changeFrequency: "yearly", priority: 0.2 },
   ];
 }

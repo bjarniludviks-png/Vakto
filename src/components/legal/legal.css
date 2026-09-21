@@ -1,0 +1,23 @@
+.lg{min-height:100dvh;background:#060607;color:#f4f2ee;font-family:'General Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;letter-spacing:-.011em;line-height:1.6}
+.lg a{color:inherit;text-decoration:none}
+.lg-top{display:flex;align-items:center;gap:22px;padding:18px 24px;border-bottom:1px solid rgba(255,255,255,.08);max-width:900px;margin:0 auto;flex-wrap:wrap}
+.lg-logo{display:inline-flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.06em}
+.lg-top nav{display:flex;gap:16px;margin-left:auto;font-size:13.5px;color:rgba(244,242,238,.62)}
+.lg-top nav a:hover{color:#fff}
+.lg-main{max-width:760px;margin:0 auto;padding:44px 24px 80px}
+.lg-main h1{font-size:clamp(28px,4vw,40px);font-weight:600;letter-spacing:-.03em;line-height:1.1;margin:0 0 8px}
+.lg-upd{font-size:13px;color:rgba(244,242,238,.45);margin:0 0 34px}
+.lg-upd a{color:#f59331}
+.lg-main h2{font-size:19px;font-weight:600;margin:34px 0 10px;color:#fff}
+.lg-main h3{font-size:15.5px;font-weight:600;margin:20px 0 6px;color:#fff}
+.lg-main p,.lg-main li{font-size:15px;color:rgba(244,242,238,.82)}
+.lg-main p{margin:0 0 12px}
+.lg-main ul{margin:0 0 14px;padding-left:20px}
+.lg-main li{margin-bottom:6px}
+.lg-main a{color:#f59331}
+.lg-main table{width:100%;border-collapse:collapse;font-size:14px;margin:8px 0 18px}
+.lg-main th,.lg-main td{text-align:left;padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.08);vertical-align:top;color:rgba(244,242,238,.82)}
+.lg-main th{color:#fff;font-weight:600;font-size:12.5px;letter-spacing:.04em;text-transform:uppercase}
+.lg-note{background:rgba(233,112,15,.08);border:1px solid rgba(245,147,49,.3);border-radius:12px;padding:12px 14px;font-size:14px;margin:0 0 22px}
+.lg-foot{max-width:900px;margin:0 auto;padding:22px 24px 40px;border-top:1px solid rgba(255,255,255,.08);display:flex;gap:18px;font-size:13px;color:rgba(244,242,238,.45)}
+.lg-foot a:hover{color:#fff}

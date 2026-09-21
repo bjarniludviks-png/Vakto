@@ -47,6 +47,9 @@ export const VAKTO_KNOWLEDGE = `
 - Gögn hýst hjá Supabase í Evrópu (Írlandi), aðgangsstýring per fyrirtæki (RLS). Hlutverk: stjórnandi, vaktstjóri, starfsmaður, verktaki.
 - Innskráning með netfangi og lykilorði (og innskráningarhlekk). Engin greiðslukortagögn geymd hjá VAKTO.
 
+## Skilmálar og persónuvernd
+- Skilmálar: vakto.is/skilmalar (m.a. vinnslusamningur/DPA, engin binding, 14 daga prufa). Persónuverndarstefna: vakto.is/personuvernd. Vafrakökur: vakto.is/vafrakokur (engar greiningar- eða auglýsingakökur).
+
 ## Samband
 - Netfang: hallo@vakto.is. VAKTO ehf., Ísland.
 - Ef spurningin snýst um tilboð fyrir keðjur, sérþarfir, tengingar við sölukerfi eða eitthvað sem er ekki hér að ofan: bjóða að tengja við manneskju (eigandi VAKTO svarar).
