@@ -237,7 +237,8 @@
   `STRAUMUR_WEBHOOK_KEY`, `STRAUMUR_WEBHOOK_HMAC`. Sandkassi: merchant.staging.straumur.is (API-lykill „VAKTO
   staging", webhook á preview-slóðina). Prófkort: 4111 1111 4555 1142 · 03/2030 · 737. Live: gátt thjonustuvefur.straumur.is, API-grunnslóð
   `https://greidslugatt.straumur.is/api/v1` (ekki í skjölum — fundin í WooCommerce-viðbót Straums), lyklar + webhook
-  „VAKTO live" settir í Vercel Production 22.9.2026. Live-samningur 454566 er aðeins með PaymentGateway-útstöð
+  „VAKTO live" settir í Vercel Production 22.9.2026. **Webhook-slóðin verður að vera `https://www.vakto.is/...`** —
+  vakto.is svarar POST með 308 á www og Authorization-hausinn týnist í áframsendingunni (→ 401). Live-samningur 454566 er aðeins með PaymentGateway-útstöð
   (8b2c633cf944); greiðslusíðan (hosted checkout) þarf PaymentPage-útstöð → `STRAUMUR_TERMINAL_PAGE` vantar þar til
   Straumur stofnar hana.
   `CRON_SECRET` er sett á Vercel (preview+production) svo cron-endapunktar taki aðeins við köllum frá Vercel Cron
