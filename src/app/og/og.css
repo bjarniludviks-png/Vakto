@@ -1,12 +1,6 @@
 /* Social images rendered from the hero: fixed canvases, no motion. */
 .og{position:relative;overflow:hidden;background:#060607;isolation:isolate}
 .og .ny-aurora,.og .ny-aurora i,.og .ny-stars,.og .ny-rays,.og .ny-underglow,.og .ny-hin{animation:none!important;opacity:1}
-/* no CSS blur in the static render (headless tiles it into visible squares): soft gradients do the job */
-.og .ny-aurora i{filter:none!important}
-.og .ny-rays{display:none}
-.og .ny-aurora .a1{background:radial-gradient(50% 50% at 50% 60%,rgba(233,112,15,.38) 0,rgba(233,112,15,.18) 35%,rgba(233,112,15,.06) 60%,transparent 78%)}
-.og .ny-aurora .a2{background:radial-gradient(50% 50% at 50% 50%,rgba(245,147,49,.26) 0,rgba(245,147,49,.1) 40%,transparent 75%)}
-.og .ny-aurora .a3{background:radial-gradient(50% 50% at 50% 50%,rgba(64,120,220,.2) 0,rgba(64,120,220,.07) 40%,transparent 75%)}
 .og-cover{width:1640px;height:624px}
 .og-cover .ny-aurora .a1{top:-10%}
 .og-cover .ny-aurora .a2{top:0}
@@ -35,9 +29,3 @@
 .og-profile .mark{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:40px;z-index:2}
 .og-profile .mark svg{filter:drop-shadow(0 0 60px rgba(233,112,15,.55)) drop-shadow(0 30px 40px rgba(0,0,0,.6))}
 .og-profile .mark b{font-size:96px;font-weight:700;letter-spacing:.1em;color:#fff;text-shadow:0 2px 40px rgba(0,0,0,.6)}
-/* horizon without giant box-shadows (software raster tiles them): gradients instead */
-.og .ny-horizon{box-shadow:none;border-top:2px solid rgba(255,226,190,.95);
-  background:radial-gradient(60% 16% at 50% 0%,rgba(233,112,15,.55) 0,rgba(233,112,15,.22) 35%,rgba(233,112,15,.06) 60%,#060607 78%)}
-.og .ny-horizon::before{content:"";position:absolute;left:10%;right:10%;top:-300px;height:600px;border-radius:50%;
-  background:radial-gradient(50% 50% at 50% 50%,rgba(255,190,120,.42) 0,rgba(233,112,15,.22) 30%,rgba(233,112,15,.06) 55%,transparent 72%)}
-.og .ny-underglow{filter:none}
