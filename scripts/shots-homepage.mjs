@@ -1,5 +1,5 @@
 // Tekur alvöru skjámyndir af kerfinu (dökkt þema) fyrir heimasíðuna.
-//   node scripts/shots-homepage.mjs [preview-url]
+//   node scripts/shots-homepage.mjs [preview-url] [is|en]
 // Notar staging-lyklana í .env.local (service role → magic link) og demo-fyrirtækið.
 import { chromium } from "playwright";
 import { createClient } from "@supabase/supabase-js";
@@ -7,7 +7,9 @@ import fs from "fs";
 
 const env = Object.fromEntries(fs.readFileSync(".env.local", "utf8").split("\n").filter((l) => l.includes("=") && !l.startsWith("#")).map((l) => [l.slice(0, l.indexOf("=")), l.slice(l.indexOf("=") + 1)]));
 const base = (process.argv[2] ?? "https://vakto-git-live-fixes-bjarniludviks-5304s-projects.vercel.app").replace(/\/$/, "");
-const out = "public/showcase/2026";
+const LANG = process.argv[3] === "en" ? "en" : "is";
+const out = LANG === "en" ? "public/showcase/2026/en" : "public/showcase/2026";
+import { mkdirSync } from "fs"; mkdirSync(out, { recursive: true });
 const admin = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
 async function link(email, next) {
@@ -22,13 +24,13 @@ const lastMon = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), t
 const lastSun = new Date(lastMon.getTime() + 6 * 86400000);
 const FROM = iso(lastMon), TO = iso(lastSun);
 async function ctx(browser, opts, theme) {
-  const c = await browser.newContext({ locale: "is-IS", ...opts });
-  await c.addInitScript(({ th, from, to }) => { try {
-    localStorage.setItem("vakto-theme", th); localStorage.setItem("vakto-lang", "is");
+  const c = await browser.newContext({ locale: LANG === "en" ? "en-GB" : "is-IS", ...opts });
+  await c.addInitScript(({ th, from, to, lang }) => { try {
+    localStorage.setItem("vakto-theme", th); localStorage.setItem("vakto-lang", lang);
     localStorage.setItem("vakto-dash-period", "custom"); localStorage.setItem("vakto-dash-from", from); localStorage.setItem("vakto-dash-to", to);
     localStorage.setItem("vakto:period:timaskraning", JSON.stringify({ preset: "custom", from, to }));
     localStorage.setItem("vakto-onb-hidden", "1");
-  } catch {} }, { th: theme, from: FROM, to: TO });
+  } catch {} }, { th: theme, from: FROM, to: TO, lang: LANG });
   return c;
 }
 async function settle(page, ms = 3500) {
@@ -63,7 +65,7 @@ await m.goto(await link("demo.dalya.r@vakto.is", "/mitt-svaedi"), { waitUntil: "
 await settle(m, 5000);
 await m.screenshot({ path: `${out}/phone-mitt.png` });
 console.log("✓ phone-mitt", m.url());
-const btn = m.getByRole("button", { name: /Skírteini/ }).first();
+const btn = m.getByRole("button", { name: /Skírteini|ID card/ }).first();
 if (await btn.count()) {
   await btn.click(); await m.waitForTimeout(1500);
   await m.screenshot({ path: `${out}/phone-skirteini.png` });

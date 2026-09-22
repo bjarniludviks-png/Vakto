@@ -861,6 +861,8 @@ export const DICT: Dict = {
   "vs í fyrra": { is: "vs. fyrra ár (YoY)", en: "vs. previous year", vi: "so với năm trước" },
   "Velta vs launakostnaður": { is: "Samhengi veltu og launakostnaðar", en: "Revenue optimization vs. labor burden", vi: "Doanh thu vs. chi phí lương" },
   "6 mánuðir": { is: "Síðustu 6 mánuðir", en: "Rolling 6-month view", vi: "6 tháng" },
+  "markmið 30%": { is: "markmið 30%", en: "target 30%", vi: "mục tiêu 30%" },
+  "Launamat": { is: "Launamat", en: "Pay estimate", vi: "Ước tính lương" },
   "Laun% þróun vs 30% markmið": { is: "Þróun launahlutfalls vs. 30% rekstrarmarkmið", en: "Labor% vector tracking vs. 30% baseline efficiency target", vi: "Xu hướng % lương so với mục tiêu 30%" },
   "síðustu 6 mánuðir": { is: "yfirlit yfir síðustu 6 mánuði", en: "rolling historical 6-month evaluation", vi: "6 tháng qua" },
   "Samanburður staða": { is: "Samanburður á milli starfsstöðva", en: "Cross-location efficiency comparison", vi: "So sánh giữa các địa điểm" },

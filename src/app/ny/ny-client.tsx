@@ -437,7 +437,8 @@ function IndustryOrb({ names }: { names: string[] }) {
 
 /* ---------- real screenshots ---------- */
 
-const SHOT = (key: string) => `/showcase/2026/${key}.jpg`;
+const SHOT = (key: string, lang: Lang = "is") => `/showcase/2026/${lang === "en" ? "en/" : ""}${key}.jpg`;
+const PHONE = (key: string, lang: Lang) => `/showcase/2026/${lang === "en" ? "en/" : ""}${key}.png`;
 
 /** Hero: an automatic tour of the app. A cursor glides to the next sidebar
     item, "clicks", and the real screenshot of that page fades in — the
@@ -452,7 +453,7 @@ const TOUR: { key: string; x: number; y: number }[] = [
   { key: "innsyn", x: 4.9, y: 47.3 },
 ];
 
-function HeroTour({ t }: { t: (typeof T)["is"] }) {
+function HeroTour({ t, lang }: { t: (typeof T)["is"]; lang: Lang }) {
   const [idx, setIdx] = useState(0);
   const [target, setTarget] = useState(0);
   const [click, setClick] = useState(false);
@@ -485,7 +486,7 @@ function HeroTour({ t }: { t: (typeof T)["is"] }) {
         onMouseLeave={() => { paused.current = false; }}
       >
         {TOUR.map((s, i) => (
-          <img key={s.key} src={SHOT(s.key)} alt={i === idx ? `${t.shotAlt} — ${t.tour[i].title}` : ""} className={`ny-tour-img${i === idx ? " on" : ""}`} loading={i === 0 ? "eager" : "lazy"} />
+          <img key={s.key} src={SHOT(s.key, lang)} alt={i === idx ? `${t.shotAlt} — ${t.tour[i].title}` : ""} className={`ny-tour-img${i === idx ? " on" : ""}`} loading={i === 0 ? "eager" : "lazy"} />
         ))}
         <span className={`ny-cursor${click ? " click" : ""}`} style={{ left: `${pos.x}%`, top: `${pos.y}%` }} aria-hidden="true" />
       </div>
@@ -502,7 +503,7 @@ function HeroTour({ t }: { t: (typeof T)["is"] }) {
 const SLIDE_KEYS = ["maelabord", "vaktaplan", "timafravik", "launakeyrslur", "starfsfolk", "innsyn", "spjall", "frettaveita"];
 
 /** Horizontal product showcase — scroll-snap slider with arrows + dots. */
-function Showcase({ slides, head, sub }: { slides: { title: string; desc: string }[]; head: string; sub: string }) {
+function Showcase({ slides, head, sub, lang }: { slides: { title: string; desc: string }[]; head: string; sub: string; lang: Lang }) {
   const track = useRef<HTMLDivElement>(null);
   const [idx, setIdx] = useState(0);
   const go = (d: number) => {
@@ -533,7 +534,7 @@ function Showcase({ slides, head, sub }: { slides: { title: string; desc: string
           <div className="ny-show-track" ref={track} onScroll={onScroll}>
             {slides.map((s, i) => (
               <figure className="ny-slide" key={i}>
-                <img src={SHOT(SLIDE_KEYS[i])} alt={s.title} loading="lazy" />
+                <img src={SHOT(SLIDE_KEYS[i], lang)} alt={s.title} loading="lazy" />
                 <figcaption><b>{s.title}</b><span>{s.desc}</span></figcaption>
               </figure>
             ))}
@@ -552,7 +553,7 @@ function Showcase({ slides, head, sub }: { slides: { title: string; desc: string
 
 /** The employee app — a real iPhone frame whose screen flips between the actual
     Mitt svæði screen and the actual ID card (tap or wait). */
-function AppPreview({ t }: { t: (typeof T)["is"] }) {
+function AppPreview({ t, lang }: { t: (typeof T)["is"]; lang: Lang }) {
   const [face, setFace] = useState(0);
   const manual = useRef(false);
   useEffect(() => {
@@ -582,11 +583,11 @@ function AppPreview({ t }: { t: (typeof T)["is"] }) {
               <div className={`ny-flip${face === 1 ? " flipped" : ""}`}>
                 <div className="ny-face front shot">
                   <span className="isl" />
-                  <img src="/showcase/2026/phone-mitt.png" alt="" loading="lazy" />
+                  <img src={PHONE("phone-mitt", lang)} alt="" loading="lazy" />
                 </div>
                 <div className="ny-face back shot">
                   <span className="isl" />
-                  <img src="/showcase/2026/phone-skirteini.png" alt="" loading="lazy" />
+                  <img src={PHONE("phone-skirteini", lang)} alt="" loading="lazy" />
                 </div>
               </div>
             </div>
@@ -718,7 +719,7 @@ export default function NyClient() {
             <a className="ny-btn ghost lg" href="#eiginleikar">{t.ctaSee}</a>
           </div>
           <div className="ny-shot ny-hin" style={{ animationDelay: "900ms" }}>
-            <HeroTour t={t} />
+            <HeroTour t={t} lang={lang} />
           </div>
         </div>
       </header>
@@ -873,10 +874,10 @@ export default function NyClient() {
       </section>
 
       {/* product showcase — real screenshots in a slider */}
-      <Showcase slides={t.slides} head={t.showHead} sub={t.showSub} />
+      <Showcase slides={t.slides} head={t.showHead} sub={t.showSub} lang={lang} />
 
       {/* the employee app */}
-      <AppPreview t={t} />
+      <AppPreview t={t} lang={lang} />
 
       {/* ---------- pricing ---------- */}
       <Pricing t={t} q={q} />
