@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
 import { nf } from "@/lib/format";
-import { emailConfigured, sendInviteEmail } from "@/lib/email";
+import { inviteToCompany, roleFromLabel } from "@/lib/invite.server";
 
 export type SyncResult = { ok: boolean; demo?: boolean; amount?: number; error?: string };
 export type SettingsResult = { ok: boolean; demo?: boolean; error?: string };
@@ -26,39 +26,6 @@ function num(s: string | undefined, fallback = 0): number {
   if (!s) return fallback;
   const n = Number(s.replace(/[^\d]/g, ""));
   return Number.isFinite(n) && n > 0 ? n : fallback;
-}
-
-/** Pull today's revenue from Inventra/POS into the revenue table. Mocked here as
- * a single revenue row; in production this calls the Inventra API. Feeds labor%. */
-export async function syncInventraRevenue(): Promise<SyncResult> {
-  if (!isSupabaseConfigured()) return { ok: true, demo: true, amount: 612000 };
-  try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
-    const { data: profile } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
-    const company = profile?.company_id as string | undefined;
-    if (!company) return { ok: false, error: "Fyrirtæki fannst ekki" };
-
-    const { data: loc } = await supabase.from("locations").select("id").eq("company_id", company).limit(1).maybeSingle();
-    if (!loc) return { ok: false, error: "Staður fannst ekki" };
-
-    const amount = 612000;
-    const { error } = await supabase.from("revenue").insert({
-      location_id: loc.id,
-      date: new Date().toISOString().slice(0, 10),
-      amount,
-      source: "inventra",
-    });
-    if (error) return { ok: false, error: error.message };
-    await logAudit(supabase, company, user.id, {
-      action: "inventra.sync", entity: "revenue", detail: `Velta sótt frá Inventra — ${nf(amount)} kr`,
-    });
-    revalidatePath("/maelabord");
-    return { ok: true, amount };
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
-  }
 }
 
 /** Manually record a revenue figure (for users without Inventra/POS). Feeds labor%. */
@@ -528,10 +495,6 @@ export async function savePayRule(
   }
 }
 
-const INVITE_ROLE: Record<string, string> = {
-  Starfsmaður: "employee", Vaktstjóri: "manager", Stjórnandi: "owner", Verktaki: "contractor",
-};
-
 /** Invite a teammate by email (admin auth invite) and link them to the company. */
 export async function inviteUser(input: { email: string; role: string }): Promise<SettingsResult> {
   if (!input.email?.trim()) return { ok: false, error: "Netfang vantar" };
@@ -540,48 +503,10 @@ export async function inviteUser(input: { email: string; role: string }): Promis
     const supabase = await createClient();
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    const role = INVITE_ROLE[Object.keys(INVITE_ROLE).find((k) => input.role.startsWith(k)) ?? "Starfsmaður"] ?? "employee";
-
-    const admin = createAdminClient();
-    const emailAddr = input.email.trim();
-    const { data: comp } = await admin.from("companies").select("name").eq("id", ctx.company).maybeSingle();
-    const companyName = (comp?.name as string) ?? "VAKTO";
-
-    // The invitee's real name from their employee profile (feed/chat show it).
-    const { data: empByMail } = await admin.from("employees")
-      .select("full_name").eq("company_id", ctx.company).ilike("email", emailAddr).limit(1).maybeSingle();
-    const fullName = (empByMail?.full_name as string) ?? null;
-
-    let userId: string | undefined;
-    if (emailConfigured()) {
-      // Branded VAKTO invite via Resend (generateLink doesn't send its own email).
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is";
-      const { data: gen, error } = await admin.auth.admin.generateLink({ type: "invite", email: emailAddr, options: { data: { role, company_id: ctx.company, full_name: fullName } } });
-      if (error) return { ok: false, error: error.message };
-      userId = gen?.user?.id;
-      // token_hash link → /nytt-lykilord verifies it itself and the invitee
-      // picks a password there (no fragile redirect chain).
-      const hash = gen?.properties?.hashed_token;
-      if (hash) await sendInviteEmail(emailAddr, companyName, input.role, `${appUrl}/nytt-lykilord?token_hash=${hash}&type=invite`);
-    } else {
-      // Supabase sends its default invite email.
-      const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(emailAddr, { data: { role, company_id: ctx.company } });
-      if (error) return { ok: false, error: error.message };
-      userId = invited?.user?.id;
-    }
-    if (userId) {
-      await admin.from("users").update({ company_id: ctx.company, role, ...(fullName ? { full_name: fullName } : {}) }).eq("id", userId);
-      // Record membership so the invited user can switch to this company (0023).
-      await admin.from("company_members").upsert({ user_id: userId, company_id: ctx.company, role });
-      // Link the auth user to their employee profile (matched by email) so
-      // Mitt svæði, punches and the mobile app resolve auth_employee_id().
-      const { data: emp } = await admin.from("employees")
-        .select("id").eq("company_id", ctx.company).is("user_id", null)
-        .ilike("email", emailAddr).limit(1).maybeSingle();
-      if (emp) await admin.from("employees").update({ user_id: userId }).eq("id", emp.id);
-    }
+    const inv = await inviteToCompany(ctx.company, input.email, input.role);
+    if (!inv.ok) return { ok: false, error: inv.error };
     await logAudit(supabase, ctx.company, ctx.userId, {
-      action: "user.invite", entity: "user", detail: `Notanda boðið — ${input.email.trim()} (${role})`,
+      action: "user.invite", entity: "user", detail: `Notanda boðið — ${input.email.trim()} (${roleFromLabel(input.role)})`,
     });
     revalidatePath("/stillingar");
     return { ok: true };

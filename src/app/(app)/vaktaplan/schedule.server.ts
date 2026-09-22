@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
+import { ensureDefaultShiftTypes } from "@/lib/provision";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees, } from "@/lib/employees.server";
 import { initials } from "@/lib/employees";
@@ -52,9 +53,13 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
     // shift types
     let types: ShiftTypeView[] = [];
     if (company) {
-      const { data: st } = await supabase
+      let { data: st } = await supabase
         .from("shift_types").select("name, start_time, end_time, premium_label, color, bg, border")
         .eq("company_id", company);
+      // Eldri fyrirtæki án vaktategunda: vista sjálfgefnu svo vaktir fái tegund.
+      if (!st?.length && (await ensureDefaultShiftTypes(company))) {
+        st = (await supabase.from("shift_types").select("name, start_time, end_time, premium_label, color, bg, border").eq("company_id", company)).data;
+      }
       types = (st ?? []).map((s) => ({
         nm: s.name as string,
         t: s.start_time && s.end_time ? `${(s.start_time as string).slice(0, 5)}–${(s.end_time as string).slice(0, 5)}` : "",

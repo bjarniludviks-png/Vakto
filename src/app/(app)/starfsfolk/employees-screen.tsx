@@ -1173,7 +1173,7 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
     }
     setBusy(false);
     onClose();
-    toast(res.demo ? "Starfsmaður stofnaður (demo — tengdu Supabase)" : "Starfsmaður stofnaður — boð sent");
+    toast(res.demo ? "Starfsmaður stofnaður (demo — tengdu Supabase)" : res.invited ? "Starfsmaður stofnaður — boð sent í pósti" : res.inviteError ? `Starfsmaður stofnaður — boð ekki sent: ${res.inviteError}` : "Starfsmaður stofnaður");
     router.refresh();
   }
   return (

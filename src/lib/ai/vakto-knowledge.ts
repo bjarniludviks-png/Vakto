@@ -41,6 +41,7 @@ export const VAKTO_KNOWLEDGE = `
 - Skráning á vakto.is/nyskraning: nafn, fyrirtæki, netfang, lykilorð → kort skráð hjá Straumi (0 kr) → 14 daga prufan byrjar → inn í kerfið. Tekur um korter að setja upp fyrirtækið, staðina, deildirnar og starfsfólkið (Excel-innlestur).
 - Innskráning: vakto.is/login. Gleymt lykilorð: hlekkur á innskráningarsíðu.
 - Stimpilklukka á spjaldtölvu: stillingar → samþættingar → afrita kiosk-slóð.
+- Samþættingar: opið API fyrir veltu (Stillingar → Samþættingar → Ný tenging gefur API-lykil; sölukerfið POST-ar á https://www.vakto.is/api/v1/revenue með Authorization: Bearer <lykill> og JSON {date, amount, location}). Virkar með hvaða sölukerfi sem getur sent HTTP-beiðni, eða gegnum Zapier/Make. Engin innbyggð Inventra/Dineout/SalesCloud-tenging — veltu má líka skrá handvirkt eða sem meðalveltu per vikudag. Laun: útflutningur í Payday (Excel) og DK (CSV), engin API-tenging við launakerfi.
 
 ## Öryggi og gögn
 - Gögn hýst hjá Supabase í Evrópu (Írlandi), aðgangsstýring per fyrirtæki (RLS). Hlutverk: stjórnandi, vaktstjóri, starfsmaður, verktaki.

@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { templateToPayRule, type RuleSet as TplRuleSet } from "@/lib/rules";
 import { getTimeBank } from "../skyrslur/timebank.server";
 import { sendContractEmail } from "@/lib/email";
+import { inviteToCompany } from "@/lib/invite.server";
 import type { CustomRules } from "@/lib/payrules";
 
 export type NewEmployeeInput = {
@@ -32,7 +33,7 @@ export type NewEmployeeInput = {
   schedulePattern?: string; // SchedulePattern.kind
 };
 
-export type ActionResult = { ok: boolean; demo?: boolean; error?: string; id?: string };
+export type ActionResult = { ok: boolean; demo?: boolean; error?: string; id?: string; invited?: boolean; inviteError?: string };
 
 const ROLE_MAP: Record<string, string> = {
   Starfsmaður: "employee",
@@ -151,8 +152,15 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
     await logAudit(supabase, company, user?.id ?? null, {
       action: "employee.create", entity: "employee", detail: `Nýr starfsmaður — ${input.fullName.trim()}`,
     });
+    // „Stofna & senda boð“: netfang → boð í VAKTO (eða tenging við aðgang sem er til).
+    let invited = false, inviteError: string | undefined;
+    if (input.email?.trim()) {
+      const inv = await inviteToCompany(company, input.email, input.role ?? "Starfsmaður");
+      invited = inv.ok && inv.sent;
+      if (!inv.ok) inviteError = inv.error;
+    }
     revalidatePath("/starfsfolk");
-    return { ok: true, id: created?.id as string | undefined };
+    return { ok: true, id: created?.id as string | undefined, invited, inviteError };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
@@ -582,7 +590,7 @@ export async function getCompanyDepartments(): Promise<string[]> {
       .eq("locations.company_id", company)
       .order("name");
     const names = Array.from(new Set((data ?? []).map((d) => d.name as string).filter(Boolean)));
-    return names.length ? names : DEMO_DEPARTMENTS;
+    return names; // tómt = engar deildir enn (ekki sýnidæmi)
   } catch {
     return DEMO_DEPARTMENTS;
   }

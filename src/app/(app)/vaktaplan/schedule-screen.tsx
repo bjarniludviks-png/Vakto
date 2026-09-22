@@ -114,10 +114,10 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   // Copied shift: code + real times, so pasting preserves them and saves.
   const [clip, setClip] = useState<{ code: string; start?: string; end?: string } | null>(null);
   // Company departments for the filter (live sync with Settings).
-  const [deptList, setDeptList] = useState<string[]>(["Eldhús", "Sal", "Stjórnun"]);
+  const [deptList, setDeptList] = useState<string[]>(initial ? [] : ["Eldhús", "Sal", "Stjórnun"]);
   const [deptColors, setDeptColors] = useState<Record<string, string>>({});
   useEffect(() => {
-    getCompanyDepartments().then((d) => { if (d.length) setDeptList(d); }).catch(() => {});
+    getCompanyDepartments().then((d) => { if (initial || d.length) setDeptList(d); }).catch(() => {});
     getDepartmentColors().then(setDeptColors).catch(() => {});
   }, []);
   // Unified right-click menu (week/day/month views).
