@@ -50,7 +50,7 @@ export async function createCardSetupCheckout(companyId: string, opts: { returnU
     recurringProcessingModel: "Subscription",
     merchantShopperReference: companyId,
     culture: opts.culture ?? "is",
-    ...(opts.email ? { shopperContact: { email: opts.email } } : {}),
+    ...(opts.email ? { shopperContact: opts.email } : {}),
   });
   return { url: res.url, checkoutReference: res.checkoutReference, reference };
 }
