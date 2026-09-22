@@ -38,7 +38,7 @@ async function call<T>(path: string, method: "GET" | "POST", body?: unknown): Pr
 }
 
 /** 0 kr greiðslusíða sem geymir kortið. merchantReference = card:<companyId>:<ts>. */
-export async function createCardSetupCheckout(companyId: string, opts: { returnUrl: string; culture?: "is-IS" | "en-US"; email?: string }): Promise<{ url: string; checkoutReference: string; reference: string }> {
+export async function createCardSetupCheckout(companyId: string, opts: { returnUrl: string; culture?: "is" | "en"; email?: string }): Promise<{ url: string; checkoutReference: string; reference: string }> {
   const reference = `card:${companyId}:${Date.now()}`;
   const res = await call<{ url: string; checkoutReference: string }>("/hostedcheckout", "POST", {
     amount: 0,
@@ -49,7 +49,7 @@ export async function createCardSetupCheckout(companyId: string, opts: { returnU
     terminalIdentifier: TERMINAL_PAGE,
     recurringProcessingModel: "Subscription",
     merchantShopperReference: companyId,
-    culture: opts.culture ?? "is-IS",
+    culture: opts.culture ?? "is",
     ...(opts.email ? { shopperContact: { email: opts.email } } : {}),
   });
   return { url: res.url, checkoutReference: res.checkoutReference, reference };
