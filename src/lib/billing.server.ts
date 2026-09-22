@@ -77,7 +77,7 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
       if (d >= 0 && d <= 3) {
         const card = await activeCard(id);
         const users = await usersCount(id);
-        for (const to of await ownerEmails(id)) void sendTrialReminderEmail(to, name, { daysLeft: d, hasCard: !!card, total: priceFor(users).total, users });
+        for (const to of await ownerEmails(id)) await sendTrialReminderEmail(to, name, { daysLeft: d, hasCard: !!card, total: priceFor(users).total, users }).catch((e) => console.error("email:", e));
         await admin.from("companies").update({ trial_reminder_sent_at: now.toISOString() }).eq("id", id);
         out.reminders++;
       }
@@ -91,12 +91,12 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
     const card = await activeCard(id);
     if (!card) {
       if (!co.trial_expired_sent_at) {
-        for (const to of await ownerEmails(id)) void sendCardMissingEmail(to, name, "expired");
+        for (const to of await ownerEmails(id)) await sendCardMissingEmail(to, name, "expired").catch((e) => console.error("email:", e));
         await admin.from("companies").update({ trial_expired_sent_at: now.toISOString(), billing_status: "unpaid" }).eq("id", id);
         out.expired++;
       } else if (status === "unpaid" && daysBetween(new Date(co.trial_expired_sent_at as string), now) >= 14) {
         await admin.from("companies").update({ billing_status: "suspended" }).eq("id", id);
-        for (const to of await ownerEmails(id)) void sendSuspendedEmail(to, name);
+        for (const to of await ownerEmails(id)) await sendSuspendedEmail(to, name).catch((e) => console.error("email:", e));
         out.suspended++;
       }
       continue;
@@ -120,8 +120,8 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
           out.invoices++;
           if (!straumurConfigured()) continue;
           const r = await chargeInvoice(inv.id as string);
-          if (r === "paid") { out.paid++; for (const to of await ownerEmails(id)) void sendReceiptEmail(to, name, { total: p.total, periodStart: iso(periodStart), periodEnd: iso(addMonths(periodStart, 1)) }); }
-          else { out.failed++; await admin.from("companies").update({ billing_status: "unpaid" }).eq("id", id); for (const to of await ownerEmails(id)) void sendPaymentFailedEmail(to, name, p.total); }
+          if (r === "paid") { out.paid++; for (const to of await ownerEmails(id)) await sendReceiptEmail(to, name, { total: p.total, periodStart: iso(periodStart), periodEnd: iso(addMonths(periodStart, 1)) }).catch((e) => console.error("email:", e)); }
+          else { out.failed++; await admin.from("companies").update({ billing_status: "unpaid" }).eq("id", id); for (const to of await ownerEmails(id)) await sendPaymentFailedEmail(to, name, p.total).catch((e) => console.error("email:", e)); }
         }
       } else if (existing.status === "failed" && (existing.attempts as number) < 4 && straumurConfigured()) {
         // endurreyna daglega í 3 daga
@@ -130,7 +130,7 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
         if (r === "paid") out.paid++;
         else if ((existing.attempts as number) + 1 >= 4 || daysBetween(new Date(existing.created_at as string), now) >= 14) {
           await admin.from("companies").update({ billing_status: "suspended" }).eq("id", id);
-          for (const to of await ownerEmails(id)) void sendSuspendedEmail(to, name);
+          for (const to of await ownerEmails(id)) await sendSuspendedEmail(to, name).catch((e) => console.error("email:", e));
           out.suspended++;
         }
       }

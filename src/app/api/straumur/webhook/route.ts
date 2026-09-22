@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyWebhookSignature } from "@/lib/straumur";
 import { sendPaymentFailedEmail, sendReceiptEmail, sendCardMissingEmail } from "@/lib/email";
@@ -62,13 +62,13 @@ export async function POST(req: Request) {
             await admin.from("invoices").update({ status: "paid", paid_at: new Date().toISOString(), payfac_reference: hook.payfacReference ?? null, last_error: null }).eq("id", inv.id);
             await admin.from("companies").update({ billing_status: "paying" }).eq("id", inv.company_id);
             const { data: co } = await admin.from("companies").select("name").eq("id", inv.company_id).maybeSingle();
-            for (const to of await ownerEmails(inv.company_id as string)) void sendReceiptEmail(to, (co?.name as string) ?? "", { total: inv.total_amount as number, periodStart: inv.period_start as string, periodEnd: inv.period_end as string });
+            after(async () => { for (const to of await ownerEmails(inv.company_id as string)) await sendReceiptEmail(to, (co?.name as string) ?? "", { total: inv.total_amount as number, periodStart: inv.period_start as string, periodEnd: inv.period_end as string }).catch((e) => console.error("email:", e)); });
           }
         } else {
           await admin.from("invoices").update({ status: "failed", last_error: hook.reason ?? "refused" }).eq("id", inv.id);
           await admin.from("companies").update({ billing_status: "unpaid" }).eq("id", inv.company_id);
           const { data: co } = await admin.from("companies").select("name").eq("id", inv.company_id).maybeSingle();
-          for (const to of await ownerEmails(inv.company_id as string)) void sendPaymentFailedEmail(to, (co?.name as string) ?? "", inv.total_amount as number);
+          after(async () => { for (const to of await ownerEmails(inv.company_id as string)) await sendPaymentFailedEmail(to, (co?.name as string) ?? "", inv.total_amount as number).catch((e) => console.error("email:", e)); });
         }
       }
     } else if (eventType === "TokenDisabled" || eventType === "Token disabled") {
@@ -77,7 +77,7 @@ export async function POST(req: Request) {
         const { data: pm } = await admin.from("payment_methods").update({ status: "disabled" }).eq("token", token).select("company_id").maybeSingle();
         if (pm?.company_id) {
           const { data: co } = await admin.from("companies").select("name").eq("id", pm.company_id).maybeSingle();
-          for (const to of await ownerEmails(pm.company_id as string)) void sendCardMissingEmail(to, (co?.name as string) ?? "", "disabled");
+          after(async () => { for (const to of await ownerEmails(pm.company_id as string)) await sendCardMissingEmail(to, (co?.name as string) ?? "", "disabled").catch((e) => console.error("email:", e)); });
         }
       }
     } else if (eventType === "TokenUpdated" || eventType === "Token updated") {
