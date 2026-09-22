@@ -19,10 +19,8 @@ export default function FbCoverPage() {
         <span className="ny-underglow" />
       </div>
       <div className="txt">
-        <span className="ny-pill">Vaktaplan · stimpilklukka · laun · laun% af veltu</span>
         <h1>Einfaldasta vaktakerfið.<br />Sem gerir meira.</h1>
-        <p className="sub">Laun% af veltu í rauntíma · vaktaplan · stimpilklukka · spjall · skírteini</p>
-        <div className="cta"><span className="ny-btn glow lg">Prófaðu frítt</span><span>vakto.is</span></div>
+        <span className="site">vakto.is</span>
       </div>
       <div className="shot"><img src="/showcase/2026/maelabord.jpg" alt="" /></div>
     </div>
