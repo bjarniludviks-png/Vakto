@@ -12,7 +12,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:"General Sans","Plus Jakarta Sans",ui-sans-serif,system-ui,-apple-system,sans-serif;color:var(--ink);
   background:#060607;-webkit-font-smoothing:antialiased;letter-spacing:-.011em}
-.wrap{display:grid;grid-template-columns:1fr 1fr;min-height:100vh}
+.wrap{display:grid;grid-template-columns:1fr 1fr;min-height:100vh;min-height:100dvh}
 
 /* left — form */
 .left{display:flex;align-items:center;justify-content:center;padding:40px 28px;background:#060607}
@@ -103,7 +103,7 @@ body{font-family:"General Sans","Plus Jakarta Sans",ui-sans-serif,system-ui,-app
 .quote{font-size:14.5px;color:var(--ink2);position:relative;z-index:1;font-style:italic;margin-top:34px}
 
 @media(prefers-reduced-motion:reduce){.sky .st,.sky .ry{animation:none}}
-@media(max-width:900px){.wrap{grid-template-columns:1fr}.right{display:none}}
+@media(max-width:900px){.wrap{grid-template-columns:1fr;min-height:100dvh;overscroll-behavior:none}.right{display:none}.left{min-height:100dvh;box-sizing:border-box}}
 @media(max-width:480px){.left{padding:32px 22px}.form h1{font-size:26px}}
 
 /* signup — steps, plan picker, card */
