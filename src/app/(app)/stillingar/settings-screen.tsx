@@ -235,7 +235,7 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
         <div className="cb">
           <div className="statline"><span className="k">{t("Verð")}</span><span className="v">5.990 kr/mán · 5 notendur · +590 kr á notanda umfram (án VSK)</span></div>
           <div className="statline"><span className="k">{t("Notendur núna")}</span><span className="v">{data.users.length}</span></div>
-          {data.company?.trialEndsAt && <div className="statline"><span className="k">{t("Prufa gildir til")}</span><span className="v">{data.company.trialEndsAt}</span></div>}
+          {data.company?.trialEndsAt && data.company?.billingStatus !== "paying" && <div className="statline"><span className="k">{t("Prufa gildir til")}</span><span className="v">{data.company.trialEndsAt}</span></div>}
           <div className="statline"><span className="k">{t("Kort")}</span><span className="v">{data.card ? `${data.card.brand === "VI" ? "Visa" : data.card.brand === "MC" ? "Mastercard" : (data.card.brand ?? t("Kort"))} •••• ${data.card.last4 ?? "····"}${data.card.expiry ? ` · ${data.card.expiry}` : ""}` : t("Ekkert kort skráð")}</span></div>
           <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
             <button className="btn" onClick={async () => { const r = await startCardChange(window.location.origin); if (r.ok && r.url) window.location.assign(r.url); else toast(r.error ?? t("Tókst ekki")); }}>{data.card ? t("Skipta um kort") : t("Skrá kort")}</button>
