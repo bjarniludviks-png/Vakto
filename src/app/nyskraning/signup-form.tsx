@@ -22,7 +22,6 @@ export default function SignupForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
-  const [country, setCountry] = useState<"IS" | "OTHER">("IS");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -31,7 +30,7 @@ export default function SignupForm() {
     e.preventDefault();
     setError(null); setBusy(true);
     try {
-      const res = await createOwnerAccount({ fullName, companyName, email, password, country });
+      const res = await createOwnerAccount({ fullName, companyName, email, password, country: "IS" });
       if (!res.ok) { setError(res.error ?? "Tókst ekki að stofna aðgang"); return; }
       if (!res.demo) {
         const supabase = createClient();
@@ -89,12 +88,6 @@ export default function SignupForm() {
 
       <div className="field"><div className="lbl"><label htmlFor="fn">Fullt nafn</label></div><input id="fn" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="Nafn Nafnsson" autoComplete="name" required /></div>
       <div className="field"><div className="lbl"><label htmlFor="co">Fyrirtæki</label></div><input id="co" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Fyrirtækið ehf" autoComplete="organization" required /></div>
-      <div className="field"><div className="lbl"><label htmlFor="ct">Land</label></div>
-        <select id="ct" value={country} onChange={(e) => setCountry(e.target.value as "IS" | "OTHER")}>
-          <option value="IS">Ísland — kjarasamningar, uppbætur, Payday</option>
-          <option value="OTHER">Annað land — staðlaðar reglur</option>
-        </select>
-      </div>
       <div className="field"><div className="lbl"><label htmlFor="em">Netfang</label></div><input id="em" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="netfang@fyrirtaeki.is" autoComplete="email" required /></div>
       <div className="field"><div className="lbl"><label htmlFor="pw">Lykilorð</label></div>
         <div className="pwwrap">

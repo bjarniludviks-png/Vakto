@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       // Public marketing/auth pages are crawlable; the authenticated app is not.
-      { userAgent: "*", allow: ["/", "/login", "/nyskraning"], disallow: ["/maelabord", "/vaktaplan", "/timaskraning", "/launakeyrslur", "/starfsfolk", "/skyrslur", "/frammistada", "/mitt-svaedi", "/spjall", "/stillingar", "/hjalp", "/kiosk", "/api/"] },
+      { userAgent: "*", allow: ["/", "/login", "/nyskraning", "/personuvernd", "/skilmalar", "/vafrakokur"], disallow: ["/maelabord", "/vaktaplan", "/timaskraning", "/launakeyrslur", "/starfsfolk", "/skyrslur", "/frammistada", "/mitt-svaedi", "/spjall", "/stillingar", "/hjalp", "/kiosk", "/api/"] },
     ],
     sitemap: `${BASE}/sitemap.xml`,
   };
