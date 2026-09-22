@@ -33,14 +33,14 @@ const Pin = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z" /><circle cx="12" cy="9" r="2.5" /></svg>
 );
 
-export default function SettingsScreen({ initialModal = null, data = DEMO_SETTINGS, payRules = [], ruleTemplates = [] }: { initialModal?: SettingsModal; data?: SettingsData; payRules?: PayRule[]; ruleTemplates?: RuleTemplate[] }) {
+export default function SettingsScreen({ initialModal = null, initialSection, data = DEMO_SETTINGS, payRules = [], ruleTemplates = [] }: { initialModal?: SettingsModal; initialSection?: string; data?: SettingsData; payRules?: PayRule[]; ruleTemplates?: RuleTemplate[] }) {
   const { t } = useLang();
   const [modal, setModal] = useState<SettingsModal>(initialModal);
   const [keyModal, setKeyModal] = useState(false);
   const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
   const [deptEdit, setDeptEdit] = useState<{ id: string; name: string; location: string; staff: number; color: string | null; members: string[] } | null>(null);
   const [rowEdit, setRowEdit] = useState<{ kind: "location" | "position"; id: string; name: string; rate?: number } | null>(null);
-  const [section, setSection] = useState<string>(initialModal === "revenue" || initialModal === "avgrevenue" ? "velta" : "fyrirtaeki");
+  const [section, setSection] = useState<string>(initialSection ?? (initialModal === "revenue" || initialModal === "avgrevenue" ? "velta" : "fyrirtaeki"));
   const SECTIONS: [string, string][] = [
     ["fyrirtaeki", "Fyrirtæki"], ["tengingar", "Samþættingar"], ["velta", "Veltuskráning"],
     ["launareglur", "Launareglur"], ["notendur", "Notendur"], ["askrift", "Áskrift"],

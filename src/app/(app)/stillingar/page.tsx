@@ -6,7 +6,7 @@ import { listRuleTemplates } from "./actions";
 export default async function StillingarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ new?: string }>;
+  searchParams: Promise<{ new?: string; tab?: string }>;
 }) {
   const [data, { rules }, { templates }] = await Promise.all([
     getSettingsData(),
@@ -15,5 +15,5 @@ export default async function StillingarPage({
   ]);
   const sp = await searchParams;
   const initial = (["location", "position", "invite", "revenue", "avgrevenue"] as const).find((m) => m === sp.new) ?? null;
-  return <SettingsScreen initialModal={initial} data={data} payRules={rules} ruleTemplates={templates} />;
+  return <SettingsScreen initialModal={initial} initialSection={sp.tab} data={data} payRules={rules} ruleTemplates={templates} />;
 }
