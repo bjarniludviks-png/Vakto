@@ -322,7 +322,7 @@ function mulberry32(seed: number) {
 
 /* Jittered-grid sampling: one candidate star per cell, randomly offset within
    it — evenly spread without clumps or straight lines. */
-function Starfield({ layer }: { layer: 1 | 2 }) {
+export function Starfield({ layer }: { layer: 1 | 2 }) {
   const rnd = mulberry32(layer === 1 ? 0x5747a1 : 0x36c9d3);
   const cols = 16, rows = 9, cw = 1600 / cols, ch = 900 / rows;
   const colors = ["255,255,255", "255,244,230", "214,228,255"];
@@ -346,7 +346,7 @@ function Starfield({ layer }: { layer: 1 | 2 }) {
   );
 }
 
-function Logo({ w = 26 }: { w?: number }) {
+export function Logo({ w = 26 }: { w?: number }) {
   return (
     <svg width={w} height={w} viewBox="0 0 28 28" fill="none">
       <rect x="3" y="15" width="5.4" height="10" rx="1.6" fill="#f59331" />
