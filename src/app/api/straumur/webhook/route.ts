@@ -17,11 +17,15 @@ type Hook = {
 
 export async function POST(req: Request) {
   const expectedKey = process.env.STRAUMUR_WEBHOOK_KEY;
-  if (expectedKey && req.headers.get("authorization") !== expectedKey) return NextResponse.json({ ok: false }, { status: 401 });
+  const authHeader = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  if (expectedKey && authHeader !== expectedKey) {
+    console.error(`straumur webhook: auth mismatch (header len ${authHeader.length}, expected len ${expectedKey.length})`);
+    return NextResponse.json({ ok: false, error: "auth" }, { status: 401 });
+  }
   let hook: Hook;
   try { hook = await req.json(); } catch { return NextResponse.json({ ok: false }, { status: 400 }); }
   if (!verifyWebhookSignature(hook)) {
-    console.error("straumur webhook: bad signature", hook.merchantReference);
+    console.error("straumur webhook: bad signature", JSON.stringify({ ref: hook.merchantReference, checkout: hook.checkoutReference, amount: hook.amount, currency: hook.currency, reason: hook.reason, success: hook.success, event: hook.additionalData?.eventType, hasSig: !!hook.hmacSignature }));
     return NextResponse.json({ ok: false, error: "signature" }, { status: 401 });
   }
   const admin = createAdminClient();
