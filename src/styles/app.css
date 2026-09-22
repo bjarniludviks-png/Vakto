@@ -956,3 +956,5 @@ html.dark .wallet-btn.google{background:var(--panel);color:var(--ink)}
 /* dark mode: "ink" is light there, so ink-filled pills need dark text */
 html.dark .etab2.on{color:#0f0f12}
 html.dark .plan-tabs button.on{color:#0f0f12}
+/* sími: síðan má aldrei verða breiðari en skjárinn — breiðar töflur skrolla innan .tbl */
+@media(max-width:700px){.main{overflow-x:hidden;max-width:100vw}.card{max-width:100%}}

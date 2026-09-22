@@ -597,9 +597,9 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
                   ref={inputRef} className="txt" placeholder={rec ? t("Tek upp… smelltu til að stöðva") : t("chat:ph")} value={val}
                   onChange={(e) => { setVal(e.target.value); if (e.target.value) sendTyping(); else sendTyping(true); }}
                   onBlur={() => sendTyping(true)}
-                  onKeyDown={(e) => e.key === "Enter" && send()}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); send(); inputRef.current?.focus(); } }}
                 />
-                <button className="msgr-send" disabled={!val.trim() && !rec} onClick={() => send()} aria-label={t("chat:send")}>
+                <button className="msgr-send" disabled={!val.trim() && !rec} onPointerDown={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()} onClick={() => { send(); inputRef.current?.focus(); }} aria-label={t("chat:send")}>
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
                 </button>
                 <input ref={fileRef} type="file" accept="image/*,image/gif" hidden onChange={onFile} />

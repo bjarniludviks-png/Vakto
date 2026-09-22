@@ -194,7 +194,7 @@ export default function ReportsScreen({ empty = false, live = false, embedded = 
       <div className="card" style={{ marginTop: 20 }}>
         <div className="ch"><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{t("áætlað á móti klukknuðum tímum — þessi vika vs fyrri vika")}</div></div>
         <div className="cb tbl" style={{ paddingTop: 8 }}>
-          <table>
+          <div className="tbl"><table>
             <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th>{compare !== "none" && <th className="r">{t(cmpCol)}</th>}<th className="r">{t("Raun kostn.")}</th></tr></thead>
             <tbody>
               {shownPVA.map((r) => (
@@ -208,7 +208,7 @@ export default function ReportsScreen({ empty = false, live = false, embedded = 
               {!shownPVA.length && <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 18 }}>{t("Enginn starfsmaður fannst")}</td></tr>}
               {shownPVA.length > 0 && <tr className="foot"><td style={{ textAlign: "left" }}>{t("Samtals")} · {shownPVA.length} {t("starfsm.")}</td><td></td><td className="r">{sc("368,0", f)}</td><td className="r">{sc("374,6", f)}</td><td className="r">{sc("+6,6", f)}</td>{compare !== "none" && <td className="r">{sc("+5,1", f)}</td>}<td className="r">{sc("1.401.900", f)}</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
 
@@ -216,7 +216,7 @@ export default function ReportsScreen({ empty = false, live = false, embedded = 
         <div className="card">
           <div className="ch"><div className="ct">{t("Tímabanki starfsfólks")}</div><div className="cs">{t("uppsafnað +/− vs vinnuskylda")}</div></div>
           <div className="cb tbl" style={{ paddingTop: 8 }}>
-            <table>
+            <div className="tbl"><table>
               <thead><tr><th>{t("th:Starfsm.")}</th><th className="r">{t("Vinnuskylda")}</th><th className="r">{t("Unnið")}</th><th className="r">{t("Staða banka")}</th></tr></thead>
               <tbody>
                 {shownBANK.map((r) => (
@@ -224,7 +224,7 @@ export default function ReportsScreen({ empty = false, live = false, embedded = 
                 ))}
                 {!shownBANK.length && <tr><td colSpan={4} className="muted" style={{ textAlign: "center", padding: 18 }}>{t("Enginn starfsmaður fannst")}</td></tr>}
               </tbody>
-            </table>
+            </table></div>
           </div>
         </div>
         <ReportLibrary from={period === "Sérsniðið" && from && to ? from : rangeFor(period).from} to={period === "Sérsniðið" && from && to ? to : rangeFor(period).to} departments={["Eldhús", "Sal", "Stjórnun"]} />
@@ -315,7 +315,7 @@ function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[
       <div className="card" style={{ marginTop: 12 }}>
         <div className="ch"><div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)} · {t("kostnaður m. byrði")}</div></div></div>
         <div className="cb tbl" style={{ paddingTop: 8, opacity: loading ? 0.5 : 1 }}>
-          <table>
+          <div className="tbl"><table>
             <thead><tr><th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th><th className="r">{t("Áætl. kostn.")}</th><th className="r">{t("Raun kostn.")}</th></tr></thead>
             <tbody>
               {shown.length ? shown.map((r) => (
@@ -329,7 +329,7 @@ function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[
               )) : <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
               {shown.length > 0 && <tr className="foot"><td style={{ textAlign: "left" }}>{t("Samtals")} · {shown.length} {t("starfsm.")}</td><td></td><td className="r">{dec1(planned)}</td><td className="r">{dec1(actual)}</td><td className="r">{actual >= planned ? "+" : ""}{dec1(actual - planned)}</td><td className="r">{nf(shown.reduce((a, r) => a + r.estCost, 0))}</td><td className="r">{nf(shown.reduce((a, r) => a + r.actCost, 0))}</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
         </>) },

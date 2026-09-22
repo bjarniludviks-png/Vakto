@@ -190,7 +190,7 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
           <div className="card" style={{ marginTop: 20 }}>
             <div className="ch"><div><div className="ct">{t("Samanburður tímabila")}</div><div className="cs">{cur.label} {t("vs")} {prev.label}</div></div></div>
             <div className="cb tbl" style={{ paddingTop: 8 }}>
-              <table>
+              <div className="tbl"><table>
                 <thead><tr><th>{t("Mælikvarði")}</th><th className="r">{cur.label}</th><th className="r">{prev.label}</th><th className="r">{t("Breyting")}</th></tr></thead>
                 <tbody>
                   <tr><td>{t("Velta")}</td><td className="r">{krCompact(cur.revenue)}</td><td className="r">{krCompact(prev.revenue)}</td>{chgCell(cur.revenue, prev.revenue, true)}</tr>
@@ -205,7 +205,7 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
                   </tr>
                   <tr><td>{t("Framlegð")}</td><td className="r">{krCompact(Math.max(0, cur.revenue - cur.cost))}</td><td className="r">{krCompact(Math.max(0, prev.revenue - prev.cost))}</td>{chgCell(Math.max(0, cur.revenue - cur.cost), Math.max(0, prev.revenue - prev.cost), true)}</tr>
                 </tbody>
-              </table>
+              </table></div>
             </div>
           </div>
           ) },
@@ -276,7 +276,7 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
       <div className="card" style={{ marginTop: 20 }}>
         <div className="ch"><div className="ct">{t("Samanburður tímabila")}</div><div className="cs">{t("þetta tímabil · síðasta tímabil · sama tímabil í fyrra")}</div></div>
         <div className="cb tbl" style={{ paddingTop: 8 }}>
-          <table>
+          <div className="tbl"><table>
             <thead><tr><th>{t("Mælikvarði")}</th><th className="r">{t("Júní 2026")}</th><th className="r">{t("Maí 2026")}</th><th className="r">{t("Júní 2025")}</th><th className="r">{t("Breyting (mán)")}</th><th className="r">{t("vs í fyrra")}</th></tr></thead>
             <tbody>
               {CMP.map((r) => {
@@ -293,7 +293,7 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         </div>
       </div>
 
@@ -314,14 +314,14 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
       <div className="card" style={{ marginTop: 20 }}>
         <div className="ch"><div className="ct">{t("Samanburður staða")}</div><div className="cs">{t("hver staður — velta, laun% og framlegð, breyting milli mánaða")}</div></div>
         <div className="cb tbl" style={{ paddingTop: 8 }}>
-          <table>
+          <div className="tbl"><table>
             <thead><tr><th>{t("Staður")}</th><th className="r">{t("Velta")}</th><th className="r">{t("Launakostn.")}</th><th className="r">{t("Laun%")}</th><th className="r">{t("Framlegð")}</th><th className="r">{t("Laun% vs maí")}</th></tr></thead>
             <tbody>
               {(locF === "all" || locF === "Reykjavík Asian") && <tr><td><b>Reykjavík Asian</b></td><td className="r">14,1 m</td><td className="r">5,52 m</td><td className="r" style={{ color: "var(--warn)" }}>39,1%</td><td className="r">8,6 m</td><td className="r" style={{ color: "var(--good)" }}>−1,0 stig</td></tr>}
               {(locF === "all" || locF === "Hotel Umi") && <tr><td><b>Hotel Umi</b></td><td className="r">4,5 m</td><td className="r">1,87 m</td><td className="r" style={{ color: "var(--bad)" }}>41,6%</td><td className="r">2,6 m</td><td className="r" style={{ color: "var(--bad)" }}>+0,8 stig</td></tr>}
               {locF === "all" && <tr className="foot"><td style={{ textAlign: "left" }}>{t("Samtals")}</td><td className="r">18,6 m</td><td className="r">7,39 m</td><td className="r">39,7%</td><td className="r">11,2 m</td><td className="r" style={{ color: "var(--good)" }}>−1,2 stig</td></tr>}
             </tbody>
-          </table>
+          </table></div>
         </div>
         <div className="cb" style={{ borderTop: "1px solid var(--line2)" }}>
           <div className="ai" style={{ margin: 0 }}>
