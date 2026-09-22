@@ -243,3 +243,7 @@
   `CRON_SECRET` er sett á Vercel (preview+production) svo cron-endapunktar taki aðeins við köllum frá Vercel Cron
   (`Authorization: Bearer <CRON_SECRET>`). Sannreynt e2e á staging 22.9.2026: kort skráð (Visa •••• 1142, prófkort),
   Tokenization-webhook → payment_methods, cron → reikningur 7.428 kr (5.990 + VSK) → Authorised → paid, kvittun send.
+  **Kort er skylda (22.9.2026):** `companies.card_required` (0051) = true við nýskráningu; middleware sendir allt á
+  `/nyskraning/kort?required=1` þar til Tokenization-webhook skilar korti (eða admin setur greiðslustöðu handvirkt).
+  Læsingin er aðeins virk þegar `STRAUMUR_TERMINAL_PAGE` er sett — án greiðslusíðu-útstöðvar (live vantar hana enn)
+  kemst fólk inn án korts. Eldri fyrirtæki (BM Veitingar o.fl.) eru með card_required=false og verða aldrei læst.

@@ -27,14 +27,14 @@ EOF
 echo "== Prod-grunnur: staða fyrir"
 run_sql "select (select count(*) from companies) companies, (select count(*) from employees) employees"
 
-MIGRATIONS="0050_billing.sql"
+MIGRATIONS="0051_card_required.sql"
 for f in $MIGRATIONS; do
   echo "== $f"
   run_sql "$(cat supabase/migrations/$f)"
 done
 
 echo "== Staðfesting"
-run_sql "select to_regclass('public.payment_methods') payment_methods, to_regclass('public.invoices') invoices, to_regclass('public.billing_events') billing_events, (select count(*) from information_schema.columns where table_name='companies' and column_name='billing_anchor') anchor"
+run_sql "select to_regclass('public.payment_methods') payment_methods, to_regclass('public.invoices') invoices, to_regclass('public.billing_events') billing_events, (select count(*) from information_schema.columns where table_name='companies' and column_name='card_required') card_required"
 
 echo "== Push live-fixes → main"
 git push origin live-fixes:main

@@ -124,7 +124,16 @@ export async function updateSession(request: NextRequest) {
     // Suspended company → everyone locked out (except the VAKTO admin allowlist).
     if (profile?.company_id && pathname !== "/adgangur-lokadur") {
       const { data: co } = await supabase
-        .from("companies").select("billing_status").eq("id", profile.company_id).maybeSingle();
+        .from("companies").select("billing_status, card_required").eq("id", profile.company_id).maybeSingle();
+      // Nýskráð fyrirtæki án korts: allt lokað nema kortasíðan — þegar greiðslusíða Straums er tengd.
+      if (co?.card_required && process.env.STRAUMUR_TERMINAL_PAGE && !pathname.startsWith("/nyskraning")) {
+        const { data: pm } = await supabase.from("payment_methods").select("id").eq("company_id", profile.company_id).eq("status", "active").limit(1).maybeSingle();
+        if (!pm) {
+          const dest = request.nextUrl.clone();
+          dest.pathname = "/nyskraning/kort"; dest.search = "?required=1";
+          return NextResponse.redirect(dest);
+        }
+      }
       if (co?.billing_status === "suspended") {
         const adminList = (process.env.VAKTO_ADMIN_EMAILS || "bjarniludviks@icloud.com")
           .split(",").map((s) => s.trim().toLowerCase());

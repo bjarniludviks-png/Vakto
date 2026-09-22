@@ -11,14 +11,14 @@ const Bars = () => (
   </svg></div>
 );
 
-export default function CardResult({ cancelled }: { cancelled: boolean }) {
+export default function CardResult({ cancelled, required = false }: { cancelled: boolean; required?: boolean }) {
   const [card, setCard] = useState<{ last4: string | null; brand: string | null } | null>(null);
   const [waited, setWaited] = useState(0);
   const [busy, setBusy] = useState(false);
 
   // Tokenið kemur með webhook nokkrum sekúndum eftir að Straumur sendir fólk til baka.
   useEffect(() => {
-    if (cancelled) return;
+    if (cancelled || required) return;
     let alive = true;
     const tick = async (n: number) => {
       const r = await hasCardOnFile();
@@ -29,7 +29,7 @@ export default function CardResult({ cancelled }: { cancelled: boolean }) {
     };
     void tick(0);
     return () => { alive = false; };
-  }, [cancelled]);
+  }, [cancelled, required]);
 
   async function retry() {
     setBusy(true);
@@ -41,12 +41,19 @@ export default function CardResult({ cancelled }: { cancelled: boolean }) {
   return (
     <div className="form">
       <div className="brand"><Bars /><b>VAKTO</b></div>
-      {cancelled ? (
+      {required ? (
+        <>
+          <h1>Skráðu kort til að opna VAKTO</h1>
+          <div className="sub">Prufan er frí í 14 daga og ekkert er dregið fyrr en hún er búin — en kortið þarf að vera skráð áður en kerfið opnast. Það er geymt hjá Straumi (Kvika), VAKTO geymir aldrei kortanúmer.</div>
+          <button className="btn" onClick={retry} disabled={busy}>{busy ? "Opna greiðslusíðu…" : "Skrá kort"}</button>
+          <div className="foot"><a href="mailto:hallo@vakto.is">Spurningar? hallo@vakto.is</a></div>
+        </>
+      ) : cancelled ? (
         <>
           <h1>Hætt við kortaskráningu</h1>
-          <div className="sub">Prufan er samt byrjuð. Þú getur skráð kortið núna eða síðar í Stillingum → Áskrift; það þarf að vera komið áður en prufan rennur út.</div>
+          <div className="sub">Aðgangurinn opnast þegar kortið er skráð. Ekkert er dregið fyrr en 14 daga prufan er búin.</div>
           <button className="btn" onClick={retry} disabled={busy}>{busy ? "Opna…" : "Skrá kort núna"}</button>
-          <div className="foot"><a href="/maelabord">Skrá kort síðar og opna VAKTO</a></div>
+          <div className="foot"><a href="mailto:hallo@vakto.is">Spurningar? hallo@vakto.is</a></div>
         </>
       ) : card ? (
         <>

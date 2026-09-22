@@ -1237,3 +1237,8 @@ drop policy if exists payment_methods_read on payment_methods;
 create policy payment_methods_read on payment_methods for select using (company_id = auth_company_id());
 drop policy if exists invoices_read on invoices;
 create policy invoices_read on invoices for select using (company_id = auth_company_id());
+
+-- ===== 0051_card_required.sql =====
+-- Nýskráð fyrirtæki komast ekki inn fyrr en kort er skráð hjá Straumi.
+-- Sett true við nýskráningu, false þegar Tokenization-webhook skilar korti (eða admin setur greiðslustöðu handvirkt).
+alter table companies add column if not exists card_required boolean not null default false;

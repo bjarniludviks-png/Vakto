@@ -105,7 +105,7 @@ export async function setBillingStatus(companyId: string, status: string): Promi
     const db = createAdminClient();
     const { data: before } = await db.from("companies").select("name, billing_status").eq("id", companyId).maybeSingle();
     const { error } = await db.from("companies")
-      .update({ billing_status: status === "auto" ? null : status })
+      .update({ billing_status: status === "auto" ? null : status, ...(status === "auto" ? {} : { card_required: false }) })
       .eq("id", companyId);
     if (error) return { ok: false, error: error.message.includes("billing_status") ? "Keyrðu migration 0027" : error.message };
     const me = await adminIdentity();

@@ -5,11 +5,11 @@ import CardResult from "./card-result";
 export const metadata: Metadata = { title: "VAKTO — Kort skráð" };
 
 // Straumur sendir kúnnann hingað eftir kortaskráningu (ok=1) eða ef hætt var við (ok=0).
-export default async function CardReturnPage({ searchParams }: { searchParams: Promise<{ ok?: string }> }) {
+export default async function CardReturnPage({ searchParams }: { searchParams: Promise<{ ok?: string; required?: string }> }) {
   const sp = await searchParams;
   return (
     <div className="wrap">
-      <div className="left"><CardResult cancelled={sp.ok === "0"} /></div>
+      <div className="left"><CardResult cancelled={sp.ok === "0"} required={sp.required === "1"} /></div>
       <div className="right">
         <div className="tag">14 daga frí prufa</div>
         <div className="mid">

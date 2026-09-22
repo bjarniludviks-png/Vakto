@@ -50,6 +50,11 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
     const userId = created.user.id;
     const prov = await provisionCompanyForUser(userId, email, fullName, companyName, input.country);
     if (!prov.ok) return { ok: false, error: prov.error };
+    // Prufan hefst núna; aðgangur opnast ekki fyrr en kort er skráð (middleware + card_required).
+    if (prov.companyId) {
+      const trialEnds = new Date(Date.now() + 14 * 86400000).toISOString();
+      await admin.from("companies").update({ plan: "vakto", trial_ends_at: trialEnds, card_required: true }).eq("id", prov.companyId);
+    }
     await sendWelcomeEmail(email, fullName, companyName); // no-op until Resend is configured
     return { ok: true };
   } catch (e) {
