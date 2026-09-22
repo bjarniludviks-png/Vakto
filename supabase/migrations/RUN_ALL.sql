@@ -996,3 +996,244 @@ begin
   alter publication supabase_realtime add table public.channels;
 exception when duplicate_object then null;
 end $$;
+
+-- ===== 0044_security.sql =====
+-- 0044 — öryggislagfæringar fyrir sölu (WASTE-listi D1–D3)
+--
+-- D1  chat-bucket: lestur var opinn öllum innskráðum notendum þvert á fyrirtæki.
+--     Slóðin er "<company_id>/…" (sjá spjall/actions.ts uploadChatMedia) → afmarka við eigið fyrirtæki.
+-- D2  kiosk: fyrirtækis-UUID í URL nægði til að sjá starfsfólk og hver er á vakt.
+--     Nýr leynilykill companies.kiosk_token; kiosk-slóðin verður /kiosk?k=<token>.
+-- D3  auth-trigger gaf nýjum notendum sjálfgefið hlutverkið owner. Sjálfgefið verður employee;
+--     nýskráning eiganda sendir role=owner í metadata (nyskraning/actions.ts) og boð senda sitt hlutverk.
+
+-- ---------- D1: chat storage ----------
+drop policy if exists chat_read on storage.objects;
+create policy chat_read on storage.objects for select to authenticated using (
+  bucket_id = 'chat'
+  and (storage.foldername(name))[1] = auth_company_id()::text
+);
+drop policy if exists chat_write on storage.objects;
+create policy chat_write on storage.objects for insert to authenticated with check (
+  bucket_id = 'chat'
+  and (storage.foldername(name))[1] = auth_company_id()::text
+);
+
+-- ---------- D2: kiosk token ----------
+create extension if not exists pgcrypto;
+alter table companies add column if not exists kiosk_token text;
+update companies set kiosk_token = encode(gen_random_bytes(16), 'hex') where kiosk_token is null;
+alter table companies alter column kiosk_token set not null;
+alter table companies alter column kiosk_token set default encode(gen_random_bytes(16), 'hex');
+create unique index if not exists companies_kiosk_token_idx on companies(kiosk_token);
+
+-- ---------- D3: default role ----------
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.users (id, email, full_name, role)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data->>'full_name', new.email),
+    coalesce((new.raw_user_meta_data->>'role')::user_role, 'employee')
+  )
+  on conflict (id) do nothing;
+  return new;
+end $$;
+
+-- ===== 0045_labor_target.sql =====
+-- 0045 — per-company target for laun % af veltu (the dashboard's traffic light:
+-- green ≤ target, yellow ≤ target + 3, red above). Was hardcoded 30 in three
+-- places; now one setting read by src/lib/labor.ts getLaborTarget(). Run after 0044.
+alter table companies add column if not exists labor_target numeric default 30;
+
+-- ===== 0046_chat_messenger.sql =====
+-- 0046: Messenger-grade chat. Run after 0045.
+--   1. channel_reads — per-user "last read" cursor per channel → real unread
+--      counts (server-side) + read receipts ("Séð").
+--   2. chat_unread_counts() — RPC that counts unread messages per channel for
+--      the caller (security invoker → messages RLS decides what is visible).
+--   3. channels.auto_key — 'dept:<id>' | 'loc:<id>' marks the automatic team
+--      channels per department / location (kept in sync from the app).
+--   4. channel_reads joins the realtime publication so read receipts update live.
+-- The web chat tolerates this migration being absent (counts fall back to 0,
+-- receipts/team channels simply do not appear).
+
+-- ---------- 1) channel_reads ----------
+create table if not exists public.channel_reads (
+  channel_id   uuid not null references public.channels(id) on delete cascade,
+  user_id      uuid not null references auth.users(id) on delete cascade,
+  last_read_at timestamptz not null default now(),
+  primary key (channel_id, user_id)
+);
+create index if not exists channel_reads_user_idx on public.channel_reads (user_id);
+
+alter table public.channel_reads enable row level security;
+
+-- Members of a channel may SEE each other's cursors (read receipts) …
+drop policy if exists channel_reads_read on public.channel_reads;
+create policy channel_reads_read on public.channel_reads
+  for select using (public.channel_visible(channel_id));
+
+-- … but only ever WRITE their own row.
+drop policy if exists channel_reads_own on public.channel_reads;
+create policy channel_reads_own on public.channel_reads
+  for all using (user_id = auth.uid())
+  with check (user_id = auth.uid() and public.channel_visible(channel_id));
+
+-- ---------- 2) unread counts ----------
+-- Messages newer than my cursor, sent by someone else, in channels I can see.
+-- A channel with no cursor row counts everything (first visit clears it).
+create or replace function public.chat_unread_counts()
+returns table (channel_id uuid, n bigint)
+language sql stable security invoker set search_path = public as $$
+  select m.channel_id, count(*)::bigint as n
+  from public.messages m
+  left join public.channel_reads r
+    on r.channel_id = m.channel_id and r.user_id = auth.uid()
+  where m.sender_id is distinct from auth.uid()
+    and m.created_at > coalesce(r.last_read_at, '1970-01-01'::timestamptz)
+  group by m.channel_id
+$$;
+grant execute on function public.chat_unread_counts() to authenticated;
+
+-- ---------- 3) automatic team channels ----------
+alter table public.channels add column if not exists auto_key text;
+-- Plain (non-partial) unique index: NULLs are distinct, so manual channels never
+-- collide, and PostgREST's `on_conflict=auto_key` upsert can infer it.
+create unique index if not exists channels_auto_key_uidx on public.channels (auto_key);
+
+-- ---------- 4) realtime ----------
+do $$
+begin
+  alter publication supabase_realtime add table public.channel_reads;
+exception when duplicate_object then null;
+end $$;
+
+-- ===== 0047_platform_admin.sql =====
+-- 0047 — VAKTO platform admin (the SaaS owner's /admin): a platform-wide audit
+-- trail of everything the owner does across tenants, plus a free-text admin
+-- note per company (billing/sales context until Stripe/Teya exists).
+-- Run after 0046 (staging first, prod at release).
+
+-- Every admin action: billing change, trial extension, suspension,
+-- impersonation start/end, note, login-link send. Written ONLY through the
+-- service-role client from src/app/admin/actions.ts — never by tenants.
+create table if not exists platform_audit (
+  id uuid primary key default gen_random_uuid(),
+  admin_email text not null,                                   -- who (allowlisted VAKTO_ADMIN_EMAILS)
+  action text not null,                                        -- billing.set | trial.extend | suspend | unsuspend |
+                                                               -- impersonate.start | impersonate.end | note.save | login_link.send
+  company_id uuid references companies(id) on delete set null, -- which tenant (null = platform-level)
+  target text,                                                 -- e.g. the user email acted on
+  detail text,                                                 -- human-readable description
+  at timestamptz not null default now()
+);
+create index if not exists platform_audit_at_idx on platform_audit(at desc);
+create index if not exists platform_audit_company_at_idx on platform_audit(company_id, at desc);
+
+-- Deny-all RLS: no policies at all, so anon/authenticated can neither read nor
+-- write. The service role bypasses RLS and is the only writer/reader.
+alter table platform_audit enable row level security;
+revoke all on table platform_audit from anon, authenticated;
+
+-- Free-text note the admin keeps per company ("Athugasemd" in /admin):
+-- who they are, what was agreed, when to follow up on payment, etc.
+alter table companies add column if not exists admin_note text;
+
+-- ===== 0048_comment_replies.sql =====
+-- 0048 — svör við athugasemdum í fréttaveitu (eitt þrep, eins og á Facebook).
+alter table post_comments add column if not exists parent_id uuid references post_comments(id) on delete cascade;
+create index if not exists post_comments_parent_idx on post_comments(parent_id);
+
+-- ===== 0049_support_chat.sql =====
+-- Spjallgaurinn á heimasíðunni: samtöl gesta (bot + eigandi tekur við).
+-- Service-role eingöngu — RLS kveikt án stefna, vefþjónninn les/skrifar með admin-lykli.
+create table if not exists support_threads (
+  id uuid primary key default gen_random_uuid(),
+  token text not null unique,
+  name text,
+  email text,
+  lang text not null default 'is',
+  status text not null default 'bot' check (status in ('bot','human','closed')),
+  page text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  owner_seen_at timestamptz
+);
+create table if not exists support_messages (
+  id uuid primary key default gen_random_uuid(),
+  thread_id uuid not null references support_threads(id) on delete cascade,
+  role text not null check (role in ('user','assistant','owner')),
+  body text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists support_messages_thread_idx on support_messages(thread_id, created_at);
+create index if not exists support_threads_updated_idx on support_threads(updated_at desc);
+alter table support_threads enable row level security;
+alter table support_messages enable row level security;
+
+-- ===== 0050_billing.sql =====
+-- Áskrift og greiðslur gegnum Straum (kort skráð við nýskráningu, tekið af því eftir prufu).
+-- Allt skrifað með service-role úr vefþjóni/webhook; RLS leyfir fyrirtækinu að LESA sín gögn.
+create table if not exists payment_methods (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id) on delete cascade,
+  provider text not null default 'straumur',
+  token text not null,
+  card_summary text,          -- síðustu 4
+  card_brand text,            -- VI / MC ...
+  card_expiry text,           -- MM/yyyy
+  checkout_reference text,
+  payfac_reference text,
+  status text not null default 'active' check (status in ('active','disabled')),
+  created_at timestamptz not null default now()
+);
+create index if not exists payment_methods_company_idx on payment_methods(company_id, status);
+create unique index if not exists payment_methods_token_idx on payment_methods(provider, token);
+
+create table if not exists invoices (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id) on delete cascade,
+  period_start date not null,
+  period_end date not null,
+  users_count int not null default 0,
+  base_amount int not null,       -- kr án VSK
+  extra_amount int not null default 0,
+  vat_amount int not null default 0,
+  total_amount int not null,      -- kr með VSK (það sem er tekið af korti)
+  currency text not null default 'ISK',
+  status text not null default 'pending' check (status in ('pending','paid','failed','refunded','void')),
+  reference text not null unique, -- merchantReference hjá Straumi: inv:<id>
+  payfac_reference text,
+  attempts int not null default 0,
+  last_error text,
+  paid_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists invoices_company_idx on invoices(company_id, period_start desc);
+
+create table if not exists billing_events (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid references companies(id) on delete set null,
+  event_type text not null,
+  payfac_reference text,
+  merchant_reference text,
+  success boolean,
+  payload jsonb not null,
+  received_at timestamptz not null default now()
+);
+create unique index if not exists billing_events_dedup on billing_events(event_type, payfac_reference, merchant_reference);
+
+alter table companies add column if not exists billing_anchor date;           -- fyrsti gjalddagi (= lok prufu)
+alter table companies add column if not exists trial_reminder_sent_at timestamptz;
+alter table companies add column if not exists trial_expired_sent_at timestamptz;
+
+alter table payment_methods enable row level security;
+alter table invoices enable row level security;
+alter table billing_events enable row level security;
+drop policy if exists payment_methods_read on payment_methods;
+create policy payment_methods_read on payment_methods for select using (company_id = auth_company_id());
+drop policy if exists invoices_read on invoices;
+create policy invoices_read on invoices for select using (company_id = auth_company_id());
