@@ -19,8 +19,8 @@ export default async function SignupPage() {
             planið á korteri. Prufan er með öllu innifalið — ekkert læst.
           </p>
           <div className="bullets">
-            <div className="bullet"><span className="ck"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" /></svg></span> 14 dagar frítt — engin binding, hættu hvenær sem er</div>
-            <div className="bullet"><span className="ck"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" /></svg></span> Eftir prufuna: 5.990 kr/mán fyrir 5 notendur, +590 kr á notanda umfram (án VSK)</div>
+            <div className="bullet"><span className="ck"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" /></svg></span> 14 dagar frítt — kortið skráð núna, ekkert dregið fyrr en prufan er búin</div>
+            <div className="bullet"><span className="ck"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" /></svg></span> Svo 5.990 kr/mán fyrir 5 notendur, +590 kr á notanda umfram (án VSK) — engin binding</div>
             <div className="bullet"><span className="ck"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" /></svg></span> Við hjálpum við uppsetninguna — hallo@vakto.is eða spjallið á forsíðunni</div>
           </div>
         </div>

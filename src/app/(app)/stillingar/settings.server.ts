@@ -10,7 +10,9 @@ export type UserRow = { name: string; initials: string; role: string; email: str
 export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string; payPeriodStart?: number; plan?: string | null; trialEndsAt?: string | null; billingStatus?: string | null };
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
 export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
-export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean };
+export type CardView = { last4: string | null; brand: string | null; expiry: string | null };
+export type InvoiceView = { id: string; periodStart: string; periodEnd: string; users: number; total: number; status: string; paidAt: string | null };
+export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean; card?: CardView | null; invoices?: InvoiceView[] };
 
 const DEMO: SettingsData = {
   departments: [
@@ -116,6 +118,14 @@ export async function getSettingsData(): Promise<SettingsData> {
       if (te) { const d = new Date(te); trialEndsAt = `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`; }
     }
 
+    // Áskrift: skráð kort + reikningar (töflur koma með 0050 — þola að vanta)
+    let card: CardView | null = null; let invoices: InvoiceView[] = [];
+    try {
+      const pm = await supabase.from("payment_methods").select("card_summary, card_brand, card_expiry").eq("company_id", company).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (pm.data) card = { last4: (pm.data.card_summary as string) ?? null, brand: (pm.data.card_brand as string) ?? null, expiry: (pm.data.card_expiry as string) ?? null };
+      const inv = await supabase.from("invoices").select("id, period_start, period_end, users_count, total_amount, status, paid_at").eq("company_id", company).order("period_start", { ascending: false }).limit(24);
+      invoices = (inv.data ?? []).map((r) => ({ id: r.id as string, periodStart: r.period_start as string, periodEnd: r.period_end as string, users: r.users_count as number, total: r.total_amount as number, status: r.status as string, paidAt: (r.paid_at as string) ?? null }));
+    } catch { /* fyrir 0050 */ }
     return {
       departments,
       locations: (locs ?? []).map((l) => ({
@@ -136,7 +146,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       })),
       apiKeys,
       companyId: company,
-      kioskToken,
+      kioskToken, card, invoices,
       company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", phone: c.phone ?? "", email: c.email ?? "", payPeriodStart: ppd, plan, trialEndsAt, billingStatus },
       live: true,
     };

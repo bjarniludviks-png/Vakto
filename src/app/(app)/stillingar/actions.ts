@@ -820,3 +820,24 @@ export async function savePayPeriodStart(day: number): Promise<SettingsResult> {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
+
+
+/** Áskrift: skrá nýtt kort (0 kr greiðslusíða hjá Straumi). Skilar slóð. */
+export async function startCardChange(origin: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const { straumurConfigured, createCardSetupCheckout } = await import("@/lib/straumur");
+    if (!straumurConfigured()) return { ok: false, error: "Kortagreiðslur eru ekki tengdar enn — hafðu samband á hallo@vakto.is." };
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
+    const { data: profile } = await supabase.from("users").select("company_id, role").eq("id", user.id).maybeSingle();
+    if (!profile?.company_id || profile.role !== "owner") return { ok: false, error: "Aðeins stjórnandi getur breytt korti" };
+    const base = /^https?:\/\/[^/]+$/.test(origin) ? origin : (process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is");
+    const { url } = await createCardSetupCheckout(profile.company_id as string, { returnUrl: `${base}/stillingar?tab=askrift&card=1`, email: user.email ?? undefined });
+    return { ok: true, url };
+  } catch (e) {
+    console.error("startCardChange:", e instanceof Error ? e.message : e);
+    return { ok: false, error: "Tókst ekki að opna greiðslusíðuna — reyndu aftur." };
+  }
+}

@@ -22,8 +22,8 @@ export default function TermsPage() {
       <ul>
         <li>Áskrift kostar <b>5.990 kr. á mánuði</b> fyrir fyrirtækið með 5 notendur innifalda og <b>590 kr. á mánuði fyrir hvern notanda umfram 5</b>. Sé greitt árlega fyrirfram er veittur um 15% afsláttur (5.090 kr. + 500 kr. á notanda umfram). Öll verð eru án virðisaukaskatts.</li>
         <li>Notandi er hver starfsmaður eða stjórnandi sem er virkur í kerfinu á reikningstímabilinu. Fjöldi notenda er talinn í lok hvers tímabils.</li>
-        <li>Nýir viðskiptavinir fá <b>14 daga fría prufu</b> með öllu innifalið. Ekki þarf greiðslukort til að byrja. Að prufu lokinni þarf að staðfesta áskrift; annars lokast aðgangurinn en gögn eru varðveitt í 90 daga.</li>
-        <li>Reikningar eru gefnir út mánaðarlega (eða árlega) fyrirfram með 14 daga greiðslufresti. Sé reikningur ekki greiddur eftir áminningu má VAKTO takmarka aðgang þar til greitt er.</li>
+        <li>Nýir viðskiptavinir fá <b>14 daga fría prufu</b> með öllu innifalið. Greiðslukort er skráð við nýskráningu á öruggri greiðslusíðu Straums (Kvika banka); VAKTO geymir aldrei kortanúmer. Ekkert er dregið af kortinu á meðan prufan stendur. Að prufu lokinni hefst áskriftin sjálfkrafa og mánaðargjaldið er tekið af kortinu á gjalddaga, nema áskriftinni hafi verið sagt upp áður.</li>
+        <li>Mánaðargjaldið er tekið af skráðu korti fyrirfram fyrir hvert tímabil og kvittun send í tölvupósti. Takist greiðsla ekki er reynt aftur næstu daga og viðskiptavinur látinn vita; berist greiðsla ekki innan 14 daga má VAKTO loka aðgangi þar til greitt er. Gögn eru varðveitt á meðan.</li>
         <li>VAKTO má breyta verðum með minnst 60 daga fyrirvara; breytingar taka gildi við næsta reikningstímabil eftir fyrirvarann.</li>
       </ul>
 

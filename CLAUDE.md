@@ -225,3 +225,15 @@
   notanda umfram (árlega 5.090 + 500), 14 daga prufa, ekkert kort; nýskráning setur `plan = "vakto"` + prufu
   (ekkert kortaform lengur). Engin eiginleikaþrep. Engar OAuth-þjónustur eru virkjaðar í Supabase svo
   Apple/Google/Microsoft-hnappar voru fjarlægðir.
+- ✅ **Straumur-áskrift (22.9.2026):** kort skráð við nýskráningu á 0 kr greiðslusíðu Straums
+  (`createCardSetupCheckout`, `recurringProcessingModel: Subscription`, `merchantReference = card:<companyId>:<ts>`),
+  token kemur með webhook (`/api/straumur/webhook`, HMAC-SHA256 sannreynt + `Authorization` = webhook-lykill) í
+  `payment_methods`. Daglegur cron `/api/cron/billing` (`src/lib/billing.server.ts`): áminning 3 d fyrir lok prufu,
+  reikningur per mánuð frá `billing_anchor` (= lok prufu) í `invoices` (5.990 + 590×umfram 5 notendur + 24 % VSK),
+  `POST /payment` með tokeninu, endurreynt 3 daga, `billing_status` → paying/unpaid/suspended (middleware lokar
+  `suspended`). Póstar í `src/lib/email.ts` (áminning, kort vantar, kvittun, greiðsla tókst ekki, lokað).
+  Stillingar → Áskrift: kort, „Skipta um kort", reikningar. Migration **0050**. Env: `STRAUMUR_API_KEY`,
+  `STRAUMUR_BASE_URL`, `STRAUMUR_TERMINAL_PAGE` (greiðslusíða), `STRAUMUR_TERMINAL_GATEWAY` (token-greiðslur),
+  `STRAUMUR_WEBHOOK_KEY`, `STRAUMUR_WEBHOOK_HMAC`. Sandkassi: merchant.staging.straumur.is (API-lykill „VAKTO
+  staging", webhook á preview-slóðina). Prófkort: 4111 1111 4555 1142 · 03/2030 · 737. Fyrir prod: nýir lyklar úr
+  live-gáttinni + webhook á vakto.is, sett í Vercel Production-env.

@@ -56,3 +56,43 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
+
+
+/** Skref 2 í nýskráningu: prufan hefst og kúnninn fer á greiðslusíðu Straums til að skrá kort (0 kr).
+ * Skilar slóð á greiðslusíðuna, eða `skip: true` ef Straumur er ekki stilltur (þá beint inn). */
+export async function startCardSetup(origin: string): Promise<{ ok: boolean; url?: string; skip?: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true, skip: true };
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const { straumurConfigured, createCardSetupCheckout } = await import("@/lib/straumur");
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
+    const { data: profile } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
+    const companyId = profile?.company_id as string | undefined;
+    if (!companyId) return { ok: false, error: "Fyrirtæki fannst ekki" };
+    await setCompanyPlan("vakto");
+    if (!straumurConfigured()) return { ok: true, skip: true };
+    const base = /^https?:\/\/[^/]+$/.test(origin) ? origin : (process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is");
+    const { url } = await createCardSetupCheckout(companyId, { returnUrl: `${base}/nyskraning/kort?ok=1`, email: user.email ?? undefined });
+    return { ok: true, url };
+  } catch (e) {
+    console.error("startCardSetup:", e instanceof Error ? e.message : e);
+    return { ok: false, error: "Tókst ekki að opna greiðslusíðuna — reyndu aftur." };
+  }
+}
+
+/** Er kort komið á skrá? (síðan eftir Straum pollar þetta þar til webhook-ið hefur skilað tokeninu) */
+export async function hasCardOnFile(): Promise<{ ok: boolean; card: { last4: string | null; brand: string | null } | null }> {
+  if (!isSupabaseConfigured()) return { ok: true, card: null };
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, card: null };
+    const { data: profile } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
+    if (!profile?.company_id) return { ok: false, card: null };
+    const { data } = await supabase.from("payment_methods").select("card_summary, card_brand").eq("company_id", profile.company_id).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
+    return { ok: true, card: data ? { last4: (data.card_summary as string) ?? null, brand: (data.card_brand as string) ?? null } : null };
+  } catch { return { ok: false, card: null }; }
+}

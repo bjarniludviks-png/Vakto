@@ -6,7 +6,7 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart } from "./actions";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, startCardChange } from "./actions";
 import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
@@ -228,14 +228,38 @@ export default function SettingsScreen({ initialModal = null, data = DEMO_SETTIN
       {section === "askrift" && (
       <div className="card owner-only">
         <div className="ch"><div><div className="ct">{t("Áskrift & greiðslur")}</div><div className="cs">{t("staða áskriftarinnar þinnar")}</div></div>
-          <span className="badge" style={data.company?.billingStatus === "paying" ? { background: "var(--good-soft)", color: "var(--good)" } : { background: "var(--warn-soft)", color: "var(--warn)" }}>
-            {data.company?.billingStatus === "paying" ? t("virk") : data.company?.billingStatus === "suspended" ? t("lokað") : data.company?.billingStatus === "free" ? t("frí") : t("prufa")}
+          <span className="badge" style={data.company?.billingStatus === "paying" ? { background: "var(--good-soft)", color: "var(--good)" } : data.company?.billingStatus === "suspended" || data.company?.billingStatus === "unpaid" ? { background: "var(--bad-soft, #fdecea)", color: "var(--bad)" } : { background: "var(--warn-soft)", color: "var(--warn)" }}>
+            {data.company?.billingStatus === "paying" ? t("virk") : data.company?.billingStatus === "suspended" ? t("lokað") : data.company?.billingStatus === "unpaid" ? t("ógreitt") : data.company?.billingStatus === "free" ? t("frí") : t("prufa")}
           </span>
         </div>
         <div className="cb">
-          <div className="statline"><span className="k">{t("Áskriftarleið")}</span><span className="v">{data.company?.plan ? data.company.plan : "—"}</span></div>
+          <div className="statline"><span className="k">{t("Verð")}</span><span className="v">5.990 kr/mán · 5 notendur · +590 kr á notanda umfram (án VSK)</span></div>
+          <div className="statline"><span className="k">{t("Notendur núna")}</span><span className="v">{data.users.length}</span></div>
           {data.company?.trialEndsAt && <div className="statline"><span className="k">{t("Prufa gildir til")}</span><span className="v">{data.company.trialEndsAt}</span></div>}
-          <p className="muted" style={{ fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>{t("Greiðslur eru afgreiddar handvirkt þar til sjálfvirk kortagreiðsla kemur. Reikningar og breytingar á áskrift: hallo@vakto.is.")}</p>
+          <div className="statline"><span className="k">{t("Kort")}</span><span className="v">{data.card ? `${data.card.brand === "VI" ? "Visa" : data.card.brand === "MC" ? "Mastercard" : (data.card.brand ?? t("Kort"))} •••• ${data.card.last4 ?? "····"}${data.card.expiry ? ` · ${data.card.expiry}` : ""}` : t("Ekkert kort skráð")}</span></div>
+          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+            <button className="btn" onClick={async () => { const r = await startCardChange(window.location.origin); if (r.ok && r.url) window.location.assign(r.url); else toast(r.error ?? t("Tókst ekki")); }}>{data.card ? t("Skipta um kort") : t("Skrá kort")}</button>
+            <a className="btn ghost" href="mailto:hallo@vakto.is?subject=Uppsögn%20áskriftar">{t("Segja upp áskrift")}</a>
+          </div>
+          <p className="muted" style={{ fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>{t("Mánaðargjaldið er tekið af skráða kortinu á gjalddaga og kvittun send í pósti. Kortið er geymt hjá Straumi (Kvika); VAKTO geymir aldrei kortanúmer. Engin binding.")}</p>
+          {(data.invoices?.length ?? 0) > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div className="ct" style={{ fontSize: 13.5, marginBottom: 6 }}>{t("Reikningar")}</div>
+              <table className="tbl" style={{ width: "100%", fontSize: 13 }}>
+                <thead><tr><th>{t("Tímabil")}</th><th>{t("Notendur")}</th><th style={{ textAlign: "right" }}>{t("Upphæð m. VSK")}</th><th>{t("Staða")}</th></tr></thead>
+                <tbody>
+                  {data.invoices!.map((inv) => (
+                    <tr key={inv.id}>
+                      <td>{inv.periodStart} – {inv.periodEnd}</td>
+                      <td>{inv.users}</td>
+                      <td style={{ textAlign: "right" }}>{inv.total.toLocaleString("de-DE")} kr</td>
+                      <td>{inv.status === "paid" ? t("Greitt") : inv.status === "failed" ? t("Greiðsla tókst ekki") : inv.status === "refunded" ? t("Endurgreitt") : t("Í bið")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
       )}

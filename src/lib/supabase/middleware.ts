@@ -104,6 +104,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/v1/") ||
     pathname.startsWith("/api/cron/") ||
     pathname.startsWith("/api/home-chat") ||
+    pathname.startsWith("/api/straumur/") ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
     pathname === "/favicon.ico";

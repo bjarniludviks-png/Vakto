@@ -270,3 +270,86 @@ export async function sendLeaveDecisionEmail(to: string, name: string, approved:
     }),
   });
 }
+
+/* ---------- áskrift & greiðslur (Straumur) ---------- */
+const kr = (n: number) => `${Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")} kr.`;
+
+export async function sendTrialReminderEmail(to: string, company: string, o: { daysLeft: number; hasCard: boolean; total: number; users: number }) {
+  const when = o.daysLeft <= 0 ? "í dag" : o.daysLeft === 1 ? "á morgun" : `eftir ${o.daysLeft} daga`;
+  return sendEmail({
+    to,
+    subject: `Prufan hjá ${company} rennur út ${when}`,
+    html: template({
+      preheader: "Áskriftin heldur áfram sjálfkrafa ef kort er skráð.",
+      heading: `Prufan rennur út ${when}`,
+      body: o.hasCard
+        ? `14 daga prufan fyrir <b>${company}</b> er að ljúka. Áskriftin heldur áfram sjálfkrafa: fyrsta mánaðargjaldið, <b>${kr(o.total)}</b> með VSK fyrir ${o.users} notendur, verður tekið af skráða kortinu á gjalddaga. Þú getur sagt upp hvenær sem er í Stillingum → Áskrift.`
+        : `14 daga prufan fyrir <b>${company}</b> er að ljúka og ekkert kort er skráð. Skráðu kort í Stillingum → Áskrift til að halda áfram; annars lokast aðgangurinn 14 dögum eftir lok prufu. Mánaðargjaldið yrði <b>${kr(o.total)}</b> með VSK fyrir ${o.users} notendur.`,
+      headingEn: `Your trial ends ${o.daysLeft <= 0 ? "today" : o.daysLeft === 1 ? "tomorrow" : `in ${o.daysLeft} days`}`,
+      bodyEn: o.hasCard
+        ? `The 14-day trial for <b>${company}</b> is ending. Your subscription continues automatically: the first monthly charge, <b>${kr(o.total)}</b> incl. VAT for ${o.users} users, will be taken from the card on file. Cancel any time in Settings → Subscription.`
+        : `The 14-day trial for <b>${company}</b> is ending and no card is on file. Add a card in Settings → Subscription to continue; otherwise access closes 14 days after the trial ends.`,
+      ctaLabel: "Opna Áskrift", ctaLabelEn: "Open Subscription", ctaHref: `${APP_URL}/stillingar?tab=askrift`,
+    }),
+  });
+}
+
+export async function sendCardMissingEmail(to: string, company: string, why: "expired" | "disabled") {
+  return sendEmail({
+    to,
+    subject: why === "disabled" ? `Kortið hjá ${company} er ekki lengur virkt` : `Prufan hjá ${company} er búin — skráðu kort`,
+    html: template({
+      preheader: "Skráðu kort til að halda VAKTO opnu.",
+      heading: why === "disabled" ? "Kortið er ekki lengur virkt" : "Prufan er búin",
+      body: `${why === "disabled" ? "Skráða kortið fyrir" : "14 daga prufan fyrir"} <b>${company}</b> ${why === "disabled" ? "er ekki lengur gilt" : "er lokið og ekkert kort er skráð"}. Skráðu kort í Stillingum → Áskrift svo áskriftin haldi áfram. Aðgangurinn lokast 14 dögum síðar ef ekkert kort er skráð, en gögnin þín eru geymd.`,
+      headingEn: why === "disabled" ? "Your card is no longer valid" : "Your trial has ended",
+      bodyEn: `Add a card in Settings → Subscription to keep <b>${company}</b> running. Access closes 14 days later if no card is on file; your data is kept.`,
+      ctaLabel: "Skrá kort", ctaLabelEn: "Add a card", ctaHref: `${APP_URL}/stillingar?tab=askrift`,
+    }),
+  });
+}
+
+export async function sendReceiptEmail(to: string, company: string, o: { total: number; periodStart: string; periodEnd: string }) {
+  return sendEmail({
+    to,
+    subject: `Kvittun: VAKTO áskrift ${company} — ${kr(o.total)}`,
+    html: template({
+      preheader: "Mánaðargjaldið var tekið af skráða kortinu.",
+      heading: "Takk fyrir",
+      body: `Mánaðargjald VAKTO fyrir <b>${company}</b>, tímabilið ${o.periodStart} – ${o.periodEnd}, <b>${kr(o.total)}</b> með VSK, var tekið af skráða kortinu. Reikninginn finnurðu í Stillingum → Áskrift. VAKTO ehf., kt. 490806-0400.`,
+      headingEn: "Thank you",
+      bodyEn: `The VAKTO monthly fee for <b>${company}</b>, ${o.periodStart} – ${o.periodEnd}, <b>${kr(o.total)}</b> incl. VAT, was charged to the card on file. Invoices are in Settings → Subscription.`,
+      ctaLabel: "Sjá reikninga", ctaLabelEn: "View invoices", ctaHref: `${APP_URL}/stillingar?tab=askrift`,
+    }),
+  });
+}
+
+export async function sendPaymentFailedEmail(to: string, company: string, total: number) {
+  return sendEmail({
+    to,
+    subject: `Greiðsla tókst ekki — VAKTO áskrift ${company}`,
+    html: template({
+      preheader: "Við reynum aftur næstu daga. Athugaðu kortið.",
+      heading: "Greiðslan tókst ekki",
+      body: `Ekki tókst að taka <b>${kr(total)}</b> af skráða kortinu fyrir <b>${company}</b>. Við reynum aftur næstu þrjá daga. Ef kortið er útrunnið eða lokað, skráðu nýtt kort í Stillingum → Áskrift. Aðgangurinn lokast ef greiðsla berst ekki innan 14 daga.`,
+      headingEn: "Payment failed",
+      bodyEn: `We could not charge <b>${kr(total)}</b> to the card on file for <b>${company}</b>. We will retry over the next three days. If the card has expired or been blocked, add a new one in Settings → Subscription.`,
+      ctaLabel: "Skoða kort", ctaLabelEn: "Check card", ctaHref: `${APP_URL}/stillingar?tab=askrift`,
+    }),
+  });
+}
+
+export async function sendSuspendedEmail(to: string, company: string) {
+  return sendEmail({
+    to,
+    subject: `Aðgangi ${company} að VAKTO hefur verið lokað`,
+    html: template({
+      preheader: "Skráðu kort til að opna aftur — gögnin eru geymd.",
+      heading: "Aðganginum hefur verið lokað",
+      body: `Greiðsla fyrir <b>${company}</b> hefur ekki borist og aðganginum hefur verið lokað tímabundið. Gögnin þín eru geymd í 90 daga. Skráðu kort eða hafðu samband á hallo@vakto.is og við opnum strax aftur.`,
+      headingEn: "Access has been suspended",
+      bodyEn: `Payment for <b>${company}</b> has not been received and access is temporarily suspended. Your data is kept for 90 days. Add a card or contact hallo@vakto.is and we will reopen right away.`,
+      ctaLabel: "Hafa samband", ctaLabelEn: "Contact us", ctaHref: "mailto:hallo@vakto.is",
+    }),
+  });
+}

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { createOwnerAccount, setCompanyPlan } from "./actions";
+import { createOwnerAccount, startCardSetup } from "./actions";
 
 const PLAN = { id: "vakto", price: "5.990", per: "kr/mán · 5 notendur innifaldir", extra: "+590 kr á hvern notanda umfram · árlega 5.090 + 500" };
 
@@ -44,11 +44,12 @@ export default function SignupForm() {
 
   async function finish(e: React.FormEvent) {
     e.preventDefault();
-    // No card at signup: the 14-day trial starts here. Billing is set up in
-    // Stillingar → Áskrift when the trial ends.
-    setBusy(true);
-    await setCompanyPlan(PLAN.id);
-    window.location.assign("/maelabord");
+    // Prufan hefst núna. Kortið er skráð hjá Straumi (0 kr) og fyrsta gjaldið
+    // tekið þegar prufan er búin — eða beint inn ef greiðslur eru ekki tengdar.
+    setBusy(true); setError(null);
+    const r = await startCardSetup(window.location.origin);
+    if (!r.ok) { setError(r.error ?? "Tókst ekki"); setBusy(false); return; }
+    window.location.assign(r.skip ? "/maelabord" : r.url!);
   }
 
   if (step === "card") {
@@ -59,20 +60,20 @@ export default function SignupForm() {
           <span className="done">1 · Aðgangur</span><span className="sep">→</span><span className="cur">2 · Prufa</span>
         </div>
         <h1>14 daga frí prufa</h1>
-        <div className="sub">Allt innifalið frá fyrsta degi. Ekkert kort, engin binding.</div>
+        <div className="sub">Skráðu kort núna — ekkert er dregið fyrr en prufan er búin, og þú getur hætt hvenær sem er.</div>
 
         <div className="planpick" style={{ gridTemplateColumns: "1fr" }}>
           <div className="planopt on" style={{ cursor: "default" }}>
             <div className="pn">VAKTO</div>
             <div className="pp">{PLAN.price} kr <small>{PLAN.per}</small></div>
             <div className="pb">{PLAN.extra}</div>
-            <div className="pb">Verð án VSK · reikningur eftir prufuna ef þú heldur áfram</div>
+            <div className="pb">Verð án VSK · fyrsta gjaldið er tekið eftir 14 daga · kvittun í pósti</div>
           </div>
         </div>
 
         {error && <div style={{ color: "var(--bad)", fontSize: 13, fontWeight: 600, marginBottom: 14 }}>{error}</div>}
-        <button className="btn" type="submit" disabled={busy}>{busy ? "Opna…" : "Byrja prufuna"}</button>
-        <p className="pcy">Þú færð póst áður en prufan rennur út · hættu hvenær sem er í Stillingum</p>
+        <button className="btn" type="submit" disabled={busy}>{busy ? "Opna greiðslusíðu…" : "Skrá kort og byrja prufuna"}</button>
+        <p className="pcy">Kortið er skráð hjá Straumi (Kvika) á öruggri greiðslusíðu · VAKTO geymir aldrei kortanúmer · hættu hvenær sem er í Stillingum</p>
       </form>
     );
   }

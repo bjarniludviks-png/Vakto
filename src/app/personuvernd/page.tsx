@@ -51,6 +51,7 @@ export default function PrivacyPage() {
           <tr><td>Supabase Inc.</td><td>Gagnagrunnur, auðkenning, skráageymsla, rauntímatengingar</td><td>ESB (Írland)</td></tr>
           <tr><td>Vercel Inc.</td><td>Hýsing vefsins og keyrsla kerfisins</td><td>ESB (Dublin); stýrilag í Bandaríkjunum undir stöðluðum samningsskilmálum (SCC)</td></tr>
           <tr><td>Resend Inc.</td><td>Sending tölvupósta úr kerfinu</td><td>Bandaríkin/ESB undir SCC</td></tr>
+          <tr><td>Straumur (Kvika banki hf.)</td><td>Greiðslusíða og kortageymsla (tokenization) fyrir áskriftargjöld. Kortanúmer fara aldrei um kerfi VAKTO; VAKTO geymir aðeins tilvísun (token), síðustu fjóra tölustafi og gildistíma.</td><td>Ísland</td></tr>
           <tr><td>Anthropic PBC</td><td>Gervigreind: svör spjallsins á heimasíðunni og tillögur að vaktaplani (aðeins þegar stjórnandi biður um það). Gögn eru ekki notuð til að þjálfa líkön.</td><td>Bandaríkin undir SCC</td></tr>
           <tr><td>Apple Inc. / Google LLC</td><td>Wallet-skírteini, eingöngu ef starfsmaður velur að bæta skírteininu í veskið sitt</td><td>Samkvæmt skilmálum Apple/Google</td></tr>
         </tbody>
