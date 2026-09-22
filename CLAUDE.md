@@ -237,3 +237,6 @@
   `STRAUMUR_WEBHOOK_KEY`, `STRAUMUR_WEBHOOK_HMAC`. Sandkassi: merchant.staging.straumur.is (API-lykill „VAKTO
   staging", webhook á preview-slóðina). Prófkort: 4111 1111 4555 1142 · 03/2030 · 737. Fyrir prod: nýir lyklar úr
   live-gáttinni + webhook á vakto.is, sett í Vercel Production-env.
+  `CRON_SECRET` er sett á Vercel (preview+production) svo cron-endapunktar taki aðeins við köllum frá Vercel Cron
+  (`Authorization: Bearer <CRON_SECRET>`). Sannreynt e2e á staging 22.9.2026: kort skráð (Visa •••• 1142, prófkort),
+  Tokenization-webhook → payment_methods, cron → reikningur 7.428 kr (5.990 + VSK) → Authorised → paid, kvittun send.
