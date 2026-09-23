@@ -1,21 +1,28 @@
-// Spjallþráður — skilaboð + sending, pollar á 4 s (eins og vefurinn).
-import React, { useCallback, useRef, useState } from "react";
-import {
-  View,
-  TextInput,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-} from "react-native";
+// Spjallþráður — realtime, skilaboð flokkuð eftir sendanda, viðbrögð með
+// löngu ýti, „séð af“, svar í þræði, skrifar-vísir.
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { View, TextInput, FlatList, KeyboardAvoidingView, Platform, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ArrowLeft, Send } from "lucide-react-native";
+import { ChevronLeft, Send, X, Hash, CornerUpLeft, Trash2 } from "lucide-react-native";
 import { Image } from "expo-image";
-import { Txt, Muted, Avatar } from "../../src/components/ui";
-import { colors, radius, font } from "../../src/theme";
+import { Txt, Muted, Avatar, Sheet, Row } from "../../src/components/ui";
+import { colors, font } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listMessages, sendChatMessage, type ChatMessage } from "../../src/lib/api/chat";
+import { listMessages, sendChatMessage, markChannelRead, setReaction, deleteMessage, subscribeChat, typingChannel, peopleMap, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
+import { supabase } from "../../src/lib/supabase";
+
+const EMOJI = ["❤️", "👍", "😂", "🙏", "🔥", "👀"];
+
+type RowItem = { key: string; kind: "sep"; label: string } | { key: string; kind: "msg"; m: ChatMessage; first: boolean; last: boolean; showSender: boolean };
+
+function dayLabel(iso: string): string {
+  const d = new Date(iso), now = new Date();
+  if (d.toDateString() === now.toDateString()) return "Í dag";
+  const y = new Date(now); y.setDate(y.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return "Í gær";
+  return `${["Sunnudagur", "Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur"][d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}`;
+}
 
 export default function Thread() {
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
@@ -23,156 +30,200 @@ export default function Thread() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
+  const [reads, setReads] = useState<ChannelRead[]>([]);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [sel, setSel] = useState<ChatMessage | null>(null);
+  const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  const [typing, setTyping] = useState<string | null>(null);
+  const [members, setMembers] = useState(0);
+  const [isGroup, setIsGroup] = useState(true);
   const list = useRef<FlatList>(null);
+  const typingRef = useRef<ReturnType<typeof typingChannel> | null>(null);
+  const lastTyped = useRef(0);
 
   const load = useCallback(async () => {
     if (!me || !id) return;
-    setMsgs(await listMessages(me, id));
+    const r = await listMessages(me, id);
+    setMsgs(r.messages);
+    setReads(r.reads);
+    markChannelRead(id).catch(() => {});
   }, [me, id]);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-      const t = setInterval(load, 4000);
-      return () => clearInterval(t);
-    }, [load])
-  );
+  useFocusEffect(useCallback(() => {
+    load();
+    supabase.from("channels").select("kind").eq("id", id).maybeSingle().then(async ({ data }) => {
+      setIsGroup(data?.kind !== "dm");
+      if (data?.kind === "general" && me) { const { count } = await supabase.from("employees").select("id", { count: "exact", head: true }).eq("company_id", me.companyId).not("user_id", "is", null); setMembers(count ?? 0); }
+      else { const { count } = await supabase.from("channel_members").select("user_id", { count: "exact", head: true }).eq("channel_id", id); setMembers(count ?? 0); }
+    });
+  }, [load, id, me]));
+
+  // realtime: nýtt skilaboð → mála strax, endurhlaða svo til að fá nöfn/viðbrögð
+  useEffect(() => {
+    if (!me || !id) return;
+    let t: ReturnType<typeof setTimeout> | null = null;
+    const ch = subscribeChat(async (row) => {
+      if (row.channel_id !== id) return;
+      const people = await peopleMap(me.companyId);
+      const { data: auth } = await supabase.auth.getUser();
+      const p = people.get(row.sender_id);
+      const full = p?.name ?? "Notandi";
+      setMsgs((cur) => cur.some((m) => m.id === row.id) ? cur : [...cur, {
+        id: row.id, senderId: row.sender_id, sender: full.split(/\s+/)[0], senderFull: full, color: p?.color ?? null, photo: p?.photo ?? null,
+        me: row.sender_id === auth.user?.id, body: row.body ?? "", at: new Date(row.created_at).toTimeString().slice(0, 5), createdAt: row.created_at,
+        kind: (row.kind ?? "text") as ChatMessage["kind"], url: row.attachment_url, reactions: [], replyTo: null,
+      }]);
+      setTyping(null);
+      if (t) clearTimeout(t);
+      t = setTimeout(load, 500);
+    }, () => { if (t) clearTimeout(t); t = setTimeout(load, 400); });
+    typingRef.current = typingChannel(id, (p) => { if (p.stop) setTyping(null); else { setTyping(p.name); setTimeout(() => setTyping((cur) => (cur === p.name ? null : cur)), 4000); } });
+    const poll = setInterval(load, 15000);
+    return () => { ch.unsubscribe(); typingRef.current?.unsubscribe(); clearInterval(poll); if (t) clearTimeout(t); };
+  }, [me, id, load]);
+
+  function onType(v: string) {
+    setText(v);
+    const now = Date.now();
+    if (now - lastTyped.current > 2500 && me) {
+      lastTyped.current = now;
+      typingRef.current?.send({ type: "broadcast", event: "typing", payload: { userId: me.empId, name: me.fullName.split(/\s+/)[0] } });
+    }
+  }
 
   async function send() {
     const body = text.trim();
     if (!me || !id || !body || sending) return;
     setSending(true);
     setText("");
-    await sendChatMessage(me, id, body);
-    await load();
+    const rt = replyTo; setReplyTo(null);
+    // optimistic
+    const tmp: ChatMessage = { id: "tmp-" + Date.now(), senderId: "me", sender: me.fullName.split(/\s+/)[0], senderFull: me.fullName, color: me.avatarColor, photo: me.photoUrl, me: true, body, at: new Date().toTimeString().slice(0, 5), createdAt: new Date().toISOString(), kind: "text", url: null, reactions: [], replyTo: rt ? { sender: rt.sender, body: rt.body } : null };
+    setMsgs((cur) => [...cur, tmp]);
+    const r = await sendChatMessage(me, id, body, rt?.id ?? null);
     setSending(false);
-    list.current?.scrollToEnd({ animated: true });
+    if (!r.ok) { setMsgs((cur) => cur.filter((m) => m.id !== tmp.id)); setText(body); return; }
+    setMsgs((cur) => cur.map((m) => (m.id === tmp.id ? { ...m, id: r.id ?? m.id } : m)));
+    typingRef.current?.send({ type: "broadcast", event: "typing", payload: { userId: me.empId, name: "", stop: true } });
   }
 
+  const rows = useMemo<RowItem[]>(() => {
+    const out: RowItem[] = [];
+    let prevDay = "";
+    msgs.forEach((m, i) => {
+      const day = new Date(m.createdAt).toDateString();
+      if (day !== prevDay) { out.push({ key: "sep-" + day, kind: "sep", label: dayLabel(m.createdAt) }); prevDay = day; }
+      const prev = msgs[i - 1], next = msgs[i + 1];
+      const sameDayPrev = prev && new Date(prev.createdAt).toDateString() === day;
+      const first = !prev || prev.senderId !== m.senderId || !sameDayPrev || new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() > 10 * 60000;
+      const last = !next || next.senderId !== m.senderId || new Date(next.createdAt).getTime() - new Date(m.createdAt).getTime() > 10 * 60000;
+      out.push({ key: m.id, kind: "msg", m, first, last, showSender: first && !m.me && isGroup });
+    });
+    return out;
+  }, [msgs, isGroup]);
+
+  // „séð af“: aðrir sem hafa lesið eftir mín síðustu skilaboð
+  const lastMine = [...msgs].reverse().find((m) => m.me);
+  const seenBy = lastMine ? reads.filter((r) => r.lastReadAt >= lastMine.createdAt) : [];
+
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: colors.bg, paddingTop: insets.top }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 12,
-          paddingHorizontal: 18,
-          paddingVertical: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.line,
-          backgroundColor: colors.panel,
-        }}
-      >
-        <Pressable onPress={() => router.back()} hitSlop={10}>
-          <ArrowLeft color={colors.ink} size={22} />
-        </Pressable>
-        <Txt weight="semibold" size={17}>
-          {name ?? "Spjall"}
-        </Txt>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 8, paddingTop: insets.top + 4, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.line2, backgroundColor: colors.panel }}>
+        <Pressable onPress={() => router.back()} hitSlop={10} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}><ChevronLeft color={colors.ink} size={26} /></Pressable>
+        {isGroup ? <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={18} /></View> : <Avatar name={name ?? "?"} size={36} />}
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Txt weight="bold" size={15} numberOfLines={1}>{name ?? "Spjall"}</Txt>
+          <Muted size={12}>{typing ? `${typing} skrifar…` : isGroup ? `${members || "—"} meðlimir` : "Einkaspjall"}</Muted>
+        </View>
       </View>
 
       <FlatList
         ref={list}
-        data={msgs}
-        keyExtractor={(m) => m.id}
-        contentContainerStyle={{ padding: 16, gap: 10 }}
+        data={rows}
+        keyExtractor={(r) => r.key}
+        contentContainerStyle={{ padding: 14, paddingBottom: 8 }}
         onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
-        renderItem={({ item: m }) => (
-          <View
-            style={{
-              flexDirection: "row",
-              gap: 8,
-              alignSelf: m.me ? "flex-end" : "flex-start",
-              maxWidth: "82%",
-            }}
-          >
-            {!m.me ? <Avatar name={m.sender} size={28} /> : null}
-            <View
-              style={{
-                backgroundColor: m.me ? colors.brand : colors.panel,
-                borderRadius: radius.card,
-                borderWidth: m.me ? 0 : 1,
-                borderColor: colors.line,
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-              }}
-            >
-              {!m.me ? (
-                <Txt weight="semibold" size={11} color={colors.brandDeep}>
-                  {m.sender}
-                </Txt>
-              ) : null}
-              {m.kind === "image" && m.url ? (
-                <Image
-                  source={{ uri: m.url }}
-                  style={{ width: 200, height: 150, borderRadius: 8, marginVertical: 4 }}
-                  contentFit="cover"
-                />
-              ) : null}
-              {m.body ? (
-                <Txt size={14} color={m.me ? "#fff" : colors.ink}>
-                  {m.body}
-                </Txt>
-              ) : null}
-              <Txt size={10} color={m.me ? "#ffffffaa" : colors.ink3} style={{ marginTop: 2 }}>
-                {m.at}
-              </Txt>
-            </View>
+        ListFooterComponent={
+          <View style={{ gap: 6 }}>
+            {typing ? <View style={{ alignSelf: "flex-start", marginLeft: 34, backgroundColor: colors.bubbleThem, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 }}><Muted size={13}>•••</Muted></View> : null}
+            {seenBy.length ? <View style={{ flexDirection: "row", alignSelf: "flex-end", gap: 2, marginTop: 4 }}>{seenBy.slice(0, 5).map((r) => <Avatar key={r.userId} name={r.name} size={16} />)}</View> : null}
           </View>
-        )}
+        }
+        renderItem={({ item }) =>
+          item.kind === "sep" ? (
+            <Txt weight="bold" size={11} color={colors.ink3} style={{ alignSelf: "center", marginVertical: 10, letterSpacing: 0.6, textTransform: "uppercase" }}>{item.label}</Txt>
+          ) : (
+            <Bubble item={item} onLong={() => setSel(item.m)} />
+          )
+        }
       />
 
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "flex-end",
-          gap: 10,
-          padding: 12,
-          paddingBottom: Math.max(12, insets.bottom),
-          backgroundColor: colors.panel,
-          borderTopWidth: 1,
-          borderTopColor: colors.line,
-        }}
-      >
+      {replyTo ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: colors.panel, borderTopWidth: 1, borderTopColor: colors.line2 }}>
+          <CornerUpLeft color={colors.ink3} size={16} />
+          <View style={{ flex: 1 }}><Txt weight="bold" size={12} color={colors.brandDeep}>Svara {replyTo.sender}</Txt><Muted size={12}>{replyTo.body.slice(0, 80)}</Muted></View>
+          <Pressable onPress={() => setReplyTo(null)} hitSlop={8}><X color={colors.ink3} size={18} /></Pressable>
+        </View>
+      ) : null}
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 10, paddingTop: 8, paddingBottom: Math.max(10, insets.bottom), backgroundColor: colors.panel, borderTopWidth: replyTo ? 0 : 1, borderTopColor: colors.line2 }}>
         <TextInput
-          style={{
-            flex: 1,
-            borderWidth: 1,
-            borderColor: colors.line,
-            borderRadius: radius.pill,
-            paddingHorizontal: 14,
-            paddingVertical: 9,
-            fontSize: 14,
-            fontFamily: font.regular,
-            color: colors.ink,
-            maxHeight: 100,
-          }}
-          multiline
-          value={text}
-          onChangeText={setText}
-          placeholder="Skrifaðu skilaboð…"
-          placeholderTextColor={colors.ink3}
+          style={{ flex: 1, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.panel2, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: font.regular, color: colors.ink, maxHeight: 110 }}
+          multiline value={text} onChangeText={onType} placeholder="Skrifaðu skilaboð…" placeholderTextColor={colors.ink3} blurOnSubmit={false}
         />
-        <Pressable
-          onPress={send}
-          disabled={!text.trim() || sending}
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 20,
-            backgroundColor: text.trim() ? colors.brand : colors.line2,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
+        <Pressable onPress={send} disabled={!text.trim() || sending} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: text.trim() ? colors.brand : colors.line2, alignItems: "center", justifyContent: "center" }}>
           <Send color={text.trim() ? "#fff" : colors.ink3} size={18} />
         </Pressable>
       </View>
+
+      <Sheet open={!!sel} onClose={() => setSel(null)} scroll={false}>
+        <View style={{ flexDirection: "row", justifyContent: "center", gap: 6, paddingBottom: 6 }}>
+          {EMOJI.map((e) => {
+            const mine = sel?.reactions.find((r) => r.emoji === e)?.mine;
+            return (
+              <Pressable key={e} onPress={async () => { if (!me || !sel) return; await setReaction(me, sel.id, mine ? null : e); setSel(null); load(); }} style={{ backgroundColor: mine ? colors.brandSoft : colors.panel2, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7 }}>
+                <Txt size={20}>{e}</Txt>
+              </Pressable>
+            );
+          })}
+        </View>
+        <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
+          <Row icon={<CornerUpLeft color={colors.ink2} size={19} />} title="Svara" onPress={() => { setReplyTo(sel); setSel(null); }} chevron={false} last={!sel?.me} />
+          {sel?.me ? <Row icon={<Trash2 color={colors.bad} size={19} />} title="Eyða skilaboðum" danger onPress={async () => { if (sel) await deleteMessage(sel.id); setSel(null); load(); }} chevron={false} last /> : null}
+        </View>
+      </Sheet>
     </KeyboardAvoidingView>
+  );
+}
+
+function Bubble({ item, onLong }: { item: Extract<RowItem, { kind: "msg" }>; onLong: () => void }) {
+  const { m, first, last, showSender } = item;
+  const r = 18, s = 6;
+  const radius = m.me
+    ? { borderTopLeftRadius: r, borderBottomLeftRadius: r, borderTopRightRadius: first ? r : s, borderBottomRightRadius: last ? r : s }
+    : { borderTopRightRadius: r, borderBottomRightRadius: r, borderTopLeftRadius: first ? r : s, borderBottomLeftRadius: last ? r : s };
+  return (
+    <View style={{ marginBottom: m.reactions.length ? 14 : last ? 8 : 2 }}>
+      {showSender ? <Txt size={11} weight="semibold" color={colors.ink3} style={{ marginLeft: 42, marginBottom: 2 }}>{m.senderFull}</Txt> : null}
+      <View style={{ flexDirection: m.me ? "row-reverse" : "row", alignItems: "flex-end", gap: 8, maxWidth: "86%", alignSelf: m.me ? "flex-end" : "flex-start" }}>
+        {!m.me ? <View style={{ width: 26, opacity: last ? 1 : 0 }}><Avatar name={m.senderFull} size={26} color={m.color} photo={m.photo} /></View> : null}
+        <Pressable onLongPress={onLong} delayLongPress={250} style={{ backgroundColor: m.me ? colors.brand : colors.bubbleThem, paddingHorizontal: 13, paddingVertical: 9, ...radius, position: "relative", flexShrink: 1 }}>
+          {m.replyTo ? (
+            <View style={{ borderLeftWidth: 2, borderLeftColor: m.me ? "rgba(255,255,255,.6)" : colors.brand, paddingLeft: 8, marginBottom: 6 }}>
+              <Txt size={11.5} weight="bold" color={m.me ? "rgba(255,255,255,.9)" : colors.brandDeep}>{m.replyTo.sender}</Txt>
+              <Txt size={12.5} color={m.me ? "rgba(255,255,255,.85)" : colors.ink2} numberOfLines={2}>{m.replyTo.body}</Txt>
+            </View>
+          ) : null}
+          {m.kind === "image" && m.url ? <Image source={{ uri: m.url }} style={{ width: 210, height: 150, borderRadius: 12, marginBottom: m.body ? 6 : 0 }} contentFit="cover" /> : null}
+          {m.body ? <Txt size={15} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 20 }}>{m.body}</Txt> : null}
+          {m.reactions.length ? (
+            <View style={{ position: "absolute", bottom: -12, [m.me ? "left" : "right"]: 8, flexDirection: "row", backgroundColor: colors.panel, borderRadius: 999, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 6, paddingVertical: 1, gap: 3 }}>
+              {m.reactions.map((x) => <Txt key={x.emoji} size={12}>{x.emoji}{x.count > 1 ? ` ${x.count}` : ""}</Txt>)}
+            </View>
+          ) : null}
+        </Pressable>
+        {last ? <Txt size={10.5} color={colors.ink3} style={{ marginBottom: 2 }}>{m.at}</Txt> : null}
+      </View>
+    </View>
   );
 }

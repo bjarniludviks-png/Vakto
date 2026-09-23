@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { View, ActivityIndicator } from "react-native";
 import { AuthProvider, useAuth } from "../src/lib/auth";
 import { MeProvider } from "../src/lib/me-context";
+import { ToastProvider } from "../src/components/ui";
 import { colors } from "../src/theme";
 
 function Gate({ children }: { children: React.ReactNode }) {
@@ -43,13 +44,10 @@ export default function RootLayout() {
     <AuthProvider>
       <Gate>
         <MeProvider>
-          <StatusBar style="dark" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.bg },
-            }}
-          />
+          <ToastProvider>
+            <StatusBar style="dark" />
+            <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+          </ToastProvider>
         </MeProvider>
       </Gate>
     </AuthProvider>

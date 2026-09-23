@@ -1,124 +1,82 @@
-// Meira — prófíll, skírteini, skjalasafn, útskráning.
-import React from "react";
+// Ég — laun, skírteini, skjöl, beiðnir, tímar, samstarfsfólk, stillingar, útskráning.
+import React, { useCallback, useState } from "react";
 import { View, Pressable, Alert } from "react-native";
-import { useRouter } from "expo-router";
-import {
-  IdCard,
-  FolderOpen,
-  UserRound,
-  FileText,
-  LogOut,
-  ChevronRight,
-} from "lucide-react-native";
-import { Screen } from "../../src/components/screen";
-import { Card, Txt, Muted, Avatar } from "../../src/components/ui";
+import { useRouter, useFocusEffect } from "expo-router";
+import { IdCard, FolderOpen, FileText, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight } from "lucide-react-native";
+import { Screen, IconBtn } from "../../src/components/screen";
+import { Txt, Muted, Avatar, List, Row, IconBox, Eyebrow, Bar, Pill, iconColor } from "../../src/components/ui";
 import { colors } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { supabase } from "../../src/lib/supabase";
+import { getMonthPay } from "../../src/lib/api/home";
+import { listMyRequests } from "../../src/lib/api/requests";
+import type { MonthPay } from "../../src/lib/api/pay";
+import { kr, dec1 } from "../../src/lib/format";
+import { unregisterPush } from "../../src/lib/push";
 
-function MenuRow({
-  icon,
-  label,
-  hint,
-  onPress,
-  danger,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  hint?: string;
-  onPress: () => void;
-  danger?: boolean;
-}) {
-  return (
-    <Pressable onPress={onPress}>
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 12,
-          paddingVertical: 13,
-        }}
-      >
-        {icon}
-        <View style={{ flex: 1 }}>
-          <Txt weight="medium" size={15} color={danger ? colors.bad : colors.ink}>
-            {label}
-          </Txt>
-          {hint ? <Muted size={12}>{hint}</Muted> : null}
-        </View>
-        {!danger ? <ChevronRight color={colors.ink3} size={18} /> : null}
-      </View>
-    </Pressable>
-  );
-}
-
-export default function Meira() {
+export default function Eg() {
   const { me } = useMe();
   const router = useRouter();
+  const [pay, setPay] = useState<MonthPay | null>(null);
+  const [pending, setPending] = useState(0);
+  const [reqCount, setReqCount] = useState(0);
+
+  useFocusEffect(useCallback(() => {
+    if (!me) return;
+    getMonthPay(me).then(setPay).catch(() => {});
+    listMyRequests(me).then((r) => { setReqCount(r.length); setPending(r.filter((x) => x.status === "pending").length); }).catch(() => {});
+  }, [me]));
+
+  const pct = pay && pay.projectedKr > 0 ? pay.earnedKr / pay.projectedKr : 0;
 
   return (
-    <Screen title="Meira">
+    <Screen title="Ég" right={<IconBtn label="Stillingar" onPress={() => router.push("/stillingar")}><Settings color={colors.ink} size={22} /></IconBtn>}>
       {me ? (
-        <Card style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
-          <Avatar name={me.fullName} size={52} />
+        <Pressable onPress={() => router.push("/profill")} style={{ flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 2, paddingVertical: 4 }}>
+          <Avatar name={me.fullName} size={56} color={me.avatarColor} photo={me.photoUrl} />
           <View style={{ flex: 1 }}>
-            <Txt weight="semibold" size={17}>
-              {me.fullName}
-            </Txt>
+            <Txt weight="bold" size={20} style={{ letterSpacing: -0.4 }}>{me.fullName}</Txt>
             <Muted>{[me.title, me.department].filter(Boolean).join(" · ") || "Starfsmaður"}</Muted>
           </View>
-        </Card>
+          <ChevronRight color={colors.ink3} size={20} />
+        </Pressable>
       ) : null}
 
-      <Card style={{ paddingVertical: 4 }}>
-        <MenuRow
-          icon={<UserRound color={colors.ink2} size={20} />}
-          label="Prófíllinn minn"
-          hint="Sími, netfang, bankareikningur"
-          onPress={() => router.push("/profill")}
-        />
-        <View style={{ height: 1, backgroundColor: colors.line2 }} />
-        <MenuRow
-          icon={<IdCard color={colors.ink2} size={20} />}
-          label="Starfsmannaskírteini"
-          hint="Skírteinið þitt með mynd"
-          onPress={() => router.push("/skirteini")}
-        />
-        <View style={{ height: 1, backgroundColor: colors.line2 }} />
-        <MenuRow
-          icon={<FolderOpen color={colors.ink2} size={20} />}
-          label="Skjalasafn"
-          hint="HACCP, handbækur og skjölin þín"
-          onPress={() => router.push("/skjol")}
-        />
-        <View style={{ height: 1, backgroundColor: colors.line2 }} />
-        <MenuRow
-          icon={<FileText color={colors.ink2} size={20} />}
-          label="Ráðningarsamningur"
-          hint="Samningurinn þinn"
-          onPress={() => router.push("/samningur")}
-        />
-      </Card>
+      {/* laun */}
+      <Pressable onPress={() => router.push("/laun")} style={({ pressed }) => ({ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, padding: 16, gap: 10, opacity: pressed ? 0.9 : 1 })}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          <Eyebrow>Laun · {pay?.monthLabel ?? "…"}</Eyebrow>
+          {pay ? <Pill tone="good" label={`Greitt ${pay.payday}`} /> : null}
+        </View>
+        <View>
+          <Txt weight="bold" size={34} style={{ letterSpacing: -0.8, lineHeight: 38, fontVariant: ["tabular-nums"] }}>{pay ? kr(pay.earnedKr) : "—"}</Txt>
+          <Muted>{pay ? `unnið hingað til · ${dec1(pay.earnedH)} klst · ${pay.shifts} ${pay.shifts === 1 ? "vakt" : "vaktir"}` : "sæki…"}</Muted>
+        </View>
+        <Bar value={pct} />
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Muted>Áætlað í mánaðarlok</Muted>
+          <Txt weight="bold" size={14} style={{ fontVariant: ["tabular-nums"] }}>{pay ? kr(pay.projectedKr) : "—"}</Txt>
+        </View>
+      </Pressable>
 
-      <Card style={{ paddingVertical: 4 }}>
-        <MenuRow
-          danger
-          icon={<LogOut color={colors.bad} size={20} />}
-          label="Skrá út"
-          onPress={() =>
-            Alert.alert("Skrá út", "Viltu skrá þig út?", [
-              { text: "Hætta við", style: "cancel" },
-              {
-                text: "Skrá út",
-                style: "destructive",
-                onPress: () => supabase.auth.signOut(),
-              },
-            ])
-          }
-        />
-      </Card>
+      <List>
+        <Row icon={<IconBox tone="brand"><IdCard color={iconColor("brand")} size={19} /></IconBox>} title="Starfsmannaskírteini" sub="Sýna eða bæta í Wallet" onPress={() => router.push("/skirteini")} />
+        <Row icon={<IconBox tone="info"><FolderOpen color={iconColor("info")} size={19} /></IconBox>} title="Skjöl" sub="Ráðningarsamningur, HACCP, handbækur" onPress={() => router.push("/skjol")} />
+        <Row icon={<IconBox tone="good"><CheckCircle2 color={iconColor("good")} size={19} /></IconBox>} title="Beiðnir" sub={reqCount ? `${pending} í bið · ${reqCount} alls` : "Frí, vaktaskipti, leiðréttingar"} onPress={() => router.push("/beidnir")} />
+        <Row icon={<IconBox><Clock color={colors.ink2} size={19} /></IconBox>} title="Tímar og stimplanir" sub={pay ? `${dec1(pay.earnedH)} klst í ${pay.monthLabel.split(" ")[0]}` : "Stimplanirnar þínar"} onPress={() => router.push("/timar")} />
+        <Row icon={<IconBox><Users color={colors.ink2} size={19} /></IconBox>} title="Samstarfsfólk" sub="Hverjir vinna með þér" onPress={() => router.push("/samstarfsfolk")} last />
+      </List>
 
-      <Muted size={11}>VAKTO · vakto.is</Muted>
+      <List>
+        <Row icon={<IconBox><FileText color={colors.ink2} size={19} /></IconBox>} title="Ráðningarsamningur" sub="Lesa eða undirrita" onPress={() => router.push("/samningur")} />
+        <Row icon={<IconBox><Settings color={colors.ink2} size={19} /></IconBox>} title="Stillingar" sub="Tilkynningar, prófíll, lykilorð" onPress={() => router.push("/stillingar")} />
+        <Row
+          icon={<IconBox tone="bad"><LogOut color={iconColor("bad")} size={19} /></IconBox>}
+          title="Skrá út" danger chevron={false} last
+          onPress={() => Alert.alert("Skrá út", "Viltu skrá þig út?", [{ text: "Hætta við", style: "cancel" }, { text: "Skrá út", style: "destructive", onPress: async () => { await unregisterPush().catch(() => {}); supabase.auth.signOut(); } }])}
+        />
+      </List>
+      <Muted size={11.5} style={{ textAlign: "center" }}>VAKTO 1.0 · vakto.is · hjalp@vakto.is</Muted>
     </Screen>
   );
 }

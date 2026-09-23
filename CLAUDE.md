@@ -255,3 +255,9 @@
 - Bot-vörn: Cloudflare Turnstile á nýskráningu, aðeins virk ef `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` eru sett (Vercel). Án þeirra sleppir þjónninn athuguninni.
 - Supabase Auth ætti að vera með password_min_length=12 og leaked password protection á báðum verkefnum (stillt í dashboard: Authentication → Sign In / Providers → Email).
 
+## Appið (mobile/, Expo) — 2026-09-23
+- Starfsmanna-appið er í `mobile/` (Expo SDK 57, expo-router, bein Supabase-tenging með RLS). Útlit fylgir samþykktri frumgerð (Heim/Vaktir/Spjall/Fréttir/Ég). Sjá `mobile/README.md`.
+- Keyra: `cd mobile && cp .env.staging .env && npx expo start` → Expo Go. `.env.production` bendir á prod.
+- Push: appið skráir `expo:<token>` í `push_subscriptions`; `src/lib/push.ts` sendir á Expo push API fyrir þau (virkar líka án VAPID-lykla).
+- `mobile/` er undanskilið í root tsconfig og eslint; appið hefur eigin `npx tsc --noEmit -p mobile`.
+
