@@ -1,5 +1,6 @@
 // Ráðningarsamningur — sýnir nýjasta sendan/undirritaðan samning.
 import React, { useCallback, useEffect, useState } from "react";
+import { useTheme } from "../src/theme";
 import { View } from "react-native";
 import { Screen } from "../src/components/screen";
 import { Card, Txt, Muted, Pill } from "../src/components/ui";
@@ -16,6 +17,7 @@ function plain(md: string): string {
 }
 
 export default function Samningur() {
+  useTheme();
   const { me } = useMe();
   const [contract, setContract] = useState<Contract | null>(null);
   const [loaded, setLoaded] = useState(false);

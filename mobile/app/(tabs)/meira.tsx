@@ -5,7 +5,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { IdCard, FolderOpen, FileText, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight } from "lucide-react-native";
 import { Screen, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, List, Row, IconBox, Eyebrow, Bar, Pill, iconColor } from "../../src/components/ui";
-import { colors } from "../../src/theme";
+import { colors, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { supabase } from "../../src/lib/supabase";
 import { getMonthPay } from "../../src/lib/api/home";
@@ -15,6 +15,7 @@ import { kr, dec1 } from "../../src/lib/format";
 import { unregisterPush } from "../../src/lib/push";
 
 export default function Eg() {
+  useTheme();
   const { me } = useMe();
   const router = useRouter();
   const [pay, setPay] = useState<MonthPay | null>(null);

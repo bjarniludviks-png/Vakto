@@ -4,12 +4,14 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { View, TextInput, FlatList, KeyboardAvoidingView, Platform, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronLeft, Send, X, Hash, CornerUpLeft, Trash2 } from "lucide-react-native";
+import { ChevronLeft, Send, X, Hash, CornerUpLeft, Trash2, ImagePlus } from "lucide-react-native";
+import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
-import { Txt, Muted, Avatar, Sheet, Row } from "../../src/components/ui";
-import { colors, font } from "../../src/theme";
+import { Txt, Muted, Avatar, Sheet, Row, useToast } from "../../src/components/ui";
+import { uploadImage } from "../../src/lib/api/feed";
+import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listMessages, sendChatMessage, markChannelRead, setReaction, deleteMessage, subscribeChat, typingChannel, peopleMap, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
+import { listMessages, sendChatMessage, sendChatImage, markChannelRead, setReaction, deleteMessage, subscribeChat, typingChannel, peopleMap, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
 import { supabase } from "../../src/lib/supabase";
 
 const EMOJI = ["❤️", "👍", "😂", "🙏", "🔥", "👀"];
@@ -25,6 +27,7 @@ function dayLabel(iso: string): string {
 }
 
 export default function Thread() {
+  useTheme();
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const { me } = useMe();
   const router = useRouter();
@@ -39,6 +42,20 @@ export default function Thread() {
   const [members, setMembers] = useState(0);
   const [isGroup, setIsGroup] = useState(true);
   const list = useRef<FlatList>(null);
+  const toast = useToast();
+  const [uploading, setUploading] = useState(false);
+  async function pickAndSend() {
+    if (!me || !id) return;
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
+    if (r.canceled || !r.assets[0]) return;
+    setUploading(true);
+    const up = await uploadImage(me, r.assets[0].uri, r.assets[0].uri.toLowerCase().endsWith(".png") ? "png" : "jpg");
+    if (!up.ok || !up.url) { setUploading(false); toast(up.error ?? "Mynd hlóðst ekki upp"); return; }
+    const res = await sendChatImage(me, id, up.url);
+    setUploading(false);
+    if (!res.ok) toast(res.error ?? "Tókst ekki að senda mynd");
+    else load();
+  }
   const typingRef = useRef<ReturnType<typeof typingChannel> | null>(null);
   const lastTyped = useRef(0);
 
@@ -167,6 +184,9 @@ export default function Thread() {
         </View>
       ) : null}
       <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 10, paddingTop: 8, paddingBottom: Math.max(10, insets.bottom), backgroundColor: colors.panel, borderTopWidth: replyTo ? 0 : 1, borderTopColor: colors.line2 }}>
+        <Pressable onPress={pickAndSend} disabled={uploading} hitSlop={6} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.5 : 1 }}>
+          <ImagePlus color={colors.ink2} size={22} />
+        </Pressable>
         <TextInput
           style={{ flex: 1, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.panel2, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: font.regular, color: colors.ink, maxHeight: 110 }}
           multiline value={text} onChangeText={onType} placeholder="Skrifaðu skilaboð…" placeholderTextColor={colors.ink3} blurOnSubmit={false}

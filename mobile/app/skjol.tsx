@@ -5,11 +5,12 @@ import * as WebBrowser from "expo-web-browser";
 import { FileText, FolderOpen } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
 import { Card, Txt, Muted, SectionTitle, Pill } from "../src/components/ui";
-import { colors } from "../src/theme";
+import { colors, useTheme } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import { listDocs, signedUrl, type DocRow } from "../src/lib/api/docs";
 
 export default function Skjol() {
+  useTheme();
   const { me } = useMe();
   const [docs, setDocs] = useState<DocRow[]>([]);
   const [loaded, setLoaded] = useState(false);

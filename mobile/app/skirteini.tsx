@@ -6,7 +6,7 @@ import Svg, { Rect } from "react-native-svg";
 import { Wallet } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
 import { Txt, Muted, Avatar, useToast } from "../src/components/ui";
-import { colors } from "../src/theme";
+import { colors, useTheme } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import { supabase } from "../src/lib/supabase";
 
@@ -30,6 +30,7 @@ function Qr({ seed, size = 76 }: { seed: string; size?: number }) {
 }
 
 export default function Skirteini() {
+  useTheme();
   const { me } = useMe();
   const toast = useToast();
   const [token, setToken] = useState<string | null>(null);

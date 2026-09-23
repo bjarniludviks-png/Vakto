@@ -6,7 +6,7 @@ import { View, ActivityIndicator } from "react-native";
 import { AuthProvider, useAuth } from "../src/lib/auth";
 import { MeProvider } from "../src/lib/me-context";
 import { ToastProvider } from "../src/components/ui";
-import { colors } from "../src/theme";
+import { colors, useTheme, loadThemeMode } from "../src/theme";
 
 function Gate({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -31,6 +31,8 @@ function Gate({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
+  const { dark } = useTheme();
+  useEffect(() => { loadThemeMode(); }, []);
   const [fontsLoaded] = useFonts({
     "GeneralSans-Regular": require("../assets/fonts/GeneralSans-Regular.otf"),
     "GeneralSans-Medium": require("../assets/fonts/GeneralSans-Medium.otf"),
@@ -45,7 +47,7 @@ export default function RootLayout() {
       <Gate>
         <MeProvider>
           <ToastProvider>
-            <StatusBar style="dark" />
+            <StatusBar style={dark ? "light" : "dark"} />
             <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
           </ToastProvider>
         </MeProvider>

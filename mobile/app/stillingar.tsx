@@ -4,13 +4,14 @@ import { View, Switch, Linking } from "react-native";
 import { useRouter } from "expo-router";
 import { Bell, UserRound, KeyRound, LifeBuoy, FileText } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
-import { List, Row, IconBox, Muted, useToast, Txt } from "../src/components/ui";
-import { colors } from "../src/theme";
+import { List, Row, IconBox, Muted, useToast, Txt, Seg } from "../src/components/ui";
+import { colors, useTheme, setThemeMode } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import { registerForPush, unregisterPush, pushEnabled } from "../src/lib/push";
 import { supabase } from "../src/lib/supabase";
 
 export default function Stillingar() {
+  const { mode, dark } = useTheme();
   const { me } = useMe();
   const router = useRouter();
   const toast = useToast();
@@ -33,6 +34,13 @@ export default function Stillingar() {
       <Muted style={{ paddingHorizontal: 2 }}>TILKYNNINGAR</Muted>
       <List>
         <Row icon={<IconBox tone="brand"><Bell color={colors.brandDeep} size={19} /></IconBox>} title="Push-tilkynningar" sub="Skilaboð, nýtt vaktaplan, svör við beiðnum" right={<Switch value={push} onValueChange={togglePush} trackColor={{ true: colors.good, false: colors.line }} thumbColor="#fff" />} last />
+      </List>
+      <Muted style={{ paddingHorizontal: 2 }}>ÚTLIT</Muted>
+      <List>
+        <View style={{ padding: 12, gap: 10 }}>
+          <Seg value={mode} onChange={setThemeMode} items={[{ id: "system", label: "Fylgir símanum" }, { id: "light", label: "Ljóst" }, { id: "dark", label: "Dökkt" }]} />
+          <Muted size={12}>{mode === "system" ? `Fylgir stillingu símans (núna ${dark ? "dökkt" : "ljóst"}).` : mode === "dark" ? "Dökkt þema alltaf." : "Ljóst þema alltaf."}</Muted>
+        </View>
       </List>
       <Muted style={{ paddingHorizontal: 2 }}>AÐGANGUR</Muted>
       <List>

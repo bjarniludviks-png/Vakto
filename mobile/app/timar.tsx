@@ -4,7 +4,7 @@ import { View } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { Screen } from "../src/components/screen";
 import { Card, Txt, Muted, Eyebrow, Btn, Pill } from "../src/components/ui";
-import { colors } from "../src/theme";
+import { colors, useTheme } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import { listMyPunches, type PunchRow } from "../src/lib/api/punches";
 import { dec1 } from "../src/lib/format";
@@ -14,6 +14,7 @@ const DAY_L = ["Sun", "Mán", "Þri", "Mið", "Fim", "Fös", "Lau"];
 const hm = (iso: string) => new Date(iso).toTimeString().slice(0, 5);
 
 export default function Timar() {
+  useTheme();
   const { me } = useMe();
   const [rows, setRows] = useState<PunchRow[]>([]);
   const [sheet, setSheet] = useState(false);

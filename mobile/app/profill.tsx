@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { View, TextInput } from "react-native";
 import { Screen } from "../src/components/screen";
 import { Card, Txt, Muted, Btn, SectionTitle } from "../src/components/ui";
-import { colors, radius, font } from "../src/theme";
+import { colors, radius, font, useTheme } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import { updateMyProfile } from "../src/lib/api/requests";
 
@@ -20,6 +20,7 @@ const inputStyle = {
 } as const;
 
 export default function Profill() {
+  useTheme();
   const { me, reload } = useMe();
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");

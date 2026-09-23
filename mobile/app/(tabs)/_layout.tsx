@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Tabs } from "expo-router";
 import { House, CalendarDays, MessageCircle, Newspaper, UserRound } from "lucide-react-native";
-import { colors, font } from "../../src/theme";
+import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { getUnreadTotal, subscribeChat } from "../../src/lib/api/chat";
 import { registerForPush } from "../../src/lib/push";
 
 export default function TabLayout() {
+  useTheme();
   const { me } = useMe();
   const [unread, setUnread] = useState(0);
 

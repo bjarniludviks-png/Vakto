@@ -206,3 +206,13 @@ export function typingChannel(channelId: string, onTyping: (p: { userId: string;
     .on("broadcast", { event: "typing" }, (m) => onTyping(m.payload as { userId: string; name: string; stop?: boolean }))
     .subscribe();
 }
+
+/** Senda mynd (þegar hlaðið upp í `chat` bucket). */
+export async function sendChatImage(me: Me, channelId: string, url: string): Promise<{ ok: boolean; error?: string }> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
+  const { error } = await supabase.from("messages").insert({ company_id: me.companyId, channel_id: channelId, sender_id: auth.user.id, body: "", kind: "image", attachment_url: url });
+  if (error) return { ok: false, error: error.message };
+  markChannelRead(channelId).catch(() => {});
+  return { ok: true };
+}

@@ -5,7 +5,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { MessageCircle, Phone } from "lucide-react-native";
 import { Screen } from "../../src/components/screen";
 import { Card, Txt, Muted, Avatar, Btn, Eyebrow, KV, useToast } from "../../src/components/ui";
-import { colors } from "../../src/theme";
+import { colors, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { supabase } from "../../src/lib/supabase";
 import { startDM } from "../../src/lib/api/chat";
@@ -14,6 +14,7 @@ import { iso, mondayOf } from "../../src/lib/api/me";
 const DAY_L = ["Sun", "Mán", "Þri", "Mið", "Fim", "Fös", "Lau"];
 
 export default function Starfsmadur() {
+  useTheme();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { me } = useMe();
   const router = useRouter();

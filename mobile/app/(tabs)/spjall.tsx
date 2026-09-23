@@ -5,7 +5,7 @@ import { useRouter, useFocusEffect } from "expo-router";
 import { Plus, MessageCircle, Hash } from "lucide-react-native";
 import { Header, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, Sheet, Empty, Row } from "../../src/components/ui";
-import { colors } from "../../src/theme";
+import { colors, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { listConversations, listPeople, startDM, subscribeChat, type Conversation, type Person } from "../../src/lib/api/chat";
 
@@ -22,6 +22,7 @@ function when(ts: string | null): string {
 }
 
 export default function Spjall() {
+  useTheme();
   const { me } = useMe();
   const router = useRouter();
   const [convs, setConvs] = useState<Conversation[] | null>(null);

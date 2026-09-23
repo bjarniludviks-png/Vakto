@@ -1,5 +1,6 @@
 // Samstarfsfólk — listi yfir alla á vinnustaðnum, með skilaboðahnappi.
 import React, { useCallback, useState } from "react";
+import { useTheme } from "../src/theme";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Screen } from "../src/components/screen";
 import { List, Row, Avatar, Muted } from "../src/components/ui";
@@ -9,6 +10,7 @@ import { supabase } from "../src/lib/supabase";
 type Emp = { id: string; name: string; role: string | null; dept: string | null; color: string | null; photo: string | null };
 
 export default function Samstarfsfolk() {
+  useTheme();
   const { me } = useMe();
   const router = useRouter();
   const [emps, setEmps] = useState<Emp[]>([]);

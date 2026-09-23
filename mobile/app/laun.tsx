@@ -5,7 +5,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { FolderOpen } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
 import { Card, Txt, Muted, Eyebrow, Bar, Btn, Pill } from "../src/components/ui";
-import { colors } from "../src/theme";
+import { colors, useTheme } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import { getMonthPay } from "../src/lib/api/home";
 import type { MonthPay } from "../src/lib/api/pay";
@@ -22,6 +22,7 @@ function Tile({ label, value, sub }: { label: string; value: string; sub: string
 }
 
 export default function Laun() {
+  useTheme();
   const { me } = useMe();
   const router = useRouter();
   const [pay, setPay] = useState<MonthPay | null>(null);

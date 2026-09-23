@@ -1,45 +1,74 @@
 // VAKTO design tokens — ported from src/app/globals.css (design source of truth)
-// and the approved app prototype (2026-09-23). Do not redesign.
+// and the approved app prototype (2026-09-23). Light + dark palette; `colors`
+// is a live view of the active palette (screens call useTheme() to re-render).
+import { useSyncExternalStore } from "react";
+import { Appearance } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const colors = {
-  // ink / neutral
-  ink: "#1a1a1f",
-  ink2: "#5f6470",
-  ink3: "#9296a6",
-  // lines / backgrounds
-  line: "#e6e6e9",
-  line2: "#f0f0f2",
-  bg: "#f4f4f6",
-  panel: "#ffffff",
-  panel2: "#f8f8fa",
-  // brand (orange)
-  brand: "#e9700f",
-  brand2: "#f59331",
-  brandDeep: "#cf5f0c",
-  brandSoft: "#fdeedd",
-  // semantic
-  good: "#1f9d6b",
-  goodSoft: "#e5f5ee",
-  warn: "#bf8f3a",
-  warnSoft: "#fbf1dc",
-  bad: "#d8483a",
-  badSoft: "#fbe9e6",
-  info: "#2f6fe4",
-  infoSoft: "#e7eefc",
-  teal: "#1f9e9e",
-  // chat
+const LIGHT = {
+  ink: "#1a1a1f", ink2: "#5f6470", ink3: "#9296a6",
+  line: "#e6e6e9", line2: "#f0f0f2", bg: "#f4f4f6", panel: "#ffffff", panel2: "#f8f8fa",
+  brand: "#e9700f", brand2: "#f59331", brandDeep: "#cf5f0c", brandSoft: "#fdeedd",
+  good: "#1f9d6b", goodSoft: "#e5f5ee", warn: "#bf8f3a", warnSoft: "#fbf1dc", bad: "#d8483a", badSoft: "#fbe9e6",
+  info: "#2f6fe4", infoSoft: "#e7eefc", teal: "#1f9e9e",
   bubbleThem: "#eeeef1",
-} as const;
+};
+export type Palette = typeof LIGHT;
+const DARK: Palette = {
+  ...LIGHT,
+  ink: "#f2f2f5", ink2: "#a4a4b0", ink3: "#6f6f7b",
+  line: "#26262e", line2: "#1d1d24", bg: "#0c0c10", panel: "#15151a", panel2: "#1b1b21",
+  brandDeep: "#f59331", brandSoft: "#33200f",
+  good: "#2fb47e", goodSoft: "#123527", warn: "#d4a24a", warnSoft: "#332a14", bad: "#e5604f", badSoft: "#3a1a16",
+  info: "#5b8df0", infoSoft: "#15243f",
+  bubbleThem: "#26262e",
+};
+
+export type ThemeMode = "system" | "light" | "dark";
+const KEY = "@vakto-theme";
+let mode: ThemeMode = "system";
+let sys: "light" | "dark" = Appearance.getColorScheme() === "dark" ? "dark" : "light";
+const listeners = new Set<() => void>();
+const emit = () => listeners.forEach((l) => l());
+Appearance.addChangeListener(({ colorScheme }) => { sys = colorScheme === "dark" ? "dark" : "light"; emit(); });
+
+export const resolvedTheme = (): "light" | "dark" => (mode === "system" ? sys : mode);
+const palette = () => (resolvedTheme() === "dark" ? DARK : LIGHT);
+
+/** Live palette — reads the active theme on every property access. */
+export const colors: Palette = new Proxy(LIGHT, { get: (_t, k) => palette()[k as keyof Palette] }) as Palette;
+
+export function setThemeMode(m: ThemeMode) {
+  mode = m;
+  AsyncStorage.setItem(KEY, m).catch(() => {});
+  emit();
+}
+export async function loadThemeMode(): Promise<ThemeMode> {
+  try {
+    const v = (await AsyncStorage.getItem(KEY)) as ThemeMode | null;
+    if (v === "light" || v === "dark" || v === "system") { mode = v; emit(); }
+  } catch { /* ignore */ }
+  return mode;
+}
+const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
+/** Subscribe a component to theme changes. Returns { mode, dark, colors }. */
+export function useTheme() {
+  const snap = useSyncExternalStore(subscribe, () => `${mode}:${sys}`, () => `${mode}:${sys}`);
+  void snap;
+  return { mode, dark: resolvedTheme() === "dark", colors };
+}
 
 export type Tone = "neutral" | "good" | "warn" | "bad" | "brand" | "info";
-export const tone: Record<Tone, { bg: string; fg: string }> = {
-  neutral: { bg: colors.line2, fg: colors.ink2 },
-  good: { bg: colors.goodSoft, fg: colors.good },
-  warn: { bg: colors.warnSoft, fg: colors.warn },
-  bad: { bg: colors.badSoft, fg: colors.bad },
-  brand: { bg: colors.brandSoft, fg: colors.brandDeep },
-  info: { bg: colors.infoSoft, fg: colors.info },
-};
+export const tone: Record<Tone, { bg: string; fg: string }> = new Proxy({} as Record<Tone, { bg: string; fg: string }>, {
+  get: (_t, k) => {
+    const c = palette();
+    const map: Record<Tone, { bg: string; fg: string }> = {
+      neutral: { bg: c.line2, fg: c.ink2 }, good: { bg: c.goodSoft, fg: c.good }, warn: { bg: c.warnSoft, fg: c.warn },
+      bad: { bg: c.badSoft, fg: c.bad }, brand: { bg: c.brandSoft, fg: c.brandDeep }, info: { bg: c.infoSoft, fg: c.info },
+    };
+    return map[k as Tone];
+  },
+});
 
 // Deild → litur (fallback þegar deild/vaktategund hefur engan lit í grunninum).
 const DEPT_FALLBACK = ["#2f6fe4", "#1f9d6b", "#b45cc9", "#bf8f3a", "#0891b2", "#e0533f", "#8b7bff"];
@@ -58,14 +87,8 @@ export const font = {
   bold: "GeneralSans-Bold",
 } as const;
 
-export const radius = {
-  card: 18,
-  control: 14,
-  chip: 12,
-  pill: 999,
-} as const;
+export const radius = { card: 18, control: 14, chip: 12, pill: 999 } as const;
 
-// Soft card shadow (RN approximation of --shadow-card)
 export const cardShadow = {
   shadowColor: "#121228",
   shadowOpacity: 0.06,

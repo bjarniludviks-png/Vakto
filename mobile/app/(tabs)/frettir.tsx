@@ -8,12 +8,13 @@ import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { Header, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, Sheet, Btn, Empty, useToast, Pill } from "../../src/components/ui";
-import { colors, font } from "../../src/theme";
+import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { listPosts, createPost, setPostReaction, addPostComment, setPinned, deletePost, canPin as canPinFn, uploadImage, REACTIONS, type FeedPost } from "../../src/lib/api/feed";
 import { inputStyle, Field } from "../../src/components/request-sheets";
 
 export default function Frettir() {
+  const { dark } = useTheme();
   const { me } = useMe();
   const toast = useToast();
   const [posts, setPosts] = useState<FeedPost[] | null>(null);
@@ -97,7 +98,7 @@ export default function Frettir() {
               </View>
               <Txt size={14.5} style={{ lineHeight: 21, paddingHorizontal: 14, paddingBottom: 12 }}>{p.body}</Txt>
               {p.imageUrl ? <Image source={{ uri: p.imageUrl }} style={{ width: "100%", height: 200 }} contentFit="cover" /> : null}
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: p.pinned ? "rgba(207,95,12,.15)" : colors.line2 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: p.pinned ? (dark ? "rgba(245,147,49,.25)" : "rgba(207,95,12,.15)") : colors.line2 }}>
                 <Pressable onPress={() => react(p, p.myReaction ?? "❤️")} onLongPress={() => setReactFor(p)} style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 }}>
                   {p.myReaction && p.myReaction !== "❤️" ? <Txt size={16}>{p.myReaction}</Txt> : <Heart color={p.myReaction ? colors.brand : colors.ink2} size={18} fill={p.myReaction ? colors.brand : "transparent"} />}
                   <Txt weight="bold" size={13} color={p.myReaction ? colors.brand : colors.ink2}>{total || ""}</Txt>
@@ -113,7 +114,7 @@ export default function Frettir() {
                   {p.comments.map((c) => (
                     <View key={c.id} style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
                       <Avatar name={c.sender} size={24} color={c.color} photo={c.photo} />
-                      <View style={{ flex: 1, backgroundColor: p.pinned ? "rgba(255,255,255,.6)" : colors.panel2, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7 }}>
+                      <View style={{ flex: 1, backgroundColor: p.pinned ? (dark ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.6)") : colors.panel2, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7 }}>
                         <Txt weight="bold" size={12}>{c.sender} <Txt size={11} color={colors.ink3}>· {c.at}</Txt></Txt>
                         <Txt size={13.5}>{c.body}</Txt>
                       </View>
@@ -135,24 +136,27 @@ export default function Frettir() {
       </ScrollView>
 
       <Sheet open={compose} onClose={() => setCompose(false)} title="Ný færsla">
-        <Muted>Birtist í fréttaveitu fyrirtækisins. Allir á vinnustaðnum sjá hana.</Muted>
-        <TextInput style={[inputStyle, { minHeight: 110, textAlignVertical: "top", fontSize: 16 }]} multiline value={draft} onChangeText={setDraft} placeholder="Hvað viltu segja starfsfólkinu?" placeholderTextColor={colors.ink3} autoFocus />
+        <Muted style={{ marginTop: -6 }}>Birtist í fréttaveitu vinnustaðarins. Allir í fyrirtækinu sjá hana{canPin ? " og fá push-tilkynningu" : ""}.</Muted>
+        <TextInput style={[inputStyle, { minHeight: 120, textAlignVertical: "top", fontSize: 16, lineHeight: 22 }]} multiline value={draft} onChangeText={setDraft} placeholder="Hvað viltu segja starfsfólkinu?" placeholderTextColor={colors.ink3} autoFocus />
         {img ? (
           <View>
-            <Image source={{ uri: img }} style={{ width: "100%", height: 160, borderRadius: 12 }} contentFit="cover" />
+            <Image source={{ uri: img }} style={{ width: "100%", height: 170, borderRadius: 14 }} contentFit="cover" />
             <Pressable onPress={() => setImg(null)} style={{ position: "absolute", top: 8, right: 8, backgroundColor: "rgba(0,0,0,.55)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}><Txt weight="bold" size={12} color="#fff">Fjarlægja</Txt></Pressable>
           </View>
         ) : null}
-        <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-          <Btn title={img ? "Skipta um mynd" : "Bæta við mynd"} variant="ghost" size="sm" icon={<ImagePlus color={colors.ink} size={16} />} onPress={pickImage} />
+        <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
+          <Pressable onPress={pickImage} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 13, borderBottomWidth: canPin ? 1 : 0, borderBottomColor: colors.line2, backgroundColor: pressed ? colors.panel2 : "transparent" })}>
+            <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: colors.infoSoft, alignItems: "center", justifyContent: "center" }}><ImagePlus color={colors.info} size={18} /></View>
+            <View style={{ flex: 1 }}><Txt weight="bold" size={14.5}>{img ? "Skipta um mynd" : "Bæta við mynd"}</Txt><Muted size={12.5}>Úr myndasafni símans</Muted></View>
+          </Pressable>
           {canPin ? (
-            <Pressable onPress={() => setPin((v) => !v)} style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 11, backgroundColor: pin ? colors.brandSoft : colors.panel2, borderWidth: 1, borderColor: pin ? colors.brand2 : colors.line }}>
-              <Pin color={pin ? colors.brandDeep : colors.ink} size={16} />
-              <Txt weight="bold" size={13} color={pin ? colors.brandDeep : colors.ink}>{pin ? "Fest efst ✓" : "Festa efst"}</Txt>
-            </Pressable>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 10 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 11, backgroundColor: colors.brandSoft, alignItems: "center", justifyContent: "center" }}><Pin color={colors.brandDeep} size={18} /></View>
+              <View style={{ flex: 1 }}><Txt weight="bold" size={14.5}>Festa efst</Txt><Muted size={12.5}>Helst efst þar til þú losar hana</Muted></View>
+              <Switch value={pin} onValueChange={setPin} trackColor={{ true: colors.brand, false: colors.line }} thumbColor="#fff" />
+            </View>
           ) : null}
         </View>
-        {canPin ? <Muted size={12}>Sem stjórnandi sendir þú push-tilkynningu til alls starfsfólks þegar þú birtir.</Muted> : null}
         <Btn title="Birta" size="lg" loading={busy} disabled={!draft.trim()} onPress={publish} />
       </Sheet>
 

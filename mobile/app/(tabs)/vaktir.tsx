@@ -6,7 +6,7 @@ import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { ChevronLeft, ChevronRight, CalendarPlus, LayoutGrid, X, ArrowLeftRight, MessageCircle } from "lucide-react-native";
 import { Header, IconBtn } from "../../src/components/screen";
 import { Card, Txt, Muted, Pill, Btn, Avatar, AvatarStack, Seg, Sheet, Eyebrow, KV, Empty, useToast } from "../../src/components/ui";
-import { colors, deptColor } from "../../src/theme";
+import { colors, deptColor, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { getWeekShifts, weekHoursOf, coworkersOf, iso, mondayOf, type SchedShift } from "../../src/lib/api/schedule";
 import { applyForShift, listMyRequests } from "../../src/lib/api/requests";
@@ -21,6 +21,7 @@ const MONTHS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júl
 type Tab = "mine" | "all" | "open";
 
 export default function Vaktir() {
+  useTheme();
   const { me } = useMe();
   const router = useRouter();
   const toast = useToast();

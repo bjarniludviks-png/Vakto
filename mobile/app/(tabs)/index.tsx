@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Bell, Clock, CalendarPlus, ArrowLeftRight, Banknote, Check, CalendarDays, MessageCircle, Newspaper, LayoutGrid } from "lucide-react-native";
 import { IconBtn } from "../../src/components/screen";
 import { Card, Txt, Btn, Muted, Eyebrow, Avatar, useToast, Sheet, iconColor } from "../../src/components/ui";
-import { colors, radius, brandShadow } from "../../src/theme";
+import { colors, radius, brandShadow, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { getHome, dayLabel, type Home, type Noti } from "../../src/lib/api/home";
 import { clockIn, clockOut } from "../../src/lib/api/punches";
@@ -29,6 +29,7 @@ function elapsed(sinceISO: string): string {
 }
 
 export default function HomeScreen() {
+  useTheme();
   const { me, loading } = useMe();
   const router = useRouter();
   const insets = useSafeAreaInsets();

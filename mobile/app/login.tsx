@@ -9,7 +9,7 @@ import {
 import Svg, { Rect } from "react-native-svg";
 import { supabase, isSupabaseConfigured } from "../src/lib/supabase";
 import { Txt, Btn, Card, Muted } from "../src/components/ui";
-import { colors, radius, font } from "../src/theme";
+import { colors, radius, font, useTheme } from "../src/theme";
 
 function Logo({ size = 44 }: { size?: number }) {
   return (
@@ -34,6 +34,7 @@ const inputStyle = {
 } as const;
 
 export default function Login() {
+  useTheme();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);

@@ -6,7 +6,7 @@
     "scheme": "vakto",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "backgroundColor": "#f4f4f6",
     "primaryColor": "#e9700f",
     "ios": {

@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { View, TextInput, Pressable } from "react-native";
 import { Screen } from "../src/components/screen";
 import { Card, Txt, Muted, Btn, SectionTitle } from "../src/components/ui";
-import { colors, radius, font } from "../src/theme";
+import { colors, radius, font, useTheme } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import {
   submitLeaveRequest,
@@ -65,6 +65,7 @@ function Seg<T extends string | number>({
 }
 
 export default function Beidnir() {
+  useTheme();
   const { me } = useMe();
   const [msg, setMsg] = useState<string | null>(null);
 
