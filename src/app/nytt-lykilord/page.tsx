@@ -8,6 +8,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { passwordStrength, PASSWORD_MIN } from "@/lib/password";
+import { checkNewPassword } from "./actions";
 
 const C = {
   ink: "#1a1a1f", ink2: "#5f6470", ink3: "#9296a6", line: "#e6e6e9",
@@ -15,14 +17,8 @@ const C = {
 };
 
 const strength = (pw: string) => {
-  const checks = {
-    len: pw.length >= 8,
-    num: /\d/.test(pw),
-    mix: /[a-záðéíóúýþæö]/.test(pw) && /[A-ZÁÐÉÍÓÚÝÞÆÖ]/.test(pw),
-    extra: pw.length >= 12 || /[^a-zA-Z0-9áðéíóúýþæöÁÐÉÍÓÚÝÞÆÖ]/.test(pw),
-  };
-  const score = (checks.len ? 1 : 0) + (checks.num ? 1 : 0) + (checks.mix ? 1 : 0) + (checks.extra ? 1 : 0);
-  return { checks, score, ok: checks.len && checks.num };
+  const st = passwordStrength(pw);
+  return { checks: { len: pw.length >= PASSWORD_MIN, words: pw.trim().split(/\s+/).length >= 3, mix: /\d/.test(pw) || /[^\p{L}\p{N}]/u.test(pw) }, score: st.score, ok: st.ok, reason: st.reason };
 };
 
 const inputStyle: React.CSSProperties = {
@@ -64,9 +60,11 @@ export default function NyttLykilord() {
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!s.ok) { setError("Lykilorðið þarf a.m.k. 8 stafi og tölustaf."); return; }
+    if (!s.ok) { setError(s.reason ?? `Lykilorðið þarf a.m.k. ${PASSWORD_MIN} stafi.`); return; }
     if (pw !== pw2) { setError("Lykilorðin stemma ekki."); return; }
     setBusy(true);
+    const chk = await checkNewPassword(pw);
+    if (!chk.ok) { setBusy(false); setError(chk.error ?? "Lykilorðið er of veikt"); return; }
     const { error: err } = await createClient().auth.updateUser({ password: pw });
     setBusy(false);
     if (err) { setFailed(true); return; }
@@ -74,7 +72,7 @@ export default function NyttLykilord() {
   }
 
   const BAR_COLORS = [C.line, C.bad, C.warn, C.good, C.good];
-  const BAR_LABELS = ["", "Veikt", "Í lagi", "Sterkt", "Mjög sterkt"];
+  const BAR_LABELS = ["", "Of veikt", "Í lagi", "Sterkt", "Mjög sterkt"];
 
   const Check = ({ on, label }: { on: boolean; label: string }) => (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, color: on ? C.good : C.ink3, fontWeight: on ? 650 : 500 }}>
@@ -109,7 +107,7 @@ export default function NyttLykilord() {
         ) : (
           <>
             <label style={{ display: "block", fontSize: 13, fontWeight: 600, color: C.ink2, marginBottom: 6 }} htmlFor="pw">Nýtt lykilorð</label>
-            <input id="pw" style={inputStyle} type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="a.m.k. 8 stafir og tölustafur" autoComplete="new-password" autoFocus required />
+            <input id="pw" style={inputStyle} type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder={`a.m.k. ${PASSWORD_MIN} stafir — setning með bilum er fín`} autoComplete="new-password" autoFocus required />
             {pw.length > 0 && (
               <div style={{ marginTop: 10 }}>
                 <div style={{ display: "flex", gap: 4, marginBottom: 7 }}>
@@ -120,9 +118,9 @@ export default function NyttLykilord() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 700, color: BAR_COLORS[s.score] }}>{BAR_LABELS[s.score]}</span>
                   <span style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <Check on={s.checks.len} label="8+ stafir" />
-                    <Check on={s.checks.num} label="tölustafur" />
-                    <Check on={s.checks.mix} label="há- og lágstafir" />
+                    <Check on={s.checks.len} label={`${PASSWORD_MIN}+ stafir`} />
+                    <Check on={s.checks.words} label="3+ orð" />
+                    <Check on={s.checks.mix} label="tala eða tákn" />
                   </span>
                 </div>
               </div>

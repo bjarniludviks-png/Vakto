@@ -4,6 +4,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { provisionCompanyForUser } from "@/lib/provision";
 import { sendWelcomeEmail } from "@/lib/email";
+import { requestEmailCode, verifyEmailCode, consumeProof } from "@/lib/signup-verify.server";
+import { validatePassword } from "@/lib/password.server";
+import { verifyTurnstile } from "@/lib/turnstile.server";
+
+/** Útgáfa skilmálanna sem nýskráning samþykkir (dagsetning síðustu breytingar á /skilmalar). */
+const TERMS_VERSION = "2026-09-22";
 
 export type SignupResult = { ok: boolean; demo?: boolean; error?: string };
 
@@ -30,14 +36,31 @@ export async function setCompanyPlan(plan: string): Promise<{ ok: boolean }> {
 /** Self-service owner signup: create the auth user, a company, and link the
  * public.users row as owner. Uses the service-role client (RLS would block a
  * brand-new user from creating a company). Demo fallback when unconfigured. */
-export async function createOwnerAccount(input: { fullName: string; companyName: string; email: string; password: string; country?: string }): Promise<SignupResult> {
+/** Skref 1: senda 6 stafa kóða á netfangið (bot-vörn ef Turnstile er stillt). */
+export async function requestSignupCode(email: string, captchaToken?: string | null): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true };
+  if (!(await verifyTurnstile(captchaToken))) return { ok: false, error: "Bot-vörnin samþykkti ekki beiðnina — endurhladdu síðuna og reyndu aftur." };
+  try { return await requestEmailCode(email); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Villa" }; }
+}
+
+/** Skref 2: staðfesta kóðann → sönnun sem skref 3 framvísar. */
+export async function verifySignupCode(email: string, code: string): Promise<{ ok: boolean; proof?: string; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true, proof: "demo" };
+  try { return await verifyEmailCode(email, code); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Villa" }; }
+}
+
+export async function createOwnerAccount(input: { fullName: string; companyName: string; email: string; password: string; country?: string; proof?: string; termsAccepted?: boolean }): Promise<SignupResult> {
   const fullName = input.fullName?.trim();
   const companyName = input.companyName?.trim();
   const email = input.email?.trim().toLowerCase();
   if (!fullName || !companyName || !email || !input.password) return { ok: false, error: "Fylltu út alla reiti" };
-  if (input.password.length < 8) return { ok: false, error: "Lykilorð þarf að vera a.m.k. 8 stafir" };
+  if (!input.termsAccepted) return { ok: false, error: "Þú þarft að samþykkja skilmála og persónuverndarstefnu" };
+  const pwErr = await validatePassword(input.password);
+  if (pwErr) return { ok: false, error: pwErr };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
+    // Netfangið verður að hafa verið staðfest með kóða (skref 1–2) fyrir < 30 mín.
+    if (!(await consumeProof(email, input.proof))) return { ok: false, error: "Staðfesting netfangs rann út — byrjaðu aftur." };
     const admin = createAdminClient();
     const { data: created, error: cErr } = await admin.auth.admin.createUser({
       email, password: input.password, email_confirm: true,
@@ -53,7 +76,7 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
     // Prufan hefst núna; aðgangur opnast ekki fyrr en kort er skráð (middleware + card_required).
     if (prov.companyId) {
       const trialEnds = new Date(Date.now() + 14 * 86400000).toISOString();
-      await admin.from("companies").update({ plan: "vakto", trial_ends_at: trialEnds, card_required: true }).eq("id", prov.companyId);
+      await admin.from("companies").update({ plan: "vakto", trial_ends_at: trialEnds, card_required: true, terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }).eq("id", prov.companyId);
     }
     await sendWelcomeEmail(email, fullName, companyName); // no-op until Resend is configured
     return { ok: true };

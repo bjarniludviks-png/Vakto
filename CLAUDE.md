@@ -248,3 +248,10 @@
   `/nyskraning/kort?required=1` þar til Tokenization-webhook skilar korti (eða admin setur greiðslustöðu handvirkt).
   Læsingin er aðeins virk þegar `STRAUMUR_TERMINAL_PAGE` er sett — án greiðslusíðu-útstöðvar (live vantar hana enn)
   kemst fólk inn án korts. Eldri fyrirtæki (BM Veitingar o.fl.) eru með card_required=false og verða aldrei læst.
+
+## Nýskráning & öryggi (2026-09-23)
+- Flæði: netfang → 6 stafa kóði í pósti (Resend, `email_verifications` 0053, 15 mín, 5 tilraunir, 3 sendingar/10 mín) → nafn/fyrirtæki/lykilorð + hak fyrir skilmála (`companies.terms_accepted_at/terms_version`) → kort hjá Straumi. Kóðinn skilar `proof` sem `createOwnerAccount` eyðir (einnota, 30 mín).
+- Lykilorð: `src/lib/password.ts` (12+ stafir, engar samsetningarkröfur, algeng/runur bönnuð) + `password.server.ts` (Have I Been Pwned k-anonymity, bilar opið). Sömu reglur á /nytt-lykilord.
+- Bot-vörn: Cloudflare Turnstile á nýskráningu, aðeins virk ef `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` eru sett (Vercel). Án þeirra sleppir þjónninn athuguninni.
+- Supabase Auth ætti að vera með password_min_length=12 og leaked password protection á báðum verkefnum (stillt í dashboard: Authentication → Sign In / Providers → Email).
+

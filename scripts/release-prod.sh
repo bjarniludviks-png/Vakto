@@ -27,7 +27,7 @@ EOF
 echo "== Prod-grunnur: staða fyrir"
 run_sql "select (select count(*) from companies) companies, (select count(*) from employees) employees"
 
-MIGRATIONS="0052_shift_types_unique.sql"
+MIGRATIONS="0053_signup_security.sql"
 for f in $MIGRATIONS; do
   echo "== $f"
   run_sql "$(cat supabase/migrations/$f)"

@@ -161,6 +161,26 @@ export async function sendInviteEmail(to: string, company: string, roleLabel: st
   });
 }
 
+/** 6 stafa staðfestingarkóði við nýskráningu (gildir í 15 mín). */
+export async function sendVerificationCodeEmail(to: string, code: string) {
+  const pretty = `${code.slice(0, 3)} ${code.slice(3)}`;
+  const box = `<div style="margin:18px 0 6px;font-size:34px;font-weight:700;letter-spacing:10px;font-family:ui-monospace,Menlo,Consolas,monospace;color:#1a1a1f">${pretty}</div>`;
+  return sendEmail({
+    to,
+    subject: `${code} er staðfestingarkóðinn þinn / your VAKTO code`,
+    html: template({
+      preheader: `Staðfestingarkóði: ${code}`,
+      heading: "Staðfestu netfangið þitt",
+      body: `Sláðu þennan kóða inn í nýskráningarglugganum. Hann gildir í 15 mínútur.${box}Ef þú varst ekki að stofna aðgang í VAKTO máttu hunsa póstinn.`,
+      headingEn: "Confirm your email",
+      bodyEn: `Enter this code in the signup window. It is valid for 15 minutes.${box}If you weren't creating a VAKTO account, ignore this email.`,
+      ctaLabel: "Opna nýskráningu",
+      ctaLabelEn: "Open signup",
+      ctaHref: `${APP_URL}/nyskraning`,
+    }),
+  });
+}
+
 export async function sendResetEmail(to: string, link: string) {
   return sendEmail({
     to,
