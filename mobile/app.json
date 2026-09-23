@@ -44,7 +44,8 @@
       "expo-secure-store",
       "expo-image",
       "expo-sharing",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-updates"
     ],
     "extra": {
       "router": {},
@@ -52,6 +53,13 @@
         "projectId": "a558b863-f212-496f-b012-c848555946eb"
       }
     },
-    "owner": "bjarniludviks"
+    "owner": "bjarniludviks",
+    "updates": {
+      "url": "https://u.expo.dev/a558b863-f212-496f-b012-c848555946eb",
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    }
   }
 }
