@@ -1,0 +1,10 @@
+import pkg from "/Users/bjarniludviksson/vakto/node_modules/playwright/index.js";
+const { chromium } = pkg;
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, colorScheme: "light" });
+const p = await ctx.newPage();
+await p.goto("http://localhost:8095", { waitUntil: "networkidle" });
+await p.waitForTimeout(5000);
+await p.screenshot({ path: "/Users/bjarniludviksson/vakto-live/mobile/store/dbg.png" });
+console.log(await p.evaluate(() => document.body.innerText.slice(0, 400)));
+await b.close();
