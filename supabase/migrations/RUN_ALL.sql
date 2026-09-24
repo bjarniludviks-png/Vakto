@@ -1,5 +1,5 @@
 -- ============================================================
--- VAKTO — ALLAR migrations samansettar (0001 → 0007).
+-- VAKTO — ALLAR migrations samansettar (0001 → 0054).
 -- Límdu í Supabase SQL Editor og keyrðu. Örugg endurkeyrsla.
 -- ============================================================
 
@@ -889,6 +889,183 @@ create policy contracts_manager on contracts for all
 drop policy if exists contracts_own_read on contracts;
 create policy contracts_own_read on contracts for select
   using (employee_id = public.auth_employee_id());
+
+-- ===== 0029_api_keys.sql =====
+-- 0029 — named API connections (open Revenue API).
+-- Each company creates named keys ("Kassinn Kringlunni", "Shopify") in
+-- Stillingar → Tengingar; external systems POST revenue with the key.
+-- Only a sha256 hash is stored — the full key is shown once on creation.
+
+create table if not exists api_keys (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id) on delete cascade,
+  name text not null,
+  prefix text not null,                      -- displayed identifier (vk_live_ab12…)
+  key_hash text not null unique,             -- sha256(full key), hex
+  created_at timestamptz not null default now(),
+  last_used_at timestamptz,
+  revoked boolean not null default false
+);
+create index if not exists api_keys_company_idx on api_keys(company_id);
+
+alter table api_keys enable row level security;
+
+drop policy if exists api_keys_select on api_keys;
+create policy api_keys_select on api_keys for select
+  using (company_id = public.auth_company_id());
+drop policy if exists api_keys_insert on api_keys;
+create policy api_keys_insert on api_keys for insert
+  with check (company_id = public.auth_company_id());
+drop policy if exists api_keys_update on api_keys;
+create policy api_keys_update on api_keys for update
+  using (company_id = public.auth_company_id());
+drop policy if exists api_keys_delete on api_keys;
+create policy api_keys_delete on api_keys for delete
+  using (company_id = public.auth_company_id());
+
+-- ===== 0030_shift_tasks.sql =====
+-- 0030 — shift tasks (checklists on a shift, Sling-parity).
+-- Keyed by employee+date (NOT shift id) so republishing a week — which
+-- replaces shifts rows — never wipes the checklist.
+
+create table if not exists shift_tasks (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id) on delete cascade,
+  employee_id uuid not null references employees(id) on delete cascade,
+  date date not null,
+  title text not null,
+  done boolean not null default false,
+  done_at timestamptz,
+  created_at timestamptz not null default now()
+);
+create index if not exists shift_tasks_day_idx on shift_tasks(company_id, date);
+create index if not exists shift_tasks_emp_idx on shift_tasks(employee_id, date);
+
+alter table shift_tasks enable row level security;
+
+-- managers/owners (users row) see + manage the company's tasks;
+-- employees see their own and may tick them off.
+drop policy if exists shift_tasks_select on shift_tasks;
+create policy shift_tasks_select on shift_tasks for select
+  using (company_id = public.auth_company_id() or employee_id = public.auth_employee_id());
+drop policy if exists shift_tasks_insert on shift_tasks;
+create policy shift_tasks_insert on shift_tasks for insert
+  with check (company_id = public.auth_company_id());
+drop policy if exists shift_tasks_update on shift_tasks;
+create policy shift_tasks_update on shift_tasks for update
+  using (company_id = public.auth_company_id() or employee_id = public.auth_employee_id());
+drop policy if exists shift_tasks_delete on shift_tasks;
+create policy shift_tasks_delete on shift_tasks for delete
+  using (company_id = public.auth_company_id());
+
+-- ===== 0031_feed.sql =====
+-- 0031 — company news feed (posts + likes + comments), Sling-parity.
+-- Everyone in the company reads and reacts; everyone can post (workplace
+-- feed, not an announcement-only board). company_id on every table keeps
+-- RLS flat and fast.
+
+create table if not exists posts (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references companies(id) on delete cascade,
+  sender_id uuid references users(id) on delete set null,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists posts_company_idx on posts(company_id, created_at desc);
+
+create table if not exists post_likes (
+  post_id uuid not null references posts(id) on delete cascade,
+  user_id uuid not null references users(id) on delete cascade,
+  company_id uuid not null references companies(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (post_id, user_id)
+);
+
+create table if not exists post_comments (
+  id uuid primary key default gen_random_uuid(),
+  post_id uuid not null references posts(id) on delete cascade,
+  company_id uuid not null references companies(id) on delete cascade,
+  sender_id uuid references users(id) on delete set null,
+  body text not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists post_comments_post_idx on post_comments(post_id, created_at);
+
+alter table posts enable row level security;
+alter table post_likes enable row level security;
+alter table post_comments enable row level security;
+
+drop policy if exists posts_rw on posts;
+create policy posts_rw on posts for all
+  using (company_id = public.auth_company_id()) with check (company_id = public.auth_company_id());
+drop policy if exists post_likes_rw on post_likes;
+create policy post_likes_rw on post_likes for all
+  using (company_id = public.auth_company_id()) with check (company_id = public.auth_company_id());
+drop policy if exists post_comments_rw on post_comments;
+create policy post_comments_rw on post_comments for all
+  using (company_id = public.auth_company_id()) with check (company_id = public.auth_company_id());
+
+-- ===== 0032_contract_sign.sql =====
+-- 0032 — in-app contract signing (þrep 1 of e-signature).
+-- The employee approves their own contract in Mitt svæði: status sent →
+-- signed with name + timestamp recorded. Qualified e-signature (Taktikal/
+-- Signet) can layer on later without schema changes.
+
+alter table contracts add column if not exists signed_by_name text;
+alter table contracts add column if not exists signed_via text;   -- 'inapp' | later: 'taktikal' etc.
+
+-- Employees may update ONLY their own contract and ONLY the sent→signed
+-- transition (USING requires status='sent', WITH CHECK requires 'signed').
+drop policy if exists contracts_own_sign on contracts;
+create policy contracts_own_sign on contracts for update
+  using (employee_id = public.auth_employee_id() and status = 'sent')
+  with check (employee_id = public.auth_employee_id() and status = 'signed');
+
+-- ===== 0033_punch_reminder.sql =====
+-- 0033 — "Ertu enn að vinna?" reminder marker: one nudge per open punch.
+alter table punches add column if not exists long_reminded_at timestamptz;
+
+-- ===== 0034_feed_v2.sql =====
+-- 0034 — Facebook-style feed upgrade: media on posts + typed reactions.
+alter table posts add column if not exists image_url text;
+alter table posts add column if not exists file_url text;
+alter table posts add column if not exists file_name text;
+alter table post_likes add column if not exists reaction text not null default '❤️';
+
+-- ===== 0035_feed_pins.sql =====
+-- 0035 — pinned announcements on the feed.
+alter table posts add column if not exists pinned boolean not null default false;
+
+-- ===== 0036_pay_period.sql =====
+-- 0036 — configurable pay period start day (1 = calendar month, 21 = 21st→20th …).
+alter table companies add column if not exists pay_period_start smallint not null default 1;
+
+-- ===== 0037_timebank_settlement.sql =====
+-- 0037 — optional time-bank settlement in payroll runs.
+-- Deduction is ALWAYS at base hourly rate only: when overtime offsets a
+-- deficit the employee keeps the overtime premium — only the base part
+-- cancels against the owed hours.
+alter table payroll_lines add column if not exists timebank_hours numeric not null default 0;
+alter table payroll_lines add column if not exists timebank_adj numeric not null default 0;
+
+-- ===== 0038_department_color.sql =====
+-- Department color (shown in Settings, schedule and staff lists).
+alter table departments add column if not exists color text;
+
+-- ===== 0039_contract_fields.sql =====
+-- Pension fund per employee + company-wide custom contract terms.
+alter table employees add column if not exists pension_fund text;
+alter table companies add column if not exists contract_terms text;
+
+-- ===== 0040_company_docs.sql =====
+-- Company-wide shared documents (HACCP, handbooks, safety manuals …).
+-- A shared doc is a documents row WITHOUT an employee: employee_id is null.
+alter table documents alter column employee_id drop not null;
+
+-- Employees may read their company's shared documents (managers already can).
+drop policy if exists documents_shared_read on documents;
+create policy documents_shared_read on documents for select
+  using (employee_id is null and company_id = public.auth_company_id());
 
 -- ===== 0041_mobile_employee_access.sql =====
 -- 0041: Mobile app employee access
