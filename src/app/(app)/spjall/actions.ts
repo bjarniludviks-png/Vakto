@@ -668,16 +668,21 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
     const policy = polRes.error ? "everyone" : ((polRes.data?.feed_post_policy as string) ?? "everyone");
     const canPost = canPin || policy === "everyone";
     const [{ data: deps }, { data: locs }] = await Promise.all([
-      supabase.from("departments").select("id, name, locations!inner(company_id)").eq("locations.company_id", ctx.company).order("name"),
+      supabase.from("departments").select("id, name, locations!inner(company_id, name)").eq("locations.company_id", ctx.company).order("name"),
       supabase.from("locations").select("id, name").eq("company_id", ctx.company).order("name"),
     ]);
+    const depLabel = (d: { name: unknown; locations?: unknown }) => {
+      const dup = (deps ?? []).filter((x) => x.name === d.name).length > 1;
+      const loc = (Array.isArray(d.locations) ? d.locations[0] : d.locations) as { name?: string } | null;
+      return dup && loc?.name ? `${d.name} · ${loc.name}` : (d.name as string);
+    };
     const audiences: FeedAudience[] = [{ kind: "all", id: null, name: "Allir" }];
     if (canPin) {
-      for (const d of deps ?? []) audiences.push({ kind: "department", id: d.id as string, name: d.name as string });
+      for (const d of deps ?? []) audiences.push({ kind: "department", id: d.id as string, name: depLabel(d) });
       if ((locs ?? []).length > 1) for (const l of locs ?? []) audiences.push({ kind: "location", id: l.id as string, name: l.name as string });
     }
     const audName = (kind: unknown, id: unknown): string | null =>
-      kind === "department" ? ((deps ?? []).find((d) => d.id === id)?.name as string) ?? "Deild"
+      kind === "department" ? (() => { const d = (deps ?? []).find((x) => x.id === id); return d ? depLabel(d) : "Deild"; })()
       : kind === "location" ? ((locs ?? []).find((l) => l.id === id)?.name as string) ?? "Staður" : null;
     let rowsRes = await supabase
       .from("posts").select("id, sender_id, body, created_at, image_url, file_url, file_name, pinned, audience_kind, audience_id, users!posts_sender_id_fkey(full_name)")

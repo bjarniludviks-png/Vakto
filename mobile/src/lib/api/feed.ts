@@ -62,10 +62,14 @@ export async function feedOptions(me: Me): Promise<{ canPost: boolean; audiences
   const audiences: FeedAudience[] = [{ kind: "all", id: null, name: "Allir" }];
   if (manager) {
     const [{ data: deps }, { data: locs }] = await Promise.all([
-      supabase.from("departments").select("id, name, locations!inner(company_id)").eq("locations.company_id", me.companyId).order("name"),
+      supabase.from("departments").select("id, name, locations!inner(company_id, name)").eq("locations.company_id", me.companyId).order("name"),
       supabase.from("locations").select("id, name").eq("company_id", me.companyId).order("name"),
     ]);
-    for (const d of deps ?? []) audiences.push({ kind: "department", id: d.id as string, name: d.name as string });
+    for (const d of deps ?? []) {
+      const dup = (deps ?? []).filter((x) => x.name === d.name).length > 1;
+      const loc = (Array.isArray(d.locations) ? d.locations[0] : d.locations) as { name?: string } | null;
+      audiences.push({ kind: "department", id: d.id as string, name: dup && loc?.name ? `${d.name} · ${loc.name}` : (d.name as string) });
+    }
     if ((locs ?? []).length > 1) for (const l of locs ?? []) audiences.push({ kind: "location", id: l.id as string, name: l.name as string });
   }
   return { canPost: manager || policy === "everyone", audiences };
