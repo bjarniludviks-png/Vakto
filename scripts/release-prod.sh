@@ -8,7 +8,7 @@ cd "$(dirname "$0")/.."
 
 TOKEN=$(grep '^SUPABASE_ACCESS_TOKEN=' .env.local | cut -d= -f2-)
 PROD_REF="lsnthbnqcelfgeyuxgfn"
-[ -n "$TOKEN" ] || { echo "Vantar SUPABASE_ACCESS_TOKEN í .env.local"; exit 1; }
+[ -n "$TOKEN" ] || [ -z "$MIGRATIONS" ] || { echo "Vantar SUPABASE_ACCESS_TOKEN í .env.local"; exit 1; }
 
 run_sql() {
   python3 - "$TOKEN" "$PROD_REF" "$1" <<'EOF'
@@ -24,10 +24,13 @@ except urllib.error.HTTPError as e:
 EOF
 }
 
+if [ -z "$MIGRATIONS" ]; then
+  echo "== Engar migrations í þessu release — sleppi grunn-skrefum"
+else
 echo "== Prod-grunnur: staða fyrir"
 run_sql "select (select count(*) from companies) companies, (select count(*) from employees) employees"
 
-MIGRATIONS="0053_signup_security.sql"
+MIGRATIONS=""
 for f in $MIGRATIONS; do
   echo "== $f"
   run_sql "$(cat supabase/migrations/$f)"
@@ -35,6 +38,7 @@ done
 
 echo "== Staðfesting"
 run_sql "select to_regclass('public.payment_methods') payment_methods, to_regclass('public.invoices') invoices, to_regclass('public.billing_events') billing_events, (select count(*) from information_schema.columns where table_name='companies' and column_name='card_required') card_required"
+fi
 
 echo "== Push live-fixes → main"
 git push origin live-fixes:main
