@@ -21,7 +21,7 @@ function Logo({ size = 44 }: { size?: number }) {
   );
 }
 
-const inputStyle = {
+const inputStyle = () => ({
   borderWidth: 1,
   borderColor: colors.line,
   borderRadius: radius.control,
@@ -31,7 +31,7 @@ const inputStyle = {
   fontFamily: font.regular,
   color: colors.ink,
   backgroundColor: colors.panel,
-} as const;
+} as const);
 
 export default function Login() {
   useTheme();
@@ -79,7 +79,7 @@ export default function Login() {
               Netfang
             </Txt>
             <TextInput
-              style={inputStyle}
+              style={inputStyle()}
               autoCapitalize="none"
               autoComplete="email"
               keyboardType="email-address"
@@ -94,7 +94,7 @@ export default function Login() {
               Lykilorð
             </Txt>
             <TextInput
-              style={inputStyle}
+              style={inputStyle()}
               secureTextEntry
               autoComplete="password"
               value={password}

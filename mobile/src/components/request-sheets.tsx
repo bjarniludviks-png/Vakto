@@ -8,10 +8,11 @@ import { submitLeaveRequest, requestShiftSwap } from "../lib/api/requests";
 import { supabase } from "../lib/supabase";
 import { iso } from "../lib/api/me";
 
-export const inputStyle = {
+/** Reiknað við hverja teikningu svo liturinn fylgi þemanu. */
+export const inputStyle = () => ({
   borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12,
   fontSize: 15, fontFamily: font.regular, color: colors.ink, backgroundColor: colors.panel2,
-} as const;
+} as const);
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -87,7 +88,7 @@ export function OfferSheet({ open, onClose, onDone, shiftLabel }: { open: boolea
     <Sheet open={open} onClose={onClose} title="Bjóða vakt til skipta">
       <Muted>Segðu hvaða vakt þú vilt losna við og hvort þú vilt skipta við einhvern ákveðinn. Vaktstjóri samþykkir skiptin.</Muted>
       <Field label="Skilaboð">
-        <TextInput style={[inputStyle, { minHeight: 90, textAlignVertical: "top" }]} multiline value={note} onChangeText={setNote} placeholder="t.d. Býð laugardagsvaktina 11:30–23:00 — Wiktoria getur tekið hana" placeholderTextColor={colors.ink3} />
+        <TextInput style={[inputStyle(), { minHeight: 90, textAlignVertical: "top" }]} multiline value={note} onChangeText={setNote} placeholder="t.d. Býð laugardagsvaktina 11:30–23:00 — Wiktoria getur tekið hana" placeholderTextColor={colors.ink3} />
       </Field>
       <Btn title="Senda" size="lg" loading={busy} disabled={!note.trim()} onPress={send} />
     </Sheet>
@@ -116,10 +117,10 @@ export function CorrectionSheet({ open, onClose, onDone, date: initDate }: { ope
     <Sheet open={open} onClose={onClose} title="Leiðrétta tíma">
       <Field label="Dagur"><DatePick value={date} onChange={setDate} /></Field>
       <View style={{ flexDirection: "row", gap: 10 }}>
-        <View style={{ flex: 1 }}><Field label="Rétt inn"><TextInput style={inputStyle} value={inT} onChangeText={setIn} placeholder="11:30" placeholderTextColor={colors.ink3} keyboardType="numbers-and-punctuation" /></Field></View>
-        <View style={{ flex: 1 }}><Field label="Rétt út"><TextInput style={inputStyle} value={outT} onChangeText={setOut} placeholder="23:05" placeholderTextColor={colors.ink3} keyboardType="numbers-and-punctuation" /></Field></View>
+        <View style={{ flex: 1 }}><Field label="Rétt inn"><TextInput style={inputStyle()} value={inT} onChangeText={setIn} placeholder="11:30" placeholderTextColor={colors.ink3} keyboardType="numbers-and-punctuation" /></Field></View>
+        <View style={{ flex: 1 }}><Field label="Rétt út"><TextInput style={inputStyle()} value={outT} onChangeText={setOut} placeholder="23:05" placeholderTextColor={colors.ink3} keyboardType="numbers-and-punctuation" /></Field></View>
       </View>
-      <Field label="Skýring"><TextInput style={[inputStyle, { minHeight: 70, textAlignVertical: "top" }]} multiline value={reason} onChangeText={setReason} placeholder="Gleymdi að stimpla út…" placeholderTextColor={colors.ink3} /></Field>
+      <Field label="Skýring"><TextInput style={[inputStyle(), { minHeight: 70, textAlignVertical: "top" }]} multiline value={reason} onChangeText={setReason} placeholder="Gleymdi að stimpla út…" placeholderTextColor={colors.ink3} /></Field>
       <Btn title="Senda beiðni" size="lg" loading={busy} onPress={send} />
     </Sheet>
   );
@@ -142,7 +143,7 @@ export function CantSheet({ open, onClose, onDone, shiftLabel }: { open: boolean
   return (
     <Sheet open={open} onClose={onClose} title="Get ekki mætt">
       <Muted>Vaktstjóri fær tilkynningu strax og getur sett vaktina í „Lausar vaktir“.</Muted>
-      <Field label="Ástæða"><TextInput style={[inputStyle, { minHeight: 70, textAlignVertical: "top" }]} multiline value={reason} onChangeText={setReason} placeholder="Veik(ur)…" placeholderTextColor={colors.ink3} /></Field>
+      <Field label="Ástæða"><TextInput style={[inputStyle(), { minHeight: 70, textAlignVertical: "top" }]} multiline value={reason} onChangeText={setReason} placeholder="Veik(ur)…" placeholderTextColor={colors.ink3} /></Field>
       <Btn title="Tilkynna forföll" size="lg" variant="danger" loading={busy} onPress={send} />
     </Sheet>
   );

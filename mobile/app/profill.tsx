@@ -7,7 +7,7 @@ import { colors, radius, font, useTheme } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import { updateMyProfile } from "../src/lib/api/requests";
 
-const inputStyle = {
+const inputStyle = () => ({
   borderWidth: 1,
   borderColor: colors.line,
   borderRadius: radius.control,
@@ -17,7 +17,7 @@ const inputStyle = {
   fontFamily: font.regular,
   color: colors.ink,
   backgroundColor: colors.panel,
-} as const;
+} as const);
 
 export default function Profill() {
   useTheme();
@@ -51,11 +51,11 @@ export default function Profill() {
       <Card style={{ gap: 12 }}>
         <SectionTitle>Upplýsingarnar mínar</SectionTitle>
         <Field label="Símanúmer">
-          <TextInput style={inputStyle} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+          <TextInput style={inputStyle()} value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
         </Field>
         <Field label="Netfang">
           <TextInput
-            style={inputStyle}
+            style={inputStyle()}
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
@@ -64,7 +64,7 @@ export default function Profill() {
         </Field>
         <Field label="Bankareikningur">
           <TextInput
-            style={inputStyle}
+            style={inputStyle()}
             value={bank}
             onChangeText={setBank}
             placeholder="0000-26-000000"

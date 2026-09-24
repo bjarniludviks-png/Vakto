@@ -1,7 +1,7 @@
 // Fréttir — fréttaveita fyrirtækisins: fest efst, myndir, viðbrögð, athugasemdir,
 // ný færsla með mynd og „festa efst“ (stjórnendur).
 import React, { useCallback, useEffect, useState } from "react";
-import { View, TextInput, Pressable, ScrollView, RefreshControl, Switch } from "react-native";
+import { View, TextInput, Pressable, ScrollView, RefreshControl, Switch, KeyboardAvoidingView, Platform } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { Plus, Heart, MessageSquare, Pin, ImagePlus, Send, Trash2 } from "lucide-react-native";
 import { Image } from "expo-image";
@@ -72,7 +72,7 @@ export default function Frettir() {
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bg }}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <Header title="Fréttaveita" right={<IconBtn label="Ný færsla" onPress={() => setCompose(true)}><Plus color={colors.ink} size={24} /></IconBtn>} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.brand} />}>
         {posts && posts.length === 0 ? <Empty icon={<MessageSquare color={colors.brandDeep} size={26} />} title="Engar færslur enn" sub="Ýttu á + til að deila því fyrsta með vinnustaðnum." /> : null}
@@ -124,7 +124,7 @@ export default function Frettir() {
               ) : null}
               {commentFor === p.id ? (
                 <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-end", paddingHorizontal: 14, paddingBottom: 12 }}>
-                  <TextInput style={[inputStyle, { flex: 1, paddingVertical: 9, borderRadius: 20 }]} value={comment} onChangeText={setComment} placeholder="Skrifa athugasemd…" placeholderTextColor={colors.ink3} autoFocus onSubmitEditing={() => sendComment(p)} />
+                  <TextInput style={[inputStyle(), { flex: 1, paddingVertical: 9, borderRadius: 20 }]} value={comment} onChangeText={setComment} placeholder="Skrifa athugasemd…" placeholderTextColor={colors.ink3} autoFocus onSubmitEditing={() => sendComment(p)} />
                   <Pressable onPress={() => sendComment(p)} disabled={!comment.trim()} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: comment.trim() ? colors.brand : colors.line2, alignItems: "center", justifyContent: "center" }}>
                     <Send color={comment.trim() ? "#fff" : colors.ink3} size={16} />
                   </Pressable>
@@ -137,7 +137,7 @@ export default function Frettir() {
 
       <Sheet open={compose} onClose={() => setCompose(false)} title="Ný færsla">
         <Muted style={{ marginTop: -6 }}>Birtist í fréttaveitu vinnustaðarins. Allir í fyrirtækinu sjá hana{canPin ? " og fá push-tilkynningu" : ""}.</Muted>
-        <TextInput style={[inputStyle, { minHeight: 120, textAlignVertical: "top", fontSize: 16, lineHeight: 22 }]} multiline value={draft} onChangeText={setDraft} placeholder="Hvað viltu segja starfsfólkinu?" placeholderTextColor={colors.ink3} autoFocus />
+        <TextInput style={[inputStyle(), { minHeight: 120, textAlignVertical: "top", fontSize: 16, lineHeight: 22 }]} multiline value={draft} onChangeText={setDraft} placeholder="Hvað viltu segja starfsfólkinu?" placeholderTextColor={colors.ink3} autoFocus />
         {img ? (
           <View>
             <Image source={{ uri: img }} style={{ width: "100%", height: 170, borderRadius: 14 }} contentFit="cover" />
@@ -169,6 +169,6 @@ export default function Frettir() {
           ))}
         </View>
       </Sheet>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

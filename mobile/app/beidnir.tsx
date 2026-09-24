@@ -12,7 +12,7 @@ import {
 } from "../src/lib/api/requests";
 import { iso } from "../src/lib/api/me";
 
-const inputStyle = {
+const inputStyle = () => ({
   borderWidth: 1,
   borderColor: colors.line,
   borderRadius: radius.control,
@@ -22,7 +22,7 @@ const inputStyle = {
   fontFamily: font.regular,
   color: colors.ink,
   backgroundColor: colors.panel,
-} as const;
+} as const);
 
 type LeaveType = "orlof" | "veikindi" | "olaunad";
 const LEAVE_TYPES: { key: LeaveType; label: string }[] = [
@@ -107,11 +107,11 @@ export default function Beidnir() {
         <View style={{ flexDirection: "row", gap: 10 }}>
           <View style={{ flex: 1, gap: 4 }}>
             <Muted size={12}>Frá (ÁÁÁÁ-MM-DD)</Muted>
-            <TextInput style={inputStyle} value={fromDate} onChangeText={setFromDate} />
+            <TextInput style={inputStyle()} value={fromDate} onChangeText={setFromDate} />
           </View>
           <View style={{ flex: 1, gap: 4 }}>
             <Muted size={12}>Til</Muted>
-            <TextInput style={inputStyle} value={toDate} onChangeText={setToDate} />
+            <TextInput style={inputStyle()} value={toDate} onChangeText={setToDate} />
           </View>
         </View>
         <Btn
@@ -132,7 +132,7 @@ export default function Beidnir() {
         <SectionTitle>Vaktaskipti</SectionTitle>
         <Muted size={13}>Lýstu hvaða vakt þú vilt skipta og hvenær.</Muted>
         <TextInput
-          style={[inputStyle, { minHeight: 70, textAlignVertical: "top" }]}
+          style={[inputStyle(), { minHeight: 70, textAlignVertical: "top" }]}
           multiline
           value={swapNote}
           onChangeText={setSwapNote}

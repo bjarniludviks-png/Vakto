@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { View, Pressable, Linking, Platform } from "react-native";
 import { Image } from "expo-image";
-import Svg, { Rect } from "react-native-svg";
+import Svg, { Rect, Defs, RadialGradient, Stop, Circle } from "react-native-svg";
 import { Wallet, ChevronRight } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
 import { Txt, Muted, Avatar, Sheet, KV, useToast } from "../src/components/ui";
@@ -49,13 +49,21 @@ export default function Skirteini() {
 
   const nr = (token ?? me?.empId ?? "").slice(0, 8).toUpperCase();
   const ios = Platform.OS === "ios";
-  const walletUrl = `https://www.vakto.is/api/wallet/${ios ? "apple" : "google"}`;
 
   return (
     <Screen title="Skírteini" back>
       {me ? (
         <Pressable onPress={() => setOpen(true)} style={({ pressed }) => ({ backgroundColor: "#111116", borderRadius: 22, padding: 20, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.35, shadowRadius: 20, shadowOffset: { width: 0, height: 12 }, elevation: 6, transform: [{ scale: pressed ? 0.99 : 1 }] })}>
-          <View style={{ position: "absolute", right: -60, bottom: -80, width: 220, height: 220, borderRadius: 110, backgroundColor: "rgba(233,112,15,.35)" }} />
+          <Svg pointerEvents="none" style={{ position: "absolute", right: -110, bottom: -130 }} width={360} height={360}>
+            <Defs>
+              <RadialGradient id="glow" cx="50%" cy="50%" r="50%">
+                <Stop offset="0" stopColor="#e9700f" stopOpacity="0.75" />
+                <Stop offset="0.45" stopColor="#e9700f" stopOpacity="0.28" />
+                <Stop offset="1" stopColor="#e9700f" stopOpacity="0" />
+              </RadialGradient>
+            </Defs>
+            <Circle cx={180} cy={180} r={180} fill="url(#glow)" />
+          </Svg>
           <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
             <Svg width={22} height={22} viewBox="0 0 28 28" fill="none">
               <Rect x="3" y="15" width="5.4" height="10" rx="1.6" fill={colors.brand2} />
@@ -78,13 +86,16 @@ export default function Skirteini() {
         </Pressable>
       ) : null}
 
-      <Pressable
-        onPress={() => Linking.openURL(walletUrl).catch(() => toast("Wallet-passinn er á leiðinni"))}
-        style={({ pressed }) => ({ backgroundColor: "#000", borderRadius: 16, paddingVertical: 17, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, borderWidth: 1, borderColor: "#333", opacity: pressed ? 0.85 : 1 })}
-      >
-        <Wallet color="#fff" size={20} />
-        <Txt weight="bold" size={16} color="#fff">{ios ? "Bæta í Apple Wallet" : "Bæta í Google Wallet"}</Txt>
-      </Pressable>
+      {(ios ? ["apple", "google"] : ["google", "apple"]).map((w) => (
+        <Pressable
+          key={w}
+          onPress={() => Linking.openURL(`https://www.vakto.is/api/wallet/${w}`).catch(() => toast("Wallet-passinn er á leiðinni"))}
+          style={({ pressed }) => ({ backgroundColor: w === "apple" ? "#000" : colors.panel, borderRadius: 16, paddingVertical: 16, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, borderWidth: 1, borderColor: w === "apple" ? "#333" : colors.line, opacity: pressed ? 0.85 : 1 })}
+        >
+          <Wallet color={w === "apple" ? "#fff" : colors.ink} size={20} />
+          <Txt weight="bold" size={16} color={w === "apple" ? "#fff" : colors.ink}>{w === "apple" ? "Bæta í Apple Wallet" : "Bæta í Google Wallet"}</Txt>
+        </Pressable>
+      ))}
       <Muted size={12.5} style={{ textAlign: "center", lineHeight: 18 }}>Ýttu á kortið til að sjá mynd og allar upplýsingar. QR-kóðann má skanna í kiosk-stimpilklukkunni. Wallet-passar opnast þegar vottorðin frá Apple og Google eru komin.</Muted>
 
       <Sheet open={open} onClose={() => setOpen(false)}>

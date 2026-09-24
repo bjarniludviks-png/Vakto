@@ -31,7 +31,7 @@ export type ChatMessage = {
   body: string;
   at: string;           // HH:MM
   createdAt: string;
-  kind: "text" | "image" | "audio";
+  kind: "text" | "image" | "audio" | "file";
   url: string | null;
   reactions: { emoji: string; count: number; mine: boolean }[];
   replyTo: { sender: string; body: string } | null;
@@ -107,7 +107,7 @@ export async function listConversations(me: Me): Promise<Conversation[]> {
       id: c.id,
       name: c.kind === "dm" ? (other?.name ?? "Samtal") : c.kind === "general" ? (c.name || "Almennt") : c.name,
       kind: c.kind as Conversation["kind"],
-      last: last ? (last.kind === "text" ? last.body : last.kind === "image" ? "📷 Mynd" : "🎤 Talskilaboð") : null,
+      last: last ? (last.kind === "text" ? last.body : last.kind === "image" ? "📷 Mynd" : last.kind === "file" ? `📎 ${last.body || "Skjal"}` : "🎤 Talskilaboð") : null,
       lastAt: last?.at ?? null,
       lastFrom: last ? (last.from === myId ? "Þú" : (people.get(last.from)?.name.split(/\s+/)[0] ?? null)) : null,
       unread: unread[c.id] ?? 0,
@@ -215,4 +215,59 @@ export async function sendChatImage(me: Me, channelId: string, url: string): Pro
   if (error) return { ok: false, error: error.message };
   markChannelRead(channelId).catch(() => {});
   return { ok: true };
+}
+
+/** Hlaða skrá (mynd/skjal) í `chat` bucket og skila opinberri slóð. */
+export async function uploadChatFile(me: Me, uri: string, name: string, contentType: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  try {
+    const res = await fetch(uri);
+    const buf = await res.arrayBuffer();
+    const safe = name.replace(/[^a-zA-Z0-9._-]+/g, "_").slice(-80);
+    const path = `${me.companyId}/chat/${Date.now()}-${safe}`;
+    const { error } = await supabase.storage.from("chat").upload(path, buf, { contentType, upsert: false });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, url: supabase.storage.from("chat").getPublicUrl(path).data.publicUrl };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Senda skjal (kind "file", body = skráarnafn). */
+export async function sendChatFile(me: Me, channelId: string, url: string, fileName: string): Promise<{ ok: boolean; error?: string }> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
+  const { error } = await supabase.from("messages").insert({ company_id: me.companyId, channel_id: channelId, sender_id: auth.user.id, body: fileName, kind: "file", attachment_url: url });
+  if (error) return { ok: false, error: error.message };
+  markChannelRead(channelId).catch(() => {});
+  return { ok: true };
+}
+
+export type Attachment = { id: string; kind: "image" | "file" | "audio"; url: string; name: string; at: string; sender: string };
+/** Myndir og skjöl sem hafa verið send í rásina. */
+export async function listAttachments(me: Me, channelId: string): Promise<Attachment[]> {
+  const [{ data }, people] = await Promise.all([
+    supabase.from("messages").select("id, kind, body, attachment_url, created_at, sender_id").eq("channel_id", channelId).not("attachment_url", "is", null).order("created_at", { ascending: false }).limit(200),
+    peopleMap(me.companyId),
+  ]);
+  return (data ?? []).map((m) => ({ id: m.id, kind: (m.kind === "image" ? "image" : m.kind === "audio" ? "audio" : "file") as Attachment["kind"], url: m.attachment_url as string, name: m.kind === "image" ? "Mynd" : (m.body || "Skjal"), at: m.created_at, sender: people.get(m.sender_id)?.name.split(/\s+/)[0] ?? "" }));
+}
+
+/** Yfirgefa hóp/einkaspjall (ekki Almennt). */
+export async function leaveChannel(channelId: string): Promise<{ ok: boolean; error?: string }> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
+  const { error } = await supabase.from("channel_members").delete().eq("channel_id", channelId).eq("user_id", auth.user.id);
+  return error ? { ok: false, error: error.message } : { ok: true };
+}
+
+/** Stofna hópspjall með nafni og meðlimum. */
+export async function createGroup(me: Me, name: string, memberUserIds: string[]): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
+  const { data: ch, error } = await supabase.from("channels").insert({ company_id: me.companyId, name: name.trim(), kind: "group", created_by: auth.user.id }).select("id").single();
+  if (error || !ch) return { ok: false, error: error?.message ?? "Villa" };
+  const ids = Array.from(new Set([auth.user.id, ...memberUserIds]));
+  const { error: mErr } = await supabase.from("channel_members").insert(ids.map((u) => ({ channel_id: ch.id, user_id: u })));
+  if (mErr) return { ok: false, error: mErr.message };
+  return { ok: true, id: ch.id as string };
 }

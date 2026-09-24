@@ -335,8 +335,8 @@ export function Sheet({
   return (
     <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,.45)" }} onPress={onClose} />
-        <View style={{ backgroundColor: colors.panel, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "88%", paddingBottom: 30 }}>
+        <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,.5)" }} onPress={onClose} />
+        <View style={{ backgroundColor: colors.panel, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: "88%", paddingBottom: 30, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: -6 }, elevation: 12 }}>
           <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: colors.line, alignSelf: "center", marginTop: 10, marginBottom: 6 }} />
           <Body contentContainerStyle={{ padding: 18, paddingTop: 6, gap: 14 }} style={scroll ? undefined : { padding: 18, paddingTop: 6, gap: 14 }} keyboardShouldPersistTaps="handled">
             {title ? (

@@ -4,14 +4,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { View, TextInput, FlatList, KeyboardAvoidingView, Platform, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronLeft, Send, X, Hash, CornerUpLeft, Trash2, ImagePlus, MoreHorizontal, BellOff, Bell } from "lucide-react-native";
+import { ChevronLeft, Send, X, Hash, CornerUpLeft, Trash2, ImagePlus, MoreHorizontal, BellOff, Bell, Paperclip, FileText, Images, LogOut } from "lucide-react-native";
+import * as DocumentPicker from "expo-document-picker";
+import { Linking, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { Txt, Muted, Avatar, Sheet, Row, useToast } from "../../src/components/ui";
 import { uploadImage } from "../../src/lib/api/feed";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listMessages, sendChatMessage, sendChatImage, markChannelRead, setReaction, deleteMessage, subscribeChat, typingChannel, peopleMap, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
+import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, markChannelRead, type Attachment, setReaction, deleteMessage, subscribeChat, typingChannel, peopleMap, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
 import { supabase } from "../../src/lib/supabase";
 import { isMuted, toggleMute } from "../../src/lib/mute";
 import type { Person } from "../../src/lib/api/chat";
@@ -46,6 +48,29 @@ export default function Thread() {
   const [info, setInfo] = useState(false);
   const [muted, setMuted] = useState(false);
   const [memberList, setMemberList] = useState<Person[]>([]);
+  const [kind, setKind] = useState<string>("group");
+  const [media, setMedia] = useState<Attachment[] | null>(null);
+  async function openMedia() {
+    if (!me || !id) return;
+    setInfo(false); setMedia([]);
+    setMedia(await listAttachments(me, id));
+  }
+  async function pickFile() {
+    if (!me || !id) return;
+    const r = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
+    if (r.canceled || !r.assets[0]) return;
+    const f = r.assets[0];
+    setUploading(true);
+    const up = await uploadChatFile(me, f.uri, f.name, f.mimeType ?? "application/octet-stream");
+    if (!up.ok || !up.url) { setUploading(false); toast(up.error ?? "Skráin hlóðst ekki upp"); return; }
+    const res = (f.mimeType ?? "").startsWith("image/") ? await sendChatImage(me, id, up.url) : await sendChatFile(me, id, up.url, f.name);
+    setUploading(false);
+    if (!res.ok) toast(res.error ?? "Tókst ekki að senda"); else load();
+  }
+  function leave() {
+    if (!id) return;
+    Alert.alert("Yfirgefa spjall", "Þú hættir að fá skilaboð úr þessu spjalli.", [{ text: "Hætta við", style: "cancel" }, { text: "Yfirgefa", style: "destructive", onPress: async () => { const r = await leaveChannel(id); if (!r.ok) { toast(r.error ?? "Tókst ekki"); return; } setInfo(false); router.back(); } }]);
+  }
   async function openInfo() {
     if (!me || !id) return;
     setInfo(true);
@@ -84,7 +109,7 @@ export default function Thread() {
     load();
     if (id) isMuted(id).then(setMuted);
     supabase.from("channels").select("kind").eq("id", id).maybeSingle().then(async ({ data }) => {
-      setIsGroup(data?.kind !== "dm");
+      setIsGroup(data?.kind !== "dm"); setKind((data?.kind as string) ?? "group");
       if (data?.kind === "general" && me) { const { count } = await supabase.from("employees").select("id", { count: "exact", head: true }).eq("company_id", me.companyId).not("user_id", "is", null); setMembers(count ?? 0); }
       else { const { count } = await supabase.from("channel_members").select("user_id", { count: "exact", head: true }).eq("channel_id", id); setMembers(count ?? 0); }
     });
@@ -199,8 +224,11 @@ export default function Thread() {
         </View>
       ) : null}
       <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 10, paddingTop: 8, paddingBottom: Math.max(10, insets.bottom), backgroundColor: colors.panel, borderTopWidth: replyTo ? 0 : 1, borderTopColor: colors.line2 }}>
-        <Pressable onPress={pickAndSend} disabled={uploading} hitSlop={6} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.5 : 1 }}>
+        <Pressable onPress={pickAndSend} disabled={uploading} hitSlop={6} style={{ width: 36, height: 40, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.5 : 1 }}>
           <ImagePlus color={colors.ink2} size={22} />
+        </Pressable>
+        <Pressable onPress={pickFile} disabled={uploading} hitSlop={6} style={{ width: 32, height: 40, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.5 : 1 }}>
+          <Paperclip color={colors.ink2} size={20} />
         </Pressable>
         <TextInput
           style={{ flex: 1, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.panel2, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: font.regular, color: colors.ink, maxHeight: 110 }}
@@ -232,6 +260,10 @@ export default function Thread() {
           <Row icon={muted ? <Bell color={colors.ink2} size={19} /> : <BellOff color={colors.ink2} size={19} />} title={muted ? "Kveikja á tilkynningum" : "Þagga spjallið"} sub={muted ? "Þú færð aftur merki og hljóð" : "Ekkert ólesið-merki eða hljóð fyrir þetta spjall"} chevron={false} last
             onPress={async () => { if (!id) return; const m = await toggleMute(id); setMuted(m); }} />
         </View>
+        <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
+          <Row icon={<Images color={colors.ink2} size={19} />} title="Myndir og skjöl" sub="Allt sem hefur verið sent í spjallinu" onPress={openMedia} last={kind === "general"} />
+          {kind !== "general" ? <Row icon={<LogOut color={colors.bad} size={19} />} title="Yfirgefa spjall" danger chevron={false} onPress={leave} last /> : null}
+        </View>
         <Txt weight="bold" size={12} color={colors.ink3} style={{ letterSpacing: 0.8, marginTop: 4 }}>{isGroup ? `MEÐLIMIR · ${memberList.length || members}` : "ÞÁTTTAKENDUR"}</Txt>
         <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
           {memberList.length === 0 ? <Muted style={{ padding: 14 }}>Sæki…</Muted> : null}
@@ -239,6 +271,25 @@ export default function Thread() {
             <Row key={p.userId} icon={<Avatar name={p.name} size={36} color={p.color} photo={p.photo} />} title={p.name} sub={[p.role, p.dept].filter(Boolean).join(" · ") || "Starfsmaður"} chevron={false} last={i === memberList.length - 1} />
           ))}
         </View>
+      </Sheet>
+      <Sheet open={media !== null} onClose={() => setMedia(null)} title="Myndir og skjöl">
+        {media && media.length === 0 ? <Muted>Engar myndir eða skjöl enn.</Muted> : null}
+        {media && media.filter((a) => a.kind === "image").length ? (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+            {media.filter((a) => a.kind === "image").map((a) => (
+              <Pressable key={a.id} onPress={() => Linking.openURL(a.url)} style={{ width: "31.5%", aspectRatio: 1, borderRadius: 12, overflow: "hidden", backgroundColor: colors.panel2 }}>
+                <Image source={{ uri: a.url }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        {media && media.filter((a) => a.kind !== "image").length ? (
+          <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
+            {media.filter((a) => a.kind !== "image").map((a, i, arr) => (
+              <Row key={a.id} icon={<FileText color={colors.ink2} size={19} />} title={a.name} sub={`${a.sender} · ${new Date(a.at).getDate()}.${new Date(a.at).getMonth() + 1}.${new Date(a.at).getFullYear()}`} chevron={false} onPress={() => Linking.openURL(a.url)} last={i === arr.length - 1} />
+            ))}
+          </View>
+        ) : null}
       </Sheet>
     </KeyboardAvoidingView>
   );
@@ -262,8 +313,13 @@ function Bubble({ item, onLong }: { item: Extract<RowItem, { kind: "msg" }>; onL
               <Txt size={12.5} color={m.me ? "rgba(255,255,255,.85)" : colors.ink2} numberOfLines={2}>{m.replyTo.body}</Txt>
             </View>
           ) : null}
-          {m.kind === "image" && m.url ? <Image source={{ uri: m.url }} style={{ width: 210, height: 150, borderRadius: 12, marginBottom: m.body ? 6 : 0 }} contentFit="cover" /> : null}
-          {m.body ? <Txt size={15} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 20 }}>{m.body}</Txt> : null}
+          {m.kind === "image" && m.url ? <Pressable onPress={() => m.url && Linking.openURL(m.url)}><Image source={{ uri: m.url }} style={{ width: 210, height: 150, borderRadius: 12, marginBottom: m.body ? 6 : 0 }} contentFit="cover" /></Pressable> : null}
+          {m.kind === "file" && m.url ? (
+            <Pressable onPress={() => m.url && Linking.openURL(m.url)} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 2 }}>
+              <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: m.me ? "rgba(255,255,255,.2)" : colors.panel, alignItems: "center", justifyContent: "center" }}><FileText color={m.me ? "#fff" : colors.ink2} size={18} /></View>
+              <View style={{ flexShrink: 1 }}><Txt weight="bold" size={14} color={m.me ? "#fff" : colors.ink} numberOfLines={2}>{m.body || "Skjal"}</Txt><Txt size={11.5} color={m.me ? "rgba(255,255,255,.8)" : colors.ink3}>Ýttu til að opna</Txt></View>
+            </Pressable>
+          ) : m.body ? <Txt size={15} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 20 }}>{m.body}</Txt> : null}
           {m.reactions.length ? (
             <View style={{ position: "absolute", bottom: -12, [m.me ? "left" : "right"]: 8, flexDirection: "row", backgroundColor: colors.panel, borderRadius: 999, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 6, paddingVertical: 1, gap: 3 }}>
               {m.reactions.map((x) => <Txt key={x.emoji} size={12}>{x.emoji}{x.count > 1 ? ` ${x.count}` : ""}</Txt>)}
