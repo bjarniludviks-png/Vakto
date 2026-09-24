@@ -6,7 +6,7 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, startCardChange } from "./actions";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, startCardChange, setFeedPostPolicy } from "./actions";
 import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
@@ -69,6 +69,14 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
             <div className="statline"><span className="k">{t("Tryggingagjald")}</span><span className="v">6,35%</span></div>
             <div className="statline"><span className="k">{t("Mótframlag lífeyris")}</span><span className="v">11,5%</span></div>
             <div className="statline"><span className="k">{t("Orlof")}</span><span className="v">10,17%</span></div>
+            <div className="statline"><span className="k">{t("Fréttaveita — hverjir birta")}</span>
+              <select className="badge" style={{ border: "1px solid var(--line)", padding: "5px 9px", font: "inherit", fontSize: 12.5 }}
+                defaultValue={data.company?.feedPostPolicy ?? "everyone"}
+                onChange={async (e) => { const r = await setFeedPostPolicy(e.target.value as "everyone" | "managers"); toast(r.ok ? t("Vistað") : (r.error ?? "Villa")); }}>
+                <option value="everyone">{t("Allir")}</option>
+                <option value="managers">{t("Stjórnendur og vaktstjórar")}</option>
+              </select>
+            </div>
             <div className="statline"><span className="k">{t("Launatímabil")}</span>
               <select className="badge" style={{ border: "1px solid var(--line)", padding: "5px 9px", font: "inherit", fontSize: 12.5 }}
                 defaultValue={String(data.company && "payPeriodStart" in (data.company as object) ? (data.company as unknown as { payPeriodStart?: number }).payPeriodStart ?? 1 : 1)}

@@ -10,7 +10,7 @@ import { useLang } from "@/components/app/lang";
 import { toast } from "@/components/app/toast";
 import {
   listPosts, createPost, setPostReaction, addPostComment, uploadChatMedia, setPostPinned,
-  type FeedPost,
+  type FeedPost, type FeedAudience,
 } from "../spjall/actions";
 import type { FeedComment } from "../spjall/actions";
 import { timeAgo } from "@/lib/time-ago";
@@ -21,6 +21,9 @@ export default function FeedScreen() {
   const { t } = useLang();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [canPin, setCanPin] = useState(false);
+  const [canPost, setCanPost] = useState(true);
+  const [audiences, setAudiences] = useState<FeedAudience[]>([]);
+  const [aud, setAud] = useState<string>("all");
   const [mePhoto, setMePhoto] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   // Relative times ("1 klst síðan") tick once a minute; 0 until mounted so SSR matches.
@@ -36,7 +39,7 @@ export default function FeedScreen() {
   const imgRef = useRef<HTMLInputElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  function reload() { listPosts().then((r) => { if (r.ok) { setPosts(r.posts); setCanPin(r.canPin); setMePhoto(r.mePhoto); } setLoaded(true); }); }
+  function reload() { listPosts().then((r) => { if (r.ok) { setPosts(r.posts); setCanPin(r.canPin); setCanPost(r.canPost); setAudiences(r.audiences); setMePhoto(r.mePhoto); } setLoaded(true); }); }
   useEffect(() => { reload(); const iv = setInterval(reload, 10000); return () => clearInterval(iv); }, []);
 
   function pickFile(kind: "image" | "file") {
@@ -62,10 +65,11 @@ export default function FeedScreen() {
   async function post() {
     if (!val.trim() && !attach) return;
     setBusy(true);
-    const r = await createPost(val, attach ?? undefined);
+    const chosen = audiences.find((a) => `${a.kind}:${a.id ?? ""}` === aud);
+    const r = await createPost(val, attach ?? undefined, chosen ? { kind: chosen.kind, id: chosen.id } : undefined);
     setBusy(false);
     if (!r.ok) { toast(r.error ?? "Villa"); return; }
-    setVal(""); setAttach(null); reload();
+    setVal(""); setAttach(null); setAud("all"); reload();
   }
 
   async function react(p: FeedPost, emoji: string) {
@@ -123,7 +127,10 @@ export default function FeedScreen() {
       <PageHeader title="Fréttaveita" subtitle="Fréttir, tilkynningar og stemning fyrirtækisins" />
       <div className="feedwrap">
         {/* composer — FB-style: avatar + pill that grows into a textarea */}
-        <div className="feed-post fc2" style={{ marginBottom: 16 }}>
+        {!canPost && loaded && (
+          <div className="muted" style={{ fontSize: 13, padding: "10px 14px", background: "var(--panel2)", borderRadius: 12, marginBottom: 16 }}>{t("Stjórnendur og vaktstjórar birta í fréttaveituna. Þú getur brugðist við og skrifað athugasemdir.")}</div>
+        )}
+        {canPost && <div className="feed-post fc2" style={{ marginBottom: 16 }}>
           <div className="fc2-row">
             {mePhoto ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -158,12 +165,17 @@ export default function FeedScreen() {
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.4 11.05 12.6 19.9a5.5 5.5 0 0 1-7.8-7.8l8.5-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.5 8.5a1.83 1.83 0 0 1-2.6-2.6l8-7.9" /></svg>
               {t("Skjal")}
             </button>
+            {audiences.length > 1 && (
+              <select className="fc-act" value={aud} onChange={(e) => setAud(e.target.value)} title={t("Hverjir sjá færsluna")} style={{ maxWidth: 180 }}>
+                {audiences.map((a) => <option key={`${a.kind}:${a.id ?? ""}`} value={`${a.kind}:${a.id ?? ""}`}>{a.kind === "all" ? t("Allir sjá") : a.name}</option>)}
+              </select>
+            )}
             <div style={{ flex: 1 }} />
             <button className="btn sm" disabled={busy || (!val.trim() && !attach)} onClick={post}>{t("Birta")}</button>
           </div>
           <input ref={imgRef} type="file" accept="image/*" hidden onChange={(e) => onFile(e, "image")} />
           <input ref={fileRef} type="file" hidden onChange={(e) => onFile(e, "file")} />
-        </div>
+        </div>}
 
         {loaded && posts.length === 0 && (
           <div className="muted" style={{ textAlign: "center", padding: 40, fontSize: 13.5 }}>{t("Engar fréttir enn — skrifaðu fyrstu færsluna!")}</div>
@@ -189,7 +201,7 @@ export default function FeedScreen() {
                 )}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <b style={{ fontSize: 14.5 }}>{p.sender}</b>
-                  <span className="muted" style={{ fontSize: 12, display: "block", marginTop: 1 }} title={p.at}>{ago(p.atISO, p.at)}</span>
+                  <span className="muted" style={{ fontSize: 12, display: "block", marginTop: 1 }} title={p.at}>{ago(p.atISO, p.at)}{p.audience ? <> · <span className="tag info" style={{ fontSize: 11, padding: "1px 7px" }}>{p.audience}</span></> : null}</span>
                 </div>
                 {canPin && !p.system && (
                   <button className="fp-pin" title={p.pinned ? t("Losa tilkynningu") : t("Festa efst sem tilkynningu")}

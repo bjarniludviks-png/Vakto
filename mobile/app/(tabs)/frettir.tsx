@@ -1,7 +1,7 @@
 // Fréttir — fréttaveita fyrirtækisins: fest efst, myndir, viðbrögð, athugasemdir,
 // ný færsla með mynd og „festa efst“ (stjórnendur).
 import React, { useCallback, useEffect, useState } from "react";
-import { tr } from "../../src/lib/i18n";
+import { tr, trf } from "../../src/lib/i18n";
 import { View, TextInput, Pressable, ScrollView, RefreshControl, Switch, KeyboardAvoidingView, Platform } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { Plus, Heart, MessageSquare, Pin, ImagePlus, Send, Trash2 } from "lucide-react-native";
@@ -11,7 +11,7 @@ import { Header, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, Sheet, Btn, Empty, useToast, Pill } from "../../src/components/ui";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listPosts, createPost, setPostReaction, addPostComment, setPinned, deletePost, canPin as canPinFn, uploadImage, REACTIONS, type FeedPost } from "../../src/lib/api/feed";
+import { listPosts, createPost, setPostReaction, addPostComment, setPinned, deletePost, canPin as canPinFn, feedOptions, uploadImage, REACTIONS, type FeedPost, type FeedAudience } from "../../src/lib/api/feed";
 import { inputStyle, Field } from "../../src/components/request-sheets";
 
 export default function Frettir() {
@@ -21,6 +21,9 @@ export default function Frettir() {
   const [posts, setPosts] = useState<FeedPost[] | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [canPin, setCanPin] = useState(false);
+  const [canPost, setCanPost] = useState(true);
+  const [audiences, setAudiences] = useState<FeedAudience[]>([]);
+  const [aud, setAud] = useState<FeedAudience | null>(null);
   const [compose, setCompose] = useState(false);
   const [draft, setDraft] = useState("");
   const [pin, setPin] = useState(false);
@@ -35,7 +38,7 @@ export default function Frettir() {
     try { setPosts(await listPosts(me)); } catch (e) { console.warn("feed", e); }
   }, [me]);
   useFocusEffect(useCallback(() => { load(); const t = setInterval(load, 20000); return () => clearInterval(t); }, [load]));
-  useEffect(() => { canPinFn().then(setCanPin); }, [me]);
+  useEffect(() => { canPinFn().then(setCanPin); if (me) feedOptions(me).then((o) => { setCanPost(o.canPost); setAudiences(o.audiences); }); }, [me]);
 
   async function pickImage() {
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: false });
@@ -51,10 +54,10 @@ export default function Frettir() {
       if (!up.ok) { toast(up.error ?? "Mynd hlóðst ekki upp"); setBusy(false); return; }
       imageUrl = up.url ?? null;
     }
-    const r = await createPost(me, body, { pinned: canPin && pin, imageUrl });
+    const r = await createPost(me, body, { pinned: canPin && pin, imageUrl, audience: aud });
     setBusy(false);
     if (!r.ok) { toast(r.error ?? "Tókst ekki að birta"); return; }
-    setDraft(""); setImg(null); setPin(false); setCompose(false);
+    setDraft(""); setImg(null); setPin(false); setAud(null); setCompose(false);
     toast("Birt í fréttaveitu");
     load();
   }
@@ -74,7 +77,7 @@ export default function Frettir() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <Header title="Fréttaveita" right={<IconBtn label="Ný færsla" onPress={() => setCompose(true)}><Plus color={colors.ink} size={24} /></IconBtn>} />
+      <Header title="Fréttaveita" right={canPost ? <IconBtn label="Ný færsla" onPress={() => setCompose(true)}><Plus color={colors.ink} size={24} /></IconBtn> : undefined} />
       <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.brand} />}>
         {posts && posts.length === 0 ? <Empty icon={<MessageSquare color={colors.brandDeep} size={26} />} title="Engar færslur enn" sub="Ýttu á + til að deila því fyrsta með vinnustaðnum." /> : null}
         {(posts ?? []).map((p) => {
@@ -86,7 +89,7 @@ export default function Frettir() {
                 <Avatar name={p.sender} size={38} color={p.system ? colors.brand : p.color} photo={p.photo} />
                 <View style={{ flex: 1 }}>
                   <Txt weight="bold" size={14}>{p.sender}</Txt>
-                  <Muted size={12}>{[p.senderRole, p.at].filter(Boolean).join(" · ")}</Muted>
+                  <Muted size={12}>{[p.senderRole, p.at].filter(Boolean).join(" · ")}{p.audience ? ` · ${p.audience}` : ""}</Muted>
                 </View>
                 {canPin ? (
                   <Pressable onPress={async () => { await setPinned(p.id, !p.pinned); load(); }} hitSlop={8} style={{ padding: 6 }}>
@@ -137,12 +140,27 @@ export default function Frettir() {
       </ScrollView>
 
       <Sheet open={compose} onClose={() => setCompose(false)} title="Ný færsla">
-        <Muted style={{ marginTop: -6 }}>Birtist í fréttaveitu vinnustaðarins. Allir í fyrirtækinu sjá hana{canPin ? " og fá push-tilkynningu" : ""}.</Muted>
+        <Muted style={{ marginTop: -6 }}>{aud ? trf("Birtist hjá {x}{y}", aud.name, canPin ? tr(" og þau fá push-tilkynningu") : "") : tr(canPin ? "Birtist í fréttaveitu vinnustaðarins. Allir í fyrirtækinu sjá hana og fá push-tilkynningu." : "Birtist í fréttaveitu vinnustaðarins. Allir í fyrirtækinu sjá hana.")}</Muted>
         <TextInput style={[inputStyle(), { minHeight: 120, textAlignVertical: "top", fontSize: 16, lineHeight: 22 }]} multiline value={draft} onChangeText={setDraft} placeholder={tr("Hvað viltu segja starfsfólkinu?")} placeholderTextColor={colors.ink3} autoFocus />
         {img ? (
           <View>
             <Image source={{ uri: img }} style={{ width: "100%", height: 170, borderRadius: 14 }} contentFit="cover" />
             <Pressable onPress={() => setImg(null)} style={{ position: "absolute", top: 8, right: 8, backgroundColor: "rgba(0,0,0,.55)", borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}><Txt weight="bold" size={12} color="#fff">Fjarlægja</Txt></Pressable>
+          </View>
+        ) : null}
+        {audiences.length > 1 ? (
+          <View>
+            <Txt weight="bold" size={12} color={colors.ink3} style={{ letterSpacing: 0.8, marginBottom: 8 }}>{tr("HVERJIR SJÁ")}</Txt>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+              {audiences.map((a) => {
+                const on = (aud?.kind ?? "all") === a.kind && (aud?.id ?? null) === a.id;
+                return (
+                  <Pressable key={`${a.kind}:${a.id ?? ""}`} onPress={() => setAud(a.kind === "all" ? null : a)} style={{ paddingHorizontal: 13, paddingVertical: 8, borderRadius: 999, backgroundColor: on ? colors.ink : colors.panel2, borderWidth: 1, borderColor: on ? colors.ink : colors.line }}>
+                    <Txt weight="bold" size={12.5} color={on ? colors.panel : colors.ink2}>{a.kind === "all" ? tr("Allir") : a.name}</Txt>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
         ) : null}
         <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>

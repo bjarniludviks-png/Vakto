@@ -766,3 +766,20 @@ export async function startCardChange(origin: string): Promise<{ ok: boolean; ur
     return { ok: false, error: "Tókst ekki að opna greiðslusíðuna — reyndu aftur." };
   }
 }
+
+/** Fréttaveita: hverjir mega birta (0054). Aðeins stjórnendur/eigendur. */
+export async function setFeedPostPolicy(policy: "everyone" | "managers"): Promise<SettingsResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("companies").update({ feed_post_policy: policy }).eq("id", ctx.company);
+    if (error) return { ok: false, error: error.message };
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "company.feed_policy", entity: "company", detail: `Fréttaveita: ${policy === "managers" ? "aðeins stjórnendur birta" : "allir mega birta"}` });
+    revalidatePath("/stillingar"); revalidatePath("/frettaveita");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}

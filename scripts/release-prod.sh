@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 TOKEN=$(grep '^SUPABASE_ACCESS_TOKEN=' .env.local | cut -d= -f2-)
 PROD_REF="lsnthbnqcelfgeyuxgfn"
 # Migrations sem vantar á prod í þessu release (tómt = sleppa grunn-skrefum).
-MIGRATIONS=""
+MIGRATIONS="0054_feed_audience.sql"
 [ -n "$TOKEN" ] || [ -z "$MIGRATIONS" ] || { echo "Vantar SUPABASE_ACCESS_TOKEN í .env.local"; exit 1; }
 
 run_sql() {

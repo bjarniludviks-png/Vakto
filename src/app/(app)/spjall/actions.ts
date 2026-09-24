@@ -643,8 +643,10 @@ export async function uploadChatMedia(dataUrl: string, ext: string): Promise<{ o
 /* ---------- news feed (posts + likes + comments) ---------- */
 
 export type FeedComment = { id: string; sender: string; av: string; color: string; body: string; at: string; atISO: string; photo: string | null; parentId: string | null };
+export type FeedAudience = { kind: "all" | "department" | "location"; id: string | null; name: string };
 export type FeedPost = {
   id: string; sender: string; av: string; color: string; me: boolean; photo: string | null;
+  audience: string | null; // "Eldhús" / "Laugavegur" / null = allir
   body: string; at: string; atISO: string; pinned: boolean; system: boolean;
   imageUrl: string | null; fileUrl: string | null; fileName: string | null;
   reactions: { emoji: string; count: number }[];
@@ -653,17 +655,37 @@ export type FeedPost = {
 };
 
 /** Latest 50 posts with likes + comments, newest first. */
-export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meId: string; canPin: boolean; mePhoto: string | null }> {
-  if (!isSupabaseConfigured()) return { ok: false, posts: [], meId: "", canPin: false, mePhoto: null };
+export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meId: string; canPin: boolean; canPost: boolean; audiences: FeedAudience[]; mePhoto: string | null }> {
+  if (!isSupabaseConfigured()) return { ok: false, posts: [], meId: "", canPin: false, canPost: false, audiences: [], mePhoto: null };
   try {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
-    if ("error" in ctx) return { ok: false, posts: [], meId: "", canPin: false, mePhoto: null };
+    if ("error" in ctx) return { ok: false, posts: [], meId: "", canPin: false, canPost: false, audiences: [], mePhoto: null };
     const { data: meRow } = await supabase.from("users").select("role").eq("id", ctx.userId).maybeSingle();
     const canPin = meRow?.role === "owner" || meRow?.role === "manager";
-    const { data: rows } = await supabase
-      .from("posts").select("id, sender_id, body, created_at, image_url, file_url, file_name, pinned, users!posts_sender_id_fkey(full_name)")
+    // 0054: birtingarheimild + markhópar (þolir grunn án dálkanna)
+    const polRes = await supabase.from("companies").select("feed_post_policy").eq("id", ctx.company).maybeSingle();
+    const policy = polRes.error ? "everyone" : ((polRes.data?.feed_post_policy as string) ?? "everyone");
+    const canPost = canPin || policy === "everyone";
+    const [{ data: deps }, { data: locs }] = await Promise.all([
+      supabase.from("departments").select("id, name, locations!inner(company_id)").eq("locations.company_id", ctx.company).order("name"),
+      supabase.from("locations").select("id, name").eq("company_id", ctx.company).order("name"),
+    ]);
+    const audiences: FeedAudience[] = [{ kind: "all", id: null, name: "Allir" }];
+    if (canPin) {
+      for (const d of deps ?? []) audiences.push({ kind: "department", id: d.id as string, name: d.name as string });
+      if ((locs ?? []).length > 1) for (const l of locs ?? []) audiences.push({ kind: "location", id: l.id as string, name: l.name as string });
+    }
+    const audName = (kind: unknown, id: unknown): string | null =>
+      kind === "department" ? ((deps ?? []).find((d) => d.id === id)?.name as string) ?? "Deild"
+      : kind === "location" ? ((locs ?? []).find((l) => l.id === id)?.name as string) ?? "Staður" : null;
+    let rowsRes = await supabase
+      .from("posts").select("id, sender_id, body, created_at, image_url, file_url, file_name, pinned, audience_kind, audience_id, users!posts_sender_id_fkey(full_name)")
       .eq("company_id", ctx.company).order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(50);
+    if (rowsRes.error) rowsRes = (await supabase
+      .from("posts").select("id, sender_id, body, created_at, image_url, file_url, file_name, pinned, users!posts_sender_id_fkey(full_name)")
+      .eq("company_id", ctx.company).order("pinned", { ascending: false }).order("created_at", { ascending: false }).limit(50)) as unknown as typeof rowsRes;
+    const rows = rowsRes.data as ({ audience_kind?: string; audience_id?: string | null } & Record<string, unknown>)[] | null;
     const ids = (rows ?? []).map((r) => r.id as string);
     const [{ data: likes }, { data: comments }, empNames] = await Promise.all([
       supabase.from("post_likes").select("post_id, user_id, reaction").in("post_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
@@ -685,6 +707,7 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
       for (const l of pLikes) byEmoji.set((l.reaction as string) || "❤️", (byEmoji.get((l.reaction as string) || "❤️") ?? 0) + 1);
       return {
         id: r.id as string, sender: name,
+        audience: audName(r.audience_kind, r.audience_id),
         av: system ? "VK" : initials(name),
         photo: system ? null : (empNames.get(String(r.sender_id))?.photo ?? null),
         color: system ? "#e9700f" : colorOf(name.split(/\s+/)[0] || name),
@@ -700,9 +723,9 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
         }),
       };
     });
-    return { ok: true, posts, meId: ctx.userId, canPin, mePhoto: empNames.get(ctx.userId)?.photo ?? null };
+    return { ok: true, posts, meId: ctx.userId, canPin, canPost, audiences, mePhoto: empNames.get(ctx.userId)?.photo ?? null };
   } catch {
-    return { ok: false, posts: [], meId: "", canPin: false, mePhoto: null };
+    return { ok: false, posts: [], meId: "", canPin: false, canPost: false, audiences: [], mePhoto: null };
   }
 }
 
@@ -722,22 +745,28 @@ export async function setPostPinned(postId: string, pinned: boolean): Promise<{ 
   }
 }
 
-export async function createPost(body: string, media?: { imageUrl?: string; fileUrl?: string; fileName?: string }): Promise<{ ok: boolean; error?: string }> {
+export async function createPost(body: string, media?: { imageUrl?: string; fileUrl?: string; fileName?: string }, audience?: { kind: "all" | "department" | "location"; id: string | null }): Promise<{ ok: boolean; error?: string }> {
   if (!body.trim() && !media?.imageUrl && !media?.fileUrl) return { ok: false, error: "Skrifaðu eitthvað fyrst" };
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    const { error } = await supabase.from("posts").insert({
+    const base = {
       company_id: ctx.company, sender_id: ctx.userId, body: body.trim(),
       image_url: media?.imageUrl ?? null, file_url: media?.fileUrl ?? null, file_name: media?.fileName ?? null,
-    });
-    if (error) return { ok: false, error: error.message };
+    };
+    const aud = audience && audience.kind !== "all" && audience.id ? { audience_kind: audience.kind, audience_id: audience.id } : {};
+    let { error } = await supabase.from("posts").insert({ ...base, ...aud });
+    if (error && /column|schema/i.test(error.message)) ({ error } = await supabase.from("posts").insert(base));
+    if (error) return { ok: false, error: /policy|permission|violates/i.test(error.message) ? "Aðeins stjórnendur mega birta í fréttaveituna" : error.message };
     // Manager/owner posts push to the team (best-effort, capped).
     const { data: meRow } = await supabase.from("users").select("role, full_name").eq("id", ctx.userId).maybeSingle();
     if (meRow?.role === "owner" || meRow?.role === "manager") {
-      const { data: team } = await supabase.from("employees").select("id, user_id").eq("company_id", ctx.company).eq("status", "active").limit(100);
+      let teamQ = supabase.from("employees").select("id, user_id").eq("company_id", ctx.company).eq("status", "active").limit(100);
+      if (audience?.kind === "department" && audience.id) teamQ = teamQ.eq("department_id", audience.id);
+      if (audience?.kind === "location" && audience.id) teamQ = teamQ.eq("location_id", audience.id);
+      const { data: team } = await teamQ;
       const preview = body.trim().slice(0, 80) || "Ný færsla á fréttaveitunni";
       for (const m of team ?? []) {
         if (m.user_id === ctx.userId) continue;
