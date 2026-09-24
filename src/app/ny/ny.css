@@ -370,7 +370,7 @@
 /* real rendered orange-titanium frame (public/app/phone-frame.png), straight
    front view. The UI is overlaid inside the measured screen area — the image
    supplies glass, bezel and the dynamic island. */
-.ny-phone-real{position:relative;width:272px;animation:nyfloat 7s ease-in-out infinite;will-change:transform;
+.ny-phone-real{position:relative;width:272px;margin-inline:auto;animation:nyfloat 7s ease-in-out infinite;will-change:transform;
   filter:drop-shadow(0 42px 60px rgba(0,0,0,.75)) drop-shadow(0 0 42px rgba(233,112,15,.3))}
 @media(prefers-reduced-motion:reduce){.ny-phone-real{animation:none}}
 .ny-phone-real .frame{display:block;width:100%;height:auto;position:relative;z-index:1;pointer-events:none}
