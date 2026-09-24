@@ -52,7 +52,7 @@ export default function Thread() {
   const [media, setMedia] = useState<Attachment[] | null>(null);
   async function openMedia() {
     if (!me || !id) return;
-    setInfo(false); setMedia([]);
+    setMedia([]);
     setMedia(await listAttachments(me, id));
   }
   async function pickFile() {
@@ -255,7 +255,35 @@ export default function Thread() {
           {sel?.me ? <Row icon={<Trash2 color={colors.bad} size={19} />} title="Eyða skilaboðum" danger onPress={async () => { if (sel) await deleteMessage(sel.id); setSel(null); load(); }} chevron={false} last /> : null}
         </View>
       </Sheet>
-      <Sheet open={info} onClose={() => setInfo(false)} title={name ?? "Spjall"}>
+      <Sheet open={info} onClose={() => { setInfo(false); setMedia(null); }}>
+        {media !== null ? (
+          <Pressable onPress={() => setMedia(null)} style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: -4 }}>
+            <ChevronLeft color={colors.brandDeep} size={18} /><Txt weight="bold" size={13} color={colors.brandDeep}>Til baka</Txt>
+          </Pressable>
+        ) : null}
+        <Txt weight="bold" size={19} style={{ letterSpacing: -0.3 }}>{media !== null ? "Myndir og skjöl" : (name ?? "Spjall")}</Txt>
+        {media !== null ? (
+          <>
+            {media.length === 0 ? <Muted>Engar myndir eða skjöl enn.</Muted> : null}
+            {media.filter((a) => a.kind === "image").length ? (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                {media.filter((a) => a.kind === "image").map((a) => (
+                  <Pressable key={a.id} onPress={() => Linking.openURL(a.url)} style={{ width: "31.5%", aspectRatio: 1, borderRadius: 12, overflow: "hidden", backgroundColor: colors.panel2 }}>
+                    <Image source={{ uri: a.url }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            {media.filter((a) => a.kind !== "image").length ? (
+              <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
+                {media.filter((a) => a.kind !== "image").map((a, i, arr) => (
+                  <Row key={a.id} icon={<FileText color={colors.ink2} size={19} />} title={a.name} sub={`${a.sender} · ${new Date(a.at).getDate()}.${new Date(a.at).getMonth() + 1}.${new Date(a.at).getFullYear()}`} chevron={false} onPress={() => Linking.openURL(a.url)} last={i === arr.length - 1} />
+                ))}
+              </View>
+            ) : null}
+          </>
+        ) : (
+        <>
         <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
           <Row icon={muted ? <Bell color={colors.ink2} size={19} /> : <BellOff color={colors.ink2} size={19} />} title={muted ? "Kveikja á tilkynningum" : "Þagga spjallið"} sub={muted ? "Þú færð aftur merki og hljóð" : "Ekkert ólesið-merki eða hljóð fyrir þetta spjall"} chevron={false} last
             onPress={async () => { if (!id) return; const m = await toggleMute(id); setMuted(m); }} />
@@ -271,25 +299,8 @@ export default function Thread() {
             <Row key={p.userId} icon={<Avatar name={p.name} size={36} color={p.color} photo={p.photo} />} title={p.name} sub={[p.role, p.dept].filter(Boolean).join(" · ") || "Starfsmaður"} chevron={false} last={i === memberList.length - 1} />
           ))}
         </View>
-      </Sheet>
-      <Sheet open={media !== null} onClose={() => setMedia(null)} title="Myndir og skjöl">
-        {media && media.length === 0 ? <Muted>Engar myndir eða skjöl enn.</Muted> : null}
-        {media && media.filter((a) => a.kind === "image").length ? (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-            {media.filter((a) => a.kind === "image").map((a) => (
-              <Pressable key={a.id} onPress={() => Linking.openURL(a.url)} style={{ width: "31.5%", aspectRatio: 1, borderRadius: 12, overflow: "hidden", backgroundColor: colors.panel2 }}>
-                <Image source={{ uri: a.url }} style={{ width: "100%", height: "100%" }} contentFit="cover" />
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-        {media && media.filter((a) => a.kind !== "image").length ? (
-          <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
-            {media.filter((a) => a.kind !== "image").map((a, i, arr) => (
-              <Row key={a.id} icon={<FileText color={colors.ink2} size={19} />} title={a.name} sub={`${a.sender} · ${new Date(a.at).getDate()}.${new Date(a.at).getMonth() + 1}.${new Date(a.at).getFullYear()}`} chevron={false} onPress={() => Linking.openURL(a.url)} last={i === arr.length - 1} />
-            ))}
-          </View>
-        ) : null}
+        </>
+        )}
       </Sheet>
     </KeyboardAvoidingView>
   );

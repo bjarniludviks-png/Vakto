@@ -2,7 +2,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Pressable, ScrollView, RefreshControl, TextInput } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { Plus, MessageCircle, Hash, BellOff, Search, X, Users, UserRound, Check } from "lucide-react-native";
+import { Plus, MessageCircle, Hash, BellOff, Search, X, Users, UserRound, Check, ChevronLeft } from "lucide-react-native";
 import { Header, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, Sheet, Empty, Row, Btn, Seg, useToast } from "../../src/components/ui";
 import { colors, font, useTheme } from "../../src/theme";
@@ -92,11 +92,11 @@ export default function Spjall() {
           <IconBtn label="Nýtt spjall" onPress={() => setNewMode("pick")}><Plus color={colors.ink} size={24} /></IconBtn>
         </View>
       } />
-      <View style={{ backgroundColor: colors.panel, paddingHorizontal: 16, paddingBottom: 10, gap: 10, borderBottomWidth: 1, borderBottomColor: colors.line2 }}>
+      <View style={{ backgroundColor: colors.panel, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: colors.line2 }}>
         {search !== null ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.panel2, borderRadius: 12, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 12 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.panel2, borderRadius: 14, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 14, marginTop: 4 }}>
             <Search color={colors.ink3} size={18} />
-            <TextInput autoFocus value={search} onChangeText={setSearch} placeholder="Leita í spjalli…" placeholderTextColor={colors.ink3} style={{ flex: 1, paddingVertical: 10, fontSize: 15, fontFamily: font.regular, color: colors.ink }} />
+            <TextInput autoFocus value={search} onChangeText={setSearch} placeholder="Leita í spjalli…" placeholderTextColor={colors.ink3} style={{ flex: 1, paddingVertical: 13, fontSize: 15.5, fontFamily: font.regular, color: colors.ink }} />
             {search ? <Pressable onPress={() => setSearch("")} hitSlop={8}><X color={colors.ink3} size={18} /></Pressable> : null}
           </View>
         ) : null}
@@ -142,36 +142,48 @@ export default function Spjall() {
         ))}
       </ScrollView>
 
-      <Sheet open={newMode === "pick"} onClose={() => setNewMode(null)} title="Nýtt spjall" scroll={false}>
-        <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
-          <Row icon={<View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: colors.brandSoft, alignItems: "center", justifyContent: "center" }}><UserRound color={colors.brandDeep} size={19} /></View>} title="Einkaspjall" sub="Skilaboð til eins samstarfsmanns" onPress={() => openNew("dm")} />
-          <Row icon={<View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: colors.infoSoft, alignItems: "center", justifyContent: "center" }}><Users color={colors.info} size={19} /></View>} title="Nýr hópur" sub="Veldu nafn og meðlimi" onPress={() => openNew("group")} last />
-        </View>
-      </Sheet>
+      <Sheet open={newMode !== null} onClose={() => setNewMode(null)}>
+        {newMode !== "pick" ? (
+          <Pressable onPress={() => setNewMode("pick")} style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: -4 }}>
+            <ChevronLeft color={colors.brandDeep} size={18} /><Txt weight="bold" size={13} color={colors.brandDeep}>Til baka</Txt>
+          </Pressable>
+        ) : null}
+        <Txt weight="bold" size={19} style={{ letterSpacing: -0.3 }}>{newMode === "group" ? "Nýr hópur" : newMode === "dm" ? "Einkaspjall" : "Nýtt spjall"}</Txt>
 
-      <Sheet open={newMode === "dm"} onClose={() => setNewMode(null)} title="Einkaspjall">
-        {people.length === 0 ? <Muted>Sæki samstarfsfólk…</Muted> : null}
-        <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
-          {people.map((p, i) => (
-            <Row key={p.userId} icon={<Avatar name={p.name} size={38} color={p.color} photo={p.photo} />} title={p.name} sub={[p.role, p.dept].filter(Boolean).join(" · ") || "Starfsmaður"} onPress={() => dm(p)} chevron={false} last={i === people.length - 1} />
-          ))}
-        </View>
-      </Sheet>
+        {newMode === "pick" ? (
+          <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
+            <Row icon={<View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: colors.brandSoft, alignItems: "center", justifyContent: "center" }}><UserRound color={colors.brandDeep} size={19} /></View>} title="Einkaspjall" sub="Skilaboð til eins samstarfsmanns" onPress={() => openNew("dm")} />
+            <Row icon={<View style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: colors.infoSoft, alignItems: "center", justifyContent: "center" }}><Users color={colors.info} size={19} /></View>} title="Nýr hópur" sub="Veldu nafn og meðlimi" onPress={() => openNew("group")} last />
+          </View>
+        ) : null}
 
-      <Sheet open={newMode === "group"} onClose={() => setNewMode(null)} title="Nýr hópur">
-        <TextInput value={groupName} onChangeText={setGroupName} placeholder="Nafn hópsins, t.d. Helgarvaktin" placeholderTextColor={colors.ink3} autoFocus style={{ borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, fontSize: 15, fontFamily: font.regular, color: colors.ink, backgroundColor: colors.panel2 }} />
-        <Txt weight="bold" size={12} color={colors.ink3} style={{ letterSpacing: 0.8 }}>MEÐLIMIR · {sel.size} valdir</Txt>
-        <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
-          {people.map((p, i) => {
-            const on = sel.has(p.userId);
-            return (
-              <Row key={p.userId} icon={<Avatar name={p.name} size={38} color={p.color} photo={p.photo} />} title={p.name} sub={[p.role, p.dept].filter(Boolean).join(" · ") || "Starfsmaður"} last={i === people.length - 1}
-                onPress={() => setSel((s) => { const n = new Set(s); if (n.has(p.userId)) n.delete(p.userId); else n.add(p.userId); return n; })}
-                right={<View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: on ? colors.brand : colors.line, backgroundColor: on ? colors.brand : "transparent", alignItems: "center", justifyContent: "center" }}>{on ? <Check color="#fff" size={14} /> : null}</View>} />
-            );
-          })}
-        </View>
-        <Btn title="Stofna hóp" size="lg" loading={busy} disabled={!groupName.trim() || sel.size === 0} onPress={makeGroup} />
+        {newMode === "dm" ? (
+          <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
+            {people.length === 0 ? <Muted style={{ padding: 14 }}>Sæki samstarfsfólk…</Muted> : null}
+            {people.map((p, i) => (
+              <Row key={p.userId} icon={<Avatar name={p.name} size={38} color={p.color} photo={p.photo} />} title={p.name} sub={[p.role, p.dept].filter(Boolean).join(" · ") || "Starfsmaður"} onPress={() => dm(p)} chevron={false} last={i === people.length - 1} />
+            ))}
+          </View>
+        ) : null}
+
+        {newMode === "group" ? (
+          <>
+            <TextInput value={groupName} onChangeText={setGroupName} placeholder="Nafn hópsins, t.d. Helgarvaktin" placeholderTextColor={colors.ink3} style={{ borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, fontSize: 15, fontFamily: font.regular, color: colors.ink, backgroundColor: colors.panel2 }} />
+            <Txt weight="bold" size={12} color={colors.ink3} style={{ letterSpacing: 0.8 }}>MEÐLIMIR · {sel.size} valdir</Txt>
+            <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
+              {people.length === 0 ? <Muted style={{ padding: 14 }}>Sæki samstarfsfólk…</Muted> : null}
+              {people.map((p, i) => {
+                const on = sel.has(p.userId);
+                return (
+                  <Row key={p.userId} icon={<Avatar name={p.name} size={38} color={p.color} photo={p.photo} />} title={p.name} sub={[p.role, p.dept].filter(Boolean).join(" · ") || "Starfsmaður"} last={i === people.length - 1}
+                    onPress={() => setSel((s) => { const n = new Set(s); if (n.has(p.userId)) n.delete(p.userId); else n.add(p.userId); return n; })}
+                    right={<View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: on ? colors.brand : colors.line, backgroundColor: on ? colors.brand : "transparent", alignItems: "center", justifyContent: "center" }}>{on ? <Check color="#fff" size={14} /> : null}</View>} />
+                );
+              })}
+            </View>
+            <Btn title="Stofna hóp" size="lg" loading={busy} disabled={!groupName.trim() || sel.size === 0} onPress={makeGroup} />
+          </>
+        ) : null}
       </Sheet>
     </View>
   );
