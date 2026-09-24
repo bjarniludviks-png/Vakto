@@ -8,6 +8,8 @@ cd "$(dirname "$0")/.."
 
 TOKEN=$(grep '^SUPABASE_ACCESS_TOKEN=' .env.local | cut -d= -f2-)
 PROD_REF="lsnthbnqcelfgeyuxgfn"
+# Migrations sem vantar á prod í þessu release (tómt = sleppa grunn-skrefum).
+MIGRATIONS=""
 [ -n "$TOKEN" ] || [ -z "$MIGRATIONS" ] || { echo "Vantar SUPABASE_ACCESS_TOKEN í .env.local"; exit 1; }
 
 run_sql() {
@@ -30,7 +32,6 @@ else
 echo "== Prod-grunnur: staða fyrir"
 run_sql "select (select count(*) from companies) companies, (select count(*) from employees) employees"
 
-MIGRATIONS=""
 for f in $MIGRATIONS; do
   echo "== $f"
   run_sql "$(cat supabase/migrations/$f)"
