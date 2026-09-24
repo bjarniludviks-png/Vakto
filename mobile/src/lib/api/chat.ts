@@ -1,6 +1,7 @@
 // Spjall — beint á Supabase (channels / channel_members / messages /
 // message_reactions / channel_reads) með realtime, eins og vefurinn.
 import type { RealtimeChannel } from "@supabase/supabase-js";
+import { tr, trf } from "../../../src/lib/i18n";
 import { supabase } from "../supabase";
 import type { Me } from "./me";
 
@@ -105,11 +106,11 @@ export async function listConversations(me: Me): Promise<Conversation[]> {
     const other = otherId ? (people.get(otherId) ?? { userId: otherId, name: "Samtal", color: null, photo: null, role: null, dept: null }) : null;
     return {
       id: c.id,
-      name: c.kind === "dm" ? (other?.name ?? "Samtal") : c.kind === "general" ? (c.name || "Almennt") : c.name,
+      name: c.kind === "dm" ? (other?.name ?? tr("Samtal")) : c.kind === "general" ? tr(c.name || "Almennt") : c.name,
       kind: c.kind as Conversation["kind"],
-      last: last ? (last.kind === "text" ? last.body : last.kind === "image" ? "📷 Mynd" : last.kind === "file" ? `📎 ${last.body || "Skjal"}` : "🎤 Talskilaboð") : null,
+      last: last ? (last.kind === "text" ? last.body : last.kind === "image" ? tr("📷 Mynd") : last.kind === "file" ? `📎 ${last.body || tr("Skjal")}` : tr("🎤 Talskilaboð")) : null,
       lastAt: last?.at ?? null,
-      lastFrom: last ? (last.from === myId ? "Þú" : (people.get(last.from)?.name.split(/\s+/)[0] ?? null)) : null,
+      lastFrom: last ? (last.from === myId ? tr("Þú") : (people.get(last.from)?.name.split(/\s+/)[0] ?? null)) : null,
       unread: unread[c.id] ?? 0,
       photo: c.kind === "dm" ? (other?.photo ?? null) : (c.photo_url ?? null),
       color: c.kind === "dm" ? (other?.color ?? null) : null,

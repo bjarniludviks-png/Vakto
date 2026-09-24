@@ -1,5 +1,6 @@
 // Stillingar — tilkynningar, prófíll, lykilorð, um appið.
 import React, { useEffect, useState } from "react";
+import { tr, trf, useLang, setLang, LANGS } from "../src/lib/i18n";
 import { View, Switch, Linking, Pressable } from "react-native";
 import { useRouter } from "expo-router";
 import { Bell, BellOff, UserRound, KeyRound, LifeBuoy, FileText } from "lucide-react-native";
@@ -13,6 +14,7 @@ import { supabase } from "../src/lib/supabase";
 
 export default function Stillingar() {
   const { mode, dark } = useTheme();
+  const lang = useLang();
   const { me } = useMe();
   const router = useRouter();
   const toast = useToast();
@@ -25,7 +27,7 @@ export default function Stillingar() {
     if (kind === "1h") until = Date.now() + 3600000;
     if (kind === "morning") { const d = new Date(); if (d.getHours() >= 8) d.setDate(d.getDate() + 1); d.setHours(8, 0, 0, 0); until = d.getTime(); }
     await setDnd(until);
-    toast(`Tilkynningar þaggaðar ${dndLabel(until)}`);
+    toast(trf("Tilkynningar þaggaðar {x}", dndLabel(until)));
   }
 
   async function togglePush(v: boolean) {
@@ -36,7 +38,7 @@ export default function Stillingar() {
   async function resetPw() {
     if (!me?.email) { toast("Ekkert netfang skráð"); return; }
     const { error } = await supabase.auth.resetPasswordForEmail(me.email, { redirectTo: "https://www.vakto.is/nytt-lykilord" });
-    toast(error ? error.message : `Póstur sendur á ${me.email}`);
+    toast(error ? error.message : trf("Póstur sendur á {x}", me.email));
   }
 
   return (
@@ -48,7 +50,7 @@ export default function Stillingar() {
       <Muted style={{ paddingHorizontal: 2 }}>EKKI TRUFLA</Muted>
       <List>
         {dnd ? (
-          <Row icon={<IconBox tone="warn"><BellOff color={colors.warn} size={19} /></IconBox>} title={`Þaggað ${dndLabel(dnd)}`} sub="Engar push-tilkynningar á meðan" right={<Pressable onPress={() => mute("off")} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: colors.brandSoft }}><Txt weight="bold" size={12.5} color={colors.brandDeep}>Kveikja</Txt></Pressable>} last />
+          <Row icon={<IconBox tone="warn"><BellOff color={colors.warn} size={19} /></IconBox>} title={trf("Þaggað {x}", dndLabel(dnd))} sub="Engar push-tilkynningar á meðan" right={<Pressable onPress={() => mute("off")} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: colors.brandSoft }}><Txt weight="bold" size={12.5} color={colors.brandDeep}>Kveikja</Txt></Pressable>} last />
         ) : (
           <>
             <Row icon={<IconBox><BellOff color={colors.ink2} size={19} /></IconBox>} title="Þagga í 1 klst" sub="Fyrir fund eða hvíld" chevron={false} onPress={() => mute("1h")} />
@@ -57,17 +59,23 @@ export default function Stillingar() {
           </>
         )}
       </List>
+      <Muted style={{ paddingHorizontal: 2 }}>TUNGUMÁL</Muted>
+      <List>
+        <View style={{ padding: 12 }}>
+          <Seg value={lang} onChange={setLang} items={LANGS} />
+        </View>
+      </List>
       <Muted style={{ paddingHorizontal: 2 }}>ÚTLIT</Muted>
       <List>
         <View style={{ padding: 12, gap: 10 }}>
           <Seg value={mode} onChange={setThemeMode} items={[{ id: "system", label: "Fylgir símanum" }, { id: "light", label: "Ljóst" }, { id: "dark", label: "Dökkt" }]} />
-          <Muted size={12}>{mode === "system" ? `Fylgir stillingu símans (núna ${dark ? "dökkt" : "ljóst"}).` : mode === "dark" ? "Dökkt þema alltaf." : "Ljóst þema alltaf."}</Muted>
+          <Muted size={12}>{mode === "system" ? trf("Fylgir stillingu símans (núna {x}).", tr(dark ? "dökkt" : "ljóst")) : mode === "dark" ? "Dökkt þema alltaf." : "Ljóst þema alltaf."}</Muted>
         </View>
       </List>
       <Muted style={{ paddingHorizontal: 2 }}>AÐGANGUR</Muted>
       <List>
         <Row icon={<IconBox><UserRound color={colors.ink2} size={19} /></IconBox>} title="Prófíll" sub="Sími, netfang, bankareikningur, mynd" onPress={() => router.push("/profill")} />
-        <Row icon={<IconBox><KeyRound color={colors.ink2} size={19} /></IconBox>} title="Breyta lykilorði" sub={me?.email ? `Sendir hlekk á ${me.email}` : "Sendir hlekk í pósti"} onPress={resetPw} chevron={false} last />
+        <Row icon={<IconBox><KeyRound color={colors.ink2} size={19} /></IconBox>} title="Breyta lykilorði" sub={me?.email ? trf("Sendir hlekk á {x}", me.email) : "Sendir hlekk í pósti"} onPress={resetPw} chevron={false} last />
       </List>
       <Muted style={{ paddingHorizontal: 2 }}>UM VAKTO</Muted>
       <List>

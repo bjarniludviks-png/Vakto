@@ -1,5 +1,6 @@
 // Starfsmaður — prófíll samstarfsmanns: vaktir vikunnar, skilaboð, hringja.
 import React, { useCallback, useState } from "react";
+import { tr } from "../../src/lib/i18n";
 import { View, Linking } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { MessageCircle, Phone } from "lucide-react-native";
@@ -59,7 +60,7 @@ export default function Starfsmadur() {
           <Card style={{ paddingVertical: 8 }}>
             <View style={{ paddingVertical: 6 }}><Eyebrow>Vaktir næstu tvær vikur</Eyebrow></View>
             {shifts.length === 0 ? <Muted style={{ paddingVertical: 8 }}>Engar vaktir á plani.</Muted> : null}
-            {shifts.map((s, i) => { const d = new Date(s.date + "T12:00:00"); return <KV key={s.date + s.start} k={`${DAY_L[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}`} v={`${s.start}–${s.end}`} last={i === shifts.length - 1} />; })}
+            {shifts.map((s, i) => { const d = new Date(s.date + "T12:00:00"); return <KV key={s.date + s.start} k={`${tr(DAY_L[d.getDay()])} ${d.getDate()}.${d.getMonth() + 1}`} v={`${s.start}–${s.end}`} last={i === shifts.length - 1} />; })}
           </Card>
         </>
       ) : null}

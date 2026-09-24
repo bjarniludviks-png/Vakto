@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from "react";
 import { Appearance } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { getLang, onLangChange } from "./lib/i18n";
 
 const LIGHT = {
   ink: "#1a1a1f", ink2: "#5f6470", ink3: "#9296a6",
@@ -50,10 +51,10 @@ export async function loadThemeMode(): Promise<ThemeMode> {
   } catch { /* ignore */ }
   return mode;
 }
-const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
+const subscribe = (l: () => void) => { listeners.add(l); const off = onLangChange(l); return () => { listeners.delete(l); off(); }; };
 /** Subscribe a component to theme changes. Returns { mode, dark, colors }. */
 export function useTheme() {
-  const snap = useSyncExternalStore(subscribe, () => `${mode}:${sys}`, () => `${mode}:${sys}`);
+  const snap = useSyncExternalStore(subscribe, () => `${mode}:${sys}:${getLang()}`, () => `${mode}:${sys}:${getLang()}`);
   void snap;
   return { mode, dark: resolvedTheme() === "dark", colors };
 }

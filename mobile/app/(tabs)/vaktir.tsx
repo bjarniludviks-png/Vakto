@@ -1,6 +1,7 @@
 // Vaktir — Mínar · Allar · Lausar, dagaræma, vaktir litaðar eftir deild,
 // vaktasíða með samstarfsfólki og áætluðum launum. (Prototýpa 2026-09-23.)
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { tr } from "../../src/lib/i18n";
 import { View, Pressable, ScrollView, RefreshControl } from "react-native";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { ChevronLeft, ChevronRight, CalendarPlus, LayoutGrid } from "lucide-react-native";
@@ -58,14 +59,14 @@ export default function Vaktir() {
 
   function moveWeek(delta: number) { const d = new Date(weekStart); d.setDate(d.getDate() + delta * 7); setWeekStart(d); setSelDate(iso(d)); }
   const w0 = new Date(days[0] + "T12:00:00"), w6 = new Date(days[6] + "T12:00:00");
-  const weekLabel = w0.getMonth() === w6.getMonth() ? `${w0.getDate()}.–${w6.getDate()}. ${MONTHS[w0.getMonth()]}` : `${w0.getDate()}. ${MONTHS[w0.getMonth()].slice(0, 3)} – ${w6.getDate()}. ${MONTHS[w6.getMonth()].slice(0, 3)}`;
+  const weekLabel = w0.getMonth() === w6.getMonth() ? `${w0.getDate()}.–${w6.getDate()}. ${tr(MONTHS[w0.getMonth()])}` : `${w0.getDate()}. ${tr(MONTHS[w0.getMonth()]).slice(0, 3)} – ${w6.getDate()}. ${tr(MONTHS[w6.getMonth()]).slice(0, 3)}`;
   const isThisWeek = days.includes(todayISO);
 
   async function apply(s: SchedShift) {
     if (!me || applied.has(s.id)) return;
     setApplied((x) => new Set(x).add(s.id));
     const d = new Date(s.date + "T12:00:00");
-    const r = await applyForShift(me, `${DAY_L[(d.getDay() + 6) % 7]} ${d.getDate()}.${d.getMonth() + 1} ${s.start ?? ""}–${s.end ?? ""}`);
+    const r = await applyForShift(me, `${tr(DAY_L[(d.getDay() + 6) % 7])} ${d.getDate()}.${d.getMonth() + 1} ${s.start ?? ""}–${s.end ?? ""}`);
     if (!r.ok) { toast(r.error ?? "Tókst ekki"); setApplied((x) => { const n = new Set(x); n.delete(s.id); return n; }); return; }
     toast("Umsókn send — vaktstjóri fær tilkynningu");
   }
@@ -96,7 +97,7 @@ export default function Vaktir() {
               const on = d === selDate, today = d === todayISO, has = mineByDay.has(d);
               return (
                 <Pressable key={d} onPress={() => setSelDate(d)} style={{ flex: 1, alignItems: "center", gap: 3, paddingVertical: 6 }}>
-                  <Txt size={10.5} weight="bold" color={colors.ink3} style={{ letterSpacing: 0.4 }}>{DAY_L[i].toUpperCase()}</Txt>
+                  <Txt size={10.5} weight="bold" color={colors.ink3} style={{ letterSpacing: 0.4 }}>{tr(DAY_L[i]).toUpperCase()}</Txt>
                   <View style={{ width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: on ? colors.brand : "transparent", borderWidth: today && !on ? 2 : 0, borderColor: colors.brand }}>
                     <Txt weight="bold" size={16} color={on ? "#fff" : colors.ink}>{new Date(d + "T12:00:00").getDate()}</Txt>
                   </View>
@@ -122,7 +123,7 @@ export default function Vaktir() {
                 <View key={d} style={{ flexDirection: "row", gap: 12 }}>
                   <View style={{ width: 44, alignItems: "center", paddingTop: 8 }}>
                     <Txt weight="bold" size={20} color={today ? colors.brand : colors.ink} style={{ lineHeight: 22 }}>{new Date(d + "T12:00:00").getDate()}</Txt>
-                    <Txt size={10.5} weight="bold" color={today ? colors.brand : colors.ink3} style={{ letterSpacing: 0.4 }}>{DAY_L[i].toUpperCase()}</Txt>
+                    <Txt size={10.5} weight="bold" color={today ? colors.brand : colors.ink3} style={{ letterSpacing: 0.4 }}>{tr(DAY_L[i]).toUpperCase()}</Txt>
                   </View>
                   <View style={{ flex: 1, gap: 8 }}>
                     {mine.length ? mine.map((s) => <ShiftCard key={s.id} s={s} color={colorOf(s)} tag={today ? "Í dag" : undefined} onPress={() => router.push(`/vakt/${s.id}`)} />) : (
@@ -140,7 +141,7 @@ export default function Vaktir() {
         {tab === "all" && (
           <>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
-              <Txt weight="bold" size={15}>{DAY_FULL[(new Date(selDate + "T12:00:00").getDay() + 6) % 7]} {new Date(selDate + "T12:00:00").getDate()}. {MONTHS[new Date(selDate + "T12:00:00").getMonth()]}</Txt>
+              <Txt weight="bold" size={15}>{tr(DAY_FULL[(new Date(selDate + "T12:00:00").getDay() + 6) % 7])} {new Date(selDate + "T12:00:00").getDate()}. {tr(MONTHS[new Date(selDate + "T12:00:00").getMonth()])}</Txt>
               <Muted>{allOnSel.length} á vakt</Muted>
             </View>
             {allOnSel.length === 0 ? <Empty title="Engar vaktir á plani" sub="Ekkert skráð þennan dag." /> : null}
@@ -159,7 +160,7 @@ export default function Vaktir() {
                 <Card key={s.id} style={{ borderWidth: 1.5, borderStyle: "dashed", borderColor: colors.brand2, gap: 10 }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
                     <View style={{ flex: 1 }}>
-                      <Eyebrow>{DAY_FULL[(d.getDay() + 6) % 7]} {d.getDate()}. {MONTHS[d.getMonth()]}</Eyebrow>
+                      <Eyebrow>{tr(DAY_FULL[(d.getDay() + 6) % 7])} {d.getDate()}. {tr(MONTHS[d.getMonth()])}</Eyebrow>
                       <Txt weight="bold" size={20} style={{ marginTop: 2, fontVariant: ["tabular-nums"] }}>{s.start ?? "?"}–{s.end ?? "?"}{s.dur ? ` · ${s.dur}` : ""}</Txt>
                       <Muted>{[s.typeName, s.dept].filter(Boolean).join(" · ") || "Opin vakt"}</Muted>
                     </View>

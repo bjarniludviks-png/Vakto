@@ -1,6 +1,7 @@
 // Heim — næsta vakt + stimplun, hverjir eru á vakt með þér, flýtihnappar,
 // tilkynningar. (Prototýpa 2026-09-23.)
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { tr, trf } from "../../src/lib/i18n";
 import { View, Pressable, ScrollView, RefreshControl } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -92,7 +93,7 @@ export default function HomeScreen() {
         </Pressable>
         <View style={{ flex: 1 }}>
           <Txt weight="bold" size={20} style={{ letterSpacing: -0.4 }}>{greeting()}, {first}</Txt>
-          <Muted>{DAYS[now.getDay()]} {now.getDate()}. {MONTHS[now.getMonth()]}</Muted>
+          <Muted>{tr(DAYS[now.getDay()])} {now.getDate()}. {tr(MONTHS[now.getMonth()])}</Muted>
         </View>
         <IconBtn label="Tilkynningar" onPress={() => setSheet("notis")} badge={(home?.notis.length ?? 0) > 0}>
           <Bell color={colors.ink} size={22} />
@@ -104,9 +105,9 @@ export default function HomeScreen() {
         {onShift ? (
           <View style={{ backgroundColor: colors.good, borderRadius: 22, padding: 18, overflow: "hidden" }}>
             <View style={{ position: "absolute", right: -40, top: -50, width: 180, height: 180, borderRadius: 90, backgroundColor: "rgba(255,255,255,.12)" }} />
-            <Eyebrow color="rgba(255,255,255,.85)">Á vakt · síðan {new Date(home!.openSince!).toTimeString().slice(0, 5)}</Eyebrow>
+            <Eyebrow color="rgba(255,255,255,.85)">{trf("Á vakt · síðan {n}", new Date(home!.openSince!).toTimeString().slice(0, 5))}</Eyebrow>
             <Txt weight="bold" size={40} color="#fff" style={{ letterSpacing: -0.8, marginTop: 4, fontVariant: ["tabular-nums"] }}>{elapsed(home!.openSince!)}</Txt>
-            <Txt size={14} color="rgba(255,255,255,.9)">{shift && shiftIsToday ? `Vaktin endar ${shift.end}${shift.dept ? ` · ${shift.dept}` : ""}` : "Engin vakt á plani — stimplun skráð samt"}</Txt>
+            <Txt size={14} color="rgba(255,255,255,.9)">{shift && shiftIsToday ? `${trf("Vaktin endar {n}", shift.end)}${shift.dept ? ` · ${shift.dept}` : ""}` : tr("Engin vakt á plani — stimplun skráð samt")}</Txt>
             <Pressable onPress={() => punch(false)} disabled={busy} style={({ pressed }) => ({ marginTop: 14, backgroundColor: "#fff", borderRadius: 14, paddingVertical: 16, alignItems: "center", opacity: pressed ? 0.9 : 1 })}>
               <Txt weight="bold" size={16} color={colors.good}>{busy ? "Augnablik…" : "Stimpla út"}</Txt>
             </Pressable>
@@ -114,11 +115,11 @@ export default function HomeScreen() {
         ) : (
           <View style={{ backgroundColor: colors.brand, borderRadius: 22, padding: 18, overflow: "hidden", ...brandShadow }}>
             <View style={{ position: "absolute", right: -40, top: -50, width: 180, height: 180, borderRadius: 90, backgroundColor: "rgba(255,255,255,.12)" }} />
-            <Eyebrow color="rgba(255,255,255,.85)">{shift ? `Næsta vakt · ${dayLabel(shift.date, todayISO)}` : "Næsta vakt"}</Eyebrow>
+            <Eyebrow color="rgba(255,255,255,.85)">{shift ? `${tr("Næsta vakt")} · ${dayLabel(shift.date, todayISO)}` : tr("Næsta vakt")}</Eyebrow>
             {shift ? (
               <>
                 <Txt weight="bold" size={28} color="#fff" style={{ letterSpacing: -0.6, marginTop: 4, fontVariant: ["tabular-nums"] }}>{shift.start}–{shift.end}</Txt>
-                <Txt size={14} color="rgba(255,255,255,.92)">{[shift.dept, shift.typeName].filter(Boolean).join(" · ") || "Vakt"}{est ? ` · ${dec1(est.hours)} klst · áætlað ${kr(est.total)}` : ""}</Txt>
+                <Txt size={14} color="rgba(255,255,255,.92)">{[shift.dept, shift.typeName].filter(Boolean).join(" · ") || tr("Vakt")}{est ? ` · ${trf("{n} klst", dec1(est.hours))} · ${tr("áætlað")} ${kr(est.total)}` : ""}</Txt>
               </>
             ) : (
               <Txt weight="bold" size={20} color="#fff" style={{ marginTop: 4 }}>Engin vakt á plani næstu 3 vikur</Txt>
@@ -153,12 +154,12 @@ export default function HomeScreen() {
 
         {/* flýtihnappar */}
         <View style={{ flexDirection: "row", gap: 10 }}>
-          <Quick icon={<LayoutGrid color={colors.brandDeep} size={18} />} title="Lausar vaktir" sub={home ? `${home.openCount} í boði` : "…"} onPress={() => router.push("/vaktir?seg=open")} />
+          <Quick icon={<LayoutGrid color={colors.brandDeep} size={18} />} title="Lausar vaktir" sub={home ? trf("{n} í boði", home.openCount) : "…"} onPress={() => router.push("/vaktir?seg=open")} />
           <Quick icon={<CalendarPlus color={colors.brandDeep} size={18} />} title="Biðja um frí" sub="svar frá vaktstjóra" onPress={() => setSheet("leave")} />
         </View>
         <View style={{ flexDirection: "row", gap: 10 }}>
           <Quick icon={<ArrowLeftRight color={colors.brandDeep} size={18} />} title="Bjóða vakt" sub="skipti við samstarfsfólk" onPress={() => setSheet("offer")} />
-          <Quick icon={<Banknote color={colors.brandDeep} size={18} />} title="Laun" sub={home ? `${kr(home.pay.earnedKr)} unnið` : "…"} onPress={() => router.push("/laun")} />
+          <Quick icon={<Banknote color={colors.brandDeep} size={18} />} title="Laun" sub={home ? trf("{n} kr unnið", kr(home.pay.earnedKr).replace(" kr", "")) : "…"} onPress={() => router.push("/laun")} />
         </View>
 
         {/* tilkynningar */}

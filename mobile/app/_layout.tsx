@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "../src/lib/auth";
 import { MeProvider } from "../src/lib/me-context";
 import { ToastProvider } from "../src/components/ui";
 import { colors, useTheme, loadThemeMode } from "../src/theme";
+import { loadLang } from "../src/lib/i18n";
 
 function Gate({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -32,7 +33,7 @@ function Gate({ children }: { children: React.ReactNode }) {
 
 export default function RootLayout() {
   const { dark } = useTheme();
-  useEffect(() => { loadThemeMode(); }, []);
+  useEffect(() => { loadThemeMode(); loadLang(); }, []);
   const [fontsLoaded] = useFonts({
     "GeneralSans-Regular": require("../assets/fonts/GeneralSans-Regular.otf"),
     "GeneralSans-Medium": require("../assets/fonts/GeneralSans-Medium.otf"),

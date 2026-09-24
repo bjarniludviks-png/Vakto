@@ -1,6 +1,7 @@
 // Spjallþráður — realtime, skilaboð flokkuð eftir sendanda, viðbrögð með
 // löngu ýti, „séð af“, svar í þræði, skrifar-vísir.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { tr, trf } from "../../src/lib/i18n";
 import { View, TextInput, FlatList, KeyboardAvoidingView, Platform, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -69,7 +70,7 @@ export default function Thread() {
   }
   function leave() {
     if (!id) return;
-    Alert.alert("Yfirgefa spjall", "Þú hættir að fá skilaboð úr þessu spjalli.", [{ text: "Hætta við", style: "cancel" }, { text: "Yfirgefa", style: "destructive", onPress: async () => { const r = await leaveChannel(id); if (!r.ok) { toast(r.error ?? "Tókst ekki"); return; } setInfo(false); router.back(); } }]);
+    Alert.alert(tr("Yfirgefa spjall"), tr("Þú hættir að fá skilaboð úr þessu spjalli."), [{ text: tr("Hætta við"), style: "cancel" }, { text: tr("Yfirgefa"), style: "destructive", onPress: async () => { const r = await leaveChannel(id); if (!r.ok) { toast(r.error ?? "Tókst ekki"); return; } setInfo(false); router.back(); } }]);
   }
   async function openInfo() {
     if (!me || !id) return;
@@ -190,7 +191,7 @@ export default function Thread() {
         {isGroup ? <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={18} /></View> : <Avatar name={name ?? "?"} size={36} />}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt weight="bold" size={15} numberOfLines={1}>{name ?? "Spjall"}</Txt>
-          <Muted size={12}>{typing ? `${typing} skrifar…` : isGroup ? `${members || "—"} meðlimir${muted ? " · þaggað" : ""}` : muted ? "Einkaspjall · þaggað" : "Einkaspjall"}</Muted>
+          <Muted size={12}>{typing ? trf("{x} skrifar…", typing) : isGroup ? (muted ? trf("{n} meðlimir · þaggað", members || "—") : trf("{n} meðlimir", members || "—")) : muted ? "Einkaspjall · þaggað" : "Einkaspjall"}</Muted>
         </View>
         <Pressable onPress={openInfo} hitSlop={10} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}><MoreHorizontal color={colors.ink} size={24} /></Pressable>
       </View>
@@ -219,7 +220,7 @@ export default function Thread() {
       {replyTo ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: colors.panel, borderTopWidth: 1, borderTopColor: colors.line2 }}>
           <CornerUpLeft color={colors.ink3} size={16} />
-          <View style={{ flex: 1 }}><Txt weight="bold" size={12} color={colors.brandDeep}>Svara {replyTo.sender}</Txt><Muted size={12}>{replyTo.body.slice(0, 80)}</Muted></View>
+          <View style={{ flex: 1 }}><Txt weight="bold" size={12} color={colors.brandDeep}>{trf("Svara {x}", replyTo.sender)}</Txt><Muted size={12}>{replyTo.body.slice(0, 80)}</Muted></View>
           <Pressable onPress={() => setReplyTo(null)} hitSlop={8}><X color={colors.ink3} size={18} /></Pressable>
         </View>
       ) : null}
@@ -232,7 +233,7 @@ export default function Thread() {
         </Pressable>
         <TextInput
           style={{ flex: 1, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.panel2, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: font.regular, color: colors.ink, maxHeight: 110 }}
-          multiline value={text} onChangeText={onType} placeholder="Skrifaðu skilaboð…" placeholderTextColor={colors.ink3} blurOnSubmit={false}
+          multiline value={text} onChangeText={onType} placeholder={tr("Skrifaðu skilaboð…")} placeholderTextColor={colors.ink3} blurOnSubmit={false}
         />
         <Pressable onPress={send} disabled={!text.trim() || sending} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: text.trim() ? colors.brand : colors.line2, alignItems: "center", justifyContent: "center" }}>
           <Send color={text.trim() ? "#fff" : colors.ink3} size={18} />
@@ -292,7 +293,7 @@ export default function Thread() {
           <Row icon={<Images color={colors.ink2} size={19} />} title="Myndir og skjöl" sub="Allt sem hefur verið sent í spjallinu" onPress={openMedia} last={kind === "general"} />
           {kind !== "general" ? <Row icon={<LogOut color={colors.bad} size={19} />} title="Yfirgefa spjall" danger chevron={false} onPress={leave} last /> : null}
         </View>
-        <Txt weight="bold" size={12} color={colors.ink3} style={{ letterSpacing: 0.8, marginTop: 4 }}>{isGroup ? `MEÐLIMIR · ${memberList.length || members}` : "ÞÁTTTAKENDUR"}</Txt>
+        <Txt weight="bold" size={12} color={colors.ink3} style={{ letterSpacing: 0.8, marginTop: 4 }}>{isGroup ? trf("MEÐLIMIR · {n}", memberList.length || members) : tr("ÞÁTTTAKENDUR")}</Txt>
         <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
           {memberList.length === 0 ? <Muted style={{ padding: 14 }}>Sæki…</Muted> : null}
           {memberList.map((p, i) => (

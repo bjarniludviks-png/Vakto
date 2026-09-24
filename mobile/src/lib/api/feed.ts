@@ -1,6 +1,7 @@
 // Fréttaveita — beint á Supabase (posts / post_likes / post_comments).
 // Allir í fyrirtækinu mega birta; aðeins stjórnendur/vaktstjórar festa efst.
 import { supabase } from "../supabase";
+import { tr, trf } from "../../../src/lib/i18n";
 import type { Me } from "./me";
 import { peopleMap } from "./chat";
 
@@ -30,13 +31,13 @@ export type FeedPost = {
 
 export function ago(isoTs: string): string {
   const mins = Math.max(0, Math.round((Date.now() - new Date(isoTs).getTime()) / 60000));
-  if (mins < 1) return "Rétt í þessu";
-  if (mins < 60) return `${mins} mín`;
+  if (mins < 1) return tr("Rétt í þessu");
+  if (mins < 60) return trf("{n} mín", mins);
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs} klst`;
+  if (hrs < 24) return trf("{n} klst", hrs);
   const d = new Date(isoTs);
   const days = Math.floor(hrs / 24);
-  if (days === 1) return "Í gær";
+  if (days === 1) return tr("Í gær");
   return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
 }
 

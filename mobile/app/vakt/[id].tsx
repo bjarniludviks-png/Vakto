@@ -1,6 +1,7 @@
 // Vakt — fullur skjár fyrir eina vakt: litaður haus, upplýsingar, samstarfsfólk,
 // áætluð laun (eigin vakt), bjóða vakt / forföll / sækja um / skilaboð.
 import React, { useCallback, useState } from "react";
+import { tr, trf } from "../../src/lib/i18n";
 import { View, Pressable, Share } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { MoreHorizontal, ArrowLeftRight, MessageCircle, Share2 } from "lucide-react-native";
@@ -65,7 +66,7 @@ export default function VaktScreen() {
   const color = deptColor(s.dept, s.typeColor && s.typeColor !== "#e9700f" ? s.typeColor : s.deptColor);
   const hrs = hoursOf(s.start, s.end);
   const est = me && mine ? estimateShift(me, s.date, s.start, s.end) : null;
-  const label = `${DAY_L[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1} ${s.start}–${s.end}`;
+  const label = `${tr(DAY_L[d.getDay()])} ${d.getDate()}.${d.getMonth() + 1} ${s.start}–${s.end}`;
 
   async function apply() {
     if (!me || applied) return;
@@ -89,7 +90,7 @@ export default function VaktScreen() {
         <View style={{ backgroundColor: color, padding: 18, flexDirection: "row", alignItems: "center", gap: 14 }}>
           <View style={{ backgroundColor: "rgba(255,255,255,.18)", borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, minWidth: 56, alignItems: "center" }}>
             <Txt weight="bold" size={26} color="#fff" style={{ lineHeight: 28 }}>{d.getDate()}</Txt>
-            <Txt size={11} weight="bold" color="#fff">{DAY_L[d.getDay()].toUpperCase()}</Txt>
+            <Txt size={11} weight="bold" color="#fff">{tr(DAY_L[d.getDay()]).toUpperCase()}</Txt>
           </View>
           <View style={{ flex: 1 }}>
             <Txt weight="bold" size={22} color="#fff" style={{ fontVariant: ["tabular-nums"], letterSpacing: -0.4 }}>{s.start && s.end ? `${s.start}–${s.end} · ${dec1(hrs)} klst` : "Opin vakt"}</Txt>
@@ -101,7 +102,7 @@ export default function VaktScreen() {
       <View style={{ height: 16 }} />
       <Card style={{ paddingVertical: 4 }}>
         <KV k="Starfsmaður" v={open ? <Pill tone="brand" label="Laus til umsóknar" /> : <Pressable onPress={() => s.empId && router.push(`/starfsmadur/${s.empId}`)} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><Avatar name={s.empName ?? "?"} size={28} color={s.empColor} photo={s.empPhoto} /><Txt weight="bold" size={14.5}>{s.empName}</Txt></Pressable>} />
-        <KV k="Dagsetning" v={`${DAY_FULL[d.getDay()]} ${d.getDate()}. ${MONTHS[d.getMonth()]}`} />
+        <KV k="Dagsetning" v={`${tr(DAY_FULL[d.getDay()])} ${d.getDate()}. ${tr(MONTHS[d.getMonth()])}`} />
         <KV k="Staður" v={[s.company, s.location].filter(Boolean).join(" · ") || "—"} />
         {s.typeName || s.dept ? <KV k="Staða" v={[s.typeName, s.dept].filter(Boolean).join(" · ")} /> : null}
         <KV k="Samstarfsfólk" last v={co.length ? <AvatarStack people={co.map((c) => ({ name: c.name, color: c.color, photo: c.photo }))} /> : <Muted>Enginn á sama tíma</Muted>} />
@@ -109,7 +110,7 @@ export default function VaktScreen() {
 
       {co.length ? (
         <Card style={{ paddingVertical: 4 }}>
-          <View style={{ paddingVertical: 10 }}><Eyebrow>Allir á vakt {DAY_FULL[d.getDay()].toLowerCase().replace("dagur", "dag")}</Eyebrow></View>
+          <View style={{ paddingVertical: 10 }}><Eyebrow>{tr("Allir á vakt")}</Eyebrow></View>
           {co.map((c) => (
             <Pressable key={c.id} onPress={() => router.push(`/starfsmadur/${c.empId}`)} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.line2 }}>
               <Avatar name={c.name} size={32} color={c.color} photo={c.photo} />
@@ -136,13 +137,13 @@ export default function VaktScreen() {
           <Btn title="Get ekki mætt" variant="danger" style={{ flex: 1 }} onPress={() => setSheet("cant")} />
         </View>
       ) : (
-        <Btn title={`Senda ${(s.empName ?? "").split(/\s+/)[0]} skilaboð`} variant="ghost" icon={<MessageCircle color={colors.ink} size={17} />} onPress={message} />
+        <Btn title={trf("Senda {x} skilaboð", (s.empName ?? "").split(/\s+/)[0])} variant="ghost" icon={<MessageCircle color={colors.ink} size={17} />} onPress={message} />
       )}
 
       <Sheet open={sheet === "more"} onClose={() => setSheet(null)} scroll={false}>
         <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
-          <Row icon={<Share2 color={colors.ink2} size={19} />} title="Deila vakt" sub="Senda tíma og stað áfram" chevron={false} onPress={() => { setSheet(null); Share.share({ message: `${DAY_FULL[d.getDay()]} ${d.getDate()}. ${MONTHS[d.getMonth()]} · ${s.start}–${s.end} · ${[s.typeName, s.dept, s.company].filter(Boolean).join(" · ")}` }); }} />
-          {!open && s.empName ? <Row icon={<MessageCircle color={colors.ink2} size={19} />} title={mine ? "Opna spjall" : `Skilaboð til ${s.empName.split(/\s+/)[0]}`} chevron={false} last onPress={() => { setSheet(null); if (mine) router.push("/spjall"); else message(); }} /> : null}
+          <Row icon={<Share2 color={colors.ink2} size={19} />} title="Deila vakt" sub="Senda tíma og stað áfram" chevron={false} onPress={() => { setSheet(null); Share.share({ message: `${tr(DAY_FULL[d.getDay()])} ${d.getDate()}. ${tr(MONTHS[d.getMonth()])} · ${s.start}–${s.end} · ${[s.typeName, s.dept, s.company].filter(Boolean).join(" · ")}` }); }} />
+          {!open && s.empName ? <Row icon={<MessageCircle color={colors.ink2} size={19} />} title={mine ? "Opna spjall" : trf("Skilaboð til {x}", s.empName.split(/\s+/)[0])} chevron={false} last onPress={() => { setSheet(null); if (mine) router.push("/spjall"); else message(); }} /> : null}
         </View>
       </Sheet>
       <OfferSheet open={sheet === "offer"} onClose={() => setSheet(null)} onDone={() => router.back()} shiftLabel={label} />

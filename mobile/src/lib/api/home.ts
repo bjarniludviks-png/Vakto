@@ -2,6 +2,7 @@
 // tilkynningar (afleiddar úr beiðnum, lausum vöktum, festum færslum og ólesnum
 // skilaboðum) og launamat mánaðarins.
 import { supabase } from "../supabase";
+import { tr, trf } from "../../../src/lib/i18n";
 import { iso, type Me } from "./me";
 import { monthPay, type MonthPay } from "./pay";
 import { getUnreadTotal } from "./chat";
@@ -31,12 +32,12 @@ export type Home = {
 const hm = (t: string | null | undefined) => (t ? t.slice(0, 5) : null);
 const DAY = ["sun", "mán", "þri", "mið", "fim", "fös", "lau"];
 export function dayLabel(dateISO: string, todayISO: string): string {
-  if (dateISO === todayISO) return "í dag";
+  if (dateISO === todayISO) return tr("í dag");
   const d = new Date(dateISO + "T12:00:00");
   const t = new Date(todayISO + "T12:00:00");
   const diff = Math.round((d.getTime() - t.getTime()) / 86400000);
-  if (diff === 1) return "á morgun";
-  return `${DAY[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}`;
+  if (diff === 1) return tr("á morgun");
+  return `${tr(DAY[d.getDay()])} ${d.getDate()}.${d.getMonth() + 1}`;
 }
 function ago(ts: string): string {
   const mins = Math.max(0, Math.round((Date.now() - new Date(ts).getTime()) / 60000));
@@ -44,7 +45,7 @@ function ago(ts: string): string {
   const h = Math.floor(mins / 60);
   if (h < 24) return `${h} klst`;
   const d = Math.floor(h / 24);
-  return d === 1 ? "í gær" : `${d} d.`;
+  return d === 1 ? tr("Í gær") : `${d} d.`;
 }
 
 export async function getHome(me: Me): Promise<Home> {
@@ -91,21 +92,21 @@ export async function getHome(me: Me): Promise<Home> {
   // tilkynningar
   const notis: Noti[] = [];
   for (const o of (openQ.data ?? []).slice(0, 3)) {
-    notis.push({ id: "open:" + o.id, kind: "open", tone: "brand", title: `Laus vakt ${dayLabel(o.date, today)} ${hm(o.start_time) ?? ""}–${hm(o.end_time) ?? ""}`, sub: "Sæktu um í Vaktir → Lausar", when: ago(o.created_at ?? now.toISOString()), at: o.created_at ?? "" });
+    notis.push({ id: "open:" + o.id, kind: "open", tone: "brand", title: `${tr("Laus vakt")} ${dayLabel(o.date, today)} ${hm(o.start_time) ?? ""}–${hm(o.end_time) ?? ""}`, sub: tr("Sæktu um í Vaktir → Lausar"), when: ago(o.created_at ?? now.toISOString()), at: o.created_at ?? "" });
   }
   const LEAVE: Record<string, string> = { orlof: "Orlof", veikindi: "Veikindi", olaunad: "Ólaunað leyfi" };
   for (const l of leavesQ.data ?? []) {
     const ok = l.status === "approved";
-    notis.push({ id: "leave:" + l.id, kind: "request", tone: ok ? "good" : "bad", title: `${LEAVE[l.type] ?? "Beiðni"} ${ok ? "samþykkt" : "hafnað"} · ${l.from_date.slice(8, 10)}.${l.from_date.slice(5, 7)}–${l.to_date.slice(8, 10)}.${l.to_date.slice(5, 7)}`, sub: ok ? "Vaktstjóri samþykkti beiðnina þína" : "Vaktstjóri hafnaði beiðninni", when: "", at: l.from_date });
+    notis.push({ id: "leave:" + l.id, kind: "request", tone: ok ? "good" : "bad", title: `${tr(LEAVE[l.type] ?? "Beiðni")} ${tr(ok ? "samþykkt" : "hafnað")} · ${l.from_date.slice(8, 10)}.${l.from_date.slice(5, 7)}–${l.to_date.slice(8, 10)}.${l.to_date.slice(5, 7)}`, sub: tr(ok ? "Vaktstjóri samþykkti beiðnina þína" : "Vaktstjóri hafnaði beiðninni"), when: "", at: l.from_date });
   }
   for (const s of swapsQ.data ?? []) {
     const ok = s.status === "approved";
-    notis.push({ id: "swap:" + s.id, kind: "request", tone: ok ? "good" : "bad", title: `${s.note?.startsWith("Umsókn") ? "Umsókn um vakt" : "Vaktaskipti"} ${ok ? "samþykkt" : "hafnað"}`, sub: s.note ?? "", when: ago(s.created_at), at: s.created_at });
+    notis.push({ id: "swap:" + s.id, kind: "request", tone: ok ? "good" : "bad", title: `${tr(s.note?.startsWith("Umsókn") ? "Umsókn um vakt" : "Vaktaskipti")} ${tr(ok ? "samþykkt" : "hafnað")}`, sub: s.note ?? "", when: ago(s.created_at), at: s.created_at });
   }
   for (const p of postsQ.data ?? []) {
-    notis.push({ id: "post:" + p.id, kind: "post", tone: "info", title: "Fest tilkynning í fréttaveitu", sub: (p.body as string).slice(0, 80), when: ago(p.created_at), at: p.created_at });
+    notis.push({ id: "post:" + p.id, kind: "post", tone: "info", title: tr("Fest tilkynning í fréttaveitu"), sub: (p.body as string).slice(0, 80), when: ago(p.created_at), at: p.created_at });
   }
-  if (unread > 0) notis.unshift({ id: "chat", kind: "chat", tone: "warn", title: `${unread} ólesin skilaboð`, sub: "Opnaðu Spjall", when: "", at: now.toISOString() });
+  if (unread > 0) notis.unshift({ id: "chat", kind: "chat", tone: "warn", title: trf("{n} ólesin skilaboð", unread), sub: tr("Opnaðu Spjall"), when: "", at: now.toISOString() });
   notis.sort((a, b) => (a.at < b.at ? 1 : -1));
 
   const punches = (punchesQ.data ?? []).map((p) => ({ clockIn: p.clock_in as string, clockOut: p.clock_out as string }));

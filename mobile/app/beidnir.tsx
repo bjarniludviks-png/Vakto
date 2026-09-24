@@ -1,5 +1,6 @@
 // Ný beiðni — orlof/veikindi/ólaunað, vaktaskipti, aðgengi.
 import React, { useState } from "react";
+import { tr } from "../src/lib/i18n";
 import { View, TextInput, Pressable } from "react-native";
 import { Screen } from "../src/components/screen";
 import { Card, Txt, Muted, Btn, SectionTitle } from "../src/components/ui";
@@ -136,7 +137,7 @@ export default function Beidnir() {
           multiline
           value={swapNote}
           onChangeText={setSwapNote}
-          placeholder="T.d. Get ekki tekið vaktina fös 22.8 — óska eftir skiptum"
+          placeholder={tr("T.d. Get ekki tekið vaktina fös 22.8 — óska eftir skiptum")}
           placeholderTextColor={colors.ink3}
         />
         <Btn

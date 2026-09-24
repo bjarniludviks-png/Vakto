@@ -45,7 +45,8 @@
       "expo-image",
       "expo-sharing",
       "expo-web-browser",
-      "expo-updates"
+      "expo-updates",
+      "expo-localization"
     ],
     "extra": {
       "router": {},

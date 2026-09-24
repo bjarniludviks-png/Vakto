@@ -2,6 +2,7 @@
 // Employees can read all company shifts + employee names (RLS company-wide).
 import { supabase } from "../supabase";
 import { iso, mondayOf, type Me } from "./me";
+import { trf } from "../../../src/lib/i18n";
 
 export type SchedShift = {
   id: string;
@@ -27,7 +28,7 @@ function durOf(start: string | null, end: string | null): { h: number; label: st
     parseInt(start.slice(0, 2), 10) - parseInt(start.slice(3, 5), 10) / 60;
   if (h < 0) h += 24;
   const r = Math.round(h * 10) / 10;
-  return { h: r, label: `${String(r).replace(".", ",")} klst` };
+  return { h: r, label: trf("{n} klst", String(r).replace(".", ",")) };
 }
 
 export async function getWeekShifts(me: Me, weekStart: Date): Promise<SchedShift[]> {

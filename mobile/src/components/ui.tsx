@@ -20,6 +20,7 @@ import {
 import { Image } from "expo-image";
 import { ChevronRight } from "lucide-react-native";
 import { colors, font, radius, cardShadow, brandShadow, tone as toneMap, type Tone } from "../theme";
+import { tr, getLang } from "../lib/i18n";
 
 type Weight = "regular" | "medium" | "semibold" | "bold";
 
@@ -28,9 +29,13 @@ export function Txt({
   color = colors.ink,
   size = 14,
   style,
+  children,
   ...rest
 }: TextProps & { weight?: Weight; color?: string; size?: number }) {
-  return <Text {...rest} style={[{ fontFamily: font[weight], color, fontSize: size }, style]} />;
+  const kids = typeof children === "string" ? tr(children) : Array.isArray(children) ? children.map((c) => (typeof c === "string" ? tr(c) : c)) : children;
+  // Víetnamska: General Sans vantar tónmerkin → kerfisletur með sömu þyngd.
+  const face = getLang() === "vi" ? { fontWeight: (weight === "bold" ? "700" : weight === "semibold" ? "600" : weight === "medium" ? "500" : "400") as "400" | "500" | "600" | "700" } : { fontFamily: font[weight] };
+  return <Text {...rest} style={[{ ...face, color, fontSize: size }, style]}>{kids}</Text>;
 }
 
 export function Muted({ children, size = 13, style }: { children: React.ReactNode; size?: number; style?: TextProps["style"] }) {
@@ -424,7 +429,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const t = useRef<ReturnType<typeof setTimeout> | null>(null);
   const show = useCallback(
     (m: string) => {
-      setMsg(m);
+      setMsg(tr(m));
       Animated.timing(op, { toValue: 1, duration: 180, useNativeDriver: true }).start();
       if (t.current) clearTimeout(t.current);
       t.current = setTimeout(() => Animated.timing(op, { toValue: 0, duration: 220, useNativeDriver: true }).start(() => setMsg(null)), 2300);

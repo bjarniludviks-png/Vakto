@@ -1,5 +1,6 @@
 // Laun — unnið hingað til, áætlað í mánaðarlok, sundurliðun og vikur.
 import React, { useCallback, useState } from "react";
+import { tr, trf } from "../src/lib/i18n";
 import { View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { FolderOpen } from "lucide-react-native";
@@ -36,11 +37,11 @@ export default function Laun() {
       <Card style={{ gap: 10 }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <Eyebrow>{pay?.monthLabel ?? "…"}</Eyebrow>
-          {pay ? <Pill tone="good" label={`Greitt ${pay.payday}`} /> : null}
+          {pay ? <Pill tone="good" label={trf("Greitt {x}", pay.payday)} /> : null}
         </View>
         <View>
           <Txt weight="bold" size={34} style={{ letterSpacing: -0.8, lineHeight: 38, fontVariant: ["tabular-nums"] }}>{pay ? kr(pay.earnedKr) : "—"}</Txt>
-          <Muted>unnið hingað til{pay ? ` · ${dec1(pay.earnedH)} klst · ${pay.shifts} ${pay.shifts === 1 ? "vakt" : "vaktir"}` : ""}</Muted>
+          <Muted>{pay ? `unnið hingað til · ${dec1(pay.earnedH)} klst · ${pay.shifts} ${pay.shifts === 1 ? "vakt" : "vaktir"}` : "unnið hingað til"}</Muted>
         </View>
         <Bar value={pct} />
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
@@ -69,7 +70,7 @@ export default function Laun() {
           </View>
           {pay.weeks.map((w, i) => (
             <View key={w.label} style={{ flexDirection: "row", paddingVertical: 10, borderBottomWidth: i === pay.weeks.length - 1 ? 0 : 1, borderBottomColor: colors.line2 }}>
-              <Txt size={13.5} color={w.planned ? colors.ink3 : colors.ink} style={{ flex: 1 }}>{w.label}{w.planned ? " · áætlað" : ""}</Txt>
+              <Txt size={13.5} color={w.planned ? colors.ink3 : colors.ink} style={{ flex: 1 }}>{w.label}{w.planned ? tr("· áætlað") : ""}</Txt>
               <Txt size={13.5} color={w.planned ? colors.ink3 : colors.ink} style={{ width: 60, textAlign: "right", fontVariant: ["tabular-nums"] }}>{dec1(w.hours)}</Txt>
               <Txt size={13.5} weight="semibold" color={w.planned ? colors.ink3 : colors.ink} style={{ width: 100, textAlign: "right", fontVariant: ["tabular-nums"] }}>{kr(w.kr)}</Txt>
             </View>
@@ -79,7 +80,7 @@ export default function Laun() {
 
       <Muted size={12} style={{ lineHeight: 18 }}>
         {me?.hourly
-          ? `Brúttólaun fyrir staðgreiðslu og lífeyri, reiknuð eftir ${me.union ? `kjarasamningi ${me.union}` : "reglum fyrirtækisins"} á tímakaupi ${kr(me.rate)}. Endanlegur launaseðill kemur úr launakerfinu.`
+          ? trf("Brúttólaun fyrir staðgreiðslu og lífeyri, reiknuð eftir {x} á tímakaupi {n} kr. Endanlegur launaseðill kemur úr launakerfinu.", me.union ? trf("kjarasamningi {x}", me.union) : tr("reglum fyrirtækisins"), kr(me.rate).replace(" kr", ""))
           : "Mánaðarlaun. Endanlegur launaseðill kemur úr launakerfinu."}
       </Muted>
       <Btn title="Launaseðlar og skjöl" variant="ghost" icon={<FolderOpen color={colors.ink} size={17} />} onPress={() => router.push("/skjol")} />

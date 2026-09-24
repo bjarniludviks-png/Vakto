@@ -1,5 +1,6 @@
 // Prófíllinn minn — sími, netfang, bankareikningur (self-service breytingar).
 import React, { useEffect, useState } from "react";
+import { tr } from "../src/lib/i18n";
 import { View, TextInput } from "react-native";
 import { Screen } from "../src/components/screen";
 import { Card, Txt, Muted, Btn, SectionTitle } from "../src/components/ui";
@@ -67,7 +68,7 @@ export default function Profill() {
             style={inputStyle()}
             value={bank}
             onChangeText={setBank}
-            placeholder="0000-26-000000"
+            placeholder={tr("0000-26-000000")}
             placeholderTextColor={colors.ink3}
           />
         </Field>

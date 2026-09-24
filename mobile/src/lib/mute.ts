@@ -1,5 +1,6 @@
 // Þöggun spjallrása — geymd í símanum (felur ólesið-merki og hljóð fyrir rásina).
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { tr, trf } from "../../src/lib/i18n";
 
 const KEY = "@vakto-muted";
 let cache: Set<string> | null = null;
@@ -42,8 +43,9 @@ export async function setDnd(until: number | null): Promise<void> {
 }
 export function dndLabel(until: number | null): string {
   if (!until) return "";
-  if (until === Infinity) return "þar til þú kveikir aftur";
+  if (until === Infinity) return tr("þar til þú kveikir aftur");
   const d = new Date(until);
   const today = new Date().toDateString() === d.toDateString();
-  return `til ${today ? "" : "morguns "}kl. ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const hhmm = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return today ? trf("til kl. {n}", hhmm) : trf("til morguns kl. {n}", hhmm);
 }

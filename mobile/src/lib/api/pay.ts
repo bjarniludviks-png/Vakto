@@ -1,6 +1,7 @@
 // Launamat — per-shift estimate and month projection from confirmed shifts.
 // Uses the same rule engine as the web (payroll.ts / payrules.ts).
 import { classifyPay, computeFromPunches, BURDEN } from "../payroll";
+import { tr, trf } from "../../../src/lib/i18n";
 import type { Me } from "./me";
 
 export type ShiftPay = { hours: number; base: number; extra: number; total: number; label: string };
@@ -21,7 +22,7 @@ export function estimateShift(me: Me, date: string, start: string | null, end: s
   const base = cls.total * me.rate;
   const extra = (cls.premiumPay + cls.overtimePay) / (1 + BURDEN);
   const d = new Date(date + "T12:00:00").getDay();
-  const label = cls.overtime > 0 ? "yfirvinna" : d === 0 || d === 6 ? `helgarálag ${me.rules.weekend}%` : cls.premium > 0 ? `kvöldálag ${me.rules.eve}%` : "dagvinna";
+  const label = cls.overtime > 0 ? tr("yfirvinna") : d === 0 || d === 6 ? trf("helgarálag {n}%", me.rules.weekend) : cls.premium > 0 ? trf("kvöldálag {n}%", me.rules.eve) : tr("dagvinna");
   return { hours: cls.total, base: Math.round(base), extra: Math.round(extra), total: Math.round(base + extra), label };
 }
 
@@ -85,6 +86,6 @@ export function monthPay(
     earnedKr, earnedH: earnedCls.total, plannedKr, plannedH: plannedCls.total, projectedKr: earnedKr + plannedKr,
     dayKr: Math.round(dayH * rate), dayH, premKr, premH: earnedCls.premium, otKr, otH: earnedCls.overtime,
     orlofKr: Math.round(earnedKr * 0.1017), shifts: punches.length,
-    weeks, monthLabel: `${MONTHS[m]} ${y}`, payday: `${payday.getDate()}. ${MONTHS[payday.getMonth()]}`,
+    weeks, monthLabel: `${tr(MONTHS[m])} ${y}`, payday: `${payday.getDate()}. ${tr(MONTHS[payday.getMonth()])}`,
   };
 }

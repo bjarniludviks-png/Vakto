@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Tabs } from "expo-router";
 import { House, CalendarDays, MessageCircle, Newspaper, UserRound } from "lucide-react-native";
 import { colors, font, useTheme } from "../../src/theme";
+import { tr } from "../../src/lib/i18n";
 import { useMe } from "../../src/lib/me-context";
 import { unreadCounts, subscribeChat } from "../../src/lib/api/chat";
 import { getMuted, onMuteChange } from "../../src/lib/mute";
@@ -40,11 +41,11 @@ export default function TabLayout() {
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: "Heim", tabBarIcon: ({ color, size }) => <House color={color} size={size} /> }} />
-      <Tabs.Screen name="vaktir" options={{ title: "Vaktir", tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} /> }} />
-      <Tabs.Screen name="spjall" options={{ title: "Spjall", tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />, tabBarBadge: unread > 0 ? unread : undefined }} />
-      <Tabs.Screen name="frettir" options={{ title: "Fréttir", tabBarIcon: ({ color, size }) => <Newspaper color={color} size={size} /> }} />
-      <Tabs.Screen name="meira" options={{ title: "Ég", tabBarIcon: ({ color, size }) => <UserRound color={color} size={size} /> }} />
+      <Tabs.Screen name="index" options={{ title: tr("Heim"), tabBarIcon: ({ color, size }) => <House color={color} size={size} /> }} />
+      <Tabs.Screen name="vaktir" options={{ title: tr("Vaktir"), tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} /> }} />
+      <Tabs.Screen name="spjall" options={{ title: tr("Spjall"), tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />, tabBarBadge: unread > 0 ? unread : undefined }} />
+      <Tabs.Screen name="frettir" options={{ title: tr("Fréttir"), tabBarIcon: ({ color, size }) => <Newspaper color={color} size={size} /> }} />
+      <Tabs.Screen name="meira" options={{ title: tr("Ég"), tabBarIcon: ({ color, size }) => <UserRound color={color} size={size} /> }} />
     </Tabs>
   );
 }

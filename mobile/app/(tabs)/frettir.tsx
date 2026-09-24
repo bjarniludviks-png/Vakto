@@ -1,6 +1,7 @@
 // Fréttir — fréttaveita fyrirtækisins: fest efst, myndir, viðbrögð, athugasemdir,
 // ný færsla með mynd og „festa efst“ (stjórnendur).
 import React, { useCallback, useEffect, useState } from "react";
+import { tr } from "../../src/lib/i18n";
 import { View, TextInput, Pressable, ScrollView, RefreshControl, Switch, KeyboardAvoidingView, Platform } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { Plus, Heart, MessageSquare, Pin, ImagePlus, Send, Trash2 } from "lucide-react-native";
@@ -124,7 +125,7 @@ export default function Frettir() {
               ) : null}
               {commentFor === p.id ? (
                 <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-end", paddingHorizontal: 14, paddingBottom: 12 }}>
-                  <TextInput style={[inputStyle(), { flex: 1, paddingVertical: 9, borderRadius: 20 }]} value={comment} onChangeText={setComment} placeholder="Skrifa athugasemd…" placeholderTextColor={colors.ink3} autoFocus onSubmitEditing={() => sendComment(p)} />
+                  <TextInput style={[inputStyle(), { flex: 1, paddingVertical: 9, borderRadius: 20 }]} value={comment} onChangeText={setComment} placeholder={tr("Skrifa athugasemd…")} placeholderTextColor={colors.ink3} autoFocus onSubmitEditing={() => sendComment(p)} />
                   <Pressable onPress={() => sendComment(p)} disabled={!comment.trim()} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: comment.trim() ? colors.brand : colors.line2, alignItems: "center", justifyContent: "center" }}>
                     <Send color={comment.trim() ? "#fff" : colors.ink3} size={16} />
                   </Pressable>
@@ -137,7 +138,7 @@ export default function Frettir() {
 
       <Sheet open={compose} onClose={() => setCompose(false)} title="Ný færsla">
         <Muted style={{ marginTop: -6 }}>Birtist í fréttaveitu vinnustaðarins. Allir í fyrirtækinu sjá hana{canPin ? " og fá push-tilkynningu" : ""}.</Muted>
-        <TextInput style={[inputStyle(), { minHeight: 120, textAlignVertical: "top", fontSize: 16, lineHeight: 22 }]} multiline value={draft} onChangeText={setDraft} placeholder="Hvað viltu segja starfsfólkinu?" placeholderTextColor={colors.ink3} autoFocus />
+        <TextInput style={[inputStyle(), { minHeight: 120, textAlignVertical: "top", fontSize: 16, lineHeight: 22 }]} multiline value={draft} onChangeText={setDraft} placeholder={tr("Hvað viltu segja starfsfólkinu?")} placeholderTextColor={colors.ink3} autoFocus />
         {img ? (
           <View>
             <Image source={{ uri: img }} style={{ width: "100%", height: 170, borderRadius: 14 }} contentFit="cover" />

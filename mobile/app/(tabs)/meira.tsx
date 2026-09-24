@@ -1,5 +1,6 @@
 // Ég — laun, skírteini, skjöl, beiðnir, tímar, samstarfsfólk, stillingar, útskráning.
 import React, { useCallback, useState } from "react";
+import { tr, trf } from "../../src/lib/i18n";
 import { View, Pressable, Alert } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { IdCard, FolderOpen, FileText, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight } from "lucide-react-native";
@@ -46,8 +47,8 @@ export default function Eg() {
       {/* laun */}
       <Pressable onPress={() => router.push("/laun")} style={({ pressed }) => ({ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, padding: 16, gap: 10, opacity: pressed ? 0.9 : 1 })}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-          <Eyebrow>Laun · {pay?.monthLabel ?? "…"}</Eyebrow>
-          {pay ? <Pill tone="good" label={`Greitt ${pay.payday}`} /> : null}
+          <Eyebrow>{trf("Laun · {x}", pay?.monthLabel ?? "…")}</Eyebrow>
+          {pay ? <Pill tone="good" label={trf("Greitt {x}", pay.payday)} /> : null}
         </View>
         <View>
           <Txt weight="bold" size={34} style={{ letterSpacing: -0.8, lineHeight: 38, fontVariant: ["tabular-nums"] }}>{pay ? kr(pay.earnedKr) : "—"}</Txt>
@@ -64,7 +65,7 @@ export default function Eg() {
         <Row icon={<IconBox tone="brand"><IdCard color={iconColor("brand")} size={19} /></IconBox>} title="Starfsmannaskírteini" sub="Sýna eða bæta í Wallet" onPress={() => router.push("/skirteini")} />
         <Row icon={<IconBox tone="info"><FolderOpen color={iconColor("info")} size={19} /></IconBox>} title="Skjöl" sub="Ráðningarsamningur, HACCP, handbækur" onPress={() => router.push("/skjol")} />
         <Row icon={<IconBox tone="good"><CheckCircle2 color={iconColor("good")} size={19} /></IconBox>} title="Beiðnir" sub={reqCount ? `${pending} í bið · ${reqCount} alls` : "Frí, vaktaskipti, leiðréttingar"} onPress={() => router.push("/beidnir")} />
-        <Row icon={<IconBox><Clock color={colors.ink2} size={19} /></IconBox>} title="Tímar og stimplanir" sub={pay ? `${dec1(pay.earnedH)} klst í ${pay.monthLabel.split(" ")[0]}` : "Stimplanirnar þínar"} onPress={() => router.push("/timar")} />
+        <Row icon={<IconBox><Clock color={colors.ink2} size={19} /></IconBox>} title="Tímar og stimplanir" sub={pay ? trf("{n} klst í {x}", dec1(pay.earnedH), pay.monthLabel.split(" ")[0]) : "Stimplanirnar þínar"} onPress={() => router.push("/timar")} />
         <Row icon={<IconBox><Users color={colors.ink2} size={19} /></IconBox>} title="Samstarfsfólk" sub="Hverjir vinna með þér" onPress={() => router.push("/samstarfsfolk")} last />
       </List>
 
@@ -74,7 +75,7 @@ export default function Eg() {
         <Row
           icon={<IconBox tone="bad"><LogOut color={iconColor("bad")} size={19} /></IconBox>}
           title="Skrá út" danger chevron={false} last
-          onPress={() => Alert.alert("Skrá út", "Viltu skrá þig út?", [{ text: "Hætta við", style: "cancel" }, { text: "Skrá út", style: "destructive", onPress: async () => { await unregisterPush().catch(() => {}); supabase.auth.signOut(); } }])}
+          onPress={() => Alert.alert(tr("Skrá út"), tr("Viltu skrá þig út?"), [{ text: tr("Hætta við"), style: "cancel" }, { text: tr("Skrá út"), style: "destructive", onPress: async () => { await unregisterPush().catch(() => {}); supabase.auth.signOut(); } }])}
         />
       </List>
       <Muted size={11.5} style={{ textAlign: "center" }}>VAKTO 1.0 · vakto.is · hjalp@vakto.is</Muted>

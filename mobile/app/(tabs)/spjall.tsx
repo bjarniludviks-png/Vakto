@@ -1,5 +1,6 @@
 // Spjall — samtalalisti í Messenger-stíl: leit, ólesið-sía, nýtt einka- eða hópspjall.
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { tr, trf } from "../../src/lib/i18n";
 import { View, Pressable, ScrollView, RefreshControl, TextInput } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Plus, MessageCircle, Hash, BellOff, Search, X, Users, UserRound, Check, ChevronLeft } from "lucide-react-native";
@@ -80,7 +81,7 @@ export default function Spjall() {
     setBusy(false);
     if (!r.ok || !r.id) { toast(r.error ?? "Tókst ekki að stofna hóp"); return; }
     setNewMode(null);
-    toast(`Hópurinn „${groupName.trim()}“ stofnaður`);
+    toast(trf("Hópurinn „{x}“ stofnaður", groupName.trim()));
     router.push(`/spjall/${r.id}?name=${encodeURIComponent(groupName.trim())}`);
   }
 
@@ -96,7 +97,7 @@ export default function Spjall() {
         {search !== null ? (
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.panel2, borderRadius: 14, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 14, marginTop: 4 }}>
             <Search color={colors.ink3} size={18} />
-            <TextInput autoFocus value={search} onChangeText={setSearch} placeholder="Leita í spjalli…" placeholderTextColor={colors.ink3} style={{ flex: 1, paddingVertical: 13, fontSize: 15.5, fontFamily: font.regular, color: colors.ink }} />
+            <TextInput autoFocus value={search} onChangeText={setSearch} placeholder={tr("Leita í spjalli…")} placeholderTextColor={colors.ink3} style={{ flex: 1, paddingVertical: 13, fontSize: 15.5, fontFamily: font.regular, color: colors.ink }} />
             {search ? <Pressable onPress={() => setSearch("")} hitSlop={8}><X color={colors.ink3} size={18} /></Pressable> : null}
           </View>
         ) : null}
@@ -104,7 +105,7 @@ export default function Spjall() {
         {dnd ? (
           <Pressable onPress={() => router.push("/stillingar")} style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.warnSoft, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 }}>
             <BellOff color={colors.warn} size={16} />
-            <Txt weight="semibold" size={12.5} color={colors.warn} style={{ flex: 1 }}>Tilkynningar þaggaðar {dndLabel(dnd)}</Txt>
+            <Txt weight="semibold" size={12.5} color={colors.warn} style={{ flex: 1 }}>{trf("Tilkynningar þaggaðar {x}", dndLabel(dnd))}</Txt>
             <Txt weight="bold" size={12.5} color={colors.warn}>Breyta</Txt>
           </Pressable>
         ) : null}
@@ -168,7 +169,7 @@ export default function Spjall() {
 
         {newMode === "group" ? (
           <>
-            <TextInput value={groupName} onChangeText={setGroupName} placeholder="Nafn hópsins, t.d. Helgarvaktin" placeholderTextColor={colors.ink3} style={{ borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, fontSize: 15, fontFamily: font.regular, color: colors.ink, backgroundColor: colors.panel2 }} />
+            <TextInput value={groupName} onChangeText={setGroupName} placeholder={tr("Nafn hópsins, t.d. Helgarvaktin")} placeholderTextColor={colors.ink3} style={{ borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, fontSize: 15, fontFamily: font.regular, color: colors.ink, backgroundColor: colors.panel2 }} />
             <Txt weight="bold" size={12} color={colors.ink3} style={{ letterSpacing: 0.8 }}>MEÐLIMIR · {sel.size} valdir</Txt>
             <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
               {people.length === 0 ? <Muted style={{ padding: 14 }}>Sæki samstarfsfólk…</Muted> : null}

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { tr } from "../src/lib/i18n";
 import {
   View,
   TextInput,
@@ -85,7 +86,7 @@ export default function Login() {
               keyboardType="email-address"
               value={email}
               onChangeText={setEmail}
-              placeholder="netfang@fyrirtaeki.is"
+              placeholder={tr("netfang@fyrirtaeki.is")}
               placeholderTextColor={colors.ink3}
             />
           </View>
@@ -99,7 +100,7 @@ export default function Login() {
               autoComplete="password"
               value={password}
               onChangeText={setPassword}
-              placeholder="••••••••"
+              placeholder={tr("••••••••")}
               placeholderTextColor={colors.ink3}
               onSubmitEditing={signIn}
             />
