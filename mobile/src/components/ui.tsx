@@ -317,8 +317,8 @@ export function KV({ k, v, last }: { k: string; v: React.ReactNode; last?: boole
   );
 }
 
-/** Sheet — á iOS innbyggt „card sheet“ (kúpt horn, bakgrunnur dregst aftar,
- * strjúka niður lokar); á Android/vef eigin sheet með mjúku yfirlagi. */
+/** Sheet neðan frá: yfirlagið fadar inn á sínum stað, síðan rennur upp með
+ * stórum kúptum hornum; strjúka niður eða ýta á bakgrunn lokar. */
 export function Sheet({
   open,
   onClose,
@@ -332,39 +332,56 @@ export function Sheet({
   title?: string;
   scroll?: boolean;
 }) {
+  const [mounted, setMounted] = useState(open);
+  const fade = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(600)).current;
+  const drag = useRef(new Animated.Value(0)).current;
+  const startY = useRef(0);
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      drag.setValue(0);
+      Animated.parallel([
+        Animated.timing(fade, { toValue: 1, duration: 220, useNativeDriver: true }),
+        Animated.spring(slide, { toValue: 0, damping: 26, stiffness: 260, mass: 0.9, useNativeDriver: true }),
+      ]).start();
+    } else if (mounted) {
+      Animated.parallel([
+        Animated.timing(fade, { toValue: 0, duration: 180, useNativeDriver: true }),
+        Animated.timing(slide, { toValue: 600, duration: 220, useNativeDriver: true }),
+      ]).start(() => setMounted(false));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+  if (!mounted) return null;
   const Body = scroll ? ScrollView : View;
-  const body = (
-    <Body contentContainerStyle={{ padding: 18, paddingTop: 6, gap: 14, paddingBottom: 40 }} style={scroll ? { flex: 1 } : { padding: 18, paddingTop: 6, gap: 14 }} keyboardShouldPersistTaps="handled">
-      {title ? (
-        <Txt weight="bold" size={20} style={{ letterSpacing: -0.4 }}>
-          {title}
-        </Txt>
-      ) : null}
-      {children}
-    </Body>
-  );
-  if (Platform.OS === "ios") {
-    return (
-      <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} onDismiss={onClose}>
-        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.panel }} behavior="padding">
-          <View style={{ alignItems: "center", paddingTop: 8, paddingBottom: 4 }}>
-            <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: colors.line }} />
-          </View>
-          <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Loka" style={{ position: "absolute", right: 12, top: 12, width: 34, height: 34, borderRadius: 17, backgroundColor: colors.panel2, alignItems: "center", justifyContent: "center", zIndex: 2 }}>
-            <Txt weight="bold" size={15} color={colors.ink2}>✕</Txt>
-          </Pressable>
-          {body}
-        </KeyboardAvoidingView>
-      </Modal>
-    );
-  }
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={undefined}>
-        <Pressable style={{ flex: 1, backgroundColor: "rgba(10,10,14,.32)" }} onPress={onClose} />
-        <View style={{ backgroundColor: colors.panel, borderTopLeftRadius: 30, borderTopRightRadius: 30, maxHeight: "90%", overflow: "hidden", elevation: 16 }}>
-          <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: colors.line, alignSelf: "center", marginTop: 10, marginBottom: 2 }} />
-          {body}
+    <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <Animated.View style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(8,8,12,.42)", opacity: fade }}>
+          <Pressable style={{ flex: 1 }} onPress={onClose} />
+        </Animated.View>
+        <View style={{ flex: 1 }} pointerEvents="box-none">
+          <Pressable style={{ flex: 1 }} onPress={onClose} />
+          <Animated.View style={{ backgroundColor: colors.panel, borderTopLeftRadius: 30, borderTopRightRadius: 30, maxHeight: "88%", overflow: "hidden", paddingBottom: 26, transform: [{ translateY: Animated.add(slide, drag) }], shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 20, shadowOffset: { width: 0, height: -6 }, elevation: 16 }}>
+            <View
+              onStartShouldSetResponder={() => true}
+              onResponderGrant={(e) => { startY.current = e.nativeEvent.pageY; }}
+              onResponderMove={(e) => { const dy = Math.max(0, e.nativeEvent.pageY - startY.current); drag.setValue(dy); }}
+              onResponderRelease={(e) => { const dy = e.nativeEvent.pageY - startY.current; if (dy > 90) onClose(); else Animated.spring(drag, { toValue: 0, useNativeDriver: true }).start(); }}
+              style={{ alignItems: "center", paddingTop: 10, paddingBottom: 6 }}
+            >
+              <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: colors.line }} />
+            </View>
+            <Body contentContainerStyle={{ padding: 18, paddingTop: 4, gap: 14 }} style={scroll ? undefined : { padding: 18, paddingTop: 4, gap: 14 }} keyboardShouldPersistTaps="handled">
+              {title ? (
+                <Txt weight="bold" size={19} style={{ letterSpacing: -0.3 }}>
+                  {title}
+                </Txt>
+              ) : null}
+              {children}
+            </Body>
+          </Animated.View>
         </View>
       </KeyboardAvoidingView>
     </Modal>
