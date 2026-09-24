@@ -317,7 +317,8 @@ export function KV({ k, v, last }: { k: string; v: React.ReactNode; last?: boole
   );
 }
 
-/** Bottom sheet (Modal) with drag handle. */
+/** Sheet — á iOS innbyggt „card sheet“ (kúpt horn, bakgrunnur dregst aftar,
+ * strjúka niður lokar); á Android/vef eigin sheet með mjúku yfirlagi. */
 export function Sheet({
   open,
   onClose,
@@ -332,20 +333,38 @@ export function Sheet({
   scroll?: boolean;
 }) {
   const Body = scroll ? ScrollView : View;
+  const body = (
+    <Body contentContainerStyle={{ padding: 18, paddingTop: 6, gap: 14, paddingBottom: 40 }} style={scroll ? { flex: 1 } : { padding: 18, paddingTop: 6, gap: 14 }} keyboardShouldPersistTaps="handled">
+      {title ? (
+        <Txt weight="bold" size={20} style={{ letterSpacing: -0.4 }}>
+          {title}
+        </Txt>
+      ) : null}
+      {children}
+    </Body>
+  );
+  if (Platform.OS === "ios") {
+    return (
+      <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose} onDismiss={onClose}>
+        <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.panel }} behavior="padding">
+          <View style={{ alignItems: "center", paddingTop: 8, paddingBottom: 4 }}>
+            <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: colors.line }} />
+          </View>
+          <Pressable onPress={onClose} hitSlop={10} accessibilityLabel="Loka" style={{ position: "absolute", right: 12, top: 12, width: 34, height: 34, borderRadius: 17, backgroundColor: colors.panel2, alignItems: "center", justifyContent: "center", zIndex: 2 }}>
+            <Txt weight="bold" size={15} color={colors.ink2}>✕</Txt>
+          </Pressable>
+          {body}
+        </KeyboardAvoidingView>
+      </Modal>
+    );
+  }
   return (
-    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <Pressable style={{ flex: 1, backgroundColor: "rgba(0,0,0,.5)" }} onPress={onClose} />
-        <View style={{ backgroundColor: colors.panel, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: "88%", paddingBottom: 30, overflow: "hidden", shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: -6 }, elevation: 12 }}>
-          <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: colors.line, alignSelf: "center", marginTop: 10, marginBottom: 6 }} />
-          <Body contentContainerStyle={{ padding: 18, paddingTop: 6, gap: 14 }} style={scroll ? undefined : { padding: 18, paddingTop: 6, gap: 14 }} keyboardShouldPersistTaps="handled">
-            {title ? (
-              <Txt weight="bold" size={18} style={{ letterSpacing: -0.3 }}>
-                {title}
-              </Txt>
-            ) : null}
-            {children}
-          </Body>
+    <Modal visible={open} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={undefined}>
+        <Pressable style={{ flex: 1, backgroundColor: "rgba(10,10,14,.32)" }} onPress={onClose} />
+        <View style={{ backgroundColor: colors.panel, borderTopLeftRadius: 30, borderTopRightRadius: 30, maxHeight: "90%", overflow: "hidden", elevation: 16 }}>
+          <View style={{ width: 38, height: 5, borderRadius: 3, backgroundColor: colors.line, alignSelf: "center", marginTop: 10, marginBottom: 2 }} />
+          {body}
         </View>
       </KeyboardAvoidingView>
     </Modal>
