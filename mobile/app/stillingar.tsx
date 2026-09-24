@@ -1,13 +1,14 @@
 // Stillingar — tilkynningar, prófíll, lykilorð, um appið.
 import React, { useEffect, useState } from "react";
-import { View, Switch, Linking } from "react-native";
+import { View, Switch, Linking, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { Bell, UserRound, KeyRound, LifeBuoy, FileText } from "lucide-react-native";
+import { Bell, BellOff, UserRound, KeyRound, LifeBuoy, FileText } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
 import { List, Row, IconBox, Muted, useToast, Txt, Seg } from "../src/components/ui";
 import { colors, useTheme, setThemeMode } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import { registerForPush, unregisterPush, pushEnabled } from "../src/lib/push";
+import { getDnd, setDnd, dndLabel, onMuteChange } from "../src/lib/mute";
 import { supabase } from "../src/lib/supabase";
 
 export default function Stillingar() {
@@ -16,7 +17,16 @@ export default function Stillingar() {
   const router = useRouter();
   const toast = useToast();
   const [push, setPush] = useState(false);
-  useEffect(() => { pushEnabled().then(setPush); }, []);
+  const [dnd, setDndState] = useState<number | null>(null);
+  useEffect(() => { pushEnabled().then(setPush); getDnd().then(setDndState); return onMuteChange(() => getDnd().then(setDndState)); }, []);
+  async function mute(kind: "1h" | "morning" | "forever" | "off") {
+    if (kind === "off") { await setDnd(null); toast("Kveikt á tilkynningum aftur"); return; }
+    let until = Infinity;
+    if (kind === "1h") until = Date.now() + 3600000;
+    if (kind === "morning") { const d = new Date(); if (d.getHours() >= 8) d.setDate(d.getDate() + 1); d.setHours(8, 0, 0, 0); until = d.getTime(); }
+    await setDnd(until);
+    toast(`Tilkynningar þaggaðar ${dndLabel(until)}`);
+  }
 
   async function togglePush(v: boolean) {
     if (!me) return;
@@ -34,6 +44,18 @@ export default function Stillingar() {
       <Muted style={{ paddingHorizontal: 2 }}>TILKYNNINGAR</Muted>
       <List>
         <Row icon={<IconBox tone="brand"><Bell color={colors.brandDeep} size={19} /></IconBox>} title="Push-tilkynningar" sub="Skilaboð, nýtt vaktaplan, svör við beiðnum" right={<Switch value={push} onValueChange={togglePush} trackColor={{ true: colors.good, false: colors.line }} thumbColor="#fff" />} last />
+      </List>
+      <Muted style={{ paddingHorizontal: 2 }}>EKKI TRUFLA</Muted>
+      <List>
+        {dnd ? (
+          <Row icon={<IconBox tone="warn"><BellOff color={colors.warn} size={19} /></IconBox>} title={`Þaggað ${dndLabel(dnd)}`} sub="Engar push-tilkynningar á meðan" right={<Pressable onPress={() => mute("off")} style={{ paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: colors.brandSoft }}><Txt weight="bold" size={12.5} color={colors.brandDeep}>Kveikja</Txt></Pressable>} last />
+        ) : (
+          <>
+            <Row icon={<IconBox><BellOff color={colors.ink2} size={19} /></IconBox>} title="Þagga í 1 klst" sub="Fyrir fund eða hvíld" chevron={false} onPress={() => mute("1h")} />
+            <Row icon={<IconBox><BellOff color={colors.ink2} size={19} /></IconBox>} title="Þagga til morguns" sub="Kveikist aftur kl. 08:00" chevron={false} onPress={() => mute("morning")} />
+            <Row icon={<IconBox><BellOff color={colors.ink2} size={19} /></IconBox>} title="Þagga þar til ég kveiki aftur" sub="Þú sérð samt ólesið í appinu" chevron={false} onPress={() => mute("forever")} last />
+          </>
+        )}
       </List>
       <Muted style={{ paddingHorizontal: 2 }}>ÚTLIT</Muted>
       <List>

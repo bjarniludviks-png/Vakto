@@ -5,7 +5,7 @@ import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { unreadCounts, subscribeChat } from "../../src/lib/api/chat";
 import { getMuted, onMuteChange } from "../../src/lib/mute";
-import { registerForPush } from "../../src/lib/push";
+import { syncPushWithDnd } from "../../src/lib/push";
 
 export default function TabLayout() {
   useTheme();
@@ -23,8 +23,8 @@ export default function TabLayout() {
     if (!me) return;
     const ch = subscribeChat(() => refresh(), () => refresh());
     const t = setInterval(refresh, 30000);
-    const off = onMuteChange(refresh);
-    registerForPush(me).catch(() => {});
+    const off = onMuteChange(() => { refresh(); syncPushWithDnd(me).catch(() => {}); });
+    syncPushWithDnd(me).catch(() => {});
     return () => { ch.unsubscribe(); clearInterval(t); off(); };
   }, [me, refresh]);
 

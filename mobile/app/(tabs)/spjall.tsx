@@ -4,11 +4,11 @@ import { View, Pressable, ScrollView, RefreshControl, TextInput } from "react-na
 import { useRouter, useFocusEffect } from "expo-router";
 import { Plus, MessageCircle, Hash, BellOff, Search, X, Users, UserRound, Check } from "lucide-react-native";
 import { Header, IconBtn } from "../../src/components/screen";
-import { Txt, Muted, Avatar, Sheet, Empty, Row, Btn, useToast } from "../../src/components/ui";
+import { Txt, Muted, Avatar, Sheet, Empty, Row, Btn, Seg, useToast } from "../../src/components/ui";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { listConversations, listPeople, startDM, createGroup, subscribeChat, type Conversation, type Person } from "../../src/lib/api/chat";
-import { getMuted, onMuteChange } from "../../src/lib/mute";
+import { getMuted, onMuteChange, getDnd, dndLabel } from "../../src/lib/mute";
 
 function when(ts: string | null): string {
   if (!ts) return "";
@@ -37,7 +37,11 @@ export default function Spjall() {
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => { getMuted().then((m) => setMuted(new Set(m))); return onMuteChange(() => getMuted().then((m) => setMuted(new Set(m)))); }, []);
+  const [dnd, setDnd] = useState<number | null>(null);
+  useEffect(() => {
+    const sync = () => { getMuted().then((m) => setMuted(new Set(m))); getDnd().then(setDnd); };
+    sync(); return onMuteChange(sync);
+  }, []);
   const load = useCallback(async () => {
     if (!me) return;
     try { setConvs(await listConversations(me)); } catch (e) { console.warn("chat", e); }
@@ -96,16 +100,14 @@ export default function Spjall() {
             {search ? <Pressable onPress={() => setSearch("")} hitSlop={8}><X color={colors.ink3} size={18} /></Pressable> : null}
           </View>
         ) : null}
-        <View style={{ flexDirection: "row", gap: 8 }}>
-          {([["all", "Allt"], ["unread", `Ólesið${unreadTotal ? ` · ${unreadTotal}` : ""}`]] as const).map(([k, l]) => {
-            const on = (k === "unread") === onlyUnread;
-            return (
-              <Pressable key={k} onPress={() => setOnlyUnread(k === "unread")} style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, backgroundColor: on ? colors.ink : colors.panel2, borderWidth: 1, borderColor: on ? colors.ink : colors.line }}>
-                <Txt weight="bold" size={12.5} color={on ? colors.panel : colors.ink2}>{l}</Txt>
-              </Pressable>
-            );
-          })}
-        </View>
+        <Seg value={onlyUnread ? "unread" : "all"} onChange={(v) => setOnlyUnread(v === "unread")} items={[{ id: "all", label: "Allt" }, { id: "unread", label: `Ólesið${unreadTotal ? ` · ${unreadTotal}` : ""}` }]} />
+        {dnd ? (
+          <Pressable onPress={() => router.push("/stillingar")} style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.warnSoft, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 }}>
+            <BellOff color={colors.warn} size={16} />
+            <Txt weight="semibold" size={12.5} color={colors.warn} style={{ flex: 1 }}>Tilkynningar þaggaðar {dndLabel(dnd)}</Txt>
+            <Txt weight="bold" size={12.5} color={colors.warn}>Breyta</Txt>
+          </Pressable>
+        ) : null}
       </View>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.brand} />}>
         {convs && visible.length === 0 ? <Empty icon={<MessageCircle color={colors.brandDeep} size={26} />} title={onlyUnread ? "Allt lesið" : search ? "Ekkert fannst" : "Engin samtöl enn"} sub={onlyUnread ? "Engin ólesin skilaboð." : search ? "Prófaðu annað leitarorð." : "Ýttu á + til að byrja spjall."} /> : null}

@@ -7,6 +7,7 @@ import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import { supabase } from "./supabase";
 import type { Me } from "./api/me";
+import { getDnd } from "./mute";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: true }),
@@ -17,6 +18,7 @@ let registered: string | null = null;
 export async function registerForPush(me: Me): Promise<string | null> {
   try {
     if (!Device.isDevice) return null;
+    if (await getDnd()) { await unregisterPush(); return null; } // Ekki trufla: ekkert token á þjóni
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("default", { name: "VAKTO", importance: Notifications.AndroidImportance.HIGH, vibrationPattern: [0, 200, 100, 200], lightColor: "#e9700f" });
     }
@@ -41,9 +43,25 @@ export async function registerForPush(me: Me): Promise<string | null> {
 }
 
 export async function unregisterPush(): Promise<void> {
-  if (!registered) return;
-  await supabase.from("push_subscriptions").delete().eq("endpoint", `expo:${registered}`);
+  try {
+    let tok = registered;
+    if (!tok && Device.isDevice) {
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status === "granted") {
+        const projectId = (Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined)?.eas?.projectId;
+        tok = (await Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined)).data;
+      }
+    }
+    if (tok) await supabase.from("push_subscriptions").delete().eq("endpoint", `expo:${tok}`);
+  } catch { /* ignore */ }
   registered = null;
+}
+
+/** Kallað þegar appið opnast: ef Ekki-trufla er útrunnið → skrá token aftur. */
+export async function syncPushWithDnd(me: Me): Promise<void> {
+  const dnd = await getDnd();
+  if (dnd) { await unregisterPush(); return; }
+  await registerForPush(me);
 }
 
 export async function pushEnabled(): Promise<boolean> {
