@@ -1,0 +1,36 @@
+<style>
+@font-face{font-family:GS;src:url("file:///Users/bjarniludviksson/vakto-live/mobile/assets/fonts/GeneralSans-Bold.otf");font-weight:700}
+@font-face{font-family:GS;src:url("file:///Users/bjarniludviksson/vakto-live/mobile/assets/fonts/GeneralSans-Medium.otf");font-weight:500}
+*{margin:0;box-sizing:border-box}
+body{width:1024px;height:500px;overflow:hidden;font-family:GS,system-ui;background:#08080b;position:relative}
+.glow{position:absolute;width:900px;height:900px;left:-180px;top:-260px;border-radius:50%;
+  background:radial-gradient(50% 50% at 50% 50%,rgba(233,112,15,.45),rgba(233,112,15,0) 70%)}
+.glow2{position:absolute;width:700px;height:700px;right:-120px;bottom:-320px;border-radius:50%;
+  background:radial-gradient(50% 50% at 50% 50%,rgba(245,147,49,.28),rgba(245,147,49,0) 70%)}
+.wrap{position:relative;height:100%;display:flex;align-items:center;padding:0 62px;gap:44px}
+.txt{flex:1}
+.logo{display:flex;align-items:flex-end;gap:5px;margin-bottom:26px}
+.logo i{display:block;width:13px;border-radius:4px;background:linear-gradient(180deg,#f59331,#e9700f)}
+h1{font-weight:700;font-size:62px;letter-spacing:-.035em;color:#fff;line-height:1}
+p{font-weight:500;font-size:22px;line-height:1.45;color:#b9b9c4;margin-top:16px;max-width:19em}
+.tags{display:flex;gap:9px;margin-top:26px;flex-wrap:wrap}
+.tags span{font-weight:500;font-size:14px;color:#ffd9b5;border:1px solid rgba(245,147,49,.42);
+  background:rgba(233,112,15,.14);border-radius:999px;padding:7px 15px}
+.shots{position:relative;width:360px;height:500px;flex:0 0 auto}
+.shots img{position:absolute;border-radius:22px;box-shadow:0 26px 60px rgba(0,0,0,.75);border:1px solid rgba(255,255,255,.1)}
+.shots img.a{width:210px;left:118px;top:42px;z-index:2}
+.shots img.b{width:178px;left:-6px;top:96px;opacity:.82}
+</style>
+<div class="glow"></div><div class="glow2"></div>
+<div class="wrap">
+  <div class="txt">
+    <div class="logo"><i style="height:26px"></i><i style="height:40px"></i><i style="height:54px"></i></div>
+    <h1>VAKTO</h1>
+    <p>Vaktaplan, stimpilklukka og laun — allt í símanum.</p>
+    <div class="tags"><span>Vaktaplan</span><span>Stimpilklukka</span><span>Launamat</span><span>Spjall</span></div>
+  </div>
+  <div class="shots">
+    <img class="b" src="file:///Users/bjarniludviksson/vakto-live/public/showcase/2026/app/heim.png">
+    <img class="a" src="file:///Users/bjarniludviksson/vakto-live/public/showcase/2026/app/vaktir.png">
+  </div>
+</div>
