@@ -13,6 +13,7 @@ import {
   ScrollView,
   Animated,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   StyleProp,
   ViewStyle,
@@ -338,6 +339,14 @@ export function Sheet({
   scroll?: boolean;
 }) {
   const [mounted, setMounted] = useState(open);
+  // Lyklaborðið: þegar það er uppi fellur blaðið þétt að því, annars heldur
+  // það neðra bilinu fyrir heimatakkann (annars kemur hvít ræma á milli).
+  const [kbUp, setKbUp] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", () => setKbUp(true));
+    const hide = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide", () => setKbUp(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
   const fade = useRef(new Animated.Value(0)).current;
   const slide = useRef(new Animated.Value(600)).current;
   const drag = useRef(new Animated.Value(0)).current;
@@ -368,7 +377,7 @@ export function Sheet({
         </Animated.View>
         <View style={{ flex: 1 }} pointerEvents="box-none">
           <Pressable style={{ flex: 1 }} onPress={onClose} />
-          <Animated.View style={{ backgroundColor: colors.panel, borderTopLeftRadius: 30, borderTopRightRadius: 30, maxHeight: "88%", overflow: "hidden", paddingBottom: 26, transform: [{ translateY: Animated.add(slide, drag) }], shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 20, shadowOffset: { width: 0, height: -6 }, elevation: 16 }}>
+          <Animated.View style={{ backgroundColor: colors.panel, borderTopLeftRadius: 30, borderTopRightRadius: 30, maxHeight: "88%", overflow: "hidden", paddingBottom: kbUp ? 8 : 26, transform: [{ translateY: Animated.add(slide, drag) }], shadowColor: "#000", shadowOpacity: 0.22, shadowRadius: 20, shadowOffset: { width: 0, height: -6 }, elevation: 16 }}>
             <View
               onStartShouldSetResponder={() => true}
               onResponderGrant={(e) => { startY.current = e.nativeEvent.pageY; }}
@@ -378,7 +387,7 @@ export function Sheet({
             >
               <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: colors.line }} />
             </View>
-            <Body contentContainerStyle={{ padding: 18, paddingTop: 4, gap: 14 }} style={scroll ? undefined : { padding: 18, paddingTop: 4, gap: 14 }} keyboardShouldPersistTaps="handled">
+            <Body contentContainerStyle={{ padding: 18, paddingTop: 4, paddingBottom: kbUp ? 10 : 18, gap: 14 }} style={scroll ? undefined : { padding: 18, paddingTop: 4, paddingBottom: kbUp ? 10 : 18, gap: 14 }} keyboardShouldPersistTaps="handled">
               {title ? (
                 <Txt weight="bold" size={19} style={{ letterSpacing: -0.3 }}>
                   {title}
