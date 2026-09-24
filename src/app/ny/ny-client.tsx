@@ -39,7 +39,7 @@ const T: Record<Lang, {
   slides: { title: string; desc: string }[];
   appBadge: string; appHead: string; appSub: string;
   appPoints: string[];
-  phoneTabs: [string, string];
+  appScreens: { key: string; label: string; blurb: string }[];
   priceHead: string; priceSub: string;
   billMonthly: string; billYearly: string; billSave: string;
   plan: Plan;
@@ -143,15 +143,24 @@ const T: Record<Lang, {
     appHead: "Appið sem fylgir fólkinu heim",
     appSub: "Starfsmaðurinn sér bara það sem skiptir hann máli — og þú sleppur við tuttugu skilaboð á dag.",
     appPoints: [
-      "Stimpla inn og út — ein snerting",
-      "Vaktirnar og næsta vakt",
-      "Launin áætluð jafnóðum, áætlun á móti raun",
-      "Beiðnir: frí, vaktaskipti, opnar vaktir",
-      "Spjall og fréttir í rauntíma",
-      "Skírteinið í Apple og Google Wallet",
-      "Ráðningarsamningur undirritaður rafrænt",
+      "Stimpla inn og út — ein snerting, teljari á vakt",
+      "Vaktirnar mínar, allra og lausar — með áætluðum launum á hverja vakt",
+      "Laun jafnóðum: unnið hingað til og áætlað í mánaðarlok",
+      "Beiðnir: frí, bjóða vakt, forföll, leiðréttingar",
+      "Spjall eins og Messenger — hópar, myndir, skjöl, viðbrögð",
+      "Fréttaveita með myndum og festum tilkynningum",
+      "Skírteini, skjöl og ráðningarsamningur — Apple og Google Wallet",
     ],
-    phoneTabs: ["Mitt svæði", "Skírteinið"],
+    appScreens: [
+      { key: "heim", label: "Heim", blurb: "Stimplaðu inn með einni snertingu — teljarinn og samstarfsfólk dagsins á sama stað." },
+      { key: "vaktir", label: "Vaktir", blurb: "Vikan þín, litað eftir vaktategund. Ýttu á vakt og sjáðu hverjir eru með þér." },
+      { key: "vakt", label: "Vaktin", blurb: "Hver vakt sýnir áætluð laun eftir kjarasamningi — og hnappa fyrir skipti og forföll." },
+      { key: "lausar", label: "Lausar vaktir", blurb: "Lausar vaktir með launum. Sækja um með einum smelli, vaktstjóri samþykkir." },
+      { key: "thread", label: "Spjall", blurb: "Skilaboð í rauntíma, viðbrögð, svör, myndir og skjöl. Hópar og einkaspjall." },
+      { key: "frettir", label: "Fréttir", blurb: "Fréttaveita vinnustaðarins — festar tilkynningar, myndir og athugasemdir." },
+      { key: "laun", label: "Laun", blurb: "Unnið hingað til og áætlað í mánaðarlok, sundurliðað eftir dagvinnu, álagi og viku." },
+      { key: "skirteini", label: "Skírteini", blurb: "Stafrænt starfsmannaskírteini með QR — í Apple og Google Wallet." },
+    ],
     priceHead: "Eitt verð. Allt innifalið.",
     priceSub: "Engin þrep. Ekkert læst. Engin binding.",
     billMonthly: "Mánaðarlega", billYearly: "Árlega", billSave: "15% afsláttur",
@@ -269,15 +278,24 @@ const T: Record<Lang, {
     appHead: "The app that goes home with your people",
     appSub: "Your team sees only what matters to them — and you skip twenty messages a day.",
     appPoints: [
-      "Clock in and out — one tap",
-      "Shifts and what's next",
-      "Pay estimated as you go, planned vs actual",
-      "Requests: time off, swaps, open shifts",
-      "Chat and news in real time",
-      "ID in Apple and Google Wallet",
-      "Employment contract signed electronically",
+      "Clock in and out — one tap, live timer on shift",
+      "My shifts, everyone's and open ones — with estimated pay per shift",
+      "Pay as you go: earned so far and projected month end",
+      "Requests: time off, offer a shift, sick call, corrections",
+      "Chat like Messenger — groups, photos, files, reactions",
+      "Newsfeed with photos and pinned announcements",
+      "ID card, documents and contract — Apple and Google Wallet",
     ],
-    phoneTabs: ["My area", "ID card"],
+    appScreens: [
+      { key: "heim", label: "Home", blurb: "Clock in with one tap — the timer and today's coworkers in one place." },
+      { key: "vaktir", label: "Shifts", blurb: "Your week, colored by shift type. Tap a shift to see who's on with you." },
+      { key: "vakt", label: "The shift", blurb: "Every shift shows estimated pay per the union agreement — plus swap and sick-call buttons." },
+      { key: "lausar", label: "Open shifts", blurb: "Open shifts with pay. Apply with one tap; the manager approves." },
+      { key: "thread", label: "Chat", blurb: "Real-time messages, reactions, replies, photos and files. Groups and DMs." },
+      { key: "frettir", label: "News", blurb: "The workplace feed — pinned announcements, photos and comments." },
+      { key: "laun", label: "Pay", blurb: "Earned so far and projected month end, broken down by regular, premium and week." },
+      { key: "skirteini", label: "ID card", blurb: "Digital staff ID with QR — in Apple and Google Wallet." },
+    ],
     priceHead: "One price. Everything included.",
     priceSub: "No tiers. Nothing locked. No lock-in.",
     billMonthly: "Monthly", billYearly: "Yearly", billSave: "15% off",
@@ -438,7 +456,6 @@ function IndustryOrb({ names }: { names: string[] }) {
 /* ---------- real screenshots ---------- */
 
 const SHOT = (key: string, lang: Lang = "is") => `/showcase/2026/${lang === "en" ? "en/" : ""}${key}.jpg`;
-const PHONE = (key: string, lang: Lang) => `/showcase/2026/${lang === "en" ? "en/" : ""}${key}.png`;
 
 /** Hero: an automatic tour of the app. A cursor glides to the next sidebar
     item, "clicks", and the real screenshot of that page fades in — the
@@ -553,15 +570,17 @@ function Showcase({ slides, head, sub, lang }: { slides: { title: string; desc: 
 
 /** The employee app — a real iPhone frame whose screen flips between the actual
     Mitt svæði screen and the actual ID card (tap or wait). */
-function AppPreview({ t, lang }: { t: (typeof T)["is"]; lang: Lang }) {
-  const [face, setFace] = useState(0);
-  const manual = useRef(false);
+function AppPreview({ t }: { t: (typeof T)["is"]; lang: Lang }) {
+  const [idx, setIdx] = useState(0);
+  const pauseUntil = useRef(0);
+  const n = t.appScreens.length;
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const id = setInterval(() => { if (!manual.current) setFace((f) => 1 - f); }, 5200);
+    const id = setInterval(() => { if (Date.now() > pauseUntil.current) setIdx((i) => (i + 1) % n); }, 3800);
     return () => clearInterval(id);
-  }, []);
-  const pick = (f: number) => { manual.current = true; setFace(f); };
+  }, [n]);
+  const pick = (i: number) => { pauseUntil.current = Date.now() + 14000; setIdx(i); };
+  const cur = t.appScreens[idx];
   return (
     <section className="ny-sec ny-appsec">
       <Rise className="ny-app-grid">
@@ -577,24 +596,23 @@ function AppPreview({ t, lang }: { t: (typeof T)["is"]; lang: Lang }) {
         </div>
         <div className="ny-app-vis">
           <span className="ny-app-glow" aria-hidden="true" />
-          <div className="ny-phone-real" onClick={() => pick(1 - face)} aria-hidden="true">
+          <div className="ny-phone-real" onClick={() => pick((idx + 1) % n)} aria-hidden="true">
             <img className="frame" src="/app/phone-frame.png" alt="" width={551} height={1137} loading="lazy" />
             <div className="ny-phone-ui">
-              <div className={`ny-flip${face === 1 ? " flipped" : ""}`}>
-                <div className="ny-face front shot">
-                  <span className="isl" />
-                  <img src={PHONE("phone-mitt", lang)} alt="" loading="lazy" />
-                </div>
-                <div className="ny-face back shot">
-                  <span className="isl" />
-                  <img src={PHONE("phone-skirteini", lang)} alt="" loading="lazy" />
-                </div>
+              <div className="ny-slides">
+                {t.appScreens.map((sc, i) => (
+                  <div key={sc.key} className={`ny-slide${i === idx ? " on" : ""}`}>
+                    <img src={`/showcase/2026/app/${sc.key}.png`} alt="" loading={i === 0 ? "eager" : "lazy"} />
+                  </div>
+                ))}
+                <span className="isl" />
               </div>
             </div>
           </div>
+          <div className="ny-app-cap" key={cur.key}><b>{cur.label}</b><span>{cur.blurb}</span></div>
           <div className="ny-phone-tabs">
-            {t.phoneTabs.map((lbl, i) => (
-              <button key={lbl} className={face === i ? "on" : ""} onClick={() => pick(i)}>{lbl}</button>
+            {t.appScreens.map((sc, i) => (
+              <button key={sc.key} className={idx === i ? "on" : ""} onClick={() => pick(i)}>{sc.label}</button>
             ))}
           </div>
         </div>
