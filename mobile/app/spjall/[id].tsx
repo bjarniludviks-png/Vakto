@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { View, TextInput, FlatList, KeyboardAvoidingView, Platform, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronLeft, Send, X, Hash, CornerUpLeft, Trash2, ImagePlus } from "lucide-react-native";
+import { ChevronLeft, Send, X, Hash, CornerUpLeft, Trash2, ImagePlus, MoreHorizontal, BellOff, Bell } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { Txt, Muted, Avatar, Sheet, Row, useToast } from "../../src/components/ui";
@@ -13,6 +13,8 @@ import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { listMessages, sendChatMessage, sendChatImage, markChannelRead, setReaction, deleteMessage, subscribeChat, typingChannel, peopleMap, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
 import { supabase } from "../../src/lib/supabase";
+import { isMuted, toggleMute } from "../../src/lib/mute";
+import type { Person } from "../../src/lib/api/chat";
 
 const EMOJI = ["❤️", "👍", "😂", "🙏", "🔥", "👀"];
 
@@ -41,6 +43,17 @@ export default function Thread() {
   const [typing, setTyping] = useState<string | null>(null);
   const [members, setMembers] = useState(0);
   const [isGroup, setIsGroup] = useState(true);
+  const [info, setInfo] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [memberList, setMemberList] = useState<Person[]>([]);
+  async function openInfo() {
+    if (!me || !id) return;
+    setInfo(true);
+    const people = await peopleMap(me.companyId);
+    const { data: ch } = await supabase.from("channels").select("kind").eq("id", id).maybeSingle();
+    if (ch?.kind === "general") setMemberList([...people.values()].sort((a, b) => a.name.localeCompare(b.name)));
+    else { const { data: mem } = await supabase.from("channel_members").select("user_id").eq("channel_id", id); setMemberList((mem ?? []).map((m) => people.get(m.user_id)).filter(Boolean).sort((a, b) => a!.name.localeCompare(b!.name)) as Person[]); }
+  }
   const list = useRef<FlatList>(null);
   const toast = useToast();
   const [uploading, setUploading] = useState(false);
@@ -69,6 +82,7 @@ export default function Thread() {
 
   useFocusEffect(useCallback(() => {
     load();
+    if (id) isMuted(id).then(setMuted);
     supabase.from("channels").select("kind").eq("id", id).maybeSingle().then(async ({ data }) => {
       setIsGroup(data?.kind !== "dm");
       if (data?.kind === "general" && me) { const { count } = await supabase.from("employees").select("id", { count: "exact", head: true }).eq("company_id", me.companyId).not("user_id", "is", null); setMembers(count ?? 0); }
@@ -151,8 +165,9 @@ export default function Thread() {
         {isGroup ? <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={18} /></View> : <Avatar name={name ?? "?"} size={36} />}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt weight="bold" size={15} numberOfLines={1}>{name ?? "Spjall"}</Txt>
-          <Muted size={12}>{typing ? `${typing} skrifar…` : isGroup ? `${members || "—"} meðlimir` : "Einkaspjall"}</Muted>
+          <Muted size={12}>{typing ? `${typing} skrifar…` : isGroup ? `${members || "—"} meðlimir${muted ? " · þaggað" : ""}` : muted ? "Einkaspjall · þaggað" : "Einkaspjall"}</Muted>
         </View>
+        <Pressable onPress={openInfo} hitSlop={10} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}><MoreHorizontal color={colors.ink} size={24} /></Pressable>
       </View>
 
       <FlatList
@@ -210,6 +225,19 @@ export default function Thread() {
         <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
           <Row icon={<CornerUpLeft color={colors.ink2} size={19} />} title="Svara" onPress={() => { setReplyTo(sel); setSel(null); }} chevron={false} last={!sel?.me} />
           {sel?.me ? <Row icon={<Trash2 color={colors.bad} size={19} />} title="Eyða skilaboðum" danger onPress={async () => { if (sel) await deleteMessage(sel.id); setSel(null); load(); }} chevron={false} last /> : null}
+        </View>
+      </Sheet>
+      <Sheet open={info} onClose={() => setInfo(false)} title={name ?? "Spjall"}>
+        <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
+          <Row icon={muted ? <Bell color={colors.ink2} size={19} /> : <BellOff color={colors.ink2} size={19} />} title={muted ? "Kveikja á tilkynningum" : "Þagga spjallið"} sub={muted ? "Þú færð aftur merki og hljóð" : "Ekkert ólesið-merki eða hljóð fyrir þetta spjall"} chevron={false} last
+            onPress={async () => { if (!id) return; const m = await toggleMute(id); setMuted(m); }} />
+        </View>
+        <Txt weight="bold" size={12} color={colors.ink3} style={{ letterSpacing: 0.8, marginTop: 4 }}>{isGroup ? `MEÐLIMIR · ${memberList.length || members}` : "ÞÁTTTAKENDUR"}</Txt>
+        <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
+          {memberList.length === 0 ? <Muted style={{ padding: 14 }}>Sæki…</Muted> : null}
+          {memberList.map((p, i) => (
+            <Row key={p.userId} icon={<Avatar name={p.name} size={36} color={p.color} photo={p.photo} />} title={p.name} sub={[p.role, p.dept].filter(Boolean).join(" · ") || "Starfsmaður"} chevron={false} last={i === memberList.length - 1} />
+          ))}
         </View>
       </Sheet>
     </KeyboardAvoidingView>

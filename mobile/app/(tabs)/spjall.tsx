@@ -2,12 +2,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Pressable, ScrollView, RefreshControl } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { Plus, MessageCircle, Hash } from "lucide-react-native";
+import { Plus, MessageCircle, Hash, BellOff } from "lucide-react-native";
 import { Header, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, Sheet, Empty, Row } from "../../src/components/ui";
 import { colors, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { listConversations, listPeople, startDM, subscribeChat, type Conversation, type Person } from "../../src/lib/api/chat";
+import { getMuted, onMuteChange } from "../../src/lib/mute";
 
 function when(ts: string | null): string {
   if (!ts) return "";
@@ -29,6 +30,8 @@ export default function Spjall() {
   const [refreshing, setRefreshing] = useState(false);
   const [newOpen, setNewOpen] = useState(false);
   const [people, setPeople] = useState<Person[]>([]);
+  const [muted, setMuted] = useState<Set<string>>(new Set());
+  useEffect(() => { getMuted().then((m) => setMuted(new Set(m))); return onMuteChange(() => getMuted().then((m) => setMuted(new Set(m)))); }, []);
 
   const load = useCallback(async () => {
     if (!me) return;
@@ -76,11 +79,11 @@ export default function Spjall() {
                 <Txt weight="bold" size={15} numberOfLines={1} style={{ flexShrink: 1 }}>{c.name}</Txt>
                 <Txt size={11.5} color={colors.ink3} style={{ fontVariant: ["tabular-nums"] }}>{when(c.lastAt)}</Txt>
               </View>
-              <Txt size={13} color={c.unread ? colors.ink : colors.ink2} weight={c.unread ? "semibold" : "regular"} numberOfLines={1} style={{ marginTop: 2 }}>
+              <Txt size={13} color={c.unread && !muted.has(c.id) ? colors.ink : colors.ink2} weight={c.unread && !muted.has(c.id) ? "semibold" : "regular"} numberOfLines={1} style={{ marginTop: 2 }}>
                 {c.last ? `${c.lastFrom && c.kind !== "dm" ? c.lastFrom + ": " : c.lastFrom === "Þú" ? "Þú: " : ""}${c.last}` : "Engin skilaboð enn"}
               </Txt>
             </View>
-            {c.unread ? (
+            {muted.has(c.id) ? <BellOff color={colors.ink3} size={16} /> : c.unread ? (
               <View style={{ minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }}>
                 <Txt weight="bold" size={11.5} color="#fff">{c.unread}</Txt>
               </View>

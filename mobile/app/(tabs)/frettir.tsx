@@ -109,7 +109,7 @@ export default function Frettir() {
                   <Txt weight="bold" size={13} color={colors.ink2}>{p.comments.length || ""}</Txt>
                 </Pressable>
               </View>
-              {p.comments.length ? (
+              {commentFor === p.id && p.comments.length ? (
                 <View style={{ gap: 8, paddingHorizontal: 14, paddingBottom: 12 }}>
                   {p.comments.map((c) => (
                     <View key={c.id} style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>

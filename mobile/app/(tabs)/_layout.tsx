@@ -3,7 +3,8 @@ import { Tabs } from "expo-router";
 import { House, CalendarDays, MessageCircle, Newspaper, UserRound } from "lucide-react-native";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { getUnreadTotal, subscribeChat } from "../../src/lib/api/chat";
+import { unreadCounts, subscribeChat } from "../../src/lib/api/chat";
+import { getMuted, onMuteChange } from "../../src/lib/mute";
 import { registerForPush } from "../../src/lib/push";
 
 export default function TabLayout() {
@@ -13,7 +14,8 @@ export default function TabLayout() {
 
   const refresh = useCallback(async () => {
     if (!me) return;
-    setUnread(await getUnreadTotal().catch(() => 0));
+    const [c, m] = await Promise.all([unreadCounts().catch(() => ({})), getMuted()]);
+    setUnread(Object.entries(c).reduce((a, [id, n]) => a + (m.has(id) ? 0 : n), 0));
   }, [me]);
 
   useEffect(() => {
@@ -21,8 +23,9 @@ export default function TabLayout() {
     if (!me) return;
     const ch = subscribeChat(() => refresh(), () => refresh());
     const t = setInterval(refresh, 30000);
+    const off = onMuteChange(refresh);
     registerForPush(me).catch(() => {});
-    return () => { ch.unsubscribe(); clearInterval(t); };
+    return () => { ch.unsubscribe(); clearInterval(t); off(); };
   }, [me, refresh]);
 
   return (

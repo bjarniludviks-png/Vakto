@@ -3,17 +3,16 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { View, Pressable, ScrollView, RefreshControl } from "react-native";
 import { useRouter, useFocusEffect, useLocalSearchParams } from "expo-router";
-import { ChevronLeft, ChevronRight, CalendarPlus, LayoutGrid, X, ArrowLeftRight, MessageCircle } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, CalendarPlus, LayoutGrid } from "lucide-react-native";
 import { Header, IconBtn } from "../../src/components/screen";
-import { Card, Txt, Muted, Pill, Btn, Avatar, AvatarStack, Seg, Sheet, Eyebrow, KV, Empty, useToast } from "../../src/components/ui";
+import { Card, Txt, Muted, Pill, Btn, Avatar, Seg, Eyebrow, Empty, useToast } from "../../src/components/ui";
 import { colors, deptColor, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { getWeekShifts, weekHoursOf, coworkersOf, iso, mondayOf, type SchedShift } from "../../src/lib/api/schedule";
+import { getWeekShifts, weekHoursOf, iso, mondayOf, type SchedShift } from "../../src/lib/api/schedule";
 import { applyForShift, listMyRequests } from "../../src/lib/api/requests";
 import { estimateShift } from "../../src/lib/api/pay";
-import { startDM, peopleMap } from "../../src/lib/api/chat";
 import { dec1, kr } from "../../src/lib/format";
-import { LeaveSheet, OfferSheet, CantSheet } from "../../src/components/request-sheets";
+import { LeaveSheet } from "../../src/components/request-sheets";
 
 const DAY_L = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
 const DAY_FULL = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
@@ -32,9 +31,8 @@ export default function Vaktir() {
   const [tab, setTab] = useState<Tab>("mine");
   const [shifts, setShifts] = useState<SchedShift[]>([]);
   const [applied, setApplied] = useState<Set<string>>(new Set());
-  const [detail, setDetail] = useState<SchedShift | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [sheet, setSheet] = useState<null | "leave" | "offer" | "cant">(null);
+  const [sheet, setSheet] = useState<null | "leave">(null);
 
   useEffect(() => { if (params.seg === "open") setTab("open"); }, [params.seg]);
 
@@ -70,7 +68,6 @@ export default function Vaktir() {
     const r = await applyForShift(me, `${DAY_L[(d.getDay() + 6) % 7]} ${d.getDate()}.${d.getMonth() + 1} ${s.start ?? ""}–${s.end ?? ""}`);
     if (!r.ok) { toast(r.error ?? "Tókst ekki"); setApplied((x) => { const n = new Set(x); n.delete(s.id); return n; }); return; }
     toast("Umsókn send — vaktstjóri fær tilkynningu");
-    setDetail(null);
   }
 
   const colorOf = (s: SchedShift) => deptColor(s.dept, s.color === "#e9700f" ? null : s.color);
@@ -128,7 +125,7 @@ export default function Vaktir() {
                     <Txt size={10.5} weight="bold" color={today ? colors.brand : colors.ink3} style={{ letterSpacing: 0.4 }}>{DAY_L[i].toUpperCase()}</Txt>
                   </View>
                   <View style={{ flex: 1, gap: 8 }}>
-                    {mine.length ? mine.map((s) => <ShiftCard key={s.id} s={s} color={colorOf(s)} tag={today ? "Í dag" : undefined} onPress={() => setDetail(s)} />) : (
+                    {mine.length ? mine.map((s) => <ShiftCard key={s.id} s={s} color={colorOf(s)} tag={today ? "Í dag" : undefined} onPress={() => router.push(`/vakt/${s.id}`)} />) : (
                       <View style={{ paddingVertical: 12, paddingHorizontal: 14, borderRadius: 14, backgroundColor: colors.panel, borderWidth: 1, borderColor: colors.line2 }}>
                         <Txt size={13.5} weight={today ? "semibold" : "regular"} color={today ? colors.ink : colors.ink3}>{today ? "Engin vakt í dag" : "Frí"}</Txt>
                       </View>
@@ -147,7 +144,7 @@ export default function Vaktir() {
               <Muted>{allOnSel.length} á vakt</Muted>
             </View>
             {allOnSel.length === 0 ? <Empty title="Engar vaktir á plani" sub="Ekkert skráð þennan dag." /> : null}
-            {allOnSel.map((s) => <ShiftCard key={s.id} s={s} color={colorOf(s)} showWho tag={s.mine ? "Þú" : undefined} onPress={() => setDetail(s)} />)}
+            {allOnSel.map((s) => <ShiftCard key={s.id} s={s} color={colorOf(s)} showWho tag={s.mine ? "Þú" : undefined} onPress={() => router.push(`/vakt/${s.id}`)} />)}
           </>
         )}
 
@@ -182,27 +179,7 @@ export default function Vaktir() {
         )}
       </ScrollView>
 
-      <ShiftDetail
-        shift={detail}
-        all={shifts}
-        color={detail ? colorOf(detail) : colors.brand}
-        onClose={() => setDetail(null)}
-        onApply={apply}
-        applied={detail ? applied.has(detail.id) : false}
-        onOffer={() => setSheet("offer")}
-        onCant={() => setSheet("cant")}
-        onMessage={async (empId) => {
-          if (!me) return;
-          const people = await peopleMap(me.companyId);
-          const other = [...people.values()].find((p) => p.name === empId);
-          if (!other) { toast("Þessi starfsmaður er ekki með aðgang að appinu"); return; }
-          const r = await startDM(me, other.userId);
-          if (r.ok && r.id) { setDetail(null); router.push(`/spjall/${r.id}?name=${encodeURIComponent(other.name)}`); }
-        }}
-      />
       <LeaveSheet open={sheet === "leave"} onClose={() => setSheet(null)} onDone={load} />
-      <OfferSheet open={sheet === "offer"} onClose={() => setSheet(null)} onDone={() => { setDetail(null); load(); }} shiftLabel={detail ? `${DAY_L[(new Date(detail.date + "T12:00:00").getDay() + 6) % 7]} ${new Date(detail.date + "T12:00:00").getDate()}.${new Date(detail.date + "T12:00:00").getMonth() + 1} ${detail.start}–${detail.end}` : undefined} />
-      <CantSheet open={sheet === "cant"} onClose={() => setSheet(null)} onDone={() => { setDetail(null); load(); }} shiftLabel={detail ? `${DAY_L[(new Date(detail.date + "T12:00:00").getDay() + 6) % 7]} ${new Date(detail.date + "T12:00:00").getDate()}.${new Date(detail.date + "T12:00:00").getMonth() + 1} ${detail.start}–${detail.end}` : ""} />
     </View>
   );
 }
@@ -219,66 +196,5 @@ function ShiftCard({ s, color, tag, showWho, onPress }: { s: SchedShift; color: 
         {tag ? <View style={{ backgroundColor: "rgba(255,255,255,.22)", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 2 }}><Txt weight="bold" size={11} color="#fff">{tag}</Txt></View> : null}
       </View>
     </Pressable>
-  );
-}
-
-function ShiftDetail({ shift, all, color, onClose, onApply, applied, onOffer, onCant, onMessage }: {
-  shift: SchedShift | null; all: SchedShift[]; color: string; onClose: () => void; onApply: (s: SchedShift) => void; applied: boolean;
-  onOffer: () => void; onCant: () => void; onMessage: (empName: string) => void;
-}) {
-  const { me } = useMe();
-  if (!shift) return null;
-  const d = new Date(shift.date + "T12:00:00");
-  const co = coworkersOf(all, shift);
-  const est = me && shift.mine ? estimateShift(me, shift.date, shift.start, shift.end) : null;
-  return (
-    <Sheet open onClose={onClose}>
-      <View style={{ backgroundColor: color, borderRadius: 18, padding: 16, flexDirection: "row", alignItems: "center", gap: 14, marginTop: -6 }}>
-        <View style={{ backgroundColor: "rgba(255,255,255,.18)", borderRadius: 12, paddingVertical: 6, paddingHorizontal: 10, minWidth: 54, alignItems: "center" }}>
-          <Txt weight="bold" size={24} color="#fff" style={{ lineHeight: 26 }}>{d.getDate()}</Txt>
-          <Txt size={11} weight="bold" color="#fff">{DAY_L[(d.getDay() + 6) % 7].toUpperCase()}</Txt>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Txt weight="bold" size={20} color="#fff" style={{ fontVariant: ["tabular-nums"], letterSpacing: -0.3 }}>{shift.start && shift.end ? `${shift.start}–${shift.end} · ${shift.dur}` : "Opin vakt"}</Txt>
-          <Txt size={13.5} color="rgba(255,255,255,.92)">{[shift.typeName, shift.dept].filter(Boolean).join(" · ") || "Vakt"}</Txt>
-        </View>
-        <Pressable onPress={onClose} hitSlop={10}><X color="#fff" size={22} /></Pressable>
-      </View>
-      <Card style={{ paddingVertical: 4 }}>
-        <KV k="Starfsmaður" v={shift.open ? <Pill tone="brand" label="Laus til umsóknar" /> : <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}><Avatar name={shift.empName ?? "?"} size={26} /><Txt weight="bold" size={14.5}>{shift.empName ?? "—"}</Txt></View>} />
-        <KV k="Dagsetning" v={`${DAY_FULL[(d.getDay() + 6) % 7]} ${d.getDate()}. ${MONTHS[d.getMonth()]}`} />
-        {shift.dept ? <KV k="Deild" v={shift.dept} /> : null}
-        <KV k="Samstarfsfólk" last v={co.length ? <AvatarStack people={co.map((c) => ({ name: c.empName ?? "?" }))} /> : <Muted>Enginn á sama tíma</Muted>} />
-      </Card>
-      {co.length ? (
-        <Card style={{ paddingVertical: 4 }}>
-          <View style={{ paddingVertical: 10 }}><Eyebrow>Á vakt á sama tíma</Eyebrow></View>
-          {co.slice(0, 10).map((c, i) => (
-            <View key={c.id} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 9, borderTopWidth: 1, borderTopColor: colors.line2 }}>
-              <Avatar name={c.empName ?? "?"} size={30} />
-              <Txt weight="semibold" size={14} style={{ flex: 1 }} numberOfLines={1}>{c.empName}</Txt>
-              <Muted size={12.5}>{c.start}–{c.end}</Muted>
-            </View>
-          ))}
-        </Card>
-      ) : null}
-      {est ? (
-        <View style={{ backgroundColor: colors.brandSoft, borderRadius: 18, padding: 16 }}>
-          <Eyebrow color={colors.brandDeep}>Áætluð laun fyrir vaktina</Eyebrow>
-          <Txt weight="bold" size={28} style={{ letterSpacing: -0.6, marginTop: 4, fontVariant: ["tabular-nums"] }}>{kr(est.total)}</Txt>
-          <Txt size={12.5} color={colors.brandDeep}>Dagvinna {kr(est.base)}{est.extra ? ` · ${est.label} ${kr(est.extra)}` : ` · ${est.label}`}{me?.union ? ` · ${me.union}` : ""}</Txt>
-        </View>
-      ) : null}
-      {shift.open ? (
-        <Btn title={applied ? "Umsókn í bið hjá vaktstjóra" : "Sækja um þessa vakt"} size="lg" disabled={applied} onPress={() => onApply(shift)} />
-      ) : shift.mine ? (
-        <View style={{ flexDirection: "row", gap: 10 }}>
-          <Btn title="Bjóða vakt" variant="ghost" icon={<ArrowLeftRight color={colors.ink} size={17} />} style={{ flex: 1 }} onPress={onOffer} />
-          <Btn title="Get ekki mætt" variant="danger" style={{ flex: 1 }} onPress={onCant} />
-        </View>
-      ) : (
-        <Btn title={`Senda ${(shift.empName ?? "").split(/\s+/)[0]} skilaboð`} variant="ghost" icon={<MessageCircle color={colors.ink} size={17} />} onPress={() => onMessage(shift.empName ?? "")} />
-      )}
-    </Sheet>
   );
 }
