@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
@@ -8,17 +8,24 @@ import { MeProvider } from "../src/lib/me-context";
 import { ToastProvider } from "../src/components/ui";
 import { colors, useTheme, loadThemeMode } from "../src/theme";
 import { loadLang } from "../src/lib/i18n";
+import { isManager } from "../src/lib/api/ops";
 
 function Gate({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
 
+  // Stjórnendur lenda á mælaborðinu þegar appið opnast; starfsfólk á Heim.
+  const landed = useRef(false);
   useEffect(() => {
     if (loading) return;
     const onLogin = segments[0] === "login";
-    if (!session && !onLogin) router.replace("/login");
-    if (session && onLogin) router.replace("/");
+    if (!session && !onLogin) { landed.current = false; router.replace("/login"); return; }
+    if (session && onLogin) { router.replace("/"); return; }
+    if (session && !onLogin && !landed.current && segments.length <= 1) {
+      landed.current = true;
+      isManager().then((m) => { if (m) router.replace("/maelabord"); }).catch(() => {});
+    }
   }, [session, loading, segments, router]);
 
   if (loading) {

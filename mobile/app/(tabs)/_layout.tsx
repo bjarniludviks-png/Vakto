@@ -1,17 +1,19 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Tabs } from "expo-router";
-import { House, CalendarDays, MessageCircle, Newspaper, UserRound } from "lucide-react-native";
+import { House, CalendarDays, MessageCircle, Newspaper, UserRound, Gauge } from "lucide-react-native";
 import { colors, font, useTheme } from "../../src/theme";
 import { tr } from "../../src/lib/i18n";
 import { useMe } from "../../src/lib/me-context";
 import { unreadCounts, subscribeChat } from "../../src/lib/api/chat";
 import { getMuted, onMuteChange } from "../../src/lib/mute";
 import { syncPushWithDnd } from "../../src/lib/push";
+import { isManager } from "../../src/lib/api/ops";
 
 export default function TabLayout() {
   useTheme();
   const { me } = useMe();
   const [unread, setUnread] = useState(0);
+  const [manager, setManager] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!me) return;
@@ -26,6 +28,7 @@ export default function TabLayout() {
     const t = setInterval(refresh, 30000);
     const off = onMuteChange(() => { refresh(); syncPushWithDnd(me).catch(() => {}); });
     syncPushWithDnd(me).catch(() => {});
+    isManager().then(setManager).catch(() => {});
     return () => { ch.unsubscribe(); clearInterval(t); off(); };
   }, [me, refresh]);
 
@@ -41,6 +44,7 @@ export default function TabLayout() {
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
+      <Tabs.Screen name="maelabord" options={{ title: tr("Mælaborð"), href: manager ? undefined : null, tabBarIcon: ({ color, size }) => <Gauge color={color} size={size} /> }} />
       <Tabs.Screen name="index" options={{ title: tr("Heim"), tabBarIcon: ({ color, size }) => <House color={color} size={size} /> }} />
       <Tabs.Screen name="vaktir" options={{ title: tr("Vaktir"), tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} /> }} />
       <Tabs.Screen name="spjall" options={{ title: tr("Spjall"), tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />, tabBarBadge: unread > 0 ? unread : undefined }} />

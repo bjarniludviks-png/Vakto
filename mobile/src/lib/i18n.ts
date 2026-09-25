@@ -31,8 +31,24 @@ type E = [string, string]; // [en, vi]
 const D: Record<string, E> = {
   // --- flipar / haus
   // Rekstur (stjórnendaflipi)
-  "Rekstur": ["Operations", "Vận hành"],
-  "Á vakt núna, laun%, beiðnir og ómannaðar vaktir": ["On shift now, labour %, requests and unstaffed shifts", "Đang trong ca, % lương, yêu cầu và ca trống"],
+  "Mælaborð": ["Dashboard", "Bảng điều khiển"],
+  "Staðan á vinnustaðnum": ["How the workplace is doing", "Tình hình nơi làm việc"],
+  "Vika": ["Week", "Tuần"],
+  "Mánuður": ["Month", "Tháng"],
+  "LAUN AF VELTU": ["LABOUR AS % OF REVENUE", "LƯƠNG TRÊN DOANH THU"],
+  "markmið {n}%": ["target {n}%", "mục tiêu {n}%"],
+  "{n} umfram markmið": ["{n} over target", "{n} vượt mục tiêu"],
+  "{n} undir markmiði": ["{n} under target", "{n} dưới mục tiêu"],
+  "Velta áætluð fyrir {n} daga af {x}": ["Revenue estimated for {n} of {x} days", "Doanh thu ước tính cho {n}/{x} ngày"],
+  "Hlutfallið birtist þegar velta tímabilsins er komin inn.": ["The percentage appears once revenue for the period is entered.", "Tỷ lệ sẽ hiện khi đã nhập doanh thu của kỳ."],
+  "Velta": ["Revenue", "Doanh thu"],
+  "Launakostnaður": ["Labour cost", "Chi phí lương"],
+  "Unnir": ["Worked", "Đã làm"],
+  "á plani {n}": ["{n} scheduled", "{n} theo lịch"],
+  "engin": ["none", "không có"],
+  "Álagstímar": ["Premium hours", "Giờ phụ cấp"],
+  "ekkert álag": ["no premium", "không phụ cấp"],
+
   "Staðan á vinnustaðnum núna": ["How the workplace looks right now", "Tình hình nơi làm việc hiện tại"],
   "VIKAN Í TÖLUM": ["THE WEEK IN NUMBERS", "TUẦN NÀY BẰNG SỐ"],
   "laun af veltu · markmið {n}%": ["labour as % of revenue · target {n}%", "lương trên doanh thu · mục tiêu {n}%"],
