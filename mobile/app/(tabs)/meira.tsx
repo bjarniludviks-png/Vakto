@@ -3,7 +3,7 @@ import React, { useCallback, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
 import { View, Pressable, Alert } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { IdCard, FolderOpen, FileText, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight } from "lucide-react-native";
+import { IdCard, FolderOpen, FileText, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight, Gauge } from "lucide-react-native";
 import { Screen, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, List, Row, IconBox, Eyebrow, Bar, Pill, iconColor } from "../../src/components/ui";
 import { colors, useTheme } from "../../src/theme";
@@ -14,6 +14,7 @@ import { listMyRequests } from "../../src/lib/api/requests";
 import type { MonthPay } from "../../src/lib/api/pay";
 import { kr, dec1 } from "../../src/lib/format";
 import { unregisterPush } from "../../src/lib/push";
+import { isManager } from "../../src/lib/api/ops";
 
 export default function Eg() {
   useTheme();
@@ -22,11 +23,13 @@ export default function Eg() {
   const [pay, setPay] = useState<MonthPay | null>(null);
   const [pending, setPending] = useState(0);
   const [reqCount, setReqCount] = useState(0);
+  const [manager, setManager] = useState(false);
 
   useFocusEffect(useCallback(() => {
     if (!me) return;
     getMonthPay(me).then(setPay).catch(() => {});
     listMyRequests(me).then((r) => { setReqCount(r.length); setPending(r.filter((x) => x.status === "pending").length); }).catch(() => {});
+    isManager().then(setManager).catch(() => {});
   }, [me]));
 
   const pct = pay && pay.projectedKr > 0 ? pay.earnedKr / pay.projectedKr : 0;
@@ -60,6 +63,18 @@ export default function Eg() {
           <Txt weight="bold" size={14} style={{ fontVariant: ["tabular-nums"] }}>{pay ? kr(pay.projectedKr) : "—"}</Txt>
         </View>
       </Pressable>
+
+      {manager ? (
+        <List>
+          <Row
+            icon={<IconBox tone="warn"><Gauge color={iconColor("warn")} size={19} /></IconBox>}
+            title={tr("Rekstur")}
+            sub={tr("Á vakt núna, laun%, beiðnir og ómannaðar vaktir")}
+            onPress={() => router.push("/rekstur")}
+            last
+          />
+        </List>
+      ) : null}
 
       <List>
         <Row icon={<IconBox tone="brand"><IdCard color={iconColor("brand")} size={19} /></IconBox>} title="Starfsmannaskírteini" sub="Sýna eða bæta í Wallet" onPress={() => router.push("/skirteini")} />

@@ -30,6 +30,28 @@ export function useLang(): Lang {
 type E = [string, string]; // [en, vi]
 const D: Record<string, E> = {
   // --- flipar / haus
+  // Rekstur (stjórnendaflipi)
+  "Rekstur": ["Operations", "Vận hành"],
+  "Á vakt núna, laun%, beiðnir og ómannaðar vaktir": ["On shift now, labour %, requests and unstaffed shifts", "Đang trong ca, % lương, yêu cầu và ca trống"],
+  "Staðan á vinnustaðnum núna": ["How the workplace looks right now", "Tình hình nơi làm việc hiện tại"],
+  "VIKAN Í TÖLUM": ["THE WEEK IN NUMBERS", "TUẦN NÀY BẰNG SỐ"],
+  "laun af veltu · markmið {n}%": ["labour as % of revenue · target {n}%", "lương trên doanh thu · mục tiêu {n}%"],
+  "Engin velta skráð": ["No revenue recorded", "Chưa có doanh thu"],
+  "Laun sem hlutfall af veltu birtist þegar velta vikunnar er komin inn.": ["Labour as a share of revenue appears once this week's revenue is entered.", "Tỷ lệ lương trên doanh thu sẽ hiện khi đã nhập doanh thu tuần này."],
+  "unnir í viku": ["worked this week", "làm trong tuần"],
+  "klst yfir 40": ["hrs over 40", "giờ vượt 40"],
+  "Kostnaður": ["Cost", "Chi phí"],
+  "með gjöldum": ["incl. on-costs", "gồm phụ phí"],
+  "Á vakt núna": ["On shift now", "Đang trong ca"],
+  "Enginn er stimplaður inn eins og er.": ["Nobody is clocked in right now.", "Hiện không có ai chấm công."],
+  "síðan {n}": ["since {n}", "từ {n}"],
+  "Beiðnir sem bíða": ["Requests waiting", "Yêu cầu đang chờ"],
+  "Engin beiðni bíður afgreiðslu.": ["No requests are waiting.", "Không có yêu cầu nào đang chờ."],
+  "Samþykkja": ["Approve", "Duyệt"],
+  "Hafna": ["Decline", "Từ chối"],
+  "Vaktir án starfsmanns": ["Shifts with nobody on", "Ca chưa có người"],
+  "Allar vaktir næstu tvær vikurnar eru mannaðar.": ["Every shift in the next two weeks is covered.", "Mọi ca trong hai tuần tới đều đã có người."],
+  "Sæki stöðuna…": ["Loading…", "Đang tải…"],
   "Heim": ["Home", "Trang chủ"], "Vaktir": ["Shifts", "Ca làm"], "Spjall": ["Chat", "Trò chuyện"], "Fréttir": ["News", "Tin tức"], "Ég": ["Me", "Tôi"],
   "Fréttaveita": ["Newsfeed", "Bảng tin"], "Vakt": ["Shift", "Ca làm"], "Laun": ["Pay", "Lương"], "Tímar": ["Hours", "Giờ làm"], "Skírteini": ["ID card", "Thẻ nhân viên"],
   "Skjöl": ["Documents", "Tài liệu"], "Beiðnir": ["Requests", "Yêu cầu"], "Samstarfsfólk": ["Coworkers", "Đồng nghiệp"], "Stillingar": ["Settings", "Cài đặt"],
