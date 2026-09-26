@@ -27,11 +27,11 @@ h1{font-weight:700;letter-spacing:-.035em;line-height:1.04}
 .phone img.frame{display:block;width:100%}
 .ui{position:absolute;left:2.9%;right:2.7%;top:.7%;bottom:1%;border-radius:13%/6.3%;overflow:hidden;background:#fff}
 .ui img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
-.isl{position:absolute;top:1.9%;left:50%;transform:translateX(-50%);width:23%;height:1.95%;border-radius:999px;background:#0b0b0d;z-index:3}
-.ui img{position:absolute;left:0;right:0;top:4.4%;height:95.6%;width:100%;object-fit:cover;object-position:top}
-.status{position:absolute;left:0;right:0;top:0;height:4.4%;background:#fff;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:0 7% 0 8%;color:#0b0b0d}
-.status .t{font-family:-apple-system,"SF Pro Text","Helvetica Neue",sans-serif;font-weight:600;font-size:29px;letter-spacing:-.01em;font-variant-numeric:tabular-nums;padding-top:2px}
-.status .ic{display:flex;align-items:center;gap:9px}
+.isl{position:absolute;top:1.2%;left:50%;transform:translateX(-50%);width:30%;height:3.9%;border-radius:999px;background:#0b0b0d;z-index:3}
+.ui img{position:absolute;left:0;right:0;top:5.8%;height:94.2%;width:100%;object-fit:cover;object-position:top}
+.status{position:absolute;left:0;right:0;top:0;height:7.2%;background:#fff;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:0 6.2% 2.2% 7%;color:#0b0b0d}
+.status .t{font-family:-apple-system,"SF Pro Text","Helvetica Neue",sans-serif;font-weight:600;font-size:35px;letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.status .ic{display:flex;align-items:center;gap:12px;transform:scale(1.35);transform-origin:right center}
 .status svg{display:block}
 .rows{display:flex;flex-direction:column;gap:30px;margin-top:54px}
 .row{display:flex;gap:20px;align-items:flex-start}
