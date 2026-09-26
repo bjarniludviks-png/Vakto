@@ -29,7 +29,7 @@ body{width:1170px;height:2532px;overflow:hidden;font-family:GS,system-ui;
 h1{font-weight:700;font-size:96px;line-height:1.08;letter-spacing:-.035em;color:#16161a;margin-top:26px}
 .phone{position:absolute;width:900px;left:135px;top:640px}
 .phone .frame{display:block;width:100%}
-.ui{position:absolute;left:2.9%;right:2.7%;top:.7%;bottom:1%;border-radius:13%/6.3%;overflow:hidden;background:#fff}
+.ui{position:absolute;left:2.72%;right:2.54%;top:.70%;bottom:.79%;border-radius:18%/8.1%;overflow:hidden;background:#fff}
 .ui img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
 .isl{position:absolute;top:2.1%;left:50%;transform:translateX(-50%);width:23%;height:1.9%;border-radius:999px;background:#0b0b0d;z-index:2}
 </style>

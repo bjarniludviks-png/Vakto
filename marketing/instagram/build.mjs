@@ -25,7 +25,7 @@ h1{font-weight:700;letter-spacing:-.035em;line-height:1.04}
 .url{font-weight:600;font-size:26px;letter-spacing:.02em}
 .phone{position:absolute;width:780px;left:150px;top:640px}
 .phone img.frame{display:block;width:100%}
-.ui{position:absolute;left:2.9%;right:2.7%;top:.7%;bottom:1%;border-radius:13%/6.3%;overflow:hidden;background:#fff}
+.ui{position:absolute;left:2.72%;right:2.54%;top:.70%;bottom:.79%;border-radius:18%/8.1%;overflow:hidden;background:#fff}
 .ui img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
 .isl{position:absolute;top:1.2%;left:50%;transform:translateX(-50%);width:30%;height:3.9%;border-radius:999px;background:#0b0b0d;z-index:3}
 .ui img{position:absolute;left:0;right:0;top:5.8%;height:94.2%;width:100%;object-fit:cover;object-position:top}

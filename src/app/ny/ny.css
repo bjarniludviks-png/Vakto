@@ -376,7 +376,7 @@
 .ny-phone-real .frame{display:block;width:100%;height:auto;position:relative;z-index:1;pointer-events:none}
 .ny-phone-real{cursor:pointer}
 /* the screen area: a 3D stage whose content flips between two faces */
-.ny-phone-ui{position:absolute;left:2.9%;right:2.7%;top:.7%;bottom:1%;z-index:2;border-radius:13%/6.3%;perspective:1100px}
+.ny-phone-ui{position:absolute;left:2.72%;right:2.54%;top:.7%;bottom:.79%;z-index:2;border-radius:18%/8.1%;perspective:1100px}
 .ny-flip{position:relative;width:100%;height:100%;border-radius:inherit;transform-style:preserve-3d;transition:transform .8s var(--ease)}
 .ny-flip.flipped{transform:rotateY(180deg)}
 @media(prefers-reduced-motion:reduce){.ny-flip{transition:none}}
