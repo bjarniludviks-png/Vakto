@@ -115,6 +115,35 @@ const list = ({ eyebrow, title, rows }) => `
 </div>
 </body>`;
 
+
+/** Lífsstílspóstur: umhverfi úr Higgsfield að baki, síminn með alvöru skjá fyrir framan. */
+const lifestyle = ({ eyebrow, title, screen, bg }) => `
+<body style="background:#111 url('file://${R}/marketing/instagram/${bg}') center/cover no-repeat;color:#fff">
+<div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.62) 0%,rgba(0,0,0,.28) 34%,rgba(0,0,0,0) 52%,rgba(0,0,0,.45) 100%)"></div>
+<div class="pad">
+  <div style="display:flex;align-items:flex-end;justify-content:space-between">
+    ${mark(false)}
+    <div class="url" style="color:rgba(255,255,255,.75)">vakto.is</div>
+  </div>
+  <div class="eyebrow" style="color:#F59331;margin-top:46px">${eyebrow}</div>
+  <h1 style="font-size:80px;margin-top:22px;max-width:11.5em;text-shadow:0 2px 24px rgba(0,0,0,.35)">${title}</h1>
+</div>
+<div class="phone" style="top:600px;width:720px;left:180px;filter:drop-shadow(0 50px 70px rgba(0,0,0,.55))">
+  <img class="frame" src="file://${R}/public/app/phone-frame.png">
+  <div class="ui">
+    <div class="status">
+      <span class="t">14:28</span>
+      <span class="ic">
+        <svg width="26" height="18" viewBox="0 0 26 18"><rect x="0" y="12" width="4.4" height="6" rx="1.4" fill="#0b0b0d"/><rect x="6.6" y="8.5" width="4.4" height="9.5" rx="1.4" fill="#0b0b0d"/><rect x="13.2" y="4.6" width="4.4" height="13.4" rx="1.4" fill="#0b0b0d"/><rect x="19.8" y="0.6" width="4.4" height="17.4" rx="1.4" fill="#0b0b0d"/></svg>
+        <svg width="24" height="18" viewBox="0 0 24 18"><path d="M12 15.6a1.9 1.9 0 1 0 0-3.8 1.9 1.9 0 0 0 0 3.8Z" fill="#0b0b0d"/><path d="M6.4 9.6a8.3 8.3 0 0 1 11.2 0" stroke="#0b0b0d" stroke-width="2.3" stroke-linecap="round" fill="none"/><path d="M2.6 5.6a14 14 0 0 1 18.8 0" stroke="#0b0b0d" stroke-width="2.3" stroke-linecap="round" fill="none"/></svg>
+        <svg width="34" height="18" viewBox="0 0 34 18"><rect x="0.9" y="1.6" width="27" height="14.8" rx="4.4" stroke="#0b0b0d" stroke-opacity=".38" stroke-width="1.8" fill="none"/><rect x="3.1" y="3.8" width="20.4" height="10.4" rx="2.6" fill="#0b0b0d"/><path d="M30.2 6.4c1.7.7 1.7 4.5 0 5.2V6.4Z" fill="#0b0b0d" fill-opacity=".38"/></svg>
+      </span>
+    </div>
+    <img src="file://${R}/mobile/store/light/${screen}.png"><span class="isl"></span>
+  </div>
+</div>
+</body>`;
+
 /** Verðpóstur. */
 const price = () => `
 <body class="dark">
@@ -156,6 +185,10 @@ const POSTS = [
         { t: "Orlof og uppbætur", s: "fylgja með í launakeyrslunni" },
       ] }) },
   { file: "5-verd", html: price() },
+  { file: "7-eldhus", html: lifestyle({
+      eyebrow: "Vaktaplan",
+      title: "Vaktaplanið er í vasanum, ekki á veggnum",
+      screen: "vaktir", bg: "bg-eldhus.png" }) },
   { file: "demo-alvoru-heim", html: product({
       eyebrow: "Heim",
       title: "Stimplaðu þig inn í símanum",
