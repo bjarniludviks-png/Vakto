@@ -208,6 +208,33 @@ export async function addDepartment(input: { name: string; locationName?: string
 }
 
 /** Save company-wide custom contract terms (appear on every new contract). */
+/** Kiosk-slóð fyrirtækisins. Býr til leynilykil ef hann vantar (eldri
+ *  fyrirtæki sem voru til áður en 0044 bætti honum við) svo stjórnandi lendi
+ *  aldrei í því að slóðin sé „ekki tilbúin“. */
+export async function ensureKioskToken(): Promise<{ ok: boolean; token?: string; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true, token: "demo" };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data, error } = await supabase.from("companies").select("kiosk_token").eq("id", ctx.company).maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    const existing = (data?.kiosk_token as string | null) ?? null;
+    if (existing) return { ok: true, token: existing };
+    const token = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+      .map((b) => b.toString(16).padStart(2, "0")).join("");
+    const { error: upErr } = await supabase.from("companies").update({ kiosk_token: token }).eq("id", ctx.company);
+    if (upErr) return { ok: false, error: upErr.message };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "company.kiosk_token", entity: "company", detail: "Kiosk-lykill búinn til",
+    });
+    revalidatePath("/stillingar");
+    return { ok: true, token };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 export async function saveContractTerms(terms: string): Promise<SettingsResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {

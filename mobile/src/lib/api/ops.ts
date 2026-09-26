@@ -28,26 +28,45 @@ export function mondayOf(d: Date): Date {
 }
 
 export type PeriodId = "day" | "week" | "month";
+/** Valið tímabil: fast tímabil með hliðrun aftur í tímann, eða valdar dagsetningar. */
+export type PeriodSel = { id: PeriodId; offset: number } | { id: "custom"; from: string; to: string };
+
+export const addDays = (d: Date, n: number) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
 
 /** Tímabilið og sama tímabil á undan, til samanburðar. */
-export function periodRange(id: PeriodId, now = new Date()): { from: string; to: string; prevFrom: string; prevTo: string } {
+export function periodRange(sel: PeriodSel, now = new Date()): { from: string; to: string; prevFrom: string; prevTo: string; label: string } {
   const d = (x: Date) => iso(x);
-  if (id === "day") {
-    const y = new Date(now); y.setDate(y.getDate() - 1);
-    return { from: d(now), to: d(now), prevFrom: d(y), prevTo: d(y) };
+  if (sel.id === "custom") {
+    const from = new Date(`${sel.from}T12:00:00`), to = new Date(`${sel.to}T12:00:00`);
+    const len = Math.round((to.getTime() - from.getTime()) / 86400000) + 1;
+    return { from: sel.from, to: sel.to, prevFrom: d(addDays(from, -len)), prevTo: d(addDays(from, -1)), label: rangeLabel(sel.from, sel.to) };
   }
-  if (id === "week") {
-    const mon = mondayOf(now);
-    const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
-    const pMon = new Date(mon); pMon.setDate(pMon.getDate() - 7);
-    const pSun = new Date(pMon); pSun.setDate(pSun.getDate() + 6);
-    return { from: d(mon), to: d(sun), prevFrom: d(pMon), prevTo: d(pSun) };
+  const off = sel.offset;
+  if (sel.id === "day") {
+    const day = addDays(now, -off);
+    const y = addDays(day, -1);
+    return { from: d(day), to: d(day), prevFrom: d(y), prevTo: d(y), label: off === 0 ? "Í dag" : off === 1 ? "Í gær" : dayLabel(d(day)) };
   }
-  const first = new Date(now.getFullYear(), now.getMonth(), 1);
-  const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  const pFirst = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const pLast = new Date(now.getFullYear(), now.getMonth(), 0);
-  return { from: d(first), to: d(last), prevFrom: d(pFirst), prevTo: d(pLast) };
+  if (sel.id === "week") {
+    const mon = addDays(mondayOf(now), -7 * off);
+    const sun = addDays(mon, 6);
+    const pMon = addDays(mon, -7);
+    return { from: d(mon), to: d(sun), prevFrom: d(pMon), prevTo: d(addDays(pMon, 6)), label: off === 0 ? "Þessi vika" : rangeLabel(d(mon), d(sun)) };
+  }
+  const first = new Date(now.getFullYear(), now.getMonth() - off, 1);
+  const last = new Date(now.getFullYear(), now.getMonth() - off + 1, 0);
+  const pFirst = new Date(first.getFullYear(), first.getMonth() - 1, 1);
+  const pLast = new Date(first.getFullYear(), first.getMonth(), 0);
+  return { from: d(first), to: d(last), prevFrom: d(pFirst), prevTo: d(pLast), label: off === 0 ? "Þessi mánuður" : MONTHS[first.getMonth()] };
+}
+
+const MONTHS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
+const dayLabel = (isoD: string) => { const x = new Date(`${isoD}T12:00:00`); return `${x.getDate()}. ${MONTHS[x.getMonth()]}`; };
+export function rangeLabel(from: string, to: string): string {
+  const a = new Date(`${from}T12:00:00`), b = new Date(`${to}T12:00:00`);
+  if (from === to) return dayLabel(from);
+  const sameMonth = a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+  return sameMonth ? `${a.getDate()}.–${b.getDate()}. ${MONTHS[b.getMonth()]}` : `${a.getDate()}.${a.getMonth() + 1}. – ${b.getDate()}.${b.getMonth() + 1}.`;
 }
 
 export type OnShift = { id: string; empId: string; name: string; color: string | null; photo: string | null; since: string; dept: string | null };
@@ -55,6 +74,7 @@ export type PendingReq = { id: string; kind: "leave" | "swap"; name: string; tit
 export type OpenShiftRow = { id: string; date: string; start: string | null; end: string | null; dept: string | null };
 
 export type Ops = {
+  label: string;
   now: LaborPeriod;
   prev: LaborPeriod;
   laborTarget: number;
@@ -70,11 +90,11 @@ function sinceLabel(isoTs: string): string {
 }
 const dayName = (dateISO: string) => ["sun", "mán", "þri", "mið", "fim", "fös", "lau"][new Date(`${dateISO}T12:00:00`).getDay()];
 
-export async function getOps(companyId: string, period: PeriodId): Promise<Ops> {
+export async function getOps(companyId: string, sel: PeriodSel): Promise<Ops> {
   const now = new Date();
   const today = iso(now);
   const in14 = new Date(now); in14.setDate(in14.getDate() + 14);
-  const r = periodRange(period, now);
+  const r = periodRange(sel, now);
 
   const [periods, openPunchQ, leaveQ, swapQ, openShiftQ, compQ] = await Promise.all([
     getLaborPeriods(companyId, [{ from: r.from, to: r.to }, { from: r.prevFrom, to: r.prevTo }]),
@@ -132,6 +152,7 @@ export async function getOps(companyId: string, period: PeriodId): Promise<Ops> 
   });
 
   return {
+    label: r.label,
     now: periods[0],
     prev: periods[1],
     laborTarget: Number((compQ.data as { labor_target?: number } | null)?.labor_target ?? DEFAULT_LABOR_TARGET),

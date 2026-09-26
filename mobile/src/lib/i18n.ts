@@ -31,6 +31,15 @@ type E = [string, string]; // [en, vi]
 const D: Record<string, E> = {
   // --- flipar / haus
   // Rekstur (stjórnendaflipi)
+  "Valið": ["Custom", "Tùy chọn"],
+  "Veldu tímabil": ["Choose a period", "Chọn khoảng thời gian"],
+  "Veldu upphafsdag": ["Pick a start date", "Chọn ngày bắt đầu"],
+  "Veldu lokadag": ["Pick an end date", "Chọn ngày kết thúc"],
+  "Síðustu 7 dagar": ["Last 7 days", "7 ngày qua"],
+  "Velja": ["Select", "Chọn"],
+  "Áætlun á móti raun": ["Plan vs actual", "Kế hoạch và thực tế"],
+  "áætlað {n}": ["{n} planned", "{n} dự kiến"],
+  "{n} klst frávik": ["{n} hrs deviation", "chênh lệch {n} giờ"],
   "Mælaborð": ["Dashboard", "Bảng điều khiển"],
   "Staðan á vinnustaðnum": ["How the workplace is doing", "Tình hình nơi làm việc"],
   "Vika": ["Week", "Tuần"],

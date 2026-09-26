@@ -6,7 +6,7 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, startCardChange, setFeedPostPolicy } from "./actions";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, startCardChange, setFeedPostPolicy, ensureKioskToken } from "./actions";
 import type { SettingsData, CompanyInfo } from "./settings.server";
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
@@ -20,10 +20,21 @@ const WEEKDAYS: [number, string][] = [[1, "Mánudagur"], [2, "Þriðjudagur"], [
 const ROLE_LABEL: Record<string, string> = { owner: "Eigandi", manager: "Stjórnandi", employee: "role:employee", contractor: "Verktaki" };
 const DEMO_SETTINGS: SettingsData = { departments: [], locations: [], positions: [], users: [], apiKeys: [], companyId: null, kioskToken: null, company: null, live: false };
 
-function copyKioskLink(kioskToken: string | null) {
-  if (!kioskToken) { toast("Kiosk-slóð er ekki tilbúin enn — hafðu samband við VAKTO"); return; }
-  const url = `${window.location.origin}/kiosk?k=${kioskToken}`;
-  navigator.clipboard?.writeText(url).then(() => toast("Kiosk-slóð afrituð"), () => toast(url));
+async function copyKioskLink(kioskToken: string | null) {
+  let token = kioskToken;
+  if (!token) {
+    // Eldri fyrirtæki gátu verið án lykils — búum hann til á staðnum.
+    const res = await ensureKioskToken();
+    if (!res.ok || !res.token) { toast(res.error ?? "Tókst ekki að sækja kiosk-slóð"); return; }
+    token = res.token;
+  }
+  const url = `${window.location.origin}/kiosk?k=${token}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast("Kiosk-slóð afrituð");
+  } catch {
+    toast(url);
+  }
 }
 
 const Globe = () => (
