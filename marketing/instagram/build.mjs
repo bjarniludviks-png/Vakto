@@ -17,15 +17,22 @@ body{width:1080px;height:1350px;overflow:hidden;font-family:GS,system-ui;positio
 .eyebrow{font-weight:600;font-size:27px;letter-spacing:.17em;text-transform:uppercase}
 h1{font-weight:700;letter-spacing:-.035em;line-height:1.04}
 .sub{font-weight:500;line-height:1.45}
+.lockup{display:flex;align-items:flex-end;gap:14px}
 .mark{display:flex;align-items:flex-end;gap:6px}
+.word{font-weight:700;font-size:40px;letter-spacing:-.02em;line-height:.88}
 .mark i{display:block;width:15px;border-radius:5px}
 .foot{margin-top:auto;display:flex;align-items:center;justify-content:space-between}
 .url{font-weight:600;font-size:26px;letter-spacing:.02em}
-.phone{position:absolute;width:780px;left:150px;top:600px}
+.phone{position:absolute;width:780px;left:150px;top:640px}
 .phone img.frame{display:block;width:100%}
 .ui{position:absolute;left:2.9%;right:2.7%;top:.7%;bottom:1%;border-radius:13%/6.3%;overflow:hidden;background:#fff}
 .ui img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
-.isl{position:absolute;top:2.1%;left:50%;transform:translateX(-50%);width:23%;height:1.9%;border-radius:999px;background:#0b0b0d;z-index:2}
+.isl{position:absolute;top:1.9%;left:50%;transform:translateX(-50%);width:23%;height:1.95%;border-radius:999px;background:#0b0b0d;z-index:3}
+.ui img{position:absolute;left:0;right:0;top:4.4%;height:95.6%;width:100%;object-fit:cover;object-position:top}
+.status{position:absolute;left:0;right:0;top:0;height:4.4%;background:#fff;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:0 7% 0 8%;color:#0b0b0d}
+.status .t{font-weight:600;font-size:27px;letter-spacing:.01em;font-variant-numeric:tabular-nums}
+.status .ic{display:flex;align-items:center;gap:9px}
+.status svg{display:block}
 .rows{display:flex;flex-direction:column;gap:30px;margin-top:54px}
 .row{display:flex;gap:20px;align-items:flex-start}
 .tick{flex:0 0 auto;width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:24px}
@@ -34,10 +41,13 @@ h1{font-weight:700;letter-spacing:-.035em;line-height:1.04}
 .big{font-weight:700;letter-spacing:-.04em;line-height:.95}
 `;
 
-const mark = (light) => `<div class="mark">
-  <i style="height:26px;background:${light ? "#F59331" : "#F59331"}"></i>
-  <i style="height:40px;background:#E9700F"></i>
-  <i style="height:54px;background:${light ? "#CF5F0C" : "#E9700F"}"></i>
+const mark = (light) => `<div class="lockup">
+  <div class="mark">
+    <i style="height:26px;background:#F59331"></i>
+    <i style="height:40px;background:#E9700F"></i>
+    <i style="height:54px;background:${light ? "#CF5F0C" : "#E9700F"}"></i>
+  </div>
+  <span class="word" style="color:${light ? "#16161A" : "#fff"}">VAKTO</span>
 </div>`;
 
 const foot = (light) => `<div class="foot">${mark(light)}<div class="url" style="color:${light ? "#6F6F7B" : "rgba(255,255,255,.66)"}">vakto.is</div></div>`;
@@ -62,17 +72,26 @@ const product = ({ eyebrow, title, screen }) => `
 <body class="cream">
 <div class="glow" style="width:1200px;height:1200px;left:-300px;top:-420px;background:radial-gradient(50% 50% at 50% 50%,rgba(233,112,15,.2),rgba(233,112,15,0) 70%)"></div>
 <div class="pad" style="padding-bottom:0">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between">
-    <div class="eyebrow" style="color:#CF5F0C">${eyebrow}</div>
-    <div style="display:flex;align-items:center;gap:14px">
-      ${mark(true)}<div class="url" style="color:#6F6F7B">vakto.is</div>
-    </div>
+  <div style="display:flex;align-items:flex-end;justify-content:space-between">
+    ${mark(true)}
+    <div class="url" style="color:#6F6F7B">vakto.is</div>
   </div>
-  <h1 style="font-size:82px;margin-top:30px;max-width:12em">${title}</h1>
+  <div class="eyebrow" style="color:#CF5F0C;margin-top:46px">${eyebrow}</div>
+  <h1 style="font-size:82px;margin-top:24px;max-width:12em">${title}</h1>
 </div>
 <div class="phone">
   <img class="frame" src="file://${R}/public/app/phone-frame.png">
-  <div class="ui"><img src="file://${R}/mobile/store/light/${screen}.png"><span class="isl"></span></div>
+  <div class="ui">
+    <div class="status">
+      <span class="t">14:28</span>
+      <span class="ic">
+        <svg width="26" height="18" viewBox="0 0 26 18"><rect x="0" y="12" width="4.4" height="6" rx="1.4" fill="#0b0b0d"/><rect x="6.6" y="8.5" width="4.4" height="9.5" rx="1.4" fill="#0b0b0d"/><rect x="13.2" y="4.6" width="4.4" height="13.4" rx="1.4" fill="#0b0b0d"/><rect x="19.8" y="0.6" width="4.4" height="17.4" rx="1.4" fill="#0b0b0d"/></svg>
+        <svg width="24" height="18" viewBox="0 0 24 18"><path d="M12 15.6a1.9 1.9 0 1 0 0-3.8 1.9 1.9 0 0 0 0 3.8Z" fill="#0b0b0d"/><path d="M6.4 9.6a8.3 8.3 0 0 1 11.2 0" stroke="#0b0b0d" stroke-width="2.3" stroke-linecap="round" fill="none"/><path d="M2.6 5.6a14 14 0 0 1 18.8 0" stroke="#0b0b0d" stroke-width="2.3" stroke-linecap="round" fill="none"/></svg>
+        <svg width="34" height="18" viewBox="0 0 34 18"><rect x="0.9" y="1.6" width="27" height="14.8" rx="4.4" stroke="#0b0b0d" stroke-opacity=".38" stroke-width="1.8" fill="none"/><rect x="3.1" y="3.8" width="20.4" height="10.4" rx="2.6" fill="#0b0b0d"/><path d="M30.2 6.4c1.7.7 1.7 4.5 0 5.2V6.4Z" fill="#0b0b0d" fill-opacity=".38"/></svg>
+      </span>
+    </div>
+    <img src="file://${R}/mobile/store/light/${screen}.png"><span class="isl"></span>
+  </div>
 </div>
 </body>`;
 
