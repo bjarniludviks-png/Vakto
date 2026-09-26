@@ -30,7 +30,7 @@ h1{font-weight:700;letter-spacing:-.035em;line-height:1.04}
 .isl{position:absolute;top:1.9%;left:50%;transform:translateX(-50%);width:23%;height:1.95%;border-radius:999px;background:#0b0b0d;z-index:3}
 .ui img{position:absolute;left:0;right:0;top:4.4%;height:95.6%;width:100%;object-fit:cover;object-position:top}
 .status{position:absolute;left:0;right:0;top:0;height:4.4%;background:#fff;z-index:2;display:flex;align-items:center;justify-content:space-between;padding:0 7% 0 8%;color:#0b0b0d}
-.status .t{font-weight:600;font-size:27px;letter-spacing:.01em;font-variant-numeric:tabular-nums}
+.status .t{font-family:-apple-system,"SF Pro Text","Helvetica Neue",sans-serif;font-weight:600;font-size:29px;letter-spacing:-.01em;font-variant-numeric:tabular-nums;padding-top:2px}
 .status .ic{display:flex;align-items:center;gap:9px}
 .status svg{display:block}
 .rows{display:flex;flex-direction:column;gap:30px;margin-top:54px}
@@ -68,7 +68,8 @@ const statement = ({ eyebrow, title, sub, size = 108 }) => `
 </body>`;
 
 /** Ljós vörupóstur með síma. */
-const product = ({ eyebrow, title, screen }) => `
+/** real=true: skjámynd tekin á alvöru iPhone, með stöðustiku og öllu — engin yfirlögn. */
+const product = ({ eyebrow, title, screen, real = false }) => `
 <body class="cream">
 <div class="glow" style="width:1200px;height:1200px;left:-300px;top:-420px;background:radial-gradient(50% 50% at 50% 50%,rgba(233,112,15,.2),rgba(233,112,15,0) 70%)"></div>
 <div class="pad" style="padding-bottom:0">
@@ -82,7 +83,7 @@ const product = ({ eyebrow, title, screen }) => `
 <div class="phone">
   <img class="frame" src="file://${R}/public/app/phone-frame.png">
   <div class="ui">
-    <div class="status">
+    ${real ? `<img src="file://${R}/mobile/store/${screen}.png" style="top:0;height:100%">` : `<div class="status">
       <span class="t">14:28</span>
       <span class="ic">
         <svg width="26" height="18" viewBox="0 0 26 18"><rect x="0" y="12" width="4.4" height="6" rx="1.4" fill="#0b0b0d"/><rect x="6.6" y="8.5" width="4.4" height="9.5" rx="1.4" fill="#0b0b0d"/><rect x="13.2" y="4.6" width="4.4" height="13.4" rx="1.4" fill="#0b0b0d"/><rect x="19.8" y="0.6" width="4.4" height="17.4" rx="1.4" fill="#0b0b0d"/></svg>
@@ -90,7 +91,7 @@ const product = ({ eyebrow, title, screen }) => `
         <svg width="34" height="18" viewBox="0 0 34 18"><rect x="0.9" y="1.6" width="27" height="14.8" rx="4.4" stroke="#0b0b0d" stroke-opacity=".38" stroke-width="1.8" fill="none"/><rect x="3.1" y="3.8" width="20.4" height="10.4" rx="2.6" fill="#0b0b0d"/><path d="M30.2 6.4c1.7.7 1.7 4.5 0 5.2V6.4Z" fill="#0b0b0d" fill-opacity=".38"/></svg>
       </span>
     </div>
-    <img src="file://${R}/mobile/store/light/${screen}.png"><span class="isl"></span>
+    <img src="file://${R}/mobile/store/light/${screen}.png"><span class="isl"></span>`}
   </div>
 </div>
 </body>`;
@@ -155,6 +156,10 @@ const POSTS = [
         { t: "Orlof og uppbætur", s: "fylgja með í launakeyrslunni" },
       ] }) },
   { file: "5-verd", html: price() },
+  { file: "demo-alvoru-heim", html: product({
+      eyebrow: "Heim",
+      title: "Stimplaðu þig inn í símanum",
+      screen: "real-heim", real: true }) },
   { file: "6-prufa", html: statement({
       eyebrow: "Byrjaðu í dag",
       title: "14 daga<br>frí prufa",
