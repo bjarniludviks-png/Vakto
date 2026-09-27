@@ -37,7 +37,7 @@ export default function EmployeeScreen({ card, my: myProp }: { card?: StaffCard;
     : card?.live
       ? {
         live: true, openSince: null, weekLabel: "", days: [], upcoming: [], weekHours: 0,
-        nextPayday: "", pay: null, rights: null, openShifts: [], tasks: [],
+        nextPayday: "", pay: null, rights: null, openShifts: [], tasks: [], geofence: "off",
         profile: { name: card.name, kennitala: card.employeeKt ?? "", position: card.role, dept: card.department ?? "", phone: "", email: "", bank: "", union: "" },
       }
       : myProp;
