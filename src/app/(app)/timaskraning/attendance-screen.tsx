@@ -379,7 +379,7 @@ function EmployeePunchesModal({ employeeId, name, from, to, onClose, onChanged }
                     <span>{spanText(p, t("opin"))}{p.open ? "" : ` · ${dec1(p.hours)} ${t("klst")}`}{p.sched ? ` · ${t("áætl.")} ${p.sched.start}–${p.sched.end}` : ""}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>
                   </div>
                   <div className="itact">
-                    <PunchFlags flags={p.flags} />
+                    <PunchFlags flags={p.flags} geo={p.geo} />
                     {p.open ? (p.flags.length ? null : <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>)
                       : p.approved ? <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Samþykkt")}</span>
                         : <span className="tag" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Bíður")}</span>}

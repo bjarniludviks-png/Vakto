@@ -4,7 +4,8 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees } from "@/lib/employees.server";
 import { nf } from "@/lib/format";
 
-export type LocationRow = { id?: string; name: string; staff: number; timezone: string };
+export type LocationRow = { id?: string; name: string; staff: number; timezone: string; lat?: number | null; lng?: number | null; radius?: number };
+export type GeofenceMode = "off" | "flag" | "block";
 export type PositionRow = { id?: string; name: string; staff: number; baseRate: string; rawRate?: number };
 export type UserRow = { name: string; initials: string; role: string; email: string };
 export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string; feedPostPolicy?: "everyone" | "managers"; payPeriodStart?: number; plan?: string | null; trialEndsAt?: string | null; billingStatus?: string | null };
@@ -12,7 +13,7 @@ export type ApiKeyView = { id: string; name: string; prefix: string; created: st
 export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
 export type CardView = { last4: string | null; brand: string | null; expiry: string | null };
 export type InvoiceView = { id: string; periodStart: string; periodEnd: string; users: number; total: number; status: string; paidAt: string | null };
-export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean; card?: CardView | null; invoices?: InvoiceView[] };
+export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean; geofenceMode?: GeofenceMode; card?: CardView | null; invoices?: InvoiceView[] };
 
 const DEMO: SettingsData = {
   departments: [
@@ -105,6 +106,11 @@ export async function getSettingsData(): Promise<SettingsData> {
     const fpRes = await supabase.from("companies").select("feed_post_policy").eq("id", company).maybeSingle();
     const feedPostPolicy = (fpRes.error ? "everyone" : (fpRes.data?.feed_post_policy as string) ?? "everyone") as "everyone" | "managers";
     const kioskToken = ktRes.error ? null : ((ktRes.data?.kiosk_token as string | null) ?? null);
+    // Geofence (0055) — mode per company, pin + radius per location. Tolerant.
+    const gfRes = await supabase.from("companies").select("geofence_mode").eq("id", company).maybeSingle();
+    const geofenceMode = (gfRes.error ? "off" : (gfRes.data?.geofence_mode as GeofenceMode | null) ?? "off");
+    const pinRes = await supabase.from("locations").select("id, lat, lng, geofence_radius").eq("company_id", company);
+    const pins = new Map((pinRes.error ? [] : pinRes.data ?? []).map((l) => [l.id as string, l]));
     // Tolerant of missing 0026 columns — fall back to name+kennitala only.
     const comp = compRes.error
       ? (await supabase.from("companies").select("name, kennitala").eq("id", company).maybeSingle()).data
@@ -134,6 +140,9 @@ export async function getSettingsData(): Promise<SettingsData> {
         id: l.id as string,
         name: l.name as string, timezone: (l.timezone as string) ?? "Atlantic/Reykjavik",
         staff: countBy("location")(l.name as string),
+        lat: (pins.get(l.id as string)?.lat as number | null) ?? null,
+        lng: (pins.get(l.id as string)?.lng as number | null) ?? null,
+        radius: Number(pins.get(l.id as string)?.geofence_radius) || 150,
       })),
       positions: (pos ?? []).map((p) => ({
         id: p.id as string,
@@ -148,7 +157,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       })),
       apiKeys,
       companyId: company,
-      kioskToken, card, invoices,
+      kioskToken, card, invoices, geofenceMode,
       company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", phone: c.phone ?? "", email: c.email ?? "", feedPostPolicy, payPeriodStart: ppd, plan, trialEndsAt, billingStatus },
       live: true,
     };

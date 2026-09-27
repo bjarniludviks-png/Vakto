@@ -85,6 +85,7 @@ const D: Record<string, E> = {
   "Góða nótt": ["Good night", "Chúc ngủ ngon"], "Góðan daginn": ["Good morning", "Chào buổi sáng"], "Góðan dag": ["Good afternoon", "Chào buổi chiều"], "Gott kvöld": ["Good evening", "Chào buổi tối"],
   "Næsta vakt": ["Next shift", "Ca tiếp theo"], "Næsta vakt · í dag": ["Next shift · today", "Ca tiếp theo · hôm nay"], "Næsta vakt · á morgun": ["Next shift · tomorrow", "Ca tiếp theo · ngày mai"],
   "í dag": ["today", "hôm nay"], "á morgun": ["tomorrow", "ngày mai"], "Í dag": ["Today", "Hôm nay"], "Í gær": ["Yesterday", "Hôm qua"], "Frí": ["Off", "Nghỉ"],
+  "Staðsetning skráð við stimplun": ["Location recorded when clocking", "Vị trí được ghi khi chấm công"],
   "Stimpla inn": ["Clock in", "Chấm công vào"], "Stimpla út": ["Clock out", "Chấm công ra"], "Augnablik…": ["One moment…", "Đợi chút…"],
   "Á vakt · síðan {n}": ["On shift · since {n}", "Đang làm · từ {n}"], "Vaktin endar {n}": ["Shift ends {n}", "Ca kết thúc lúc {n}"],
   "Engin vakt á plani — stimplun skráð samt": ["No shift planned — punch recorded anyway", "Không có ca theo lịch — vẫn ghi nhận chấm công"],

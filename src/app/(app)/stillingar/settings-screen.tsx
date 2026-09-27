@@ -6,8 +6,11 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, startCardChange, setFeedPostPolicy, ensureKioskToken } from "./actions";
-import type { SettingsData, CompanyInfo } from "./settings.server";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, startCardChange, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit } from "./actions";
+import dynamic from "next/dynamic";
+import type { SettingsData, CompanyInfo, GeofenceMode } from "./settings.server";
+
+const GeoMap = dynamic(() => import("@/components/app/geo-map"), { ssr: false });
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
 import { dec1 } from "@/lib/format";
@@ -50,7 +53,7 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
   const [keyModal, setKeyModal] = useState(false);
   const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
   const [deptEdit, setDeptEdit] = useState<{ id: string; name: string; location: string; staff: number; color: string | null; members: string[] } | null>(null);
-  const [rowEdit, setRowEdit] = useState<{ kind: "location" | "position"; id: string; name: string; rate?: number } | null>(null);
+  const [rowEdit, setRowEdit] = useState<EditRow | null>(null);
   const [section, setSection] = useState<string>(initialSection ?? (initialModal === "revenue" || initialModal === "avgrevenue" ? "velta" : "fyrirtaeki"));
   const SECTIONS: [string, string][] = [
     ["fyrirtaeki", "Fyrirtæki"], ["tengingar", "Samþættingar"], ["velta", "Veltuskráning"],
@@ -188,9 +191,9 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
           <div className="ch"><div className="ct">{t("Staðir")}</div><button className="btn sm" onClick={() => setModal("location")}>{t("+ Bæta við stað")}</button></div>
           <div className="cb att">
             {data.locations.map((l) => (
-              <div className={l.id ? "it rowlink" : "it"} key={l.name} onClick={() => l.id && setRowEdit({ kind: "location", id: l.id, name: l.name })}>
+              <div className={l.id ? "it rowlink" : "it"} key={l.name} onClick={() => l.id && setRowEdit({ kind: "location", id: l.id, name: l.name, lat: l.lat ?? null, lng: l.lng ?? null, radius: l.radius ?? 150 })}>
                 <div className={`ic ${l.staff > 0 ? "info" : "mut"}`} style={l.staff > 0 ? undefined : { background: "var(--line2)" }}><Pin /></div>
-                <div className="tx"><b>{l.name}</b><span>{l.staff} {t("starfsmenn")} · {l.timezone}</span></div>
+                <div className="tx"><b>{l.name}</b><span>{l.staff} {t("starfsmenn")} · {l.lat != null ? `${t("á korti")} · ${l.radius ?? 150} m` : l.timezone}</span></div>
                 <span className={`tag ${l.staff > 0 ? "good" : "mut"}`}>{l.staff > 0 ? t("virkt") : t("nýtt")}</span>
               </div>
             ))}
@@ -224,6 +227,7 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
             {data.departments.length === 0 && <p className="muted" style={{ fontSize: 12.5 }}>{t("Engar deildir enn — deildir (t.d. Eldhús, Sal) birtast í vali þegar þú stofnar starfsmann.")}</p>}
           </div>
         </div>
+        <GeofenceCard mode={data.geofenceMode ?? "off"} locations={data.locations} onEdit={(l) => l.id && setRowEdit({ kind: "location", id: l.id, name: l.name, lat: l.lat ?? null, lng: l.lng ?? null, radius: l.radius ?? 150 })} />
       </div>
 
       <CompanyDocsCard />
@@ -753,14 +757,125 @@ function DeptEditModal({ dept, onClose }: { dept: { id: string; name: string; lo
 }
 
 /** Edit or delete a position / location. */
-function RowEditModal({ row, onClose }: { row: { kind: "location" | "position"; id: string; name: string; rate?: number }; onClose: () => void }) {
+type EditRow = { kind: "location" | "position"; id: string; name: string; rate?: number; lat?: number | null; lng?: number | null; radius?: number };
+
+const GEO_MODES: [GeofenceMode, string, string][] = [
+  ["off", "Slökkt", "engin staðsetning er skráð"],
+  ["flag", "Merkja", "stimplun utan svæðis er leyfð en merkt í Tímaskráningu"],
+  ["block", "Hafna", "ekki hægt að stimpla sig inn utan svæðis (útstimplun er alltaf leyfð)"],
+];
+
+/** Company-wide mode + which workplaces are pinned on the map. */
+function GeofenceCard({ mode, locations, onEdit }: { mode: GeofenceMode; locations: SettingsData["locations"]; onEdit: (l: SettingsData["locations"][number]) => void }) {
+  const { t } = useLang();
+  const [cur, setCur] = useState<GeofenceMode>(mode);
+  const [busy, setBusy] = useState(false);
+  const pinned = locations.filter((l) => l.lat != null);
+  async function pick(m: GeofenceMode) {
+    if (m === cur || busy) return;
+    setBusy(true);
+    const r = await saveGeofenceMode(m);
+    setBusy(false);
+    if (!r.ok) { toast(r.error ?? t("Tókst ekki")); return; }
+    setCur(m);
+    toast(t("Vistað"));
+  }
+  return (
+    <div className="card">
+      <div className="ch"><div><div className="ct">{t("Staðsetning við stimplun")}</div><div className="cs">{t("síminn sendir staðsetningu einu sinni þegar stimplað er inn og út í appinu — engin rakning þess á milli")}</div></div></div>
+      <div className="cb att">
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+          {GEO_MODES.map(([m, label]) => (
+            <button key={m} className={`btn sm${cur === m ? "" : " ghost"}`} disabled={busy} onClick={() => pick(m)}>{t(label)}</button>
+          ))}
+        </div>
+        <p className="muted" style={{ fontSize: 12.5, margin: "0 0 8px" }}>{t(GEO_MODES.find(([m]) => m === cur)![2])}</p>
+        {cur !== "off" && locations.map((l) => (
+          <div className="it rowlink" key={l.id ?? l.name} onClick={() => onEdit(l)}>
+            <div className={`ic ${l.lat != null ? "good" : "mut"}`} style={l.lat != null ? undefined : { background: "var(--line2)" }}><Pin /></div>
+            <div className="tx"><b>{l.name}</b><span>{l.lat != null ? `${t("á korti")} · ${t("radíus")} ${l.radius ?? 150} m` : t("smelltu til að merkja staðinn á korti")}</span></div>
+            <span className={`tag ${l.lat != null ? "good" : "warn"}`}>{l.lat != null ? t("virkt") : t("vantar")}</span>
+          </div>
+        ))}
+        {cur !== "off" && pinned.length === 0 && (
+          <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("Enginn staður er kominn á kort — þangað til er staðsetning ekki skoðuð.")}</p>
+        )}
+        <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("Starfsfólk sér í appinu að staðsetning er skráð við stimplun. Stimpilklukkan (kiosk) á staðnum er ekki skoðuð.")}</p>
+      </div>
+    </div>
+  );
+}
+
+/** Pin + radius editor for a workplace: address search, "I'm here", or click the map. */
+function FenceEditor({ lat, lng, radius, onChange }: { lat: number | null; lng: number | null; radius: number; onChange: (v: { lat: number | null; lng: number | null; radius: number }) => void }) {
+  const { t } = useLang();
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<GeoHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  async function search() {
+    setSearching(true);
+    const r = await geocodeAddress(q);
+    setSearching(false);
+    setHits(r.hits);
+    if (!r.ok) toast(t("Leit tókst ekki — smelltu á kortið í staðinn"));
+    else if (!r.hits.length) toast(t("Ekkert fannst — prófaðu annað heimilisfang"));
+  }
+  function here() {
+    if (!navigator.geolocation) { toast(t("Vafrinn styður ekki staðsetningu")); return; }
+    navigator.geolocation.getCurrentPosition(
+      (p) => onChange({ lat: p.coords.latitude, lng: p.coords.longitude, radius }),
+      () => toast(t("Fékk ekki staðsetningu — leyfðu hana í vafranum")),
+      { enableHighAccuracy: true, timeout: 15000 },
+    );
+  }
+  return (
+    <div className="field">
+      <label>{t("Staðsetning á korti")}</label>
+      <div style={{ display: "flex", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
+        <input style={{ flex: 1, minWidth: 160 }} value={q} placeholder={t("Heimilisfang, t.d. Laugavegur 1")} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); search(); } }} />
+        <button type="button" className="btn ghost sm" disabled={searching || q.trim().length < 3} onClick={search}>{t("Leita")}</button>
+        <button type="button" className="btn ghost sm" onClick={here}>{t("Ég er hér")}</button>
+      </div>
+      {hits.length > 0 && (
+        <div className="att" style={{ marginBottom: 8 }}>
+          {hits.map((h, i) => (
+            <div className="it rowlink" key={i} onClick={() => { onChange({ lat: h.lat, lng: h.lng, radius }); setHits([]); }}>
+              <div className="tx"><span style={{ fontSize: 12.5 }}>{h.label}</span></div>
+            </div>
+          ))}
+        </div>
+      )}
+      <GeoMap
+        height={240}
+        points={lat != null && lng != null ? [{ lat, lng, kind: "site" }] : []}
+        circles={lat != null && lng != null ? [{ lat, lng, radius }] : []}
+        onPick={(la, ln) => onChange({ lat: la, lng: ln, radius })}
+      />
+      <div className="muted" style={{ fontSize: 12, margin: "6px 0 10px" }}>{lat != null ? t("Smelltu á kortið til að færa pinnann.") : t("Leitaðu að heimilisfangi eða smelltu á kortið til að setja pinna.")}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <label style={{ margin: 0, whiteSpace: "nowrap" }}>{t("Radíus")}</label>
+        <input type="range" min={50} max={1000} step={25} value={radius} onChange={(e) => onChange({ lat, lng, radius: Number(e.target.value) })} style={{ flex: 1 }} />
+        <b style={{ minWidth: 56, textAlign: "right" }}>{radius} m</b>
+      </div>
+      {lat != null && <button type="button" className="btn ghost sm" style={{ marginTop: 8, color: "var(--bad)" }} onClick={() => onChange({ lat: null, lng: null, radius })}>{t("Fjarlægja af korti")}</button>}
+    </div>
+  );
+}
+
+function RowEditModal({ row, onClose }: { row: EditRow; onClose: () => void }) {
   const { t } = useLang();
   const isPos = row.kind === "position";
   const [name, setName] = useState(row.name);
   const [rate, setRate] = useState(row.rate ? String(row.rate) : "");
+  const [fence, setFence] = useState({ lat: row.lat ?? null, lng: row.lng ?? null, radius: row.radius ?? 150 });
+  const fenceChanged = fence.lat !== (row.lat ?? null) || fence.lng !== (row.lng ?? null) || fence.radius !== (row.radius ?? 150);
   const [busy, setBusy] = useState(false);
   async function save() {
     setBusy(true);
+    if (!isPos && fenceChanged) {
+      const fr = await saveLocationFence(row.id, fence);
+      if (!fr.ok) { setBusy(false); toast(fr.error ?? t("Tókst ekki")); return; }
+    }
     const res = isPos ? await updatePosition(row.id, { name, baseRate: rate }) : await updateLocation(row.id, { name });
     setBusy(false);
     if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
@@ -787,6 +902,7 @@ function RowEditModal({ row, onClose }: { row: { kind: "location" | "position"; 
         <div className="mb">
           <div className="field"><label>{isPos ? t("Heiti stöðu") : t("Heiti staðar")}</label><input value={name} onChange={(e) => setName(e.target.value)} autoFocus /></div>
           {isPos && <div className="field"><label>{t("Grunntaxti (kr/klst)")}</label><input value={rate} onChange={(e) => setRate(e.target.value)} placeholder="2.900" /></div>}
+          {!isPos && <FenceEditor lat={fence.lat} lng={fence.lng} radius={fence.radius} onChange={setFence} />}
           <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
             <button className="btn" disabled={busy} onClick={save}>{t("Vista")}</button>
             <button className="btn ghost" disabled={busy} onClick={remove} style={{ color: "var(--bad)" }}>{t("Eyða")}</button>

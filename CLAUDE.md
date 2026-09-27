@@ -52,6 +52,13 @@
 
 ## Status
 
+- ✅ **Staðsetning við stimplun / geofence (27. sept 2026):** migration **0055** — `companies.geofence_mode`
+  (off/flag/block, sjálfgefið off), pinni+radíus á `locations`, `in_*`/`out_*` staðsetning+úrskurður á `punches`.
+  Trigger `punches_geofence` metur í grunninum (vefur OG app fylgja sömu reglu; starfsmaður getur ekki skrifað
+  úrskurðinn); kiosk/handvirkt ekki skoðað; útstimplun aldrei hafnað. Stillingar → Fyrirtæki → „Staðsetning við
+  stimplun“ + kort í staðar-glugga (`components/app/geo-map.tsx`, MapLibre + OpenFreeMap, leit gegnum Nominatim).
+  Tímaskráning: „Inn/Út utan svæðis · 3,6 km“ + kort. App: `expo-location` aðeins „meðan appið er notað“ (engin
+  bakgrunnsrakning) — Play/App Store gagnaöryggi: nákvæm staðsetning, virkni appsins.
 - **Fasi 1 — ALL screens built & verified pixel-for-pixel with Playwright:** project setup,
   DB schema + RLS + seed, app shell, login, marketing homepage (`/`, IS/EN + auth modal), kiosk PIN
   clock (`/kiosk`), Mælaborð, Vaktaplan (drag-drop grid + day/month views + shift types + AI prompt),

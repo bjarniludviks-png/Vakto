@@ -5,13 +5,13 @@ import { tr, trf } from "../../src/lib/i18n";
 import { View, Pressable, ScrollView, RefreshControl } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Bell, Clock, CalendarPlus, ArrowLeftRight, Banknote, Check, CalendarDays, MessageCircle, Newspaper, LayoutGrid } from "lucide-react-native";
+import { Bell, Clock, MapPin, CalendarPlus, ArrowLeftRight, Banknote, Check, CalendarDays, MessageCircle, Newspaper, LayoutGrid } from "lucide-react-native";
 import { IconBtn } from "../../src/components/screen";
 import { Card, Txt, Btn, Muted, Eyebrow, Avatar, useToast, Sheet, iconColor } from "../../src/components/ui";
 import { colors, radius, brandShadow, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { getHome, dayLabel, type Home, type Noti } from "../../src/lib/api/home";
-import { clockIn, clockOut } from "../../src/lib/api/punches";
+import { clockIn, clockOut, getGeofenceMode, punchPosition, type GeofenceMode } from "../../src/lib/api/punches";
 import { estimateShift } from "../../src/lib/api/pay";
 import { iso } from "../../src/lib/api/me";
 import { kr, dec1 } from "../../src/lib/format";
@@ -39,12 +39,17 @@ export default function HomeScreen() {
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [sheet, setSheet] = useState<null | "leave" | "offer" | "notis">(null);
+  const [geofence, setGeofence] = useState<GeofenceMode>("off");
   const [, tick] = useState(0);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
     if (!me) return;
-    try { setHome(await getHome(me)); } catch (e) { console.warn("home", e); }
+    try {
+      const [h, g] = await Promise.all([getHome(me), getGeofenceMode()]);
+      setHome(h);
+      setGeofence(g);
+    } catch (e) { console.warn("home", e); }
   }, [me]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
@@ -58,7 +63,9 @@ export default function HomeScreen() {
   async function punch(into: boolean) {
     if (!me) return;
     setBusy(true);
-    const res = into ? await clockIn(me) : await clockOut(me);
+    // Geofence (0055): one position with the punch — only when the company has it on.
+    const pos = geofence !== "off" ? await punchPosition() : null;
+    const res = into ? await clockIn(me, pos) : await clockOut(me, pos);
     setBusy(false);
     if (!res.ok) { toast(res.error ?? "Aðgerð tókst ekki"); return; }
     toast(into ? `Stimplað inn kl. ${new Date().toTimeString().slice(0, 5)}` : "Stimplað út — tímarnir bíða samþykkis");
@@ -111,6 +118,12 @@ export default function HomeScreen() {
             <Pressable onPress={() => punch(false)} disabled={busy} style={({ pressed }) => ({ marginTop: 14, backgroundColor: "#fff", borderRadius: 14, paddingVertical: 16, alignItems: "center", opacity: pressed ? 0.9 : 1 })}>
               <Txt weight="bold" size={16} color={colors.good}>{busy ? "Augnablik…" : "Stimpla út"}</Txt>
             </Pressable>
+            {geofence !== "off" ? (
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, marginTop: 10 }}>
+                <MapPin color="rgba(255,255,255,.85)" size={13} />
+                <Txt size={12.5} color="rgba(255,255,255,.85)">{tr("Staðsetning skráð við stimplun")}</Txt>
+              </View>
+            ) : null}
           </View>
         ) : (
           <View style={{ backgroundColor: colors.brand, borderRadius: 22, padding: 18, overflow: "hidden", ...brandShadow }}>
@@ -128,6 +141,12 @@ export default function HomeScreen() {
               <Clock color={colors.brandDeep} size={20} />
               <Txt weight="bold" size={16} color={colors.brandDeep}>{busy ? "Augnablik…" : "Stimpla inn"}</Txt>
             </Pressable>
+            {geofence !== "off" ? (
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, marginTop: 10 }}>
+                <MapPin color="rgba(255,255,255,.85)" size={13} />
+                <Txt size={12.5} color="rgba(255,255,255,.85)">{tr("Staðsetning skráð við stimplun")}</Txt>
+              </View>
+            ) : null}
           </View>
         )}
 

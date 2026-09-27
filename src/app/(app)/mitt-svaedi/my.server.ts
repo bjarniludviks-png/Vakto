@@ -33,9 +33,10 @@ export type MyArea = {
   profile: { name: string; kennitala: string; position: string; dept: string; phone: string; email: string; bank: string; union: string } | null;
   openShifts: MyOpenShift[];
   tasks: { id: string; title: string; done: boolean }[];   // today's shift checklist
+  geofence: "off" | "flag" | "block"; // 0055: ask for a position when clocking in/out?
 };
 
-const EMPTY: MyArea = { live: false, openSince: null, weekLabel: "", days: [], upcoming: [], weekHours: 0, nextPayday: "", pay: null, rights: null, profile: null, openShifts: [], tasks: [] };
+const EMPTY: MyArea = { live: false, openSince: null, weekLabel: "", days: [], upcoming: [], weekHours: 0, nextPayday: "", pay: null, rights: null, profile: null, openShifts: [], tasks: [], geofence: "off" };
 
 export async function getMyArea(): Promise<MyArea> {
   if (!isSupabaseConfigured()) return EMPTY;
@@ -202,9 +203,14 @@ export async function getMyArea(): Promise<MyArea> {
     const tRes = await supabase.from("shift_tasks").select("id, title, done").eq("employee_id", empId).eq("date", todayISO).order("created_at");
     if (!tRes.error) myTasks = (tRes.data ?? []).map((r) => ({ id: r.id as string, title: r.title as string, done: !!r.done }));
 
+    // Geofence mode (0055) — tolerant of a not-yet-run migration.
+    const gf = await supabase.rpc("my_geofence_mode");
+    const geofence = (gf.error ? "off" : (gf.data as MyArea["geofence"] | null) ?? "off");
+
     const payday = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     return {
       live: true,
+      geofence,
       openSince: (open?.clock_in as string) ?? null,
       weekLabel,
       days,

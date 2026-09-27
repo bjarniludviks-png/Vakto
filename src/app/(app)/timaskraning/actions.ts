@@ -194,7 +194,13 @@ export type PunchFlag =
   | { kind: "warn"; code: "late"; n: number }         // clocked in n min after the shift start
   | { kind: "warn"; code: "early"; n: number }        // clocked out n min before the shift end
   | { kind: "warn"; code: "over"; n: number }         // n hours over the planned length
-  | { kind: "warn"; code: "unscheduled" };            // no shift planned that day
+  | { kind: "warn"; code: "unscheduled" }             // no shift planned that day
+  | { kind: "bad"; code: "off_site"; edge: "in" | "out"; n: number } // punched n m from the nearest workplace (0055)
+  | { kind: "warn"; code: "no_location"; edge: "in" | "out" };      // geofence on but no position came with it
+
+/** Where a punch happened (geofence, 0055) — null when none was recorded. */
+export type PunchEdgeGeo = { lat: number | null; lng: number | null; verdict: "ok" | "outside" | "missing"; dist: number | null };
+export type PunchGeo = { in: PunchEdgeGeo | null; out: PunchEdgeGeo | null };
 
 export type PunchRow = {
   punchId: string; date: string; in: string; out: string | null; hours: number; source: string; approved: boolean; open: boolean;
@@ -203,6 +209,7 @@ export type PunchRow = {
   /** The planned shift that day, if any. */
   sched: { start: string; end: string; hours: number } | null;
   flags: PunchFlag[];
+  geo?: PunchGeo | null;
 };
 /** A planned shift on a past day with no punch at all. */
 export type MissedShift = { date: string; start: string; end: string; hours: number };
@@ -291,6 +298,33 @@ export async function getEmployeePunches(employeeId: string, fromISO: string, to
         sched, flags: flagsFor({ open, in: inHM, hours, clockInMs: new Date(ci).getTime() }, sched, nowMs),
       };
     });
+    // Geofence verdicts (0055) — separate, tolerant query so a missing migration changes nothing.
+    if (rows.length) {
+      const geoRes = await supabase.from("punches")
+        .select("id, in_lat, in_lng, in_geo, in_dist, out_lat, out_lng, out_geo, out_dist")
+        .in("id", rows.map((r) => r.punchId));
+      if (!geoRes.error) {
+        const edge = (g: Record<string, unknown>, k: "in" | "out"): PunchEdgeGeo | null => {
+          const v = g[`${k}_geo`] as PunchEdgeGeo["verdict"] | null;
+          if (!v) return null;
+          return { lat: (g[`${k}_lat`] as number | null) ?? null, lng: (g[`${k}_lng`] as number | null) ?? null, verdict: v, dist: (g[`${k}_dist`] as number | null) ?? null };
+        };
+        const byId = new Map((geoRes.data ?? []).map((g) => [g.id as string, g as Record<string, unknown>]));
+        for (const r of rows) {
+          const g = byId.get(r.punchId);
+          if (!g) continue;
+          const geo: PunchGeo = { in: edge(g, "in"), out: edge(g, "out") };
+          if (!geo.in && !geo.out) continue;
+          r.geo = geo;
+          for (const k of ["in", "out"] as const) {
+            const e = geo[k];
+            if (e?.verdict === "outside") r.flags.push({ kind: "bad", code: "off_site", edge: k, n: e.dist ?? 0 });
+            else if (e?.verdict === "missing") r.flags.push({ kind: "warn", code: "no_location", edge: k });
+          }
+        }
+      }
+    }
+
     // Past days with a planned shift but no punch at all — a deviation too.
     const today = new Date(); const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     const missed: MissedShift[] = [];
@@ -506,5 +540,23 @@ export async function approvePunchList(ids: string[]): Promise<ApproveResult> {
     return { ok: true, count };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+export type FenceSite = { name: string; lat: number; lng: number; radius: number };
+
+/** The company's pinned workplaces — drawn under a punch on the map. */
+export async function getFenceSites(): Promise<FenceSite[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return [];
+    const { data, error } = await supabase.from("locations").select("name, lat, lng, geofence_radius")
+      .eq("company_id", ctx.company).not("lat", "is", null);
+    if (error) return [];
+    return (data ?? []).map((l) => ({ name: l.name as string, lat: l.lat as number, lng: l.lng as number, radius: Number(l.geofence_radius) || 150 }));
+  } catch {
+    return [];
   }
 }
