@@ -48,7 +48,20 @@ export function PhotoAvatar({ photo, setPhoto, big, initials = "VK" }: { photo: 
 
 /* ------------------------------------------------------------- punch card */
 /** The clock: one big button, live elapsed time from the real open punch. */
-export function PunchCard({ openSince }: { openSince: string | null }) {
+/** One position for a punch (geofence on). Resolves null when denied/unavailable —
+ *  the server then decides (flag as "missing" or refuse in block mode). */
+function punchPosition(): Promise<{ lat: number; lng: number; acc: number } | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 },
+    );
+  });
+}
+
+export function PunchCard({ openSince, geofence = "off" }: { openSince: string | null; geofence?: "off" | "flag" | "block" }) {
   const { t } = useLang();
   const [on, setOn] = useState(!!openSince);
   const [since, setSince] = useState(openSince ? openSince.slice(11, 16) : "");
@@ -67,7 +80,8 @@ export function PunchCard({ openSince }: { openSince: string | null }) {
   }, [on]);
   async function toggle() {
     const next = !on;
-    const res = await myPunch(next);
+    const pos = geofence !== "off" ? await punchPosition() : null;
+    const res = await myPunch(next, pos);
     if (!res.ok) { toast(res.error ?? t("Tókst ekki")); return; }
     if (next) {
       startRef.current = Date.now();
@@ -82,6 +96,12 @@ export function PunchCard({ openSince }: { openSince: string | null }) {
       <div className="st">{on ? `${t("Á vakt síðan")} ${since}` : t("Ekki á vakt")}</div>
       <div className="big">{elapsed}</div>
       <AsyncButton className="" onClick={toggle}>{on ? t("Stimpla út") : t("Stimpla inn")}</AsyncButton>
+      {geofence !== "off" && (
+        <div className="st" style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, opacity: 0.85 }}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z" /><circle cx="12" cy="9" r="2.5" /></svg>
+          {t("Staðsetning skráð við stimplun")}
+        </div>
+      )}
     </div>
   );
 }

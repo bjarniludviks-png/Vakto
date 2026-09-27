@@ -212,6 +212,12 @@
   starfsmannaflæðin séu prófanleg. Eftir í appinu: push-tilkynningar, myndataka prófílmyndar,
   undirritun samnings, Wallet.
 
+- ✅ **Staðsetning við stimplun / geofence (27. sept 2026, á `dev`):** migration **0048** — `companies.geofence_mode`
+  (off/flag/block), pinni+radíus á `locations`, `in_*`/`out_*` staðsetning+úrskurður á `punches`. Trigger
+  `punches_geofence` metur í grunninum (vefur OG app fylgja sömu reglu; starfsmaður getur ekki skrifað úrskurðinn);
+  kiosk/handvirkt skoðað ekki; útstimplun aldrei hafnað. Stillingar → „Staðsetning við stimplun“ + kort í staðar-glugga
+  (MapLibre + OpenFreeMap, leit gegnum Nominatim). Tímaskráning: „Inn/Út utan svæðis · 3,6 km“ + kort. App: `expo-location`
+  aðeins „meðan appið er notað“ (engin bakgrunnsrakning). Keyrð á staging, EKKI prod. Krefst nýs app-builds.
 - ✅ **UX-einföldun & „ekkert falskt" (19. sept 2026 — sjá `VAKTO-WASTE-LISTI.md`):** öll demo-viðmótstré
   og fölsk gögn fjarlægð (fast 32,1 %, falskt VISA-kort, Forskoða, INVENTRA-mock, aðstoðar-FAB,
   tilkynningabjalla, hlutverks-forskoðun, AI-demo-tillaga). **Laun % af veltu reiknast á EINN hátt:**

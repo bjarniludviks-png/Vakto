@@ -797,3 +797,70 @@ export async function savePayPeriodStart(day: number): Promise<SettingsResult> {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
 }
+
+/* ------------------------------------------------ geofence (migration 0048) */
+
+/** Company-wide "Staðsetning við stimplun": off / flag / block. */
+export async function saveGeofenceMode(mode: "off" | "flag" | "block"): Promise<SettingsResult> {
+  if (!["off", "flag", "block"].includes(mode)) return { ok: false, error: "Ógilt val" };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("companies").update({ geofence_mode: mode }).eq("id", ctx.company);
+    if (error) return dbFail("saveGeofenceMode", error);
+    const label = { off: "slökkt", flag: "merkja utan svæðis", block: "hafna utan svæðis" }[mode];
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "company.geofence", entity: "companies", detail: `Staðsetning við stimplun — ${label}`,
+    });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Pin a workplace on the map (null clears the pin) + its radius in metres. */
+export async function saveLocationFence(id: string, input: { lat: number | null; lng: number | null; radius: number }): Promise<SettingsResult> {
+  const { lat, lng } = input;
+  const radius = Math.round(input.radius);
+  if ((lat == null) !== (lng == null)) return { ok: false, error: "Ógild staðsetning" };
+  if (lat != null && (Math.abs(lat) > 90 || Math.abs(lng!) > 180)) return { ok: false, error: "Ógild staðsetning" };
+  if (!(radius >= 30 && radius <= 5000)) return { ok: false, error: "Radíus þarf að vera 30–5.000 m" };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("locations")
+      .update({ lat, lng, geofence_radius: radius }).eq("id", id).eq("company_id", ctx.company);
+    if (error) return dbFail("saveLocationFence", error);
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "location.fence", entity: "location", entityId: id,
+      detail: lat == null ? "Staðsetning staðar fjarlægð" : `Staðsetning staðar stillt — ${radius} m radíus`,
+    });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+export type GeoHit = { label: string; lat: number; lng: number };
+
+/** Address → coordinates via OpenStreetMap Nominatim (server-side so we can
+ *  send a proper User-Agent per their usage policy). Iceland first. */
+export async function geocodeAddress(q: string): Promise<{ ok: boolean; hits: GeoHit[] }> {
+  const query = q.trim();
+  if (query.length < 3) return { ok: true, hits: [] };
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=is&accept-language=is&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, { headers: { "User-Agent": "VAKTO (vakto.is)" }, cache: "no-store" });
+    if (!res.ok) return { ok: false, hits: [] };
+    const rows = (await res.json()) as { display_name: string; lat: string; lon: string }[];
+    return { ok: true, hits: rows.map((r) => ({ label: r.display_name, lat: Number(r.lat), lng: Number(r.lon) })) };
+  } catch {
+    return { ok: false, hits: [] };
+  }
+}

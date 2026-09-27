@@ -1,13 +1,13 @@
 // Heim — Mitt svæði: stimplun, vikuplan, næstu vaktir, launamat, réttindi.
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { View } from "react-native";
-import { Clock, CalendarClock } from "lucide-react-native";
+import { Clock, CalendarClock, MapPin } from "lucide-react-native";
 import { Screen } from "../../src/components/screen";
 import { Card, Txt, Btn, Muted, Pill, SectionTitle } from "../../src/components/ui";
 import { colors } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { getMyArea, type MyArea } from "../../src/lib/api/me";
-import { clockIn, clockOut } from "../../src/lib/api/punches";
+import { clockIn, clockOut, getGeofenceMode, punchPosition, type GeofenceMode } from "../../src/lib/api/punches";
 import { kr, dec1 } from "../../src/lib/format";
 
 function elapsed(sinceISO: string): string {
@@ -23,12 +23,15 @@ export default function Home() {
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [geofence, setGeofence] = useState<GeofenceMode>("off");
   const [, tick] = useState(0);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
     if (!me) return;
-    setArea(await getMyArea(me));
+    const [a, g] = await Promise.all([getMyArea(me), getGeofenceMode()]);
+    setArea(a);
+    setGeofence(g);
   }, [me]);
 
   useEffect(() => {
@@ -49,7 +52,8 @@ export default function Home() {
     if (!me) return;
     setBusy(true);
     setError(null);
-    const res = into ? await clockIn(me) : await clockOut(me);
+    const pos = geofence !== "off" ? await punchPosition() : null;
+    const res = into ? await clockIn(me, pos) : await clockOut(me, pos);
     setBusy(false);
     if (!res.ok) {
       setError(res.error ?? "Aðgerð tókst ekki");
@@ -134,6 +138,12 @@ export default function Home() {
           loading={busy}
           onPress={() => punch(!onShift)}
         />
+        {geofence !== "off" ? (
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }}>
+            <MapPin color={colors.ink3} size={13} />
+            <Muted>Staðsetning skráð við stimplun</Muted>
+          </View>
+        ) : null}
       </Card>
 
       {/* Vikan */}

@@ -16,7 +16,8 @@
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "VAKTO notar myndasafnið til að velja prófílmynd.",
         "NSCameraUsageDescription": "VAKTO notar myndavélina til að taka prófílmynd.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "VAKTO skráir staðsetningu einu sinni þegar þú stimplar þig inn og út, ef vinnustaðurinn hefur kveikt á því. Engin rakning þess á milli."
       }
     },
     "android": {
@@ -44,7 +45,16 @@
       "expo-secure-store",
       "expo-image",
       "expo-sharing",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "VAKTO skráir staðsetningu einu sinni þegar þú stimplar þig inn og út, ef vinnustaðurinn hefur kveikt á því. Engin rakning þess á milli.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ]
     ],
     "extra": {
       "router": {},

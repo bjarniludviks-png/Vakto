@@ -4,16 +4,17 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees } from "@/lib/employees.server";
 import { nf } from "@/lib/format";
 
-export type LocationRow = { id?: string; name: string; staff: number; timezone: string };
+export type LocationRow = { id?: string; name: string; staff: number; timezone: string; lat?: number | null; lng?: number | null; radius?: number };
+export type GeofenceMode = "off" | "flag" | "block";
 export type PositionRow = { id?: string; name: string; staff: number; baseRate: string; rawRate?: number };
 export type UserRow = { name: string; initials: string; role: string; email: string };
 export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string; payPeriodStart?: number };
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
 export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
-export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean };
+export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; geofenceMode: GeofenceMode; live: boolean };
 
 // Honest empty state (unconfigured / signed out) — never demo rows.
-const DEMO: SettingsData = { departments: [], locations: [], positions: [], users: [], apiKeys: [], companyId: null, kioskToken: null, company: null, live: false };
+const DEMO: SettingsData = { departments: [], locations: [], positions: [], users: [], apiKeys: [], companyId: null, kioskToken: null, company: null, geofenceMode: "off", live: false };
 
 const ini = (s: string) => s.trim().split(/\s+/)[0].slice(0, 2).toUpperCase();
 
@@ -79,6 +80,11 @@ export async function getSettingsData(): Promise<SettingsData> {
     // Secret kiosk token (0044) — the only thing that opens /kiosk for this company.
     const ktRes = await supabase.from("companies").select("kiosk_token").eq("id", company).maybeSingle();
     const kioskToken = ktRes.error ? null : ((ktRes.data?.kiosk_token as string | null) ?? null);
+    // Geofence (0048) — mode per company, pin + radius per location. Tolerant.
+    const gfRes = await supabase.from("companies").select("geofence_mode").eq("id", company).maybeSingle();
+    const geofenceMode = (gfRes.error ? "off" : (gfRes.data?.geofence_mode as GeofenceMode | null) ?? "off");
+    const pinRes = await supabase.from("locations").select("id, lat, lng, geofence_radius").eq("company_id", company);
+    const pins = new Map((pinRes.error ? [] : pinRes.data ?? []).map((l) => [l.id as string, l]));
     // Tolerant of missing 0026 columns — fall back to name+kennitala only.
     const comp = compRes.error
       ? (await supabase.from("companies").select("name, kennitala").eq("id", company).maybeSingle()).data
@@ -91,6 +97,9 @@ export async function getSettingsData(): Promise<SettingsData> {
         id: l.id as string,
         name: l.name as string, timezone: (l.timezone as string) ?? "Atlantic/Reykjavik",
         staff: countBy("location")(l.name as string),
+        lat: (pins.get(l.id as string)?.lat as number | null) ?? null,
+        lng: (pins.get(l.id as string)?.lng as number | null) ?? null,
+        radius: Number(pins.get(l.id as string)?.geofence_radius) || 150,
       })),
       positions: (pos ?? []).map((p) => ({
         id: p.id as string,
@@ -106,6 +115,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       apiKeys,
       companyId: company,
       kioskToken,
+      geofenceMode,
       company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", phone: c.phone ?? "", email: c.email ?? "", payPeriodStart: ppd },
       live: true,
     };

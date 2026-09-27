@@ -40,7 +40,7 @@ export default function StimplaScreen({ card, my }: { card: StaffCard; my: MyAre
 
       {!my.live ? <NoEmployeeCard /> : (
         <div className="emp-pane on">
-          {perms.clock && <PunchCard openSince={my.openSince} />}
+          {perms.clock && <PunchCard openSince={my.openSince} geofence={my.geofence} />}
           <TasksCard initial={my.tasks} />
           <NextShiftCard my={my} />
           <ContractSignCard />

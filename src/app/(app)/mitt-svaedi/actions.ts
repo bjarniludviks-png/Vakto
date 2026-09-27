@@ -77,8 +77,24 @@ export async function requestCorrection(input: { punchId?: string; date: string;
   }
 }
 
-/** Clock the currently signed-in employee in or out (source: app). */
-export async function myPunch(into: boolean): Promise<PunchResult> {
+export type PunchPos = { lat: number; lng: number; acc: number };
+
+/** Friendly text for the geofence trigger's refusals (0048). */
+function punchError(message: string): string {
+  if (message.includes("GEOFENCE_OUTSIDE")) {
+    const m = message.match(/GEOFENCE_OUTSIDE:(\d+)/);
+    const d = m ? Number(m[1]) : 0;
+    const far = d >= 1000 ? `${(Math.round(d / 100) / 10).toString().replace(".", ",")} km` : `${d} m`;
+    return `Þú ert utan vinnusvæðis${d ? ` (${far} frá næsta stað)` : ""} — ekki hægt að stimpla inn hér.`;
+  }
+  if (message.includes("GEOFENCE_MISSING")) return "Staðsetning þarf til að stimpla inn — leyfðu staðsetningu og reyndu aftur.";
+  console.error("[myPunch]", message);
+  return "Stimplun tókst ekki — reyndu aftur.";
+}
+
+/** Clock the currently signed-in employee in or out (source: app). `pos` is
+ *  only sent when the company has geofencing on; the DB trigger judges it. */
+export async function myPunch(into: boolean, pos?: PunchPos | null): Promise<PunchResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -99,8 +115,9 @@ export async function myPunch(into: boolean): Promise<PunchResult> {
         employee_id: emp.id,
         clock_in: now,
         source: "app",
+        ...(pos ? { in_lat: pos.lat, in_lng: pos.lng, in_acc: Math.round(pos.acc) } : {}),
       });
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: punchError(error.message) };
     } else {
       const { data: open } = await supabase
         .from("punches")
@@ -111,8 +128,10 @@ export async function myPunch(into: boolean): Promise<PunchResult> {
         .limit(1)
         .maybeSingle();
       if (open) {
-        const { error } = await supabase.from("punches").update({ clock_out: now }).eq("id", open.id);
-        if (error) return { ok: false, error: error.message };
+        const { error } = await supabase.from("punches")
+          .update({ clock_out: now, ...(pos ? { out_lat: pos.lat, out_lng: pos.lng, out_acc: Math.round(pos.acc) } : {}) })
+          .eq("id", open.id);
+        if (error) return { ok: false, error: punchError(error.message) };
       }
     }
     return { ok: true };
