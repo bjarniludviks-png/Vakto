@@ -590,11 +590,12 @@
 
 /* app-section: sjálfvirk fletting milli alvöru skjámynda úr appinu */
 .ny-slides{position:relative;width:100%;height:100%;border-radius:inherit;overflow:hidden;background:#15151a}
-.ny-slide{position:absolute;inset:0;top:38px;opacity:0;transform:scale(1.015);transition:opacity .75s var(--ease),transform 1.4s var(--ease)}
-.ny-slide.on{opacity:1;transform:none}
-.ny-slide img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
+/* scoped to the phone: .ny-slide is also the showcase carousel's class (#kerfid) */
+.ny-slides .ny-slide{position:absolute;inset:0;top:38px;opacity:0;transform:scale(1.015);transition:opacity .75s var(--ease),transform 1.4s var(--ease)}
+.ny-slides .ny-slide.on{opacity:1;transform:none}
+.ny-slides .ny-slide img{display:block;width:100%;height:100%;object-fit:cover;object-position:top}
 .ny-slides .isl{position:absolute;top:12px;left:50%;transform:translateX(-50%);width:72px;height:21px;border-radius:11px;background:#060607;z-index:2}
-@media(prefers-reduced-motion:reduce){.ny-slide{transition:none}}
+@media(prefers-reduced-motion:reduce){.ny-slides .ny-slide{transition:none}}
 .ny-app-cap{position:relative;z-index:2;margin:18px auto 0;max-width:340px;text-align:center;display:flex;flex-direction:column;gap:4px;animation:nyfade .5s var(--ease) both}
 .ny-app-cap b{color:#fff;font-size:14px;letter-spacing:-.01em}
 .ny-app-cap span{color:var(--dim);font-size:13px;line-height:1.5}
