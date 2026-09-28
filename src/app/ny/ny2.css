@@ -1,0 +1,107 @@
+/* Viðbætur við miðnætursólar-forsíðuna (sept. 2026). Sama útlit og
+   ny.css: dökkt, glerkort, appelsínugulur bjarmi. Vaktaplanið notar alvöru dökka
+   þema VAKTO (sömu litir og skjámyndirnar á síðunni). Prefix nx- svo ekkert rekst á. */
+
+/* ---------- live schedule ---------- */
+.nx-livesec{padding-bottom:70px}
+.nx-frame{position:relative;max-width:1060px;margin:0 auto;border-radius:22px;padding:10px;
+  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));border:1px solid var(--line);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 40px 90px -40px rgba(0,0,0,.8)}
+.nx-frame-glow{position:absolute;left:10%;right:10%;bottom:-60px;height:180px;border-radius:50%;
+  background:radial-gradient(closest-side,rgba(233,112,15,.35),transparent);filter:blur(30px);z-index:-1;pointer-events:none}
+.nx-sched{position:relative;background:#111114;border-radius:14px;padding:18px;font-size:12.5px;user-select:none;overflow:hidden}
+.nx-top{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;padding:0 4px 14px}
+.nx-top > div:first-child b{display:block;font-size:17px;color:#fff;letter-spacing:-.02em}
+.nx-top > div:first-child span{font-size:12.5px;color:var(--dim2)}
+.nx-kpis{margin-left:auto;display:flex;gap:22px;flex-wrap:wrap}
+.nx-kpis > div{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2}
+.nx-kpis small{font-size:10.5px;color:var(--dim2)}
+.nx-kpis b{font-size:15.5px;color:#fff;font-weight:600;font-variant-numeric:tabular-nums;transition:color 400ms ease}
+.nx-kpis b.up{color:var(--brand2)}
+.nx-kpis b.good{color:#4fd18b}
+.nx-grid{display:grid;grid-template-columns:132px repeat(5,minmax(0,1fr));border-radius:12px;border:1px solid rgba(255,255,255,.08);overflow:hidden;background:#17171c}
+.nx-grid .hd{padding:10px 6px 9px;text-align:center;font-size:10.5px;font-weight:600;letter-spacing:.08em;color:var(--dim2);border-bottom:1px solid rgba(255,255,255,.07);background:#1b1b21}
+.nx-grid .hd.first{text-align:left;padding-left:12px}
+.nx-grid .hd b{display:block;font-size:16px;color:#fff;letter-spacing:-.02em;margin-top:2px}
+.nx-grid .hd .flag{display:inline-flex;align-items:center;gap:4px;margin-top:6px;font-size:10px;font-weight:600;letter-spacing:0;white-space:nowrap;padding:3px 8px;border-radius:999px;transition:background-color 400ms ease,color 400ms ease}
+.nx-grid .hd .flag svg{width:10px;height:10px}
+.nx-grid .hd .flag.warn{background:rgba(245,147,49,.14);color:var(--brand2);box-shadow:inset 0 0 0 1px rgba(245,147,49,.3)}
+.nx-grid .hd .flag.ok{background:rgba(46,194,126,.14);color:#4fd18b;box-shadow:inset 0 0 0 1px rgba(46,194,126,.3)}
+.nx-grid .hd .flag .fl-s{display:none}
+.nx-grid .emp,.nx-grid .cell{height:54px}
+.nx-grid .emp{display:flex;align-items:center;gap:9px;padding:0 10px;border-top:1px solid rgba(255,255,255,.06);color:#fff;font-weight:600;font-size:12.5px;line-height:1.15}
+.nx-grid .emp small{display:block;font-weight:500;font-size:10.5px;color:var(--dim2);margin-top:2px}
+.nx-grid .emp .av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff;flex:none}
+.nx-grid .emp .av.plus{background:none;color:var(--brand2);box-shadow:inset 0 0 0 1.5px rgba(245,147,49,.55)}
+.nx-grid .emp.open{color:var(--brand2)}
+.nx-grid .cell{border-top:1px solid rgba(255,255,255,.06);border-left:1px solid rgba(255,255,255,.06);padding:5px;position:relative}
+.nx-grid .cell.na{background:repeating-linear-gradient(135deg,rgba(255,255,255,.05) 0 6px,transparent 6px 12px)}
+.nx-grid .cell.na::after{content:attr(data-na);position:absolute;inset:auto 0 5px;text-align:center;font-size:9.5px;color:var(--dim2)}
+.nx-grid .cell.target{transition:box-shadow 300ms ease,background-color 300ms ease}
+.nx-sched.lift .nx-grid .cell.target{box-shadow:inset 0 0 0 2px rgba(245,147,49,.6);background:rgba(233,112,15,.1)}
+.nx-chip{height:100%;border-radius:8px;padding:6px 8px;display:flex;flex-direction:column;justify-content:center;line-height:1.15;font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden}
+.nx-chip small{font-size:9.5px;font-weight:500;opacity:.85}
+.nx-chip.day{background:#16301f;color:#5fd38d;box-shadow:inset 0 0 0 1px rgba(46,194,126,.35)}
+.nx-chip.eve{background:#fdf0dc;color:#b85c0a}
+.nx-chip.openc{background:#111114;color:var(--brand2);box-shadow:inset 0 0 0 1.5px rgba(245,147,49,.7);background-image:repeating-linear-gradient(135deg,rgba(245,147,49,.1) 0 6px,transparent 6px 12px)}
+.nx-grid .foot{grid-column:1/-1;display:flex;justify-content:space-between;gap:10px;padding:10px 12px;border-top:1px solid rgba(255,255,255,.06);font-size:11.5px;color:var(--dim2);background:#1b1b21}
+.nx-grid .foot b{color:#fff}
+.nx-mover{position:absolute;left:0;right:0;top:-1px;height:54px;padding:6px 5px 5px;z-index:5;pointer-events:none;transition:transform 900ms cubic-bezier(.77,0,.175,1),opacity 400ms ease}
+.nx-mover .nx-chip{transition:transform 260ms var(--ease),box-shadow 260ms var(--ease),background-color 400ms ease,color 400ms ease}
+.nx-sched.lift .nx-mover .nx-chip{transform:scale(1.06) rotate(-1.2deg);box-shadow:0 18px 34px -10px rgba(0,0,0,.8),0 0 24px -6px var(--glow),inset 0 0 0 1.5px rgba(245,147,49,.8)}
+.nx-sched.placed .nx-mover .nx-chip{background:#fdf0dc;color:#b85c0a;background-image:none;box-shadow:none}
+.nx-cursor{position:absolute;right:-6px;bottom:-14px;width:22px;height:22px;opacity:0;transform:translate(30px,34px);transition:opacity 300ms ease,transform 700ms var(--ease);filter:drop-shadow(0 3px 5px rgba(0,0,0,.5))}
+.nx-sched.aim .nx-cursor,.nx-sched.lift .nx-cursor{opacity:1;transform:none}
+.nx-sched.lift .nx-cursor{transform:scale(.9)}
+.nx-livepts{list-style:none;margin:34px auto 0;padding:0;max-width:1060px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.nx-livepts li{display:flex;align-items:center;gap:11px;font-size:14.5px;color:var(--ink);background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.015));border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.nx-livepts li svg{width:17px;height:17px;color:var(--brand2);flex-shrink:0}
+@media(max-width:760px){
+  .nx-sched{padding:12px 8px}
+  .nx-grid{grid-template-columns:78px repeat(5,minmax(0,1fr))}
+  .nx-grid .emp{padding:0 6px}.nx-grid .emp .av{display:none}
+  .nx-chip{padding:4px 3px;font-size:10px;letter-spacing:-.03em;align-items:center}
+  .nx-chip small{display:none}
+  .nx-grid .hd{font-size:9.5px;letter-spacing:.04em;padding-inline:2px}
+  .nx-grid .hd .flag{padding:3px 5px}
+  .nx-grid .hd .flag .fl-t{display:none}.nx-grid .hd .flag .fl-s{display:inline-flex}
+  .nx-kpis{margin-left:0;gap:14px}.nx-kpis > div{align-items:flex-start}
+  .nx-grid .foot span:first-child{display:none}
+  .nx-livepts{grid-template-columns:1fr}
+}
+
+/* ---------- crew flow: hire → contract → handbook → first shift ---------- */
+.nx-crewsec{padding-top:70px}
+.nx-crew{max-width:1060px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:stretch}
+.nx-steps{list-style:none;margin:0;padding:24px;display:flex;flex-direction:column;gap:6px;
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.02));border:1px solid var(--line);border-radius:20px;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.nx-steps li{display:flex;gap:14px;padding:14px 12px;border-radius:14px;position:relative;transition:background-color 400ms ease}
+.nx-steps li:not(:last-child)::after{content:"";position:absolute;left:29px;top:48px;bottom:-14px;width:1.5px;background:var(--line);transition:background-color 500ms ease}
+.nx-steps li.done:not(:last-child)::after{background:rgba(245,147,49,.55)}
+.nx-steps li.on{background:rgba(255,255,255,.05)}
+.nx-steps .dot{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:600;color:var(--dim);background:rgba(255,255,255,.05);border:1px solid var(--line);position:relative;z-index:1;transition:background-color 400ms ease,color 400ms ease,border-color 400ms ease,box-shadow 400ms ease}
+.nx-steps .dot svg{width:16px;height:16px}
+.nx-steps li.done .dot{background:var(--brand);border-color:var(--brand);color:#fff}
+.nx-steps li.on .dot{color:#fff;border-color:rgba(245,147,49,.7);box-shadow:0 0 18px -2px var(--glow)}
+.nx-steps .tag{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--brand2);opacity:.85}
+.nx-steps b{display:block;color:#fff;font-size:16.5px;margin-top:2px;letter-spacing:-.01em}
+.nx-steps p{font-size:14px;color:var(--dim);margin-top:4px;line-height:1.55;max-width:46ch}
+.nx-steps li:not(.on):not(.done) b{color:var(--ink)}
+.nx-clip{position:relative;border-radius:20px;overflow:hidden;border:1px solid var(--line);background:#111;min-height:280px}
+.nx-clip video,.nx-clip img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.nx-clip .cap{position:absolute;left:14px;bottom:14px;font-size:12.5px;font-weight:500;color:#fff;background:rgba(10,10,12,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:7px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.1)}
+@media(max-width:860px){.nx-crew{grid-template-columns:1fr}.nx-clip{min-height:0;aspect-ratio:16/10}}
+
+/* ---------- people: clips + industries ---------- */
+.nx-clips{max-width:1060px;margin:0 auto 18px;display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.nx-clips .nx-clip{aspect-ratio:16/10;min-height:0}
+.nx-inds{max-width:1060px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.nx-ind{position:relative;margin:0;border-radius:18px;overflow:hidden;aspect-ratio:4/3;border:1px solid var(--line);background:#111}
+.nx-ind img{width:100%;height:100%;object-fit:cover;transition:transform 1200ms var(--ease)}
+.nx-ind::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,6,7,0) 40%,rgba(6,6,7,.82))}
+.nx-ind figcaption{position:absolute;left:18px;right:18px;bottom:16px;z-index:1}
+.nx-ind b{display:block;color:#fff;font-size:18px;letter-spacing:-.01em}
+.nx-ind span{font-size:13.5px;color:var(--dim)}
+@media(hover:hover) and (pointer:fine){.nx-ind:hover img{transform:scale(1.04)}}
+@media(max-width:860px){.nx-clips{grid-template-columns:1fr}.nx-inds{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){.nx-inds{grid-template-columns:1fr}}

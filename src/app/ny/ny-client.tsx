@@ -5,7 +5,7 @@
 // persisted in localStorage("vakto-lang") — the same key the app shell uses.
 // Every screenshot on the page is a real capture of the app (scripts/shots-homepage.mjs).
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CUSTOMERS, type Brand } from "../home-data";
 import HomeChat from "./home-chat";
 
@@ -40,6 +40,11 @@ const T: Record<Lang, {
   appBadge: string; appHead: string; appSub: string;
   appPoints: string[];
   appScreens: { key: string; label: string; blurb: string }[];
+  live: { head: string; sub: string; title: string; week: string; hours: string; cost: string; pct: string; emp: string; days: string[];
+    full: string; missing: string; na: string; open: string; openSub: string; openChip: string; day: string; eve: string; foot: string; h: string; cur: string;
+    points: string[] };
+  crew: { head: string; sub: string; steps: { title: string; desc: string; tag: string }[]; videoCap: string };
+  inds: { head: string; sub: string; items: [string, string][]; clips: [string, string] };
   priceHead: string; priceSub: string;
   billMonthly: string; billYearly: string; billSave: string;
   plan: Plan;
@@ -161,6 +166,30 @@ const T: Record<Lang, {
       { key: "laun", label: "Laun", blurb: "Unnið hingað til og áætlað í mánaðarlok, sundurliðað eftir dagvinnu, álagi og viku." },
       { key: "skirteini", label: "Skírteini", blurb: "Stafrænt starfsmannaskírteini með QR — í Apple og Google Wallet." },
     ],
+    live: {
+      head: "Vikan klár á nokkrum mínútum.", sub: "Dragðu vakt á milli fólks og daga. Mönnunin og launakostnaðurinn uppfærast um leið — áður en þú birtir planið.",
+      title: "Vaktaplan", week: "21.–25. september", hours: "Tímar", cost: "Áætl. launakostnaður", pct: "Laun %", emp: "Starfsmaður",
+      days: ["MÁN", "ÞRI", "MIÐ", "FIM", "FÖS"], full: "Fullmannað", missing: "Vantar 1", na: "Ekki laus",
+      open: "Opnar vaktir", openSub: "Dragðu á starfsmann", openChip: "Opin vakt", day: "Dagvakt", eve: "Kvöldvakt",
+      foot: "Dragðu og slepptu — launakostnaður reiknast samstundis", h: "klst", cur: "kr",
+      points: ["Opnar vaktir sem starfsfólk sækir um í appinu", "Framboð og frí sjást áður en þú raðar", "Vaktategundir með álagi og sniðmát"],
+    },
+    crew: {
+      head: "Ekki bara vaktaplan.", sub: "Frá ráðningu að fyrstu vakt — allt um fólkið þitt á sama stað og vaktirnar.",
+      steps: [
+        { title: "Starfsmaður stofnaður", desc: "Kennitala, kjarasamningur, starfshlutfall og banki — eða lesið inn úr Excel.", tag: "Starfsfólk" },
+        { title: "Ráðningarsamningur undirritaður", desc: "Samningurinn verður til úr gögnunum. Starfsmaðurinn les og undirritar í símanum.", tag: "Rafræn undirritun" },
+        { title: "Handbók og reglur lesnar", desc: "Starfsmannahandbók, öryggisreglur og skjöl í appinu. Þú sérð hver hefur lesið.", tag: "Skjöl" },
+        { title: "Fyrsta vaktin", desc: "Vaktin birtist í símanum, skírteinið í Wallet og hann stimplar sig inn á kioskinu.", tag: "Vaktaplan" },
+      ],
+      videoCap: "Nýr starfsmaður undirritar samninginn",
+    },
+    inds: {
+      head: "Fyrir vinnustaði sem ganga á vöktum.", sub: "Veitingastaðir, kaffihús, hótel, verslanir og ferðaþjónusta um allt land.",
+      items: [["Veitingastaðir", "Sal og eldhús, kvöld og helgar"], ["Kaffihús og bakarí", "Snemmvaktir og hlutastörf"], ["Hótel og gisting", "Móttaka, þrif og morgunmatur"],
+        ["Verslanir", "Opnun, lokun og álagstímar"], ["Ferðaþjónusta", "Bílstjórar, leiðsögn og árstíðir"], ["Þjónustufyrirtæki", "Fólk á ferðinni og á staðnum"]],
+      clips: ["Opin vakt tekin í pásunni", "Stimplað inn við komu"],
+    },
     priceHead: "Eitt verð. Allt innifalið.",
     priceSub: "Engin þrep. Ekkert læst. Engin binding.",
     billMonthly: "Mánaðarlega", billYearly: "Árlega", billSave: "15% afsláttur",
@@ -296,6 +325,30 @@ const T: Record<Lang, {
       { key: "laun", label: "Pay", blurb: "Earned so far and projected month end, broken down by regular, premium and week." },
       { key: "skirteini", label: "ID card", blurb: "Digital staff ID with QR — in Apple and Google Wallet." },
     ],
+    live: {
+      head: "Build the week in minutes.", sub: "Drag a shift between people and days. Staffing and labor cost update instantly — before you publish.",
+      title: "Schedule", week: "September 21–25", hours: "Hours", cost: "Est. labor cost", pct: "Labor %", emp: "Employee",
+      days: ["MON", "TUE", "WED", "THU", "FRI"], full: "Fully staffed", missing: "1 missing", na: "Unavailable",
+      open: "Open shifts", openSub: "Drag onto someone", openChip: "Open shift", day: "Day", eve: "Evening",
+      foot: "Drag and drop — labor cost recalculates instantly", h: "h", cur: "ISK",
+      points: ["Open shifts your team claims in the app", "See availability and time off before you schedule", "Shift types with premiums, and templates"],
+    },
+    crew: {
+      head: "Not just a schedule.", sub: "From hiring to the first shift — everything about your people, in the same place as the shifts.",
+      steps: [
+        { title: "Employee added", desc: "ID number, union agreement, employment ratio and bank — or imported from Excel.", tag: "People" },
+        { title: "Employment contract signed", desc: "The contract is generated from the data. The employee reads and signs on their phone.", tag: "E-signature" },
+        { title: "Handbook and rules read", desc: "Staff handbook, safety rules and documents in the app. You see who has read them.", tag: "Documents" },
+        { title: "The first shift", desc: "The shift lands on their phone, the ID card in Wallet, and they clock in at the kiosk.", tag: "Scheduling" },
+      ],
+      videoCap: "A new hire signs the contract",
+    },
+    inds: {
+      head: "For workplaces that run on shifts.", sub: "Restaurants, cafés, hotels, retail and tourism across Iceland.",
+      items: [["Restaurants", "Floor and kitchen, nights and weekends"], ["Cafés and bakeries", "Early shifts and part-timers"], ["Hotels", "Reception, housekeeping and breakfast"],
+        ["Retail", "Opening, closing and peak hours"], ["Tourism", "Drivers, guides and seasons"], ["Service companies", "People on the road and on site"]],
+      clips: ["Picking up an open shift on a break", "Clocking in on arrival"],
+    },
     priceHead: "One price. Everything included.",
     priceSub: "No tiers. Nothing locked. No lock-in.",
     billMonthly: "Monthly", billYearly: "Yearly", billSave: "15% off",
@@ -655,6 +708,158 @@ function Pricing({ t, q }: { t: (typeof T)["is"]; q: string }) {
   );
 }
 
+/* ---------- additions (preview): live schedule, crew flow, people ---------- */
+
+const RM = "(prefers-reduced-motion: reduce)";
+function useReducedMotion() {
+  return useSyncExternalStore(
+    (cb) => { const m = window.matchMedia(RM); m.addEventListener("change", cb); return () => m.removeEventListener("change", cb); },
+    () => window.matchMedia(RM).matches,
+    () => false,
+  );
+}
+/** Viewport visibility (not latched — demos pause when scrolled away). */
+function useSeen<T extends Element>(threshold = 0.3) {
+  const ref = useRef<T>(null);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => setSeen(e.isIntersecting), { threshold });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [threshold]);
+  return [ref, seen] as const;
+}
+/** Timed step loop while `run`; reduced motion shows `finalStep`. */
+function useSteps(run: boolean, durations: number[], finalStep: number) {
+  const rm = useReducedMotion();
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    if (!run || rm) return;
+    let i = 0;
+    let t: ReturnType<typeof setTimeout> = setTimeout(() => setStep(0), 0);
+    const tick = () => { t = setTimeout(() => { i = (i + 1) % durations.length; setStep(i); tick(); }, durations[i]); };
+    tick();
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run, rm]);
+  return rm ? finalStep : step;
+}
+const fmtN = (n: number, lang: Lang, dec = 0) => {
+  const [i, d] = n.toFixed(dec).split(".");
+  const int = i.replace(/\B(?=(\d{3})+(?!\d))/g, lang === "is" ? "." : ",");
+  return d ? `${int}${lang === "is" ? "," : "."}${d}` : int;
+};
+
+// The demo company's real people and a real week (same as the screenshots).
+const EMPS = [
+  { n: "Dalya", r: "Salur", ren: "Floor", c: "#d99a06" },
+  { n: "Fannar", r: "Stjórnun", ren: "Management", c: "#8b5cf6" },
+  { n: "Ha", r: "Eldhús", ren: "Kitchen", c: "#ea6a1f" },
+  { n: "Lóa", r: "Salur", ren: "Floor", c: "#e0364f" },
+];
+type Cell = null | "d" | "d2" | "e" | "na";
+const PLAN: Cell[][] = [["d2", "d", "d", null, "e"], ["e", "d", "d", "d", null], ["e", "e", "d", "d", null], [null, "e", "e", "na", "d"]];
+
+/** The real VAKTO week (dark theme): an open Friday shift is dragged onto Ha,
+ *  the Friday warning clears and hours / cost / labor % update. */
+function LiveSchedule({ t, lang }: { t: (typeof T)["is"]; lang: Lang }) {
+  const [ref, seen] = useSeen<HTMLDivElement>(0.35);
+  // 0 idle · 1 aim · 2 lift · 3 move · 4 placed · 5 fade
+  const s = useSteps(seen, [1300, 900, 450, 950, 3800, 450], 4);
+  const L = t.live;
+  const placed = s >= 4;
+  const cls = ["nx-sched", s === 1 ? "aim" : "", s === 2 || s === 3 ? "lift" : "", placed ? "placed" : ""].filter(Boolean).join(" ");
+  const chip = (c: Cell) => {
+    if (!c || c === "na") return null;
+    const eve = c === "e";
+    return <div className={`nx-chip ${eve ? "eve" : "day"}`}>{eve ? "15–23" : c === "d2" ? "10–18" : "07–15"}<small>{eve ? L.eve : L.day}</small></div>;
+  };
+  return (
+    <div className={cls} ref={ref}>
+      <div className="nx-top">
+        <div><b>{L.title}</b><span>{L.week}</span></div>
+        <div className="nx-kpis">
+          <div><small>{L.hours}</small><b className={placed ? "up" : ""}>{fmtN(placed ? 254 : 248, lang, 1)}</b></div>
+          <div><small>{L.cost}</small><b className={placed ? "up" : ""}>{fmtN(placed ? 961382 : 938240, lang)} {L.cur}</b></div>
+          <div><small>{L.pct}</small><b className="good">{fmtN(placed ? 27.8 : 27.1, lang, 1)}%</b></div>
+        </div>
+      </div>
+      <div className="nx-grid" role="img" aria-label={L.head}>
+        <div className="hd first">{L.emp}</div>
+        {L.days.map((d, i) => (
+          <div key={d} className={`hd${i === 4 ? " fri" : ""}`}>
+            {d}<b>{21 + i}</b>
+            {i === 4 && <span className={`flag ${placed && s !== 5 ? "ok" : "warn"}`}><span className="fl-t">{placed && s !== 5 ? L.full : L.missing}</span><span className="fl-s">{placed && s !== 5 ? <Check /> : "−1"}</span></span>}
+          </div>
+        ))}
+        {EMPS.map((e, r) => (
+          <Frag key={e.n}>
+            <div className="emp"><span className="av" style={{ background: e.c }}>{e.n.slice(0, 2).toUpperCase()}</span><div>{e.n}<small>{lang === "is" ? e.r : e.ren}</small></div></div>
+            {PLAN[r].map((c, ci) => <div key={ci} className={`cell${c === "na" ? " na" : ""}${r === 2 && ci === 4 ? " target" : ""}`} data-na={c === "na" ? L.na : undefined}>{chip(c)}</div>)}
+          </Frag>
+        ))}
+        <div className="emp open"><span className="av plus">+</span><div>{L.open}<small>{L.openSub}</small></div></div>
+        {[0, 1, 2, 3].map((i) => <div key={i} className="cell" />)}
+        <div className="cell">
+          <div className="nx-mover" style={{ transform: `translateY(${s >= 3 && s !== 5 ? "-200%" : "0"})`, opacity: s === 5 ? 0 : 1, transition: s === 0 ? "none" : undefined }}>
+            <div className="nx-chip openc">15–23<small>{placed ? L.eve : L.openChip}</small></div>
+            <svg className="nx-cursor" viewBox="0 0 24 24"><path d="M5 3l14 7-6 1.8L10.5 18Z" fill="#fff" stroke="#111" strokeWidth="1.4" strokeLinejoin="round" /></svg>
+          </div>
+        </div>
+        <div className="foot"><span>{L.foot}</span><span><b>{fmtN(placed ? 254 : 248, lang, 1)}</b> {L.h}</span></div>
+      </div>
+    </div>
+  );
+}
+function Frag({ children }: { children: React.ReactNode }) { return <>{children}</>; }
+
+/** Short lifestyle clip: loads near the viewport, plays only while visible. */
+function Clip({ src, poster, cap }: { src: string; poster: string; cap: string }) {
+  const [ref, seen] = useSeen<HTMLDivElement>(0.3);
+  const [nearRef, near] = useSeen<HTMLSpanElement>(0);
+  const [loaded, setLoaded] = useState(false);
+  const vid = useRef<HTMLVideoElement>(null);
+  const rm = useReducedMotion();
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { if (near) setLoaded(true); }, [near]);
+  useEffect(() => {
+    const v = vid.current;
+    if (!v || rm) return;
+    if (seen) v.play().catch(() => {}); else v.pause();
+  }, [seen, loaded, rm]);
+  return (
+    <div className="nx-clip" ref={ref}>
+      <span ref={nearRef} aria-hidden="true" />
+      {loaded && !rm ? <video ref={vid} src={src} poster={poster} muted loop playsInline preload="none" aria-label={cap} /> : <img src={poster} alt={cap} loading="lazy" />}
+      <span className="cap">{cap}</span>
+    </div>
+  );
+}
+
+/** Hire → contract → handbook → first shift, stepping through while visible. */
+function CrewFlow({ t }: { t: (typeof T)["is"] }) {
+  const [ref, seen] = useSeen<HTMLDivElement>(0.35);
+  const s = useSteps(seen, [2200, 2200, 2200, 3200], 3);
+  const C = t.crew;
+  return (
+    <div className="nx-crew" ref={ref}>
+      <ol className="nx-steps">
+        {C.steps.map((st, i) => (
+          <li key={st.title} className={i < s ? "done" : i === s ? "on" : ""}>
+            <span className="dot">{i < s ? <Check /> : i + 1}</span>
+            <div><span className="tag">{st.tag}</span><b>{st.title}</b><p>{st.desc}</p></div>
+          </li>
+        ))}
+      </ol>
+      <Clip src="/forsida/v-contract.mp4" poster="/forsida/v-contract.jpg" cap={C.videoCap} />
+    </div>
+  );
+}
+
+const IND_IMG = ["ind-veitingar", "ind-kaffihus", "ind-hotel", "ind-verslun", "ind-ferdathjonusta", "ind-thjonusta"];
+
 export default function NyClient() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [lang, setLang] = useState<Lang>("is");
@@ -859,6 +1064,27 @@ export default function NyClient() {
         </div>
       </section>
 
+      {/* ---------- NEW: the schedule, live ---------- */}
+      <section className="ny-sec nx-livesec" id="vaktaplan">
+        <Rise><div className="ny-head">
+          <h2>{t.live.head}</h2>
+          <p>{t.live.sub}</p>
+        </div></Rise>
+        <Rise delay={60}>
+          <div className="nx-frame"><span className="nx-frame-glow" aria-hidden="true" /><LiveSchedule t={t} lang={lang} /></div>
+          <ul className="nx-livepts">{t.live.points.map((pt) => <li key={pt}><Check />{pt}</li>)}</ul>
+        </Rise>
+      </section>
+
+      {/* ---------- NEW: not just a schedule — hire → contract → handbook → first shift ---------- */}
+      <section className="ny-sec nx-crewsec" id="starfsfolk">
+        <Rise><div className="ny-head">
+          <h2>{t.crew.head}</h2>
+          <p>{t.crew.sub}</p>
+        </div></Rise>
+        <Rise delay={60}><CrewFlow t={t} /></Rise>
+      </section>
+
       {/* ---------- simpler for both ---------- */}
       <section className="ny-sec ny-twosec">
         <Rise><div className="ny-head">
@@ -896,6 +1122,28 @@ export default function NyClient() {
 
       {/* the employee app */}
       <AppPreview t={t} lang={lang} />
+
+      {/* ---------- NEW: people — the workplaces VAKTO is for ---------- */}
+      <section className="ny-sec nx-indsec">
+        <Rise><div className="ny-head">
+          <h2>{t.inds.head}</h2>
+          <p>{t.inds.sub}</p>
+        </div></Rise>
+        <Rise delay={60}>
+          <div className="nx-clips">
+            <Clip src="/forsida/v-app.mp4" poster="/forsida/v-app.jpg" cap={t.inds.clips[0]} />
+            <Clip src="/forsida/v-kiosk.mp4" poster="/forsida/v-kiosk.jpg" cap={t.inds.clips[1]} />
+          </div>
+          <div className="nx-inds">
+            {t.inds.items.map(([name, line], i) => (
+              <figure className="nx-ind" key={name}>
+                <img src={`/forsida/${IND_IMG[i]}.jpg`} alt="" loading="lazy" />
+                <figcaption><b>{name}</b><span>{line}</span></figcaption>
+              </figure>
+            ))}
+          </div>
+        </Rise>
+      </section>
 
       {/* ---------- pricing ---------- */}
       <Pricing t={t} q={q} />
