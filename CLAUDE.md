@@ -260,7 +260,12 @@
 - Flæði: netfang → 6 stafa kóði í pósti (Resend, `email_verifications` 0053, 15 mín, 5 tilraunir, 3 sendingar/10 mín) → nafn/fyrirtæki/lykilorð + hak fyrir skilmála (`companies.terms_accepted_at/terms_version`) → kort hjá Straumi. Kóðinn skilar `proof` sem `createOwnerAccount` eyðir (einnota, 30 mín).
 - Lykilorð: `src/lib/password.ts` (12+ stafir, engar samsetningarkröfur, algeng/runur bönnuð) + `password.server.ts` (Have I Been Pwned k-anonymity, bilar opið). Sömu reglur á /nytt-lykilord.
 - Bot-vörn: Cloudflare Turnstile á nýskráningu, aðeins virk ef `NEXT_PUBLIC_TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` eru sett (Vercel). Án þeirra sleppir þjónninn athuguninni.
-- Supabase Auth ætti að vera með password_min_length=12 og leaked password protection á báðum verkefnum (stillt í dashboard: Authentication → Sign In / Providers → Email).
+- **Supabase Auth (stillt 29.9.2026, prod + staging):** „Allow new users to sign up" = AF (engin bein nýskráning gegnum
+  /auth/v1/signup — allir aðgangar verða til gegnum admin API: nýskráning `admin.createUser`, boð `inviteUserByEmail`/
+  `generateLink`), lágmarkslengd 12, „Prevent use of leaked passwords" = Á. Gildir líka um admin-köll (stutt lykilorð → 422).
+- **Öryggishausar** í `next.config.ts` (X-Frame-Options, CSP frame-ancestors, nosniff, Referrer-Policy, Permissions-Policy).
+  Engin script-src CSP enn (þarf nonce). **0056**: SECURITY DEFINER hjálparföll lokuð fyrir anon/PUBLIC.
+- **Eftir:** Cloudflare Turnstile-lyklar (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY`) ekki settir á Vercel → bot-vörn óvirk.
 
 ## Appið (mobile/, Expo) — 2026-09-23
 - Starfsmanna-appið er í `mobile/` (Expo SDK 57, expo-router, bein Supabase-tenging með RLS). Útlit fylgir samþykktri frumgerð (Heim/Vaktir/Spjall/Fréttir/Ég). Sjá `mobile/README.md`.
