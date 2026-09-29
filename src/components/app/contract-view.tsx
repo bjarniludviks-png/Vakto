@@ -28,7 +28,8 @@ export function ContractView({ content }: { content: string }) {
   const { title, sections } = parseContract(content);
   const [tIs, tEn] = splitLang(title);
   const summary = contractSummary(sections);
-  let n = 0;
+  const shown = sections.filter((s) => s.rows.length || s.paras.length);
+  const nums = shown.map((s, i) => shown.slice(0, i + 1).filter((x) => x.title).length);
   return (
     <div>
       <div style={{ background: "#fbf6f0", borderRadius: 12, padding: "18px 20px", marginBottom: 18 }}>
@@ -49,11 +50,11 @@ export function ContractView({ content }: { content: string }) {
           ))}
         </div>
       </div>
-      {sections.filter((s) => s.rows.length || s.paras.length).map((sec, i) => {
+      {shown.map((sec, i) => {
         const [sIs, sEn] = splitLang(sec.title);
         const rows = visibleRows(sec.rows);
         const alone = aloneMap(rows);
-        if (sec.title) n += 1;
+        const n = nums[i];
         return (
           <section key={i} className="cview-sec">
             <div>

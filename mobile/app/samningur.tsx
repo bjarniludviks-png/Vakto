@@ -110,7 +110,8 @@ function ContractBody({ content }: { content: string }) {
   const { title, sections } = parseContract(content);
   const [tIs, tEn] = splitLang(title);
   const summary = contractSummary(sections);
-  let n = 0;
+  const shown = sections.filter((s) => s.rows.length || s.paras.length);
+  const nums = shown.map((s, i) => shown.slice(0, i + 1).filter((x) => x.title).length);
   return (
     <View style={{ gap: 4 }}>
       <View style={{ backgroundColor: "#fbf6f0", borderRadius: 12, padding: 14, gap: 8 }}>
@@ -133,9 +134,9 @@ function ContractBody({ content }: { content: string }) {
           ))}
         </View>
       </View>
-      {sections.filter((s) => s.rows.length || s.paras.length).map((sec, i) => {
+      {shown.map((sec, i) => {
         const [sIs, sEn] = splitLang(sec.title);
-        if (sec.title) n += 1;
+        const n = nums[i];
         return (
           <View key={i} style={{ borderTopWidth: 1, borderColor: "#ece9e4", paddingTop: 12, paddingBottom: 8, gap: 9 }}>
             <View>
