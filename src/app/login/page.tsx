@@ -28,12 +28,12 @@ export default async function LoginPage({
         <div className="tag">{s.tag}</div>
         <div className="mid">
           <h2>
-            {s.h2[0]} <span className="arr">→</span> {s.h2[1]}{" "}
-            <span className="arr">→</span> {s.h2[2]} <span className="arr">→</span>{" "}
-            {s.h2[3]}
+            {s.h2[0]}
+            <br />
+            {s.h2[1]}
           </h2>
           <p className="desc">{s.desc}</p>
-          <div className="bullets">
+          {s.bullets.length > 0 && <div className="bullets">
             {s.bullets.map((b, i) => (
               <div className="bullet" key={i}>
                 <span className="ck">
@@ -44,7 +44,7 @@ export default async function LoginPage({
                 {b}
               </div>
             ))}
-          </div>
+          </div>}
         </div>
         <div className="quote">
           {s.quote} {s.quoteBy}

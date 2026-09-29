@@ -9,9 +9,9 @@ export const LOGIN_I18N: Record<Lang, {
   metaTitle: string;
   // right panel
   tag: string;
-  h2: [string, string, string, string]; // words joined by arrows
+  h2: [string, string]; // two lines
   desc: string;
-  bullets: [string, string, string];
+  bullets: string[];
   quote: string;
   quoteBy: string;
   // form
@@ -38,14 +38,10 @@ export const LOGIN_I18N: Record<Lang, {
   is: {
     metaTitle: "VAKTO — Skrá inn",
     tag: "Velkomin aftur",
-    h2: ["Vaktaplan", "stimplun", "laun", "laun% af veltu."],
-    desc: "Sama innskráning fyrir stjórnendur og starfsfólk — hver sér sitt. Nokkur atriði sem spara tíma:",
-    bullets: [
-      "Í síma: opnaðu vakto.is og bættu á heimaskjáinn — þá virkar það eins og app",
-      "Stimpilklukka á spjaldtölvu: Stillingar → Samþættingar → afrita slóð",
-      "Gleymt lykilorð? Sláðu inn netfangið og smelltu á hlekkinn hér til hliðar",
-    ],
-    quote: "Þarftu hjálp? hallo@vakto.is eða spjallið neðst á forsíðunni.",
+    h2: ["Einfaldasta vaktakerfið,", "sem gerir meira."],
+    desc: "Sama innskráning fyrir stjórnendur og starfsfólk — hver sér sitt.",
+    bullets: [],
+    quote: "Þarftu aðstoð? hallo@vakto.is",
     quoteBy: "",
     welcome: "Velkomin aftur",
     welcomeSub: "Skráðu þig inn — reksturinn bíður.",
@@ -70,14 +66,10 @@ export const LOGIN_I18N: Record<Lang, {
   en: {
     metaTitle: "VAKTO — Sign in",
     tag: "Welcome back",
-    h2: ["Schedule", "clock-in", "payroll", "labor % of revenue."],
-    desc: "One sign-in for managers and staff — everyone sees their own. A few time-savers:",
-    bullets: [
-      "On your phone: open vakto.is and add it to the home screen — it works like an app",
-      "Time clock on a tablet: Settings → Integrations → copy link",
-      "Forgot your password? Enter your email and tap the link next to it",
-    ],
-    quote: "Need help? hallo@vakto.is or the chat at the bottom of the homepage.",
+    h2: ["The simplest scheduling system,", "and it does more."],
+    desc: "One sign-in for managers and staff — everyone sees their own.",
+    bullets: [],
+    quote: "Need help? hallo@vakto.is",
     quoteBy: "",
     welcome: "Welcome back",
     welcomeSub: "Sign in — your business is waiting.",
