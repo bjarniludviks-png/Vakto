@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "../login/login.css";
 import SignupForm from "./signup-form";
+import Sky from "../login/sky";
 
 export const metadata: Metadata = { title: "VAKTO — Stofna aðgang" };
 
@@ -11,6 +12,7 @@ export default async function SignupPage() {
         <SignupForm />
       </div>
       <div className="right">
+        <Sky />
         <div className="tag">14 daga frí prufa</div>
         <div className="mid">
           <h2>Stofnaðu aðgang <span className="arr">→</span> fyrsta planið í dag.</h2>

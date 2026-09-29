@@ -79,13 +79,19 @@ body{font-family:"General Sans","Plus Jakarta Sans",ui-sans-serif,system-ui,-app
   -webkit-mask-image:radial-gradient(60% 70% at 50% 100%,#000 20%,transparent 74%);
   mask-image:radial-gradient(60% 70% at 50% 100%,#000 20%,transparent 74%)}
 .sky .ry.r1{filter:blur(7px);
-  background:repeating-linear-gradient(90deg,transparent 0 48px,rgba(245,147,49,.13) 48px 58px,transparent 58px 128px,rgba(233,112,15,.09) 128px 140px,transparent 140px 176px,rgba(96,150,235,.06) 176px 184px,transparent 184px 230px);
-  animation:lgdrift1 23s ease-in-out infinite alternate}
+  background:repeating-linear-gradient(90deg,transparent 0 48px,rgba(245,147,49,.18) 48px 58px,transparent 58px 128px,rgba(233,112,15,.13) 128px 140px,transparent 140px 176px,rgba(96,150,235,.06) 176px 184px,transparent 184px 230px);
+  animation:lgdrift1 14s ease-in-out infinite alternate,lgbreath 7s ease-in-out infinite}
 .sky .ry.r2{filter:blur(4px);
-  background:repeating-linear-gradient(90deg,transparent 0 82px,rgba(255,244,230,.07) 82px 87px,transparent 87px 150px,rgba(120,168,240,.06) 150px 155px,transparent 155px 205px);
-  animation:lgdrift2 31s ease-in-out infinite alternate}
-@keyframes lgdrift1{from{transform:translateX(-53%)}to{transform:translateX(-47%)}}
-@keyframes lgdrift2{from{transform:translateX(-47%)}to{transform:translateX(-53%)}}
+  background:repeating-linear-gradient(90deg,transparent 0 82px,rgba(255,244,230,.1) 82px 87px,transparent 87px 150px,rgba(120,168,240,.06) 150px 155px,transparent 155px 205px);
+  animation:lgdrift2 19s ease-in-out infinite alternate,lgbreath 9s ease-in-out infinite 2s}
+.sky .ry.r3{filter:blur(8px);
+  background:repeating-linear-gradient(90deg,transparent 0 64px,rgba(96,150,235,.12) 64px 74px,transparent 74px 130px,rgba(245,147,49,.1) 130px 138px,transparent 138px 170px);
+  animation:lgdrift3 25s ease-in-out infinite alternate,lgbreath 11s ease-in-out infinite 4s}
+/* visible, slow sway (was ±3% over 23s — too subtle to notice) */
+@keyframes lgdrift1{from{transform:translateX(-59%)}to{transform:translateX(-41%)}}
+@keyframes lgdrift2{from{transform:translateX(-42%)}to{transform:translateX(-58%)}}
+@keyframes lgdrift3{from{transform:translateX(-56%)}to{transform:translateX(-44%)}}
+@keyframes lgbreath{0%,100%{opacity:.7}50%{opacity:1}}
 /* the sun below the bottom edge: luminous arc + glow rising up into the panel */
 .sky .hz{position:absolute;left:50%;bottom:-2360px;width:2400px;height:2400px;transform:translateX(-50%);border-radius:50%;
   background:#060607;

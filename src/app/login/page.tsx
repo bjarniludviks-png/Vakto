@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./login.css";
 import LoginForm from "./login-form";
+import Sky from "./sky";
 import { LOGIN_I18N, pickLang } from "./login-i18n";
 
 export const metadata: Metadata = {
@@ -23,13 +24,7 @@ export default async function LoginPage({
       </div>
 
       <div className="right">
-        <span className="sky" aria-hidden>
-          <i className="st s1" />
-          <i className="st s2" />
-          <i className="ry r1" />
-          <i className="ry r2" />
-          <i className="hz" />
-        </span>
+        <Sky />
         <div className="tag">{s.tag}</div>
         <div className="mid">
           <h2>

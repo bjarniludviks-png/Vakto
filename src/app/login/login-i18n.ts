@@ -64,7 +64,7 @@ export const LOGIN_I18N: Record<Lang, {
     noAccount: "Ertu ekki með aðgang?",
     createAccount: "Stofna aðgang",
     errOauth: "Innskráningin tókst ekki. Reyndu aftur eða notaðu netfangið þitt.",
-    errConnect: "Tókst ekki að tengjast — er Supabase stillt í .env.local?",
+    errConnect: "Tókst ekki að tengjast — reyndu aftur eftir augnablik.",
     errAudkenni: "Rafræn skilríki (Auðkenni) eru rétt handan við hornið.",
   },
   en: {
@@ -96,7 +96,7 @@ export const LOGIN_I18N: Record<Lang, {
     noAccount: "Don't have an account?",
     createAccount: "Create account",
     errOauth: "That sign-in didn't work. Try again or use your email.",
-    errConnect: "Couldn't connect — is Supabase configured in .env.local?",
+    errConnect: "Couldn't connect — please try again in a moment.",
     errAudkenni: "Electronic ID (Auðkenni) is just around the corner.",
   },
 };
