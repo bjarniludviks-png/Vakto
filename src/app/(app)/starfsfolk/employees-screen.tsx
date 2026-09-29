@@ -803,6 +803,8 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
       {pfld("Sími", "pPhone", e.phone, "+354 …")}
       {pfld("Kennitala", "pKennitala", e.kennitala, "000000-0000")}
       {pfld("Bankareikningur", "pBank", e.bankAccount, "0000-00-000000")}
+      {pfld("Heimilisfang", "pAddress", e.address ?? null, "Gata 1, 101 Reykjavík")}
+      {pfld("Nánasti aðstandandi", "pNextOfKin", e.nextOfKin ?? null, "Nafn, sími")}
       <Stat k="Tímabelti" v="Atlantic/Reykjavik" />
     </>
   );

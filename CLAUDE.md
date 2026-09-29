@@ -203,6 +203,11 @@
   og á þjóni) í skjalasafn starfsmanns + tölvupóstur með viðhengi til beggja. Appið fer um `/api/app/contract`.
   Starfsmaður getur ekki merkt undirritað beint (reglan `contracts_own_sign` farin); sendur samningur er
   læstur (`contracts_lock`). „Merkja undirritað“ er eftir fyrir pappírssamninga.
+- ✅ **Ráðningarsamningur = form Vinnumálastofnunar (nóv. 2021), template `vmst-2021`:** `contractMarkdown` í
+  `starfsfolk/actions.ts` fylgir köflum formsins (9 lágmarksatriði 91/533/EBE). Skyldureitir án gagna =
+  `CONTRACT_BLANK` og `setContractStatus("sent")` hafnar sendingu þar til þeir eru fylltir. Álagsprósentur fara
+  ALDREI í samninginn (UNION_PRESETS eru óstaðfestir) — yfirvinna/vaktaálag „skv. kjarasamningi“. Verktakar fá
+  ekki ráðningarsamning. Migration **0059**: `employees.address`, `employees.next_of_kin` (Persónulegt-flipinn).
 - **Still remaining:** contractor billable-vs-cost/GPS job tracking, a signed-URL viewer for the
   private `documents` bucket, Google/Microsoft/Auðkenni OAuth (scaffolded in `login-form`).
 - ✅ **VAKTO Admin (ofurstjórnborð SaaS-eigandans):** `/admin` — aðgangur EINGÖNGU fyrir netföng í

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
+import { nf } from "@/lib/format";
 import { templateToPayRule, type RuleSet as TplRuleSet } from "@/lib/rules";
 import { getTimeBank } from "../skyrslur/timebank.server";
 import { sendContractEmail } from "@/lib/email";
@@ -338,6 +339,8 @@ export type UpdateEmployeeInput = {
   email?: string;
   phone?: string;
   kennitala?: string;
+  address?: string;
+  nextOfKin?: string;
   bankAccount?: string;
   rate?: string;
   employmentRatio?: string;
@@ -472,6 +475,8 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
     if (input.phone !== undefined) patch.phone = input.phone.trim() || null;
     if (input.kennitala !== undefined) patch.kennitala = input.kennitala.trim() || null;
     if (input.bankAccount !== undefined) patch.bank_account = input.bankAccount.trim() || null;
+    if (input.address !== undefined) patch.address = input.address.trim() || null;
+    if (input.nextOfKin !== undefined) patch.next_of_kin = input.nextOfKin.trim() || null;
     if (input.rate) patch.rate = num(input.rate, 2900);
     if (input.employmentRatio) patch.employment_ratio = num(input.employmentRatio, 100);
     if (input.union) {
@@ -649,57 +654,68 @@ export type ContractRow = {
   signed_at: string | null;
 };
 
-function contractMarkdown(e: Record<string, unknown>, c: Record<string, unknown>, extras: { unionName?: string; contractType?: string; locationName?: string }): string {
-  const line = (k: string, v: unknown) => (v ? `**${k}:** ${v}\n\n` : "");
-  // Official-form fields render even when empty (filled in by hand / later).
-  const alw = (k: string, v: unknown) => `**${k}:** ${v || "____________"}\n\n`;
-  const ctLabel: Record<string, string> = {
-    fulltime: "Ótímabundið — fullt starf / Permanent, full-time",
-    parttime: "Ótímabundið — hlutastarf / Permanent, part-time",
-    temporary: "Tímabundið / Temporary",
-    contractor: "Verktakasamningur / Contractor agreement",
-    custom: "Annað / Other",
-  };
+/** Skyldureitur sem vantar — samningur er ekki sendur fyrr en hann er fylltur (sjá CONTRACT_BLANK í setContractStatus). */
+const CONTRACT_BLANK = "____________";
+
+/**
+ * Ráðningarsamningur eftir formi Vinnumálastofnunar (nóv. 2021) — sömu kaflar, sama röð,
+ * tvítyngd heiti. Formið tilgreinir 9 lágmarksatriði (91/533/EBE): aðila, starfsstöð,
+ * starfsheiti, upphaf og lengd, orlof, laun, starfshlutfall og vinnutíma, lífeyrissjóð og
+ * kjarasamning/stéttarfélag. Skyldureitir sem VAKTO hefur ekki gögn í verða CONTRACT_BLANK;
+ * valkvæðir verða „—“. Álagsprósentur fara EKKI inn (þær eru óstaðfestar í VAKTO) —
+ * yfirvinna og vaktaálag eru „skv. kjarasamningi“ eins og formið gerir ráð fyrir.
+ */
+function contractMarkdown(e: Record<string, unknown>, c: Record<string, unknown>, extras: { unionName?: string; contractType?: string; locationName?: string; positionName?: string }): string {
+  const req = (k: string, v: unknown) => `**${k}:** ${v == null || v === "" ? CONTRACT_BLANK : v}\n\n`;
+  const opt = (k: string, v: unknown) => `**${k}:** ${v == null || v === "" ? "—" : v}\n\n`;
+  const kr = (n: unknown) => `${nf(Math.round(Number(n) || 0))} kr.`;
+  const dmy = (iso: unknown) => { const m = String(iso ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${+m[3]}.${+m[2]}.${m[1]}` : ""; };
+
+  const full = String(e.full_name ?? "").trim();
+  const parts = full.split(/\s+/);
+  const first = parts[0] ?? "";
+  const last = parts.slice(1).join(" ");
+  const ratio = Number(e.employment_ratio) || 100;
+  const monthly = e.pay_type === "monthly";
+  const temporary = extras.contractType === "temporary";
+  const pattern = ((e.schedule_pattern as { kind?: string } | null)?.kind) ?? "";
+  const dayWork = pattern === "weekdays";
+  const union = extras.unionName;
   const orlof = e.orlof as { mode?: string; pct?: number } | null;
-  const orlofTxt = orlof?.pct ? `${String(orlof.pct).replace(".", ",")}% ${orlof.mode === "pay_out" ? "greitt út með launum / paid out with wages" : "áunnið skv. kjarasamningi / accrued per agreement"}` : "Samkvæmt kjarasamningi / According to the collective agreement";
+  const orlofPct = orlof?.pct ? `${String(orlof.pct).replace(".", ",")}%` : "";
+  const orlofTxt = orlof?.mode === "pay_out" ? `Greitt út með launum${orlofPct ? ` (${orlofPct})` : ""} / Paid out with wages`
+    : orlof?.mode === "to_bank" ? `Lagt inn á orlofsreikning${orlofPct ? ` (${orlofPct})` : ""} / Paid into a holiday account`
+    : orlofPct ? `Áunnið orlof ${orlofPct} skv. kjarasamningi / Accrued acc. to collective agreement`
+    : "Skv. kjarasamningi og lögum nr. 30/1987 um orlof / Acc. to collective agreement and the Holiday Act";
+  const benefits = (e.benefits as { name: string; amount?: number }[] | null) ?? [];
+  const address = [c.address].filter(Boolean).join(", ");
+  const place = [extras.locationName && extras.locationName !== c.name ? extras.locationName : c.name, address].filter(Boolean).join(", ");
   const terms = (c.contract_terms as string | null)?.trim();
-  return `# Ráðningarsamningur / Employment contract
+
+  return `# Ráðningarsamningur / Contract of employment
 
 ## Vinnuveitandi / Employer
-${alw("Fyrirtæki", c.name)}${alw("Kennitala", c.kennitala)}${alw("Heimilisfang", c.address)}${alw("Sími", c.phone)}${alw("Netfang", c.email)}
+${req("Nafn / Name", c.name)}${req("Kennitala / ID No.", c.kennitala)}${req("Lögheimili / Address", c.address)}${opt("Sími / Telephone", c.phone)}${opt("Netfang / Email", c.email)}
 ## Starfsmaður / Employee
-${alw("Nafn", e.full_name)}${alw("Kennitala", e.kennitala)}${alw("Heimilisfang", (e as { address?: string }).address)}${alw("Netfang", e.email)}${alw("Sími", e.phone)}${line("Bankareikningur", e.bank_account)}
-## Starfið / The role
-${line("Starfsheiti", e.title)}${alw("Vinnustaður / heimilisfang", c.address ? `${c.name}, ${c.address}` : c.name)}${extras.locationName && extras.locationName !== c.name ? line("Starfsstöð (ef önnur)", extras.locationName) : ""}${line("Ráðningarform", extras.contractType ? (ctLabel[extras.contractType] ?? extras.contractType) : "Ótímabundið / Permanent")}${line("Ráðningardagur / fyrsti starfsdagur", e.hire_date)}${line("Starfshlutfall", e.employment_ratio ? `${e.employment_ratio}%` : "")}${line("Vinnustundir á mánuði (fullt starf)", e.monthly_hours ? String(e.monthly_hours).replace(".", ",") : "173,33")}
-## Laun og kjör / Wages and terms
-${line("Launafyrirkomulag", e.pay_type === "monthly" ? "Mánaðarlaun / Monthly salary" : "Tímakaup / Hourly wages")}${line(e.pay_type === "monthly" ? "Grunnlaun á mánuði" : "Tímakaup (grunntaxti)", e.rate ? `${e.rate} kr` : "")}${line("Orlof", orlofTxt)}${line("Greiðsla launa", "Mánaðarlega, inn á bankareikning starfsmanns / Monthly, into the employee's bank account")}
-## Lífeyrissjóður og stéttarfélag / Pension fund and union
-${line("Lífeyrissjóður", (e.pension_fund as string) || "Skv. vali starfsmanns eða kjarasamningi / Per the employee's choice or agreement")}${line("Stéttarfélag / kjarasamningur", extras.unionName)}
-## Vinnutími og vaktir / Working time and shifts
-Vinnutími fer eftir vaktaplani sem birt er í VAKTO. Starfsmaður fær vaktaplan með a.m.k. þeim fyrirvara sem kjarasamningur kveður á um og tilkynningu í appi þegar plan er birt eða því breytt. Vaktaskipti eru óskað eftir í VAKTO og taka gildi þegar vaktstjóri samþykkir. / Working hours follow the shift schedule published in VAKTO. The employee receives the schedule at least with the notice required by the collective agreement, and an app notification when it is published or changed. Shift swaps are requested in VAKTO and take effect once a manager approves.
+${req("Skírnarnafn / First name", first)}${req("Eftirnafn / Surname", last)}${req("Kennitala / ID No. / Date of birth", e.kennitala)}${req("Heimili á Íslandi / Address in Iceland", e.address)}${opt("Aðsetur ef annað / Temporary address", "")}${opt("Netfang / Email", e.email)}${opt("Sími / Telephone", e.phone)}${opt("Nánasti aðstandandi og sími / Closest family member and tel.", e.next_of_kin)}
+## Starfssvið / Field of work
+${req("Starfsheiti / Stutt lýsing á starfi / Job designation / Short description", e.title || extras.positionName)}${req("Vinnustaður / Place of work", place)}${opt("Vinna á mismunandi vinnustöðum / Work at more than one place", "Nei / No")}
+## Vinnutími / Working time
+${req("Starfshlutfall / Work ratio", ratio >= 100 ? "Fullt starf 100% / Full position 100%" : `Hlutastarf ${ratio}% / Part time ${ratio}%`)}${req("Fyrirkomulag / Arrangement", dayWork ? "Dagvinna / Daytime work" : "Vaktavinna / Shift work")}${opt("Klst. á mánuði / Hours per month", e.monthly_hours ? String(e.monthly_hours).replace(".", ",") : "")}${opt("Annað / Other information", "Vaktir eru birtar í vaktaplani VAKTO. / Shifts are published in the VAKTO schedule.")}
+## Ráðningartími / Length of engagement
+${req("Ráðning / Engagement", temporary ? "Tímabundin / Temporary" : "Ótímabundin / Unlimited")}${req("Fyrsti starfsdagur / Starting date", dmy(e.hire_date))}${temporary ? req("Til / To", "") : ""}
+## Laun / Wages
+${req("Launaákvörðun / Wage basis", union ? "Skv. kjarasamningi / Acc. to collective agreement" : "Skv. samkomulagi / By agreement")}${opt("Launaflokkur / Launaþrep / Payscale group / step", "")}${monthly ? req("Laun kr./mán. / Wage ISK/month", e.rate ? kr(e.rate) : "") : req("Dagvinna kr./klst. / Daytime work ISK/hr", e.rate ? kr(e.rate) : "")}${req("Yfirvinna kr./klst. / Overtime ISK/hr", "Skv. kjarasamningi / Acc. to collective agreement")}${req("Vaktaálag / Shift supplement", "Skv. kjarasamningi / Acc. to collective agreement")}${opt("Aðrar greiðslur / Other payments", "")}${opt("Hlunnindi / Perquisites", benefits.length ? benefits.map((b) => b.amount ? `${b.name} (${kr(b.amount)})` : b.name).join(", ") : "Engin / None")}${req("Fyrirkomulag orlofsgreiðslna / Holiday entitlement", orlofTxt)}${req("Greiðslufyrirkomulag / Method of payment", "Mánaðarlega, á reikning starfsmanns / Monthly, into the employee's bank account")}${opt("Bankareikningur / Bank account", e.bank_account)}
+## Uppsagnarfrestur, orlof og veikindagreiðslur / Notice period, holiday pay and sick-leave pay
+${req("Fyrirkomulag / Arrangement", "Samkvæmt neðanskráðum kjarasamningi / Acc. to collective agreement named below")}${opt("Sérákvæði / Special provision", "")}
+## Áunnin réttindi samkvæmt kjarasamningi* / Earned rights acc. to collective agreement*
+${opt("Miðað við fyrri ráðningu hjá fyrirtækinu / Based on previous engagement with company", "")}${opt("Miðað við starfsgrein / Based on occupation", "")}${opt("Annað / Other", "")}
+* Átt er við áunnin réttindi samkv. kjarasamningi eða samkv. reglum sem byggja á ákvæðum samningsins um Evrópska efnahagssvæðið. / Refers to earned rights acc. to collective agreement or according to rules based on the EEA Agreement.
 
-${alw("Dagvinnutímabil / reference hours", "")}${alw("Lágmarksfyrirvari á vaktaplani / minimum notice", "")}
-**Yfirvinna / Overtime:** Vinna umfram umsamið starfshlutfall eða utan dagvinnutímabils er greidd sem yfirvinna eða með álagi skv. kjarasamningi, og aðeins að beiðni eða með samþykki vaktstjóra. / Work beyond the agreed ratio or outside the day-work period is paid as overtime or with a premium per the collective agreement, and only when requested or approved by a manager.
+## Kjarasamningur / Collective agreement
+Um réttindi og skyldur fer að öðru leyti skv. kjarasamningi. Samningar um lakari kjör en almennir kjarasamningar ákveða eru ógildir (1. gr. laga nr. 55/1980). / All other rights and obligations acc. to the collective agreement. Agreements on poorer terms than the general collective agreements are void (Art. 1, Act No. 55/1980).
 
-## Reynslutími, þjálfun og breytingar / Probation, training and changes
-${extras.contractType === "temporary" ? alw("Lok tímabundinnar ráðningar / end date", "") : ""}${alw("Reynslutími / probation period", "")}
-Á reynslutíma gildir styttri uppsagnarfrestur skv. kjarasamningi. / A shorter notice period applies during probation per the collective agreement.
-
-**Starfslýsing / Job description:** ${(e.title as string) || "____________"} — helstu verkefni eru skráð sem verkefni vaktar í VAKTO og nánar útfærð af vaktstjóra. / Main duties are recorded as shift tasks in VAKTO and specified further by the manager.
-
-**Þjálfun / Training:** Starfsmaður á rétt á þeirri þjálfun sem vinnuveitanda er skylt að veita vegna starfsins (t.d. öryggis- og hreinlætisþjálfun) á vinnutíma og á kostnað vinnuveitanda. / The employee is entitled to the training the employer must provide for the role (e.g. safety and hygiene), during working hours and at the employer's expense.
-
-**Breytingar / Changes:** Breytingar á ráðningarkjörum skulu kynntar starfsmanni skriflega eigi síðar en þær taka gildi. / Changes to the terms of employment shall be given to the employee in writing no later than the day they take effect.
-
-## Uppsagnarfrestur, orlof og veikindi / Notice period, holiday and sick pay
-Uppsögn skal vera skrifleg. Uppsagnarfrestur, orlofsréttur og veikindaréttur fara eftir gildandi kjarasamningi og lögum á starfsstað, þ.m.t. áunnin réttindi miðað við starfsaldur. / Notice must be given in writing. Notice period, holiday and sick-pay rights follow the applicable collective agreement and local law, including earned rights based on tenure.
-${terms ? `\n## Sérákvæði fyrirtækisins / Company provisions\n${terms}\n` : ""}
-## Annað / Other
-Um starfið gilda að öðru leyti þær vinnureglur sem fyrirtækið hefur skilgreint í VAKTO
-(yfirvinna, álög, hvíldartími, orlof og veikindaréttur skv. völdu reglusniðmáti) og
-gildandi lög á starfsstað. / The role is otherwise governed by the working rules the
-company has defined in VAKTO and applicable local law.
-
+${req("Kjarasamningur / Collective agreement", union)}${req("Stéttarfélag / Trade union", union)}${req("Lífeyrissjóður / Pension fund", e.pension_fund)}${terms ? `\n## Sérákvæði / Special provisions\n${terms}\n` : ""}
 _Undirritun / Signatures:_
 
 Vinnuveitandi: ______________________　Dags: ________
@@ -720,6 +736,14 @@ export async function generateContract(employeeId: string): Promise<ActionResult
       supabase.from("companies").select("*").eq("id", company).maybeSingle(),
     ]);
     if (!emp) return { ok: false, error: "Starfsmaður fannst ekki" };
+    if (emp.contract_type === "contractor" || emp.role === "contractor") {
+      return { ok: false, error: "Verktakar fá verktakasamning, ekki ráðningarsamning — þetta form á aðeins við um launafólk." };
+    }
+    let positionName: string | undefined;
+    if (emp.position_id) {
+      const { data: pos } = await supabase.from("positions").select("name").eq("id", emp.position_id).maybeSingle();
+      positionName = (pos?.name as string) ?? undefined;
+    }
     let locationName: string | undefined;
     if (emp.location_id) {
       const { data: loc } = await supabase.from("locations").select("name").eq("id", emp.location_id).maybeSingle();
@@ -729,12 +753,13 @@ export async function generateContract(employeeId: string): Promise<ActionResult
       unionName: (emp.union_name as string) || (emp.union_agreement as string) || undefined,
       contractType: (emp.contract_type as string) || undefined,
       locationName,
+      positionName,
     });
     const { data: { user } } = await supabase.auth.getUser();
     const { data: created, error } = await supabase.from("contracts").insert({
       company_id: company,
       employee_id: employeeId,
-      template: "universal-v1",
+      template: "vmst-2021",
       title: `Ráðningarsamningur — ${emp.full_name}`,
       content,
       status: "draft",
@@ -809,6 +834,12 @@ export async function setContractStatus(id: string, status: "draft" | "sent" | "
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
+    // Skyldureitir (lágmarksatriði 91/533/EBE) verða að vera fylltir áður en samningur er sendur.
+    if (status === "sent") {
+      const { data: cur } = await supabase.from("contracts").select("content").eq("id", id).maybeSingle();
+      const missing = [...String(cur?.content ?? "").matchAll(/\*\*([^*]+?):\*\*\s*_{6,}/g)].map((m) => m[1].split(" / ")[0]);
+      if (missing.length) return { ok: false, error: `Fylltu út áður en samningurinn er sendur: ${missing.join(", ")}` };
+    }
     const patch: Record<string, unknown> = { status };
     if (status === "sent") patch.sent_at = new Date().toISOString();
     if (status === "signed") patch.signed_at = new Date().toISOString();

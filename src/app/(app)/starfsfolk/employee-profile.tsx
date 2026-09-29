@@ -49,6 +49,8 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
       phone: fd.has("pPhone") ? (fd.get("pPhone") as string) : undefined,
       kennitala: fd.has("pKennitala") ? (fd.get("pKennitala") as string) : undefined,
       bankAccount: fd.has("pBank") ? (fd.get("pBank") as string) : undefined,
+      address: fd.has("pAddress") ? (fd.get("pAddress") as string) : undefined,
+      nextOfKin: fd.has("pNextOfKin") ? (fd.get("pNextOfKin") as string) : undefined,
     });
     setSaving(false);
     toast(res.demo ? "Vistað (demo — tengdu Supabase)" : "Vistað");
