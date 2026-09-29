@@ -19,7 +19,7 @@ export default function FbCoverPage() {
         <span className="ny-underglow" />
       </div>
       <div className="txt">
-        <h1>Einfaldasta vaktakerfið.<br />Sem gerir meira.</h1>
+        <h1>Einfaldasta vaktakerfið,<br />sem gerir meira.</h1>
         <span className="site">vakto.is</span>
       </div>
       <div className="shot"><img src="/showcase/2026/maelabord.jpg" alt="" /></div>
