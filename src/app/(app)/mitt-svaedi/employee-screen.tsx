@@ -17,6 +17,7 @@ import PushToggle from "@/components/app/push-toggle";
 import { AsyncButton } from "@/components/app/async-button";
 import { WalletButtons } from "@/components/app/wallet-buttons";
 import { ContractView } from "@/components/app/contract-view";
+import { WelcomeTour } from "./welcome";
 
 type ReqKind = "leave" | "avail" | "swap" | "pickup";
 const IC = (d: string) => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">{d.split("|").map((p, i) => <path key={i} d={p} />)}</svg>;
@@ -53,6 +54,7 @@ export default function EmployeeScreen({ card, my: myProp }: { card?: StaffCard;
   return (
     <>
       <PageHeader title="Mitt svæði" subtitle="Vaktir, laun, réttindi og prófíll" />
+      {myProp?.live && <WelcomeTour firstName={card?.name?.split(/\s+/)[0]} />}
 
       <div className="card" style={{ marginBottom: 18 }}>
         <div className="cb" style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>

@@ -5,7 +5,17 @@ import { getEmployees } from "@/lib/employees.server";
 import { computeLine, totals as sumTotals } from "@/lib/payroll";
 import { nf, dec1 } from "@/lib/format";
 
-export type Onboarding = { show: boolean; hasLocation: boolean; hasStaff: boolean; hasSchedule: boolean; hasRevenue: boolean };
+/** „Fyrstu skrefin“ — hvert skref er hakað sjálfkrafa út frá raungögnum fyrirtækisins. */
+export type Onboarding = {
+  show: boolean;
+  hasCompanyInfo: boolean;  // kennitala + heimilisfang (þarf í ráðningarsamninga)
+  hasLocation: boolean;
+  hasStaff: boolean;
+  hasPayRules: boolean;     // allt virkt starfsfólk með kjarasamning/stéttarfélag
+  hasSchedule: boolean;     // birt vaktaplan
+  hasClockIn: boolean;      // einhver hefur stimplað sig (app, vefur eða stimpilklukka)
+  hasRevenue: boolean;      // velta skráð (handvirkt, meðalvelta eða tenging)
+};
 export type DashboardView = {
   laborPct: number;
   laborCostWeek: string; // m kr (1 dp)
@@ -15,7 +25,7 @@ export type DashboardView = {
 };
 
 const WEEKS_PER_MONTH = 4.33;
-const NO_ONBOARD: Onboarding = { show: false, hasLocation: true, hasStaff: true, hasSchedule: true, hasRevenue: true };
+const NO_ONBOARD: Onboarding = { show: false, hasCompanyInfo: true, hasLocation: true, hasStaff: true, hasPayRules: true, hasSchedule: true, hasClockIn: true, hasRevenue: true };
 // Unconfigured/signed-out fallback — zeros, never placeholder figures.
 const DEMO: DashboardView = { laborPct: 0, laborCostWeek: "0", hoursWeek: "0", live: false, onboarding: NO_ONBOARD };
 
@@ -32,7 +42,7 @@ export async function getDashboard(scopeDepts: string[] = []): Promise<Dashboard
   if (!live) return { ...DEMO, laborPct: metrics.live ? (metrics.laborPct ?? 0) : DEMO.laborPct, live: metrics.live };
 
   // Signed-in company. Compute onboarding completion from real tables.
-  let hasLocation = false, hasSchedule = false, hasRevenue = false;
+  let hasCompanyInfo = false, hasLocation = false, hasPayRules = false, hasSchedule = false, hasClockIn = false, hasRevenue = false;
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -41,15 +51,24 @@ export async function getDashboard(scopeDepts: string[] = []): Promise<Dashboard
       : { data: null };
     const company = profile?.company_id as string | undefined;
     if (company) {
-      const [{ count: locCount }, { count: shiftCount }, { data: locs }] = await Promise.all([
-        supabase.from("locations").select("id", { count: "exact", head: true }).eq("company_id", company),
-        supabase.from("shifts").select("id", { count: "exact", head: true }).eq("company_id", company),
+      const [compRes, { data: locs }, { count: shiftCount }, { count: punchCount }, unionRes] = await Promise.all([
+        supabase.from("companies").select("kennitala, address, weekday_revenue").eq("id", company).maybeSingle(),
         supabase.from("locations").select("id").eq("company_id", company),
+        supabase.from("shifts").select("id", { count: "exact", head: true }).eq("company_id", company).eq("published", true),
+        supabase.from("punches").select("id", { count: "exact", head: true }).eq("company_id", company),
+        supabase.from("employees").select("union_agreement, union_name, status").eq("company_id", company),
       ]);
-      hasLocation = (locCount ?? 0) > 0;
-      hasSchedule = (shiftCount ?? 0) > 0;
+      const c = compRes.data as { kennitala?: string | null; address?: string | null; weekday_revenue?: Record<string, number> | null } | null;
+      hasCompanyInfo = !!(c?.kennitala?.trim() && c?.address?.trim());
       const locIds = (locs ?? []).map((l) => l.id as string);
-      if (locIds.length) {
+      hasLocation = locIds.length > 0;
+      hasSchedule = (shiftCount ?? 0) > 0;
+      hasClockIn = (punchCount ?? 0) > 0;
+      const active = (unionRes.data ?? []).filter((e) => e.status !== "inactive");
+      hasPayRules = active.length > 0 && active.every((e) => !!((e.union_agreement as string | null)?.trim() || (e.union_name as string | null)?.trim()));
+      const avg = Object.values(c?.weekday_revenue ?? {}).some((v) => Number(v) > 0);
+      if (avg) hasRevenue = true;
+      else if (locIds.length) {
         const { count: revCount } = await supabase.from("revenue").select("id", { count: "exact", head: true }).in("location_id", locIds);
         hasRevenue = (revCount ?? 0) > 0;
       }
@@ -57,8 +76,8 @@ export async function getDashboard(scopeDepts: string[] = []): Promise<Dashboard
   } catch { /* keep defaults */ }
 
   const hasStaff = employees.length > 0;
-  const allDone = hasLocation && hasStaff && hasSchedule && hasRevenue;
-  const onboarding: Onboarding = { show: !allDone, hasLocation, hasStaff, hasSchedule, hasRevenue };
+  const flags = { hasCompanyInfo, hasLocation, hasStaff, hasPayRules, hasSchedule, hasClockIn, hasRevenue };
+  const onboarding: Onboarding = { show: !Object.values(flags).every(Boolean), ...flags };
 
   if (!hasStaff) {
     return { laborPct: metrics.live ? (metrics.laborPct ?? 0) : 0, laborCostWeek: "0", hoursWeek: "0", live: true, onboarding };

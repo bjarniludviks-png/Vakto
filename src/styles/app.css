@@ -145,6 +145,23 @@ body.kioskmode .fab{display:none}
 .onb .ostep.done .n svg{width:13px;height:13px;stroke:#fff;stroke-width:2.6}
 .onb .ostep.cur{border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 @media(max-width:900px){.onb .osteps{grid-template-columns:1fr 1fr}}
+/* Fyrstu skrefin (maelabord/onboarding.tsx): listi vinstra megin, valið skref hægra megin */
+.onb .ohide{background:none;border:0;font:inherit;font-size:13px;padding:0}
+.onb2{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:18px;align-items:start}
+.olist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.ostep2{width:100%;display:flex;align-items:center;gap:11px;padding:9px 10px;border:0;border-radius:10px;background:none;font:inherit;font-size:13.5px;font-weight:500;color:var(--ink);text-align:left;cursor:pointer;transition:background .15s ease}
+.ostep2:hover{background:var(--panel2,#f6f5f3)}
+.ostep2.sel{background:var(--brand-soft)}
+.ostep2 .n{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--ink3);flex-shrink:0;background:var(--panel)}
+.ostep2.sel .n{border-color:var(--brand);color:var(--brand)}
+.ostep2.done{color:var(--ink3)}
+.ostep2.done .n{background:var(--brand);border-color:var(--brand);color:#fff}
+.ostep2.done .n svg{width:13px;height:13px;stroke:#fff;stroke-width:2.6}
+.odetail{border:1px solid var(--line);border-radius:12px;padding:18px 20px;background:var(--panel)}
+.odetail .oeyebrow{font-size:11.5px;font-weight:600;color:var(--brand);letter-spacing:.02em}
+.odetail .otitle{font-size:17px;font-weight:700;margin-top:4px;letter-spacing:-.01em}
+.odetail .owhy{font-size:13.5px;line-height:1.55;color:var(--ink2);margin:6px 0 14px;max-width:520px}
+@media(max-width:760px){.onb2{grid-template-columns:1fr}}
 /* dashboard "í gær" hero strip (Inventra-style) */
 .dhero{position:relative;background:linear-gradient(105deg,#fff 52%,#fdf3ea 100%);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-card);padding:22px 26px;margin-bottom:20px;overflow:hidden}
 .dhero::after{content:"";position:absolute;right:-90px;top:-90px;width:320px;height:320px;border-radius:50%;background:radial-gradient(circle,rgba(233,112,15,.08),transparent 70%);pointer-events:none}

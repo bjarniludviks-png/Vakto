@@ -9,6 +9,8 @@ import { useLang } from "@/components/app/lang";
 import { dec1, krCompact } from "@/lib/format";
 import { DateField } from "@/components/app/fields";
 import { getDashboardPeriod, type PeriodData } from "./actions";
+import { OnboardingCard, useOnboardingHidden, onboardingProgress, ONBOARDING_TOTAL } from "./onboarding";
+import type { Onboarding } from "./dashboard.server";
 
 // Paired demo bars (this period vs previous) — used only in the demo/preview state.
 function Paired({ a, b }: { a: number[]; b: number[] }) {
@@ -84,7 +86,7 @@ function EmptyBody({ msg }: { msg: string }) {
   return <div className="cb"><div className="muted" style={{ fontSize: 13, lineHeight: 1.6, padding: "22px 6px", textAlign: "center" }}>{t(msg)}</div></div>;
 }
 
-type Onb = { show: boolean; hasLocation: boolean; hasStaff: boolean; hasSchedule: boolean; hasRevenue: boolean };
+type Onb = Onboarding;
 type OnNow = { punchId: string; name: string; av: string; c: string; dept: string; in: string; since: string; unscheduled?: boolean };
 type Missing = { employeeId: string; name: string; av: string; c: string; dept: string; start: string; late: boolean; mins: number };
 
@@ -107,7 +109,7 @@ function presetRange(k: string): { from: string; to: string } {
 export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding, live = false, onNow = [], missing = [], pending = 0 }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean; onNow?: OnNow[]; missing?: Missing[]; pending?: number }) {
   const { t } = useLang();
   const [chartSeg, setChartSeg] = useState("Vika");
-  const [hideOnb, setHideOnb] = useState(false);
+  const [hideOnb, setHideOnb] = useOnboardingHidden();
   const [period, setPeriod] = useState("vika");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
@@ -141,7 +143,6 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
     );
   };
   useEffect(() => {
-    if (localStorage.getItem("vakto-onb-hidden") === "1") requestAnimationFrame(() => setHideOnb(true));
     // Restore the last-selected period + custom range (persists across navigation).
     const sp = localStorage.getItem("vakto-dash-period"); if (sp) setPeriod(sp);
     const sf = localStorage.getItem("vakto-dash-from"); if (sf) setCustomFrom(sf);
@@ -175,23 +176,9 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
     getDashboardPeriod(from, to).then((r) => { if (!cancelled && r.ok) setWeekSeries(r.series); });
     return () => { cancelled = true; };
   }, [live]);
-  function hideOnboarding() {
-    setHideOnb(true);
-    try { localStorage.setItem("vakto-onb-hidden", "1"); } catch {}
-  }
   const ringP = Math.round(laborPct);
   const ringColor = laborPct <= 30 ? "var(--good)" : laborPct <= 33 ? "var(--warn)" : "var(--bad)";
   const pctLabel = laborPct.toFixed(1).replace(".", ",");
-
-  const steps = [
-    { label: "Fyrirtæki & staðir", href: "/stillingar?new=location", done: !!onboarding?.hasLocation },
-    { label: "Bæta við starfsfólki", href: "/starfsfolk?new=1", done: !!onboarding?.hasStaff },
-    { label: "Gera fyrsta vaktaplan", href: "/vaktaplan", done: !!onboarding?.hasSchedule },
-    { label: "Skrá veltu / tengja Inventra", href: "/stillingar?new=revenue", done: !!onboarding?.hasRevenue },
-  ];
-  const doneCount = steps.filter((s) => s.done).length;
-  const curIdx = steps.findIndex((s) => !s.done);
-  const Check = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12.5l4 4 10-10" /></svg>;
 
   // Live company (signed in): the standard dashboard layout, always — filled
   // with real numbers where we have them, clean empty-states where we don't.
@@ -221,33 +208,19 @@ export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40
         <PageHeader
           title="Mælaborð"
           subtitle={t("Rauntölur úr þínum gögnum")}
-          actions={
+          actions={<>
+            {onboarding?.show && hideOnb && (
+              <button className="btn ghost sm" onClick={() => setHideOnb(false)}>
+                {t("Fyrstu skrefin")} · {onboardingProgress(onboarding)}/{ONBOARDING_TOTAL}
+              </button>
+            )}
             <button className={`btn ${editMode ? "" : "ghost "}sm`} onClick={() => setEditMode((v) => !v)}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h11M4 12h7M4 18h13M17 4v4M13 10v4M19 16v4" /></svg>{editMode ? t("Búið") : t("Sérsníða")}
             </button>
-          }
+          </>}
         />
 
-        {onboarding?.show && !hideOnb && (
-          <div className="onb">
-            <div className="ohd">
-              <div>
-                <h3>{t("Komdu þér af stað með VAKTO")}</h3>
-                <div className="osub">{doneCount} {t("af 4 skrefum kláruð — settu kerfið upp á nokkrum mínútum.")}</div>
-              </div>
-              <span className="ohide" onClick={hideOnboarding} style={{ cursor: "pointer" }}>{t("Fela")}</span>
-            </div>
-            <div className="obar"><i style={{ width: `${(doneCount / 4) * 100}%` }} /></div>
-            <div className="osteps">
-              {steps.map((s, i) => (
-                <Link href={s.href} key={s.label} className={`ostep ${s.done ? "done" : i === curIdx ? "cur" : ""}`} style={{ cursor: "pointer" }}>
-                  <span className="n">{s.done ? <Check /> : i + 1}</span>
-                  <span className="t">{t(s.label)}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
+        {onboarding?.show && !hideOnb && <OnboardingCard onboarding={onboarding} onHide={() => setHideOnb(true)} />}
 
         {editMode && (
           <div style={{ background: "var(--brand-soft)", border: "1px solid var(--brand-2)", color: "var(--brand-deep)", borderRadius: 10, padding: "9px 13px", margin: "0 0 14px", fontSize: 12.5, fontWeight: 500 }}>
