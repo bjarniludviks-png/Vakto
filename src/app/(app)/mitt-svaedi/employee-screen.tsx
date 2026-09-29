@@ -8,6 +8,7 @@ import { TimeField, DateField } from "@/components/app/fields";
 import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, getMyContract, signMyContract, type LeaveType, type MyPunchRow, type MyContract } from "./actions";
 import { listCompanyDocs, openCompanyDoc, type CompanyDoc } from "../stillingar/actions";
 import { dec1, nf, krCompact } from "@/lib/format";
+import { leaveWorkdays } from "@/lib/orlof";
 import { StaffCardModal, type StaffCardData } from "@/components/app/staff-card";
 import type { StaffCard } from "@/lib/mycard.server";
 import type { MyArea } from "./my.server";
@@ -554,8 +555,17 @@ function Rights({ my }: { my?: MyArea }) {
     return (
       <div className="emp-pane on">
         <div className="mini">
-          <div className="mh">{t("Orlof")} <span className="muted" style={{ fontWeight: 500 }}>· {t("áætlað")}</span></div>
-          <div className="mr"><span>{t("Áunnir dagar (í ár)")}</span><b>{dec1(r.orlofDays)} {t("dagar")}</b></div>
+          <div className="mh">{t("Orlofsstaða")} <span className="muted" style={{ fontWeight: 500 }}>· {t("orlofsár frá 1. maí")}</span></div>
+          {r.orlof && !r.orlof.tracksDays ? (
+            <div className="mr"><span>{t("Orlofið")}</span><b>{t(r.orlof.mode === "to_bank" ? "Lagt inn á orlofsreikning" : "Greitt út með launum")}</b></div>
+          ) : r.orlof ? (<>
+            <div className="mr"><span>{t("Áunnið")}</span><b>{dec1(r.orlof.earnedDays)} {t("dagar")}</b></div>
+            <div className="mr"><span>{t("Tekið")}</span><b>{dec1(r.orlof.takenDays)} {t("dagar")}</b></div>
+            {r.orlof.pendingDays > 0 && <div className="mr"><span>{t("Í bið")}</span><b>{dec1(r.orlof.pendingDays)} {t("dagar")}</b></div>}
+            <div className="mr"><span>{t("Eftir")}</span><b style={r.orlof.remainingDays < 0 ? { color: "var(--bad)" } : undefined}>{dec1(r.orlof.remainingDays)} {t("dagar")}</b></div>
+          </>) : (
+            <div className="mr"><span>{t("Áunnir dagar (í ár)")}</span><b>{dec1(r.orlofDays)} {t("dagar")}</b></div>
+          )}
           {r.orlofFund > 0 && <div className="mr"><span>{t("Orlofssjóður")}</span><b>{nf(r.orlofFund)} kr</b></div>}
         </div>
         <div className="mini">
@@ -707,9 +717,21 @@ function ReqModal({ kind, onClose, my }: { kind: ReqKind; onClose: () => void; m
       <div className="field"><label>{t("Til")}</label><DateField value={leaveTo} onChange={setLeaveTo} min={leaveFrom || undefined} /></div>
       <div className="field"><label>{t("Tegund")}</label>
         <select value={leaveType} onChange={(e) => setLeaveType(e.target.value as LeaveType)}>
-          <option value="orlof">{t("Orlof")}</option><option value="olaunad">{t("Frí (ólaunað)")}</option><option value="veikindi">{t("Veikindi")}</option>
+          <option value="orlof">{t("Orlofsfrí")}</option><option value="olaunad">{t("Frí (ólaunað)")}</option><option value="veikindi">{t("Veikindi")}</option>
         </select>
       </div>
+      {leaveType === "orlof" && my?.rights?.orlof?.tracksDays && (() => {
+        const ob = my.rights!.orlof!;
+        const n = leaveWorkdays(leaveFrom, leaveTo);
+        const over = n > ob.remainingDays;
+        return (
+          <div className="mini" style={{ marginTop: 4 }}>
+            <div className="mr"><span>{t("Orlof eftir")}</span><b>{dec1(ob.remainingDays)} {t("dagar")}</b></div>
+            <div className="mr"><span>{t("Þessi beiðni")}</span><b>{n} {t(n === 1 ? "virkur dagur" : "virkir dagar")}</b></div>
+            {over && <div className="muted" style={{ fontSize: 12.5, color: "var(--warn)", paddingTop: 6 }}>{t("Beiðnin er lengri en orlofið sem þú átt eftir — vaktstjóri sér það þegar hann afgreiðir hana.")}</div>}
+          </div>
+        );
+      })()}
     </>;
   } else if (kind === "avail") {
     body = <>

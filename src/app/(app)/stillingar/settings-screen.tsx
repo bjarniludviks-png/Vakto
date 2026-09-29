@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { DateField } from "@/components/app/fields";
 import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, startCardChange, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit } from "./actions";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, saveCompanyLimits, startCardChange, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit } from "./actions";
 import dynamic from "next/dynamic";
 import type { SettingsData, CompanyInfo, GeofenceMode } from "./settings.server";
+import type { AgreementResult, AgreementSource } from "@/lib/ai/agreement";
 
 const GeoMap = dynamic(() => import("@/components/app/geo-map"), { ssr: false });
 import { type PayRule } from "@/lib/payrules";
@@ -89,6 +90,20 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
                 onChange={async (e) => { const r = await setFeedPostPolicy(e.target.value as "everyone" | "managers"); toast(r.ok ? t("Vistað") : (r.error ?? "Villa")); }}>
                 <option value="everyone">{t("Allir")}</option>
                 <option value="managers">{t("Stjórnendur og vaktstjórar")}</option>
+              </select>
+            </div>
+            <div className="statline"><span className="k">{t("Laun % af veltu — markmið")}</span>
+              <span className="v"><input type="number" min={5} max={80} step={0.5} inputMode="decimal" aria-label={t("Laun % af veltu — markmið")}
+                style={{ width: 64, border: "1px solid var(--line)", borderRadius: 8, padding: "4px 8px", font: "inherit", fontSize: 12.5, textAlign: "right" }}
+                defaultValue={data.company?.laborTarget ?? 30}
+                onBlur={async (e) => { const v = Number(e.target.value.replace(",", ".")); if (v === (data.company?.laborTarget ?? 30)) return; const r = await saveCompanyLimits({ laborTarget: v }); toast(r.ok ? t("Vistað") : (r.error ?? "Villa")); }} /> %</span>
+            </div>
+            <div className="statline"><span className="k">{t("Hámark í fríi sama dag")}</span>
+              <select className="badge" style={{ border: "1px solid var(--line)", padding: "5px 9px", font: "inherit", fontSize: 12.5 }}
+                defaultValue={data.company?.leaveCap == null ? "" : String(data.company.leaveCap)}
+                onChange={async (e) => { const r = await saveCompanyLimits({ leaveCap: e.target.value ? Number(e.target.value) : null }); toast(r.ok ? t("Vistað") : (r.error ?? "Villa")); }}>
+                <option value="">{t("Ekkert hámark")}</option>
+                {[1, 2, 3, 4, 5, 6, 8, 10].map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </div>
             <div className="statline"><span className="k">{t("Launatímabil")}</span>
@@ -535,6 +550,12 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
   const [aiNote, setAiNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  // Kjarasamningur lesinn með AI: hvert gildi með tilvitnun; stjórnandi staðfestir yfirferð.
+  const [sources, setSources] = useState<AgreementSource[]>([]);
+  const [missing, setMissing] = useState<string[]>([]);
+  const [reviewed, setReviewed] = useState(false);
+  const [docBusy, setDocBusy] = useState(false);
+  const docInput = useRef<HTMLInputElement>(null);
 
   const numVal = (v: number | undefined) => (v == null ? "" : String(v).replace(".", ","));
   const setNum = (path: (r: RuleSet, n: number | undefined) => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -563,8 +584,33 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
     setAiNote(res.explanation);
   }
 
+  async function readDoc(file: File) {
+    setDocBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("hint", [role, tenure, aiQ].filter(Boolean).join(" · "));
+      const r = await fetch("/api/ai/agreement", { method: "POST", body: fd });
+      const res = (await r.json()) as AgreementResult;
+      if (!res.ok) { toast(res.error ?? t("Tókst ekki að lesa samninginn")); return; }
+      setRules(res.rules);
+      if (!name) setName(res.name);
+      setSource("ai");
+      setAiNote(res.explanation);
+      setSources(res.sources);
+      setMissing(res.missing);
+      setReviewed(false);
+    } catch {
+      toast(t("Tókst ekki að lesa samninginn"));
+    } finally {
+      setDocBusy(false);
+      if (docInput.current) docInput.current.value = "";
+    }
+  }
+
   async function submit() {
     if (!name.trim()) { toast(t("Gefðu sniðmátinu nafn")); return; }
+    if (sources.length && !reviewed) { toast(t("Staðfestu að þú hafir borið gildin saman við samninginn")); return; }
     setBusy(true);
     // Best-effort mapping of the free-form rows onto the structured slots the
     // payroll calc reads today (night/weekend/holiday) — the rows stay the
@@ -627,8 +673,31 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6Z" /></svg>
               {aiBusy ? t("AI hugsar…") : t("Fá tillögu með AI")}
             </button>
+            <button className="btn ghost sm" disabled={docBusy} onClick={() => docInput.current?.click()}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M9 13h6M9 17h4" /></svg>
+              {docBusy ? t("Les samninginn… (allt að mínúta)") : t("Lesa kjarasamning (PDF)")}
+            </button>
+            <input ref={docInput} type="file" accept="application/pdf,.pdf,.txt,text/plain" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void readDoc(f); }} />
           </div>
           {aiNote && <p className="muted" style={{ fontSize: 12, background: "var(--brand-soft)", borderRadius: 9, padding: "9px 11px", marginBottom: 10 }}>{aiNote}</p>}
+          {sources.length > 0 && (
+            <div style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--ink3)", marginBottom: 6 }}>{t("Heimildir úr samningnum")}</div>
+              {sources.map((src, i) => (
+                <div key={i} style={{ fontSize: 12.5, padding: "6px 0", borderTop: i ? "1px dashed var(--line2)" : undefined }}>
+                  <div><b>{src.field}</b> = {src.value} <span className="muted">· {src.location}</span></div>
+                  <div className="muted" style={{ fontStyle: "italic", marginTop: 2 }}>„{src.quote}“</div>
+                </div>
+              ))}
+              {missing.length > 0 && (
+                <div style={{ fontSize: 12.5, marginTop: 8, color: "var(--warn)" }}>{t("Ekki í samningnum — fylltu inn sjálf(ur):")} {missing.join(", ")}</div>
+              )}
+              <label style={{ display: "flex", gap: 8, alignItems: "flex-start", fontSize: 12.5, marginTop: 10, cursor: "pointer" }}>
+                <input type="checkbox" checked={reviewed} onChange={(e) => setReviewed(e.target.checked)} style={{ marginTop: 2 }} />
+                <span>{t("Ég hef borið gildin saman við samninginn og þau eru rétt.")}</span>
+              </label>
+            </div>
+          )}
 
           <div className="hr" />
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>

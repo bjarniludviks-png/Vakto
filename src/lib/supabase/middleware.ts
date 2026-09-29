@@ -105,6 +105,10 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/cron/") ||
     pathname.startsWith("/api/home-chat") ||
     pathname.startsWith("/api/straumur/") ||
+    // Mobile-app notifications — authenticated by the caller's Supabase bearer token.
+    pathname.startsWith("/api/app/") ||
+    // Dagatalsstraumur (ICS) — leynitengill per starfsmann, engin innskráning.
+    pathname.startsWith("/api/cal/") ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
     pathname === "/favicon.ico";

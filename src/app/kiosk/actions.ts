@@ -2,6 +2,8 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { after } from "next/server";
+import { checkNoShows } from "@/lib/noshow.server";
 
 
 export type PunchResult = { ok: boolean; demo?: boolean; error?: string };
@@ -18,7 +20,10 @@ async function companyByKey(admin: ReturnType<typeof createAdminClient>, kioskKe
   const key = (kioskKey ?? "").trim();
   if (!/^[a-f0-9]{32}$/.test(key)) return null;
   const { data } = await admin.from("companies").select("id, name").eq("kiosk_token", key).maybeSingle();
-  return data ? { id: data.id as string, name: data.name as string } : null;
+  if (!data) return null;
+  // Spjaldtölvan á staðnum er virkust rétt við upphaf vakta — góður tími til að athuga „mætti ekki“.
+  after(() => checkNoShows(data.id as string));
+  return { id: data.id as string, name: data.name as string };
 }
 
 /** Load a company's employees for the shared kiosk tablet (no kennitala leaves the server). */

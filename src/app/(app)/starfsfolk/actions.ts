@@ -672,8 +672,24 @@ ${line("Starfsheiti", e.title)}${alw("Vinnustaður / heimilisfang", c.address ? 
 ${line("Launafyrirkomulag", e.pay_type === "monthly" ? "Mánaðarlaun / Monthly salary" : "Tímakaup / Hourly wages")}${line(e.pay_type === "monthly" ? "Grunnlaun á mánuði" : "Tímakaup (grunntaxti)", e.rate ? `${e.rate} kr` : "")}${line("Orlof", orlofTxt)}${line("Greiðsla launa", "Mánaðarlega, inn á bankareikning starfsmanns / Monthly, into the employee's bank account")}
 ## Lífeyrissjóður og stéttarfélag / Pension fund and union
 ${line("Lífeyrissjóður", (e.pension_fund as string) || "Skv. vali starfsmanns eða kjarasamningi / Per the employee's choice or agreement")}${line("Stéttarfélag / kjarasamningur", extras.unionName)}
+## Vinnutími og vaktir / Working time and shifts
+Vinnutími fer eftir vaktaplani sem birt er í VAKTO. Starfsmaður fær vaktaplan með a.m.k. þeim fyrirvara sem kjarasamningur kveður á um og tilkynningu í appi þegar plan er birt eða því breytt. Vaktaskipti eru óskað eftir í VAKTO og taka gildi þegar vaktstjóri samþykkir. / Working hours follow the shift schedule published in VAKTO. The employee receives the schedule at least with the notice required by the collective agreement, and an app notification when it is published or changed. Shift swaps are requested in VAKTO and take effect once a manager approves.
+
+${alw("Dagvinnutímabil / reference hours", "")}${alw("Lágmarksfyrirvari á vaktaplani / minimum notice", "")}
+**Yfirvinna / Overtime:** Vinna umfram umsamið starfshlutfall eða utan dagvinnutímabils er greidd sem yfirvinna eða með álagi skv. kjarasamningi, og aðeins að beiðni eða með samþykki vaktstjóra. / Work beyond the agreed ratio or outside the day-work period is paid as overtime or with a premium per the collective agreement, and only when requested or approved by a manager.
+
+## Reynslutími, þjálfun og breytingar / Probation, training and changes
+${extras.contractType === "temporary" ? alw("Lok tímabundinnar ráðningar / end date", "") : ""}${alw("Reynslutími / probation period", "")}
+Á reynslutíma gildir styttri uppsagnarfrestur skv. kjarasamningi. / A shorter notice period applies during probation per the collective agreement.
+
+**Starfslýsing / Job description:** ${(e.title as string) || "____________"} — helstu verkefni eru skráð sem verkefni vaktar í VAKTO og nánar útfærð af vaktstjóra. / Main duties are recorded as shift tasks in VAKTO and specified further by the manager.
+
+**Þjálfun / Training:** Starfsmaður á rétt á þeirri þjálfun sem vinnuveitanda er skylt að veita vegna starfsins (t.d. öryggis- og hreinlætisþjálfun) á vinnutíma og á kostnað vinnuveitanda. / The employee is entitled to the training the employer must provide for the role (e.g. safety and hygiene), during working hours and at the employer's expense.
+
+**Breytingar / Changes:** Breytingar á ráðningarkjörum skulu kynntar starfsmanni skriflega eigi síðar en þær taka gildi. / Changes to the terms of employment shall be given to the employee in writing no later than the day they take effect.
+
 ## Uppsagnarfrestur, orlof og veikindi / Notice period, holiday and sick pay
-Fer eftir gildandi kjarasamningi og lögum á starfsstað, þ.m.t. áunnin réttindi miðað við starfsaldur. / According to the applicable collective agreement and local law, including earned rights based on tenure.
+Uppsögn skal vera skrifleg. Uppsagnarfrestur, orlofsréttur og veikindaréttur fara eftir gildandi kjarasamningi og lögum á starfsstað, þ.m.t. áunnin réttindi miðað við starfsaldur. / Notice must be given in writing. Notice period, holiday and sick-pay rights follow the applicable collective agreement and local law, including earned rights based on tenure.
 ${terms ? `\n## Sérákvæði fyrirtækisins / Company provisions\n${terms}\n` : ""}
 ## Annað / Other
 Um starfið gilda að öðru leyti þær vinnureglur sem fyrirtækið hefur skilgreint í VAKTO

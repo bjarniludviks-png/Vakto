@@ -4,6 +4,7 @@
 import * as Location from "expo-location";
 import { supabase } from "../supabase";
 import type { Me } from "./me";
+import { notifyServer } from "./notify";
 
 export type GeofenceMode = "off" | "flag" | "block";
 export type PunchPos = { lat: number; lng: number; acc: number };
@@ -46,7 +47,9 @@ export async function clockIn(me: Me, pos?: PunchPos | null): Promise<{ ok: bool
     source: "app",
     ...(pos ? { in_lat: pos.lat, in_lng: pos.lng, in_acc: pos.acc } : {}),
   });
-  return error ? { ok: false, error: punchError(error.message) } : { ok: true };
+  if (error) return { ok: false, error: punchError(error.message) };
+  void notifyServer("punch"); // vefurinn athugar „mætti ekki“ hjá hinum
+  return { ok: true };
 }
 
 export async function clockOut(me: Me, pos?: PunchPos | null): Promise<{ ok: boolean; error?: string }> {

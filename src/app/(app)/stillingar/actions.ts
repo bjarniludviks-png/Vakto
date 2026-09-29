@@ -817,6 +817,38 @@ export async function setFeedPostPolicy(policy: "everyone" | "managers"): Promis
   }
 }
 
+/** Laun % markmið (0045) og hámark starfsmanna í fríi sama dag (0057, null = ekkert). */
+export async function saveCompanyLimits(input: { laborTarget?: number; leaveCap?: number | null }): Promise<SettingsResult> {
+  const patch: Record<string, number | null> = {};
+  if (input.laborTarget !== undefined) {
+    const n = Math.round(Number(input.laborTarget) * 10) / 10;
+    if (!Number.isFinite(n) || n < 5 || n > 80) return { ok: false, error: "Markmið þarf að vera á milli 5 og 80 %" };
+    patch.labor_target = n;
+  }
+  if (input.leaveCap !== undefined) {
+    const c = input.leaveCap == null ? null : Math.round(Number(input.leaveCap));
+    if (c != null && (!Number.isFinite(c) || c < 1 || c > 50)) return { ok: false, error: "Ógilt hámark" };
+    patch.leave_cap = c;
+  }
+  if (!Object.keys(patch).length) return { ok: true };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("companies").update(patch).eq("id", ctx.company);
+    if (error) return dbFail("saveCompanyLimits", error);
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "company.limits", entity: "companies",
+      detail: [patch.labor_target !== undefined ? `Laun% markmið ${patch.labor_target}%` : "", patch.leave_cap !== undefined ? `Hámark í fríi: ${patch.leave_cap ?? "ekkert"}` : ""].filter(Boolean).join(" · "),
+    });
+    revalidatePath("/stillingar"); revalidatePath("/maelabord"); revalidatePath("/vaktaplan");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 /* ------------------------------------------------ geofence (migration 0055) */
 
 /** Company-wide "Staðsetning við stimplun": off / flag / block. */

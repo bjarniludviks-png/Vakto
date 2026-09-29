@@ -12,6 +12,7 @@ import { colors, radius, brandShadow, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { getHome, dayLabel, type Home, type Noti } from "../../src/lib/api/home";
 import { clockIn, clockOut, getGeofenceMode, punchPosition, type GeofenceMode } from "../../src/lib/api/punches";
+import { getTodayTasks, setTaskDone, type Task } from "../../src/lib/api/tasks";
 import { estimateShift } from "../../src/lib/api/pay";
 import { iso } from "../../src/lib/api/me";
 import { kr, dec1 } from "../../src/lib/format";
@@ -40,15 +41,17 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [sheet, setSheet] = useState<null | "leave" | "offer" | "notis">(null);
   const [geofence, setGeofence] = useState<GeofenceMode>("off");
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [, tick] = useState(0);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const load = useCallback(async () => {
     if (!me) return;
     try {
-      const [h, g] = await Promise.all([getHome(me), getGeofenceMode()]);
+      const [h, g, tk] = await Promise.all([getHome(me), getGeofenceMode(), getTodayTasks(me)]);
       setHome(h);
       setGeofence(g);
+      setTasks(tk);
     } catch (e) { console.warn("home", e); }
   }, [me]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -149,6 +152,37 @@ export default function HomeScreen() {
             ) : null}
           </View>
         )}
+
+        {/* verkefni dagsins — vaktstjóri setur þau í vaktaplaninu */}
+        {tasks.length > 0 ? (
+          <Card>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <Eyebrow>Verkefni dagsins</Eyebrow>
+              <Muted>{tasks.filter((x) => x.done).length}/{tasks.length}</Muted>
+            </View>
+            {tasks.map((task) => (
+              <Pressable
+                key={task.id}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: task.done }}
+                onPress={async () => {
+                  const next = !task.done;
+                  setTasks((ts) => ts.map((x) => (x.id === task.id ? { ...x, done: next } : x)));
+                  if (!(await setTaskDone(task.id, next))) {
+                    setTasks((ts) => ts.map((x) => (x.id === task.id ? { ...x, done: !next } : x)));
+                    toast("Tókst ekki að vista");
+                  }
+                }}
+                style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 10, opacity: pressed ? 0.7 : 1 })}
+              >
+                <View style={{ width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, borderColor: task.done ? colors.good : colors.line, backgroundColor: task.done ? colors.good : "transparent", alignItems: "center", justifyContent: "center" }}>
+                  {task.done ? <Check color="#fff" size={15} strokeWidth={3} /> : null}
+                </View>
+                <Txt size={15} color={task.done ? colors.ink3 : colors.ink} style={task.done ? { textDecorationLine: "line-through" } : undefined}>{task.title}</Txt>
+              </Pressable>
+            ))}
+          </Card>
+        ) : null}
 
         {/* á vakt með þér */}
         <Card>

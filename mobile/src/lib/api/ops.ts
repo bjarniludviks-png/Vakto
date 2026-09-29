@@ -5,6 +5,7 @@ import { supabase } from "../supabase";
 import { getLaborPeriods, DEFAULT_LABOR_TARGET as LT, type LaborPeriod } from "../labor";
 import { iso, type Me } from "./me";
 import { canPin } from "./feed";
+import { notifyServer } from "./notify";
 
 /** Eigandi eða vaktstjóri? Sama athugun og fréttaveitan notar. */
 export const isManager = canPin;
@@ -175,5 +176,7 @@ export function targetGapKr(p: LaborPeriod, target: number): number | null {
 export async function decideRequest(r: PendingReq, approve: boolean): Promise<{ ok: boolean; error?: string }> {
   const table = r.kind === "leave" ? "leave_requests" : "shift_swaps";
   const { error } = await supabase.from(table).update({ status: approve ? "approved" : "rejected" }).eq("id", r.id);
-  return error ? { ok: false, error: error.message } : { ok: true };
+  if (error) return { ok: false, error: error.message };
+  if (r.kind === "leave") void notifyServer("leave_decided", r.id);
+  return { ok: true };
 }

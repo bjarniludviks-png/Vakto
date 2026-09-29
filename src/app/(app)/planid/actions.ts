@@ -137,3 +137,17 @@ export async function getCoworkers(): Promise<{ live: boolean; people: Coworker[
     return { live: false, people: [] };
   }
 }
+
+/** Leynitengill starfsmannsins á dagatalsstraum vakta (/api/cal/<token>.ics, 0057). */
+export async function getMyCalendarToken(): Promise<string | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data } = await supabase.from("employees").select("calendar_token").eq("user_id", user.id).maybeSingle();
+    return (data?.calendar_token as string | null) ?? null;
+  } catch {
+    return null;
+  }
+}

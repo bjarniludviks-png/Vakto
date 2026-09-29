@@ -1,12 +1,16 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { getOrlofBalances } from "@/lib/orlof.server";
+import { leaveWorkdays } from "@/lib/orlof";
 
 export type ReqItem = {
   id: string | null; // null = demo entry (no DB row to act on)
   kind: "leave" | "swap" | "avail";
   title: string;
   detail: string;
+  /** Extra context for the manager, e.g. orlof balance vs. the request. */
+  hints?: { text: string; warn?: boolean }[];
 };
 export type Requests = { items: ReqItem[]; live: boolean };
 
@@ -28,7 +32,7 @@ export async function getPendingRequests(): Promise<Requests> {
     if (!user) return { items: DEMO, live: false };
     const [leave, swaps, avail] = await Promise.all([
       supabase.from("leave_requests")
-        .select("id, type, from_date, to_date, employees(full_name)")
+        .select("id, type, from_date, to_date, employee_id, employees(full_name)")
         .eq("status", "pending").order("from_date", { ascending: true }).limit(10),
       supabase.from("shift_swaps")
         .select("id, note, requester:requester_id(full_name)")
@@ -44,11 +48,23 @@ export async function getPendingRequests(): Promise<Requests> {
     };
 
     const items: ReqItem[] = [];
+    // Orlof balance for everyone with a pending orlof request (tolerant — no hint on failure).
+    const orlofIds = (leave.data ?? []).filter((r) => r.type === "orlof").map((r) => r.employee_id as string);
+    const balances = await getOrlofBalances(supabase, orlofIds).catch(() => new Map());
     for (const r of leave.data ?? []) {
+      const hints: ReqItem["hints"] = [];
+      const b = r.type === "orlof" ? balances.get(r.employee_id as string) : undefined;
+      if (b?.tracksDays) {
+        const n = leaveWorkdays(r.from_date as string, r.to_date as string);
+        // remainingDays already subtracts pending requests (incl. this one) — show what's left before it.
+        const before = Math.round((b.remainingDays + n) * 10) / 10;
+        hints.push({ text: `Á eftir ${String(before).replace(".", ",")} daga orlofs · beiðnin er ${n} ${n === 1 ? "dagur" : "dagar"}`, warn: n > before });
+      }
       items.push({
         id: r.id as string, kind: "leave",
         title: `Frí-beiðni: ${name(r.employees)}`,
         detail: `${r.from_date} – ${r.to_date} · ${LEAVE_LABEL[r.type as string] ?? r.type}`,
+        hints,
       });
     }
     for (const r of swaps.data ?? []) {

@@ -3,8 +3,11 @@ import { getDashboard } from "./dashboard.server";
 import { getWhoIsOn } from "../timaskraning/attendance.server";
 import { getPendingRequests } from "../vaktaplan/requests.server";
 import { getMyScope, scopeRows } from "@/lib/scope.server";
+import { checkNoShows } from "@/lib/noshow.server";
+import { after } from "next/server";
 
 export default async function MaelabordPage() {
+  after(() => checkNoShows());
   const scope = await getMyScope();
   const [view, board, reqs] = await Promise.all([getDashboard(scope.departments), getWhoIsOn(), getPendingRequests()]);
   const d = scope.departments;

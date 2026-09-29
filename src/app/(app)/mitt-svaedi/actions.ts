@@ -6,6 +6,8 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
 import { sendContractSignedEmail } from "@/lib/email";
 import { notifyManagers } from "@/lib/push";
+import { after } from "next/server";
+import { checkNoShows } from "@/lib/noshow.server";
 
 export type PunchResult = { ok: boolean; demo?: boolean; error?: string };
 export type ActionResult = { ok: boolean; demo?: boolean; error?: string };
@@ -96,6 +98,7 @@ function punchError(message: string): string {
  *  only sent when the company has geofencing on; the DB trigger judges it. */
 export async function myPunch(into: boolean, pos?: PunchPos | null): Promise<PunchResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  after(() => checkNoShows());
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -159,7 +162,13 @@ export async function submitLeaveRequest(
       to_date: input.toDate,
       status: "pending",
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      // 0057 leave_cap_check: „LEAVE_CAP:YYYY-MM-DD“ — dagurinn er þegar fullur.
+      const cap = error.message.match(/LEAVE_CAP:(\d{4})-(\d{2})-(\d{2})/);
+      if (cap) return { ok: false, error: `Hámarksfjöldi er þegar í fríi ${+cap[3]}.${+cap[2]}. — talaðu við vaktstjórann.` };
+      console.error("submitLeaveRequest", error);
+      return { ok: false, error: "Tókst ekki að senda beiðnina." };
+    }
     void notifyManagers(me.company, { title: "Ný frí-beiðni", body: "Starfsmaður sótti um frí — samþykktu eða hafnaðu.", url: "/vaktaplan", tag: "requests" });
     await logAudit(supabase, me.company, me.userId, {
       action: "leave.request", entity: "leave_request",

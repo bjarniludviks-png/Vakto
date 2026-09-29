@@ -8,6 +8,8 @@ import { useMe } from "../lib/me-context";
 import { submitLeaveRequest, requestShiftSwap } from "../lib/api/requests";
 import { supabase } from "../lib/supabase";
 import { iso } from "../lib/api/me";
+import { getMyOrlof } from "../lib/api/orlof";
+import { leaveWorkdays, type OrlofBalance } from "../lib/orlof";
 
 /** Reiknað við hverja teikningu svo liturinn fylgi þemanu. */
 export const inputStyle = () => ({
@@ -49,7 +51,10 @@ export function LeaveSheet({ open, onClose, onDone }: { open: boolean; onClose: 
   const [to, setTo] = useState(today);
   const [type, setType] = useState<"orlof" | "veikindi" | "olaunad">("orlof");
   const [busy, setBusy] = useState(false);
+  const [orlof, setOrlof] = useState<OrlofBalance | null>(null);
   useEffect(() => { if (to < from) setTo(from); }, [from, to]);
+  useEffect(() => { if (open && me) getMyOrlof(me).then(setOrlof).catch(() => setOrlof(null)); }, [open, me]);
+  const days = leaveWorkdays(from, to);
   async function send() {
     if (!me) return;
     setBusy(true);
@@ -64,6 +69,19 @@ export function LeaveSheet({ open, onClose, onDone }: { open: boolean; onClose: 
       <Seg value={type} onChange={setType} items={[{ id: "orlof", label: "Orlof" }, { id: "veikindi", label: "Veikindi" }, { id: "olaunad", label: "Ólaunað" }]} />
       <Field label="Frá"><DatePick value={from} onChange={setFrom} min={today} /></Field>
       <Field label="Til"><DatePick value={to} onChange={setTo} min={from} /></Field>
+      {type === "orlof" && orlof?.tracksDays ? (
+        <View style={{ borderRadius: radius.control, backgroundColor: colors.panel2, borderWidth: 1, borderColor: colors.line, padding: 12, gap: 6 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Muted>Orlof eftir</Muted>
+            <Txt weight="bold" color={orlof.remainingDays < 0 ? colors.bad : colors.ink}>{String(orlof.remainingDays).replace(".", ",")} {tr("dagar")}</Txt>
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Muted>Þessi beiðni</Muted>
+            <Txt weight="bold">{days} {tr(days === 1 ? "virkur dagur" : "virkir dagar")}</Txt>
+          </View>
+          {days > orlof.remainingDays ? <Txt size={12.5} color={colors.warn}>Beiðnin er lengri en orlofið sem þú átt eftir — vaktstjóri sér það.</Txt> : null}
+        </View>
+      ) : null}
       <Btn title="Senda beiðni" size="lg" loading={busy} onPress={send} />
       <Muted size={12}>Vaktstjóri fær tilkynningu strax og þú sérð svarið undir Beiðnir.</Muted>
     </Sheet>

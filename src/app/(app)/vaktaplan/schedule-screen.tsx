@@ -7,12 +7,13 @@ import { useLang } from "@/components/app/lang";
 import { nf, dec1 } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
 import { AsyncButton } from "@/components/app/async-button";
-import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, type ShiftInput } from "./actions";
+import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, getWeekBudget, type ShiftInput } from "./actions";
 import { getCompanyDepartments, getDepartmentColors } from "../starfsfolk/actions";
 import { getDashboardPeriod } from "../maelabord/actions";
 import { buildSchedulePdf, type PdfShift } from "./pdf";
 import type { ReqItem } from "./requests.server";
 import type { ScheduleInitial } from "./schedule.server";
+import type { WeekBudget } from "@/lib/labor";
 
 type Emp = [string, string, string, string]; // initials, name, dept, color
 type ShiftDef = { l: string; s: string; h: number; c: "day" | "eve" | "off" };
@@ -374,6 +375,30 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       ? { hl: "Tímar mánaðar", hrs: Math.round(totalHrs * 4.33), sl: "Vaktir í mánuði", shifts: weekShifts * 4, open: false }
       : { hl: "Tímar vikunnar", hrs: totalHrs, sl: "Vaktir í viku", shifts: weekShifts, open: true };
 
+  // Launaáætlun: áætlaður launakostnaður ALLS plansins (allar raðir, líka óbirtar
+  // breytingar) á móti veltuspá vikunnar × markmiði fyrirtækisins.
+  const [budget, setBudget] = useState<WeekBudget | null>(null);
+  useEffect(() => {
+    if (!liveCompany) return;
+    let cancelled = false;
+    getWeekBudget(weekMonISO).then((b) => { if (!cancelled) setBudget(b); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [weekMonISO, liveCompany]);
+  const planCost = useMemo(() => {
+    if (!budget) return null;
+    let c = budget.fixed;
+    emp.forEach((e, r) => {
+      const rate = budget.rates[`${e[0]}|${e[1]}`] ?? budget.avgRate ?? COST_HR;
+      grid[r]?.forEach((s, col) => { if (s && s !== "off") c += cellHrs(r, col, s) * rate; });
+    });
+    return Math.round(c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budget, emp, grid, cellTimes]);
+  const laborTarget = budget?.target ?? 30;
+  const planPct = budget && planCost != null && budget.revenue > 0 ? Math.round((planCost / budget.revenue) * 1000) / 10 : null;
+  const planColor = planPct == null ? "" : planPct <= laborTarget ? "good" : planPct <= laborTarget + 3 ? "warn" : "bad";
+  const budgetCap = budget && budget.revenue > 0 ? Math.round((budget.revenue * laborTarget) / 100) : null;
+
   async function decideLeave(id: string | null, approved: boolean) {
     if (!id) { toast(approved ? "Samþykkt" : "Hafnað"); return; }
     const res = await updateLeaveRequest(id, approved);
@@ -406,6 +431,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     return out;
   }
   async function publish() {
+    if (planPct != null && planPct > laborTarget
+      && !window.confirm(`${t("Áætluð laun eru")} ${dec1(planPct)} % ${t("af veltuspá vikunnar — markmiðið er")} ${dec1(laborTarget)} %. ${t("Birta samt?")}`)) return;
     const res = await publishSchedule(buildShiftPayload());
     if (!res.ok) { toast(res.error ?? "Tókst ekki að birta"); return; }
     toast(res.demo ? `Plan birt (demo — ${res.count} vaktir)` : `Plan birt — ${res.count} vaktir vistaðar`);
@@ -774,7 +801,12 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       {view !== "Dagur" && (
       <div className="kstrip">
         <span>{t(kpi.hl)} <b>{dec1(kpi.hrs)}</b> {t("klst")}</span>
-        <span>{t("Áætl. launakostnaður")} <b>{nf(Math.round(kpi.hrs * COST_HR))}</b> kr</span>
+        <span>{t("Áætl. launakostnaður")} <b>{nf(view === "Vika" && planCost != null ? planCost : Math.round(kpi.hrs * COST_HR))}</b> kr</span>
+        {view === "Vika" && planPct != null && budgetCap != null && (
+          <span className={planColor} title={budget?.revenueSource === "estimated" || budget?.revenueSource === "mixed" ? t("Veltuspá byggir á meðalveltu vikudaga þar sem rauntölur vantar") : undefined}>
+            {t("Laun % af veltuspá")} <b>{dec1(planPct)} %</b> · {t("markmið")} {dec1(laborTarget)} % · {t("svigrúm")} <b>{nf(budgetCap - (planCost ?? 0))}</b> kr
+          </span>
+        )}
         <span>{t("Áætl. álagstímar")} <b>{dec1(estHrs.premium)}</b> {t("klst")}</span>
         <span className={estHrs.overtime > 0 ? "bad" : ""}>{t("Áætl. yfirvinna")} <b>{dec1(estHrs.overtime)}</b> {t("klst")}</span>
         <span>{t(kpi.sl)} <b>{kpi.shifts}</b>{kpi.open && !liveCompany ? <> · 2 {t("opnar")}</> : null}</span>
@@ -942,7 +974,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
             {[
               ["Lækka launakostnað um 10%", "haltu mönnun en lægri launum"],
               ["Minnka yfirvinnu", "dreifa tímum, laga hvíld"],
-              ["Halda launum undir 30% af veltu", "stilla mönnun að veltuspá"],
+              [`Halda launum undir ${laborTarget}% af veltu`, "stilla mönnun að veltuspá"],
             ].map((x) => (
               <div className="it" key={x[0]} style={{ cursor: "pointer" }} onClick={() => runAi(x[0])}>
                 <div className="ic info"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 8l5 5 4-3 6 7" /><path d="M16 17h4v-4" /></svg></div>
@@ -989,7 +1021,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
               <div className={`ic ${r.kind === "swap" ? "info" : "warn"}`}>
                 <svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor">{REQ_ICON[r.kind]}</svg>
               </div>
-              <div className="tx"><b>{t(r.title)}</b><span>{t(r.detail)}</span></div>
+              <div className="tx"><b>{t(r.title)}</b><span>{t(r.detail)}</span>
+                {r.hints?.map((h, hi) => <span key={hi} style={h.warn ? { color: "var(--warn)", fontWeight: 600 } : undefined}>{h.text}</span>)}
+              </div>
               {r.kind === "leave" && <>
                 <button className="btn sm" onClick={() => decideLeave(r.id, true)}>{t("Samþykkja")}</button>
                 <button className="btn ghost sm" style={{ marginLeft: 8 }} onClick={() => decideLeave(r.id, false)}>{t("Hafna")}</button>

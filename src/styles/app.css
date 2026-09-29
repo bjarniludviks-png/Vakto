@@ -434,6 +434,8 @@ td.unav.conf .shift{outline:2px solid var(--bad);outline-offset:-2px}
 .kstrip{display:flex;flex-wrap:wrap;gap:6px 24px;align-items:baseline;margin:2px 2px 14px;font-size:13px;color:var(--ink3)}
 .kstrip b{font-size:15.5px;font-weight:650;color:var(--ink);font-variant-numeric:tabular-nums;margin-left:2px}
 .kstrip .bad,.kstrip .bad b{color:var(--bad)}
+.kstrip .warn,.kstrip .warn b{color:var(--warn)}
+.kstrip .good b{color:var(--good)}
 @media(max-width:760px){
   .kstrip{display:grid;grid-template-columns:1fr;gap:7px;font-size:12.5px}
   .kstrip span{display:flex;align-items:baseline;gap:5px;border-bottom:1px dashed var(--line2);padding-bottom:5px}

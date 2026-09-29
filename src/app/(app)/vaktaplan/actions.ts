@@ -9,6 +9,7 @@ import { sendSchedulePublishedEmail, sendLeaveDecisionEmail } from "@/lib/email"
 import { getEmployees } from "@/lib/employees.server";
 import { initials as empInitials } from "@/lib/employees";
 import { getWeekUnavail } from "./schedule.server";
+import { getWeekBudget as laborWeekBudget, type WeekBudget } from "@/lib/labor";
 
 export type ShiftInput = {
   employeeName: string; // first name as shown in the grid
@@ -93,6 +94,20 @@ function weekCodeForStart(start: string | null): string {
 /** Load the grid (employee × 7 days) for a specific week, aligned to the
  * full_name-ordered employee list (same order the screen renders). Returns
  * both the coarse code grid (for colour) and the real start/end times per cell. */
+/** Veltuspá + launamarkmið vikunnar og kostnaður per klst — fyrir launaáætlunina. */
+export async function getWeekBudget(monISO: string): Promise<WeekBudget | null> {
+  if (!isSupabaseConfigured() || !/^\d{4}-\d{2}-\d{2}$/.test(monISO)) return null;
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return null;
+    return await laborWeekBudget(supabase, ctx.company, monISO);
+  } catch (e) {
+    console.error("getWeekBudget", e);
+    return null;
+  }
+}
+
 export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][]; times: Record<string, { start: string; end: string }>; names?: string[]; inits?: string[]; unavail?: Record<string, number[]> }> {
   if (!isSupabaseConfigured()) return { ok: false, grid: [], times: {} };
   try {

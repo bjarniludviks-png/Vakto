@@ -2,32 +2,47 @@
 // (leave_requests / shift_swaps / availability RLS from migration 0005).
 import { supabase } from "../supabase";
 import type { Me } from "./me";
+import { notifyServer } from "./notify";
 
 type Result = { ok: boolean; error?: string };
+
+/** Friendly text for the leave-cap trigger (migration 0057). */
+function leaveError(message: string): string {
+  const m = message.match(/LEAVE_CAP:(\d{4}-\d{2}-\d{2})/);
+  if (m) {
+    const d = new Date(m[1] + "T12:00:00");
+    return `Hámarksfjöldi er þegar í fríi ${d.getDate()}.${d.getMonth() + 1}. — talaðu við vaktstjórann.`;
+  }
+  return message;
+}
 
 export async function submitLeaveRequest(
   me: Me,
   input: { fromDate: string; toDate: string; type: "orlof" | "veikindi" | "olaunad" }
 ): Promise<Result> {
-  const { error } = await supabase.from("leave_requests").insert({
+  const { data, error } = await supabase.from("leave_requests").insert({
     company_id: me.companyId,
     employee_id: me.empId,
     type: input.type,
     from_date: input.fromDate,
     to_date: input.toDate,
     status: "pending",
-  });
-  return error ? { ok: false, error: error.message } : { ok: true };
+  }).select("id").single();
+  if (error) return { ok: false, error: leaveError(error.message) };
+  void notifyServer("leave_request", data.id as string);
+  return { ok: true };
 }
 
 export async function requestShiftSwap(me: Me, note: string): Promise<Result> {
-  const { error } = await supabase.from("shift_swaps").insert({
+  const { data, error } = await supabase.from("shift_swaps").insert({
     company_id: me.companyId,
     requester_id: me.empId,
     note,
     status: "pending",
-  });
-  return error ? { ok: false, error: error.message } : { ok: true };
+  }).select("id").single();
+  if (error) return { ok: false, error: error.message };
+  void notifyServer("swap_request", data.id as string);
+  return { ok: true };
 }
 
 /** Apply for an open shift — same convention as the web (note-encoded). */

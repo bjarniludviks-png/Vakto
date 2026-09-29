@@ -282,3 +282,48 @@ export async function getLaborTarget(supabase: Db, companyId: string): Promise<n
     return DEFAULT_LABOR_TARGET;
   }
 }
+
+/** Launaáætlun vikunnar fyrir Vaktaplan: veltuspá (raun + vikudagsmeðaltal) og
+ * markmið, auk kostnaðar per klst hvers tímakaupsmanns svo skjárinn geti reiknað
+ * áætlaðan launakostnað lifandi úr óbirtu plani. Sama kostnaðarformúla og
+ * getLaborPeriods (computeLine → cost/hours; mánaðarlaun = fastur hlutur vikunnar). */
+export type WeekBudget = {
+  revenue: number; revenueSource: RevenueSource; target: number;
+  fixed: number;                    // kr — mánaðarlaunafólk, hlutfall vikunnar
+  rates: Record<string, number>;    // "ÍN|Fornafn" → kr/klst (með launatengdum gjöldum)
+  avgRate: number;                  // fyrir raðir sem finnast ekki
+};
+
+export async function getWeekBudget(supabase: Db, companyId: string, monISO: string): Promise<WeekBudget> {
+  const [y, m, d] = monISO.split("-").map(Number);
+  const sun = isoOf(new Date(y, m - 1, d + 6));
+  const [period, target, empRes, ruleRes] = await Promise.all([
+    getLaborPeriod(supabase, companyId, monISO, sun),
+    getLaborTarget(supabase, companyId),
+    supabase.from("employees").select("id, full_name, pay_type, rate, employment_ratio, union_agreement, status").eq("company_id", companyId),
+    supabase.from("employees").select("id, pay_rule").eq("company_id", companyId),
+  ]);
+  const ruleMap = new Map<string, unknown>();
+  if (!ruleRes.error) for (const r of ruleRes.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never) ?? null);
+  const share = monthShareOf(dateRange(monISO, sun));
+  const rates: Record<string, number> = {};
+  let fixed = 0, sum = 0, n = 0;
+  for (const r of empRes.data ?? []) {
+    if ((r.status as string) === "inactive") continue;
+    const union = (r.union_agreement as string | null) ?? null;
+    const e = {
+      id: r.id as string, fullName: r.full_name as string,
+      payType: ((r.pay_type as string) === "monthly" ? "monthly" : "hourly") as "hourly" | "monthly",
+      rate: Number(r.rate) || 0, employmentRatio: Number(r.employment_ratio) || 100,
+      union, rules: resolveRuleSet(union, ruleMap.get(r.id as string) as never),
+    };
+    const l = computeLine(e as never);
+    if (e.payType === "monthly") { fixed += l.cost * share; continue; }
+    const per = l.hours > 0 ? l.cost / l.hours : 0;
+    if (per > 0) {
+      rates[`${initials(e.fullName)}|${e.fullName.split(/\s+/)[0]}`] = Math.round(per);
+      sum += per; n++;
+    }
+  }
+  return { revenue: period.revenue, revenueSource: period.revenueSource, target, fixed: Math.round(fixed), rates, avgRate: n ? Math.round(sum / n) : 0 };
+}

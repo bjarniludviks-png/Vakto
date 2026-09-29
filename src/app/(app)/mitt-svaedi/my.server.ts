@@ -2,11 +2,12 @@ import "server-only";
 // Live data for Mitt svæði: my shifts (this week + upcoming), open punch state,
 // month pay estimate from real punches, rights (orlof/tímabanki), profile fields
 // and open shifts I can apply for. Everything scoped to the signed-in employee.
-
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { resolveRuleSet } from "@/lib/payrules";
 import { classifyPay, computeFromPunches, STORHATID, BURDEN } from "@/lib/payroll";
+import { getOrlofBalances } from "@/lib/orlof.server";
+import type { OrlofBalance } from "@/lib/orlof";
 
 const MONTHLY_HOURS = 173.33;
 const ORLOF_PCT = 0.1017;
@@ -29,7 +30,7 @@ export type MyArea = {
   weekHours: number;
   nextPayday: string;       // "1. ágúst"
   pay: { monthly: boolean; dayH: number; dayKr: number; premH: number; premKr: number; otH: number; otKr: number; totalH: number; totalKr: number } | null;
-  rights: { required: number; worked: number; bank: number; orlofDays: number; orlofFund: number; union: string } | null;
+  rights: { required: number; worked: number; bank: number; orlofDays: number; orlofFund: number; union: string; orlof: OrlofBalance | null } | null;
   profile: { name: string; kennitala: string; position: string; dept: string; phone: string; email: string; bank: string; union: string } | null;
   openShifts: MyOpenShift[];
   tasks: { id: string; title: string; done: boolean }[];   // today's shift checklist
@@ -187,6 +188,8 @@ export async function getMyArea(): Promise<MyArea> {
       orlofDays: Math.round((yearWorked * ORLOF_PCT / 8) * 10) / 10,
       orlofFund: hourly ? Math.round(yearWorked * rate * 1.18 * ORLOF_PCT) : 0,
       union,
+      // Orlofsárið (1. maí) og tekið/óafgreitt orlof dregið frá — sjá src/lib/orlof.ts
+      orlof: (await getOrlofBalances(supabase, [empId]).catch(() => new Map())).get(empId) ?? null,
     };
 
     const position = ((Array.isArray(emp.positions) ? emp.positions[0] : emp.positions) as { name?: string } | null)?.name ?? "";

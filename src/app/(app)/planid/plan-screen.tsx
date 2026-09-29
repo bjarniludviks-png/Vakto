@@ -9,7 +9,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { useLang } from "@/components/app/lang";
 import { toast } from "@/components/app/toast";
 import { applyForShift } from "@/app/(app)/mitt-svaedi/actions";
-import { getPlan, getCoworkers, type PlanShift, type Coworker } from "./actions";
+import { getPlan, getCoworkers, getMyCalendarToken, type PlanShift, type Coworker } from "./actions";
 
 const DAY_L = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
 const DAY_FULL = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
@@ -99,7 +99,7 @@ export default function PlanScreen() {
 
   return (
     <>
-      <PageHeader title="Planið" subtitle="Vaktir vikunnar — þínar og alls teymisins" />
+      <PageHeader title="Planið" subtitle="Vaktir vikunnar — þínar og alls teymisins" actions={<CalendarButtons />} />
 
       {/* week nav + day strip */}
       <div className="card" style={{ marginTop: 14 }}>
@@ -313,6 +313,25 @@ export default function PlanScreen() {
           </div>
         </div>
       )}
+    </>
+  );
+}
+
+/** Vaktir í dagatal símans/tölvunnar: webcal-áskrift (uppfærist sjálf) + afrita tengil
+ *  fyrir Google Calendar („Frá vefslóð“). Birtist bara starfsmönnum með prófíl. */
+function CalendarButtons() {
+  const { t } = useLang();
+  const [token, setToken] = useState<string | null>(null);
+  useEffect(() => { getMyCalendarToken().then(setToken).catch(() => {}); }, []);
+  if (!token) return null;
+  const path = `/api/cal/${token}.ics`;
+  return (
+    <>
+      <button className="btn sm" onClick={() => { window.location.href = `webcal://${window.location.host}${path}`; }}>{t("Setja vaktir í dagatal")}</button>
+      <button className="btn ghost sm" onClick={async () => {
+        try { await navigator.clipboard.writeText(`${window.location.origin}${path}`); toast(t("Tengill afritaður — límdu hann í Google Calendar undir „Frá vefslóð“")); }
+        catch { toast(t("Tókst ekki að afrita")); }
+      }}>{t("Afrita tengil")}</button>
     </>
   );
 }

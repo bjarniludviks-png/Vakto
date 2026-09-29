@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { tr, trf, useLang, setLang, LANGS } from "../src/lib/i18n";
 import { View, Switch, Linking, Pressable } from "react-native";
 import { useRouter } from "expo-router";
-import { Bell, BellOff, UserRound, KeyRound, LifeBuoy, FileText } from "lucide-react-native";
+import { Bell, BellOff, UserRound, KeyRound, LifeBuoy, FileText, CalendarPlus } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
 import { List, Row, IconBox, Muted, useToast, Txt, Seg } from "../src/components/ui";
 import { colors, useTheme, setThemeMode } from "../src/theme";
@@ -21,6 +21,14 @@ export default function Stillingar() {
   const [push, setPush] = useState(false);
   const [dnd, setDndState] = useState<number | null>(null);
   useEffect(() => { pushEnabled().then(setPush); getDnd().then(setDndState); return onMuteChange(() => getDnd().then(setDndState)); }, []);
+  // Áskrift að vöktum (ICS) — iOS/Android dagatalið sækir /api/cal/<leynitengill> reglulega.
+  async function addCalendar() {
+    const { data } = await supabase.from("employees").select("calendar_token").eq("id", me!.empId).maybeSingle();
+    const token = data?.calendar_token as string | undefined;
+    if (!token) { toast("Dagatalstengill er ekki tilbúinn — reyndu aftur síðar"); return; }
+    const host = (process.env.EXPO_PUBLIC_API_URL ?? "https://www.vakto.is").replace(/^https?:\/\//, "").replace(/\/$/, "");
+    Linking.openURL(`webcal://${host}/api/cal/${token}.ics`).catch(() => toast("Gat ekki opnað dagatalið"));
+  }
   async function mute(kind: "1h" | "morning" | "forever" | "off") {
     if (kind === "off") { await setDnd(null); toast("Kveikt á tilkynningum aftur"); return; }
     let until = Infinity;
@@ -77,6 +85,12 @@ export default function Stillingar() {
         <Row icon={<IconBox><UserRound color={colors.ink2} size={19} /></IconBox>} title="Prófíll" sub="Sími, netfang, bankareikningur, mynd" onPress={() => router.push("/profill")} />
         <Row icon={<IconBox><KeyRound color={colors.ink2} size={19} /></IconBox>} title="Breyta lykilorði" sub={me?.email ? trf("Sendir hlekk á {x}", me.email) : "Sendir hlekk í pósti"} onPress={resetPw} chevron={false} last />
       </List>
+      {me?.empId ? <>
+        <Muted style={{ paddingHorizontal: 2 }}>DAGATAL</Muted>
+        <List>
+          <Row icon={<IconBox><CalendarPlus color={colors.ink2} size={19} /></IconBox>} title="Vaktir í dagatal símans" sub="Uppfærist sjálft þegar planið breytist" onPress={addCalendar} chevron={false} last />
+        </List>
+      </> : null}
       <Muted style={{ paddingHorizontal: 2 }}>UM VAKTO</Muted>
       <List>
         <Row icon={<IconBox><LifeBuoy color={colors.ink2} size={19} /></IconBox>} title="Hjálp" sub="hjalp@vakto.is" onPress={() => Linking.openURL("mailto:hjalp@vakto.is")} chevron={false} />

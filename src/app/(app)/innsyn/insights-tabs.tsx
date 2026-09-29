@@ -16,6 +16,8 @@ import type { PerfHistory } from "../frammistada/perf.server";
 import type { Insight } from "../frammistada/insights.server";
 import type { AttRow } from "@/lib/analytics.server";
 import type { TimeBank } from "../skyrslur/timebank.server";
+import type { Absence } from "@/lib/absence.server";
+import { AbsenceCard } from "./absence-card";
 
 export type InnsynProps = {
   owner: boolean;
@@ -23,9 +25,10 @@ export type InnsynProps = {
   empty: boolean;
   perf: { live: boolean; perf?: PerfView; staffing?: StaffingPattern; history?: PerfHistory; insights: Insight[] };
   reports: { live: boolean; rows: AttRow[]; timebank?: TimeBank };
+  absence: Absence;
 };
 
-export function InsightsTabs({ owner, initialTab, empty, perf, reports }: InnsynProps) {
+export function InsightsTabs({ owner, initialTab, empty, perf, reports, absence }: InnsynProps) {
   const { t } = useLang();
   const [tab, setTab] = useState<"rekstur" | "timar">(owner ? initialTab : "timar");
   const tabs: ["rekstur" | "timar", string][] = owner
@@ -43,7 +46,7 @@ export function InsightsTabs({ owner, initialTab, empty, perf, reports }: Innsyn
       )}
       {tab === "rekstur" && owner
         ? <PerformanceScreen embedded empty={empty} live={perf.live} perf={perf.perf} staffing={perf.staffing} history={perf.history} insights={perf.insights} />
-        : <ReportsScreen embedded empty={empty} live={reports.live} rows={reports.rows} timebank={reports.timebank} />}
+        : <><ReportsScreen embedded empty={empty} live={reports.live} rows={reports.rows} timebank={reports.timebank} /><AbsenceCard data={absence} /></>}
     </>
   );
 }
