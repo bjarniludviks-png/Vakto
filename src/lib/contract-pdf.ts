@@ -11,9 +11,33 @@ const INK: [number, number, number] = [17, 17, 17];
 const MUT: [number, number, number] = [110, 110, 110];
 const LINE: [number, number, number] = [225, 225, 228];
 
-type Section = { title: string; rows: [string, string][]; paras: string[] };
+export type Section = { title: string; rows: [string, string][]; paras: string[] };
 
-function parseContract(content: string): { title: string; sections: Section[] } {
+/** Fields → rows: two short fields share a row, anything else stands alone (full width). */
+export function pairFields<T extends [string, string]>(fields: T[]): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < fields.length; i++) {
+    const a = fields[i], b = fields[i + 1];
+    if (!isWideField(a[0], a[1]) && b && !isWideField(b[0], b[1])) { out.push([a, b]); i++; } else out.push([a]);
+  }
+  return out;
+}
+
+/** A field takes the full row when either language of its value (or label) is long. */
+export function isWideField(label: string, value: string): boolean {
+  const [vi, ve] = splitLang(value);
+  const [li, le] = splitLang(label);
+  return Math.max(vi.length, ve.length) > 40 || Math.max(li.length, le.length) > 44;
+}
+
+/** "Íslenska / English" → ["Íslenska", "English"]. Only a spaced " / " separates the
+ *  languages, so "kr./klst." or "55/1980" stay intact. */
+export function splitLang(s: string): [string, string] {
+  const i = s.indexOf(" / ");
+  return i < 0 ? [s, ""] : [s.slice(0, i).trim(), s.slice(i + 3).trim()];
+}
+
+export function parseContract(content: string): { title: string; sections: Section[] } {
   let title = "Ráðningarsamningur / Employment contract";
   const sections: Section[] = [];
   let cur: Section | null = null;
@@ -86,7 +110,7 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
-  const M = 48;
+  const M = 42;
 
   const parsed = parseContract(content);
   const [tIs, tEn] = parsed.title.split(" / ");
@@ -100,52 +124,109 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
   doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...MUT);
   doc.text("vakto.is", W - M, topY - 2, { align: "right" });
 
-  doc.setFont("helvetica", "bold"); doc.setFontSize(21); doc.setTextColor(...INK);
-  doc.text(tIs ?? "Ráðningarsamningur", M, topY + 42);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(19); doc.setTextColor(...INK);
+  doc.text(tIs ?? "Ráðningarsamningur", M, topY + 36);
   if (tEn) {
-    doc.setFont("helvetica", "italic"); doc.setFontSize(11.5); doc.setTextColor(...MUT);
-    doc.text(tEn, M, topY + 58);
+    doc.setFont("helvetica", "italic"); doc.setFontSize(10.5); doc.setTextColor(...MUT);
+    doc.text(tEn, M, topY + 51);
   }
-  doc.setDrawColor(...ORANGE); doc.setLineWidth(2.2);
-  doc.line(M, topY + 70, W - M, topY + 70);
+  doc.setDrawColor(...ORANGE); doc.setLineWidth(2);
+  doc.line(M, topY + 60, W - M, topY + 60);
 
-  let y = topY + 84;
+  let y = topY + 72;
 
-  // ---- Sections as bordered form tables with orange section-header bars ----
+  // ---- Sections as a compact bilingual form grid (like the VMST form) ----
+  // Each field is a bordered cell: small label (IS bold · EN italic grey) above the
+  // value. Short fields pair up two per row; long ones take the full width.
   type Doc = jsPDF & { lastAutoTable?: { finalY: number } };
-  const baseStyles = { fontSize: 10, cellPadding: { top: 7, bottom: 7, left: 9, right: 9 }, lineColor: LINE, lineWidth: 0.7, textColor: INK } as const;
   const headStyles = { fillColor: ORANGE, textColor: 255, fontStyle: "bold", fontSize: 10.5, cellPadding: { top: 7, bottom: 7, left: 9, right: 9 } } as const;
+  const CW = W - M * 2;
+  const PAD = 6;
+  const LBL = 7.3, VAL = 9.6, LBL_LH = 8.8, VAL_LH = 11.6;
+  const ensure = (h: number) => { if (y + h > H - 58) { doc.addPage(); y = 48; } };
+
+  type Lay = { lbl: [string[], string[]]; val: [string[], string[]]; blank: boolean; h: number };
+  const layout = (label: string, value: string, w: number): Lay => {
+    const inner = w - PAD * 2;
+    const [lIs, lEn] = splitLang(label);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(LBL);
+    const lisLines = doc.splitTextToSize(lIs, inner) as string[];
+    doc.setFont("helvetica", "italic");
+    const lenLines = lEn ? doc.splitTextToSize(lEn, inner) as string[] : [];
+    const blank = /^_{6,}$/.test(value.trim());
+    const v = blank ? "" : (value || "—");
+    const [vIs, vEn] = splitLang(v);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(VAL);
+    const visLines = vIs ? doc.splitTextToSize(vIs, inner) as string[] : [];
+    doc.setFont("helvetica", "italic"); doc.setFontSize(VAL - 1);
+    const venLines = vEn ? doc.splitTextToSize(vEn, inner) as string[] : [];
+    const h = PAD + (lisLines.length + lenLines.length) * LBL_LH + 3 + Math.max(1, visLines.length + venLines.length) * VAL_LH + PAD - 2;
+    return { lbl: [lisLines, lenLines], val: [visLines, venLines], blank, h };
+  };
+  const drawCell = (x: number, w: number, h: number, l: Lay) => {
+    if (l.blank) { doc.setFillColor(253, 244, 231); doc.rect(x, y, w, h, "F"); }
+    doc.setDrawColor(...LINE); doc.setLineWidth(0.7); doc.rect(x, y, w, h);
+    let ty = y + PAD + LBL_LH - 2;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(LBL); doc.setTextColor(70, 70, 76);
+    for (const ln of l.lbl[0]) { doc.text(ln, x + PAD, ty); ty += LBL_LH; }
+    doc.setFont("helvetica", "italic"); doc.setTextColor(...MUT);
+    for (const ln of l.lbl[1]) { doc.text(ln, x + PAD, ty); ty += LBL_LH; }
+    ty += 3 + VAL_LH - LBL_LH;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(VAL); doc.setTextColor(...INK);
+    for (const ln of l.val[0]) { doc.text(ln, x + PAD, ty); ty += VAL_LH; }
+    doc.setFont("helvetica", "italic"); doc.setFontSize(VAL - 1); doc.setTextColor(...MUT);
+    for (const ln of l.val[1]) { doc.text(ln, x + PAD, ty); ty += VAL_LH; }
+  };
+  const sectionBar = (title: string, nextH: number) => {
+    ensure(17 + nextH);
+    const [tIs2, tEn2] = splitLang(title);
+    doc.setFillColor(...ORANGE); doc.rect(M, y, CW, 17, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(255);
+    doc.text(tIs2, M + PAD, y + 11.8);
+    if (tEn2) {
+      const wIs = doc.getTextWidth(tIs2);
+      doc.setFont("helvetica", "italic"); doc.setFontSize(8.5); doc.setTextColor(255, 226, 200);
+      doc.text(`/ ${tEn2}`, M + PAD + wIs + 5, y + 11.8);
+    }
+    y += 17;
+  };
+
   for (const sec of parsed.sections) {
     if (!sec.rows.length && !sec.paras.length) continue;
-    if (sec.rows.length) {
-      // Two-column key/value form table; free paragraphs span both columns.
-      const body: (string[] | { content: string; colSpan: number; styles: { fontStyle: "normal"; fillColor: [number, number, number] } }[])[] = sec.rows.map(([k, v]) => [k, v || "—"]);
-      // Paragraphs span both columns — plain text, not the bold key-column style.
-      for (const p of sec.paras) body.push([{ content: p, colSpan: 2, styles: { fontStyle: "normal", fillColor: [255, 255, 255] } }]);
-      autoTable(doc, {
-        startY: y,
-        margin: { left: M, right: M, bottom: 60 },
-        head: sec.title ? [[{ content: sec.title, colSpan: 2 }]] : undefined,
-        body,
-        theme: "grid",
-        styles: { ...baseStyles },
-        headStyles: { ...headStyles },
-        columnStyles: { 0: { fontStyle: "bold", cellWidth: 170, fillColor: [250, 248, 246] }, 1: { cellWidth: "auto" } },
-      });
-    } else {
-      // Paragraph-only section (e.g. Annað/Other) — single wide column, since
-      // autotable can't size columns that only ever appear inside a colSpan.
-      autoTable(doc, {
-        startY: y,
-        margin: { left: M, right: M, bottom: 60 },
-        head: sec.title ? [[sec.title]] : undefined,
-        body: sec.paras.map((p) => [p]),
-        theme: "grid",
-        styles: { ...baseStyles },
-        headStyles: { ...headStyles },
-      });
+    // Pack fields into rows: two per row when both are short.
+    const rows = pairFields(sec.rows);
+    const lays = rows.map((r) => r.length === 2
+      ? r.map(([k, v]) => layout(k, v, CW / 2))
+      : [layout(r[0][0], r[0][1], CW)]);
+    const paraLays = sec.paras.map((p) => {
+      const [pIs, pEn] = splitLang(p);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8.4);
+      const a = doc.splitTextToSize(pIs, CW - PAD * 2) as string[];
+      doc.setFont("helvetica", "italic");
+      const b = pEn ? doc.splitTextToSize(pEn, CW - PAD * 2) as string[] : [];
+      return { a, b, h: PAD * 2 + (a.length + b.length) * 10.4 + (b.length ? 3 : 0) };
+    });
+    const firstH = lays[0] ? Math.max(...lays[0].map((l) => l.h)) : (paraLays[0]?.h ?? 0);
+    if (sec.title) sectionBar(sec.title, firstH);
+    lays.forEach((cells) => {
+      const h = Math.max(...cells.map((l) => l.h));
+      ensure(h);
+      if (cells.length === 2) { drawCell(M, CW / 2, h, cells[0]); drawCell(M + CW / 2, CW / 2, h, cells[1]); }
+      else drawCell(M, CW, h, cells[0]);
+      y += h;
+    });
+    for (const pl of paraLays) {
+      ensure(pl.h);
+      doc.setDrawColor(...LINE); doc.setLineWidth(0.7); doc.rect(M, y, CW, pl.h);
+      let ty = y + PAD + 7.5;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8.4); doc.setTextColor(...INK);
+      for (const ln of pl.a) { doc.text(ln, M + PAD, ty); ty += 10.4; }
+      if (pl.b.length) ty += 3;
+      doc.setFont("helvetica", "italic"); doc.setTextColor(...MUT);
+      for (const ln of pl.b) { doc.text(ln, M + PAD, ty); ty += 10.4; }
+      y += pl.h;
     }
-    y = ((doc as Doc).lastAutoTable?.finalY ?? y) + 14;
+    y += 10;
   }
 
   // ---- Signature block (like the official forms, two columns) ----

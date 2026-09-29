@@ -17,6 +17,7 @@ import { TimeField, DateField } from "@/components/app/fields";
 import { useCountry } from "@/components/app/country";
 import { CONTRACT_TYPES, SCHEDULE_PATTERNS, templateToPayRule, type RuleTemplate } from "@/lib/rules";
 import { listRuleTemplates } from "../stillingar/actions";
+import { ContractView, ContractEditor } from "@/components/app/contract-view";
 
 /** Best-effort document type from a filename (for the documents table). */
 function detectDocType(name: string): string {
@@ -960,6 +961,7 @@ function ContractViewModal({ view, onClose, onChanged }: { view: ContractRow; on
   const { t } = useLang();
   const isDraft = view.status === "draft";
   const [text, setText] = useState(view.content);
+  const [raw, setRaw] = useState(false);
   const [busy, setBusy] = useState(false);
   async function saveDraft(): Promise<boolean> {
     setBusy(true);
@@ -987,11 +989,14 @@ function ContractViewModal({ view, onClose, onChanged }: { view: ContractRow; on
         <div className="mb" style={{ maxHeight: "70vh", overflowY: "auto" }}>
           {isDraft ? (
             <>
-              <p className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>{t("Yfirfarðu drögin og lagaðu að vild — línur á forminu **Heiti:** gildi verða að snyrtilegum reitum í PDF. Staðfestu svo og sendu til undirritunar.")}</p>
-              <textarea className="lf-ta" rows={18} value={text} onChange={(e) => setText(e.target.value)} style={{ fontSize: 12.5, lineHeight: 1.55, fontFamily: "ui-monospace, monospace" }} />
+              <p className="muted" style={{ fontSize: 12.5, marginBottom: 10 }}>{t("Yfirfarðu drögin og fylltu út merkta reiti. Þegar allt er rétt: „Undirrita & senda starfsmanni“.")}</p>
+              {raw
+                ? <textarea className="lf-ta" rows={18} value={text} onChange={(e) => setText(e.target.value)} style={{ fontSize: 12.5, lineHeight: 1.55, fontFamily: "ui-monospace, monospace" }} />
+                : <ContractEditor content={text} onChange={setText} />}
+              <button type="button" className="btn ghost sm" style={{ marginTop: 8 }} onClick={() => setRaw((r) => !r)}>{raw ? t("Sýna sem form") : t("Ítarlegt: breyta sem texta")}</button>
             </>
           ) : (
-            <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13, lineHeight: 1.6 }}>{view.content}</pre>
+            <ContractView content={view.content} />
           )}
           <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
             {isDraft && <button className="btn" type="button" disabled={busy} onClick={confirmSend}>{t("Undirrita & senda starfsmanni")}</button>}

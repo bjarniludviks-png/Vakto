@@ -16,6 +16,7 @@ import { resolvePerms, type Perms } from "@/lib/permissions";
 import PushToggle from "@/components/app/push-toggle";
 import { AsyncButton } from "@/components/app/async-button";
 import { WalletButtons } from "@/components/app/wallet-buttons";
+import { ContractView } from "@/components/app/contract-view";
 
 type ReqKind = "leave" | "avail" | "swap" | "pickup";
 const IC = (d: string) => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">{d.split("|").map((p, i) => <path key={i} d={p} />)}</svg>;
@@ -219,7 +220,7 @@ function ContractSignCard() {
             <div className="mh"><div style={{ fontSize: 15, fontWeight: 700 }}>{contract.title}</div><button className="x" onClick={() => setOpen(false)}>✕</button></div>
             <div className="mb">
               <div style={{ maxHeight: sentTo == null ? "48vh" : "30vh", overflowY: "auto", border: "1px solid var(--line)", borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-                <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13, lineHeight: 1.6, margin: 0 }}>{contract.content.replace(/^#{1,6}\s*/gm, "").replace(/\*\*(.*?)\*\*/g, "$1").replace(/^_(.*)_$/gm, "$1")}</pre>
+                <ContractView content={contract.content} />
               </div>
               {sentTo == null ? (
                 <>

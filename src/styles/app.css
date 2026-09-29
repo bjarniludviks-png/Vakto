@@ -960,3 +960,7 @@ html.dark .etab2.on{color:#0f0f12}
 html.dark .plan-tabs button.on{color:#0f0f12}
 /* sími: síðan má aldrei verða breiðari en skjárinn — breiðar töflur skrolla innan .tbl */
 @media(max-width:700px){.main{overflow-x:hidden;max-width:100vw}.card{max-width:100%}}
+
+/* Ráðningarsamningur á skjá (components/app/contract-view.tsx) — 2 dálkar, 1 á síma */
+.cview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:560px){.cview-grid{grid-template-columns:1fr}}

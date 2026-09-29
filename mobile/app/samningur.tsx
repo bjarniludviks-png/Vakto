@@ -10,15 +10,8 @@ import { colors } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import { getMyContract, requestContractCode, signContract, type Contract } from "../src/lib/api/docs";
 import { tr } from "../src/lib/i18n";
+import { parseContract, splitLang } from "../src/lib/contract";
 
-/** Very light markdown → text: strip #, **, keep line structure. */
-function plain(md: string): string {
-  return md
-    .replace(/^#{1,6}\s*/gm, "")
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/\*(.*?)\*/g, "$1")
-    .replace(/^[-*]\s+/gm, "• ");
-}
 
 export default function Samningur() {
   useTheme();
@@ -80,9 +73,7 @@ export default function Samningur() {
             />
           </View>
           {contract.signedAt ? <Muted size={12}>Undirritað {contract.signedAt.slice(0, 10)}</Muted> : null}
-          <Txt size={13} style={{ lineHeight: 20 }}>
-            {plain(contract.content)}
-          </Txt>
+          <ContractBody content={contract.content} />
           {contract.status !== "signed" && sentTo == null ? (
             <View style={{ gap: 12, paddingTop: 4 }}>
               <Pressable onPress={() => setAgreed((a) => !a)} style={{ flexDirection: "row", gap: 10, alignItems: "flex-start" }} accessibilityRole="checkbox" accessibilityState={{ checked: agreed }}>
@@ -111,5 +102,48 @@ export default function Samningur() {
         </Card>
       ) : null}
     </Screen>
+  );
+}
+
+/** Samningurinn í sömu uppsetningu og PDF-ið: kaflar, tvítyngd heiti, gildi undir. */
+function ContractBody({ content }: { content: string }) {
+  const { sections } = parseContract(content);
+  return (
+    <View style={{ gap: 12 }}>
+      {sections.filter((s) => s.rows.length || s.paras.length).map((sec, i) => {
+        const [sIs, sEn] = splitLang(sec.title);
+        return (
+          <View key={i} style={{ borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: colors.line }}>
+            {sec.title ? (
+              <View style={{ backgroundColor: colors.brand, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Txt weight="bold" size={12.5} color="#fff">{sIs}</Txt>
+                {sEn ? <Txt size={11} color="#ffe2c8" style={{ fontStyle: "italic" }}>{sEn}</Txt> : null}
+              </View>
+            ) : null}
+            {sec.rows.map(([k, v], j) => {
+              const [lIs, lEn] = splitLang(k);
+              const blank = /^_{6,}$/.test(v.trim());
+              const [vIs, vEn] = splitLang(blank ? "" : v || "—");
+              return (
+                <View key={j} style={{ paddingHorizontal: 10, paddingVertical: 7, borderTopWidth: j || sec.title ? 1 : 0, borderColor: colors.line, backgroundColor: blank ? "#fdf4e7" : "transparent" }}>
+                  <Txt size={10.5} color={colors.ink2} weight="semibold">{lIs}{lEn ? <Txt size={10.5} color={colors.ink3} style={{ fontStyle: "italic" }}>{` · ${lEn}`}</Txt> : null}</Txt>
+                  <Txt size={13.5} style={{ marginTop: 2 }}>{blank ? "—" : vIs}</Txt>
+                  {vEn ? <Txt size={12} color={colors.ink3} style={{ fontStyle: "italic" }}>{vEn}</Txt> : null}
+                </View>
+              );
+            })}
+            {sec.paras.map((p, j) => {
+              const [pIs, pEn] = splitLang(p);
+              return (
+                <View key={`p${j}`} style={{ paddingHorizontal: 10, paddingVertical: 8, borderTopWidth: 1, borderColor: colors.line }}>
+                  <Txt size={12} style={{ lineHeight: 17 }}>{pIs}</Txt>
+                  {pEn ? <Txt size={11.5} color={colors.ink3} style={{ fontStyle: "italic", lineHeight: 16, marginTop: 3 }}>{pEn}</Txt> : null}
+                </View>
+              );
+            })}
+          </View>
+        );
+      })}
+    </View>
   );
 }
