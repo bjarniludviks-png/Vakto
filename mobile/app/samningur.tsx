@@ -10,7 +10,7 @@ import { colors } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import { getMyContract, requestContractCode, signContract, type Contract } from "../src/lib/api/docs";
 import { tr } from "../src/lib/i18n";
-import { parseContract, splitLang } from "../src/lib/contract";
+import { parseContract, splitLang, contractSummary, visibleRows, isBlank } from "../src/lib/contract";
 
 
 export default function Samningur() {
@@ -105,29 +105,53 @@ export default function Samningur() {
   );
 }
 
-/** Samningurinn í sömu uppsetningu og PDF-ið: kaflar, tvítyngd heiti, gildi undir. */
+/** Samningurinn í sama útliti („C“) og PDF-ið: hlýr haus með samantekt og lykiltölum, svo kaflar. */
 function ContractBody({ content }: { content: string }) {
-  const { sections } = parseContract(content);
+  const { title, sections } = parseContract(content);
+  const [tIs, tEn] = splitLang(title);
+  const summary = contractSummary(sections);
+  let n = 0;
   return (
-    <View style={{ gap: 12 }}>
+    <View style={{ gap: 4 }}>
+      <View style={{ backgroundColor: "#fbf6f0", borderRadius: 12, padding: 14, gap: 8 }}>
+        <View>
+          <Txt weight="bold" size={19}>{tIs}</Txt>
+          {tEn ? <Txt size={12} color="#8a7a68" style={{ fontStyle: "italic" }}>{tEn}</Txt> : null}
+        </View>
+        {summary.sentence ? (
+          <View>
+            <Txt size={13} color="#3d3a36" style={{ lineHeight: 19 }}>{summary.sentence[0]}</Txt>
+            <Txt size={11.5} color="#8a7a68" style={{ fontStyle: "italic", lineHeight: 16 }}>{summary.sentence[1]}</Txt>
+          </View>
+        ) : null}
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+          {summary.tiles.map((t) => (
+            <View key={t.label} style={{ backgroundColor: "#fff", borderRadius: 9, paddingHorizontal: 10, paddingVertical: 7, width: "48.5%" }}>
+              <Txt size={10} color="#8a7a68">{t.label}</Txt>
+              <Txt weight="bold" size={13.5}>{t.value}</Txt>
+            </View>
+          ))}
+        </View>
+      </View>
       {sections.filter((s) => s.rows.length || s.paras.length).map((sec, i) => {
         const [sIs, sEn] = splitLang(sec.title);
+        if (sec.title) n += 1;
         return (
-          <View key={i} style={{ borderRadius: 10, overflow: "hidden", borderWidth: 1, borderColor: colors.line }}>
-            {sec.title ? (
-              <View style={{ backgroundColor: colors.brand, paddingHorizontal: 10, paddingVertical: 6 }}>
-                <Txt weight="bold" size={12.5} color="#fff">{sIs}</Txt>
-                {sEn ? <Txt size={11} color="#ffe2c8" style={{ fontStyle: "italic" }}>{sEn}</Txt> : null}
-              </View>
-            ) : null}
-            {sec.rows.map(([k, v], j) => {
+          <View key={i} style={{ borderTopWidth: 1, borderColor: "#ece9e4", paddingTop: 12, paddingBottom: 8, gap: 9 }}>
+            <View>
+              <Txt weight="bold" size={14}>{sec.title ? `${n}. ` : ""}{sIs}</Txt>
+              {sEn ? <Txt size={11.5} color={colors.ink3} style={{ fontStyle: "italic" }}>{sEn}</Txt> : null}
+            </View>
+            {visibleRows(sec.rows).map(([k, v], j) => {
               const [lIs, lEn] = splitLang(k);
-              const blank = /^_{6,}$/.test(v.trim());
+              const blank = isBlank(v);
               const [vIs, vEn] = splitLang(blank ? "" : v || "—");
               return (
-                <View key={j} style={{ paddingHorizontal: 10, paddingVertical: 7, borderTopWidth: j || sec.title ? 1 : 0, borderColor: colors.line, backgroundColor: blank ? "#fdf4e7" : "transparent" }}>
-                  <Txt size={10.5} color={colors.ink2} weight="semibold">{lIs}{lEn ? <Txt size={10.5} color={colors.ink3} style={{ fontStyle: "italic" }}>{` · ${lEn}`}</Txt> : null}</Txt>
-                  <Txt size={13.5} style={{ marginTop: 2 }}>{blank ? "—" : vIs}</Txt>
+                <View key={j}>
+                  <Txt size={10.5} color={colors.ink3} weight="semibold">{lIs}{lEn ? ` · ${lEn}` : ""}</Txt>
+                  {blank
+                    ? <Txt size={13} color="#c4620a" weight="semibold">Vantar / Missing</Txt>
+                    : <Txt size={14}>{vIs}</Txt>}
                   {vEn ? <Txt size={12} color={colors.ink3} style={{ fontStyle: "italic" }}>{vEn}</Txt> : null}
                 </View>
               );
@@ -135,9 +159,9 @@ function ContractBody({ content }: { content: string }) {
             {sec.paras.map((p, j) => {
               const [pIs, pEn] = splitLang(p);
               return (
-                <View key={`p${j}`} style={{ paddingHorizontal: 10, paddingVertical: 8, borderTopWidth: 1, borderColor: colors.line }}>
-                  <Txt size={12} style={{ lineHeight: 17 }}>{pIs}</Txt>
-                  {pEn ? <Txt size={11.5} color={colors.ink3} style={{ fontStyle: "italic", lineHeight: 16, marginTop: 3 }}>{pEn}</Txt> : null}
+                <View key={`p${j}`}>
+                  <Txt size={12.5} style={{ lineHeight: 18 }}>{pIs}</Txt>
+                  {pEn ? <Txt size={11.5} color={colors.ink3} style={{ fontStyle: "italic", lineHeight: 16, marginTop: 2 }}>{pEn}</Txt> : null}
                 </View>
               );
             })}

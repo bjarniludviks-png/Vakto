@@ -963,4 +963,7 @@ html.dark .plan-tabs button.on{color:#0f0f12}
 
 /* Ráðningarsamningur á skjá (components/app/contract-view.tsx) — 2 dálkar, 1 á síma */
 .cview-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
-@media(max-width:560px){.cview-grid{grid-template-columns:1fr}}
+.cview-sec{display:grid;grid-template-columns:150px minmax(0,1fr);column-gap:18px;padding:14px 2px;border-top:1px solid #ece9e4}
+.cview-sec .cview-grid{row-gap:10px;column-gap:16px}
+.cview-tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:14px}
+@media(max-width:560px){.cview-grid{grid-template-columns:1fr}.cview-sec{grid-template-columns:1fr;row-gap:8px}.cview-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}

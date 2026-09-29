@@ -1,15 +1,21 @@
-// PDF for employment contracts — branded like the schedule/report PDFs (orange
-// section bars, VAKTO mark, bordered form layout à la the classic Icelandic
-// ráðningarsamningur forms). Parses the stored markdown-ish content (## sections,
-// **key:** value lines, free paragraphs). Runs in the browser (download) AND on
-// the server (signed copy emailed to both parties, lib/esign.server.ts).
-// jsPDF + autotable are imported lazily.
+// Ráðningarsamningur sem PDF — útlit „C, yfirlit fyrst“ (valið sept. 2026):
+// hlýr haus með samantekt á mannamáli og fjórum lykiltölum, síðan tölusettir kaflar
+// (titill vinstra megin, reitir hægra megin), íslenska fyrst og enska grá undir.
+// Letur: General Sans (VAKTO). Les geymdan texta (## kaflar, **heiti:** gildi,
+// málsgreinar). Keyrir í vafra (niðurhal) OG á þjóni (undirritað eintak, esign.server.ts).
+// jsPDF og letrið eru hlaðin inn með dynamic import.
 import type { jsPDF } from "jspdf";
 
-const ORANGE: [number, number, number] = [233, 112, 15];
-const INK: [number, number, number] = [17, 17, 17];
-const MUT: [number, number, number] = [110, 110, 110];
-const LINE: [number, number, number] = [225, 225, 228];
+type RGB = [number, number, number];
+const ORANGE: RGB = [233, 112, 15];
+const INK: RGB = [23, 23, 28];
+const INK2: RGB = [61, 58, 54];
+const MUT: RGB = [138, 138, 148];
+const WARM: RGB = [251, 246, 240];
+const WARM_MUT: RGB = [138, 122, 104];
+const RULE: RGB = [236, 233, 228];
+const MISSING_BG: RGB = [253, 241, 226];
+const MISSING_FG: RGB = [196, 98, 10];
 
 export type Section = { title: string; rows: [string, string][]; paras: string[] };
 
@@ -27,7 +33,7 @@ export function pairFields<T extends [string, string]>(fields: T[]): T[][] {
 export function isWideField(label: string, value: string): boolean {
   const [vi, ve] = splitLang(value);
   const [li, le] = splitLang(label);
-  return Math.max(vi.length, ve.length) > 40 || Math.max(li.length, le.length) > 44;
+  return Math.max(vi.length, ve.length) > 34 || Math.max(li.length, le.length) > 40;
 }
 
 /** "Íslenska / English" → ["Íslenska", "English"]. Only a spaced " / " separates the
@@ -35,6 +41,15 @@ export function isWideField(label: string, value: string): boolean {
 export function splitLang(s: string): [string, string] {
   const i = s.indexOf(" / ");
   return i < 0 ? [s, ""] : [s.slice(0, i).trim(), s.slice(i + 3).trim()];
+}
+
+export const isBlank = (v: string) => /^_{6,}$/.test(v.trim());
+
+/** Prentuð/lesin útgáfa: tómir valkvæðir reitir („—“) falla út svo samningurinn sé
+ *  hnitmiðaður; skyldureitir (líka auðir) standa alltaf. Kafli sem tæmist fær eina línu. */
+export function visibleRows(rows: [string, string][]): [string, string][] {
+  const keep = rows.filter(([, v]) => v.trim() !== "—" && v.trim() !== "");
+  return rows.length && !keep.length ? [["Skráning / Record", "Ekkert skráð / None recorded"]] : keep;
 }
 
 export function parseContract(content: string): { title: string; sections: Section[] } {
@@ -62,24 +77,44 @@ export function parseContract(content: string): { title: string; sections: Secti
   return { title, sections };
 }
 
-// Branded footer: VAKTO mark + wordmark + tagline, with a page counter.
-function drawFooter(doc: jsPDF, pageNum: number, pageCount: number) {
-  const W = doc.internal.pageSize.getWidth();
-  const H = doc.internal.pageSize.getHeight();
-  const by = H - 24;
-  doc.setDrawColor(...LINE); doc.setLineWidth(0.7);
-  doc.line(48, by - 13, W - 48, by - 13);
-  const bx = 48;
-  doc.setFillColor(...ORANGE);
-  [6, 9, 12].forEach((h, i) => doc.roundedRect(bx + i * 5, by - h, 3.2, h, 1, 1, "F"));
-  doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...INK);
-  const wmX = bx + 21;
-  doc.text("VAKTO", wmX, by - 1);
-  const wmW = doc.getTextWidth("VAKTO");
-  doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...MUT);
-  doc.text("Vaktaskipulag & launakostnaður · vakto.is", wmX + wmW + 9, by - 1);
-  if (pageCount > 1) doc.text(`${pageNum} / ${pageCount}`, W - 48, by - 1, { align: "right" });
-  doc.setTextColor(0);
+export type ContractSummary = {
+  sentence: [string, string] | null;             // IS, EN
+  tiles: { label: string; value: string }[];     // 4 lykiltölur (tómar = „—“)
+};
+
+/** Samantekt fyrir hausinn — lesin úr reitunum (sniðmát vmst-2021). Eldri samningar fá bara reiti sem finnast. */
+export function contractSummary(sections: Section[]): ContractSummary {
+  const find = (sec: string, label: string) => {
+    for (const s of sections) {
+      if (!splitLang(s.title)[0].startsWith(sec)) continue;
+      const r = s.rows.find(([k]) => splitLang(k)[0].startsWith(label));
+      if (r && !isBlank(r[1]) && r[1].trim() && r[1].trim() !== "—") return r[1].trim();
+    }
+    return "";
+  };
+  const is = (v: string) => splitLang(v)[0];
+  const employer = find("Vinnuveitandi", "Nafn");
+  const name = [find("Starfsmaður", "Skírnarnafn"), find("Starfsmaður", "Eftirnafn")].filter(Boolean).join(" ");
+  const start = find("Ráðningartími", "Fyrsti starfsdagur");
+  const role = is(find("Starfssvið", "Starfsheiti"));
+  const ratio = is(find("Vinnutími", "Starfshlutfall")).replace(/^(Fullt starf|Hlutastarf)\s*/, "");
+  const arr = is(find("Vinnutími", "Fyrirkomulag")).toLowerCase();
+  const pay = find("Laun", "Dagvinna");
+  const monthly = find("Laun", "Laun kr.");
+  const agreement = find("Kjarasamningur", "Kjarasamningur");
+  const sentence: [string, string] | null = employer && name
+    ? [`${employer} ræður ${name} til starfa${start ? ` frá ${start}` : ""} á þeim kjörum sem hér fara á eftir.`,
+       `${employer} employs ${name}${start ? ` from ${start}` : ""} on the terms set out below.`]
+    : null;
+  return {
+    sentence,
+    tiles: [
+      { label: "Starf · Role", value: role || "—" },
+      { label: "Starfshlutfall · Ratio", value: [ratio, arr].filter(Boolean).join(" · ") || "—" },
+      monthly ? { label: "Laun · Monthly", value: `${monthly}/mán.` } : { label: "Dagvinna · Hourly", value: pay ? `${pay}/klst.` : "—" },
+      { label: "Kjarasamningur · Agreement", value: agreement || "—" },
+    ],
+  };
 }
 
 /** One recorded signature (contract_signatures, migration 0058). */
@@ -106,210 +141,212 @@ export async function downloadContractPdf(title: string, content: string, signat
 
 export async function buildContractPdf(content: string, signatures: SignatureRecord[] = []): Promise<jsPDF> {
   const { jsPDF } = await import("jspdf");
-  const autoTable = (await import("jspdf-autotable")).default;
+  const fonts = await import("./fonts/general-sans");
   const doc = new jsPDF({ unit: "pt", format: "a4" });
+  doc.addFileToVFS("GS-Regular.ttf", fonts.regular); doc.addFont("GS-Regular.ttf", "GS", "normal");
+  doc.addFileToVFS("GS-Medium.ttf", fonts.medium); doc.addFont("GS-Medium.ttf", "GS", "medium");
+  doc.addFileToVFS("GS-Semibold.ttf", fonts.semibold); doc.addFont("GS-Semibold.ttf", "GS", "bold");
+  doc.addFileToVFS("GS-Italic.ttf", fonts.italic); doc.addFont("GS-Italic.ttf", "GS", "italic");
+
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
-  const M = 42;
+  const M = 44;
+  const CW = W - M * 2;
+  const BOTTOM = H - 58;
+  const font = (style: "normal" | "medium" | "bold" | "italic", size: number, color: RGB) => {
+    doc.setFont("GS", style); doc.setFontSize(size); doc.setTextColor(...color);
+  };
+  const wrap = (text: string, width: number) => doc.splitTextToSize(text, width) as string[];
+  const mark = (x: number, baseY: number, scale = 1) => {
+    doc.setFillColor(...ORANGE);
+    [6, 9, 12].forEach((h, i) => doc.roundedRect(x + i * 5 * scale, baseY - h * scale, 3.2 * scale, h * scale, 1, 1, "F"));
+  };
 
   const parsed = parseContract(content);
-  const [tIs, tEn] = parsed.title.split(" / ");
+  const [tIs, tEn] = splitLang(parsed.title);
+  const summary = contractSummary(parsed.sections);
+  const empName = summary.sentence ? (summary.sentence[0].split(" ræður ")[1] ?? "").split(" til starfa")[0] : "";
 
-  // ---- Header: logo mark + wordmark, bilingual document title, orange rule ----
-  const topY = 52;
-  doc.setFillColor(...ORANGE);
-  [9, 13.5, 18].forEach((h, i) => doc.roundedRect(M + i * 7.5, topY - h, 4.8, h, 1.4, 1.4, "F"));
-  doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(...INK);
-  doc.text("VAKTO", M + 31, topY - 2);
-  doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...MUT);
-  doc.text("vakto.is", W - M, topY - 2, { align: "right" });
-
-  doc.setFont("helvetica", "bold"); doc.setFontSize(19); doc.setTextColor(...INK);
-  doc.text(tIs ?? "Ráðningarsamningur", M, topY + 36);
-  if (tEn) {
-    doc.setFont("helvetica", "italic"); doc.setFontSize(10.5); doc.setTextColor(...MUT);
-    doc.text(tEn, M, topY + 51);
-  }
-  doc.setDrawColor(...ORANGE); doc.setLineWidth(2);
-  doc.line(M, topY + 60, W - M, topY + 60);
-
-  let y = topY + 72;
-
-  // ---- Sections as a compact bilingual form grid (like the VMST form) ----
-  // Each field is a bordered cell: small label (IS bold · EN italic grey) above the
-  // value. Short fields pair up two per row; long ones take the full width.
-  type Doc = jsPDF & { lastAutoTable?: { finalY: number } };
-  const headStyles = { fillColor: ORANGE, textColor: 255, fontStyle: "bold", fontSize: 10.5, cellPadding: { top: 7, bottom: 7, left: 9, right: 9 } } as const;
-  const CW = W - M * 2;
-  const PAD = 6;
-  const LBL = 7.3, VAL = 9.6, LBL_LH = 8.8, VAL_LH = 11.6;
-  const ensure = (h: number) => { if (y + h > H - 58) { doc.addPage(); y = 48; } };
-
-  type Lay = { lbl: [string[], string[]]; val: [string[], string[]]; blank: boolean; h: number };
-  const layout = (label: string, value: string, w: number): Lay => {
-    const inner = w - PAD * 2;
-    const [lIs, lEn] = splitLang(label);
-    doc.setFont("helvetica", "bold"); doc.setFontSize(LBL);
-    const lisLines = doc.splitTextToSize(lIs, inner) as string[];
-    doc.setFont("helvetica", "italic");
-    const lenLines = lEn ? doc.splitTextToSize(lEn, inner) as string[] : [];
-    const blank = /^_{6,}$/.test(value.trim());
-    const v = blank ? "" : (value || "—");
-    const [vIs, vEn] = splitLang(v);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(VAL);
-    const visLines = vIs ? doc.splitTextToSize(vIs, inner) as string[] : [];
-    doc.setFont("helvetica", "italic"); doc.setFontSize(VAL - 1);
-    const venLines = vEn ? doc.splitTextToSize(vEn, inner) as string[] : [];
-    const h = PAD + (lisLines.length + lenLines.length) * LBL_LH + 3 + Math.max(1, visLines.length + venLines.length) * VAL_LH + PAD - 2;
-    return { lbl: [lisLines, lenLines], val: [visLines, venLines], blank, h };
-  };
-  const drawCell = (x: number, w: number, h: number, l: Lay) => {
-    if (l.blank) { doc.setFillColor(253, 244, 231); doc.rect(x, y, w, h, "F"); }
-    doc.setDrawColor(...LINE); doc.setLineWidth(0.7); doc.rect(x, y, w, h);
-    let ty = y + PAD + LBL_LH - 2;
-    doc.setFont("helvetica", "bold"); doc.setFontSize(LBL); doc.setTextColor(70, 70, 76);
-    for (const ln of l.lbl[0]) { doc.text(ln, x + PAD, ty); ty += LBL_LH; }
-    doc.setFont("helvetica", "italic"); doc.setTextColor(...MUT);
-    for (const ln of l.lbl[1]) { doc.text(ln, x + PAD, ty); ty += LBL_LH; }
-    ty += 3 + VAL_LH - LBL_LH;
-    doc.setFont("helvetica", "normal"); doc.setFontSize(VAL); doc.setTextColor(...INK);
-    for (const ln of l.val[0]) { doc.text(ln, x + PAD, ty); ty += VAL_LH; }
-    doc.setFont("helvetica", "italic"); doc.setFontSize(VAL - 1); doc.setTextColor(...MUT);
-    for (const ln of l.val[1]) { doc.text(ln, x + PAD, ty); ty += VAL_LH; }
-  };
-  const sectionBar = (title: string, nextH: number) => {
-    ensure(17 + nextH);
-    const [tIs2, tEn2] = splitLang(title);
-    doc.setFillColor(...ORANGE); doc.rect(M, y, CW, 17, "F");
-    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(255);
-    doc.text(tIs2, M + PAD, y + 11.8);
-    if (tEn2) {
-      const wIs = doc.getTextWidth(tIs2);
-      doc.setFont("helvetica", "italic"); doc.setFontSize(8.5); doc.setTextColor(255, 226, 200);
-      doc.text(`/ ${tEn2}`, M + PAD + wIs + 5, y + 11.8);
+  // ---- Hlýr haus: merki, titill, samantekt, fjórar lykiltölur ----
+  let y = 0;
+  {
+    const inner = CW;
+    font("normal", 10, INK2);
+    const sIs = summary.sentence ? wrap(summary.sentence[0], inner * 0.78) : [];
+    font("italic", 9, WARM_MUT);
+    const sEn = summary.sentence ? wrap(summary.sentence[1], inner * 0.78) : [];
+    const headH = 34 + 20 + 30 + 14 + (sIs.length ? sIs.length * 13.5 + sEn.length * 12 + 14 : 0) + 44 + 24;
+    doc.setFillColor(...WARM); doc.rect(0, 0, W, headH, "F");
+    y = 34;
+    mark(M, y + 2);
+    font("bold", 10.5, INK); doc.text("VAKTO", M + 20, y + 1.5);
+    font("normal", 8, WARM_MUT); doc.text("vakto.is", W - M, y + 1.5, { align: "right" });
+    y += 38;
+    font("bold", 23, INK); doc.text(tIs || "Ráðningarsamningur", M, y);
+    y += 15;
+    if (tEn) { font("italic", 10, WARM_MUT); doc.text(tEn, M, y); }
+    y += 20;
+    if (sIs.length) {
+      font("normal", 10, INK2); sIs.forEach((l) => { doc.text(l, M, y); y += 13.5; });
+      font("italic", 9, WARM_MUT); sEn.forEach((l) => { doc.text(l, M, y); y += 12; });
+      y += 12;
     }
-    y += 17;
+    const gap = 8, tw = (CW - gap * 3) / 4;
+    summary.tiles.forEach((t, i) => {
+      const x = M + i * (tw + gap);
+      doc.setFillColor(255, 255, 255); doc.roundedRect(x, y, tw, 40, 6, 6, "F");
+      font("normal", 7, WARM_MUT); doc.text(t.label, x + 9, y + 13);
+      font("bold", 10.5, INK); doc.text(wrap(t.value, tw - 18)[0] ?? "—", x + 9, y + 29);
+    });
+    y = headH + 22;
+  }
+
+  const ensure = (h: number) => { if (y + h > BOTTOM) { doc.addPage(); y = 50; } };
+
+  // ---- Kaflar: titill vinstra megin, reitir/málsgreinar hægra megin ----
+  const LEFT = 128;               // breidd titildálks
+  const RX = M + LEFT + 14;       // x hægri dálks
+  const RW = W - M - RX;          // breidd hægri dálks
+  const COLG = 16;
+
+  type FieldLay = { lIs: string[]; lEn: string; vIs: string[]; vEn: string[]; blank: boolean; h: number };
+  const layField = (label: string, value: string, w: number): FieldLay => {
+    const [li, le] = splitLang(label);
+    const blank = isBlank(value);
+    const [vi, ve] = splitLang(blank ? "" : (value || "—"));
+    font("medium", 7.3, MUT);
+    const lIs = wrap(le ? `${li} · ${le}` : li, w);
+    font("normal", 9.6, INK);
+    const vIs = blank ? ["Vantar / Missing"] : wrap(vi, w);
+    font("italic", 8.3, MUT);
+    const vEn = ve ? wrap(ve, w) : [];
+    const h = lIs.length * 9 + 3 + vIs.length * 12 + vEn.length * 10.5 + 7;
+    return { lIs, lEn: "", vIs, vEn, blank, h };
+  };
+  const drawField = (x: number, top: number, w: number, l: FieldLay) => {
+    let ty = top + 7;
+    font("medium", 7.3, MUT);
+    l.lIs.forEach((ln) => { doc.text(ln, x, ty); ty += 9; });
+    ty += 3 + 2.5;
+    if (l.blank) {
+      doc.setFillColor(...MISSING_BG); doc.roundedRect(x - 3, ty - 9.5, Math.min(w, 96), 13, 3, 3, "F");
+      font("medium", 8.8, MISSING_FG); doc.text(l.vIs[0], x, ty);
+      return;
+    }
+    font("normal", 9.6, INK); l.vIs.forEach((ln) => { doc.text(ln, x, ty); ty += 12; });
+    font("italic", 8.3, MUT); l.vEn.forEach((ln) => { doc.text(ln, x, ty - 1.5); ty += 10.5; });
   };
 
-  for (const sec of parsed.sections) {
-    if (!sec.rows.length && !sec.paras.length) continue;
-    // Pack fields into rows: two per row when both are short.
-    const rows = pairFields(sec.rows);
-    const lays = rows.map((r) => r.length === 2
-      ? r.map(([k, v]) => layout(k, v, CW / 2))
-      : [layout(r[0][0], r[0][1], CW)]);
-    const paraLays = sec.paras.map((p) => {
-      const [pIs, pEn] = splitLang(p);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(8.4);
-      const a = doc.splitTextToSize(pIs, CW - PAD * 2) as string[];
-      doc.setFont("helvetica", "italic");
-      const b = pEn ? doc.splitTextToSize(pEn, CW - PAD * 2) as string[] : [];
-      return { a, b, h: PAD * 2 + (a.length + b.length) * 10.4 + (b.length ? 3 : 0) };
+  const drawSection = (num: number | null, title: string, rows: [string, string][], paras: string[]) => {
+    const [sIs, sEn] = splitLang(title);
+    const groups = pairFields(rows).map((g) => g.length === 2
+      ? { cells: g.map(([k, v]) => layField(k, v, (RW - COLG) / 2)), two: true }
+      : { cells: [layField(g[0][0], g[0][1], RW)], two: false });
+    const paraLays = paras.map((p) => {
+      const [pi, pe] = splitLang(p);
+      font("normal", 8.8, INK2); const a = wrap(pi, RW);
+      font("italic", 8.2, MUT); const b = pe ? wrap(pe, RW) : [];
+      return { a, b, h: a.length * 11.6 + b.length * 10.6 + (b.length ? 3 : 0) + 8 };
     });
-    const firstH = lays[0] ? Math.max(...lays[0].map((l) => l.h)) : (paraLays[0]?.h ?? 0);
-    if (sec.title) sectionBar(sec.title, firstH);
-    lays.forEach((cells) => {
-      const h = Math.max(...cells.map((l) => l.h));
+    font("bold", 10, INK); const tLines = wrap(`${num != null ? `${num}. ` : ""}${sIs}`, LEFT);
+    font("italic", 8.3, MUT); const eLines = sEn ? wrap(sEn, LEFT) : [];
+    const titleH = tLines.length * 12.5 + eLines.length * 10.5;
+    const firstH = Math.max(titleH, groups[0] ? Math.max(...groups[0].cells.map((c) => c.h)) : (paraLays[0]?.h ?? 0));
+    ensure(firstH + 6);
+    // hárlína á milli kafla
+    doc.setDrawColor(...RULE); doc.setLineWidth(0.8); doc.line(M, y - 9, W - M, y - 9);
+    let ty = y + 8;
+    font("bold", 10, INK); tLines.forEach((l) => { doc.text(l, M, ty); ty += 12.5; });
+    font("italic", 8.3, MUT); eLines.forEach((l) => { doc.text(l, M, ty - 1.5); ty += 10.5; });
+    const titleBottom = ty;
+    const titlePage = doc.getNumberOfPages();
+    for (const g of groups) {
+      const h = Math.max(...g.cells.map((c) => c.h));
       ensure(h);
-      if (cells.length === 2) { drawCell(M, CW / 2, h, cells[0]); drawCell(M + CW / 2, CW / 2, h, cells[1]); }
-      else drawCell(M, CW, h, cells[0]);
+      if (g.two) { drawField(RX, y, (RW - COLG) / 2, g.cells[0]); drawField(RX + (RW - COLG) / 2 + COLG, y, (RW - COLG) / 2, g.cells[1]); }
+      else drawField(RX, y, RW, g.cells[0]);
       y += h;
-    });
+    }
     for (const pl of paraLays) {
       ensure(pl.h);
-      doc.setDrawColor(...LINE); doc.setLineWidth(0.7); doc.rect(M, y, CW, pl.h);
-      let ty = y + PAD + 7.5;
-      doc.setFont("helvetica", "normal"); doc.setFontSize(8.4); doc.setTextColor(...INK);
-      for (const ln of pl.a) { doc.text(ln, M + PAD, ty); ty += 10.4; }
-      if (pl.b.length) ty += 3;
-      doc.setFont("helvetica", "italic"); doc.setTextColor(...MUT);
-      for (const ln of pl.b) { doc.text(ln, M + PAD, ty); ty += 10.4; }
+      let py = y + 8;
+      font("normal", 8.8, INK2); pl.a.forEach((l) => { doc.text(l, RX, py); py += 11.6; });
+      if (pl.b.length) py += 3;
+      font("italic", 8.2, MUT); pl.b.forEach((l) => { doc.text(l, RX, py - 1.5); py += 10.6; });
       y += pl.h;
     }
-    y += 10;
-  }
-
-  // ---- Signature block (like the official forms, two columns) ----
-  const need = 150;
-  if (y + need > H - 60) { doc.addPage(); y = M; }
-  y += 10;
-  doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...INK);
-  doc.text("Undirritun / Signatures", M, y);
-  doc.setDrawColor(...ORANGE); doc.setLineWidth(1.2);
-  doc.line(M, y + 5, M + 150, y + 5);
-  y += 34;
-
-  const colW = (W - M * 2 - 40) / 2;
-  const sigLine = (x: number, yy: number, w: number, labelIs: string, labelEn: string) => {
-    doc.setDrawColor(120); doc.setLineWidth(0.8);
-    doc.line(x, yy, x + w, yy);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...MUT);
-    doc.text(`${labelIs} / ${labelEn}`, x, yy + 12);
+    // Titilbotninn gildir aðeins ef kaflinn endaði á sömu síðu og hann byrjaði.
+    y = (doc.getNumberOfPages() === titlePage ? Math.max(y, titleBottom) : y) + 14;
   };
-  // Row 1: place + date
-  sigLine(M, y + 18, colW, "Staður", "Place");
-  sigLine(M + colW + 40, y + 18, colW, "Dagsetning", "Date");
-  // Row 2: signatures
-  sigLine(M, y + 70, colW, "Undirskrift vinnuveitanda", "Employer's signature");
-  sigLine(M + colW + 40, y + 70, colW, "Undirskrift starfsmanns", "Employee's signature");
-  // Electronic signatures are written onto the lines; details on the record page.
-  const emp = signatures.find((s) => s.role === "employer");
-  const ee = signatures.find((s) => s.role === "employee");
-  doc.setFont("helvetica", "italic"); doc.setFontSize(10); doc.setTextColor(...INK);
-  if (emp) doc.text(`Rafrænt: ${emp.name}`, M, y + 64);
-  if (ee) doc.text(`Rafrænt: ${ee.name}`, M + colW + 40, y + 64);
-  const last = ee ?? emp;
-  if (last) {
-    doc.setFont("helvetica", "normal");
-    doc.text("Rafræn undirritun í VAKTO", M, y + 12);
-    doc.text(fmtUtc(last.signedAt).replace(" (UTC)", " UTC"), M + colW + 40, y + 12);
+
+  let n = 0;
+  for (const sec of parsed.sections) {
+    if (!sec.rows.length && !sec.paras.length) continue;
+    n += 1;
+    drawSection(sec.title ? n : null, sec.title, visibleRows(sec.rows), sec.paras);
   }
 
-  // ---- Signature record (audit trail) ----
+  // ---- Undirritun (kafli í sama stíl) ----
+  {
+    const emp = signatures.find((s) => s.role === "employer");
+    const ee = signatures.find((s) => s.role === "employee");
+    ensure(92);
+    doc.setDrawColor(...RULE); doc.setLineWidth(0.8); doc.line(M, y - 9, W - M, y - 9);
+    font("bold", 10, INK); doc.text(`${n + 1}. Undirritun`, M, y + 8);
+    font("italic", 8.3, MUT); doc.text("Signatures", M, y + 19);
+    const colW = (RW - COLG) / 2;
+    const sig = (x: number, s: SignatureRecord | undefined, labelIs: string, labelEn: string) => {
+      if (s) {
+        font("italic", 10.5, INK); doc.text(wrap(`Rafrænt: ${s.name}`, colW)[0], x, y + 30);
+        font("normal", 7.6, MUT); doc.text(fmtUtc(s.signedAt), x, y + 41);
+      }
+      doc.setDrawColor(...INK); doc.setLineWidth(0.8); doc.line(x, y + 48, x + colW, y + 48);
+      font("medium", 7.4, MUT); doc.text(`${labelIs} · ${labelEn}`, x, y + 59);
+    };
+    sig(RX, emp, "Undirskrift atvinnurekanda", "Employer");
+    sig(RX + colW + COLG, ee, "Undirskrift starfsmanns", "Employee");
+    y += 80;
+  }
+
+  // ---- Undirritunarskrá (audit trail) ----
   if (signatures.length) {
-    doc.addPage();
-    let ay = 60;
-    doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.setTextColor(...INK);
-    doc.text("Undirritunarskrá / Signature record", M, ay);
-    doc.setDrawColor(...ORANGE); doc.setLineWidth(1.6); doc.line(M, ay + 8, W - M, ay + 8);
-    ay += 26;
-    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...MUT);
-    const intro = doc.splitTextToSize(
-      "Samningurinn var undirritaður rafrænt í VAKTO. Fingrafar (SHA-256) er reiknað af samningstextanum eins og hann var sendur; " +
-      "ef einn stafur breytist verður fingrafarið annað. / The contract was signed electronically in VAKTO. The SHA-256 fingerprint is " +
-      "computed from the contract text as sent; changing a single character changes it.", W - M * 2);
-    doc.text(intro, M, ay); ay += intro.length * 11 + 8;
-    autoTable(doc, {
-      startY: ay, margin: { left: M, right: M, bottom: 60 }, theme: "grid",
-      styles: { fontSize: 8.5, cellPadding: 6, lineColor: LINE, lineWidth: 0.7, textColor: INK, overflow: "linebreak" },
-      columnStyles: { 0: { fontStyle: "bold", cellWidth: 150, fillColor: [250, 248, 246] } },
-      body: [["Fingrafar skjals / Document SHA-256", signatures[signatures.length - 1].sha256]],
-    });
-    ay = ((doc as Doc).lastAutoTable?.finalY ?? ay) + 14;
+    y += 26;
+    ensure(230);
+    doc.setDrawColor(...ORANGE); doc.setLineWidth(1.4); doc.line(M, y - 20, W - M, y - 20);
+    font("bold", 17, INK); doc.text("Undirritunarskrá", M, y);
+    font("italic", 10, MUT); doc.text("Signature record", M, y + 15);
+    y += 34;
+    font("normal", 8.8, INK2);
+    const intro = wrap("Samningurinn var undirritaður rafrænt í VAKTO. Fingrafar (SHA-256) er reiknað af samningstextanum eins og hann var sendur; ef einn stafur breytist verður fingrafarið annað.", CW);
+    intro.forEach((l) => { doc.text(l, M, y); y += 11.6; });
+    font("italic", 8.2, MUT);
+    wrap("The contract was signed electronically in VAKTO. The SHA-256 fingerprint is computed from the contract text as sent; changing a single character changes it.", CW)
+      .forEach((l) => { doc.text(l, M, y); y += 10.6; });
+    y += 22;
+    drawSection(null, "Fingrafar skjals / Document fingerprint", [["SHA-256", signatures[signatures.length - 1].sha256]], []);
     for (const s of signatures) {
-      autoTable(doc, {
-        startY: ay, margin: { left: M, right: M, bottom: 60 }, theme: "grid",
-        head: [[{ content: s.role === "employer" ? "Vinnuveitandi / Employer" : "Starfsmaður / Employee", colSpan: 2 }]],
-        styles: { fontSize: 8.5, cellPadding: 6, lineColor: LINE, lineWidth: 0.7, textColor: INK, overflow: "linebreak" },
-        headStyles: { ...headStyles, fontSize: 9.5 },
-        columnStyles: { 0: { fontStyle: "bold", cellWidth: 150, fillColor: [250, 248, 246] } },
-        body: [
-          ["Nafn / Name", s.name],
-          ["Netfang / Email", s.email ?? "—"],
-          ["Aðferð / Method", METHOD[s.method] ?? s.method],
-          ["Tími / Time", fmtUtc(s.signedAt)],
-          ["IP-tala / IP address", s.ip ?? "—"],
-          ["Tæki / Device", s.userAgent ?? "—"],
-          ["Fingrafar / SHA-256", s.sha256],
-        ],
-      });
-      ay = ((doc as Doc).lastAutoTable?.finalY ?? ay) + 14;
+      drawSection(null, s.role === "employer" ? "Vinnuveitandi / Employer" : "Starfsmaður / Employee", [
+        ["Nafn / Name", s.name],
+        ["Netfang / Email", s.email ?? "—"],
+        ["Aðferð / Method", METHOD[s.method] ?? s.method],
+        ["Tími / Time", fmtUtc(s.signedAt)],
+        ["IP-tala / IP address", s.ip ?? "—"],
+        ["Tæki / Device", s.userAgent ?? "—"],
+      ], []);
     }
   }
 
-  // ---- Footer on every page ----
+  // ---- Fótur á hverri síðu ----
   const pages = doc.getNumberOfPages();
-  for (let i = 1; i <= pages; i++) { doc.setPage(i); drawFooter(doc, i, pages); }
-
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    const by = H - 26;
+    doc.setDrawColor(...RULE); doc.setLineWidth(0.7); doc.line(M, by - 12, W - M, by - 12);
+    mark(M, by + 0.5, 0.8);
+    font("bold", 8.5, INK); doc.text("VAKTO", M + 16, by);
+    font("normal", 7.8, MUT);
+    doc.text(`${tIs || "Ráðningarsamningur"}${empName ? ` · ${empName}` : ""}`, M + 52, by);
+    doc.text(`vakto.is · ${i} / ${pages}`, W - M, by, { align: "right" });
+  }
   return doc;
 }
