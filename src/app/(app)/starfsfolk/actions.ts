@@ -9,6 +9,9 @@ import { getTimeBank } from "../skyrslur/timebank.server";
 import { sendContractEmail } from "@/lib/email";
 import { inviteToCompany } from "@/lib/invite.server";
 import type { CustomRules } from "@/lib/payrules";
+import { headers } from "next/headers";
+import { employerSign, metaFrom } from "@/lib/esign.server";
+import type { SignatureRecord } from "@/lib/contract-pdf";
 
 export type NewEmployeeInput = {
   fullName: string;
@@ -812,6 +815,18 @@ export async function setContractStatus(id: string, status: "draft" | "sent" | "
     const { data: row, error } = await supabase.from("contracts").update(patch).eq("id", id)
       .select("employee_id, employees(full_name, email), companies(name)").maybeSingle();
     if (error) return { ok: false, error: error.message };
+    // "Sent" → vinnuveitandi undirritar (lota + IP/tæki + fingrafar skjals, 0058).
+    if (status === "sent" && row) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: me } = await supabase.from("employees").select("full_name").eq("user_id", user.id).maybeSingle();
+          const { data: u } = await supabase.from("users").select("full_name").eq("id", user.id).maybeSingle();
+          const name = (u?.full_name as string) || (me?.full_name as string) || user.email || "Vinnuveitandi";
+          await employerSign(id, { userId: user.id, name, email: user.email ?? null }, metaFrom(await headers()));
+        }
+      } catch (e) { console.error("employerSign", e); }
+    }
     // "Sent" → tell the employee a contract awaits their signature (best-effort).
     if (status === "sent" && row) {
       const emp = (Array.isArray(row.employees) ? row.employees[0] : row.employees) as { full_name?: string; email?: string } | null;
@@ -874,5 +889,24 @@ export async function getEmployeeTimebank(employeeId: string): Promise<EmployeeT
     return { live: true, balance: row.balance, months: row.months };
   } catch {
     return null;
+  }
+}
+
+/** Undirritunarskrá samnings (0058) — fyrir PDF með undirritunarskrá. RLS: stjórnandi/eigandi samnings. */
+export async function getContractSignatures(id: string): Promise<SignatureRecord[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("contract_signatures")
+      .select("signer_role, signer_name, signer_email, method, signed_at, ip, user_agent, doc_sha256")
+      .eq("contract_id", id).order("signed_at");
+    if (error) return [];
+    return (data ?? []).map((s) => ({
+      role: s.signer_role as "employer" | "employee", name: s.signer_name as string, email: (s.signer_email as string | null) ?? null,
+      method: s.method as string, signedAt: s.signed_at as string, ip: (s.ip as string | null) ?? null,
+      userAgent: (s.user_agent as string | null) ?? null, sha256: s.doc_sha256 as string,
+    }));
+  } catch {
+    return [];
   }
 }

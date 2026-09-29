@@ -62,3 +62,26 @@ export async function getMyContract(me: Me): Promise<Contract | null> {
     ? { id: c.id, title: c.title, content: c.content, status: c.status, signedAt: c.signed_at }
     : null;
 }
+
+// Rafræn undirritun (0058) fer um vefþjóninn: kóði á netfang → staðfesting →
+// undirritunarskrá + PDF til beggja aðila. Sama flæði og á vefnum.
+const API = (process.env.EXPO_PUBLIC_API_URL ?? "https://www.vakto.is").replace(/\/$/, "");
+
+async function contractCall(body: Record<string, string>): Promise<{ ok: boolean; sentTo?: string; error?: string }> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return { ok: false, error: "Ekki innskráð(ur)" };
+    const r = await fetch(`${API}/api/app/contract`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    });
+    return (await r.json()) as { ok: boolean; sentTo?: string; error?: string };
+  } catch {
+    return { ok: false, error: "Engin tenging — reyndu aftur" };
+  }
+}
+
+export const requestContractCode = (id: string) => contractCall({ action: "code", id });
+export const signContract = (id: string, code: string) => contractCall({ action: "sign", id, code });

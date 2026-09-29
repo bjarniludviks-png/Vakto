@@ -9,8 +9,8 @@ import { toast } from "@/components/app/toast";
 import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
-import { downloadContractPdf } from "./contract-pdf";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getDepartmentColors, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, type ContractRow } from "./actions";
+import { downloadContractPdf } from "@/lib/contract-pdf";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getDepartmentColors, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, type ContractRow } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField } from "@/components/app/fields";
@@ -889,8 +889,8 @@ const CONTRACT_STATUS: Record<string, { label: string; tag: string }> = {
   void: { label: "ógilt", tag: "mut" },
 };
 
-/** Employment contracts: generate from employee data, view, track status.
- * E-signature comes later — sent/signed are tracked manually until then. */
+/** Employment contracts: generate from employee data, send for e-signature
+ * (0058: employer signs on send, employee confirms with an emailed code). */
 function ContractTab({ employeeId }: { employeeId: string }) {
   const { t } = useLang();
   const [contracts, setContracts] = useState<ContractRow[]>([]);
@@ -909,8 +909,9 @@ function ContractTab({ employeeId }: { employeeId: string }) {
     load();
   }
   async function mark(c: ContractRow, status: "sent" | "signed" | "void") {
+    if (status === "sent" && !window.confirm(t("Undirrita samninginn fyrir hönd fyrirtækisins og senda hann starfsmanninum? Eftir það er ekki hægt að breyta textanum."))) return;
     const res = await setContractStatus(c.id, status);
-    toast(res.ok ? t("Staða uppfærð") : (res.error ?? "Villa"));
+    toast(res.ok ? (status === "sent" ? t("Undirritað og sent — starfsmaðurinn fær tölvupóst") : t("Staða uppfærð")) : (res.error ?? "Villa"));
     load();
   }
   async function remove(c: ContractRow) {
@@ -935,9 +936,9 @@ function ContractTab({ employeeId }: { employeeId: string }) {
             <span style={{ cursor: "pointer" }} onClick={() => setView(c)}>{c.title}</span>
             <span className={`tag ${CONTRACT_STATUS[c.status]?.tag ?? "mut"}`}>{t(CONTRACT_STATUS[c.status]?.label ?? c.status)}</span>
             <span className="dl">{c.signed_at ?? c.created}</span>
-            <button className="btn ghost sm" type="button" onClick={() => downloadContractPdf(c.title, c.content)}>PDF</button>
-            {c.status === "draft" && <button className="btn ghost sm" type="button" onClick={() => mark(c, "sent")}>{t("Merkja sent")}</button>}
-            {c.status !== "signed" && c.status !== "void" && <button className="btn ghost sm" type="button" onClick={() => mark(c, "signed")}>{t("Merkja undirritað")}</button>}
+            <button className="btn ghost sm" type="button" onClick={async () => downloadContractPdf(c.title, c.content, c.status === "draft" ? [] : await getContractSignatures(c.id))}>PDF</button>
+            {c.status === "draft" && <button className="btn sm" type="button" onClick={() => mark(c, "sent")}>{t("Undirrita & senda")}</button>}
+            {c.status !== "signed" && c.status !== "void" && <button className="btn ghost sm" type="button" title={t("Ef samningurinn var undirritaður á pappír")} onClick={() => mark(c, "signed")}>{t("Merkja undirritað")}</button>}
             {c.status !== "signed" && <button className="x" type="button" title={t("Eyða samningi")} onClick={() => remove(c)} style={{ color: "var(--bad)" }}>✕</button>}
           </div>
         ))}
@@ -945,7 +946,7 @@ function ContractTab({ employeeId }: { employeeId: string }) {
       <button className="btn sm" type="button" disabled={busy} onClick={create} style={{ marginTop: 12 }}>
         {busy ? t("Bý til…") : t("+ Búa til samning úr gögnum")}
       </button>
-      <p className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>{t("Samningurinn byggir á starfsmanninum, fyrirtækinu og völdu reglusniðmáti. Rafræn undirritun er væntanleg — þangað til er staðan merkt handvirkt.")}</p>
+      <p className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>{t("„Undirrita & senda“ skráir undirskrift þína og sendir starfsmanninum samninginn. Hann staðfestir með kóða í tölvupósti og báðir fá undirritað PDF með undirritunarskrá (tími, IP, tæki, fingrafar skjals).")}</p>
       {view && <ContractViewModal view={view} onClose={() => setView(null)} onChanged={load} />}
     </>
   );
@@ -972,7 +973,7 @@ function ContractViewModal({ view, onClose, onChanged }: { view: ContractRow; on
     setBusy(true);
     const res = await setContractStatus(view.id, "sent");
     setBusy(false);
-    toast(res.ok ? t("Sent til undirritunar") : (res.error ?? "Villa"));
+    toast(res.ok ? t("Undirritað og sent — starfsmaðurinn fær tölvupóst") : (res.error ?? "Villa"));
     onChanged();
     onClose();
   }
@@ -991,9 +992,9 @@ function ContractViewModal({ view, onClose, onChanged }: { view: ContractRow; on
             <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13, lineHeight: 1.6 }}>{view.content}</pre>
           )}
           <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
-            {isDraft && <button className="btn" type="button" disabled={busy} onClick={confirmSend}>{t("Staðfesta & senda til undirritunar")}</button>}
+            {isDraft && <button className="btn" type="button" disabled={busy} onClick={confirmSend}>{t("Undirrita & senda starfsmanni")}</button>}
             {isDraft && <button className="btn ghost" type="button" disabled={busy} onClick={saveDraft}>{t("Vista drög")}</button>}
-            <button className="btn ghost sm" type="button" style={{ alignSelf: "center" }} onClick={() => downloadContractPdf(view.title, isDraft ? text : view.content)}>{t("Sækja PDF")}</button>
+            <button className="btn ghost sm" type="button" style={{ alignSelf: "center" }} onClick={async () => downloadContractPdf(view.title, isDraft ? text : view.content, isDraft ? [] : await getContractSignatures(view.id))}>{t("Sækja PDF")}</button>
           </div>
         </div>
       </div>

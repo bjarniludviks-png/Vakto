@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
-import { sendContractSignedEmail } from "@/lib/email";
 import { notifyManagers } from "@/lib/push";
 import { after } from "next/server";
 import { checkNoShows } from "@/lib/noshow.server";
+import { headers } from "next/headers";
+import { requestSignCode, signWithCode, metaFrom } from "@/lib/esign.server";
 
 export type PunchResult = { ok: boolean; demo?: boolean; error?: string };
 export type ActionResult = { ok: boolean; demo?: boolean; error?: string };
@@ -350,13 +351,19 @@ export async function toggleShiftTask(id: string, done: boolean): Promise<{ ok: 
 
 export type MyContract = { id: string; title: string; content: string; status: string };
 
-/** My newest contract (RLS shows only my own). */
+/** My newest contract. */
 export async function getMyContract(): Promise<{ ok: boolean; contract?: MyContract }> {
   if (!isSupabaseConfigured()) return { ok: false };
   try {
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false };
+    // Stjórnendur sjá alla samninga fyrirtækisins gegnum RLS — síum á eigin starfsmann.
+    const { data: me } = await supabase.from("employees").select("id").eq("user_id", user.id).maybeSingle();
+    if (!me) return { ok: true };
     const { data } = await supabase
       .from("contracts").select("id, title, content, status")
+      .eq("employee_id", me.id)
       .in("status", ["sent", "signed"])
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (!data) return { ok: true };
@@ -366,40 +373,32 @@ export async function getMyContract(): Promise<{ ok: boolean; contract?: MyContr
   }
 }
 
-/** Approve my contract: sent → signed with name + timestamp stamped into the
- * document itself, so every later view/PDF carries the approval line. */
-export async function signMyContract(id: string): Promise<{ ok: boolean; error?: string }> {
-  if (!isSupabaseConfigured()) return { ok: true };
+/** Rafræn undirritun (0058), skref 1: 6 stafa kóði á netfang starfsmannsins. */
+export async function requestContractCode(id: string): Promise<{ ok: boolean; sentTo?: string; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
-    const { data: emp } = await supabase
-      .from("employees").select("full_name").eq("user_id", user.id).maybeSingle();
-    const name = (emp?.full_name as string) ?? user.email ?? "Starfsmaður";
-    const { data: c } = await supabase.from("contracts").select("content, status").eq("id", id).maybeSingle();
-    if (!c) return { ok: false, error: "Samningur fannst ekki" };
-    if (c.status !== "sent") return { ok: false, error: "Samningurinn er ekki í undirritunarferli" };
-    const now = new Date();
-    const stamp = `${now.getDate()}.${now.getMonth() + 1}.${now.getFullYear()} kl. ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-    const content = `${c.content}\n\n---\n\n_Samþykkt rafrænt í VAKTO af **${name}**, ${stamp} (innskráður notandi ${user.email ?? user.id})._`;
-    const { error } = await supabase.from("contracts").update({
-      status: "signed", signed_at: now.toISOString(), signed_by_name: name, signed_via: "inapp", content,
-    }).eq("id", id);
-    if (error) return { ok: false, error: error.message };
-    // Tell the owner(s) — best-effort, via admin client (employee sessions
-    // can't read the users table).
-    try {
-      const { createAdminClient } = await import("@/lib/supabase/admin");
-      const admin = createAdminClient();
-      const { data: empRow } = await admin.from("employees").select("company_id").eq("user_id", user.id).maybeSingle();
-      if (empRow?.company_id) {
-        const { data: owners } = await admin.from("users").select("email").eq("company_id", empRow.company_id).eq("role", "owner");
-        for (const o of owners ?? []) if (o.email) void sendContractSignedEmail(o.email as string, name);
-      }
-    } catch { /* email is best-effort */ }
-    return { ok: true };
+    return await requestSignCode({ userId: user.id, email: user.email ?? null }, id);
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    console.error("requestContractCode", e);
+    return { ok: false, error: "Tókst ekki að senda kóða" };
+  }
+}
+
+/** Skref 2: kóðinn staðfestur → samningur undirritaður, PDF sent báðum aðilum. */
+export async function signContractWithCode(id: string, code: string): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
+    const res = await signWithCode({ userId: user.id, email: user.email ?? null }, id, code, metaFrom(await headers()));
+    if (res.ok) { revalidatePath("/mitt-svaedi"); revalidatePath("/mitt"); }
+    return res;
+  } catch (e) {
+    console.error("signContractWithCode", e);
+    return { ok: false, error: "Tókst ekki að undirrita" };
   }
 }

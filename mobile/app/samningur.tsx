@@ -1,11 +1,15 @@
 // Ráðningarsamningur — sýnir nýjasta sendan/undirritaðan samning.
 import React, { useCallback, useEffect, useState } from "react";
 import { useTheme } from "../src/theme";
-import { View } from "react-native";
+import { View, TextInput, Pressable } from "react-native";
+import { Check } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
-import { Card, Txt, Muted, Pill } from "../src/components/ui";
+import { Card, Txt, Muted, Pill, Btn, useToast } from "../src/components/ui";
+import { inputStyle } from "../src/components/request-sheets";
+import { colors } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
-import { getMyContract, type Contract } from "../src/lib/api/docs";
+import { getMyContract, requestContractCode, signContract, type Contract } from "../src/lib/api/docs";
+import { tr } from "../src/lib/i18n";
 
 /** Very light markdown → text: strip #, **, keep line structure. */
 function plain(md: string): string {
@@ -21,6 +25,31 @@ export default function Samningur() {
   const { me } = useMe();
   const [contract, setContract] = useState<Contract | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [agreed, setAgreed] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const toast = useToast();
+
+  async function sendCode() {
+    if (!contract) return;
+    setBusy(true);
+    const r = await requestContractCode(contract.id);
+    setBusy(false);
+    if (!r.ok) { toast(r.error ?? "Tókst ekki að senda kóða"); return; }
+    setSentTo(r.sentTo ?? "");
+    setCode("");
+  }
+  async function sign() {
+    if (!contract) return;
+    setBusy(true);
+    const r = await signContract(contract.id, code);
+    setBusy(false);
+    if (!r.ok) { toast(r.error ?? "Tókst ekki að undirrita"); return; }
+    toast("Samningurinn er undirritaður — afrit er sent á netfangið þitt.");
+    setSentTo(null);
+    load();
+  }
 
   const load = useCallback(async () => {
     if (!me) return;
@@ -54,8 +83,30 @@ export default function Samningur() {
           <Txt size={13} style={{ lineHeight: 20 }}>
             {plain(contract.content)}
           </Txt>
-          {contract.status !== "signed" ? (
-            <Muted size={12}>Undirritun fer fram á vefnum (vakto.is) að sinni.</Muted>
+          {contract.status !== "signed" && sentTo == null ? (
+            <View style={{ gap: 12, paddingTop: 4 }}>
+              <Pressable onPress={() => setAgreed((a) => !a)} style={{ flexDirection: "row", gap: 10, alignItems: "flex-start" }} accessibilityRole="checkbox" accessibilityState={{ checked: agreed }}>
+                <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: agreed ? colors.brand : colors.line, backgroundColor: agreed ? colors.brand : "transparent", alignItems: "center", justifyContent: "center", marginTop: 1 }}>
+                  {agreed ? <Check color="#fff" size={15} strokeWidth={3} /> : null}
+                </View>
+                <Txt size={13} style={{ flex: 1, lineHeight: 19 }}>{tr("Ég hef lesið samninginn og samþykki hann. Ég staðfesti með kóða sem sendur er á netfangið mitt.")}</Txt>
+              </Pressable>
+              <Btn title="Senda mér kóða" disabled={!agreed || busy} loading={busy} onPress={sendCode} />
+            </View>
+          ) : null}
+          {contract.status !== "signed" && sentTo != null ? (
+            <View style={{ gap: 12, paddingTop: 4 }}>
+              <Txt size={13}>{tr("Kóði var sendur á")} {sentTo}. {tr("Hann gildir í 10 mínútur.")}</Txt>
+              <TextInput
+                style={[inputStyle(), { fontSize: 26, letterSpacing: 8, textAlign: "center" }]}
+                value={code} onChangeText={(v) => setCode(v.replace(/[^\d]/g, "").slice(0, 6))}
+                keyboardType="number-pad" textContentType="oneTimeCode" autoComplete="one-time-code" autoFocus
+                placeholder="000000" placeholderTextColor={colors.ink3} maxLength={6}
+              />
+              <Btn title="Undirrita samninginn" disabled={code.length !== 6 || busy} loading={busy} onPress={sign} />
+              <Btn title="Senda nýjan kóða" variant="ghost" disabled={busy} onPress={sendCode} />
+              <Muted size={11.5}>{tr("Við undirritun er skráður tími, IP-tala, tæki og fingrafar samningsins. Báðir aðilar fá undirritað eintak sem PDF.")}</Muted>
+            </View>
           ) : null}
         </Card>
       ) : null}

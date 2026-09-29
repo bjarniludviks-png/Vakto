@@ -1,8 +1,9 @@
-// Client-side PDF for employment contracts — branded like the schedule/report
-// PDFs (orange section bars, VAKTO mark, bordered form layout à la the classic
-// Icelandic ráðningarsamningur forms). Parses the stored markdown-ish content
-// (## sections, **key:** value lines, free paragraphs). jsPDF + autotable are
-// imported lazily so they never hit the server bundle.
+// PDF for employment contracts — branded like the schedule/report PDFs (orange
+// section bars, VAKTO mark, bordered form layout à la the classic Icelandic
+// ráðningarsamningur forms). Parses the stored markdown-ish content (## sections,
+// **key:** value lines, free paragraphs). Runs in the browser (download) AND on
+// the server (signed copy emailed to both parties, lib/esign.server.ts).
+// jsPDF + autotable are imported lazily.
 import type { jsPDF } from "jspdf";
 
 const ORANGE: [number, number, number] = [233, 112, 15];
@@ -57,7 +58,29 @@ function drawFooter(doc: jsPDF, pageNum: number, pageCount: number) {
   doc.setTextColor(0);
 }
 
-export async function downloadContractPdf(title: string, content: string) {
+/** One recorded signature (contract_signatures, migration 0058). */
+export type SignatureRecord = {
+  role: "employer" | "employee"; name: string; email: string | null; method: string;
+  signedAt: string; ip: string | null; userAgent: string | null; sha256: string;
+};
+
+const fmtUtc = (iso: string) => {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCDate()}.${d.getUTCMonth() + 1}.${d.getUTCFullYear()} kl. ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())} (UTC)`;
+};
+const METHOD: Record<string, string> = {
+  session: "Innskráð lota í VAKTO / Signed-in VAKTO session",
+  email_otp: "Kóði sendur á netfang / One-time code sent by email",
+  manual: "Skráð handvirkt (pappír) / Recorded manually (paper)",
+};
+
+export async function downloadContractPdf(title: string, content: string, signatures: SignatureRecord[] = []) {
+  const doc = await buildContractPdf(content, signatures);
+  doc.save(`${title.replace(/[^\wÀ-ÿ —-]+/g, "").trim() || "Radningarsamningur"}.pdf`);
+}
+
+export async function buildContractPdf(content: string, signatures: SignatureRecord[] = []): Promise<jsPDF> {
   const { jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -96,8 +119,9 @@ export async function downloadContractPdf(title: string, content: string) {
     if (!sec.rows.length && !sec.paras.length) continue;
     if (sec.rows.length) {
       // Two-column key/value form table; free paragraphs span both columns.
-      const body: (string[] | { content: string; colSpan: number }[])[] = sec.rows.map(([k, v]) => [k, v || "—"]);
-      for (const p of sec.paras) body.push([{ content: p, colSpan: 2 }]);
+      const body: (string[] | { content: string; colSpan: number; styles: { fontStyle: "normal"; fillColor: [number, number, number] } }[])[] = sec.rows.map(([k, v]) => [k, v || "—"]);
+      // Paragraphs span both columns — plain text, not the bold key-column style.
+      for (const p of sec.paras) body.push([{ content: p, colSpan: 2, styles: { fontStyle: "normal", fillColor: [255, 255, 255] } }]);
       autoTable(doc, {
         startY: y,
         margin: { left: M, right: M, bottom: 60 },
@@ -147,10 +171,64 @@ export async function downloadContractPdf(title: string, content: string) {
   // Row 2: signatures
   sigLine(M, y + 70, colW, "Undirskrift vinnuveitanda", "Employer's signature");
   sigLine(M + colW + 40, y + 70, colW, "Undirskrift starfsmanns", "Employee's signature");
+  // Electronic signatures are written onto the lines; details on the record page.
+  const emp = signatures.find((s) => s.role === "employer");
+  const ee = signatures.find((s) => s.role === "employee");
+  doc.setFont("helvetica", "italic"); doc.setFontSize(10); doc.setTextColor(...INK);
+  if (emp) doc.text(`Rafrænt: ${emp.name}`, M, y + 64);
+  if (ee) doc.text(`Rafrænt: ${ee.name}`, M + colW + 40, y + 64);
+  const last = ee ?? emp;
+  if (last) {
+    doc.setFont("helvetica", "normal");
+    doc.text("Rafræn undirritun í VAKTO", M, y + 12);
+    doc.text(fmtUtc(last.signedAt).replace(" (UTC)", " UTC"), M + colW + 40, y + 12);
+  }
+
+  // ---- Signature record (audit trail) ----
+  if (signatures.length) {
+    doc.addPage();
+    let ay = 60;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.setTextColor(...INK);
+    doc.text("Undirritunarskrá / Signature record", M, ay);
+    doc.setDrawColor(...ORANGE); doc.setLineWidth(1.6); doc.line(M, ay + 8, W - M, ay + 8);
+    ay += 26;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...MUT);
+    const intro = doc.splitTextToSize(
+      "Samningurinn var undirritaður rafrænt í VAKTO. Fingrafar (SHA-256) er reiknað af samningstextanum eins og hann var sendur; " +
+      "ef einn stafur breytist verður fingrafarið annað. / The contract was signed electronically in VAKTO. The SHA-256 fingerprint is " +
+      "computed from the contract text as sent; changing a single character changes it.", W - M * 2);
+    doc.text(intro, M, ay); ay += intro.length * 11 + 8;
+    autoTable(doc, {
+      startY: ay, margin: { left: M, right: M, bottom: 60 }, theme: "grid",
+      styles: { fontSize: 8.5, cellPadding: 6, lineColor: LINE, lineWidth: 0.7, textColor: INK, overflow: "linebreak" },
+      columnStyles: { 0: { fontStyle: "bold", cellWidth: 150, fillColor: [250, 248, 246] } },
+      body: [["Fingrafar skjals / Document SHA-256", signatures[signatures.length - 1].sha256]],
+    });
+    ay = ((doc as Doc).lastAutoTable?.finalY ?? ay) + 14;
+    for (const s of signatures) {
+      autoTable(doc, {
+        startY: ay, margin: { left: M, right: M, bottom: 60 }, theme: "grid",
+        head: [[{ content: s.role === "employer" ? "Vinnuveitandi / Employer" : "Starfsmaður / Employee", colSpan: 2 }]],
+        styles: { fontSize: 8.5, cellPadding: 6, lineColor: LINE, lineWidth: 0.7, textColor: INK, overflow: "linebreak" },
+        headStyles: { ...headStyles, fontSize: 9.5 },
+        columnStyles: { 0: { fontStyle: "bold", cellWidth: 150, fillColor: [250, 248, 246] } },
+        body: [
+          ["Nafn / Name", s.name],
+          ["Netfang / Email", s.email ?? "—"],
+          ["Aðferð / Method", METHOD[s.method] ?? s.method],
+          ["Tími / Time", fmtUtc(s.signedAt)],
+          ["IP-tala / IP address", s.ip ?? "—"],
+          ["Tæki / Device", s.userAgent ?? "—"],
+          ["Fingrafar / SHA-256", s.sha256],
+        ],
+      });
+      ay = ((doc as Doc).lastAutoTable?.finalY ?? ay) + 14;
+    }
+  }
 
   // ---- Footer on every page ----
   const pages = doc.getNumberOfPages();
   for (let i = 1; i <= pages; i++) { doc.setPage(i); drawFooter(doc, i, pages); }
 
-  doc.save(`${title.replace(/[^\wÀ-ÿ —-]+/g, "").trim() || "Radningarsamningur"}.pdf`);
+  return doc;
 }

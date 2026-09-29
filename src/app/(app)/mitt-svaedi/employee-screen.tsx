@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
-import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, getMyContract, signMyContract, type LeaveType, type MyPunchRow, type MyContract } from "./actions";
+import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, getMyContract, requestContractCode, signContractWithCode, type LeaveType, type MyPunchRow, type MyContract } from "./actions";
 import { listCompanyDocs, openCompanyDoc, type CompanyDoc } from "../stillingar/actions";
 import { dec1, nf, krCompact } from "@/lib/format";
 import { leaveWorkdays } from "@/lib/orlof";
@@ -173,23 +173,35 @@ function PunchCard({ live = false, openSince = null, geofence = "off" }: { live?
   );
 }
 
-/** In-app contract signing (þrep 1): shows only while a contract awaits
- * approval; the confirm modal stamps name + time into the document. */
+/** Rafræn undirritun (0058): starfsmaður les, hakar við samþykki, fær 6 stafa kóða
+ * á netfangið sitt og slær hann inn. Þjónninn skráir tíma, IP, tæki og fingrafar
+ * skjalsins og sendir báðum aðilum undirritað PDF. */
 function ContractSignCard() {
   const { t } = useLang();
   const [contract, setContract] = useState<MyContract | null>(null);
   const [open, setOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+  const [code, setCode] = useState("");
   useEffect(() => { getMyContract().then((r) => { if (r.ok && r.contract?.status === "sent") setContract(r.contract); }); }, []);
   if (!contract) return null;
+  async function sendCode() {
+    if (!contract) return;
+    setBusy(true);
+    const res = await requestContractCode(contract.id);
+    setBusy(false);
+    if (!res.ok) { toast(res.error ?? t("Tókst ekki að senda kóða")); return; }
+    setSentTo(res.sentTo ?? "");
+    setCode("");
+  }
   async function sign() {
     if (!contract) return;
     setBusy(true);
-    const res = await signMyContract(contract.id);
+    const res = await signContractWithCode(contract.id, code);
     setBusy(false);
     if (!res.ok) { toast(res.error ?? "Villa"); return; }
-    toast(t("Samningurinn er undirritaður — til hamingju!"));
+    toast(t("Samningurinn er undirritaður — afrit er sent á netfangið þitt."));
     setOpen(false);
     setContract(null);
   }
@@ -197,8 +209,8 @@ function ContractSignCard() {
     <>
       <div className="mini" style={{ borderColor: "var(--brand)", background: "var(--brand-soft, #fdf1e7)" }}>
         <div className="mh" style={{ color: "var(--brand)" }}>{t("Ráðningarsamningur bíður undirritunar")}</div>
-        <p style={{ fontSize: 13, margin: "4px 0 10px" }}>{t("Vinnuveitandinn þinn sendi þér ráðningarsamning. Lestu hann yfir og samþykktu rafrænt.")}</p>
-        <button className="btn sm" onClick={() => setOpen(true)}>{t("Skoða & samþykkja")}</button>
+        <p style={{ fontSize: 13, margin: "4px 0 10px" }}>{t("Vinnuveitandinn þinn sendi þér ráðningarsamning. Lestu hann yfir og undirritaðu rafrænt.")}</p>
+        <button className="btn sm" onClick={() => setOpen(true)}>{t("Skoða & undirrita")}</button>
       </div>
       {open && (
         <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && setOpen(false)}>
@@ -206,17 +218,34 @@ function ContractSignCard() {
           <div className="modal" style={{ maxWidth: 620 }}>
             <div className="mh"><div style={{ fontSize: 15, fontWeight: 700 }}>{contract.title}</div><button className="x" onClick={() => setOpen(false)}>✕</button></div>
             <div className="mb">
-              <div style={{ maxHeight: "48vh", overflowY: "auto", border: "1px solid var(--line)", borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
-                <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13, lineHeight: 1.6, margin: 0 }}>{contract.content}</pre>
+              <div style={{ maxHeight: sentTo == null ? "48vh" : "30vh", overflowY: "auto", border: "1px solid var(--line)", borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
+                <pre style={{ whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 13, lineHeight: 1.6, margin: 0 }}>{contract.content.replace(/^#{1,6}\s*/gm, "").replace(/\*\*(.*?)\*\*/g, "$1").replace(/^_(.*)_$/gm, "$1")}</pre>
               </div>
-              <label style={{ display: "flex", alignItems: "flex-start", gap: 9, fontSize: 13, cursor: "pointer" }}>
-                <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 2 }} />
-                {t("Ég hef lesið samninginn og samþykki hann. Rafrænt samþykki mitt er skráð með nafni, tímastimpli og innskráningu.")}
-              </label>
-              <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
-                <button className="btn" disabled={!agreed || busy} onClick={sign}>{t("Samþykkja ráðningarsamninginn")}</button>
-                <button className="btn ghost" onClick={() => setOpen(false)}>{t("Loka")}</button>
-              </div>
+              {sentTo == null ? (
+                <>
+                  <label style={{ display: "flex", alignItems: "flex-start", gap: 9, fontSize: 13, cursor: "pointer" }}>
+                    <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 2 }} />
+                    {t("Ég hef lesið samninginn og samþykki hann. Ég staðfesti með kóða sem sendur er á netfangið mitt.")}
+                  </label>
+                  <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
+                    <button className="btn" disabled={!agreed || busy} onClick={sendCode}>{busy ? t("Sendi…") : t("Senda mér kóða")}</button>
+                    <button className="btn ghost" onClick={() => setOpen(false)}>{t("Loka")}</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p style={{ fontSize: 13, margin: "0 0 8px" }}>{t("Kóði var sendur á")} <b>{sentTo}</b>. {t("Hann gildir í 10 mínútur.")}</p>
+                  <input inputMode="numeric" autoComplete="one-time-code" maxLength={7} value={code} autoFocus
+                    onChange={(e) => setCode(e.target.value.replace(/[^\d ]/g, ""))}
+                    placeholder="000 000" aria-label={t("Kóði")}
+                    style={{ fontSize: 24, letterSpacing: 8, textAlign: "center", fontVariantNumeric: "tabular-nums", width: "100%", maxWidth: 240, padding: "10px 12px", border: "1px solid var(--line)", borderRadius: 12 }} />
+                  <div style={{ display: "flex", gap: 9, marginTop: 14, flexWrap: "wrap" }}>
+                    <button className="btn" disabled={code.replace(/\D/g, "").length !== 6 || busy} onClick={sign}>{busy ? t("Undirrita…") : t("Undirrita samninginn")}</button>
+                    <button className="btn ghost" disabled={busy} onClick={sendCode}>{t("Senda nýjan kóða")}</button>
+                  </div>
+                  <p className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>{t("Við undirritun er skráður tími, IP-tala, tæki og fingrafar samningsins. Báðir aðilar fá undirritað eintak sem PDF.")}</p>
+                </>
+              )}
             </div>
           </div>
         </div>

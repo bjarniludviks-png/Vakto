@@ -14,7 +14,7 @@ export function emailConfigured(): boolean {
   return !!KEY;
 }
 
-export async function sendEmail(input: { to: string; subject: string; html: string }): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+export async function sendEmail(input: { to: string; subject: string; html: string; attachments?: { filename: string; content: string }[] }): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   if (!KEY) {
     console.log(`[email] skipped (no RESEND_API_KEY): "${input.subject}" → ${input.to}`);
     return { ok: true, skipped: true };
@@ -23,7 +23,7 @@ export async function sendEmail(input: { to: string; subject: string; html: stri
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM, to: [input.to], reply_to: REPLY_TO, subject: input.subject, html: input.html }),
+      body: JSON.stringify({ from: FROM, to: [input.to], reply_to: REPLY_TO, subject: input.subject, html: input.html, ...(input.attachments?.length ? { attachments: input.attachments } : {}) }),
     });
     if (!r.ok) return { ok: false, error: `${r.status} ${await r.text()}` };
     return { ok: true };
@@ -371,5 +371,44 @@ export async function sendSuspendedEmail(to: string, company: string) {
       bodyEn: `Payment for <b>${company}</b> has not been received and access is temporarily suspended. Your data is kept for 90 days. Add a card or contact hallo@vakto.is and we will reopen right away.`,
       ctaLabel: "Hafa samband", ctaLabelEn: "Contact us", ctaHref: "mailto:hallo@vakto.is",
     }),
+  });
+}
+
+/** 6 stafa kóði til að staðfesta rafræna undirritun ráðningarsamnings (0058). */
+export async function sendContractCodeEmail(to: string, code: string, company: string) {
+  const pretty = `${code.slice(0, 3)} ${code.slice(3)}`;
+  const box = `<div style="margin:18px 0 6px;font-size:34px;font-weight:700;letter-spacing:10px;font-family:ui-monospace,Menlo,Consolas,monospace;color:#1a1a1f">${pretty}</div>`;
+  return sendEmail({
+    to,
+    subject: `${code} — kóði til að undirrita samninginn / code to sign your contract`,
+    html: template({
+      preheader: `Undirritunarkóði: ${code}`,
+      heading: "Staðfestu undirritunina",
+      body: `Sláðu þennan kóða inn til að undirrita ráðningarsamninginn við <b>${company}</b>. Hann gildir í 10 mínútur.${box}Ef þú baðst ekki um kóðann skaltu ekki nota hann og láta vinnuveitandann vita.`,
+      headingEn: "Confirm your signature",
+      bodyEn: `Enter this code to sign your employment contract with <b>${company}</b>. It is valid for 10 minutes.${box}If you didn't request it, don't use it and tell your employer.`,
+    }),
+  });
+}
+
+/** Undirritað eintak (PDF með undirritunarskrá) til beggja aðila. */
+export async function sendSignedContractEmail(to: string, o: { employeeName: string; company: string; pdfBase64: string; filename: string; forEmployer: boolean }) {
+  return sendEmail({
+    to,
+    subject: o.forEmployer
+      ? `${o.employeeName} undirritaði ráðningarsamninginn / signed the contract — VAKTO`
+      : `Undirritaður ráðningarsamningur við ${o.company} / your signed contract`,
+    html: template({
+      preheader: "Undirritað eintak fylgir sem PDF.",
+      heading: "Samningurinn er undirritaður",
+      body: o.forEmployer
+        ? `<b>${o.employeeName}</b> undirritaði ráðningarsamninginn rafrænt. Undirritað eintak með undirritunarskrá (tími, IP, tæki og fingrafar skjals) fylgir sem PDF og er í skjalasafni starfsmannsins.`
+        : `Þú undirritaðir ráðningarsamninginn við <b>${o.company}</b>. Undirritað eintak fylgir sem PDF — geymdu það. Það er líka í skjalasafninu þínu í VAKTO.`,
+      headingEn: "The contract is signed",
+      bodyEn: o.forEmployer
+        ? `<b>${o.employeeName}</b> signed the employment contract electronically. The signed copy with its signature record (time, IP, device and document fingerprint) is attached and saved in the employee's documents.`
+        : `You signed your employment contract with <b>${o.company}</b>. The signed copy is attached — keep it. It is also in your documents in VAKTO.`,
+    }),
+    attachments: [{ filename: o.filename, content: o.pdfBase64 }],
   });
 }

@@ -196,6 +196,13 @@
   Bearer-token); ráðningarsamningur m. ESB 2019/1152 atriðum; AI les kjarasamning `/api/ai/agreement`
   (`lib/ai/agreement.ts`, tilvitnun per gildi, stjórnandi hakar „yfirfarið“ áður en vistað er).
   App-hlutinn krefst nýs EAS-builds.
+- ✅ **Rafræn undirritun samninga — ókeypis, án þriðja aðila (29. sept 2026, migration 0058):**
+  `lib/esign.server.ts`. „Undirrita & senda“ → `employerSign` (fingrafar SHA-256 af texta, lota + IP/tæki);
+  starfsmaður fær 6 stafa kóða á netfang (`requestSignCode`, hash geymt, 10 mín, 5 tilraunir) →
+  `signWithCode` → `contract_signatures` + PDF með undirritunarskrá (`lib/contract-pdf.ts`, keyrir í vafra
+  og á þjóni) í skjalasafn starfsmanns + tölvupóstur með viðhengi til beggja. Appið fer um `/api/app/contract`.
+  Starfsmaður getur ekki merkt undirritað beint (reglan `contracts_own_sign` farin); sendur samningur er
+  læstur (`contracts_lock`). „Merkja undirritað“ er eftir fyrir pappírssamninga.
 - **Still remaining:** contractor billable-vs-cost/GPS job tracking, a signed-URL viewer for the
   private `documents` bucket, Google/Microsoft/Auðkenni OAuth (scaffolded in `login-form`).
 - ✅ **VAKTO Admin (ofurstjórnborð SaaS-eigandans):** `/admin` — aðgangur EINGÖNGU fyrir netföng í
