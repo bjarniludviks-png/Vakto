@@ -184,8 +184,18 @@
   tilvitnun í bólu + svar-borði yfir innslætti), eyða eigin skilaboðum, hover-aðgerðir á bólum,
   nafna-fallback á `employees.full_name` þegar users-röð vantar. **Migration 0042** er forsenda
   viðbragða/svara/hópamynda — spjallið sjálft þolir að hún vanti (fallback-fyrirspurnir).
-- ⚠️ **AI er EKKI virkt:** `ANTHROPIC_API_KEY` er tómur í `.env.local` og EKKI settur á Vercel —
-  `/api/ai/schedule` fellur á demo-tillögu. Setja lykil (console.anthropic.com) + `vercel env add`.
+- ✅ **AI er virkt:** `ANTHROPIC_API_KEY` er settur á Vercel (Production + Preview) og í `.env.local`.
+- ✅ **Eiginleikar úr samkeppnisgreiningu (29. sept 2026, migration 0057 á staging + prod):**
+  orlofsstaða (`src/lib/orlof.ts` + `mobile/src/lib/orlof.ts` afrit, orlofsár frá 1. maí) í Mitt svæði,
+  frí-beiðni og beiðnaspjaldi vaktstjóra; launaáætlun í Vaktaplani (`getWeekBudget` í `lib/labor.ts` —
+  plan-kostnaður vs veltuspá × `labor_target`, viðvörun við birtingu); Stillingar → laun%-markmið +
+  `companies.leave_cap` (trigger `leave_cap_check` → `LEAVE_CAP:<dags>`); „Mætti ekki á vakt“
+  (`lib/noshow.server.ts`, dedupe í `noshow_alerts`, keyrir tækifærisbundið við stimplun/síðuopnun — engin
+  tíðari cron); fjarvistayfirlit í Innsýn (`lib/absence.server.ts`); ICS-dagatal `/api/cal/<calendar_token>.ics`
+  (opinber slóð); verkefni dagsins í appinu + hert `shift_tasks` RLS; `/api/app/notify` (push úr appinu,
+  Bearer-token); ráðningarsamningur m. ESB 2019/1152 atriðum; AI les kjarasamning `/api/ai/agreement`
+  (`lib/ai/agreement.ts`, tilvitnun per gildi, stjórnandi hakar „yfirfarið“ áður en vistað er).
+  App-hlutinn krefst nýs EAS-builds.
 - **Still remaining:** contractor billable-vs-cost/GPS job tracking, a signed-URL viewer for the
   private `documents` bucket, Google/Microsoft/Auðkenni OAuth (scaffolded in `login-form`).
 - ✅ **VAKTO Admin (ofurstjórnborð SaaS-eigandans):** `/admin` — aðgangur EINGÖNGU fyrir netföng í
