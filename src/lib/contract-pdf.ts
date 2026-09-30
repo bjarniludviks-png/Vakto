@@ -136,7 +136,10 @@ const METHOD: Record<string, string> = {
 
 export async function downloadContractPdf(title: string, content: string, signatures: SignatureRecord[] = []) {
   const doc = await buildContractPdf(content, signatures);
-  doc.save(`${title.replace(/[^\wÀ-ÿ —-]+/g, "").trim() || "Radningarsamningur"}.pdf`);
+  // ASCII-skráarnafn: íslenskir stafir brenglast í sumum símum („Ra%CC%81%C3%B0…“).
+  const ascii = title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ð/g, "d").replace(/Ð/g, "D").replace(/þ/g, "th").replace(/Þ/g, "Th").replace(/æ/g, "ae").replace(/Æ/g, "Ae")
+    .replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  doc.save(`${ascii || "Radningarsamningur"}.pdf`);
 }
 
 export async function buildContractPdf(content: string, signatures: SignatureRecord[] = []): Promise<jsPDF> {
@@ -175,7 +178,19 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
     const sIs = summary.sentence ? wrap(summary.sentence[0], inner * 0.78) : [];
     font("italic", 9, WARM_MUT);
     const sEn = summary.sentence ? wrap(summary.sentence[1], inner * 0.78) : [];
-    const headH = 34 + 20 + 30 + 14 + (sIs.length ? sIs.length * 13.5 + sEn.length * 12 + 14 : 0) + 44 + 24;
+    // Lykiltölur: gildið má fara í tvær línur (annars „…“); allir kassar jafnháir þeim hæsta.
+    const gap = 8, tw = (CW - gap * 3) / 4;
+    font("bold", 10.5, INK);
+    const tileLines = summary.tiles.map((t) => {
+      const ls = wrap(t.value, tw - 18);
+      if (ls.length <= 2) return ls;
+      let last = ls[1];
+      while (last.length > 1 && doc.getTextWidth(`${last}…`) > tw - 18) last = last.slice(0, -1);
+      return [ls[0], `${last.trimEnd()}…`];
+    });
+    const maxLines = Math.max(1, ...tileLines.map((l) => l.length));
+    const tileH = 27 + maxLines * 12.5;
+    const headH = 34 + 20 + 30 + 14 + (sIs.length ? sIs.length * 13.5 + sEn.length * 12 + 14 : 0) + tileH + 4 + 24;
     doc.setFillColor(...WARM); doc.rect(0, 0, W, headH, "F");
     y = 34;
     mark(M, y + 2);
@@ -191,12 +206,12 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
       font("italic", 9, WARM_MUT); sEn.forEach((l) => { doc.text(l, M, y); y += 12; });
       y += 12;
     }
-    const gap = 8, tw = (CW - gap * 3) / 4;
     summary.tiles.forEach((t, i) => {
       const x = M + i * (tw + gap);
-      doc.setFillColor(255, 255, 255); doc.roundedRect(x, y, tw, 40, 6, 6, "F");
+      doc.setFillColor(255, 255, 255); doc.roundedRect(x, y, tw, tileH, 6, 6, "F");
       font("normal", 7, WARM_MUT); doc.text(t.label, x + 9, y + 13);
-      font("bold", 10.5, INK); doc.text(wrap(t.value, tw - 18)[0] ?? "—", x + 9, y + 29);
+      font("bold", 10.5, INK);
+      (tileLines[i].length ? tileLines[i] : ["—"]).forEach((ln, k) => doc.text(ln, x + 9, y + 29 + k * 12.5));
     });
     y = headH + 22;
   }
