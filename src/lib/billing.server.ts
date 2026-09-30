@@ -1,7 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { chargeToken, straumurConfigured } from "@/lib/straumur";
-import { invoiceFor, planFor, type PlanId } from "@/lib/pricing";
+import { invoiceFor, planFor, baseModeFor, type PlanId, type BillingInterval } from "@/lib/pricing";
 import { sendTrialReminderEmail, sendCardMissingEmail, sendPaymentFailedEmail, sendReceiptEmail, sendSuspendedEmail } from "@/lib/email";
 
 // Áskriftarvélin: prufu-áminningar, mánaðarreikningar, gjaldtaka af skráðu korti, lokun.
@@ -40,10 +40,21 @@ export async function esignCount(companyId: string, from: string, to: string): P
 }
 
 /** Áætlaður mánaðarreikningur (með VSK) miðað við síðustu 30 daga — fyrir áminningar og Stillingar. */
-export async function estimateMonthly(companyId: string, plan: PlanId, now = new Date()) {
+export async function estimateMonthly(companyId: string, plan: PlanId, now = new Date(), interval: BillingInterval = "month") {
   const to = iso(new Date(now.getTime() + 86400000)), from = iso(new Date(now.getTime() - 30 * 86400000));
   const units = plan === "v1" ? await usersCount(companyId) : await activeEmployees(companyId, from, to);
-  return { units, ...invoiceFor(plan, units, 0) };
+  // Árlegt: mánaðarígildi (baseYear + umfram á árlegum kjörum) — sjálft árgjaldið er 12 × baseYear.
+  const a = interval === "year" ? invoiceFor(plan, units, 0, { base: "none", yearly: true }) : invoiceFor(plan, units, 0);
+  if (interval === "year") { const b = invoiceFor(plan, 0, 0, { base: "year" }); const monthBase = Math.round(b.base / 12); const net = monthBase + a.extra; const vat = Math.round(net * 0.24); return { units, ...a, base: monthBase, vat, total: net + vat }; }
+  return { units, ...a };
+}
+
+/** Næsti gjalddagi (upphaf næsta tímabils) frá billing_anchor. */
+export function nextDueDate(anchorIso: string | null, now = new Date()): string | null {
+  if (!anchorIso) return null;
+  let d = new Date(anchorIso);
+  while (d.getTime() <= now.getTime()) d = addMonths(d, 1);
+  return iso(d);
 }
 
 export async function activeCard(companyId: string) {
@@ -87,7 +98,7 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
   const admin = createAdminClient();
   const out: BillingRunResult = { reminders: 0, expired: 0, invoices: 0, paid: 0, failed: 0, suspended: 0, retried: 0 };
   const { data: companies } = await admin.from("companies")
-    .select("id, name, plan, price_plan, price_v1_until, trial_ends_at, billing_status, billing_anchor, trial_reminder_sent_at, trial_expired_sent_at")
+    .select("id, name, plan, price_plan, price_v1_until, billing_interval, billing_year_start, trial_ends_at, billing_status, billing_anchor, trial_reminder_sent_at, trial_expired_sent_at")
     .not("plan", "is", null);
   for (const co of companies ?? []) {
     const id = co.id as string, name = (co.name as string) ?? "";
@@ -139,6 +150,8 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
       if (!existing) {
         // Grunngjald fyrirfram fyrir tímabilið sem hefst; notkun (virkir starfsmenn umfram, undirritanir)
         // gerð upp eftir á fyrir tímabilið sem lauk. Fyrsti reikningur eftir prufu: engin notkun.
+        // Árlegt: árgjaldið (12 × baseYear) tekið í upphafi ársins, síðan aðeins notkun á árlegum kjörum.
+        // Skipt aftur í mánaðarlegt gildir þegar greidda árið rennur út.
         const plan = planFor(co, periodStart);
         const prevStart = addMonths(periodStart, -1);
         const hasUsage = prevStart.getTime() >= anchor.getTime();
@@ -147,20 +160,29 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
         const active = hasUsage ? await activeEmployees(id, uFrom, uTo) : 0;
         const users = await usersCount(id);
         const units = plan === "v1" ? users : active;   // v1: notendur fyrirfram eins og áður
-        const p = invoiceFor(plan, units, esigns);
+        const interval = ((co.billing_interval as string) === "year" ? "year" : "month") as BillingInterval;
+        const yearStart = co.billing_year_start ? new Date(co.billing_year_start as string) : null;
+        const { mode: baseMode, startYear } = baseModeFor({ interval, yearStart, periodStart });
+        if (startYear) await admin.from("companies").update({ billing_year_start: iso(periodStart) }).eq("id", id);
+        const yearlyRates = baseMode !== "month";
+        const p = invoiceFor(plan, units, esigns, { base: baseMode, yearly: yearlyRates });
+        const periodEnd = baseMode === "year" ? addMonths(periodStart, 12) : addMonths(periodStart, 1);
+        const settled = p.total === 0; // greitt ár og engin notkun umfram → skráð sem uppgert, ekkert tekið af korti
         const { data: inv } = await admin.from("invoices").insert({
-          company_id: id, period_start: iso(periodStart), period_end: iso(addMonths(periodStart, 1)), users_count: users,
+          company_id: id, period_start: iso(periodStart), period_end: iso(periodEnd), users_count: users,
           active_employees: plan === "v2" ? active : null, esign_count: esigns, esign_amount: p.esign,
-          usage_start: hasUsage ? uFrom : null, usage_end: hasUsage ? uTo : null,
+          usage_start: hasUsage ? uFrom : null, usage_end: hasUsage ? uTo : null, billing_interval: yearlyRates ? "year" : "month",
           base_amount: p.base, extra_amount: p.extra, vat_amount: p.vat, total_amount: p.total, reference: `inv:${crypto.randomUUID()}`,
+          ...(settled ? { status: "paid", paid_at: new Date().toISOString() } : {}),
         }).select("id").single();
+        if (inv && settled) { await admin.from("invoices").update({ reference: `inv:${inv.id}` }).eq("id", inv.id); continue; }
         if (inv) {
           // reference verður að vísa í id-ið svo webhook finni reikninginn
           await admin.from("invoices").update({ reference: `inv:${inv.id}` }).eq("id", inv.id);
           out.invoices++;
           if (!straumurConfigured()) continue;
           const r = await chargeInvoice(inv.id as string);
-          if (r === "paid") { out.paid++; for (const to of await ownerEmails(id)) await sendReceiptEmail(to, name, { total: p.total, periodStart: iso(periodStart), periodEnd: iso(addMonths(periodStart, 1)) }).catch((e) => console.error("email:", e)); }
+          if (r === "paid") { out.paid++; for (const to of await ownerEmails(id)) await sendReceiptEmail(to, name, { total: p.total, periodStart: iso(periodStart), periodEnd: iso(periodEnd) }).catch((e) => console.error("email:", e)); }
           else { out.failed++; await admin.from("companies").update({ billing_status: "unpaid" }).eq("id", id); for (const to of await ownerEmails(id)) await sendPaymentFailedEmail(to, name, p.total).catch((e) => console.error("email:", e)); }
         }
       } else if (existing.status === "failed" && (existing.attempts as number) < 4 && straumurConfigured()) {

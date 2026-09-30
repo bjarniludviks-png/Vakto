@@ -968,3 +968,25 @@ export async function geocodeAddress(q: string): Promise<{ ok: boolean; hits: Ge
     return { ok: false, hits: [] };
   }
 }
+
+/** Mánaðarlegt ⇄ árlegt. Árlegt tekur gildi á næsta gjalddaga (árgjald fyrirfram); mánaðarlegt
+ *  tekur gildi þegar greitt ár rennur út (fyrirframgreitt ár er ekki endurgreitt). Aðeins eigandi. */
+export async function setBillingInterval(interval: "month" | "year"): Promise<SettingsResult> {
+  if (interval !== "month" && interval !== "year") return { ok: false, error: "Ógilt val" };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
+    const { data: profile } = await supabase.from("users").select("company_id, role").eq("id", user.id).maybeSingle();
+    if (!profile?.company_id || profile.role !== "owner") return { ok: false, error: "Aðeins stjórnandi getur breytt áskriftinni" };
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { error } = await createAdminClient().from("companies").update({ billing_interval: interval }).eq("id", profile.company_id);
+    if (error) return dbFail("setBillingInterval", error);
+    await logAudit(supabase, profile.company_id as string, user.id, { action: "company.billing_interval", entity: "companies", detail: interval === "year" ? "Áskrift: greitt árlega" : "Áskrift: greitt mánaðarlega" });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}

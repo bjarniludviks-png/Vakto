@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { DateField } from "@/components/app/fields";
 import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, aiContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, saveCompanyLimits, setEsignProvider, startCardChange, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit } from "./actions";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, aiContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, saveCompanyLimits, setEsignProvider, startCardChange, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, setBillingInterval, type GeoHit } from "./actions";
 import dynamic from "next/dynamic";
 import type { SettingsData, CompanyInfo, GeofenceMode } from "./settings.server";
 import type { AgreementResult, AgreementSource } from "@/lib/ai/agreement";
@@ -52,6 +53,7 @@ const Pin = () => (
 
 export default function SettingsScreen({ initialModal = null, initialSection, data = DEMO_SETTINGS, payRules = [], ruleTemplates = [] }: { initialModal?: SettingsModal; initialSection?: string; data?: SettingsData; payRules?: PayRule[]; ruleTemplates?: RuleTemplate[] }) {
   const { t } = useLang();
+  const router = useRouter();
   const [modal, setModal] = useState<SettingsModal>(initialModal);
   const [keyModal, setKeyModal] = useState(false);
   const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
@@ -283,15 +285,39 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
           </span>
         </div>
         <div className="cb">
+          {data.pricing && (
+            <div className="statline" style={{ alignItems: "center" }}><span className="k">{t("Greiðsla")}</span>
+              <span className="v">
+                <span className="seg">
+                  {(["month", "year"] as const).map((iv) => (
+                    <button key={iv} type="button" className={data.pricing!.interval === iv ? "on" : ""} disabled={data.pricing!.interval === iv}
+                      onClick={async () => {
+                        const r = await setBillingInterval(iv);
+                        toast(r.ok ? (iv === "year" ? t("Árleg greiðsla tekur gildi á næsta gjalddaga") : t("Mánaðarleg greiðsla vistuð")) : (r.error ?? t("Tókst ekki")));
+                        if (r.ok) router.refresh();
+                      }}>{iv === "month" ? t("Mánaðarlega") : t("Árlega · 15% afsláttur")}</button>
+                  ))}
+                </span>
+              </span>
+            </div>
+          )}
+          {data.pricing && (() => {
+            const pr = data.pricing!;
+            const msg = pr.paidYearUntil
+              ? (pr.interval === "year" ? `${t("Árið er greitt til")} ${pr.paidYearUntil}.` : `${t("Greitt ár gildir til")} ${pr.paidYearUntil}${t("; mánaðarleg greiðsla tekur við eftir það.")}`)
+              : pr.interval === "year" ? `${t("Árgjaldið")} (${nf(pr.yearFeeTotal)} kr ${t("m. VSK")}) ${t("verður tekið á næsta gjalddaga")}${pr.nextDue ? ` (${pr.nextDue})` : ""}. ${t("Virkir umfram 5 eru gerðir upp mánaðarlega á árlegum kjörum.")}`
+              : null;
+            return msg ? <p className="muted" style={{ fontSize: 12.5, margin: "4px 0 8px", lineHeight: 1.5 }}>{msg}</p> : null;
+          })()}
           {data.pricing?.plan === "v1" ? (
             <>
-              <div className="statline"><span className="k">{t("Verð")}</span><span className="v">{nf(PLANS.v1.base)} kr/mán · {PLANS.v1.included} {t("notendur")} · +{nf(PLANS.v1.extra)} kr {t("á notanda umfram (án VSK)")}</span></div>
+              <div className="statline"><span className="k">{t("Verð")}</span><span className="v">{nf(data.pricing.interval === "year" ? PLANS.v1.baseYear : PLANS.v1.base)} kr/mán · {PLANS.v1.included} {t("notendur")} · +{nf(data.pricing.interval === "year" ? PLANS.v1.extraYear : PLANS.v1.extra)} kr {t("á notanda umfram (án VSK)")}</span></div>
               {data.pricing.v1Until && <div className="statline"><span className="k">{t("Eldra verð gildir til")}</span><span className="v">{data.pricing.v1Until}</span></div>}
               <div className="statline"><span className="k">{t("Notendur núna")}</span><span className="v">{data.users.length}</span></div>
             </>
           ) : (
             <>
-              <div className="statline"><span className="k">{t("Verð")}</span><span className="v">{nf(PLANS.v2.base)} kr/mán · {PLANS.v2.included} {t("virkir starfsmenn")} · +{nf(PLANS.v2.extra)} kr {t("á hvern virkan umfram (án VSK)")}</span></div>
+              <div className="statline"><span className="k">{t("Verð")}</span><span className="v">{nf(data.pricing?.interval === "year" ? PLANS.v2.baseYear : PLANS.v2.base)} kr/mán · {PLANS.v2.included} {t("virkir starfsmenn")} · +{nf(data.pricing?.interval === "year" ? PLANS.v2.extraYear : PLANS.v2.extra)} kr {t("á hvern virkan umfram (án VSK)")}</span></div>
               <div className="statline"><span className="k">{t("Virkir síðustu 30 daga")}</span><span className="v">{data.pricing?.units ?? "—"}</span></div>
             </>
           )}

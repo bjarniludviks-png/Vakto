@@ -93,3 +93,9 @@ insert into public.billing_usage (company_id, kind, ref, day)
   select company_id, 'esign', id::text, signed_at::date from public.contract_signatures
   where method = 'taktikal_qes' and signed_at >= now() - interval '60 days'
   on conflict do nothing;
+
+-- Árleg greiðsla: árgjald (12 × baseYear) fyrirfram frá billing_year_start; notkun mánaðarlega á árlegum kjörum.
+alter table public.companies add column if not exists billing_interval text not null default 'month'
+  check (billing_interval in ('month', 'year'));
+alter table public.companies add column if not exists billing_year_start date;
+alter table public.invoices add column if not exists billing_interval text not null default 'month';
