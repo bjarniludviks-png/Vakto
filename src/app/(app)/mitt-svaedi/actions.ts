@@ -8,7 +8,7 @@ import { notifyManagers } from "@/lib/push";
 import { after } from "next/server";
 import { checkNoShows } from "@/lib/noshow.server";
 import { headers } from "next/headers";
-import { requestSignCode, signWithCode, metaFrom } from "@/lib/esign.server";
+import { requestSignCode, signWithCode, metaFrom, taktikalEmployeeLink } from "@/lib/esign.server";
 
 export type PunchResult = { ok: boolean; demo?: boolean; error?: string };
 export type ActionResult = { ok: boolean; demo?: boolean; error?: string };
@@ -349,7 +349,7 @@ export async function toggleShiftTask(id: string, done: boolean): Promise<{ ok: 
 
 /* ---------- ráðningarsamningur: in-app signing (þrep 1) ---------- */
 
-export type MyContract = { id: string; title: string; content: string; status: string };
+export type MyContract = { id: string; title: string; content: string; status: string; signedVia?: string | null };
 
 /** My newest contract. */
 export async function getMyContract(): Promise<{ ok: boolean; contract?: MyContract }> {
@@ -362,14 +362,28 @@ export async function getMyContract(): Promise<{ ok: boolean; contract?: MyContr
     const { data: me } = await supabase.from("employees").select("id").eq("user_id", user.id).maybeSingle();
     if (!me) return { ok: true };
     const { data } = await supabase
-      .from("contracts").select("id, title, content, status")
+      .from("contracts").select("id, title, content, status, signed_via")
       .eq("employee_id", me.id)
       .in("status", ["sent", "signed"])
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
     if (!data) return { ok: true };
-    return { ok: true, contract: { id: data.id as string, title: data.title as string, content: data.content as string, status: data.status as string } };
+    return { ok: true, contract: { id: data.id as string, title: data.title as string, content: data.content as string, status: data.status as string, signedVia: (data.signed_via as string | null) ?? null } };
   } catch {
     return { ok: false };
+  }
+}
+
+/** Taktikal (0062): undirritunartengill starfsmanns — tilbúinn þegar vinnuveitandi hefur skrifað undir. */
+export async function taktikalMyLink(id: string): Promise<{ ok: boolean; url?: string; waiting?: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
+    return await taktikalEmployeeLink({ userId: user.id }, id);
+  } catch (e) {
+    console.error("taktikalMyLink", e);
+    return { ok: false, error: "Tókst ekki að opna undirritun" };
   }
 }
 

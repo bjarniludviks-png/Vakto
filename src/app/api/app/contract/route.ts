@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { requestSignCode, signWithCode, metaFrom } from "@/lib/esign.server";
+import { requestSignCode, signWithCode, metaFrom, taktikalEmployeeLink } from "@/lib/esign.server";
 
 // Rafræn undirritun úr appinu (0058). Appið talar beint við Supabase, en undirritun
 // fer um þjóninn: kóði á netfang, staðfesting, undirritunarskrá og PDF til beggja.
@@ -18,6 +18,7 @@ export async function POST(req: Request) {
   const caller = { userId: auth.user.id, email: auth.user.email ?? null };
 
   if (action === "code") return NextResponse.json(await requestSignCode(caller, id));
+  if (action === "taktikal") return NextResponse.json(await taktikalEmployeeLink({ userId: caller.userId }, id));
   if (action === "sign") return NextResponse.json(await signWithCode(caller, id, String(body.code ?? ""), metaFrom(req.headers)));
   return NextResponse.json({ ok: false, error: "Ógild aðgerð" }, { status: 400 });
 }

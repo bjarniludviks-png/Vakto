@@ -3,12 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees } from "@/lib/employees.server";
 import { nf } from "@/lib/format";
+import { taktikalEnabled } from "@/lib/taktikal.server";
 
 export type LocationRow = { id?: string; name: string; staff: number; timezone: string; lat?: number | null; lng?: number | null; radius?: number };
 export type GeofenceMode = "off" | "flag" | "block";
 export type PositionRow = { id?: string; name: string; staff: number; baseRate: string; rawRate?: number };
 export type UserRow = { name: string; initials: string; role: string; email: string };
-export type CompanyInfo = { name: string; kennitala: string; address: string; postalCode?: string; city?: string; phone: string; email: string; feedPostPolicy?: "everyone" | "managers"; payPeriodStart?: number; plan?: string | null; trialEndsAt?: string | null; billingStatus?: string | null; laborTarget?: number; leaveCap?: number | null };
+export type CompanyInfo = { name: string; kennitala: string; address: string; postalCode?: string; city?: string; phone: string; email: string; feedPostPolicy?: "everyone" | "managers"; payPeriodStart?: number; plan?: string | null; trialEndsAt?: string | null; billingStatus?: string | null; laborTarget?: number; leaveCap?: number | null; esignProvider?: "vakto" | "taktikal"; taktikalAvailable?: boolean };
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
 export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
 export type CardView = { last4: string | null; brand: string | null; expiry: string | null };
@@ -106,6 +107,10 @@ export async function getSettingsData(): Promise<SettingsData> {
     const fpRes = await supabase.from("companies").select("feed_post_policy").eq("id", company).maybeSingle();
     const feedPostPolicy = (fpRes.error ? "everyone" : (fpRes.data?.feed_post_policy as string) ?? "everyone") as "everyone" | "managers";
     const kioskToken = ktRes.error ? null : ((ktRes.data?.kiosk_token as string | null) ?? null);
+    // Rafræn undirritun (0062) — tolerant.
+    const esRes = await supabase.from("companies").select("esign_provider").eq("id", company).maybeSingle();
+    const esignProvider = (esRes.error ? "vakto" : (esRes.data?.esign_provider as "vakto" | "taktikal" | null) ?? "vakto");
+    const taktikalAvailable = taktikalEnabled();
     // Póstnúmer + staður (0061) — tolerant.
     const pcRes = await supabase.from("companies").select("postal_code, city").eq("id", company).maybeSingle();
     const postalCode = pcRes.error ? "" : ((pcRes.data?.postal_code as string | null) ?? "");
@@ -167,7 +172,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       apiKeys,
       companyId: company,
       kioskToken, card, invoices, geofenceMode,
-      company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", postalCode, city, phone: c.phone ?? "", email: c.email ?? "", feedPostPolicy, payPeriodStart: ppd, plan, trialEndsAt, billingStatus, laborTarget, leaveCap },
+      company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", postalCode, city, phone: c.phone ?? "", email: c.email ?? "", feedPostPolicy, payPeriodStart: ppd, plan, trialEndsAt, billingStatus, laborTarget, leaveCap, esignProvider, taktikalAvailable },
       live: true,
     };
   } catch {

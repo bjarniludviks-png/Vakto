@@ -109,6 +109,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/app/") ||
     // Dagatalsstraumur (ICS) — leynitengill per starfsmann, engin innskráning.
     pathname.startsWith("/api/cal/") ||
+    // Taktikal webhook — sannreynt með HMAC-lykli, engin innskráning.
+    pathname.startsWith("/api/taktikal/") ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
     pathname === "/favicon.ico";

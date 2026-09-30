@@ -6,7 +6,7 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, aiContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, saveCompanyLimits, startCardChange, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit } from "./actions";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, aiContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, saveCompanyLimits, setEsignProvider, startCardChange, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit } from "./actions";
 import dynamic from "next/dynamic";
 import type { SettingsData, CompanyInfo, GeofenceMode } from "./settings.server";
 import type { AgreementResult, AgreementSource } from "@/lib/ai/agreement";
@@ -99,6 +99,16 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
                 defaultValue={data.company?.laborTarget ?? 30}
                 onBlur={async (e) => { const v = Number(e.target.value.replace(",", ".")); if (v === (data.company?.laborTarget ?? 30)) return; const r = await saveCompanyLimits({ laborTarget: v }); toast(r.ok ? t("Vistað") : (r.error ?? "Villa")); }} /> %</span>
             </div>
+            {data.company?.taktikalAvailable && (
+              <div className="statline"><span className="k">{t("Undirritun samninga")}</span>
+                <select className="badge" style={{ border: "1px solid var(--line)", padding: "5px 9px", font: "inherit", fontSize: 12.5 }}
+                  defaultValue={data.company?.esignProvider ?? "vakto"}
+                  onChange={async (e) => { const r = await setEsignProvider(e.target.value as "vakto" | "taktikal"); toast(r.ok ? t("Vistað") : (r.error ?? "Villa")); }}>
+                  <option value="vakto">{t("Kóði í tölvupósti (ókeypis)")}</option>
+                  <option value="taktikal">{t("Rafræn skilríki, Taktikal (~500 kr./samning)")}</option>
+                </select>
+              </div>
+            )}
             <div className="statline"><span className="k">{t("Hámark í fríi sama dag")}</span>
               <select className="badge" style={{ border: "1px solid var(--line)", padding: "5px 9px", font: "inherit", fontSize: 12.5 }}
                 defaultValue={data.company?.leaveCap == null ? "" : String(data.company.leaveCap)}

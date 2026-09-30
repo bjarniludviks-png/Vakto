@@ -17,6 +17,7 @@ import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendContractCodeEmail, sendSignedContractEmail } from "@/lib/email";
 import { buildContractPdf, type SignatureRecord } from "@/lib/contract-pdf";
+import { createSigningProcess, fetchSignedPdf, TAKTIKAL_EVENT, type TaktikalWebhook } from "@/lib/taktikal.server";
 
 const CODE_TTL_MIN = 10;
 const MAX_ATTEMPTS = 5;
@@ -172,4 +173,140 @@ async function deliverSignedCopy(contractId: string) {
   const employerEmail = sigs.find((s) => s.role === "employer")?.email;
   const to = new Set([...(owners ?? []).map((o) => o.email as string | null), employerEmail].filter(Boolean) as string[]);
   for (const addr of to) await sendSignedContractEmail(addr, { employeeName, company, pdfBase64: b64, filename, forEmployer: true });
+}
+
+/* ------------------------------------------------------------------------------------------
+ * Taktikal (0062): fullgild undirskrift beggja aðila með rafrænum skilríkjum.
+ * Vinnuveitandi „Undirrita & senda“ → ferli stofnað hjá Taktikal, vinnuveitandi skrifar
+ * fyrst (tengill opnast), starfsmaður fær tölvupóst frá Taktikal og tengil í Mitt svæði.
+ * Webhook (/api/taktikal/webhook) skráir hverja undirskrift; við AllSigned er undirritaða
+ * PDF-ið frá Taktikal (lagalega skjalið) vistað í skjalasafn og sent báðum.
+ * ---------------------------------------------------------------------------------------- */
+
+
+export async function startTaktikalSigning(
+  contractId: string,
+  employer: { userId: string; name: string; email: string; ssn: string; phone?: string | null },
+): Promise<{ ok: boolean; employerUrl?: string; error?: string }> {
+  const admin = createAdminClient();
+  const { data: c } = await admin.from("contracts")
+    .select("id, company_id, title, content, status, employees(full_name, kennitala, email, phone)")
+    .eq("id", contractId).maybeSingle();
+  if (!c || c.status !== "sent") return { ok: false, error: "Samningurinn er ekki í undirritunarferli" };
+  const emp = (Array.isArray(c.employees) ? c.employees[0] : c.employees) as { full_name?: string; kennitala?: string; email?: string; phone?: string } | null;
+  if (!emp?.kennitala || emp.kennitala.replace(/\D/g, "").length !== 10) return { ok: false, error: "Kennitölu starfsmanns vantar — hún þarf fyrir rafræn skilríki" };
+  if (!emp.email) return { ok: false, error: "Netfang starfsmanns vantar — Taktikal sendir undirritunartengil þangað" };
+  if (employer.ssn.replace(/\D/g, "").length !== 10) return { ok: false, error: "Sláðu inn þína kennitölu (10 stafir)" };
+
+  const { data: existing } = await admin.from("contract_taktikal").select("employer_url, status").eq("contract_id", contractId).maybeSingle();
+  if (existing && existing.status !== "canceled" && existing.status !== "expired" && existing.status !== "failed") {
+    return { ok: true, employerUrl: existing.employer_url as string };
+  }
+
+  const doc = await buildContractPdf(c.content as string, []);
+  const pdfBase64 = Buffer.from(doc.output("arraybuffer")).toString("base64");
+  const safe = (emp.full_name ?? "starfsmadur").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "_");
+  const proc = await createSigningProcess({
+    pdfBase64, fileName: `Radningarsamningur_${safe}.pdf`, ownerEmail: employer.email, contractId,
+    employer: { name: employer.name, ssn: employer.ssn, email: employer.email, phone: employer.phone, reason: "Fyrir hönd vinnuveitanda" },
+    employee: { name: emp.full_name ?? "Starfsmaður", ssn: emp.kennitala, email: emp.email, phone: emp.phone },
+  });
+  await admin.from("contract_taktikal").upsert({
+    contract_id: contractId, company_id: c.company_id, process_key: proc.processKey,
+    employer_signee_key: proc.employer.key, employee_signee_key: proc.employee.key,
+    employer_url: proc.employer.url, employee_url: proc.employee.url, status: "created", updated_at: new Date().toISOString(),
+  });
+  await admin.from("contracts").update({ content_sha256: sha256(c.content as string), signed_via: "taktikal" }).eq("id", contractId);
+  return { ok: true, employerUrl: proc.employer.url };
+}
+
+/** Undirritunartengill starfsmanns (aðeins eigin samningur, aðeins þegar vinnuveitandi hefur skrifað undir). */
+export async function taktikalEmployeeLink(caller: { userId: string }, contractId: string): Promise<{ ok: boolean; url?: string; waiting?: boolean; error?: string }> {
+  const admin = createAdminClient();
+  const { data: emp } = await admin.from("employees").select("id").eq("user_id", caller.userId).maybeSingle();
+  const { data: c } = await admin.from("contracts").select("employee_id, status").eq("id", contractId).maybeSingle();
+  if (!emp || !c || c.employee_id !== emp.id) return { ok: false, error: "Samningur fannst ekki" };
+  const { data: t } = await admin.from("contract_taktikal").select("employee_url, status").eq("contract_id", contractId).maybeSingle();
+  if (!t) return { ok: false, error: "Samningurinn er ekki í rafrænni undirritun" };
+  if (t.status === "created") return { ok: true, waiting: true };
+  if (t.status === "canceled" || t.status === "expired" || t.status === "failed") return { ok: false, error: "Undirritunarferlið rann út — biddu vinnuveitandann að senda samninginn aftur" };
+  return { ok: true, url: t.employee_url as string };
+}
+
+/** Úrvinnsla sannreynds webhooks frá Taktikal. Skilar false ef ferlið er okkur óþekkt. */
+export async function handleTaktikalEvent(p: TaktikalWebhook): Promise<boolean> {
+  const admin = createAdminClient();
+  const ev = p.EventData;
+  const { data: t } = await admin.from("contract_taktikal")
+    .select("contract_id, company_id, process_key, employer_signee_key, employee_signee_key, status, last_event_id")
+    .eq("process_key", ev.ProcessKey).maybeSingle();
+  if (!t) return false;
+  if (t.last_event_id === p.Id) return true; // sama webhook tvisvar
+  const now = new Date().toISOString();
+  const { data: c } = await admin.from("contracts").select("content, content_sha256, status").eq("id", t.contract_id).maybeSingle();
+  const hash = (c?.content_sha256 as string | null) ?? sha256((c?.content as string) ?? "");
+
+  if (ev.EventType === TAKTIKAL_EVENT.Canceled || ev.EventType === TAKTIKAL_EVENT.Expired) {
+    await admin.from("contract_taktikal").update({ status: ev.EventType === TAKTIKAL_EVENT.Canceled ? "canceled" : "expired", last_event_id: p.Id, updated_at: now }).eq("contract_id", t.contract_id);
+    return true;
+  }
+
+  // Skrá hverja nýja undirskrift (einu sinni per hlutverk).
+  const { data: existing } = await admin.from("contract_signatures").select("signer_role").eq("contract_id", t.contract_id).eq("method", "taktikal_qes");
+  const have = new Set((existing ?? []).map((r) => r.signer_role as string));
+  for (const s of ev.Signees ?? []) {
+    if (!s.Signed) continue;
+    const role = s.Key === t.employer_signee_key ? "employer" : s.Key === t.employee_signee_key ? "employee" : null;
+    if (!role || have.has(role)) continue;
+    await admin.from("contract_signatures").insert({
+      contract_id: t.contract_id, company_id: t.company_id, signer_role: role, signer_name: s.Name,
+      signer_email: s.Email ?? null, method: "taktikal_qes", doc_sha256: hash, signed_at: s.SignedAt || now,
+    });
+    have.add(role);
+    if (role === "employer") await admin.from("contracts").update({ employer_signed_at: s.SignedAt || now, employer_signed_by: s.Name }).eq("id", t.contract_id);
+  }
+
+  const allSigned = have.has("employer") && have.has("employee");
+  const status = allSigned ? "all_signed" : have.has("employer") ? "employer_signed" : have.has("employee") ? "employee_signed" : t.status;
+  await admin.from("contract_taktikal").update({ status, last_event_id: p.Id, updated_at: now }).eq("contract_id", t.contract_id);
+
+  if (allSigned && c?.status !== "signed") {
+    const empSig = (ev.Signees ?? []).find((s) => s.Key === t.employee_signee_key);
+    await admin.from("contracts").update({ status: "signed", signed_at: empSig?.SignedAt || now, signed_by_name: empSig?.Name ?? null, signed_via: "taktikal" }).eq("id", t.contract_id);
+    // Lagalega skjalið er PDF-ið frá Taktikal (með þeirra undirskriftum). Sótt beint frá API,
+    // ekki tekið úr webhook-sendingunni.
+    let pdf: Buffer | null = null;
+    try { pdf = await fetchSignedPdf(t.process_key as string, t.employee_signee_key as string); }
+    catch (e) {
+      console.error("taktikal fetch pdf", e);
+      // Varaleið: skjalið sem fylgir sannreyndu AllSigned-webhooki (svo samningurinn glatist ekki).
+      if (ev.SignedDocument) pdf = Buffer.from(ev.SignedDocument, "base64");
+    }
+    if (pdf && pdf.subarray(0, 5).toString() === "%PDF-") {
+      try { await deliverTaktikalCopy(t.contract_id as string, pdf); } catch (e) { console.error("taktikal deliver", e); }
+    }
+  }
+  return true;
+}
+
+async function deliverTaktikalCopy(contractId: string, pdf: Buffer) {
+  const admin = createAdminClient();
+  const { data: c } = await admin.from("contracts")
+    .select("company_id, employee_id, employees(full_name, email), companies(name)").eq("id", contractId).maybeSingle();
+  if (!c) return;
+  const emp = (Array.isArray(c.employees) ? c.employees[0] : c.employees) as { full_name?: string; email?: string } | null;
+  const co = (Array.isArray(c.companies) ? c.companies[0] : c.companies) as { name?: string } | null;
+  const safe = (emp?.full_name ?? "starfsmadur").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "_");
+  const filename = `Radningarsamningur_${safe}_undirritadur.pdf`;
+  const path = `${c.company_id}/${c.employee_id}/${Date.now()}-${filename}`;
+  const { error: upErr } = await admin.storage.from("documents").upload(path, pdf, { contentType: "application/pdf", upsert: false });
+  if (!upErr) {
+    await admin.from("documents").insert({ company_id: c.company_id, employee_id: c.employee_id, name: "Ráðningarsamningur (undirritaður með rafrænum skilríkjum).pdf", type: "Samningur", url: path });
+  } else console.error("taktikal pdf upload", upErr);
+  const b64 = pdf.toString("base64");
+  const employeeName = emp?.full_name ?? "Starfsmaður";
+  const company = co?.name ?? "Vinnuveitandi";
+  if (emp?.email) await sendSignedContractEmail(emp.email, { employeeName, company, pdfBase64: b64, filename, forEmployer: false });
+  const { data: owners } = await admin.from("users").select("email").eq("company_id", c.company_id).eq("role", "owner");
+  for (const o of owners ?? []) if (o.email) await sendSignedContractEmail(o.email as string, { employeeName, company, pdfBase64: b64, filename, forEmployer: true });
 }

@@ -11,7 +11,8 @@ import { sendContractEmail } from "@/lib/email";
 import { inviteToCompany } from "@/lib/invite.server";
 import type { CustomRules } from "@/lib/payrules";
 import { headers } from "next/headers";
-import { employerSign, metaFrom } from "@/lib/esign.server";
+import { employerSign, metaFrom, startTaktikalSigning } from "@/lib/esign.server";
+import { taktikalEnabled } from "@/lib/taktikal.server";
 import type { SignatureRecord } from "@/lib/contract-pdf";
 
 export type NewEmployeeInput = {
@@ -40,7 +41,11 @@ export type NewEmployeeInput = {
   schedulePattern?: string; // SchedulePattern.kind
 };
 
-export type ActionResult = { ok: boolean; demo?: boolean; error?: string; id?: string; invited?: boolean; inviteError?: string };
+export type ActionResult = { ok: boolean; demo?: boolean; error?: string; id?: string; invited?: boolean; inviteError?: string;
+  /** Taktikal (0062): vantar kennitölu/síma undirritara fyrir hönd vinnuveitanda. */
+  needSigner?: { ssn: string; phone: string };
+  /** Taktikal: undirritunartengill vinnuveitanda (opnast strax eftir sendingu). */
+  employerUrl?: string };
 
 const ROLE_MAP: Record<string, string> = {
   Starfsmaður: "employee",
@@ -672,6 +677,7 @@ export type ContractRow = {
   content: string;
   created: string;
   signed_at: string | null;
+  signed_via?: string | null;
 };
 
 /** Skyldureitur sem vantar — samningur er ekki sendur fyrr en hann er fylltur (sjá CONTRACT_BLANK í setContractStatus). */
@@ -799,7 +805,7 @@ export async function listContracts(employeeId: string): Promise<{ contracts: Co
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.from("contracts")
-      .select("id, title, template, status, content, created_at, signed_at")
+      .select("id, title, template, status, content, created_at, signed_at, signed_via")
       .eq("employee_id", employeeId).order("created_at", { ascending: false });
     if (error) return { contracts: [], live: false };
     return {
@@ -808,6 +814,7 @@ export async function listContracts(employeeId: string): Promise<{ contracts: Co
         id: r.id as string, title: r.title as string, template: r.template as string | null,
         status: r.status as ContractRow["status"], content: r.content as string,
         created: String(r.created_at).slice(0, 10), signed_at: r.signed_at ? String(r.signed_at).slice(0, 10) : null,
+        signed_via: (r.signed_via as string | null) ?? null,
       })),
     };
   } catch {
@@ -850,10 +857,25 @@ export async function deleteContract(id: string): Promise<ActionResult> {
   }
 }
 
-export async function setContractStatus(id: string, status: "draft" | "sent" | "signed" | "void"): Promise<ActionResult> {
+export async function setContractStatus(
+  id: string, status: "draft" | "sent" | "signed" | "void",
+  signer?: { ssn: string; phone?: string },
+): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
+    // Taktikal (0062): fyrirtækið notar rafræn skilríki → þarf kennitölu undirritara áður en sent er.
+    let useTaktikal = false;
+    if (status === "sent" && taktikalEnabled()) {
+      const cid = await companyId(supabase);
+      const { data: co } = cid ? await supabase.from("companies").select("esign_provider").eq("id", cid).maybeSingle() : { data: null };
+      useTaktikal = co?.esign_provider === "taktikal";
+      if (useTaktikal && !signer?.ssn) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: me } = user ? await supabase.from("employees").select("kennitala, phone").eq("user_id", user.id).maybeSingle() : { data: null };
+        return { ok: false, needSigner: { ssn: (me?.kennitala as string) ?? "", phone: (me?.phone as string) ?? "" } };
+      }
+    }
     // Skyldureitir (lágmarksatriði 91/533/EBE) verða að vera fylltir áður en samningur er sendur.
     if (status === "sent") {
       const { data: cur } = await supabase.from("contracts").select("content").eq("id", id).maybeSingle();
@@ -866,6 +888,24 @@ export async function setContractStatus(id: string, status: "draft" | "sent" | "
     const { data: row, error } = await supabase.from("contracts").update(patch).eq("id", id)
       .select("employee_id, employees(full_name, email), companies(name)").maybeSingle();
     if (error) return { ok: false, error: error.message };
+    // Taktikal: stofna undirritunarferli (vinnuveitandi skrifar fyrst með rafrænum skilríkjum).
+    if (status === "sent" && row && useTaktikal && signer) {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: u } = user ? await supabase.from("users").select("full_name").eq("id", user.id).maybeSingle() : { data: null };
+      try {
+        const r = await startTaktikalSigning(id, {
+          userId: user?.id ?? "", name: (u?.full_name as string) || user?.email || "Vinnuveitandi", email: user?.email ?? "",
+          ssn: signer.ssn, phone: signer.phone,
+        });
+        if (!r.ok) { await supabase.from("contracts").update({ status: "draft", sent_at: null }).eq("id", id); return { ok: false, error: r.error }; }
+        revalidatePath("/starfsfolk");
+        return { ok: true, employerUrl: r.employerUrl };
+      } catch (e) {
+        console.error("startTaktikalSigning", e);
+        await supabase.from("contracts").update({ status: "draft", sent_at: null }).eq("id", id);
+        return { ok: false, error: "Tókst ekki að stofna undirritun hjá Taktikal — reyndu aftur" };
+      }
+    }
     // "Sent" → vinnuveitandi undirritar (lota + IP/tæki + fingrafar skjals, 0058).
     if (status === "sent" && row) {
       try {
@@ -959,5 +999,21 @@ export async function getContractSignatures(id: string): Promise<SignatureRecord
     }));
   } catch {
     return [];
+  }
+}
+
+/** Opnar undirritunartengil vinnuveitanda aftur (Taktikal), t.d. ef glugganum var lokað. */
+export async function taktikalEmployerLink(contractId: string): Promise<{ ok: boolean; url?: string; status?: string; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: false };
+  try {
+    const supabase = await createClient();
+    const { data: c } = await supabase.from("contracts").select("id").eq("id", contractId).maybeSingle(); // RLS: stjórnandi fyrirtækisins
+    if (!c) return { ok: false, error: "Samningur fannst ekki" };
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { data: t } = await createAdminClient().from("contract_taktikal").select("employer_url, status").eq("contract_id", contractId).maybeSingle();
+    if (!t) return { ok: false };
+    return { ok: true, url: t.employer_url as string, status: t.status as string };
+  } catch {
+    return { ok: false };
   }
 }

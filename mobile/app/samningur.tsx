@@ -1,14 +1,14 @@
 // Ráðningarsamningur — sýnir nýjasta sendan/undirritaðan samning.
 import React, { useCallback, useEffect, useState } from "react";
 import { useTheme } from "../src/theme";
-import { View, TextInput, Pressable } from "react-native";
+import { View, TextInput, Pressable, Linking } from "react-native";
 import { Check } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
 import { Card, Txt, Muted, Pill, Btn, useToast } from "../src/components/ui";
 import { inputStyle } from "../src/components/request-sheets";
 import { colors } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
-import { getMyContract, requestContractCode, signContract, type Contract } from "../src/lib/api/docs";
+import { getMyContract, requestContractCode, signContract, taktikalLink, type Contract } from "../src/lib/api/docs";
 import { tr } from "../src/lib/i18n";
 import { parseContract, splitLang, contractSummary, visibleRows, isBlank } from "../src/lib/contract";
 
@@ -74,7 +74,19 @@ export default function Samningur() {
           </View>
           {contract.signedAt ? <Muted size={12}>Undirritað {contract.signedAt.slice(0, 10)}</Muted> : null}
           <ContractBody content={contract.content} />
-          {contract.status !== "signed" && sentTo == null ? (
+          {contract.status !== "signed" && contract.signedVia === "taktikal" ? (
+            <View style={{ gap: 10, paddingTop: 4 }}>
+              <Muted size={12.5}>{tr("Þessi samningur er undirritaður með rafrænum skilríkjum hjá Taktikal (fullgild undirskrift).")}</Muted>
+              <Btn title="Undirrita með rafrænum skilríkjum" loading={busy} disabled={busy} onPress={async () => {
+                setBusy(true);
+                const r = await taktikalLink(contract.id);
+                setBusy(false);
+                if (r.url) { Linking.openURL(r.url).catch(() => toast("Tókst ekki að opna undirritun")); return; }
+                toast(r.waiting ? "Vinnuveitandinn á eftir að skrifa undir. Þú færð tölvupóst þegar röðin er komin að þér." : (r.error ?? "Tókst ekki að opna undirritun"));
+              }} />
+            </View>
+          ) : null}
+          {contract.status !== "signed" && contract.signedVia !== "taktikal" && sentTo == null ? (
             <View style={{ gap: 12, paddingTop: 4 }}>
               <Pressable onPress={() => setAgreed((a) => !a)} style={{ flexDirection: "row", gap: 10, alignItems: "flex-start" }} accessibilityRole="checkbox" accessibilityState={{ checked: agreed }}>
                 <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: agreed ? colors.brand : colors.line, backgroundColor: agreed ? colors.brand : "transparent", alignItems: "center", justifyContent: "center", marginTop: 1 }}>
@@ -85,7 +97,7 @@ export default function Samningur() {
               <Btn title="Senda mér kóða" disabled={!agreed || busy} loading={busy} onPress={sendCode} />
             </View>
           ) : null}
-          {contract.status !== "signed" && sentTo != null ? (
+          {contract.status !== "signed" && contract.signedVia !== "taktikal" && sentTo != null ? (
             <View style={{ gap: 12, paddingTop: 4 }}>
               <Txt size={13}>{tr("Kóði var sendur á")} {sentTo}. {tr("Hann gildir í 10 mínútur.")}</Txt>
               <TextInput

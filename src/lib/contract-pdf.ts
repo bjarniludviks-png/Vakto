@@ -132,6 +132,7 @@ const METHOD: Record<string, string> = {
   session: "Innskráð lota í VAKTO / Signed-in VAKTO session",
   email_otp: "Kóði sendur á netfang / One-time code sent by email",
   manual: "Skráð handvirkt (pappír) / Recorded manually (paper)",
+  taktikal_qes: "Rafræn skilríki, fullgild undirskrift (Taktikal) / Electronic ID, qualified signature (Taktikal)",
 };
 
 export async function downloadContractPdf(title: string, content: string, signatures: SignatureRecord[] = []) {

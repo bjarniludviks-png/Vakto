@@ -9,6 +9,7 @@ import { nf } from "@/lib/format";
 import { inviteToCompany, roleFromLabel } from "@/lib/invite.server";
 import { draftContractTerms, type TermsDraft } from "@/lib/ai/terms";
 import { strictSchema, stripUnset } from "@/lib/ai/schema";
+import { taktikalEnabled } from "@/lib/taktikal.server";
 
 export type SyncResult = { ok: boolean; demo?: boolean; amount?: number; error?: string };
 export type SettingsResult = { ok: boolean; demo?: boolean; error?: string };
@@ -244,6 +245,25 @@ export async function ensureKioskToken(): Promise<{ ok: boolean; token?: string;
     });
     revalidatePath("/stillingar");
     return { ok: true, token };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Aðferð við rafræna undirritun samninga (0062): 'vakto' (kóði í tölvupósti) eða 'taktikal' (rafræn skilríki). */
+export async function setEsignProvider(provider: "vakto" | "taktikal"): Promise<SettingsResult> {
+  if (provider !== "vakto" && provider !== "taktikal") return { ok: false, error: "Ógilt val" };
+  if (provider === "taktikal" && !taktikalEnabled()) return { ok: false, error: "Rafræn skilríki eru ekki virk á þessum aðgangi" };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("companies").update({ esign_provider: provider }).eq("id", ctx.company);
+    if (error) return dbFail("setEsignProvider", error);
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "company.esign", entity: "companies", detail: `Rafræn undirritun samninga: ${provider === "taktikal" ? "rafræn skilríki (Taktikal)" : "kóði í tölvupósti"}` });
+    revalidatePath("/stillingar");
+    return { ok: true };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
   }
