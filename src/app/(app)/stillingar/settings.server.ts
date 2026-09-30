@@ -8,7 +8,7 @@ export type LocationRow = { id?: string; name: string; staff: number; timezone: 
 export type GeofenceMode = "off" | "flag" | "block";
 export type PositionRow = { id?: string; name: string; staff: number; baseRate: string; rawRate?: number };
 export type UserRow = { name: string; initials: string; role: string; email: string };
-export type CompanyInfo = { name: string; kennitala: string; address: string; phone: string; email: string; feedPostPolicy?: "everyone" | "managers"; payPeriodStart?: number; plan?: string | null; trialEndsAt?: string | null; billingStatus?: string | null; laborTarget?: number; leaveCap?: number | null };
+export type CompanyInfo = { name: string; kennitala: string; address: string; postalCode?: string; city?: string; phone: string; email: string; feedPostPolicy?: "everyone" | "managers"; payPeriodStart?: number; plan?: string | null; trialEndsAt?: string | null; billingStatus?: string | null; laborTarget?: number; leaveCap?: number | null };
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
 export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
 export type CardView = { last4: string | null; brand: string | null; expiry: string | null };
@@ -106,6 +106,10 @@ export async function getSettingsData(): Promise<SettingsData> {
     const fpRes = await supabase.from("companies").select("feed_post_policy").eq("id", company).maybeSingle();
     const feedPostPolicy = (fpRes.error ? "everyone" : (fpRes.data?.feed_post_policy as string) ?? "everyone") as "everyone" | "managers";
     const kioskToken = ktRes.error ? null : ((ktRes.data?.kiosk_token as string | null) ?? null);
+    // Póstnúmer + staður (0061) — tolerant.
+    const pcRes = await supabase.from("companies").select("postal_code, city").eq("id", company).maybeSingle();
+    const postalCode = pcRes.error ? "" : ((pcRes.data?.postal_code as string | null) ?? "");
+    const city = pcRes.error ? "" : ((pcRes.data?.city as string | null) ?? "");
     // Launamarkmið (0045) + hámark í fríi sama dag (0057) — tolerant.
     const limRes = await supabase.from("companies").select("labor_target, leave_cap").eq("id", company).maybeSingle();
     const lt = Number(limRes.data?.labor_target);
@@ -163,7 +167,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       apiKeys,
       companyId: company,
       kioskToken, card, invoices, geofenceMode,
-      company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", phone: c.phone ?? "", email: c.email ?? "", feedPostPolicy, payPeriodStart: ppd, plan, trialEndsAt, billingStatus, laborTarget, leaveCap },
+      company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", postalCode, city, phone: c.phone ?? "", email: c.email ?? "", feedPostPolicy, payPeriodStart: ppd, plan, trialEndsAt, billingStatus, laborTarget, leaveCap },
       live: true,
     };
   } catch {

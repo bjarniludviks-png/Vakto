@@ -398,12 +398,14 @@ function CompanyCard({ info }: { info: CompanyInfo | null }) {
   const [name, setName] = useState(info?.name ?? "");
   const [kt, setKt] = useState(info?.kennitala ?? "");
   const [address, setAddress] = useState(info?.address ?? "");
+  const [postal, setPostal] = useState(info?.postalCode ?? "");
+  const [city, setCity] = useState(info?.city ?? "");
   const [phone, setPhone] = useState(info?.phone ?? "");
   const [email, setEmail] = useState(info?.email ?? "");
   const [busy, setBusy] = useState(false);
   async function save() {
     setBusy(true);
-    const res = await saveCompanyInfo({ name, kennitala: kt, address, phone, email });
+    const res = await saveCompanyInfo({ name, kennitala: kt, address, postalCode: postal, city, phone, email });
     setBusy(false);
     toast(res.ok ? (res.demo ? "Vistað (demo — tengdu Supabase)" : "Fyrirtækjaupplýsingar vistaðar") : (res.error ?? "Tókst ekki"));
   }
@@ -416,8 +418,12 @@ function CompanyCard({ info }: { info: CompanyInfo | null }) {
           <div className="field" style={{ flex: 1 }}><label>{t("Kennitala")}</label><input value={kt} onChange={(e) => setKt(e.target.value)} placeholder="550101-2210" /></div>
           <div className="field" style={{ flex: 1 }}><label>{t("Sími")}</label><input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+354 555 1234" /></div>
         </div>
-        <div className="field"><label>{t("Heimilisfang")}</label><input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("t.d. Laugavegur 1, 101 Reykjavík")} /></div>
-        <div className="field"><label>{t("Netfang")}</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="bokhald@fyrirtaeki.is" /></div>
+        <div className="field"><label>{t("Heimilisfang")}</label><input value={address} onChange={(e) => setAddress(e.target.value)} placeholder={t("Gata og húsnúmer")} /></div>
+        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)", gap: 10 }}>
+          <div className="field"><label>{t("Póstnúmer")}</label><input value={postal} onChange={(e) => setPostal(e.target.value.replace(/\D/g, "").slice(0, 3))} inputMode="numeric" placeholder="101" /></div>
+          <div className="field"><label>{t("Staður (bær)")}</label><input value={city} onChange={(e) => setCity(e.target.value)} placeholder="Reykjavík" /></div>
+        </div>
+        <div className="field"><label>{t("Netfang fyrirtækis")}</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="bokhald@fyrirtaeki.is" /></div>
         <button className="btn sm" disabled={busy} onClick={save}>{t("Vista")}</button>
       </div>
     </div>

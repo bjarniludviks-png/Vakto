@@ -107,7 +107,7 @@ export async function setWeekdayRevenue(map: Record<string, number>): Promise<Se
 
 /** Save the company's own info (name, kennitala, address, contact). Owner-only via RLS. */
 export async function saveCompanyInfo(
-  input: { name: string; kennitala?: string; address?: string; phone?: string; email?: string },
+  input: { name: string; kennitala?: string; address?: string; postalCode?: string; city?: string; phone?: string; email?: string },
 ): Promise<SettingsResult> {
   if (!input.name?.trim()) return { ok: false, error: "Nafn fyrirtækis vantar" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
@@ -130,6 +130,12 @@ export async function saveCompanyInfo(
       if (!error) error = { message: "Vistað að hluta — keyrðu migration 0026 fyrir heimilisfang/síma/netfang" } as never;
     }
     if (error) return { ok: false, error: error.message };
+    // Póstnúmer + staður (0061) — sér uppfærsla svo vistun virki þótt migration vanti.
+    if (input.postalCode !== undefined || input.city !== undefined) {
+      const { error: pcErr } = await supabase.from("companies")
+        .update({ postal_code: input.postalCode?.trim() || null, city: input.city?.trim() || null }).eq("id", ctx.company);
+      if (pcErr) console.error("saveCompanyInfo postal", pcErr.message);
+    }
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "company.update", entity: "company", detail: `Fyrirtækjaupplýsingar uppfærðar — ${patch.name}`,
     });

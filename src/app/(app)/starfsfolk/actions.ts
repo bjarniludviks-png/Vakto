@@ -708,14 +708,14 @@ function contractMarkdown(e: Record<string, unknown>, c: Record<string, unknown>
     : orlofPct ? `Áunnið orlof ${orlofPct} skv. kjarasamningi / Accrued acc. to collective agreement`
     : "Skv. kjarasamningi og lögum nr. 30/1987 um orlof / Acc. to collective agreement and the Holiday Act";
   const benefits = (e.benefits as { name: string; amount?: number }[] | null) ?? [];
-  const address = [c.address].filter(Boolean).join(", ");
+  const address = [c.address, [c.postal_code, c.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
   const place = [extras.locationName && extras.locationName !== c.name ? extras.locationName : c.name, address].filter(Boolean).join(", ");
   const terms = (c.contract_terms as string | null)?.trim();
 
   return `# Ráðningarsamningur / Contract of employment
 
 ## Vinnuveitandi / Employer
-${req("Nafn / Name", c.name)}${req("Kennitala / ID No.", c.kennitala)}${req("Lögheimili / Address", c.address)}${opt("Sími / Telephone", c.phone)}${opt("Netfang / Email", c.email)}
+${req("Nafn / Name", c.name)}${req("Kennitala / ID No.", c.kennitala)}${req("Lögheimili / Address", address)}${opt("Sími / Telephone", c.phone)}${opt("Netfang / Email", c.email)}
 ## Starfsmaður / Employee
 ${req("Skírnarnafn / First name", first)}${req("Eftirnafn / Surname", last)}${req("Kennitala eða fæðingardagur / ID No. or date of birth", e.kennitala)}${req("Heimili á Íslandi / Address in Iceland", [e.address, [e.postal_code, e.city].filter(Boolean).join(" ")].filter(Boolean).join(", "))}${opt("Aðsetur ef annað / Temporary address", "")}${opt("Netfang / Email", e.email)}${opt("Sími / Telephone", e.phone)}${opt("Nánasti aðstandandi og sími / Closest family member and tel.", e.next_of_kin)}
 ## Starfssvið / Field of work

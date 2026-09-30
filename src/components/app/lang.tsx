@@ -1378,6 +1378,10 @@ export const DICT: Dict = {
   "Sleppa": { is: "Sleppa", en: "Skip", vi: "Bỏ qua" },
   "Byrja": { is: "Byrja", en: "Get started", vi: "Bắt đầu" },
   "Næsta": { is: "Næsta", en: "Next", vi: "Tiếp" },
+  "Gata og húsnúmer": { is: "Gata og húsnúmer", en: "Street and number", vi: "Đường và số nhà" },
+  "Póstnúmer": { is: "Póstnúmer", en: "Postcode", vi: "Mã bưu chính" },
+  "Staður (bær)": { is: "Staður", en: "Town", vi: "Thành phố" },
+  "Netfang fyrirtækis": { is: "Netfang", en: "Email", vi: "Email" },
   // Orlofsstaða (sept. 2026)
   "Orlofsfrí": { is: "Orlof", en: "Vacation", vi: "Nghỉ phép" },
   "Orlofsstaða": { is: "Orlofsstaða", en: "Vacation balance", vi: "Số dư nghỉ phép" },
