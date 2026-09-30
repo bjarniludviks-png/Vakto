@@ -497,6 +497,10 @@ td.unav.conf .shift{outline:2px solid var(--bad);outline-offset:-2px}
 .bars .b,.sbars .col{position:relative}
 .ctip{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%) translateY(3px);background:#22242c;color:#fff;font-size:11.5px;font-weight:600;line-height:1.45;padding:6px 10px;border-radius:8px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .12s,transform .12s;z-index:6;box-shadow:0 6px 18px rgba(16,18,24,.18);font-variant-numeric:tabular-nums}
 .bars .b:hover .ctip,.sbars .col:hover .ctip{opacity:1;transform:translateX(-50%) translateY(0)}
+/* Ystu súlurnar: tooltip festur við brúnina svo hann (líka falinn) teygi ekki síðuna út fyrir skjáinn (iPad) */
+.bars .b:first-child .ctip,.sbars .col:first-child .ctip{left:0;transform:translateY(3px)}
+.bars .b:last-child .ctip,.sbars .col:last-child .ctip{left:auto;right:0;transform:translateY(3px)}
+.bars .b:first-child:hover .ctip,.sbars .col:first-child:hover .ctip,.bars .b:last-child:hover .ctip,.sbars .col:last-child:hover .ctip{transform:translateY(0)}
 .legend{display:flex;flex-wrap:wrap;gap:14px;margin-top:14px;font-size:12px;color:var(--ink2)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:middle;margin-right:6px}
 
@@ -543,6 +547,9 @@ th.r,td.r{text-align:right;font-variant-numeric:tabular-nums}
 .who{display:flex;align-items:center;gap:10px}
 .who small{display:block;color:var(--ink3);font-weight:400;font-size:11px}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px}
+/* iPad/þröngar töflur: merkimiðar, tölur og dálkaheiti brotna aldrei — taflan skrollar frekar innan .tbl */
+.pill,.tag{white-space:nowrap}
+.tbl th,.tbl td.r{white-space:nowrap}
 
 /* schedule grid */
 .stoolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
