@@ -47,19 +47,20 @@ export type Contract = {
   content: string;
   status: string;
   signedAt: string | null;
+  signedVia: string | null;
 };
 
 export async function getMyContract(me: Me): Promise<Contract | null> {
   const { data } = await supabase
     .from("contracts")
-    .select("id, title, content, status, signed_at")
+    .select("id, title, content, status, signed_at, signed_via")
     .eq("employee_id", me.empId)
     .in("status", ["sent", "signed"])
     .order("created_at", { ascending: false })
     .limit(1);
   const c = data?.[0];
   return c
-    ? { id: c.id, title: c.title, content: c.content, status: c.status, signedAt: c.signed_at }
+    ? { id: c.id, title: c.title, content: c.content, status: c.status, signedAt: c.signed_at, signedVia: c.signed_via ?? null }
     : null;
 }
 
@@ -67,7 +68,7 @@ export async function getMyContract(me: Me): Promise<Contract | null> {
 // undirritunarskrá + PDF til beggja aðila. Sama flæði og á vefnum.
 const API = (process.env.EXPO_PUBLIC_API_URL ?? "https://www.vakto.is").replace(/\/$/, "");
 
-async function contractCall(body: Record<string, string>): Promise<{ ok: boolean; sentTo?: string; error?: string }> {
+async function contractCall(body: Record<string, string>): Promise<{ ok: boolean; sentTo?: string; url?: string; waiting?: boolean; error?: string }> {
   try {
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
@@ -77,7 +78,7 @@ async function contractCall(body: Record<string, string>): Promise<{ ok: boolean
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
     });
-    return (await r.json()) as { ok: boolean; sentTo?: string; error?: string };
+    return (await r.json()) as { ok: boolean; sentTo?: string; url?: string; waiting?: boolean; error?: string };
   } catch {
     return { ok: false, error: "Engin tenging — reyndu aftur" };
   }
@@ -85,3 +86,5 @@ async function contractCall(body: Record<string, string>): Promise<{ ok: boolean
 
 export const requestContractCode = (id: string) => contractCall({ action: "code", id });
 export const signContract = (id: string, code: string) => contractCall({ action: "sign", id, code });
+/** Taktikal (rafræn skilríki): undirritunartengill þegar vinnuveitandi hefur skrifað undir. */
+export const taktikalLink = (id: string) => contractCall({ action: "taktikal", id });

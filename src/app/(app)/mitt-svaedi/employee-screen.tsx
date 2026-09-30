@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
-import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, getMyContract, requestContractCode, signContractWithCode, type LeaveType, type MyPunchRow, type MyContract } from "./actions";
+import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, getMyContract, requestContractCode, signContractWithCode, taktikalMyLink, type LeaveType, type MyPunchRow, type MyContract } from "./actions";
 import { listCompanyDocs, openCompanyDoc, type CompanyDoc } from "../stillingar/actions";
 import { dec1, nf, krCompact } from "@/lib/format";
 import { leaveWorkdays } from "@/lib/orlof";
@@ -176,6 +176,27 @@ function PunchCard({ live = false, openSince = null, geofence = "off" }: { live?
   );
 }
 
+/** Taktikal: starfsmaður skrifar undir með rafrænum skilríkjum hjá Taktikal (eftir vinnuveitanda). */
+function TaktikalSignBox({ contractId }: { contractId: string }) {
+  const { t } = useLang();
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  async function open() {
+    setBusy(true);
+    const r = await taktikalMyLink(contractId);
+    setBusy(false);
+    if (r.url) { window.location.href = r.url; return; }
+    setMsg(r.waiting ? t("Vinnuveitandinn á eftir að skrifa undir. Þú færð tölvupóst þegar röðin er komin að þér.") : (r.error ?? t("Tókst ekki að opna undirritun")));
+  }
+  return (
+    <div>
+      <p style={{ fontSize: 13, margin: "0 0 10px" }}>{t("Þessi samningur er undirritaður með rafrænum skilríkjum hjá Taktikal (fullgild undirskrift).")}</p>
+      <button className="btn" type="button" disabled={busy} onClick={open}>{busy ? t("Opna…") : t("Undirrita með rafrænum skilríkjum")}</button>
+      {msg && <p className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>{msg}</p>}
+    </div>
+  );
+}
+
 /** Rafræn undirritun (0058): starfsmaður les, hakar við samþykki, fær 6 stafa kóða
  * á netfangið sitt og slær hann inn. Þjónninn skráir tíma, IP, tæki og fingrafar
  * skjalsins og sendir báðum aðilum undirritað PDF. */
@@ -224,7 +245,9 @@ function ContractSignCard() {
               <div style={{ maxHeight: sentTo == null ? "48vh" : "30vh", overflowY: "auto", border: "1px solid var(--line)", borderRadius: 12, padding: "12px 14px", marginBottom: 12 }}>
                 <ContractView content={contract.content} />
               </div>
-              {sentTo == null ? (
+              {contract.signedVia === "taktikal" ? (
+                <TaktikalSignBox contractId={contract.id} />
+              ) : sentTo == null ? (
                 <>
                   <label style={{ display: "flex", alignItems: "flex-start", gap: 9, fontSize: 13, cursor: "pointer" }}>
                     <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 2 }} />

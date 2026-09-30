@@ -218,6 +218,15 @@
   (`lib/ai/schema.ts`) — API krefst additionalProperties:false, ≤24 valkvæðra og ≤16 nullable reita; án þess
   hafnaði það `aiSuggestRules` og `readAgreement` og kerfið féll hljóðlaust á sniðmát. „Ágiska með AI (án samnings)“
   sýnir viðvörun og krefst staðfestingar áður en vistað er.
+- 🟡 **Taktikal — fullgild undirskrift með rafrænum skilríkjum (30. sept 2026, migration 0062, ÓPRÓFAÐ gegn Taktikal):**
+  `lib/taktikal.server.ts` (Signing API `POST /api/management/signing`, Basic Auth companyKey:apiKey, PDF
+  `GET /api/pdf/{process}/{signee}.pdf`, webhook-HMAC). Fyrirtæki velur í Stillingum (`companies.esign_provider`,
+  sést aðeins ef `TAKTIKAL_ENABLED=1`). Sending → `SignerModal` (kennitala/sími undirritara) → `startTaktikalSigning`
+  (vinnuveitandi skrifar fyrst, svo starfsmaður; báðir Qualified). Webhook `/api/taktikal/webhook` (opinber, HMAC +
+  CompanyKey + ≤24 klst + Id einu sinni) → `handleTaktikalEvent` → `contract_signatures` (method `taktikal_qes`) og við
+  AllSigned er PDF frá Taktikal vistað og sent báðum. Env: `TAKTIKAL_COMPANY_KEY/API_KEY/WEBHOOK_KEY` (á Vercel),
+  `TAKTIKAL_BASE_URL` (þróun: onboardingdev), `TAKTIKAL_FLOW_KEY` (annars fyrsta flæði). Webhook-slóð þarf að skrá á
+  flæðið í Taktikal. Samningur BGL: 26.300 kr/mán + 130 kr/undirskrift + Auðkenni ~119 kr.
 - **Still remaining:** contractor billable-vs-cost/GPS job tracking, a signed-URL viewer for the
   private `documents` bucket, Google/Microsoft/Auðkenni OAuth (scaffolded in `login-form`).
 - ✅ **VAKTO Admin (ofurstjórnborð SaaS-eigandans):** `/admin` — aðgangur EINGÖNGU fyrir netföng í

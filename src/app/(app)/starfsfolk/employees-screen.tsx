@@ -10,7 +10,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "@/lib/contract-pdf";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getDepartmentColors, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, type ContractRow } from "./actions";
+import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getDepartmentColors, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField, BankField } from "@/components/app/fields";
@@ -921,6 +921,7 @@ function ContractTab({ employeeId }: { employeeId: string }) {
   const [live, setLive] = useState(false);
   const [view, setView] = useState<ContractRow | null>(null);
   const [busy, setBusy] = useState(false);
+  const [signerFor, setSignerFor] = useState<{ id: string; ssn: string; phone: string } | null>(null);
   const load = () => listContracts(employeeId).then((r) => { setContracts(r.contracts); setLive(r.live); }).catch(() => {});
   useEffect(() => { load(); }, [employeeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -935,6 +936,7 @@ function ContractTab({ employeeId }: { employeeId: string }) {
   async function mark(c: ContractRow, status: "sent" | "signed" | "void") {
     if (status === "sent" && !window.confirm(t("Undirrita samninginn fyrir hönd fyrirtækisins og senda hann starfsmanninum? Eftir það er ekki hægt að breyta textanum."))) return;
     const res = await setContractStatus(c.id, status);
+    if (res.needSigner) { setSignerFor({ id: c.id, ...res.needSigner }); return; }
     toast(res.ok ? (status === "sent" ? t("Undirritað og sent — starfsmaðurinn fær tölvupóst") : t("Staða uppfærð")) : (res.error ?? "Villa"));
     load();
   }
@@ -962,6 +964,13 @@ function ContractTab({ employeeId }: { employeeId: string }) {
             <span className="dl">{c.signed_at ?? c.created}</span>
             <button className="btn ghost sm" type="button" onClick={async () => downloadContractPdf(c.title, c.content, c.status === "draft" ? [] : await getContractSignatures(c.id))}>PDF</button>
             {c.status === "draft" && <button className="btn sm" type="button" onClick={() => mark(c, "sent")}>{t("Undirrita & senda")}</button>}
+            {c.status === "sent" && c.signed_via === "taktikal" && (
+              <button className="btn ghost sm" type="button" onClick={async () => {
+                const r = await taktikalEmployerLink(c.id);
+                if (r.url && r.status === "created") window.location.href = r.url;
+                else toast(r.status === "employer_signed" ? t("Þú hefur skrifað undir — beðið eftir starfsmanni") : t("Undirritun er ekki opin"));
+              }}>{t("Opna undirritun")}</button>
+            )}
             {c.status !== "signed" && c.status !== "void" && <button className="btn ghost sm" type="button" title={t("Ef samningurinn var undirritaður á pappír")} onClick={() => mark(c, "signed")}>{t("Merkja undirritað")}</button>}
             {c.status !== "signed" && <button className="x" type="button" title={t("Eyða samningi")} onClick={() => remove(c)} style={{ color: "var(--bad)" }}>✕</button>}
           </div>
@@ -971,14 +980,56 @@ function ContractTab({ employeeId }: { employeeId: string }) {
         {busy ? t("Bý til…") : t("+ Búa til samning úr gögnum")}
       </button>
       <p className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>{t("„Undirrita & senda“ skráir undirskrift þína og sendir starfsmanninum samninginn. Hann staðfestir með kóða í tölvupósti og báðir fá undirritað PDF með undirritunarskrá (tími, IP, tæki, fingrafar skjals).")}</p>
-      {view && <ContractViewModal view={view} onClose={() => setView(null)} onChanged={load} />}
+      {view && <ContractViewModal view={view} onClose={() => setView(null)} onChanged={load} onNeedSigner={(x) => setSignerFor(x)} />}
+      {signerFor && <SignerModal init={signerFor} onClose={() => setSignerFor(null)} onDone={load} />}
     </>
   );
 }
 
 /** Draft review flow: managers read the generated draft, edit it inline,
  * then confirm & send for signature. Sent/signed contracts are read-only. */
-function ContractViewModal({ view, onClose, onChanged }: { view: ContractRow; onClose: () => void; onChanged: () => void }) {
+/** Taktikal: kennitala og sími þess sem skrifar undir fyrir hönd fyrirtækisins (rafræn skilríki). */
+function SignerModal({ init, onClose, onDone }: { init: { id: string; ssn: string; phone: string }; onClose: () => void; onDone: () => void }) {
+  const { t } = useLang();
+  const [ssn, setSsn] = useState(init.ssn);
+  const [phone, setPhone] = useState(init.phone);
+  const [busy, setBusy] = useState(false);
+  const [url, setUrl] = useState<string | null>(null);
+  async function go() {
+    setBusy(true);
+    const res = await setContractStatus(init.id, "sent", { ssn, phone });
+    setBusy(false);
+    if (!res.ok) { toast(res.error ?? "Villa"); return; }
+    onDone();
+    setUrl(res.employerUrl ?? null);
+  }
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal" role="dialog" aria-modal="true" style={{ maxWidth: 440 }}>
+        <div className="mh"><div style={{ fontSize: 15, fontWeight: 700 }}>{t("Undirrita með rafrænum skilríkjum")}</div><button className="x" type="button" onClick={onClose}>✕</button></div>
+        <div className="mb">
+          <p style={{ fontSize: 13, color: "var(--ink2)", margin: "0 0 12px" }}>{t("Þú skrifar fyrst undir fyrir hönd fyrirtækisins, síðan fær starfsmaðurinn samninginn. Báðir nota rafræn skilríki (fullgild undirskrift).")}</p>
+          {url ? (
+            <>
+              <p style={{ fontSize: 13, margin: "0 0 12px" }}>{t("Samningurinn er tilbúinn hjá Taktikal. Skrifaðu undir núna — starfsmaðurinn fær tölvupóst þegar þú hefur skrifað undir.")}</p>
+              <a className="btn" href={url} target="_blank" rel="noopener noreferrer" onClick={() => setTimeout(onClose, 300)}>{t("Skrifa undir hjá Taktikal")}</a>
+            </>
+          ) : <>
+          <div className="emp-fld"><label htmlFor="sg-ssn">{t("Kennitala þín")}</label><input id="sg-ssn" inputMode="numeric" value={ssn} onChange={(e) => setSsn(e.target.value)} placeholder="000000-0000" /></div>
+          <div className="emp-fld"><label htmlFor="sg-ph">{t("Farsími með rafrænum skilríkjum")}</label><input id="sg-ph" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="6xx xxxx" /></div>
+          <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+            <button className="btn" type="button" disabled={busy || ssn.replace(/\D/g, "").length !== 10} onClick={go}>{busy ? t("Sendi…") : t("Opna undirritun")}</button>
+            <button className="btn ghost" type="button" onClick={onClose}>{t("Hætta við")}</button>
+          </div>
+          </>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContractViewModal({ view, onClose, onChanged, onNeedSigner }: { view: ContractRow; onClose: () => void; onChanged: () => void; onNeedSigner: (x: { id: string; ssn: string; phone: string }) => void }) {
   const { t } = useLang();
   const isDraft = view.status === "draft";
   const [text, setText] = useState(view.content);
@@ -998,6 +1049,7 @@ function ContractViewModal({ view, onClose, onChanged }: { view: ContractRow; on
     setBusy(true);
     const res = await setContractStatus(view.id, "sent");
     setBusy(false);
+    if (res.needSigner) { onClose(); onNeedSigner({ id: view.id, ...res.needSigner }); return; }
     toast(res.ok ? t("Undirritað og sent — starfsmaðurinn fær tölvupóst") : (res.error ?? "Villa"));
     onChanged();
     onClose();
