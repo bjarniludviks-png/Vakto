@@ -20,7 +20,10 @@ export type Employee = {
   phone: string | null;
   bankAccount: string | null;
   address?: string | null;
+  postalCode?: string | null;
+  city?: string | null;
   nextOfKin?: string | null;
+  hireDate?: string | null;
   role: string;
   payRule?: CustomRules | null;
   permissions?: { clock: boolean; shifts: boolean; pay: boolean; requests: boolean; card: boolean; chat: boolean } | null;

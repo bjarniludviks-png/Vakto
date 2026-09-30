@@ -13,7 +13,7 @@ import { downloadContractPdf } from "@/lib/contract-pdf";
 import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getDepartmentColors, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, type ContractRow } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
-import { TimeField, DateField } from "@/components/app/fields";
+import { TimeField, DateField, BankField } from "@/components/app/fields";
 import { useCountry } from "@/components/app/country";
 import { CONTRACT_TYPES, SCHEDULE_PATTERNS, templateToPayRule, type RuleTemplate } from "@/lib/rules";
 import { listRuleTemplates } from "../stillingar/actions";
@@ -791,22 +791,37 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
   if (tab === "Samningur") {
     return <ContractTab employeeId={e.id} />;
   }
-  const pfld = (label: string, name: string, value: string | null, placeholder: string) => (
-    <div className="statline">
-      <span className="k">{label}</span>
-      <input name={name} defaultValue={value ?? ""} placeholder={placeholder} style={{ ...FLD, width: 200 }} />
-    </div>
+  const fld = (label: string, name: string, value: string | null | undefined, placeholder: string, extra?: React.InputHTMLAttributes<HTMLInputElement>) => (
+    <div className="emp-fld"><label htmlFor={`f-${name}`}>{label}</label><input id={`f-${name}`} name={name} defaultValue={value ?? ""} placeholder={placeholder} {...extra} /></div>
   );
   return (
     <>
-      <Sec first>Persónulegt</Sec>
-      {pfld("Netfang", "pEmail", e.email, "netfang@daemi.is")}
-      {pfld("Sími", "pPhone", e.phone, "+354 …")}
-      {pfld("Kennitala", "pKennitala", e.kennitala, "000000-0000")}
-      {pfld("Bankareikningur", "pBank", e.bankAccount, "0000-00-000000")}
-      {pfld("Heimilisfang", "pAddress", e.address ?? null, "Gata 1, 101 Reykjavík")}
-      {pfld("Nánasti aðstandandi", "pNextOfKin", e.nextOfKin ?? null, "Nafn, sími")}
-      <Stat k="Tímabelti" v="Atlantic/Reykjavik" />
+      <Sec first>Grunnupplýsingar</Sec>
+      <div className="emp-row2">
+        {fld("Netfang", "pEmail", e.email, "netfang@daemi.is", { type: "email", autoComplete: "off" })}
+        {fld("Sími", "pPhone", e.phone, "+354 …", { type: "tel", inputMode: "tel" })}
+      </div>
+      <div className="emp-row2">
+        {fld("Kennitala", "pKennitala", e.kennitala, "000000-0000", { inputMode: "numeric" })}
+        <div className="emp-fld"><label>Ráðningardagur</label><DateField full name="pHireDate" defaultValue={e.hireDate ?? ""} /></div>
+      </div>
+
+      <Sec>Heimilisfang</Sec>
+      {fld("Heimilisfang", "pAddress", e.address, "Gata og húsnúmer")}
+      <div className="emp-row2" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)" }}>
+        {fld("Póstnúmer", "pPostal", e.postalCode, "101", { inputMode: "numeric", maxLength: 3 })}
+        {fld("Staður", "pCity", e.city, "Reykjavík")}
+      </div>
+
+      <Sec>Banki</Sec>
+      <div className="emp-fld">
+        <label>Bankareikningur</label>
+        <BankField name="pBank" defaultValue={e.bankAccount} />
+        <div className="muted" style={{ fontSize: 11.5, marginTop: 5 }}>Banki · höfuðbók · reikningsnúmer</div>
+      </div>
+
+      <Sec>Nánasti aðstandandi</Sec>
+      {fld("Nafn og sími", "pNextOfKin", e.nextOfKin, "t.d. Lan Vu, 691 2345")}
     </>
   );
 }
@@ -1165,7 +1180,7 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
     setError(null);
     const res = await createEmployee({
       fullName: g("fullName")!, kennitala: g("kennitala"), email: g("email"), phone: g("phone"),
-      bankAccount: g("bankAccount"), role: g("role") ?? "Starfsmaður", position: g("position"),
+      bankAccount: g("bankAccount"), address: g("address"), postalCode: g("postalCode"), city: g("city"), role: g("role") ?? "Starfsmaður", position: g("position"),
       department: g("department"), location: g("location"), hireDate: g("hireDate"),
       employmentRatio: g("employmentRatio"), payType: g("payType"), rate: g("rate"), union: g("union"),
       pensionFund: g("pensionFund"), monthlyHours: g("monthlyHours"),
@@ -1202,7 +1217,12 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
             <div className="emp-fld"><label>Netfang</label><input name="email" placeholder="netfang@fyrirtaeki.is" /></div>
             <div className="emp-fld"><label>Sími</label><input name="phone" placeholder="+354 ..." /></div>
           </div>
-          <div className="emp-fld"><label>Bankareikningur (laun)</label><input name="bankAccount" placeholder="0000-00-000000" /></div>
+          <div className="emp-fld"><label>Heimilisfang</label><input name="address" placeholder="Gata og húsnúmer" /></div>
+          <div className="emp-row2" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)" }}>
+            <div className="emp-fld"><label>Póstnúmer</label><input name="postalCode" placeholder="101" inputMode="numeric" maxLength={3} /></div>
+            <div className="emp-fld"><label>Staður</label><input name="city" placeholder="Reykjavík" /></div>
+          </div>
+          <div className="emp-fld"><label>Bankareikningur (laun)</label><BankField name="bankAccount" /></div>
 
           <Sec>Starf & aðgangur</Sec>
           <div className="emp-fld">

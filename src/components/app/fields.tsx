@@ -71,9 +71,11 @@ function displayToIso(str: string): string {
 const MONTHS_IS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
 const WD_IS = ["M", "Þ", "M", "F", "F", "L", "S"]; // Mon-first
 
-export function DateField({ value, defaultValue, name, onChange, style, min, max }: {
+export function DateField({ value, defaultValue, name, onChange, style, min, max, full }: {
   value?: string; defaultValue?: string; name?: string; onChange?: (v: string) => void;
   style?: React.CSSProperties; min?: string; max?: string;
+  /** Fyllir breidd forms-reits (t.d. í .emp-fld) í stað þéttrar 118px útgáfu. */
+  full?: boolean;
 }) {
   const controlled = value !== undefined;
   const [iso, setIso] = useState(value ?? defaultValue ?? "");
@@ -104,13 +106,13 @@ export function DateField({ value, defaultValue, name, onChange, style, min, max
   };
 
   return (
-    <span ref={wrap} style={{ position: "relative", display: "inline-flex" }}>
+    <span ref={wrap} style={{ position: "relative", display: full ? "flex" : "inline-flex", width: full ? "100%" : undefined }}>
       {name && <input type="hidden" name={name} value={iso} readOnly />}
       <input
         type="text" inputMode="numeric" value={text} placeholder="dd.mm.áááá"
         onChange={(e) => setText(e.target.value)}
         onBlur={(e) => { const n = displayToIso(e.target.value); if (n) set(n); else if (!e.target.value) set(""); else setText(isoToDisplay(iso)); }}
-        style={{ ...FIELD, width: 118, ...style }}
+        style={{ ...FIELD, width: full ? "100%" : 118, ...(full ? { padding: "9px 34px 9px 11px", fontSize: 14, borderRadius: 9 } : {}), ...style }}
       />
       <button type="button" onClick={() => setOpen((o) => !o)} title="Dagatal"
         style={{ marginLeft: -30, width: 26, background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
@@ -140,3 +142,49 @@ export function DateField({ value, defaultValue, name, onChange, style, min, max
   );
 }
 const navBtn: React.CSSProperties = { width: 26, height: 26, borderRadius: 7, border: "1px solid var(--line)", background: "var(--panel)", color: "var(--ink)", cursor: "pointer", fontSize: 15, lineHeight: 1 };
+
+/** Íslenskur bankareikningur í þremur reitum: banki (4) · höfuðbók (2) · reikningsnúmer (6).
+ *  Hoppar sjálfkrafa í næsta reit, bakk í tómum reit fer til baka og heill reikningur
+ *  límdur í hvaða reit sem er dreifist rétt. Falinn reitur `name` ber „0000-00-000000“. */
+export function BankField({ name, defaultValue, ariaLabel = "Bankareikningur" }: { name: string; defaultValue?: string | null; ariaLabel?: string }) {
+  const LENS = [4, 2, 6];
+  const split = (v: string | null | undefined): string[] => {
+    const d = (v ?? "").replace(/\D/g, "");
+    if (!d) return ["", "", ""];
+    const parts = (v ?? "").split(/[-\s]+/).filter(Boolean);
+    if (parts.length === 3) return parts.map((p, i) => p.replace(/\D/g, "").slice(0, LENS[i]));
+    return [d.slice(0, 4), d.slice(4, 6), d.slice(6, 12)];
+  };
+  const [parts, setParts] = useState<string[]>(() => split(defaultValue));
+  const refs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
+  const setPart = (i: number, raw: string) => {
+    const d = raw.replace(/\D/g, "");
+    if (d.length > LENS[i] && i === 0 && d.length >= 10) { setParts(split(d)); refs[2].current?.focus(); return; }
+    const next = [...parts];
+    next[i] = d.slice(0, LENS[i]);
+    setParts(next);
+    if (next[i].length === LENS[i] && i < 2) refs[i + 1].current?.focus();
+  };
+  const onPaste = (i: number) => (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const txt = e.clipboardData.getData("text");
+    if (txt.replace(/\D/g, "").length >= 10) { e.preventDefault(); setParts(split(txt)); refs[2].current?.focus(); }
+    else if (i === 0) return;
+  };
+  const onKey = (i: number) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !parts[i] && i > 0) refs[i - 1].current?.focus();
+  };
+  const joined = parts.some(Boolean) ? parts.join("-") : "";
+  const box = (i: number, ph: string, label: string, w: string) => (
+    <input ref={refs[i]} inputMode="numeric" autoComplete="off" aria-label={`${ariaLabel}: ${label}`} placeholder={ph}
+      value={parts[i]} maxLength={i === 0 ? 14 : LENS[i]} onChange={(e) => setPart(i, e.target.value)} onPaste={onPaste(i)} onKeyDown={onKey(i)}
+      style={{ width: w, flex: "none", textAlign: "center", fontVariantNumeric: "tabular-nums", letterSpacing: "0.04em" }} />
+  );
+  return (
+    <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      {box(0, "0000", "banki", "5.2em")}
+      {box(1, "00", "höfuðbók", "3.4em")}
+      {box(2, "000000", "reikningsnúmer", "7.2em")}
+      <input type="hidden" name={name} value={joined} />
+    </div>
+  );
+}

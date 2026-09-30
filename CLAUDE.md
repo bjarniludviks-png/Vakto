@@ -208,6 +208,10 @@
   `CONTRACT_BLANK` og `setContractStatus("sent")` hafnar sendingu þar til þeir eru fylltir. Álagsprósentur fara
   ALDREI í samninginn (UNION_PRESETS eru óstaðfestir) — yfirvinna/vaktaálag „skv. kjarasamningi“. Verktakar fá
   ekki ráðningarsamning. Migration **0059**: `employees.address`, `employees.next_of_kin` (Persónulegt-flipinn).
+- ✅ **Starfsmannaspjald (30. sept 2026):** flipar sem hafa verið opnaðir haldast lifandi (faldir) svo óvistaður
+  innsláttur tapast ekki; ein „Vista“ fyrir alla flipa + „Óvistaðar breytingar“ + viðvörun við að fara. Persónulegt:
+  heimilisfang · póstnúmer · staður (migration **0060**: `postal_code`, `city`, skiptir eldri „Gata 1, 101 Staður“),
+  bankareikningur í þremur reitum (`BankField` í `components/app/fields.tsx`, geymt sem „0000-00-000000“).
 - **Still remaining:** contractor billable-vs-cost/GPS job tracking, a signed-URL viewer for the
   private `documents` bucket, Google/Microsoft/Auðkenni OAuth (scaffolded in `login-form`).
 - ✅ **VAKTO Admin (ofurstjórnborð SaaS-eigandans):** `/admin` — aðgangur EINGÖNGU fyrir netföng í

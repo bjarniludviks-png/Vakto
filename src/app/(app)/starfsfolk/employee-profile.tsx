@@ -18,7 +18,18 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
   const router = useRouter();
   const { t } = useLang();
   const [tab, setTab] = useState<ProfileTab>("Laun");
+  // Flipar sem hafa verið opnaðir haldast lifandi (faldir) svo óvistaður innsláttur
+  // tapast ekki þegar skipt er um flipa; „Vista“ vistar alla flipa í einu.
+  const [visited, setVisited] = useState<Set<ProfileTab>>(() => new Set<ProfileTab>(["Laun"]));
+  const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const openTab = (x: ProfileTab) => { setTab(x); setVisited((v) => (v.has(x) ? v : new Set(v).add(x))); };
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (ev: BeforeUnloadEvent) => { ev.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [dirty]);
   const [deptColors, setDeptColors] = useState<Record<string, string>>({});
   useEffect(() => { getDepartmentColors().then(setDeptColors).catch(() => {}); }, []);
   const e = employee;
@@ -50,10 +61,14 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
       kennitala: fd.has("pKennitala") ? (fd.get("pKennitala") as string) : undefined,
       bankAccount: fd.has("pBank") ? (fd.get("pBank") as string) : undefined,
       address: fd.has("pAddress") ? (fd.get("pAddress") as string) : undefined,
+      postalCode: fd.has("pPostal") ? (fd.get("pPostal") as string) : undefined,
+      city: fd.has("pCity") ? (fd.get("pCity") as string) : undefined,
+      hireDate: fd.has("pHireDate") ? ((fd.get("pHireDate") as string) || undefined) : undefined,
       nextOfKin: fd.has("pNextOfKin") ? (fd.get("pNextOfKin") as string) : undefined,
     });
     setSaving(false);
-    toast(res.demo ? "Vistað (demo — tengdu Supabase)" : "Vistað");
+    if (res.ok) setDirty(false);
+    toast(res.demo ? "Vistað (demo — tengdu Supabase)" : res.ok ? "Vistað" : (res.error ?? "Villa"));
     router.refresh();
   }
 
@@ -90,13 +105,16 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
         </div>
         <div style={{ display: "flex", gap: 2, padding: "0 16px", borderBottom: "1px solid var(--line)", overflowX: "auto" }}>
           {PROFILE_TABS.map((x) => (
-            <button key={x} className={`etab${x === tab ? " on" : ""}`} onClick={() => setTab(x)}>{x}</button>
+            <button key={x} type="button" className={`etab${x === tab ? " on" : ""}`} onClick={() => openTab(x)}>{x}</button>
           ))}
         </div>
-        <form className="cb" onSubmit={save}>
-          <ProfileTabBody e={e} tab={tab} />
+        <form className="cb" onSubmit={save} onInput={() => setDirty(true)} onChange={() => setDirty(true)}>
+          {PROFILE_TABS.filter((x) => visited.has(x)).map((x) => (
+            <div key={x} hidden={x !== tab}><ProfileTabBody e={e} tab={x} /></div>
+          ))}
           <div style={{ display: "flex", gap: 9, marginTop: 22, flexWrap: "wrap" }}>
             <button className="btn" type="submit" disabled={saving}>{saving ? t("Vista…") : t("Vista")}</button>
+            {dirty && !saving && <span style={{ alignSelf: "center", fontSize: 12.5, color: "var(--warn)", fontWeight: 600 }}>{t("Óvistaðar breytingar")}</span>}
             <button className="btn ghost" type="button" disabled={saving} onClick={toggleActive}>{e.status === "inactive" ? t("Virkja") : t("Óvirkja")}</button>
             <span className="muted" style={{ marginLeft: "auto", fontSize: 12, alignSelf: "center" }}>{t("Eyðing er á starfsmannalistanum")}</span>
           </div>

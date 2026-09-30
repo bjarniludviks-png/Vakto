@@ -20,6 +20,9 @@ export type NewEmployeeInput = {
   email?: string;
   phone?: string;
   bankAccount?: string;
+  address?: string;
+  postalCode?: string;
+  city?: string;
   role: string; // label from the form
   position?: string;
   department?: string;
@@ -151,6 +154,13 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
       ({ data: created, error } = await supabase.from("employees").insert(baseRow).select("id").maybeSingle());
     }
     if (error) return { ok: false, error: error.message };
+    // Heimilisfang (0059/0060) — sér uppfærsla svo stofnun virki þótt migration vanti.
+    if (created?.id && (input.address || input.postalCode || input.city)) {
+      const { error: adErr } = await supabase.from("employees").update({
+        address: input.address?.trim() || null, postal_code: input.postalCode?.trim() || null, city: input.city?.trim() || null,
+      }).eq("id", created.id);
+      if (adErr) console.error("createEmployee address", adErr.message);
+    }
 
     const { data: { user } } = await supabase.auth.getUser();
     await logAudit(supabase, company, user?.id ?? null, {
@@ -340,6 +350,8 @@ export type UpdateEmployeeInput = {
   phone?: string;
   kennitala?: string;
   address?: string;
+  postalCode?: string;
+  city?: string;
   nextOfKin?: string;
   bankAccount?: string;
   rate?: string;
@@ -477,6 +489,14 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
     if (input.bankAccount !== undefined) patch.bank_account = input.bankAccount.trim() || null;
     if (input.address !== undefined) patch.address = input.address.trim() || null;
     if (input.nextOfKin !== undefined) patch.next_of_kin = input.nextOfKin.trim() || null;
+    // Póstnúmer/staður (0060) — sér uppfærsla svo vistun virki þótt migration vanti.
+    if (input.postalCode !== undefined || input.city !== undefined) {
+      const pc: Record<string, string | null> = {};
+      if (input.postalCode !== undefined) pc.postal_code = input.postalCode.trim() || null;
+      if (input.city !== undefined) pc.city = input.city.trim() || null;
+      const { error: pcErr } = await supabase.from("employees").update(pc).eq("id", id);
+      if (pcErr) console.error("updateEmployee postal", pcErr.message);
+    }
     if (input.rate) patch.rate = num(input.rate, 2900);
     if (input.employmentRatio) patch.employment_ratio = num(input.employmentRatio, 100);
     if (input.union) {
@@ -697,7 +717,7 @@ function contractMarkdown(e: Record<string, unknown>, c: Record<string, unknown>
 ## Vinnuveitandi / Employer
 ${req("Nafn / Name", c.name)}${req("Kennitala / ID No.", c.kennitala)}${req("Lögheimili / Address", c.address)}${opt("Sími / Telephone", c.phone)}${opt("Netfang / Email", c.email)}
 ## Starfsmaður / Employee
-${req("Skírnarnafn / First name", first)}${req("Eftirnafn / Surname", last)}${req("Kennitala eða fæðingardagur / ID No. or date of birth", e.kennitala)}${req("Heimili á Íslandi / Address in Iceland", e.address)}${opt("Aðsetur ef annað / Temporary address", "")}${opt("Netfang / Email", e.email)}${opt("Sími / Telephone", e.phone)}${opt("Nánasti aðstandandi og sími / Closest family member and tel.", e.next_of_kin)}
+${req("Skírnarnafn / First name", first)}${req("Eftirnafn / Surname", last)}${req("Kennitala eða fæðingardagur / ID No. or date of birth", e.kennitala)}${req("Heimili á Íslandi / Address in Iceland", [e.address, [e.postal_code, e.city].filter(Boolean).join(" ")].filter(Boolean).join(", "))}${opt("Aðsetur ef annað / Temporary address", "")}${opt("Netfang / Email", e.email)}${opt("Sími / Telephone", e.phone)}${opt("Nánasti aðstandandi og sími / Closest family member and tel.", e.next_of_kin)}
 ## Starfssvið / Field of work
 ${req("Starfsheiti og stutt lýsing á starfi / Job designation and short description", e.title || extras.positionName)}${req("Vinnustaður / Place of work", place)}${opt("Vinna á mismunandi vinnustöðum / Work at more than one place", "Nei / No")}
 ## Vinnutími / Working time

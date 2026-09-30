@@ -55,11 +55,16 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
 
     const rows = (data ?? []) as unknown as Row[];
     // Heimilisfang + aðstandandi (0059) — sér fyrirspurn svo listinn virki þótt migration vanti.
-    const ex = await supabase.from("employees").select("id, address, next_of_kin");
-    const extra = new Map((ex.error ? [] : ex.data ?? []).map((x) => [x.id as string, x as { address: string | null; next_of_kin: string | null }]));
+    type Extra = { address: string | null; next_of_kin: string | null; postal_code?: string | null; city?: string | null; hire_date?: string | null };
+    let ex = await supabase.from("employees").select("id, address, next_of_kin, postal_code, city, hire_date");
+    if (ex.error) ex = await supabase.from("employees").select("id, address, next_of_kin, hire_date") as typeof ex; // fyrir 0060
+    const extra = new Map((ex.error ? [] : ex.data ?? []).map((x) => [x.id as string, x as Extra]));
     const employees: Employee[] = rows.map((r) => ({
       address: extra.get(r.id)?.address ?? null,
       nextOfKin: extra.get(r.id)?.next_of_kin ?? null,
+      postalCode: extra.get(r.id)?.postal_code ?? null,
+      city: extra.get(r.id)?.city ?? null,
+      hireDate: extra.get(r.id)?.hire_date ?? null,
       id: r.id,
       fullName: r.full_name,
       title: r.title,
