@@ -124,18 +124,27 @@ export type TaktikalWebhook = {
 export const TAKTIKAL_EVENT = { SignedDocument: 1, AllSigned: 2, Canceled: 5, Expired: 6, Completed: 10, Created: 11 } as const;
 
 /** Sannreynir að Taktikal hafi sent webhookið: HMAC-SHA256(webhookKey, SignedData) = Signature,
- *  SignedData = TimeStamp + Guid, og CompanyKey passar við okkar. */
-export function verifyWebhook(p: TaktikalWebhook): boolean {
+ *  SignedData = TimeStamp + Guid, og CompanyKey passar við okkar. Skilar ástæðu höfnunar eða null.
+ *  TimeStamp kemur sem 18 stafa JSON-tala sem JS getur ekki lesið nákvæmlega — því er tíminn
+ *  lesinn úr SignedData (strengur) en ekki borinn saman við TimeStamp-svæðið. */
+export function webhookRejectReason(p: TaktikalWebhook): string | null {
   const key = process.env.TAKTIKAL_WEBHOOK_KEY;
   const sig = p?.EventSignature;
-  if (!key || !sig?.Signature || !sig.SignedData) return false;
-  if (sig.SignedData !== `${sig.TimeStamp}${sig.Guid}`) return false;
-  // TimeStamp er .NET ticks (100 ns frá árinu 1) — hafnað ef eldra en 24 klst (endurspilun).
-  const ms = (Number(sig.TimeStamp) - 621355968000000000) / 10000;
-  if (!Number.isFinite(ms) || Math.abs(Date.now() - ms) > 24 * 3600e3) return false;
-  if (process.env.TAKTIKAL_COMPANY_KEY && p.EventData?.CompanyKey !== process.env.TAKTIKAL_COMPANY_KEY) return false;
+  if (!key) return "no key configured";
+  if (!sig?.Signature || !sig.SignedData || !sig.Guid) return "missing signature fields";
+  const guid = String(sig.Guid);
+  if (!sig.SignedData.endsWith(guid)) return "SignedData does not end with Guid";
+  const ticks = sig.SignedData.slice(0, -guid.length);
+  if (!/^\d{15,20}$/.test(ticks)) return "SignedData has no timestamp";
+  // .NET ticks (100 ns frá árinu 1) — hafnað ef meira en 24 klst frá (endurspilun).
+  const ms = (Number(ticks) - 621355968000000000) / 10000;
+  if (!Number.isFinite(ms) || Math.abs(Date.now() - ms) > 24 * 3600e3) return "stale timestamp";
+  if (process.env.TAKTIKAL_COMPANY_KEY && p.EventData?.CompanyKey !== process.env.TAKTIKAL_COMPANY_KEY) return "CompanyKey mismatch";
   const want = createHmac("sha256", key).update(sig.SignedData, "utf8").digest();
-  let got: Buffer;
-  try { got = Buffer.from(sig.Signature, "base64"); } catch { return false; }
-  return got.length === want.length && timingSafeEqual(got, want);
+  const got = Buffer.from(sig.Signature, "base64");
+  if (got.length !== want.length || !timingSafeEqual(got, want)) return "HMAC mismatch";
+  return null;
+}
+export function verifyWebhook(p: TaktikalWebhook): boolean {
+  return webhookRejectReason(p) === null;
 }
