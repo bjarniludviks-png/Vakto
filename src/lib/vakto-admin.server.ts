@@ -1,4 +1,5 @@
 import "server-only";
+import { invoiceFor, planFor, type PlanId } from "@/lib/pricing";
 // VAKTO super-admin (the SaaS owner's view over ALL companies) — strictly
 // gated by email allowlist, then reads with the service-role client since the
 // data spans every tenant. Never expose any of this through normal RLS paths.
@@ -24,10 +25,6 @@ export const IMPERSONATION_COOKIE = "vakto-impersonating";
 export const IMPERSONATION_UI_COOKIE = "vakto-impersonating-ui";
 export const IMPERSONATION_MAX_AGE = 8 * 3600; // seconds
 
-// VAKTO pricing (same as the signup + Settings subscription card).
-export const PLAN_BASE = 5990;        // kr/mán án VSK, 5 notendur innifaldir
-export const PLAN_INCLUDED_USERS = 5;
-export const PLAN_EXTRA_USER = 590;   // kr/mán per notanda umfram
 
 export type BillingStatus = "paying" | "trial" | "trial_expired" | "unpaid" | "free" | "suspended" | "none";
 export type AdminCompany = {
@@ -45,7 +42,10 @@ export type AdminCompany = {
   trialDaysLeft: number | null; // negative = expired N days ago; null = no trial date
   billingStatus: BillingStatus;
   manualStatus: string | null; // raw billing_status column (admin override)
-  mrr: number;                 // kr/mán this company contributes (0 unless paying)
+  mrr: number;                 // kr/mán án VSK this company contributes (0 unless paying) — síðustu 30 dagar
+  pricePlan: PlanId;
+  activeEmployees30d: number;   // virkir (vakt eða stimplun) síðustu 30 daga — grunnur v2-verðs
+  esigns30d: number;            // fullgildar undirskriftir síðustu 30 daga
   adminNote: string | null;    // companies.admin_note (0047)
   hasPunches30d: boolean;      // signup health: has anyone clocked in?
   hasRevenue30d: boolean;      // signup health: any revenue rows?
@@ -120,9 +120,11 @@ function deriveStatus(manual: string | null, trialEndsAt: string | null, plan: s
   return plan ? "trial_expired" : "none";
 }
 
-function mrrOf(status: BillingStatus, users: number): number {
+/** Mánaðartekjur án VSK eftir verðskrá fyrirtækisins (src/lib/pricing.ts). */
+function mrrOf(status: BillingStatus, plan: PlanId, users: number, active: number, esigns: number): number {
   if (status !== "paying") return 0;
-  return PLAN_BASE + Math.max(0, users - PLAN_INCLUDED_USERS) * PLAN_EXTRA_USER;
+  const a = invoiceFor(plan, plan === "v1" ? users : active, esigns);
+  return a.total - a.vat;
 }
 
 function daysLeft(trialEndsAt: string | null): number | null {
@@ -159,12 +161,12 @@ export async function getAdminOverview(): Promise<AdminOverview> {
     let needsMigration = false;
     let needsPlatformMigration = false;
     let comps = await db.from("companies")
-      .select("id, name, kennitala, country, created_at, plan, trial_ends_at, billing_status, admin_note")
+      .select("id, name, kennitala, country, created_at, plan, trial_ends_at, billing_status, admin_note, price_plan, price_v1_until")
       .order("created_at", { ascending: true });
     if (comps.error) {
       needsPlatformMigration = true;
       comps = await db.from("companies")
-        .select("id, name, kennitala, country, created_at, plan, trial_ends_at, billing_status")
+        .select("id, name, kennitala, country, created_at, plan, trial_ends_at, billing_status, price_plan, price_v1_until")
         .order("created_at", { ascending: true }) as typeof comps;
     }
     if (comps.error) {
@@ -187,6 +189,13 @@ export async function getAdminOverview(): Promise<AdminOverview> {
       db.from("revenue").select("location_id").gte("date", monthDate).limit(5000),
       db.from("platform_audit").select("id, admin_email, action, company_id, target, detail, at").order("at", { ascending: false }).limit(50),
     ]);
+    const usageRes = await db.from("billing_usage").select("company_id, kind, ref").gte("day", monthDate).limit(50000);
+    const active30 = new Map<string, Set<string>>(), esign30 = new Map<string, number>();
+    for (const r of usageRes.data ?? []) {
+      const k = String(r.company_id);
+      if (r.kind === "esign") esign30.set(k, (esign30.get(k) ?? 0) + 1);
+      else { if (!active30.has(k)) active30.set(k, new Set()); active30.get(k)!.add(String(r.ref)); }
+    }
     if (platRes.error) needsPlatformMigration = true;
 
     const countBy = (list: { company_id?: unknown }[] | null) => {
@@ -226,6 +235,7 @@ export async function getAdminOverview(): Promise<AdminOverview> {
       const manual = (c.billing_status as string) ?? null;
       const trialEndsAt = (c.trial_ends_at as string) ?? null;
       const status = deriveStatus(manual, trialEndsAt, (c.plan as string) ?? null);
+      const plan = planFor({ price_plan: c.price_plan as string | null, price_v1_until: c.price_v1_until as string | null });
       return {
         id,
         name: String(c.name ?? "—"),
@@ -241,7 +251,10 @@ export async function getAdminOverview(): Promise<AdminOverview> {
         trialDaysLeft: daysLeft(trialEndsAt),
         billingStatus: status,
         manualStatus: manual,
-        mrr: mrrOf(status, u),
+        mrr: mrrOf(status, plan, u, active30.get(id)?.size ?? 0, esign30.get(id) ?? 0),
+        pricePlan: plan,
+        activeEmployees30d: active30.get(id)?.size ?? 0,
+        esigns30d: esign30.get(id) ?? 0,
         adminNote: (c.admin_note as string) ?? null,
         hasPunches30d: punched30d.has(id),
         hasRevenue30d: revenueCompanies.has(id),

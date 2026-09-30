@@ -15,7 +15,8 @@ import type { TermsDraft } from "@/lib/ai/terms";
 const GeoMap = dynamic(() => import("@/components/app/geo-map"), { ssr: false });
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
-import { dec1 } from "@/lib/format";
+import { dec1, nf } from "@/lib/format";
+import { PLANS, ESIGN_PRICE } from "@/lib/pricing";
 
 type SettingsModal = "location" | "department" | "position" | "invite" | "revenue" | "avgrevenue" | null;
 
@@ -105,7 +106,7 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
                   defaultValue={data.company?.esignProvider ?? "vakto"}
                   onChange={async (e) => { const r = await setEsignProvider(e.target.value as "vakto" | "taktikal"); toast(r.ok ? t("Vistað") : (r.error ?? "Villa")); }}>
                   <option value="vakto">{t("Kóði í tölvupósti (ókeypis)")}</option>
-                  <option value="taktikal">{t("Rafræn skilríki, Taktikal (~500 kr./samning)")}</option>
+                  <option value="taktikal">{t("Rafræn skilríki, Taktikal (490 kr á undirskrift)")}</option>
                 </select>
               </div>
             )}
@@ -282,8 +283,20 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
           </span>
         </div>
         <div className="cb">
-          <div className="statline"><span className="k">{t("Verð")}</span><span className="v">5.990 kr/mán · 5 notendur · +590 kr á notanda umfram (án VSK)</span></div>
-          <div className="statline"><span className="k">{t("Notendur núna")}</span><span className="v">{data.users.length}</span></div>
+          {data.pricing?.plan === "v1" ? (
+            <>
+              <div className="statline"><span className="k">{t("Verð")}</span><span className="v">{nf(PLANS.v1.base)} kr/mán · {PLANS.v1.included} {t("notendur")} · +{nf(PLANS.v1.extra)} kr {t("á notanda umfram (án VSK)")}</span></div>
+              {data.pricing.v1Until && <div className="statline"><span className="k">{t("Eldra verð gildir til")}</span><span className="v">{data.pricing.v1Until}</span></div>}
+              <div className="statline"><span className="k">{t("Notendur núna")}</span><span className="v">{data.users.length}</span></div>
+            </>
+          ) : (
+            <>
+              <div className="statline"><span className="k">{t("Verð")}</span><span className="v">{nf(PLANS.v2.base)} kr/mán · {PLANS.v2.included} {t("virkir starfsmenn")} · +{nf(PLANS.v2.extra)} kr {t("á hvern virkan umfram (án VSK)")}</span></div>
+              <div className="statline"><span className="k">{t("Virkir síðustu 30 daga")}</span><span className="v">{data.pricing?.units ?? "—"}</span></div>
+            </>
+          )}
+          {data.pricing && <div className="statline"><span className="k">{t("Áætlað á mánuði")}</span><span className="v">{nf(data.pricing.estimateTotal)} kr {t("m. VSK")}</span></div>}
+          <div className="statline"><span className="k">{t("Rafræn skilríki (valkvætt)")}</span><span className="v">{nf(ESIGN_PRICE)} kr {t("á undirskrift (án VSK)")}</span></div>
           {data.company?.trialEndsAt && data.company?.billingStatus !== "paying" && <div className="statline"><span className="k">{t("Prufa gildir til")}</span><span className="v">{data.company.trialEndsAt}</span></div>}
           <div className="statline"><span className="k">{t("Kort")}</span><span className="v">{data.card ? `${data.card.brand === "VI" ? "Visa" : data.card.brand === "MC" ? "Mastercard" : (data.card.brand ?? t("Kort"))} •••• ${data.card.last4 ?? "····"}${data.card.expiry ? ` · ${data.card.expiry}` : ""}` : t("Ekkert kort skráð")}</span></div>
           <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
@@ -291,17 +304,18 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
             <a className="btn ghost" href="mailto:hallo@vakto.is?subject=Uppsögn%20áskriftar">{t("Segja upp áskrift")}</a>
           </div>
           <p className="muted" style={{ fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>{t("Mánaðargjaldið er tekið af skráða kortinu á gjalddaga og kvittun send í pósti. Kortið er geymt hjá Straumi (Kvika); VAKTO geymir aldrei kortanúmer. Engin binding.")}</p>
+          {data.pricing?.plan !== "v1" && <p className="muted" style={{ fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>{t("Virkur starfsmaður = átti vakt eða stimplaði sig á tímabilinu. Grunngjaldið er greitt fyrirfram; virkir umfram 5 og undirskriftir eru gerð upp eftir á fyrir mánuðinn sem lauk.")}</p>}
           {(data.invoices?.length ?? 0) > 0 && (
             <div style={{ marginTop: 16 }}>
               <div className="ct" style={{ fontSize: 13.5, marginBottom: 6 }}>{t("Reikningar")}</div>
               <table className="tbl" style={{ width: "100%", fontSize: 13 }}>
-                <thead><tr><th>{t("Tímabil")}</th><th>{t("Notendur")}</th><th style={{ textAlign: "right" }}>{t("Upphæð m. VSK")}</th><th>{t("Staða")}</th></tr></thead>
+                <thead><tr><th>{t("Tímabil")}</th><th>{t("Virkir / notendur")}</th><th style={{ textAlign: "right" }}>{t("Upphæð m. VSK")}</th><th>{t("Staða")}</th></tr></thead>
                 <tbody>
                   {data.invoices!.map((inv) => (
                     <tr key={inv.id}>
                       <td>{inv.periodStart} – {inv.periodEnd}</td>
-                      <td>{inv.users}</td>
-                      <td style={{ textAlign: "right" }}>{inv.total.toLocaleString("de-DE")} kr</td>
+                      <td>{inv.active ?? inv.users}{inv.esigns ? ` · ${inv.esigns} ${t("undirskr.")}` : ""}</td>
+                      <td style={{ textAlign: "right" }}>{nf(inv.total)} kr</td>
                       <td>{inv.status === "paid" ? t("Greitt") : inv.status === "failed" ? t("Greiðsla tókst ekki") : inv.status === "refunded" ? t("Endurgreitt") : t("Í bið")}</td>
                     </tr>
                   ))}

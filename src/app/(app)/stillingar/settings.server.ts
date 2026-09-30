@@ -4,6 +4,8 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees } from "@/lib/employees.server";
 import { nf } from "@/lib/format";
 import { taktikalEnabled } from "@/lib/taktikal.server";
+import { estimateMonthly } from "@/lib/billing.server";
+import { planFor, type PlanId } from "@/lib/pricing";
 
 export type LocationRow = { id?: string; name: string; staff: number; timezone: string; lat?: number | null; lng?: number | null; radius?: number };
 export type GeofenceMode = "off" | "flag" | "block";
@@ -13,8 +15,10 @@ export type CompanyInfo = { name: string; kennitala: string; address: string; po
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
 export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
 export type CardView = { last4: string | null; brand: string | null; expiry: string | null };
-export type InvoiceView = { id: string; periodStart: string; periodEnd: string; users: number; total: number; status: string; paidAt: string | null };
-export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean; geofenceMode?: GeofenceMode; card?: CardView | null; invoices?: InvoiceView[] };
+export type InvoiceView = { id: string; periodStart: string; periodEnd: string; users: number; active: number | null; esigns: number; total: number; status: string; paidAt: string | null };
+/** Verðskrá og áætlun (síðustu 30 dagar) fyrir Áskrift-spjaldið. */
+export type PricingView = { plan: PlanId; v1Until: string | null; units: number; estimateTotal: number };
+export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean; geofenceMode?: GeofenceMode; card?: CardView | null; invoices?: InvoiceView[]; pricing?: PricingView | null };
 
 const DEMO: SettingsData = {
   departments: [
@@ -132,8 +136,15 @@ export async function getSettingsData(): Promise<SettingsData> {
     const c = (comp ?? {}) as Record<string, string | null>;
     // Subscription state (0020 / 0027) — tolerant of missing columns.
     let plan: string | null = null, trialEndsAt: string | null = null, billingStatus: string | null = null;
-    const sub = await supabase.from("companies").select("plan, trial_ends_at, billing_status").eq("id", company).maybeSingle();
+    let pricing: PricingView | null = null;
+    const sub = await supabase.from("companies").select("plan, trial_ends_at, billing_status, price_plan, price_v1_until").eq("id", company).maybeSingle();
     if (!sub.error && sub.data) {
+      const pp = planFor({ price_plan: sub.data.price_plan as string | null, price_v1_until: sub.data.price_v1_until as string | null });
+      try {
+        const est = await estimateMonthly(company, pp);
+        const until = pp === "v1" ? (sub.data.price_v1_until as string | null) : null;
+        pricing = { plan: pp, v1Until: until ? until.split("-").reverse().map((x) => String(Number(x))).join(".") : null, units: est.units, estimateTotal: est.total };
+      } catch (e) { console.error("estimateMonthly", e); }
       plan = (sub.data.plan as string | null) ?? null;
       billingStatus = (sub.data.billing_status as string | null) ?? null;
       const te = sub.data.trial_ends_at as string | null;
@@ -145,8 +156,8 @@ export async function getSettingsData(): Promise<SettingsData> {
     try {
       const pm = await supabase.from("payment_methods").select("card_summary, card_brand, card_expiry").eq("company_id", company).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (pm.data) card = { last4: (pm.data.card_summary as string) ?? null, brand: (pm.data.card_brand as string) ?? null, expiry: (pm.data.card_expiry as string) ?? null };
-      const inv = await supabase.from("invoices").select("id, period_start, period_end, users_count, total_amount, status, paid_at").eq("company_id", company).order("period_start", { ascending: false }).limit(24);
-      invoices = (inv.data ?? []).map((r) => ({ id: r.id as string, periodStart: r.period_start as string, periodEnd: r.period_end as string, users: r.users_count as number, total: r.total_amount as number, status: r.status as string, paidAt: (r.paid_at as string) ?? null }));
+      const inv = await supabase.from("invoices").select("id, period_start, period_end, users_count, active_employees, esign_count, total_amount, status, paid_at").eq("company_id", company).order("period_start", { ascending: false }).limit(24);
+      invoices = (inv.data ?? []).map((r) => ({ id: r.id as string, periodStart: r.period_start as string, periodEnd: r.period_end as string, users: r.users_count as number, active: (r.active_employees as number | null) ?? null, esigns: (r.esign_count as number) ?? 0, total: r.total_amount as number, status: r.status as string, paidAt: (r.paid_at as string) ?? null }));
     } catch { /* fyrir 0050 */ }
     return {
       departments,
@@ -171,7 +182,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       })),
       apiKeys,
       companyId: company,
-      kioskToken, card, invoices, geofenceMode,
+      kioskToken, card, invoices, pricing, geofenceMode,
       company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", postalCode, city, phone: c.phone ?? "", email: c.email ?? "", feedPostPolicy, payPeriodStart: ppd, plan, trialEndsAt, billingStatus, laborTarget, leaveCap, esignProvider, taktikalAvailable },
       live: true,
     };

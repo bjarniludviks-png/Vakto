@@ -227,6 +227,14 @@
   AllSigned er PDF frá Taktikal vistað og sent báðum. Env: `TAKTIKAL_COMPANY_KEY/API_KEY/WEBHOOK_KEY` (á Vercel),
   `TAKTIKAL_BASE_URL` (þróun: onboardingdev), `TAKTIKAL_FLOW_KEY` (annars fyrsta flæði). Webhook-slóð þarf að skrá á
   flæðið í Taktikal. Samningur BGL: 26.300 kr/mán + 130 kr/undirskrift + Auðkenni ~119 kr.
+- 🟡 **Verð v2 (30. sept 2026, á `verd-v2`, migration 0063 á staging):** 9.990 kr/mán með 5 VIRKUM starfsmönnum +
+  1.490 kr á hvern virkan umfram + 490 kr á fullgilda undirskrift (Taktikal) — allt án VSK. **Eina verðskráin er
+  `src/lib/pricing.ts`** (`PLANS`, `invoiceFor`, `planFor`) — reikningar, Stillingar, /admin og texti lesa þaðan. „Virkur“ =
+  átti vakt eða stimplaði sig; skráð jafnóðum í `billing_usage` (triggerar á shifts/punches/contract_signatures, ENGIN FK)
+  svo eyðing starfsmanns/vaktar fyrir mánaðamót breytir engu (framtíðarvakt sem er fjarlægð telst ekki). Grunngjald
+  fyrirfram, virkir umfram + undirskriftir eftir á fyrir tímabilið sem lauk (fyrsti reikningur eftir prufu = grunngjald).
+  Eldri fyrirtæki: `price_plan='v1'` (5.990 + 590/notanda) til `price_v1_until` = 1.4.2027. Árlegt verð (8.490 + 1.270) er
+  enn aðeins texti — engin árleg innheimta í kóða.
 - **Still remaining:** contractor billable-vs-cost/GPS job tracking, a signed-URL viewer for the
   private `documents` bucket, Google/Microsoft/Auðkenni OAuth (scaffolded in `login-form`).
 - ✅ **VAKTO Admin (ofurstjórnborð SaaS-eigandans):** `/admin` — aðgangur EINGÖNGU fyrir netföng í

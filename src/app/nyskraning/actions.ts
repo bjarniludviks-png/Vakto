@@ -9,7 +9,7 @@ import { validatePassword } from "@/lib/password.server";
 import { verifyTurnstile } from "@/lib/turnstile.server";
 
 /** Útgáfa skilmálanna sem nýskráning samþykkir (dagsetning síðustu breytingar á /skilmalar). */
-const TERMS_VERSION = "2026-09-22";
+const TERMS_VERSION = "2026-09-30";
 
 export type SignupResult = { ok: boolean; demo?: boolean; error?: string };
 

@@ -5,7 +5,7 @@ export const metadata: Metadata = { title: "VAKTO — Skilmálar", description: 
 
 export default function TermsPage() {
   return (
-    <LegalShell title="Þjónustuskilmálar" updated="21. september 2026">
+    <LegalShell title="Þjónustuskilmálar" updated="30. september 2026">
       <p>Þessir skilmálar gilda um notkun fyrirtækja („viðskiptavinur“, „þú“) á VAKTO, vakta- og launakerfi sem VAKTO ehf., kt. 490806-0400 („VAKTO“, „við“) rekur á vakto.is og í tengdum öppum. Með því að stofna aðgang samþykkir þú skilmálana fyrir hönd fyrirtækisins.</p>
 
       <h2>1. Þjónustan</h2>
@@ -20,7 +20,7 @@ export default function TermsPage() {
 
       <h2>3. Verð og greiðslur</h2>
       <ul>
-        <li>Áskrift kostar <b>5.990 kr. á mánuði</b> fyrir fyrirtækið með 5 notendur innifalda og <b>590 kr. á mánuði fyrir hvern notanda umfram 5</b>. Sé greitt árlega fyrirfram er veittur um 15% afsláttur (5.090 kr. + 500 kr. á notanda umfram). Öll verð eru án virðisaukaskatts.</li>
+        <li>Áskrift kostar <b>9.990 kr. á mánuði</b> fyrir fyrirtækið með 5 virka starfsmenn innifalda og <b>1.490 kr. á mánuði fyrir hvern virkan starfsmann umfram 5</b>. Virkur starfsmaður er sá sem átti skráða vakt eða stimplaði sig á tímabilinu. Grunngjaldið er greitt fyrirfram en virkir starfsmenn umfram 5 eru gerðir upp eftir á fyrir tímabilið sem lauk. Undirritun samninga með rafrænum skilríkjum er valkvæð og kostar <b>490 kr. á hverja undirskrift</b>. Sé greitt árlega fyrirfram er veittur um 15% afsláttur (8.490 kr. + 1.270 kr. á virkan starfsmann umfram). Öll verð eru án virðisaukaskatts.</li>
         <li>Notandi er hver starfsmaður eða stjórnandi sem er virkur í kerfinu á reikningstímabilinu. Fjöldi notenda er talinn í lok hvers tímabils.</li>
         <li>Nýir viðskiptavinir fá <b>14 daga fría prufu</b> með öllu innifalið. Greiðslukort er skráð við nýskráningu á öruggri greiðslusíðu Straums (Kvika banka); VAKTO geymir aldrei kortanúmer. Ekkert er dregið af kortinu á meðan prufan stendur. Að prufu lokinni hefst áskriftin sjálfkrafa og mánaðargjaldið er tekið af kortinu á gjalddaga, nema áskriftinni hafi verið sagt upp áður.</li>
         <li>Mánaðargjaldið er tekið af skráðu korti fyrirfram fyrir hvert tímabil og kvittun send í tölvupósti. Takist greiðsla ekki er reynt aftur næstu daga og viðskiptavinur látinn vita; berist greiðsla ekki innan 14 daga má VAKTO loka aðgangi þar til greitt er. Gögn eru varðveitt á meðan.</li>

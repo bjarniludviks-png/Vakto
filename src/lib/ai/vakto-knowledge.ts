@@ -32,9 +32,10 @@ export const VAKTO_KNOWLEDGE = `
 - Handbækur/skjöl: hægt að hlaða upp skjölum fyrirtækisins og starfsmanna (t.d. handbók) sem starfsfólk sér í appinu.
 
 ## Verð (án VSK)
-- Eitt verð, allt innifalið: 5.990 kr á mánuði fyrir fyrirtækið með 5 notendur innifalda, og 590 kr á mánuði fyrir hvern notanda umfram 5. Engin þrep, ekkert læst.
-- Árleg greiðsla: um 15% afsláttur (5.090 kr/mán + 500 kr á auka notanda).
-- Dæmi: 12 manna staður = 5.990 + 7 × 590 = 10.120 kr/mán.
+- Eitt verð, allt innifalið: 9.990 kr á mánuði fyrir fyrirtækið með 5 virka starfsmenn innifalda, og 1.490 kr á mánuði fyrir hvern virkan starfsmann umfram 5. „Virkur“ = átti vakt eða stimplaði sig í mánuðinum — ekki er greitt fyrir skráða starfsmenn sem vinna ekki. Engin þrep, ekkert læst.
+- Árleg greiðsla: um 15% afsláttur (8.490 kr/mán + 1.270 kr á auka virkan starfsmann).
+- Valkvætt: undirritun ráðningarsamninga með rafrænum skilríkjum (Taktikal) kostar 490 kr á undirskrift (980 kr á samning, báðir aðilar). Ókeypis undirritun með kóða í tölvupósti er innifalin.
+- Dæmi: staður með 12 virka starfsmenn = 9.990 + 7 × 1.490 = 20.420 kr/mán (án VSK).
 - 14 daga frí prufa með öllu. Kort er skráð við nýskráningu á greiðslusíðu Straums (Kvika) en ekkert dregið fyrr en prufan er búin; þá er mánaðargjaldið tekið sjálfkrafa af kortinu og kvittun send. Engin binding, hægt að segja upp hvenær sem er í Stillingum → Áskrift. VAKTO geymir aldrei kortanúmer. Keðjur með marga staði: hafa samband um tilboð.
 
 ## Að byrja

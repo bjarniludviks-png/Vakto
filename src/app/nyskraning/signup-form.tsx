@@ -7,7 +7,7 @@ import { createOwnerAccount, requestSignupCode, startCardSetup, verifySignupCode
 import { passwordStrength, PASSWORD_MIN } from "@/lib/password";
 import Turnstile, { TURNSTILE_SITE_KEY } from "@/components/turnstile";
 
-const PLAN = { id: "vakto", price: "5.990", per: "kr/mán · 5 notendur innifaldir", extra: "+590 kr á hvern notanda umfram · árlega 5.090 + 500" };
+const PLAN = { id: "vakto", price: "9.990", per: "kr/mán · 5 virkir starfsmenn innifaldir", extra: "+1.490 kr á hvern virkan starfsmann umfram · árlega 8.490 + 1.270" };
 
 const Bars = () => (
   <div className="m"><svg viewBox="0 0 28 28" fill="none">

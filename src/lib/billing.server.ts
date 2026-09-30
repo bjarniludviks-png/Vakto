@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { chargeToken, priceFor, straumurConfigured } from "@/lib/straumur";
+import { chargeToken, straumurConfigured } from "@/lib/straumur";
+import { invoiceFor, planFor, type PlanId } from "@/lib/pricing";
 import { sendTrialReminderEmail, sendCardMissingEmail, sendPaymentFailedEmail, sendReceiptEmail, sendSuspendedEmail } from "@/lib/email";
 
 // Áskriftarvélin: prufu-áminningar, mánaðarreikningar, gjaldtaka af skráðu korti, lokun.
@@ -20,6 +21,29 @@ async function usersCount(companyId: string): Promise<number> {
   const admin = createAdminClient();
   const { count } = await admin.from("users").select("id", { count: "exact", head: true }).eq("company_id", companyId);
   return Math.max(1, count ?? 1);
+}
+
+/** Virkir starfsmenn á [from, to): átti vakt eða stimplaði sig (billing_usage, óháð síðari eyðingu). */
+export async function activeEmployees(companyId: string, from: string, to: string): Promise<number> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("billing_usage").select("ref").eq("company_id", companyId)
+    .in("kind", ["shift", "punch"]).gte("day", from).lt("day", to).limit(20000);
+  return new Set((data ?? []).map((r) => r.ref as string)).size;
+}
+
+/** Fullgildar undirskriftir (Taktikal) á [from, to). */
+export async function esignCount(companyId: string, from: string, to: string): Promise<number> {
+  const admin = createAdminClient();
+  const { count } = await admin.from("billing_usage").select("ref", { count: "exact", head: true })
+    .eq("company_id", companyId).eq("kind", "esign").gte("day", from).lt("day", to);
+  return count ?? 0;
+}
+
+/** Áætlaður mánaðarreikningur (með VSK) miðað við síðustu 30 daga — fyrir áminningar og Stillingar. */
+export async function estimateMonthly(companyId: string, plan: PlanId, now = new Date()) {
+  const to = iso(new Date(now.getTime() + 86400000)), from = iso(new Date(now.getTime() - 30 * 86400000));
+  const units = plan === "v1" ? await usersCount(companyId) : await activeEmployees(companyId, from, to);
+  return { units, ...invoiceFor(plan, units, 0) };
 }
 
 export async function activeCard(companyId: string) {
@@ -63,7 +87,7 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
   const admin = createAdminClient();
   const out: BillingRunResult = { reminders: 0, expired: 0, invoices: 0, paid: 0, failed: 0, suspended: 0, retried: 0 };
   const { data: companies } = await admin.from("companies")
-    .select("id, name, plan, trial_ends_at, billing_status, billing_anchor, trial_reminder_sent_at, trial_expired_sent_at")
+    .select("id, name, plan, price_plan, price_v1_until, trial_ends_at, billing_status, billing_anchor, trial_reminder_sent_at, trial_expired_sent_at")
     .not("plan", "is", null);
   for (const co of companies ?? []) {
     const id = co.id as string, name = (co.name as string) ?? "";
@@ -76,8 +100,13 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
       const d = daysBetween(now, trialEnds);
       if (d >= 0 && d <= 3) {
         const card = await activeCard(id);
+        // Fyrsti reikningur eftir prufu = grunngjald (v2: notkun í prufunni er ekki rukkuð; v1: notendur fyrirfram).
+        const plan = planFor(co, now);
         const users = await usersCount(id);
-        for (const to of await ownerEmails(id)) await sendTrialReminderEmail(to, name, { daysLeft: d, hasCard: !!card, total: priceFor(users).total, users }).catch((e) => console.error("email:", e));
+        const first = invoiceFor(plan, plan === "v1" ? users : 0, 0);
+        const note = plan === "v1" ? `${users} notendur` : `grunngjald með 5 virkum starfsmönnum`;
+        const noteEn = plan === "v1" ? `${users} users` : `base fee incl. 5 active employees`;
+        for (const to of await ownerEmails(id)) await sendTrialReminderEmail(to, name, { daysLeft: d, hasCard: !!card, total: first.total, note, noteEn }).catch((e) => console.error("email:", e));
         await admin.from("companies").update({ trial_reminder_sent_at: now.toISOString() }).eq("id", id);
         out.reminders++;
       }
@@ -108,10 +137,21 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
     if (periodStart.getTime() <= now.getTime()) {
       const { data: existing } = await admin.from("invoices").select("id, status, attempts, created_at").eq("company_id", id).eq("period_start", iso(periodStart)).maybeSingle();
       if (!existing) {
+        // Grunngjald fyrirfram fyrir tímabilið sem hefst; notkun (virkir starfsmenn umfram, undirritanir)
+        // gerð upp eftir á fyrir tímabilið sem lauk. Fyrsti reikningur eftir prufu: engin notkun.
+        const plan = planFor(co, periodStart);
+        const prevStart = addMonths(periodStart, -1);
+        const hasUsage = prevStart.getTime() >= anchor.getTime();
+        const uFrom = iso(prevStart), uTo = iso(periodStart);
+        const esigns = hasUsage ? await esignCount(id, uFrom, uTo) : 0;
+        const active = hasUsage ? await activeEmployees(id, uFrom, uTo) : 0;
         const users = await usersCount(id);
-        const p = priceFor(users);
+        const units = plan === "v1" ? users : active;   // v1: notendur fyrirfram eins og áður
+        const p = invoiceFor(plan, units, esigns);
         const { data: inv } = await admin.from("invoices").insert({
           company_id: id, period_start: iso(periodStart), period_end: iso(addMonths(periodStart, 1)), users_count: users,
+          active_employees: plan === "v2" ? active : null, esign_count: esigns, esign_amount: p.esign,
+          usage_start: hasUsage ? uFrom : null, usage_end: hasUsage ? uTo : null,
           base_amount: p.base, extra_amount: p.extra, vat_amount: p.vat, total_amount: p.total, reference: `inv:${crypto.randomUUID()}`,
         }).select("id").single();
         if (inv) {

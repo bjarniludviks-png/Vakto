@@ -194,8 +194,8 @@ const T: Record<Lang, {
     priceSub: "Engin þrep. Ekkert læst. Engin binding.",
     billMonthly: "Mánaðarlega", billYearly: "Árlega", billSave: "15% afsláttur",
     plan: {
-      price: "5.990", priceY: "5.090", unit: "kr/mán · 5 notendur innifaldir", yearNote: "greitt árlega",
-      extra: "590", extraY: "500", extraUnit: "kr á hvern notanda umfram",
+      price: "9.990", priceY: "8.490", unit: "kr/mán · 5 virkir starfsmenn innifaldir", yearNote: "greitt árlega",
+      extra: "1.490", extraY: "1.270", extraUnit: "kr á hvern virkan starfsmann umfram",
       items: [
         "Vaktaplan, stimpilklukka, beiðnir og vaktaskipti",
         "Laun sem % af veltu í rauntíma og frávik með krónutölu",
@@ -206,7 +206,7 @@ const T: Record<Lang, {
       ],
       cta: "Prófa frítt í 14 daga",
     },
-    priceFine: "Verð án VSK. 14 daga frí prufa — kortið er skráð við nýskráningu en ekkert dregið fyrr en prufan er búin. Keðjur með marga staði: hafðu samband.",
+    priceFine: "Verð án VSK. Virkur starfsmaður = átti vakt eða stimplaði sig í mánuðinum — þú borgar ekki fyrir þá sem vinna ekki. Undirritun samninga með rafrænum skilríkjum er valkvæð: 490 kr á undirskrift. 14 daga frí prufa — kortið er skráð við nýskráningu en ekkert dregið fyrr en prufan er búin. Keðjur með marga staði: hafðu samband.",
     ctaEnd: "Sjáðu hvað vaktin kostar — áður en hún klárast.",
     ctaDemo: "Hafa samband",
     footBlurb: "Eitt einfaldasta vaktakerfið sem til er: vaktaplan, stimpilklukka, laun — og launin sem % af veltu í rauntíma. Hannað fyrir íslenska vinnustaði.",
@@ -353,8 +353,8 @@ const T: Record<Lang, {
     priceSub: "No tiers. Nothing locked. No lock-in.",
     billMonthly: "Monthly", billYearly: "Yearly", billSave: "15% off",
     plan: {
-      price: "5,990", priceY: "5,090", unit: "ISK/mo · 5 users included", yearNote: "billed yearly",
-      extra: "590", extraY: "500", extraUnit: "ISK per additional user",
+      price: "9,990", priceY: "8,490", unit: "ISK/mo · 5 active employees included", yearNote: "billed yearly",
+      extra: "1,490", extraY: "1,270", extraUnit: "ISK per additional active employee",
       items: [
         "Scheduling, time clock, requests and shift swaps",
         "Labor as % of revenue in real time and deviations in króna",
@@ -365,7 +365,7 @@ const T: Record<Lang, {
       ],
       cta: "Try free for 14 days",
     },
-    priceFine: "Prices excl. VAT. 14-day free trial — a card is registered at signup, nothing is charged until the trial ends. Chains with many sites: get in touch.",
+    priceFine: "Prices excl. VAT. An active employee is anyone who had a shift or clocked in that month — you never pay for people who don't work. Signing contracts with electronic ID is optional: 490 ISK per signature. 14-day free trial — a card is registered at signup, nothing is charged until the trial ends. Chains with many sites: get in touch.",
     ctaEnd: "See what the shift costs — before it's over.",
     ctaDemo: "Contact us",
     footBlurb: "One of the simplest scheduling systems out there: shifts, a time clock, payroll — and labor as % of revenue in real time. Built for Icelandic workplaces.",

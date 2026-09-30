@@ -11,10 +11,7 @@ const TERMINAL_PAGE = process.env.STRAUMUR_TERMINAL_PAGE || "";      // greiðsl
 const TERMINAL_GATEWAY = process.env.STRAUMUR_TERMINAL_GATEWAY || TERMINAL_PAGE; // token-greiðslur (API)
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is";
 
-export const PRICE_BASE = 5990;          // kr/mán án VSK, 5 notendur innifaldir
-export const PRICE_INCLUDED_USERS = 5;
-export const PRICE_EXTRA_USER = 590;     // kr/mán án VSK
-export const VAT_RATE = 0.24;
+// Verðskrá: src/lib/pricing.ts
 
 export function straumurConfigured(): boolean {
   return !!(KEY && TERMINAL_PAGE);
@@ -81,14 +78,6 @@ export async function disableToken(token: string): Promise<void> {
 }
 
 /** Verð fyrir fjölda notenda: grunnur + auka notendur, VSK ofan á. Allt í heilum krónum. */
-export function priceFor(users: number): { base: number; extra: number; vat: number; total: number; extraUsers: number } {
-  const extraUsers = Math.max(0, users - PRICE_INCLUDED_USERS);
-  const base = PRICE_BASE, extra = extraUsers * PRICE_EXTRA_USER;
-  const net = base + extra;
-  const vat = Math.round(net * VAT_RATE);
-  return { base, extra, vat, total: net + vat, extraUsers };
-}
-
 /** HMAC-SHA256 yfir CheckoutReference:PayfacReference:MerchantReference:Amount:Currency:Reason:Success, lykill hex, úttak base64. */
 export function verifyWebhookSignature(p: { checkoutReference?: string | null; payfacReference?: string | null; merchantReference?: string | null; amount?: string | number | null; currency?: string | null; reason?: string | null; success?: string | boolean | null; hmacSignature?: string | null }): boolean {
   const hmacKey = process.env.STRAUMUR_WEBHOOK_HMAC || "";

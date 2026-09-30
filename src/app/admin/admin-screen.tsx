@@ -4,6 +4,7 @@
 // billing status and MRR, with manual billing control until Stripe/Teya
 // automates it. Everything the owner does here is written to platform_audit.
 
+import { PLANS, ESIGN_PRICE, invoiceFor } from "@/lib/pricing";
 import { useMemo, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
@@ -291,8 +292,9 @@ export default function AdminScreen({ data }: { data: AdminOverview }) {
             </div>
             <div className="cb" style={{ borderTop: "1px solid var(--line2)" }}>
               <p className="muted" style={{ fontSize: 12, lineHeight: 1.55, margin: 0 }}>
-                Verðskrá: 9.990 kr/mán m/VSK (5 notendur innifaldir) + 990 kr per notanda umfram. MRR telur aðeins
-                fyrirtæki merkt „Borgar“. Engin sjálfvirk innheimta er tengd enn — greiðslustaðan er skráð hér handvirkt.
+                Verðskrá (án VSK): {nf(PLANS.v2.base)} kr/mán með {PLANS.v2.included} virkum starfsmönnum + {nf(PLANS.v2.extra)} kr á hvern virkan umfram
+                („virkur“ = vakt eða stimplun í mánuðinum) + {nf(ESIGN_PRICE)} kr á hverja fullgilda undirskrift. Eldri viðskiptavinir (v1):
+                {" "}{nf(PLANS.v1.base)} + {nf(PLANS.v1.extra)} kr á notanda umfram {PLANS.v1.included}. MRR telur aðeins fyrirtæki merkt „Borgar“ og miðar við síðustu 30 daga.
               </p>
             </div>
           </div>
@@ -379,7 +381,12 @@ export default function AdminScreen({ data }: { data: AdminOverview }) {
                         <div><span className="muted">Staða:</span> <StatusBadge s={detailFor.billingStatus} /></div>
                         <div><span className="muted">Prufa til:</span> {detailFor.trialEndsAt ? niceDate(detailFor.trialEndsAt) : "—"}{detailFor.trialDaysLeft !== null && detailFor.billingStatus === "trial" ? ` (${detailFor.trialDaysLeft} d. eftir)` : ""}</div>
                         <div><span className="muted">MRR:</span> {detailFor.mrr > 0 ? `${nf(detailFor.mrr)} kr/mán` : "0 kr — borgar ekki enn"}</div>
-                        <div style={{ gridColumn: "1 / -1" }} className="muted">Greiðslur handvirkt þar til Stripe kemur — {detailFor.users} notendur = {nf(9990 + Math.max(0, detailFor.users - 5) * 990)} kr/mán ef borgar.</div>
+                        <div><span className="muted">Verðskrá:</span> {detailFor.pricePlan === "v1" ? "v1 (eldra verð)" : "v2"}</div>
+                        <div><span className="muted">Virkir 30 d.:</span> {detailFor.activeEmployees30d} · undirskriftir {detailFor.esigns30d}</div>
+                        <div style={{ gridColumn: "1 / -1" }} className="muted">
+                          Áætlað ef borgar: {nf((() => { const a = invoiceFor(detailFor.pricePlan, detailFor.pricePlan === "v1" ? detailFor.users : detailFor.activeEmployees30d, detailFor.esigns30d); return a.total - a.vat; })())} kr/mán án VSK
+                          {detailFor.pricePlan === "v1" ? ` (${detailFor.users} notendur)` : ` (${detailFor.activeEmployees30d} virkir)`}.
+                        </div>
                       </div>
 
                       <div className="ct" style={{ fontSize: 13, marginBottom: 6 }}>Athugasemd</div>

@@ -1010,6 +1010,7 @@ function SignerModal({ init, onClose, onDone }: { init: { id: string; ssn: strin
         <div className="mh"><div style={{ fontSize: 15, fontWeight: 700 }}>{t("Undirrita með rafrænum skilríkjum")}</div><button className="x" type="button" onClick={onClose}>✕</button></div>
         <div className="mb">
           <p style={{ fontSize: 13, color: "var(--ink2)", margin: "0 0 12px" }}>{t("Þú skrifar fyrst undir fyrir hönd fyrirtækisins, síðan fær starfsmaðurinn samninginn. Báðir nota rafræn skilríki (fullgild undirskrift).")}</p>
+          <p style={{ fontSize: 12.5, color: "var(--ink3)", margin: "0 0 12px" }}>{t("Kostnaður: 490 kr á hverja undirskrift (980 kr fyrir samninginn, án VSK) bætist á næsta mánaðarreikning.")}</p>
           {url ? (
             <>
               <p style={{ fontSize: 13, margin: "0 0 12px" }}>{t("Samningurinn er tilbúinn hjá Taktikal. Skrifaðu undir núna — starfsmaðurinn fær tölvupóst þegar þú hefur skrifað undir.")}</p>
