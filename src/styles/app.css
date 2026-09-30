@@ -507,6 +507,7 @@ td.unav.conf .shift{outline:2px solid var(--bad);outline-offset:-2px}
 /* attention/list */
 .att{display:flex;flex-direction:column}
 .att .it{display:flex;gap:12px;padding:13px 0;border-bottom:1px solid var(--line2)}
+.att .it>.btn{align-self:center;flex-shrink:0;white-space:nowrap}
 .att .it:last-child{border-bottom:none;padding-bottom:0}
 .att .ic{width:32px;height:32px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
 .att .ic svg{width:16px;height:16px;stroke-width:2}
