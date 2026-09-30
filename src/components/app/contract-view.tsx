@@ -41,14 +41,16 @@ export function ContractView({ content }: { content: string }) {
             <div style={{ fontStyle: "italic", fontSize: 12, color: "#8a7a68" }}>{summary.sentence[1]}</div>
           </div>
         )}
-        <div className="cview-tiles">
-          {summary.tiles.map((t) => (
-            <div key={t.label} style={{ background: "#fff", borderRadius: 9, padding: "8px 10px", minWidth: 0 }}>
-              <div style={{ fontSize: 10, color: "#8a7a68" }}>{t.label}</div>
-              <div style={{ fontSize: 14, fontWeight: 650, marginTop: 2, overflowWrap: "anywhere" }}>{t.value}</div>
-            </div>
-          ))}
-        </div>
+        {summary.tiles.length > 0 && (
+          <div className="cview-tiles">
+            {summary.tiles.map((t) => (
+              <div key={t.label} style={{ background: "#fff", borderRadius: 9, padding: "8px 10px", minWidth: 0 }}>
+                <div style={{ fontSize: 10, color: "#8a7a68" }}>{t.label}</div>
+                <div style={{ fontSize: 14, fontWeight: 650, marginTop: 2, overflowWrap: "anywhere" }}>{t.value}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       {shown.map((sec, i) => {
         const [sIs, sEn] = splitLang(sec.title);

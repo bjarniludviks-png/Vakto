@@ -203,7 +203,7 @@ export async function startTaktikalSigning(
     return { ok: true, employerUrl: existing.employer_url as string };
   }
 
-  const doc = await buildContractPdf(c.content as string, []);
+  const doc = await buildContractPdf(c.content as string, [], { stampStrip: true });
   const pdfBase64 = Buffer.from(doc.output("arraybuffer")).toString("base64");
   const safe = (emp.full_name ?? "starfsmadur").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "_");
   const proc = await createSigningProcess({
