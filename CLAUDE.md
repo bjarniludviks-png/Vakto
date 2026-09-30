@@ -231,7 +231,11 @@
   `SignedData` (strengur). Taktikal setur stimpla aðeins `TopFirstPage`/`BottomLastPage` (engin hnit) → PDF-ið fær
   `stampStrip` (autt belti neðst, fótur færður upp, texti í stað undirskriftarlína). DEV-prófunaraðilar: kt. 5000101886 er
   AÐEINS Auðkennisapp (virkar ekki) — nota SIM-aðila, t.d. 6000101991/3333333 og 6000101994/6666666. Tölvupóstar og
-  undirritunarsíða Taktikal sýna nafn Taktikal-aðgangsins („BGL Experiences ehf.") — ekki stillanlegt per beiðni í API.
+  undirritunarsíða Taktikal sýna nafn Taktikal-aðgangsins (verður „VAKTO") — ekki stillanlegt per beiðni. Því sendir
+  Taktikal ENGAN póst: signees fá `communicationDeliveryType: None`, VAKTO sendir starfsmanni boðið (`sendTaktikalSignEmail`,
+  „<Fyrirtæki>: ráðningarsamningur til undirritunar") eftir undirskrift vinnuveitanda, og stimpillinn segir „Fyrir hönd:
+  <fyrirtæki>". **Á flæðinu í Taktikal-gáttinni (Stillingar → Flæði → Afhending) má AÐEINS webhook vera virkt** — eyða
+  „Afhending til eiganda ferlisins" og „Staðfestingarpóstur á viðskiptavin" (gert á DEV 30.9.2026; gera líka á prod).
 - **Still remaining:** contractor billable-vs-cost/GPS job tracking, a signed-URL viewer for the
   private `documents` bucket, Google/Microsoft/Auðkenni OAuth (scaffolded in `login-form`).
 - ✅ **VAKTO Admin (ofurstjórnborð SaaS-eigandans):** `/admin` — aðgangur EINGÖNGU fyrir netföng í
