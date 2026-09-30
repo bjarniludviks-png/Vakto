@@ -3,7 +3,7 @@
 // Ráðningarsamningur á skjá — sama útlit („C“) og PDF-ið (lib/contract-pdf.ts). ContractView
 // er lestrarsýn; ContractEditor er reitaritill fyrir drög (heldur einfaldara grindarútliti).
 
-import { parseContract, splitLang, pairFields, contractSummary, visibleRows, isBlank } from "@/lib/contract-pdf";
+import { parseContract, splitLang, pairFields, contractSummary, visibleRows, isBlank, boldNames } from "@/lib/contract-pdf";
 
 /** Index → true when that field stands alone on its row (same pairing as the PDF). */
 const aloneMap = (rows: [string, string][]) => { const m = new Set<number>(); let i = 0; for (const g of pairFields(rows)) { if (g.length === 1) m.add(i); i += g.length; } return m; };
@@ -37,7 +37,7 @@ export function ContractView({ content }: { content: string }) {
         {tEn && <div style={{ fontSize: 12.5, fontStyle: "italic", color: "#8a7a68" }}>{tEn}</div>}
         {summary.sentence && (
           <div style={{ marginTop: 10, fontSize: 13.5, lineHeight: 1.5, color: "#3d3a36" }}>
-            {summary.sentence[0]}
+            {boldNames(summary.sentence[0], summary.names).map((r, i) => (r.b ? <b key={i} style={{ fontWeight: 650, color: "#1c1b19" }}>{r.t}</b> : <span key={i}>{r.t}</span>))}
             <div style={{ fontStyle: "italic", fontSize: 12, color: "#8a7a68" }}>{summary.sentence[1]}</div>
           </div>
         )}

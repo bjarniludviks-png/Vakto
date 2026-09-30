@@ -77,8 +77,25 @@ export function parseContract(content: string): { title: string; sections: Secti
   return { title, sections };
 }
 
+/** Setningin í bútum: nöfn vinnuveitanda og starfsmanns feitletruð (fyrsta tilvik hvors). */
+export function boldNames(text: string, names: { employer: string; employee: string } | null): { t: string; b: boolean }[] {
+  if (!names) return [{ t: text, b: false }];
+  const out: { t: string; b: boolean }[] = [];
+  let rest = text;
+  for (const n of [names.employer, names.employee]) {
+    const i = n ? rest.indexOf(n) : -1;
+    if (i < 0) continue;
+    if (i > 0) out.push({ t: rest.slice(0, i), b: false });
+    out.push({ t: n, b: true });
+    rest = rest.slice(i + n.length);
+  }
+  if (rest) out.push({ t: rest, b: false });
+  return out;
+}
+
 export type ContractSummary = {
   sentence: [string, string] | null;             // IS, EN
+  names: { employer: string; employee: string } | null; // feitletruð í setningunni
   tiles: { label: string; value: string }[];     // 4 lykiltölur (tómar = „—“)
 };
 
@@ -104,6 +121,10 @@ export function contractSummary(sections: Section[]): ContractSummary {
   const employer = find("Vinnuveitandi", "Nafn");
   const name = [find("Starfsmaður", "Skírnarnafn"), find("Starfsmaður", "Eftirnafn")].filter(Boolean).join(" ");
   const start = find("Ráðningartími", "Fyrsti starfsdagur");
+  // Kennitala sýnd aðeins ef hún er 10 tölustafir (ekki fæðingardagur eða „—“).
+  const kt = (v: string) => { const d = v.replace(/\D/g, ""); return d.length === 10 ? `${d.slice(0, 6)}-${d.slice(6)}` : ""; };
+  const ktEr = kt(find("Vinnuveitandi", "Kennitala"));
+  const ktEe = kt(find("Starfsmaður", "Kennitala"));
   const role = is(find("Starfssvið", "Starfsheiti") || any("Starfsheiti", "Staða"));
   const ratio = is(find("Vinnutími", "Starfshlutfall") || any("Starfshlutfall")).replace(/^(Fullt starf|Hlutastarf)\s*/, "");
   const arr = is(find("Vinnutími", "Fyrirkomulag")).toLowerCase();
@@ -111,12 +132,14 @@ export function contractSummary(sections: Section[]): ContractSummary {
   const monthly = find("Laun", "Laun kr.") || any("Mánaðarlaun");
   const agreement = find("Kjarasamningur", "Kjarasamningur") || any("Kjarasamningur", "Stéttarfélag");
   const sentence: [string, string] | null = employer && name
-    ? [`${employer} ræður ${name} til starfa${start ? ` frá ${start}` : ""} á þeim kjörum sem hér fara á eftir.`,
+    ? [`${employer}${ktEr ? ` (kt. ${ktEr})` : ""} ræður ${name}${ktEe ? ` (kt. ${ktEe})` : ""} til starfa${start ? ` frá ${start}` : ""} á þeim kjörum sem hér fara á eftir.`,
        `${employer} employs ${name}${start ? ` from ${start}` : ""} on the terms set out below.`]
     : null;
-  if (!role && !ratio && !arr && !pay && !monthly && !agreement) return { sentence, tiles: [] };
+  const names = sentence ? { employer, employee: name } : null;
+  if (!role && !ratio && !arr && !pay && !monthly && !agreement) return { sentence, names, tiles: [] };
   return {
     sentence,
+    names,
     tiles: [
       { label: "Starf · Role", value: role || "—" },
       { label: "Starfshlutfall · Ratio", value: [ratio, arr].filter(Boolean).join(" · ") || "—" },
@@ -180,14 +203,32 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
   const parsed = parseContract(content);
   const [tIs, tEn] = splitLang(parsed.title);
   const summary = contractSummary(parsed.sections);
-  const empName = summary.sentence ? (summary.sentence[0].split(" ræður ")[1] ?? "").split(" til starfa")[0] : "";
+  const empName = summary.names?.employee ?? "";
 
   // ---- Hlýr haus: merki, titill, samantekt, fjórar lykiltölur ----
   let y = 0;
   {
     const inner = CW;
-    font("normal", 10, INK2);
-    const sIs = summary.sentence ? wrap(summary.sentence[0], inner * 0.78) : [];
+    // Íslenska setningin með feitletruðum nöfnum: orð fyrir orð, hvert með sínu letri.
+    type Run = { t: string; b: boolean };
+    const richWrap = (runs: Run[], width: number): Run[][] => {
+      const words: Run[] = [];
+      for (const r of runs) for (const w of r.t.split(/(\s+)/)) if (w) words.push({ t: w, b: r.b });
+      const lines: Run[][] = [[]]; let lw = 0;
+      for (const w of words) {
+        font(w.b ? "bold" : "normal", 10, INK2);
+        const ww = doc.getTextWidth(w.t);
+        if (/^\s+$/.test(w.t)) { if (lines[lines.length - 1].length) { lines[lines.length - 1].push(w); lw += ww; } continue; }
+        if (lw + ww > width && lines[lines.length - 1].length) {
+          const cur = lines[lines.length - 1];
+          while (cur.length && /^\s+$/.test(cur[cur.length - 1].t)) cur.pop();
+          lines.push([]); lw = 0;
+        }
+        lines[lines.length - 1].push(w); lw += ww;
+      }
+      return lines.filter((l) => l.length);
+    };
+    const sIs = summary.sentence ? richWrap(boldNames(summary.sentence[0], summary.names), inner * 0.78) : [];
     font("italic", 9, WARM_MUT);
     const sEn = summary.sentence ? wrap(summary.sentence[1], inner * 0.78) : [];
     // Lykiltölur: gildið má fara í tvær línur (annars „…“); allir kassar jafnháir þeim hæsta.
@@ -214,7 +255,11 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
     if (tEn) { font("italic", 10, WARM_MUT); doc.text(tEn, M, y); }
     y += 20;
     if (sIs.length) {
-      font("normal", 10, INK2); sIs.forEach((l) => { doc.text(l, M, y); y += 13.5; });
+      sIs.forEach((line) => {
+        let x = M;
+        for (const w of line) { font(w.b ? "bold" : "normal", 10, w.b ? INK : INK2); doc.text(w.t, x, y); x += doc.getTextWidth(w.t); }
+        y += 13.5;
+      });
       font("italic", 9, WARM_MUT); sEn.forEach((l) => { doc.text(l, M, y); y += 12; });
       y += 12;
     }
