@@ -7,6 +7,8 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
 import { nf } from "@/lib/format";
 import { inviteToCompany, roleFromLabel } from "@/lib/invite.server";
+import { draftContractTerms, type TermsDraft } from "@/lib/ai/terms";
+import { strictSchema, stripUnset } from "@/lib/ai/schema";
 
 export type SyncResult = { ok: boolean; demo?: boolean; amount?: number; error?: string };
 export type SettingsResult = { ok: boolean; demo?: boolean; error?: string };
@@ -244,6 +246,28 @@ export async function ensureKioskToken(): Promise<{ ok: boolean; token?: string;
     return { ok: true, token };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** AI semur/yfirfer sérákvæði ráðningarsamninga. Aðeins eigandi/vaktstjóri; vistar ekkert. */
+export async function aiContractTerms(input: { description?: string; current?: string }): Promise<TermsDraft> {
+  const fail = (error: string): TermsDraft => ({ ok: false, clauses: [], flags: [], summary: "", error });
+  if (!isSupabaseConfigured()) return fail("Ekki tengt");
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return fail(ctx.error ?? "Villa");
+    const { data: u } = await supabase.from("users").select("role").eq("id", ctx.userId).maybeSingle();
+    if (u?.role !== "owner" && u?.role !== "manager") return fail("Aðeins stjórnendur");
+    const { data: c } = await supabase.from("companies").select("name").eq("id", ctx.company).maybeSingle();
+    return await draftContractTerms({
+      description: input.description?.slice(0, 3000),
+      current: input.current?.slice(0, 8000),
+      companyName: (c?.name as string | undefined) ?? undefined,
+    });
+  } catch (e) {
+    console.error("aiContractTerms", e);
+    return fail("Tókst ekki að semja ákvæðin.");
   }
 }
 
@@ -662,7 +686,9 @@ export async function aiSuggestRules(input: { country?: string; region?: string;
       output_config: {
         format: {
           type: "json_schema",
-          schema: {
+          // Structured outputs krefjast additionalProperties:false á hverjum hlut — án þess
+          // hafnaði API-ið kallinu og kerfið féll hljóðlaust á innbyggða sniðmátið.
+          schema: strictSchema({
             type: "object",
             properties: {
               name: { type: "string" },
@@ -685,7 +711,7 @@ export async function aiSuggestRules(input: { country?: string; region?: string;
               },
             },
             required: ["name", "explanation", "rules"],
-          },
+          }),
         },
       },
       messages: [{
@@ -703,10 +729,11 @@ Notaðu premiums-listann fyrir öll álög (heiti + % + tímabil/dagar ef við �
       }],
     });
     const block = msg.content.find((b) => b.type === "text");
-    const parsed = block && "text" in block ? JSON.parse(block.text) : null;
+    const parsed = block && "text" in block ? stripUnset(JSON.parse(block.text)) : null;
     if (!parsed?.rules) return fallback;
     return { name: parsed.name, rules: parsed.rules as RuleSet, explanation: parsed.explanation, live: true };
-  } catch {
+  } catch (e) {
+    console.error("aiSuggestRules", e instanceof Error ? e.message : e);
     return fallback;
   }
 }

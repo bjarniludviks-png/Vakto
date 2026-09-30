@@ -11,6 +11,7 @@ import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
 import type { RuleSet } from "@/lib/rules";
+import { strictSchema, stripUnset } from "./schema";
 
 export type AgreementSource = { field: string; value: string; quote: string; location: string };
 export type AgreementResult = {
@@ -84,7 +85,7 @@ export async function readAgreement(input: { pdfBase64?: string; text?: string; 
       model: "claude-opus-4-8",
       max_tokens: 32000,
       thinking: { type: "adaptive" },
-      output_config: { effort: "high", format: { type: "json_schema", schema: SCHEMA } },
+      output_config: { effort: "high", format: { type: "json_schema", schema: strictSchema(SCHEMA) } },
       system: PROMPT,
       messages: [{
         role: "user",
@@ -99,7 +100,7 @@ export async function readAgreement(input: { pdfBase64?: string; text?: string; 
     if (msg.stop_reason === "max_tokens") return { ...empty, error: "Samningurinn var of langur til að klára — prófaðu að hlaða upp aðeins viðeigandi köflum." };
     const block = msg.content.find((b) => b.type === "text");
     if (!block || block.type !== "text") return { ...empty, error: "Ekkert svar frá AI" };
-    const p = JSON.parse(block.text) as Omit<AgreementResult, "ok" | "live">;
+    const p = stripUnset(JSON.parse(block.text)) as Omit<AgreementResult, "ok" | "live">;
     return { ok: true, live: true, name: p.name, explanation: p.explanation, rules: p.rules ?? {}, sources: p.sources ?? [], missing: p.missing ?? [] };
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return { ...empty, error: "AI er upptekið — reyndu aftur eftir smá stund." };

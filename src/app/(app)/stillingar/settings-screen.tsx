@@ -6,10 +6,11 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, saveCompanyLimits, startCardChange, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit } from "./actions";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, aiContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, saveCompanyLimits, startCardChange, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit } from "./actions";
 import dynamic from "next/dynamic";
 import type { SettingsData, CompanyInfo, GeofenceMode } from "./settings.server";
 import type { AgreementResult, AgreementSource } from "@/lib/ai/agreement";
+import type { TermsDraft } from "@/lib/ai/terms";
 
 const GeoMap = dynamic(() => import("@/components/app/geo-map"), { ssr: false });
 import { type PayRule } from "@/lib/payrules";
@@ -313,11 +314,18 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
   );
 }
 
-/** Company-wide custom contract terms — appended to every new employment contract. */
+/** Company-wide custom contract terms — appended to every new employment contract.
+ *  AI-aðstoð: lýstu vinnustaðnum → tvítyngd ákvæði + lagaflögg; eða yfirfara núverandi.
+ *  Stjórnandi velur ákvæðin, setur inn og vistar sjálfur. */
 function ContractTermsCard() {
   const { t } = useLang();
   const [terms, setTerms] = useState("");
   const [busy, setBusy] = useState(false);
+  const [desc, setDesc] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [draft, setDraft] = useState<TermsDraft | null>(null);
+  const [picked, setPicked] = useState<boolean[]>([]);
+  const [reviewMode, setReviewMode] = useState(false);
   useEffect(() => { getContractTerms().then(setTerms).catch(() => {}); }, []);
   async function save() {
     setBusy(true);
@@ -325,11 +333,73 @@ function ContractTermsCard() {
     setBusy(false);
     toast(res.ok ? (res.demo ? t("Vistað (demo)") : t("Skilmálar vistaðir — birtast á nýjum samningum")) : (res.error ?? "Tókst ekki"));
   }
+  async function runAi(review: boolean) {
+    setAiBusy(true);
+    const res = await aiContractTerms(review ? { current: terms, description: desc } : { description: desc });
+    setAiBusy(false);
+    if (!res.ok) { toast(res.error ?? t("Tókst ekki að semja ákvæðin")); return; }
+    setDraft(res);
+    setReviewMode(review);
+    setPicked(res.clauses.map(() => true));
+  }
+  function insert() {
+    if (!draft) return;
+    const chosen = draft.clauses.filter((_, i) => picked[i]);
+    const block = chosen.map((c) => `**${c.titleIs} / ${c.titleEn}:** ${c.textIs} / ${c.textEn}`).join("\n\n");
+    // Yfirferð skilar endurbættri heildarútgáfu → kemur í stað textans; ný ákvæði bætast við.
+    setTerms(reviewMode || !terms.trim() ? block : `${terms.trim()}\n\n${block}`);
+    setDraft(null);
+    toast(t("Ákvæðin eru komin inn — lestu yfir og smelltu á „Vista skilmála“"));
+  }
+  const sevColor = (s: string) => (s === "high" ? "var(--bad)" : "var(--warn)");
   return (
     <div className="card" style={{ marginTop: 16 }}>
       <div className="ch"><div><div className="ct">{t("Sérskilmálar ráðningarsamninga")}</div><div className="cs">{t("þínir skilmálar — birtast sem sér kafli á hverjum nýjum samningi")}</div></div></div>
       <div className="cb">
-        <textarea className="lf-ta" rows={5} value={terms} onChange={(e) => setTerms(e.target.value)}
+        <div style={{ background: "var(--brand-soft)", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 650, marginBottom: 6 }}>{t("Semja með AI")}</div>
+          <textarea className="lf-ta" rows={2} value={desc} onChange={(e) => setDesc(e.target.value)}
+            placeholder={t("Lýstu vinnustaðnum og því sem á að vera í skilmálunum, t.d. „Veitingastaður, kokkar og þjónar. Vinnuföt lögð til. Tilkynna veikindi fyrir kl. 10. Símar ekki í eldhúsi.“")} />
+          <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+            <button type="button" className="btn sm" disabled={aiBusy || !desc.trim()} onClick={() => runAi(false)}>{aiBusy ? t("AI hugsar…") : t("Semja ákvæði")}</button>
+            <button type="button" className="btn ghost sm" disabled={aiBusy || !terms.trim()} onClick={() => runAi(true)}>{t("Yfirfara núverandi ákvæði")}</button>
+          </div>
+        </div>
+
+        {draft && (
+          <div style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
+            {draft.summary && <p style={{ fontSize: 13, margin: "0 0 10px", color: "var(--ink2)" }}>{draft.summary}</p>}
+            {draft.flags.length > 0 && (
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--ink3)", marginBottom: 6 }}>{t("Athugið")}</div>
+                {draft.flags.map((f, i) => (
+                  <div key={i} style={{ display: "flex", gap: 8, fontSize: 12.5, padding: "5px 0", borderTop: i ? "1px dashed var(--line2)" : undefined }}>
+                    <span style={{ width: 8, height: 8, borderRadius: 99, background: sevColor(f.severity), marginTop: 5, flexShrink: 0 }} />
+                    <span><b>{f.clause}</b>: {f.issueIs}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase", color: "var(--ink3)", marginBottom: 6 }}>{t("Tillaga að ákvæðum")}</div>
+            {draft.clauses.map((c, i) => (
+              <label key={i} style={{ display: "flex", gap: 9, alignItems: "flex-start", padding: "7px 0", borderTop: i ? "1px dashed var(--line2)" : undefined, cursor: "pointer" }}>
+                <input type="checkbox" checked={!!picked[i]} onChange={(e) => setPicked((p) => p.map((v, j) => (j === i ? e.target.checked : v)))} style={{ marginTop: 3 }} />
+                <span style={{ fontSize: 13 }}>
+                  <b>{c.titleIs}</b> <span className="muted" style={{ fontStyle: "italic" }}>· {c.titleEn}</span>
+                  <div>{c.textIs}</div>
+                  <div className="muted" style={{ fontStyle: "italic", fontSize: 12 }}>{c.textEn}</div>
+                </span>
+              </label>
+            ))}
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <button type="button" className="btn sm" disabled={!picked.some(Boolean)} onClick={insert}>{t("Setja valin ákvæði inn")}</button>
+              <button type="button" className="btn ghost sm" onClick={() => setDraft(null)}>{t("Hætta við")}</button>
+            </div>
+            <p className="muted" style={{ fontSize: 11.5, marginTop: 8 }}>{t(reviewMode ? "Tillaga frá AI, ekki lögfræðiráðgjöf. Yfirfarin útgáfa kemur í stað núverandi texta; ekkert vistast fyrr en þú smellir á „Vista skilmála“." : "Tillaga frá AI, ekki lögfræðiráðgjöf. Valin ákvæði bætast aftan við núverandi texta; ekkert vistast fyrr en þú smellir á „Vista skilmála“.")}</p>
+          </div>
+        )}
+
+        <textarea className="lf-ta" rows={6} value={terms} onChange={(e) => setTerms(e.target.value)}
           placeholder={t("t.d. Trúnaðarskylda gildir um öll viðskiptaleyndarmál. Starfsmaður skal tilkynna veikindi fyrir kl. 10:00. Einkennisfatnaður er lagður til af fyrirtækinu…")} />
         <button className="btn sm" disabled={busy} onClick={save} style={{ marginTop: 10 }}>{t("Vista skilmála")}</button>
         <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{t("Skilmálarnir bætast við alla nýja ráðningarsamninga sem kaflinn „Sérákvæði fyrirtækisins“. Eldri samningar breytast ekki.")}</p>
@@ -560,6 +630,8 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
   const [sources, setSources] = useState<AgreementSource[]>([]);
   const [missing, setMissing] = useState<string[]>([]);
   const [reviewed, setReviewed] = useState(false);
+  // Ágiskun AI án kjarasamnings — sýnd með viðvörun og krefst staðfestingar eins og PDF-leiðin.
+  const [guess, setGuess] = useState(false);
   const [docBusy, setDocBusy] = useState(false);
   const docInput = useRef<HTMLInputElement>(null);
 
@@ -588,6 +660,10 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
     if (!name) setName(res.name);
     setSource("ai");
     setAiNote(res.explanation);
+    setSources([]);
+    setMissing([]);
+    setGuess(res.live);
+    setReviewed(false);
   }
 
   async function readDoc(file: File) {
@@ -605,6 +681,7 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
       setAiNote(res.explanation);
       setSources(res.sources);
       setMissing(res.missing);
+      setGuess(false);
       setReviewed(false);
     } catch {
       toast(t("Tókst ekki að lesa samninginn"));
@@ -616,7 +693,7 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
 
   async function submit() {
     if (!name.trim()) { toast(t("Gefðu sniðmátinu nafn")); return; }
-    if (sources.length && !reviewed) { toast(t("Staðfestu að þú hafir borið gildin saman við samninginn")); return; }
+    if ((sources.length || guess) && !reviewed) { toast(t("Staðfestu að þú hafir borið gildin saman við samninginn")); return; }
     setBusy(true);
     // Best-effort mapping of the free-form rows onto the structured slots the
     // payroll calc reads today (night/weekend/holiday) — the rows stay the
@@ -677,7 +754,7 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
             ))}
             <button className="btn sm" disabled={aiBusy} onClick={askAi}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6Z" /></svg>
-              {aiBusy ? t("AI hugsar…") : t("Fá tillögu með AI")}
+              {aiBusy ? t("AI hugsar…") : t("Ágiska með AI (án samnings)")}
             </button>
             <button className="btn ghost sm" disabled={docBusy} onClick={() => docInput.current?.click()}>
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M9 13h6M9 17h4" /></svg>
@@ -686,6 +763,15 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
             <input ref={docInput} type="file" accept="application/pdf,.pdf,.txt,text/plain" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) void readDoc(f); }} />
           </div>
           {aiNote && <p className="muted" style={{ fontSize: 12, background: "var(--brand-soft)", borderRadius: 9, padding: "9px 11px", marginBottom: 10 }}>{aiNote}</p>}
+          {guess && (
+            <div style={{ border: "1px solid var(--warn)", background: "#fdf4e7", borderRadius: 10, padding: "10px 12px", marginBottom: 10, fontSize: 12.5 }}>
+              <b>{t("Ágiskun, ekki lesið úr kjarasamningi.")}</b> {t("Prósenturnar byggja á almennri þekkingu AI og geta verið rangar, sem þýðir röng laun. Berðu hverja tölu saman við kjarasamninginn, eða notaðu „Lesa kjarasamning (PDF)“ sem vísar í grein og blaðsíðu fyrir hvert gildi.")}
+              <label style={{ display: "flex", gap: 8, alignItems: "flex-start", marginTop: 8, cursor: "pointer" }}>
+                <input type="checkbox" checked={reviewed} onChange={(e) => setReviewed(e.target.checked)} style={{ marginTop: 2 }} />
+                <span>{t("Ég hef borið gildin saman við samninginn og þau eru rétt.")}</span>
+              </label>
+            </div>
+          )}
           {sources.length > 0 && (
             <div style={{ border: "1px solid var(--line)", borderRadius: 10, padding: "10px 12px", marginBottom: 10 }}>
               <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--ink3)", marginBottom: 6 }}>{t("Heimildir úr samningnum")}</div>

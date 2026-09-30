@@ -212,6 +212,12 @@
   innsláttur tapast ekki; ein „Vista“ fyrir alla flipa + „Óvistaðar breytingar“ + viðvörun við að fara. Persónulegt:
   heimilisfang · póstnúmer · staður (migration **0060**: `postal_code`, `city`, skiptir eldri „Gata 1, 101 Staður“),
   bankareikningur í þremur reitum (`BankField` í `components/app/fields.tsx`, geymt sem „0000-00-000000“).
+- ✅ **AI sérákvæði + lagfæring á AI launareglum (30. sept 2026):** Stillingar → Launareglur → „Sérskilmálar“:
+  „Semja ákvæði“ / „Yfirfara núverandi ákvæði“ (`lib/ai/terms.ts`, `aiContractTerms`) → tvítyngd ákvæði + lagaflögg
+  (high/medium); stjórnandi velur og vistar. **Structured outputs:** notið alltaf `strictSchema()`/`stripUnset()`
+  (`lib/ai/schema.ts`) — API krefst additionalProperties:false, ≤24 valkvæðra og ≤16 nullable reita; án þess
+  hafnaði það `aiSuggestRules` og `readAgreement` og kerfið féll hljóðlaust á sniðmát. „Ágiska með AI (án samnings)“
+  sýnir viðvörun og krefst staðfestingar áður en vistað er.
 - **Still remaining:** contractor billable-vs-cost/GPS job tracking, a signed-URL viewer for the
   private `documents` bucket, Google/Microsoft/Auðkenni OAuth (scaffolded in `login-form`).
 - ✅ **VAKTO Admin (ofurstjórnborð SaaS-eigandans):** `/admin` — aðgangur EINGÖNGU fyrir netföng í
