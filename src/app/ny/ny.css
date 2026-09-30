@@ -273,8 +273,8 @@
 /* ---------- pricing ---------- */
 .ny-price{position:relative;overflow:hidden;max-width:520px;margin:0 auto;text-align:center;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(245,147,49,.35);border-radius:24px;padding:44px 36px 36px;box-shadow:0 0 60px -18px var(--glow),inset 0 1px 0 rgba(255,255,255,.09)}
 .ny-price-glow{position:absolute;left:50%;top:-130px;width:420px;height:260px;transform:translateX(-50%);background:radial-gradient(50% 50% at 50% 50%,rgba(233,112,15,.4),transparent 70%);filter:blur(30px);pointer-events:none}
-.ny-amt{position:relative;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:52px;font-weight:700;color:#fff;letter-spacing:-.02em}
-.ny-amt small{font-family:'General Sans',sans-serif;font-size:14px;font-weight:500;color:var(--dim)}
+.ny-amt{position:relative;font-family:'General Sans',-apple-system,BlinkMacSystemFont,sans-serif;font-size:60px;font-weight:700;color:#fff;letter-spacing:-.045em;line-height:1.05;font-variant-numeric:tabular-nums}
+.ny-amt small{font-family:'General Sans',sans-serif;font-size:14px;font-weight:500;color:var(--dim);letter-spacing:-.01em;margin-left:6px}
 .ny-price ul{list-style:none;margin:26px 0 30px;padding:0;display:flex;flex-direction:column;gap:12px;text-align:left}
 .ny-price li{position:relative;font-size:14.5px;color:var(--ink);padding-left:26px}
 .ny-price li::before{content:"";position:absolute;left:0;top:7px;width:7px;height:7px;border-radius:50%;background:var(--brand2);box-shadow:0 0 10px var(--glow)}
@@ -518,7 +518,7 @@
 .ny-plan.pro{border-color:rgba(245,147,49,.4);box-shadow:0 0 60px -18px var(--glow),inset 0 1px 0 rgba(255,255,255,.09)}
 .ny-plan h3{font-size:22px;color:#fff}
 .ny-plan .pd{font-size:14px;color:var(--dim);margin-top:6px}
-.ny-plan .ny-amt{margin-top:18px;font-size:46px}
+.ny-plan .ny-amt{margin-top:18px;font-size:54px}
 .ny-plan ul{list-style:none;margin:22px 0 28px;padding:0;display:flex;flex-direction:column;gap:11px;text-align:left;flex:1}
 .ny-plan li{position:relative;font-size:14.5px;color:var(--ink);padding-left:24px}
 .ny-plan li::before{content:"";position:absolute;left:0;top:8px;width:7px;height:7px;border-radius:50%;background:var(--brand2);box-shadow:0 0 10px var(--glow)}
@@ -585,7 +585,7 @@
 
 /* one price */
 .ny-extra{position:relative;margin-top:10px;font-size:14.5px;color:var(--dim)}
-.ny-extra b{color:#fff;font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:16px}
+.ny-extra b{color:#fff;font-family:'General Sans',sans-serif;font-weight:700;font-size:17px;letter-spacing:-.02em}
 .ny-price{max-width:560px}
 
 /* app-section: sjálfvirk fletting milli alvöru skjámynda úr appinu */

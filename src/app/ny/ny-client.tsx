@@ -13,7 +13,7 @@ type Lang = "is" | "en";
 
 /* ---------- copy ---------- */
 
-type Plan = { price: string; priceY: string; unit: string; extra: string; extraY: string; extraUnit: string; yearNote: string; items: string[]; cta: string };
+type Plan = { price: string; priceY: string; cur: string; unit: string; extra: string; extraY: string; extraUnit: string; yearNote: string; items: string[]; cta: string };
 
 const T: Record<Lang, {
   nav: [string, string, string];
@@ -194,7 +194,7 @@ const T: Record<Lang, {
     priceSub: "Engin þrep. Ekkert læst. Engin binding.",
     billMonthly: "Mánaðarlega", billYearly: "Árlega", billSave: "15% afsláttur",
     plan: {
-      price: "9.990", priceY: "8.490", unit: "kr/mán · 5 virkir starfsmenn innifaldir", yearNote: "greitt árlega",
+      price: "9.990", priceY: "8.490", cur: "kr", unit: "/mán · 5 virkir starfsmenn innifaldir", yearNote: "greitt árlega",
       extra: "1.490", extraY: "1.270", extraUnit: "kr á hvern virkan starfsmann umfram",
       items: [
         "Vaktaplan, stimpilklukka, beiðnir og vaktaskipti",
@@ -353,7 +353,7 @@ const T: Record<Lang, {
     priceSub: "No tiers. Nothing locked. No lock-in.",
     billMonthly: "Monthly", billYearly: "Yearly", billSave: "15% off",
     plan: {
-      price: "9,990", priceY: "8,490", unit: "ISK/mo · 5 active employees included", yearNote: "billed yearly",
+      price: "9,990", priceY: "8,490", cur: "ISK", unit: "/mo · 5 active employees included", yearNote: "billed yearly",
       extra: "1,490", extraY: "1,270", extraUnit: "ISK per additional active employee",
       items: [
         "Scheduling, time clock, requests and shift swaps",
@@ -695,7 +695,7 @@ function Pricing({ t, q }: { t: (typeof T)["is"]; q: string }) {
         </div>
         <div className="ny-price">
           <div className="ny-price-glow" aria-hidden="true" />
-          <div className="ny-amt">{yearly ? pl.priceY : pl.price} <small>{pl.unit}{yearly ? ` · ${pl.yearNote}` : ""}</small></div>
+          <div className="ny-amt">{yearly ? pl.priceY : pl.price} {pl.cur}<small>{pl.unit}{yearly ? ` · ${pl.yearNote}` : ""}</small></div>
           <div className="ny-extra">+ <b>{yearly ? pl.extraY : pl.extra}</b> {pl.extraUnit}</div>
           <ul>
             {pl.items.map((it) => <li key={it}>{it}</li>)}
