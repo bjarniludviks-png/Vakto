@@ -480,6 +480,12 @@ function LaunTab({ e }: { e: Employee }) {
             if (v.startsWith("tpl:")) {
               const tp = tpls.find((x) => `tpl:${x.id}` === v);
               if (tp) {
+                // Laun úr sniðmátinu (launatafla) forfyllast: mánaðarlaun ef fastlaunað, annars dagvinnukaup.
+                const w = tp.rules.wage;
+                if (w?.monthly && payType === "Mánaðarlaun") setRate(Math.round(w.monthly));
+                else if (w?.dayRate && payType === "Tímakaup") setRate(Math.round(w.dayRate));
+                else if (w?.monthly && !w.dayRate) { setPayType("Mánaðarlaun"); setRate(Math.round(w.monthly)); }
+                else if (w?.dayRate) { setPayType("Tímakaup"); setRate(Math.round(w.dayRate)); }
                 const cr = templateToPayRule(tp.rules);
                 setRules((r) => ({ ...r, eve: cr.eve, weekend: cr.weekend, overtime: cr.overtime, holiday: cr.holiday, night: cr.night }));
                 setOtWeekly(cr.otWeekly ?? DEFAULT_OT_WEEKLY);
@@ -1094,9 +1100,15 @@ function DocsTab({ employeeId }: { employeeId: string }) {
 
 /** Pay-type + rate pair for the new-employee form — the unit and example
  * follow the chosen type (kr/klst for hourly, kr/mán for monthly). */
-function PayFields() {
+function PayFields({ preset }: { preset?: { kind: string; rate: string; n: number } | null }) {
   const [kind, setKind] = useState("Tímakaup");
   const [rate, setRate] = useState("2.900");
+  // Reglusniðmát valið með launum → forfylla (n breytist við hvert val).
+  useEffect(() => {
+    if (!preset) return;
+    const id = requestAnimationFrame(() => { setKind(preset.kind); setRate(preset.rate); });
+    return () => cancelAnimationFrame(id);
+  }, [preset]);
   const monthly = kind === "Mánaðarlaun";
   function switchKind(next: string) {
     setKind(next);
@@ -1151,6 +1163,7 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tpls, setTpls] = useState<RuleTemplate[]>([]);
+  const [payPreset, setPayPreset] = useState<{ kind: string; rate: string; n: number } | null>(null);
   const [opts, setOpts] = useState<{ departments: string[]; positions: string[]; locations: string[] }>({ departments: [], positions: [], locations: [] });
   useEffect(() => {
     listRuleTemplates().then((r) => setTpls(r.templates)).catch(() => {});
@@ -1265,12 +1278,16 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <Sec>Laun</Sec>
-          <PayFields />
+          <PayFields preset={payPreset} />
           <UnionPensionFields />
           <div className="emp-row2">
             <div className="emp-fld">
               <label>Reglusniðmát</label>
-              <select name="ruleTemplateId" defaultValue="">
+              <select name="ruleTemplateId" defaultValue="" onChange={(ev) => {
+                const w = tpls.find((x) => x.id === ev.target.value)?.rules.wage;
+                if (w?.dayRate) setPayPreset({ kind: "Tímakaup", rate: nf(Math.round(w.dayRate)), n: Date.now() });
+                else if (w?.monthly) setPayPreset({ kind: "Mánaðarlaun", rate: nf(Math.round(w.monthly)), n: Date.now() });
+              }}>
                 <option value="">— ekkert (grunnreglur) —</option>
                 {tpls.map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}
               </select>

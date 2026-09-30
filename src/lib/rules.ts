@@ -27,6 +27,8 @@ export type RuleSet = {
   sick?: { daysPerYear?: number; paidPct?: number };
   /** Payroll levies employer pays on top of gross (%, e.g. 30.2 in Iceland). */
   levies?: { pct?: number };
+  /** Laun úr launatöflu kjarasamnings (kr). Aldrei giskað af AI — aðeins lesið úr samningi eða slegið inn. */
+  wage?: { monthly?: number; dayRate?: number; overtimeRate?: number; scale?: string };
   /** Free-text union/local/company rules the numbers can't capture. */
   notes?: string;
 };

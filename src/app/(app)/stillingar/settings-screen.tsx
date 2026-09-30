@@ -833,6 +833,16 @@ function RuleTemplateModal({ tpl, onClose }: { tpl: RuleTemplate | null; onClose
             <N label={t("Lágm. hvíld milli vakta (klst)")} value={rules.rest?.minHoursBetweenShifts} onChange={setNum((r, n) => { r.rest = { ...r.rest, minHoursBetweenShifts: n }; })} />
             <N label={t("Hámark samfelldir dagar")} value={rules.rest?.maxConsecutiveDays} onChange={setNum((r, n) => { r.rest = { ...r.rest, maxConsecutiveDays: n }; })} />
           </div>
+          <label style={{ fontSize: 12, fontWeight: 700, letterSpacing: ".05em", textTransform: "uppercase", color: "var(--ink3)", display: "block", margin: "6px 0" }}>{t("Laun (úr launatöflu)")}</label>
+          <div style={{ display: "flex", gap: 10 }}>
+            <N label={t("Mánaðarlaun (kr)")} value={rules.wage?.monthly} onChange={setNum((r, n) => { r.wage = { ...r.wage, monthly: n }; })} />
+            <N label={t("Dagvinnukaup (kr/klst)")} value={rules.wage?.dayRate} onChange={setNum((r, n) => { r.wage = { ...r.wage, dayRate: n }; })} />
+            <N label={t("Yfirvinnukaup (kr/klst)")} value={rules.wage?.overtimeRate} onChange={setNum((r, n) => { r.wage = { ...r.wage, overtimeRate: n }; })} />
+          </div>
+          <div className="field"><label>{t("Launaflokkur og þrep")}</label>
+            <input value={rules.wage?.scale ?? ""} onChange={(e) => setRules((r) => ({ ...r, wage: { ...r.wage, scale: e.target.value || undefined } }))} placeholder={t("t.d. Lfl. 5, þrep 2")} />
+          </div>
+          <p className="muted" style={{ fontSize: 11.5, margin: "-4px 0 10px" }}>{t("Launin forfyllast á starfsmann þegar sniðmátið er valið. AI giskar aldrei á laun — „Lesa kjarasamning (PDF)“ les þau úr launatöflunni.")}</p>
           <div style={{ display: "flex", gap: 10 }}>
             <N label={t("Orlofsdagar á ári")} value={rules.vacation?.daysPerYear} onChange={setNum((r, n) => { r.vacation = { ...r.vacation, daysPerYear: n }; })} />
             <N label={t("Veikindadagar á ári")} value={rules.sick?.daysPerYear} onChange={setNum((r, n) => { r.sick = { ...r.sick, daysPerYear: n }; })} />

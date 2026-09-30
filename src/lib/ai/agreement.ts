@@ -43,6 +43,12 @@ const SCHEMA = obj({
     rest: obj({ minHoursBetweenShifts: num, maxConsecutiveDays: num }),
     vacation: obj({ daysPerYear: num, accrualPct: num }),
     sick: obj({ daysPerYear: num, paidPct: num }),
+    wage: obj({
+      monthly: { type: "number", description: "Mánaðarlaun (kr) úr launatöflu fyrir hlutverkið/starfsaldur" },
+      dayRate: { type: "number", description: "Dagvinnukaup (kr/klst) úr launatöflu" },
+      overtimeRate: { type: "number", description: "Yfirvinnukaup (kr/klst) úr launatöflu, eða reiknað eftir formúlu samningsins" },
+      scale: { type: "string", description: "Launaflokkur og þrep, t.d. „Lfl. 5, þrep 2“" },
+    }),
     notes: str,
   }),
   sources: {
@@ -66,6 +72,7 @@ Reglur:
 - Prósentur sem tölur (33 fyrir 33%). Tímar sem HH:MM. Vikudagar í premiums.days: 0=mán … 6=sun.
 - Öll álög (kvöld, nótt, helgar, stórhátíðir, bakvaktir o.s.frv.) fara í "premiums" með heiti, %, og tímabili/dögum ef samningurinn tilgreinir það. Settu líka night/weekend/holiday ef samningurinn skilgreinir þau skýrt.
 - Ef samningurinn hefur mismunandi reglur eftir starfi eða starfsaldri, notaðu þær sem eiga við hlutverkið hér að neðan og nefndu hin afbrigðin í "notes".
+- Laun (wage): lestu mánaðarlaun, dagvinnukaup og yfirvinnukaup úr launatöflu samningsins fyrir hlutverkið og starfsaldurinn, og launaflokk/þrep. Ef launatafla fylgir ekki eða hlutverkið er óljóst, slepptu wage og nefndu það í "missing". Hvert launagildi þarf tilvitnun í sources eins og önnur gildi. Taktu fram í explanation frá hvaða dagsetningu launataflan gildir.
 - Skrifaðu explanation og notes á íslensku. Þetta er tillaga sem stjórnandi yfirfer — ekki lögfræðiráðgjöf.`;
 
 export async function readAgreement(input: { pdfBase64?: string; text?: string; hint?: string }): Promise<AgreementResult> {
