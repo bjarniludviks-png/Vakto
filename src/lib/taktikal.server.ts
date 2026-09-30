@@ -65,7 +65,8 @@ function phoneFor(p?: string | null): string | undefined {
 
 export type TaktikalProcess = { processKey: string; employer: { key: string; url: string }; employee: { key: string; url: string } };
 
-/** Stofnar undirritunarferli: vinnuveitandi skrifar fyrst, síðan starfsmaður — báðir með rafrænum skilríkjum. */
+/** Stofnar undirritunarferli: vinnuveitandi skrifar fyrst, síðan starfsmaður — báðir með rafrænum skilríkjum.
+ *  Tenglar koma í svarinu; VAKTO afhendir þá (vinnuveitandi strax, starfsmaður í pósti eftir undirskrift vinnuveitanda). */
 export async function createSigningProcess(input: {
   pdfBase64: string; fileName: string; ownerEmail: string; contractId: string;
   employer: TaktikalSigner; employee: TaktikalSigner;
@@ -91,7 +92,8 @@ export async function createSigningProcess(input: {
       meta: { vaktoContractId: input.contractId },
       signInOrder: true,
       signatureLocation: "BottomLastPage",
-      createSignees: [signee(input.employer, false), signee(input.employee, true)],
+      // Taktikal sendir engan póst (hann kæmi „frá VAKTO“ án nafns fyrirtækisins) — VAKTO sendir boðin sjálft.
+      createSignees: [signee(input.employer, false), signee(input.employee, false)],
     }),
   });
   const digits = (x?: string) => (x ?? "").replace(/\D/g, "");
