@@ -31,11 +31,13 @@ for (const theme of ["light", "dark"]) {
     localStorage.setItem("vakto-dash-period", "custom"); localStorage.setItem("vakto-dash-from", from); localStorage.setItem("vakto-dash-to", to);
     localStorage.setItem("vakto:period:timaskraning", JSON.stringify({ preset: "custom", from, to }));
     localStorage.setItem("vakto-onb-hidden", "1");
+    localStorage.setItem("vakto-rail", "1"); // hliðarvalmynd lokuð, aðeins íkon
   } catch {} }, { th: theme, from: FROM, to: TO });
   const p = await c.newPage();
   await p.goto(await link(env.DEMO_LOGIN_EMAIL, "/maelabord"), { waitUntil: "domcontentloaded" });
   await settle(p, 6000);
-  for (const [name, path] of [["maelabord", "/maelabord"], ["vaktaplan", "/vaktaplan"], ["timaskraning", "/timaskraning"], ["launakeyrslur", "/launakeyrslur"], ["innsyn", "/innsyn"], ["spjall", "/spjall"]]) {
+  const ONLY = process.env.ONLY?.split(",");
+  for (const [name, path] of [["maelabord", "/maelabord"], ["vaktaplan", "/vaktaplan"], ["timaskraning", "/timaskraning"], ["launakeyrslur", "/launakeyrslur"], ["innsyn", "/innsyn"], ["spjall", "/spjall"]].filter(([n]) => !ONLY || ONLY.includes(n))) {
     await p.goto(base + path, { waitUntil: "domcontentloaded" });
     await settle(p, name === "maelabord" ? 7000 : 4500);
     if (name === "launakeyrslur") { await p.getByRole("button", { name: "Síðasti mánuður" }).click().catch(() => {}); await settle(p, 4000); }
@@ -43,6 +45,7 @@ for (const theme of ["light", "dark"]) {
     console.log("✓", theme, name);
   }
   await c.close();
+  if (process.env.ONLY) continue;
   // sími
   const m = await browser.newContext({ locale: "is-IS", viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
   await m.addInitScript(({ th }) => { try { localStorage.setItem("vakto-theme", th); localStorage.setItem("vakto-lang", "is"); localStorage.setItem("vakto-welcome-v1", "1"); } catch {} }, { th: theme });

@@ -105,6 +105,12 @@
 .ah-tile-warm{background:linear-gradient(165deg,rgba(255,244,233,.92),rgba(253,226,200,.85));box-shadow:0 0 0 1px rgba(233,112,15,.14),0 20px 50px -30px rgba(233,112,15,.45)}
 .ah-tall{grid-row:span 2;padding-bottom:32px;justify-content:space-between}
 .ah-tall .ah-phone{width:min(250px,64vw)}
+/* Síminn fyllir háa reitinn: hæðin ræður (allt að breidd reitsins), og hann nær aðeins niður fyrir brúnina */
+@media (min-width:901px){
+  .ah-tall{justify-content:flex-start;padding-bottom:0}
+  .ah-tall-ph{flex:1;min-height:0;position:relative;container-type:size;margin-top:6px}
+  .ah-tall-ph .ah-phone{position:absolute;top:0;left:50%;transform:translateX(-50%);width:auto;height:min(calc(100cqh + 70px),calc(100cqw * 2.164));aspect-ratio:390/844}
+}
 .ah-crop{position:relative;margin:0 -32px;overflow:hidden;border-top:1px solid var(--line);background:#f3f3f5;margin-top:auto}
 .ah-crop img{width:100%;height:100%;object-fit:cover}
 @media (max-width:900px){.ah-bento{grid-template-columns:1fr}.ah-wide,.ah-tall{grid-column:auto;grid-row:auto}}
@@ -237,13 +243,13 @@
 .ah-mac-tile .ah-mac-bar{height:30px}
 .ah-mac-tile .ah-dots i{width:9px;height:9px}
 .ah-mac-tile .ah-url{font-size:11px;padding:3px 10px}
-.ah-stage{position:absolute;inset:0;transform:scale(1.55);transform-origin:66% 47%}
+.ah-stage{position:absolute;inset:0;transform:scale(1.4);transform-origin:46% 44%}
 .ah-stage img{width:100%;height:100%;object-fit:cover;object-position:top left}
-.ah-dg-hole,.ah-dg{position:absolute;left:59.375%;top:35.78%;width:7.5%;height:4.44%}
-.ah-dg-hole,.ah-dg-chip{background-size:1333.3% auto;background-repeat:no-repeat}
-.ah-dg-hole{background-position:64.19% 54.42%;opacity:0}
-.ah-dg-chip{position:absolute;inset:0;background-position:64.19% 37.44%;border-radius:9%/20%;opacity:0}
-.ah-cursor{position:absolute;left:52%;top:46%;width:29%;overflow:visible;transform-origin:20% 10%;opacity:0;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.35))}
+.ah-dg-hole,.ah-dg{position:absolute;left:50.625%;top:35.78%;width:8.333%;height:4.44%}
+.ah-dg-hole,.ah-dg-chip{background-size:1200% auto;background-repeat:no-repeat}
+.ah-dg-hole{background-position:55.23% 54.42%;opacity:0}
+.ah-dg-chip{position:absolute;inset:0;background-position:55.23% 37.44%;border-radius:9%/20%;opacity:0}
+.ah-cursor{position:absolute;left:52%;top:46%;width:26%;overflow:visible;transform-origin:20% 10%;opacity:0;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.35))}
 .ah-cursor path{fill:#111;stroke:#fff;stroke-width:1.6;stroke-linejoin:round}
 .ah-mac-tile.run .ah-dg{animation:ah-dgm 8s cubic-bezier(.65,0,.35,1) infinite}
 .ah-mac-tile.run .ah-dg-chip{animation:ah-dgc 8s infinite}
@@ -375,7 +381,7 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 .ah-chatbox{background:#fbfbfd}
 @media (max-width:900px){.ah-dark-copy .ah-ticks{margin-left:auto;margin-right:auto}}
 @media (max-width:700px){
-  .ah-stage{transform:scale(2.3);transform-origin:62% 46%}
+  .ah-stage{transform:scale(2.2);transform-origin:52% 46%}
   .ah-mac-tile{margin-bottom:-30px}
   .ah-peek{margin:auto -22px -150px}
   .ah-chatfab{padding:13px}

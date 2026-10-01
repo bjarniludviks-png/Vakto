@@ -237,7 +237,7 @@ function Features() {
         </div>
         <div className="ah-tile ah-tall ah-tile-warm">
           <div className="ah-tile-tx"><h3>Stimplað í símanum.</h3><p>Eða á spjaldtölvu við innganginn. Staðsetning staðfest ef þú vilt.</p></div>
-          <Phone live src={`${SHOT}/light/app-heim.png`} alt="VAKTO-appið: á vakt síðan 05:38, stimpla út" />
+          <div className="ah-tall-ph"><Phone live src={`${SHOT}/light/app-heim.png`} alt="VAKTO-appið: á vakt síðan 05:38, stimpla út" /></div>
         </div>
         <div className="ah-tile">
           <div className="ah-tile-tx"><h3>Frávik með krónutölu.</h3><p>Hver mætti seint, hver fór fyrr og hvað það kostaði.</p></div>
