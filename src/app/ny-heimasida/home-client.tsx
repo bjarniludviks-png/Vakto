@@ -136,10 +136,21 @@ function HeroZoom() {
   const frame = useRef<HTMLDivElement>(null);
   const img = useRef<HTMLImageElement>(null);
   const cap1 = useRef<HTMLDivElement>(null), cap2 = useRef<HTMLDivElement>(null), ring = useRef<HTMLDivElement>(null), head = useRef<HTMLDivElement>(null);
+  // Upphafsfærsla gluggans: rétt fyrir neðan hnappana, óháð skjástærð (mælt einu sinni per skjástærð).
+  const shift = useRef({ key: "", px: 0 });
+  const startShift = () => {
+    const key = `${window.innerWidth}x${window.innerHeight}`;
+    if (shift.current.key !== key && head.current && frame.current) {
+      const headBottom = head.current.offsetTop + head.current.offsetHeight;
+      const f = frame.current;
+      shift.current = { key, px: Math.max(0, headBottom + 44 - (f.offsetTop + f.offsetHeight * 0.09)) };
+    }
+    return shift.current.px;
+  };
   const ref = useScrub((p) => {
     const a = ease(seg(p, 0, 0.3)), z = ease(seg(p, 0.32, 0.72));
     if (head.current) { head.current.style.opacity = String(1 - seg(p, 0.05, 0.25)); head.current.style.transform = `translate3d(0, ${-60 * seg(p, 0, 0.3)}px, 0)`; }
-    if (frame.current) frame.current.style.transform = `translate3d(0, ${(1 - a) * 44}vh, 0) scale(${0.82 + a * 0.18})`;
+    if (frame.current) frame.current.style.transform = `translate3d(0, ${(1 - a) * startShift()}px, 0) scale(${0.82 + a * 0.18})`;
     if (img.current) img.current.style.transform = `scale(${1 + z * 2.1})`;
     if (ring.current) ring.current.style.opacity = String(seg(p, 0.6, 0.72) * (1 - seg(p, 0.94, 1)));
     if (cap1.current) { const o = seg(p, 0.5, 0.6) * (1 - seg(p, 0.76, 0.82)); cap1.current.style.opacity = String(o); cap1.current.style.transform = `translate3d(0, ${(1 - o) * 18}px, 0)`; }
