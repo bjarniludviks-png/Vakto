@@ -92,7 +92,7 @@ Your workplace needs a VAKTO subscription. You will receive an email invitation 
 | Nafn, netfang, sími | Safnað, tengt notanda, nauðsynlegt fyrir virkni |
 | Myndir | Safnað (prófílmynd, myndir í spjalli), tengt notanda |
 | Skilaboð í appi | Safnað, tengt notanda |
-| Staðsetning | Nei |
+| Staðsetning | Já: nákvæm staðsetning aðeins við stimplun inn/út og aðeins ef vinnustaðurinn kveikir á því (engin bakgrunnsrakning). Safnað, ekki deilt; tilgangur: virkni appsins |
 | Fjárhagsupplýsingar | Nei (áskrift greidd á vefnum) |
 | Deilt með þriðja aðila | Nei |
 | Dulkóðað á leiðinni | Já |
