@@ -242,11 +242,11 @@ function Features() {
         </div>
         <div className="ah-tile">
           <div className="ah-tile-tx"><h3>Frávik með krónutölu.</h3><p>Hver mætti seint, hver fór fyrr og hvað það kostaði.</p></div>
-          <Crop src={`${SHOT}/light/timaskraning.jpg`} alt="Tímaskráning með frávikum" pos="65% 35%" zoom={1.4} />
+          <Crop src={`${SHOT}/light/timaskraning.jpg`} alt="Tímaskráning með frávikum" pos="65% 35%" zoom={1.4} ratio="16 / 9" />
         </div>
         <div className="ah-tile">
           <div className="ah-tile-tx"><h3>Laun eftir kjarasamningi.</h3><p>Álag, yfirvinna og uppbót reiknuð. Beint í Payday eða DK.</p></div>
-          <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt="Launakeyrsla mánaðarins" pos="65% 35%" zoom={1.4} />
+          <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt="Launakeyrsla mánaðarins" pos="65% 35%" zoom={1.4} ratio="16 / 9" />
         </div>
         <div className="ah-tile ah-wide">
           <div className="ah-tile-tx"><h3>Spjaldtölva við innganginn.</h3><p>Starfsfólk ýtir á nafnið sitt eða skannar skírteinið í símanum. Enginn PIN-kóði að gleyma og enginn stimplar fyrir annan.</p></div>

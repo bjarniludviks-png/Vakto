@@ -400,3 +400,14 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 .ah-chatfab span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 @media (hover:hover) and (pointer:fine){.ah-chatfab:hover{background:#d9640a;transform:translateY(-1px)}}
 @media (max-width:700px){.ah-chatfab{padding:0;width:54px;height:54px}}
+
+/* Hái reiturinn: breiðari dálkur + lægri myndir vinstra megin svo síminn fylli reitinn */
+@media (min-width:901px){
+  .ah-bento{grid-template-columns:1fr 1fr 1.22fr}
+  .ah-mac-tile .ah-mac-view{aspect-ratio:16/8.6}
+  .ah-tall-ph{margin:6px -14px 0}
+}
+.ah-foot nav a{min-height:36px}
+.ah-legal-body ul{list-style:disc}
+.ah-legal-body ol{list-style:decimal}
+.ah-legal-body li::marker{color:#e9700f}
