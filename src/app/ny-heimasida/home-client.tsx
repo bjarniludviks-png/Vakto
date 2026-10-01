@@ -112,9 +112,9 @@ function MacFrame({ src, alt, url, children, imgRef }: { src: string; alt: strin
   );
 }
 
-function Phone({ src, alt, className = "" }: { src: string; alt: string; className?: string }) {
+function Phone({ src, alt, className = "", dark = false }: { src: string; alt: string; className?: string; dark?: boolean }) {
   return (
-    <div className={`ah-phone ${className}`}>
+    <div className={`ah-phone${dark ? " ah-phone-dk" : ""} ${className}`}>
       <div className="ah-phone-in">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={alt} loading="lazy" decoding="async" />
@@ -192,11 +192,11 @@ function Features() {
         </Reveal>
         <Reveal className="ah-tile">
           <div className="ah-tile-tx"><h3>Frávik með krónutölu.</h3><p>Hver mætti seint, hver fór fyrr — og hvað það kostaði.</p></div>
-          <Crop src={`${SHOT}/light/timaskraning.jpg`} alt="Tímaskráning með frávikum" pos="60% 45%" zoom={1.5} />
+          <Crop src={`${SHOT}/light/timaskraning.jpg`} alt="Tímaskráning með frávikum" pos="66% 36%" zoom={1.55} />
         </Reveal>
         <Reveal className="ah-tile" delay={80}>
           <div className="ah-tile-tx"><h3>Laun eftir kjarasamningi.</h3><p>Álag, yfirvinna og uppbót reiknuð — beint í Payday eða DK.</p></div>
-          <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt="Launakeyrsla mánaðarins" pos="60% 30%" zoom={1.5} />
+          <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt="Launakeyrsla mánaðarins" pos="52% 32%" zoom={1.55} />
         </Reveal>
         <Reveal className="ah-tile ah-wide">
           <div className="ah-tile-tx"><h3>Innsýn sem skiptir máli.</h3><p>Velta, launakostnaður og laun % mánuð fyrir mánuð. Engar skýrslur til að setja saman — þær eru þegar til.</p></div>
@@ -242,7 +242,7 @@ function DarkCompare() {
         </div>
       </Reveal>
       <div className="ah-dark-row">
-        <Reveal><Phone src={`${SHOT}/dark/phone-mitt.png`} alt="Appið í dökku þema" /></Reveal>
+        <Reveal><Phone dark src={`${SHOT}/dark/phone-mitt.png`} alt="Appið í dökku þema" /></Reveal>
         <Reveal delay={100} className="ah-dark-copy">
           <h3>Starfsfólkið fær appið.</h3>
           <p>Vaktirnar, stimplun, áætluð laun, orlofsstaða, frí og vaktaskipti — og spjall og fréttaveita fyrir allan hópinn.</p>
@@ -250,7 +250,7 @@ function DarkCompare() {
             <li>iPhone og Android</li><li>Íslenska, enska og víetnamska</li><li>Tilkynning þegar planið breytist</li>
           </ul>
         </Reveal>
-        <Reveal delay={200}><Phone src={`${SHOT}/dark/phone-frettir.png`} alt="Fréttaveita í appinu" className="ah-phone-lo" /></Reveal>
+        <Reveal delay={200}><Phone dark src={`${SHOT}/dark/phone-frettir.png`} alt="Fréttaveita í appinu" className="ah-phone-lo" /></Reveal>
       </div>
     </section>
   );
@@ -366,6 +366,14 @@ function Pricing() {
 
 export default function AppleHome() {
   const [scrolled, setScrolled] = useState(false);
+  const [overDark, setOverDark] = useState(false);
+  useEffect(() => {
+    const dark = document.querySelector(".ah-dark");
+    if (!dark) return;
+    const io = new IntersectionObserver(([e]) => setOverDark(e.isIntersecting), { rootMargin: "0px 0px -92% 0px" });
+    io.observe(dark);
+    return () => io.disconnect();
+  }, []);
   useEffect(() => {
     const on = () => setScrolled(window.scrollY > 8);
     on();
@@ -375,7 +383,7 @@ export default function AppleHome() {
   return (
     <div className="ah">
       <Glow />
-      <nav className={`ah-nav${scrolled ? " sc" : ""}`}>
+      <nav className={`ah-nav${scrolled ? " sc" : ""}${overDark ? " dk" : ""}`}>
         <a href="/ny-heimasida" aria-label="VAKTO"><Logo /></a>
         <div className="ah-nav-links">
           <a href="#kerfid">Kerfið</a><a href="#samningar">Samningar</a><a href="#verd">Verð</a>
