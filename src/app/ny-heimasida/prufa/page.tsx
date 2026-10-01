@@ -3,6 +3,7 @@ import "../../login/login.css";
 import "../home.css";
 import "../auth.css";
 import SignupForm from "../../nyskraning/signup-form";
+import { MacFrame } from "../home-client";
 
 // „Prófa frítt“ í útliti nýju forsíðunnar (tilraun). Sama nýskráningarflæði og /nyskraning.
 export const metadata: Metadata = { title: "VAKTO: Prófa frítt", robots: { index: false, follow: false } };
@@ -28,6 +29,7 @@ export default function Page() {
           <li>Engin binding. Þú borgar aðeins fyrir þá sem unnu í mánuðinum</li>
           <li>Við hjálpum við uppsetninguna á hallo@vakto.is</li>
         </ul>
+        <div className="ah-auth-mac"><MacFrame src="/showcase/forsida/light/maelabord.jpg" alt="Mælaborð VAKTO" url="vakto.is/maelabord" /></div>
       </div>
     </div>
   );

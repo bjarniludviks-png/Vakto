@@ -84,7 +84,7 @@ function Glow() {
   );
 }
 
-function MacFrame({ src, alt, url, children, imgRef, priority = false }: { src: string; alt: string; url: string; children?: ReactNode; imgRef?: React.Ref<HTMLImageElement>; priority?: boolean }) {
+export function MacFrame({ src, alt, url, children, imgRef, priority = false }: { src: string; alt: string; url: string; children?: ReactNode; imgRef?: React.Ref<HTMLImageElement>; priority?: boolean }) {
   return (
     <div className="ah-mac">
       <div className="ah-mac-bar">
@@ -253,7 +253,7 @@ function Features() {
         </div>
         <div className="ah-tile">
           <div className="ah-tile-tx"><h3>Spjall fyrir hópinn.</h3><p>Rásir per deild og stað. Enginn Messenger-hópur með fyrrverandi starfsfólki.</p></div>
-          <Crop src={`${SHOT}/light/spjall.jpg`} alt="Spjall í VAKTO" pos="60% 40%" zoom={1.5} />
+          <div className="ah-peek"><Phone src={`${SHOT}/light/app-spjall.png`} alt="Spjallrásir í VAKTO-appinu" /></div>
         </div>
       </div>
     </section>

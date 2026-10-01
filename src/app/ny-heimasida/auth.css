@@ -38,3 +38,6 @@
   .ah-auth-r{padding:64px 22px 72px;border-left:0;border-top:1px solid rgba(233,112,15,.12)}
 }
 .ah-auth-top .ah-logo{color:var(--ink)}
+.ah-auth-mac{width:min(560px,100%)}
+.ah-auth-mac .ah-mac{border-radius:12px}
+.ah-auth-mac .ah-mac-bar{height:30px}

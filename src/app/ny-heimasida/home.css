@@ -366,3 +366,19 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 .ah-chatbox .in:focus-within{box-shadow:0 0 0 2px rgba(233,112,15,.5)}
 @media (max-width:520px){.ah-chatbox{right:0;left:0;bottom:0;width:100%;height:min(88dvh,640px);border-radius:24px 24px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}}
 @media (prefers-reduced-motion: reduce){.ah-chatbox{animation:none}}
+
+/* ---------- lagfæringar eftir yfirferð (sími) ---------- */
+.ah-peek{margin:auto -32px -150px;padding-top:8px;display:flex;justify-content:center}
+.ah-peek .ah-phone{width:min(230px,62vw)}
+.ah-dark-copy .ah-ticks{width:fit-content;max-width:100%}
+.ah-dark-copy .ah-ticks li{text-align:left}
+.ah-chatbox{background:rgba(251,251,253,.97)}
+@media (max-width:900px){.ah-dark-copy .ah-ticks{margin-left:auto;margin-right:auto}}
+@media (max-width:700px){
+  .ah-stage{transform:scale(2.3);transform-origin:62% 46%}
+  .ah-mac-tile{margin-bottom:-30px}
+  .ah-peek{margin:auto -22px -150px}
+  .ah-chatfab{padding:13px}
+  .ah-chatfab span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .ah-chatfab svg{width:22px;height:22px}
+}
