@@ -411,3 +411,9 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 .ah-legal-body ul{list-style:disc}
 .ah-legal-body ol{list-style:decimal}
 .ah-legal-body li::marker{color:#e9700f}
+.ah-foot nav{gap:12px}
+.ah-foot nav a{min-height:0;line-height:1.35}
+.ah-foot h2{margin-bottom:4px}
+.ah-foot-mail{display:inline-block;margin-top:14px;font-weight:600;color:var(--ink)!important}
+.ah-foot-mail:hover{color:#b85309!important}
+@media (pointer:coarse){.ah-foot nav{gap:4px}.ah-foot nav a{min-height:40px}}

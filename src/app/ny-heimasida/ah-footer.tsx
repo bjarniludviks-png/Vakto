@@ -24,6 +24,7 @@ export default function AhFooter() {
         <div className="ah-foot-brand">
           <a href={H} aria-label="VAKTO forsíða"><AhLogo /></a>
           <p>Vaktaplan, stimpilklukka, laun og ráðningarsamningar. Og launin sem hlutfall af veltu í rauntíma. Hannað fyrir íslenska vinnustaði.</p>
+          <a className="ah-foot-mail" href="mailto:hallo@vakto.is">hallo@vakto.is</a>
         </div>
         {COLS.map((c) => (
           <nav key={c.h} aria-label={c.h}>
