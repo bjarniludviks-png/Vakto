@@ -10,6 +10,7 @@ import { Txt, Muted, Avatar, Sheet, KV, useToast } from "../src/components/ui";
 import { colors, useTheme } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import { supabase } from "../src/lib/supabase";
+import { googleWalletUrl } from "../src/lib/api/docs";
 
 /** Deterministic QR-like block pattern (visual stand-in until the pass exists). */
 function Qr({ seed, size = 76 }: { seed: string; size?: number }) {
@@ -89,14 +90,19 @@ export default function Skirteini() {
       {(ios ? ["apple", "google"] : ["google", "apple"]).map((w) => (
         <Pressable
           key={w}
-          onPress={() => Linking.openURL(`https://www.vakto.is/api/wallet/${w}`).catch(() => toast("Wallet-passinn er á leiðinni"))}
+          onPress={async () => {
+            if (w === "apple") { toast("Apple Wallet kemur fljótlega"); return; }
+            const r = await googleWalletUrl();
+            if (r.ok && r.url) Linking.openURL(r.url).catch(() => toast("Tókst ekki að opna Google Wallet"));
+            else toast(r.error ?? "Google Wallet er ekki tilbúið enn");
+          }}
           style={({ pressed }) => ({ backgroundColor: w === "apple" ? "#000" : colors.panel, borderRadius: 16, paddingVertical: 16, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, borderWidth: 1, borderColor: w === "apple" ? "#333" : colors.line, opacity: pressed ? 0.85 : 1 })}
         >
           <Wallet color={w === "apple" ? "#fff" : colors.ink} size={20} />
           <Txt weight="bold" size={16} color={w === "apple" ? "#fff" : colors.ink}>{w === "apple" ? "Bæta í Apple Wallet" : "Bæta í Google Wallet"}</Txt>
         </Pressable>
       ))}
-      <Muted size={12.5} style={{ textAlign: "center", lineHeight: 18 }}>Ýttu á kortið til að sjá mynd og allar upplýsingar. QR-kóðann má skanna í kiosk-stimpilklukkunni. Wallet-passar opnast þegar vottorðin frá Apple og Google eru komin.</Muted>
+      <Muted size={12.5} style={{ textAlign: "center", lineHeight: 18 }}>Ýttu á kortið til að sjá mynd og allar upplýsingar. QR-kóðann má skanna í kiosk-stimpilklukkunni. Google Wallet: ýttu á hnappinn og vistaðu skírteinið. Apple Wallet kemur fljótlega.</Muted>
 
       <Sheet open={open} onClose={() => setOpen(false)}>
         {me ? (

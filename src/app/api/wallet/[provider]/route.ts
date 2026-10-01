@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { appleConfigured, googleConfigured, buildApplePass, buildGoogleSaveUrl, type PassEmployee } from "@/lib/wallet";
+import { appleConfigured, googleConfigured, buildApplePass, buildGoogleSaveUrl, walletEmployee } from "@/lib/wallet";
 
 // GET /api/wallet/apple  or  /api/wallet/google — the signed staff ID pass for the
 // currently signed-in employee. Returns 501 with a hint until certs are configured.
@@ -13,25 +13,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ provide
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Ekki innskráð(ur)" }, { status: 401 });
 
-  // Employee linked to this user (+ company name).
-  const { data: emp } = await supabase
-    .from("employees")
-    .select("id, full_name, position, department:departments(name), photo_url, clock_token, companies(name), positions(name)")
-    .eq("user_id", user.id).maybeSingle();
-  if (!emp) return NextResponse.json({ error: "Starfsmannaprófíll fannst ekki" }, { status: 404 });
-
-  const dept = (Array.isArray(emp.department) ? emp.department[0] : emp.department) as { name?: string } | null;
-  const pos = (Array.isArray(emp.positions) ? emp.positions[0] : emp.positions) as { name?: string } | null;
-  const comp = (Array.isArray(emp.companies) ? emp.companies[0] : emp.companies) as { name?: string } | null;
-  const passEmp: PassEmployee = {
-    id: emp.id as string,
-    name: (emp.full_name as string) ?? "Starfsmaður",
-    role: pos?.name ?? "Starfsmaður",
-    department: dept?.name ?? "",
-    company: comp?.name ?? "VAKTO",
-    token: (emp.clock_token as string) ?? (emp.id as string),
-    photoUrl: (emp.photo_url as string) ?? null,
-  };
+  const passEmp = await walletEmployee(user.id);
+  if (!passEmp) return NextResponse.json({ error: "Starfsmannaprófíll fannst ekki" }, { status: 404 });
 
   try {
     if (provider === "apple") {

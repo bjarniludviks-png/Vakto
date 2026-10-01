@@ -236,6 +236,14 @@
   Eldri fyrirtæki: `price_plan='v1'` (5.990 + 590/notanda) til `price_v1_until` = 1.4.2027. Árlegt verð (8.490 + 1.270) er
   Árleg greiðsla: `companies.billing_interval` (Stillingar → Áskrift), árgjald 12 × 8.490 fyrirfram frá `billing_year_start`,
   virkir umfram á árlegum kjörum (1.270) mánaðarlega; skipt í mánaðarlegt gildir eftir greitt ár (`baseModeFor`).
+- 🟡 **Google Wallet starfsmannaskírteini (1. okt 2026, á `google-wallet`):** kóðinn er tilbúinn — vefur `/api/wallet/google`
+  (vafrakaka) og app `/api/app/wallet` (Bearer) skila undirrituðum „Save to Google Wallet“-hlekk (`buildGoogleSaveUrl`,
+  `src/lib/wallet.ts`; flokkurinn `genericClasses` fylgir JWT svo hann verður til sjálfkrafa; merki `public/wallet/vakto-logo.png`).
+  **Eigandinn þarf:** (1) útgefandaaðgang í Google Pay & Wallet Console (pay.google.com/business/console) → Issuer ID;
+  (2) Google Cloud verkefni með „Google Wallet API“ virkt + þjónustureikning með JSON-lykli; (3) bæta þjónustureikningnum
+  við sem notanda (Developer) í Wallet Console; (4) Vercel env `GOOGLE_WALLET_ISSUER_ID`, `GOOGLE_WALLET_SA_EMAIL`,
+  `GOOGLE_WALLET_SA_KEY` (private_key úr JSON); (5) prófa í demo-ham og sækja um „publishing access“ fyrir Generic pass.
+  Appið þarf nýtt EAS-build. Apple Wallet bíður Pass Type ID-vottorða.
 - **Still remaining:** contractor billable-vs-cost/GPS job tracking, a signed-URL viewer for the
   private `documents` bucket, Google/Microsoft/Auðkenni OAuth (scaffolded in `login-form`).
 - ✅ **VAKTO Admin (ofurstjórnborð SaaS-eigandans):** `/admin` — aðgangur EINGÖNGU fyrir netföng í

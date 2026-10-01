@@ -65,8 +65,10 @@ export async function buildGoogleSaveUrl(e: PassEmployee): Promise<string> {
   const issuer = process.env.GOOGLE_WALLET_ISSUER_ID!;
   const classId = process.env.GOOGLE_WALLET_CLASS || `${issuer}.vakto_staff`;
   const objectId = `${issuer}.${e.id.replace(/[^\w.-]/g, "")}`;
+  const logo = { sourceUri: { uri: `${APP_URL.replace(/\/$/, "")}/wallet/vakto-logo.png` }, contentDescription: { defaultValue: { language: "is", value: "VAKTO" } } };
   const genericObject = {
     id: objectId, classId,
+    logo,
     genericType: "GENERIC_TYPE_UNSPECIFIED",
     hexBackgroundColor: "#e9700f",
     cardTitle: { defaultValue: { language: "is", value: "VAKTO" } },
@@ -83,10 +85,35 @@ export async function buildGoogleSaveUrl(e: PassEmployee): Promise<string> {
     aud: "google",
     typ: "savetowallet",
     iat: Math.floor(Date.now() / 1000),
-    payload: { genericObjects: [genericObject] },
+    // Flokkurinn fylgir með svo hann verði til við fyrstu vistun (annars hafnar Google passanum).
+    payload: { genericClasses: [{ id: classId }], genericObjects: [genericObject] },
+    origins: [APP_URL.replace(/\/$/, ""), "https://www.vakto.is", "https://vakto.is"],
   };
   const token = jwt.default.sign(claims, process.env.GOOGLE_WALLET_SA_KEY!.replace(/\\n/g, "\n"), { algorithm: "RS256" });
   return `https://pay.google.com/gp/v/save/${token}`;
+}
+
+/** Skírteinisgögn innskráðs starfsmanns (service role — kallandi hefur þegar sannreynt notandann). */
+export async function walletEmployee(userId: string): Promise<PassEmployee | null> {
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const { data: emp } = await createAdminClient()
+    .from("employees")
+    .select("id, full_name, department:departments(name), photo_url, clock_token, companies(name), positions(name)")
+    .eq("user_id", userId).maybeSingle();
+  if (!emp) return null;
+  const one = <T,>(v: T | T[] | null | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
+  const dept = one(emp.department as { name?: string } | null);
+  const pos = one(emp.positions as { name?: string } | null);
+  const comp = one(emp.companies as { name?: string } | null);
+  return {
+    id: emp.id as string,
+    name: (emp.full_name as string) ?? "Starfsmaður",
+    role: pos?.name ?? "Starfsmaður",
+    department: dept?.name ?? "",
+    company: comp?.name ?? "VAKTO",
+    token: (emp.clock_token as string) ?? (emp.id as string),
+    photoUrl: (emp.photo_url as string) ?? null,
+  };
 }
 
 export { APP_URL };

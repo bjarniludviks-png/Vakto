@@ -88,3 +88,20 @@ export const requestContractCode = (id: string) => contractCall({ action: "code"
 export const signContract = (id: string, code: string) => contractCall({ action: "sign", id, code });
 /** Taktikal (rafræn skilríki): undirritunartengill þegar vinnuveitandi hefur skrifað undir. */
 export const taktikalLink = (id: string) => contractCall({ action: "taktikal", id });
+
+/** Starfsmannaskírteini í Google Wallet: vefþjónninn býr til undirritaðan „Save to Google Wallet“-hlekk. */
+export async function googleWalletUrl(): Promise<{ ok: boolean; url?: string; error?: string }> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    if (!token) return { ok: false, error: "Ekki innskráð(ur)" };
+    const r = await fetch(`${API}/api/app/wallet`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ provider: "google" }),
+    });
+    return (await r.json()) as { ok: boolean; url?: string; error?: string };
+  } catch {
+    return { ok: false, error: "Engin tenging — reyndu aftur" };
+  }
+}
