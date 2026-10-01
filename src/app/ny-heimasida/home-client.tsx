@@ -530,7 +530,7 @@ export default function AppleHome() {
       <nav className={`ah-nav${scrolled ? " sc" : ""}${overDark ? " dk" : ""}`}>
         <a href="/ny-heimasida" aria-label="VAKTO"><Logo /></a>
         <div className="ah-nav-links">
-          <a href="#kerfid">Kerfið</a><a href="#samningar">Samningar</a><a href="#verd">Verð</a>
+          <a href="#kerfid">Kerfið</a><a href="#samningar">Samningar</a><a href="#verd">Verð</a><a href="/ny-heimasida/um-okkur">Um okkur</a>
         </div>
         <div className="ah-nav-cta">
           <a href="/ny-heimasida/innskraning" className="ah-nav-in">Innskráning</a>

@@ -24,7 +24,7 @@ export default function Page() {
       <nav className="ah-nav sc">
         <a href="/ny-heimasida" aria-label="VAKTO forsíða"><AhLogo /></a>
         <div className="ah-nav-links">
-          <a href="/ny-heimasida#kerfid">Kerfið</a><a href="/ny-heimasida#samningar">Samningar</a><a href="/ny-heimasida#verd">Verð</a>
+          <a href="/ny-heimasida#kerfid">Kerfið</a><a href="/ny-heimasida#samningar">Samningar</a><a href="/ny-heimasida#verd">Verð</a><a href="/ny-heimasida/um-okkur" aria-current="page">Um okkur</a>
         </div>
         <div className="ah-nav-cta">
           <a href="/ny-heimasida/innskraning" className="ah-nav-in">Innskráning</a>

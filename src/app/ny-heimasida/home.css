@@ -417,3 +417,4 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 .ah-foot-mail{display:inline-block;margin-top:14px;font-weight:600;color:var(--ink)!important}
 .ah-foot-mail:hover{color:#b85309!important}
 @media (pointer:coarse){.ah-foot nav{gap:4px}.ah-foot nav a{min-height:40px}}
+.ah-nav-links a[aria-current="page"]{color:var(--ink);font-weight:600}
