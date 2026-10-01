@@ -40,16 +40,16 @@
 .ah-nav.dk{background:rgba(0,0,0,.72);box-shadow:0 1px 0 rgba(255,255,255,.08);color:#f5f5f7}
 .ah-nav.dk .ah-nav-links,.ah-nav.dk .ah-nav-in{color:#a1a1a6}
 .ah-nav.dk .ah-nav-links a:hover{color:#fff}
-@media (max-width:760px){.ah-nav-links,.ah-nav-in{display:none}}
+@media (max-width:760px){.ah-nav-links{display:none}}
 
 /* ---------- hnappar ---------- */
-.ah-btn{display:inline-flex;align-items:center;justify-content:center;background:var(--brand);color:#fff!important;font-weight:600;font-size:16px;
+.ah-btn{display:inline-flex;align-items:center;justify-content:center;background:var(--brand);color:#fff!important;font-weight:700;font-size:16px;
   padding:13px 24px;border-radius:999px;box-shadow:0 8px 24px rgba(233,112,15,.28);transition:transform .16s var(--ease),box-shadow .2s var(--ease),background .2s}
 .ah-btn:hover{background:#d9640a;box-shadow:0 10px 30px rgba(233,112,15,.36)}
 .ah-btn:active{transform:scale(.97)}
 .ah-btn-sm{font-size:13px;padding:7px 15px;box-shadow:none}
 .ah-btn-lg{font-size:17px;padding:15px 30px}
-.ah-link{color:var(--brand)!important;font-weight:500;font-size:16px}
+.ah-link{color:#b85309!important;font-weight:600;font-size:16px}
 .ah-link:hover{text-decoration:underline}
 
 /* ---------- letur ---------- */
@@ -80,7 +80,7 @@
 .ah-island{position:absolute;top:21px;left:50%;transform:translateX(-50%);width:84px;height:24px;border-radius:14px;background:#000}
 
 /* ---------- 1. hetja / aðdráttur ---------- */
-.ah-hero{position:relative;height:360vh}
+.ah-hero{position:relative;height:290vh}
 .ah-sticky{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px}
 .ah-hero-head{position:absolute;top:calc(env(safe-area-inset-top,0px) + 11vh);left:0;right:0;text-align:center;padding:0 20px;will-change:transform,opacity}
 .ah-ctas{display:flex;gap:26px;justify-content:center;align-items:center;margin-top:32px;flex-wrap:wrap}
@@ -195,13 +195,32 @@
   .ah-hero{height:auto}
   .ah-sticky{position:relative;height:auto;padding:140px 20px 60px}
   .ah-hero-head{position:relative;top:auto;margin-bottom:60px}
-  .ah-zcap{display:none}
+  .ah-zcap{display:block;position:static;opacity:1;margin:16px auto 0;transform:none}
+  .ah-zcap+.ah-zcap{display:none}
   .ah-ring-hl,  .ah-stamp{opacity:1}
 }
 @media (max-width:700px){
-  .ah-hero{height:300vh}
+  .ah-hero{height:250vh}
   .ah-hero-head{top:calc(env(safe-area-inset-top,0px) + 12vh)}
   .ah-sec,.ah-dark{padding-top:110px;padding-bottom:110px}
   .ah-tile{padding:26px 22px 0}.ah-crop{margin:0 -22px}
   .ah-zcap{bottom:-120px}
 }
+
+/* Læsileiki ofan á bjarmanum (HIG: color.md › Inclusive color) */
+.ah-sec .ah-lede,.ah-tile p,.ah-price-card p,.ah-ticks li{color:#4a4a4f}
+.ah-price-card .ah-fine{color:#6e6e73}
+.ah-foot{background:var(--bg);color:#6e6e73}
+.ah-foot a{display:inline-flex;align-items:center;min-height:44px}
+.ah-foot div{gap:4px 20px;flex-wrap:wrap}
+.ah h3{line-height:1.12}
+.ah h1{letter-spacing:-.03em}
+/* Wallet-merki eru upplýsingar, ekki hnappar */
+.ah-badges{gap:18px}
+.ah-badge,.ah-badge-g{background:none;color:var(--ink2);box-shadow:none;padding:0;font-weight:600}
+.ah-badge svg{fill:currentColor}
+/* Smátexti á skírteininu */
+.ah-pass-lbl,.ah-pass-grid span{font-size:11px;opacity:1;font-weight:600}
+.ah-pass-foot{font-size:12px;opacity:1}
+.ah-stamp{font-weight:700;background:#138a5b}
+@media (max-width:900px){.ah-split-rev .ah-pass-wrap{order:1}}

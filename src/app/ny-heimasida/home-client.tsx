@@ -65,9 +65,9 @@ function Glow() {
       const max = document.documentElement.scrollHeight - window.innerHeight;
       const p = max > 0 ? window.scrollY / max : 0;
       const w = Math.sin(p * Math.PI * 3);
-      if (a.current) { a.current.style.transform = `translate3d(${-30 * p + 8 * w}vw, ${10 * p}vh, 0) scale(${0.7 + p * 1.1})`; a.current.style.opacity = String(0.35 + p * 0.45); }
+      if (a.current) { a.current.style.transform = `translate3d(${-30 * p + 8 * w}vw, ${10 * p}vh, 0) scale(${0.7 + p * 1.1})`; a.current.style.opacity = String(0.35 + p * 0.3); }
       if (b.current) { b.current.style.transform = `translate3d(${20 * p - 10 * w}vw, ${-15 * p}vh, 0) scale(${0.4 + p * 1.4})`; b.current.style.opacity = String(clamp(p * 1.6) * 0.7); }
-      if (c.current) { c.current.style.transform = `translate3d(${12 * w}vw, 0, 0) scale(${0.6 + seg(p, 0.6, 1) * 1.2})`; c.current.style.opacity = String(seg(p, 0.55, 1) * 0.85); }
+      if (c.current) { c.current.style.transform = `translate3d(${12 * w}vw, 0, 0) scale(${0.6 + seg(p, 0.6, 1) * 1.2})`; c.current.style.opacity = String(seg(p, 0.55, 1) * 0.6); }
     };
     const on = () => { if (!raf) raf = requestAnimationFrame(run); };
     run();
@@ -88,7 +88,7 @@ function MacFrame({ src, alt, url, children, imgRef, priority = false }: { src: 
     <div className="ah-mac">
       <div className="ah-mac-bar">
         <span className="ah-dots"><i /><i /><i /></span>
-        <span className="ah-url">{url}</span>
+        <span className="ah-url" aria-hidden="true">{url}</span>
       </div>
       <div className="ah-mac-view">
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -240,7 +240,7 @@ function DarkCompare() {
           <div className="ah-compare-dark" ref={layer} style={{ clipPath: "inset(0 0 0 50%)" }}>
             <MacFrame src={`${SHOT}/dark/vaktaplan.jpg`} alt="Vaktaplan í dökku þema" url="vakto.is/vaktaplan" />
           </div>
-          <div className="ah-handle" ref={handle} style={{ left: "50%" }} aria-hidden="true"><span>‹ ›</span></div>
+          <div className="ah-handle" ref={handle} style={{ left: "50%" }} aria-hidden="true"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 7-5 5 5 5" /><path d="m15 7 5 5-5 5" /></svg></span></div>
         </div>
       </div>
       <div className="ah-dark-row">
