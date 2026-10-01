@@ -170,53 +170,45 @@ function PlanDrag() {
   );
 }
 
-/* ---------- 1. Hetja + aðdráttur inn í mælaborðið ---------- */
+/* ---------- 1. Hetja: myndband af kerfinu í notkun, glugginn stækkar þegar skrunað er ---------- */
 
-function HeroZoom() {
+function HeroVideo() {
   const t = useT();
   const frame = useRef<HTMLDivElement>(null);
-  const img = useRef<HTMLImageElement>(null);
-  const cap1 = useRef<HTMLDivElement>(null), cap2 = useRef<HTMLDivElement>(null), ring = useRef<HTMLDivElement>(null), head = useRef<HTMLDivElement>(null);
-  // Upphafsfærsla gluggans: rétt fyrir neðan hnappana, óháð skjástærð (mælt einu sinni per skjástærð).
-  const shift = useRef({ key: "", px: 0 });
-  const startShift = () => {
-    const key = `${window.innerWidth}x${window.innerHeight}`;
-    if (shift.current.key !== key && head.current && frame.current) {
-      const headBottom = head.current.offsetTop + head.current.offsetHeight;
-      const f = frame.current;
-      shift.current = { key, px: Math.max(0, headBottom + 44 - (f.offsetTop + f.offsetHeight * 0.09)) };
-    }
-    return shift.current.px;
-  };
+  const video = useRef<HTMLVideoElement>(null);
   const ref = useScrub((p) => {
-    const offset = startShift(); // útlitslestur fyrst, öll skrif á eftir (ekkert þvingað endurútlit)
-    const a = ease(seg(p, 0, 0.3)), z = ease(seg(p, 0.32, 0.72));
-    if (head.current) { head.current.style.opacity = String(1 - seg(p, 0.05, 0.25)); head.current.style.transform = `translate3d(0, ${-60 * seg(p, 0, 0.3)}px, 0)`; }
-    if (frame.current) frame.current.style.transform = `translate3d(0, ${(1 - a) * offset}px, 0) scale(${0.82 + a * 0.18})`;
-    if (img.current) img.current.style.transform = `scale(${1 + z * 2.1})`;
-    if (ring.current) ring.current.style.opacity = String(seg(p, 0.6, 0.72) * (1 - seg(p, 0.94, 1)));
-    if (cap1.current) { const o = seg(p, 0.5, 0.6) * (1 - seg(p, 0.76, 0.82)); cap1.current.style.opacity = String(o); cap1.current.style.transform = `translate3d(0, ${(1 - o) * 18}px, 0)`; }
-    if (cap2.current) { const o = seg(p, 0.8, 0.88); cap2.current.style.opacity = String(o); cap2.current.style.transform = `translate3d(0, ${(1 - o) * 18}px, 0)`; }
-  });
+    const g = ease(seg(p, 0.08, 0.5));
+    if (frame.current) frame.current.style.transform = `scale(${0.86 + g * 0.16})`;
+  }, "view");
+  useEffect(() => {
+    const v = video.current; if (!v) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) { v.removeAttribute("autoplay"); v.pause(); v.controls = true; return; }
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) v.play().catch(() => {}); else v.pause(); }, { threshold: 0.25 });
+    io.observe(v);
+    return () => io.disconnect();
+  }, []);
   return (
-    <section className="ah-hero" ref={ref}>
-      <div className="ah-sticky">
-        <div className="ah-hero-head" ref={head}>
-          <h1>{t.h1a}<br /><span>{t.h1b}</span></h1>
-          <p className="ah-lede">{t.lede}</p>
-          <div className="ah-ctas">
-            <a className="ah-btn" href="/nyskraning">{t.try}</a>
-            <a className="ah-link" href="#kerfid">{t.see}</a>
-          </div>
-        </div>
-        <div className="ah-hero-frame" ref={frame}>
-          <MacFrame src={`${SHOT}/light/maelabord.jpg`} alt={t.heroAlt} url="vakto.is/maelabord" imgRef={img} priority>
-            <div className="ah-ring-hl" ref={ring} aria-hidden="true" />
-          </MacFrame>
-          <div className="ah-zcap" ref={cap1}><b>{t.cap1b}</b>{t.cap1}</div>
-          <div className="ah-zcap" ref={cap2}><b>{t.cap2b}</b>{t.cap2}</div>
+    <section className="ah-hero2" ref={ref}>
+      <div className="ah-hero-head2">
+        <h1>{t.h1a}<br /><span>{t.h1b}</span></h1>
+        <p className="ah-lede">{t.lede}</p>
+        <div className="ah-ctas">
+          <a className="ah-btn" href="/nyskraning">{t.try}</a>
+          <a className="ah-link" href="#kerfid">{t.see}</a>
         </div>
       </div>
+      <div className="ah-hero-frame2" ref={frame}>
+        <div className="ah-mac">
+          <div className="ah-mac-bar">
+            <span className="ah-dots"><i /><i /><i /></span>
+            <span className="ah-url" aria-hidden="true">vakto.is</span>
+          </div>
+          <div className="ah-mac-view">
+            <video ref={video} src={`${SHOT}/video/hero.mp4`} poster={`${SHOT}/video/hero.jpg`} autoPlay muted loop playsInline preload="metadata" aria-label={t.videoAlt} width={1920} height={1200} />
+          </div>
+        </div>
+      </div>
+      <p className="ah-hero-cap"><b>{t.cap1b}</b>{t.cap1}</p>
     </section>
   );
 }
@@ -531,7 +523,7 @@ export default function AppleHome() {
       <Glow />
       <SiteNav home scrolled={scrolled} dark={overDark} />
       <main id="efni">
-        <HeroZoom />
+        <HeroVideo />
         <Features />
         <Showcase />
         <DarkCompare />
