@@ -13,8 +13,9 @@ const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const seg = (p: number, a: number, b: number) => clamp((p - a) / (b - a));
 const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 
-/** Framvinda (0→1) einingar á meðan hún fer í gegnum skjáinn — fyrir „sticky“ kafla. */
-function useScrub(cb: (p: number, el: HTMLElement) => void) {
+/** Framvinda (0→1). "sticky": hve langt er skrunað í gegnum háan kafla með sticky-innihaldi.
+ *  "view": kaflinn kemur inn neðst (0), er á miðjum skjá (~0,5) og fer út efst (1). */
+function useScrub(cb: (p: number, el: HTMLElement) => void, mode: "sticky" | "view" = "sticky") {
   const ref = useRef<HTMLDivElement | null>(null);
   const cbRef = useRef(cb);
   useEffect(() => { cbRef.current = cb; });
@@ -26,8 +27,9 @@ function useScrub(cb: (p: number, el: HTMLElement) => void) {
     const run = () => {
       raf = 0;
       const r = el.getBoundingClientRect();
-      const total = r.height - window.innerHeight;
-      const p = total > 0 ? clamp(-r.top / total) : clamp(1 - r.top / window.innerHeight);
+      const vh = window.innerHeight;
+      const total = r.height - vh;
+      const p = mode === "view" ? clamp((vh - r.top) / (vh + r.height)) : total > 0 ? clamp(-r.top / total) : clamp(1 - r.top / vh);
       cbRef.current(p, el);
     };
     const on = () => { if (!raf) raf = requestAnimationFrame(run); };
@@ -35,7 +37,7 @@ function useScrub(cb: (p: number, el: HTMLElement) => void) {
     window.addEventListener("scroll", on, { passive: true });
     window.addEventListener("resize", on);
     return () => { window.removeEventListener("scroll", on); window.removeEventListener("resize", on); cancelAnimationFrame(raf); };
-  }, []);
+  }, [mode]);
   return ref;
 }
 
@@ -213,7 +215,7 @@ function DarkCompare() {
   const box = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState(50);
   const touched = useRef(false);
-  const ref = useScrub((p) => { if (!touched.current) setPos(Math.round(100 - ease(seg(p, 0.1, 0.5)) * 50)); });
+  const ref = useScrub((p) => { if (!touched.current) setPos(Math.round(100 - ease(seg(p, 0.12, 0.4)) * 50)); }, "view");
   const move = (clientX: number) => {
     const r = box.current?.getBoundingClientRect(); if (!r) return;
     touched.current = true;
@@ -261,11 +263,11 @@ function DarkCompare() {
 function Contract() {
   const back = useRef<HTMLDivElement>(null), front = useRef<HTMLDivElement>(null), stamp = useRef<HTMLDivElement>(null);
   const ref = useScrub((p) => {
-    const t = seg(p, 0, 0.7);
-    if (back.current) back.current.style.transform = `translate3d(${-20 + t * 40}px, ${40 - t * 80}px, 0) rotate(${-7 + t * 3}deg)`;
-    if (front.current) front.current.style.transform = `translate3d(0, ${60 - t * 90}px, 0) rotate(${3 - t * 3}deg)`;
-    if (stamp.current) { const o = seg(p, 0.35, 0.5); stamp.current.style.opacity = String(o); stamp.current.style.transform = `scale(${1.25 - o * 0.25}) rotate(-6deg)`; }
-  });
+    const t = ease(seg(p, 0.1, 0.55));
+    if (back.current) back.current.style.transform = `translate3d(${-20 + t * 40}px, ${50 - t * 80}px, 0) rotate(${-8 + t * 4}deg)`;
+    if (front.current) front.current.style.transform = `translate3d(0, ${70 - t * 90}px, 0) rotate(${3 - t * 3}deg)`;
+    if (stamp.current) { const o = ease(seg(p, 0.42, 0.52)); stamp.current.style.opacity = String(o); stamp.current.style.transform = `scale(${1.3 - o * 0.3}) rotate(-6deg)`; }
+  }, "view");
   return (
     <section className="ah-sec ah-contract" ref={ref}>
       <div className="ah-split">
@@ -324,9 +326,9 @@ function WalletCard() {
 function Wallet() {
   const card = useRef<HTMLDivElement>(null);
   const ref = useScrub((p) => {
-    const t = ease(seg(p, 0, 0.6));
+    const t = ease(seg(p, 0.1, 0.48));
     if (card.current) card.current.style.transform = `perspective(1400px) rotateY(${(1 - t) * -32}deg) rotateX(${(1 - t) * 14}deg) translate3d(0, ${(1 - t) * 60}px, 0)`;
-  });
+  }, "view");
   return (
     <section className="ah-sec ah-wallet" ref={ref}>
       <div className="ah-split ah-split-rev">
