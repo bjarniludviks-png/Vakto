@@ -372,7 +372,7 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 .ah-peek .ah-phone{width:min(230px,62vw)}
 .ah-dark-copy .ah-ticks{width:fit-content;max-width:100%}
 .ah-dark-copy .ah-ticks li{text-align:left}
-.ah-chatbox{background:rgba(251,251,253,.97)}
+.ah-chatbox{background:#fbfbfd}
 @media (max-width:900px){.ah-dark-copy .ah-ticks{margin-left:auto;margin-right:auto}}
 @media (max-width:700px){
   .ah-stage{transform:scale(2.3);transform-origin:62% 46%}
