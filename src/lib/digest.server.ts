@@ -1,6 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendEmail, brandedReportHtml } from "@/lib/email";
+import { sendEmail, digestReportHtml } from "@/lib/email";
 import { nf, dec1 } from "@/lib/format";
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -11,17 +11,17 @@ type Period = { kind: "daily" | "weekly" | "monthly"; from: string; to: string; 
 export function periodsFor(now: Date): Period[] {
   const out: Period[] = [];
   const y = new Date(now); y.setDate(y.getDate() - 1);
-  out.push({ kind: "daily", from: iso(y), to: iso(y), label: `Dagskýrsla — ${y.getDate()}.${y.getMonth() + 1}.${y.getFullYear()}` });
+  out.push({ kind: "daily", from: iso(y), to: iso(y), label: `Dagskýrsla ${y.getDate()}.${y.getMonth() + 1}.${y.getFullYear()}` });
   if (now.getDay() === 1) { // Monday → last week
     const from = new Date(now); from.setDate(from.getDate() - 7);
     const to = new Date(now); to.setDate(to.getDate() - 1);
-    out.push({ kind: "weekly", from: iso(from), to: iso(to), label: `Vikuskýrsla — ${from.getDate()}.${from.getMonth() + 1}.–${to.getDate()}.${to.getMonth() + 1}.` });
+    out.push({ kind: "weekly", from: iso(from), to: iso(to), label: `Vikuskýrsla ${from.getDate()}.${from.getMonth() + 1}.–${to.getDate()}.${to.getMonth() + 1}.` });
   }
   if (now.getDate() === 1) { // 1st → last month
     const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const to = new Date(now.getFullYear(), now.getMonth(), 0);
     const MO = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
-    out.push({ kind: "monthly", from: iso(from), to: iso(to), label: `Mánaðarskýrsla — ${MO[from.getMonth()]} ${from.getFullYear()}` });
+    out.push({ kind: "monthly", from: iso(from), to: iso(to), label: `Mánaðarskýrsla ${MO[from.getMonth()]} ${from.getFullYear()}` });
   }
   return out;
 }
@@ -89,7 +89,7 @@ export async function sendDigests(now = new Date()): Promise<{ sent: number }> {
       const unsched = [...unschedBy.values()].reduce((a, b) => a + b, 0);
       const dev = hours - planned;
       const devTxt = `${dev >= 0 ? "+" : "−"}${dec1(Math.abs(dev))} klst`;
-      const devCol = Math.abs(dev) < 0.05 ? "#5f6470" : dev > 0 ? "#d8483a" : "#1f9d6b";
+      const devCol = Math.abs(dev) < 0.05 ? "#6e6e73" : dev > 0 ? "#d8483a" : "#1f9d6b";
 
       // ALL employees who worked (or were scheduled), full names, planned/worked/deviation
       const empIds = new Set<string>([...perEmp.keys(), ...plannedBy.keys()]);
@@ -97,40 +97,22 @@ export async function sendDigests(now = new Date()): Promise<{ sent: number }> {
         .map((eid) => ({ eid, name: nameOf.get(eid) ?? "?", plan: plannedBy.get(eid) ?? 0, got: perEmp.get(eid) ?? 0 }))
         .sort((a, b) => b.got - a.got);
       const capped = all.slice(0, 30);
-      const cell = "padding:7px 8px;border-bottom:1px solid #eef0f3;font-size:13px";
-      const rowsHtml = capped.map((r) => {
-        const d = r.got - r.plan;
-        const dc = Math.abs(d) < 0.05 ? "#9296a6" : d > 0 ? "#d8483a" : "#1f9d6b";
-        return `<tr>
-          <td style="${cell}">${r.name}${(unschedBy.get(r.eid) ?? 0) > 0 ? ` <span style="color:#bf8f3a;font-size:11px;font-weight:700">· óáætl.</span>` : ""}</td>
-          <td style="${cell};text-align:right;color:#5f6470">${r.plan ? dec1(r.plan) : "—"}</td>
-          <td style="${cell};text-align:right;font-weight:700">${r.got ? dec1(r.got) : "—"}</td>
-          <td style="${cell};text-align:right;font-weight:700;color:${dc}">${r.plan || r.got ? `${d >= 0 ? "+" : "−"}${dec1(Math.abs(d))}` : "—"}</td>
-        </tr>`;
-      }).join("") + (all.length > capped.length ? `<tr><td colspan="4" style="${cell};color:#9296a6">+ ${all.length - capped.length} til viðbótar</td></tr>` : "");
-      const unschedNames = [...unschedBy.keys()].map((eid) => nameOf.get(eid) ?? "?").join(", ");
-      const stat = (label: string, value: string, color?: string) =>
-        `<tr><td style="padding:8px 0;border-bottom:1px solid #eef0f3;color:#5f6470;font-size:14px">${label}</td>
-         <td style="padding:8px 0;border-bottom:1px solid #eef0f3;text-align:right;font-weight:700;font-variant-numeric:tabular-nums${color ? `;color:${color}` : ""}">${value}</td></tr>`;
-      const th = "padding:6px 8px;font-size:10.5px;font-weight:700;letter-spacing:.07em;color:#9296a6;text-transform:uppercase;border-bottom:2px solid #eef0f3";
-      const inner = `
-        <table style="border-collapse:collapse;width:100%;margin:4px 0 6px">
-          ${stat("Áætlaðir tímar (vaktaplan)", `${dec1(planned)} klst`)}
-          ${stat("Unnir tímar", `${dec1(hours)} klst`)}
-          ${stat("Frávik", devTxt, devCol)}
-          ${stat("Áætlaður launakostnaður (m. gjöldum)", `${nf(Math.round(cost))} kr`)}
-          ${stat("Óáætlaðar stimplanir", unsched ? `${unsched} — ${unschedNames}` : "0", unsched ? "#bf8f3a" : undefined)}
-          ${stat("Opnar stimplanir", String(open), open ? "#d8483a" : undefined)}
-        </table>
-        ${all.length ? `<div style="font-size:12px;font-weight:700;letter-spacing:.08em;color:#9296a6;margin:18px 0 4px">TÍMAR PER STARFSMANN</div>
-        <table style="border-collapse:collapse;width:100%">
-          <tr><th style="${th};text-align:left">Nafn</th><th style="${th};text-align:right">Áætlað</th><th style="${th};text-align:right">Unnið</th><th style="${th};text-align:right">Frávik</th></tr>
-          ${rowsHtml}
-        </table>` : ""}`;
-      const html = brandedReportHtml({
-        preheader: `${co.name} · ${p.label}`,
-        heading: `${co.name} — ${p.label}`,
-        innerHtml: inner,
+      const html = digestReportHtml({
+        company: co.name, label: p.label,
+        planned: `${dec1(planned)} klst`, worked: `${dec1(hours)} klst`,
+        deviation: devTxt, deviationColor: devCol, cost: `${nf(Math.round(cost))} kr`,
+        unscheduled: unsched ? `${unsched}: ${[...unschedBy.keys()].map((eid) => nameOf.get(eid) ?? "?").join(", ")}` : "0", unscheduledWarn: unsched > 0,
+        open: String(open), openWarn: open > 0,
+        people: capped.map((r) => {
+          const d = r.got - r.plan;
+          return {
+            name: r.name, unscheduled: (unschedBy.get(r.eid) ?? 0) > 0,
+            plan: r.plan ? dec1(r.plan) : "–", got: r.got ? dec1(r.got) : "–",
+            dev: r.plan || r.got ? `${d >= 0 ? "+" : "−"}${dec1(Math.abs(d))}` : "–",
+            devColor: Math.abs(d) < 0.05 ? "#86868b" : d > 0 ? "#d8483a" : "#1f9d6b",
+          };
+        }),
+        more: all.length - capped.length,
       });
       for (const to of emails) {
         const res = await sendEmail({ to, subject: `${co.name} · ${p.label}`, html });
