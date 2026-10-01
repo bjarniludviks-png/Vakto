@@ -1448,6 +1448,13 @@ export const DICT: Dict = {
   "Árgjaldið": { is: "Árgjaldið", en: "The annual fee", vi: "Phí hàng năm" },
   "verður tekið á næsta gjalddaga": { is: "verður tekið á næsta gjalddaga", en: "will be charged on the next due date", vi: "sẽ được thu vào kỳ tới" },
   "Virkir umfram 5 eru gerðir upp mánaðarlega á árlegum kjörum.": { is: "Virkir umfram 5 eru gerðir upp mánaðarlega á árlegum kjörum.", en: "Active employees beyond 5 are settled monthly at the yearly rate.", vi: "Nhân viên vượt 5 được thanh toán hàng tháng theo giá năm." },
+  "Engar vinnustundir eru skráðar á tímabilinu og engin laun voru greidd.": { is: "Engar vinnustundir eru skráðar á tímabilinu og engin laun voru greidd.", en: "No working hours were recorded in the period and no pay was issued.", vi: "Không có giờ làm trong kỳ và không có lương được trả." },
+  "Mánaðarlaun": { is: "Mánaðarlaun", en: "Monthly salary", vi: "Lương tháng" },
+  "Tímakaup": { is: "Tímakaup", en: "Hourly pay", vi: "Lương theo giờ" },
+  "Yfirvinnuálag": { is: "Yfirvinnuálag", en: "Overtime premium", vi: "Phụ cấp làm thêm" },
+  "Desember-/orlofsuppbót": { is: "Desember-/orlofsuppbót", en: "Holiday bonus", vi: "Thưởng lễ" },
+  "Lífeyrissjóður (4%)": { is: "Lífeyrissjóður (4%)", en: "Pension fund (4%)", vi: "Quỹ hưu trí (4%)" },
+  "Félagsgjald": { is: "Félagsgjald", en: "Union fee", vi: "Phí công đoàn" },
   // Orlofsstaða (sept. 2026)
   "Orlofsfrí": { is: "Orlof", en: "Vacation", vi: "Nghỉ phép" },
   "Orlofsstaða": { is: "Orlofsstaða", en: "Vacation balance", vi: "Số dư nghỉ phép" },

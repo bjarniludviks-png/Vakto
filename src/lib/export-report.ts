@@ -33,33 +33,10 @@ export async function exportTimeReportXlsx(rows: TimeReportRow[], company: strin
   XLSX.writeFile(wb, `vakto-timaskyrsla-${from}_${to}.xlsx`);
 }
 
-export async function exportTimeReportPdf(rows: TimeReportRow[], company: string, from: string, to: string) {
-  const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);
-  const doc = new jsPDF();
-  const t = totals(rows);
-  doc.setFontSize(15); doc.setTextColor(20); doc.text(`Tímaskýrsla — ${company}`, 14, 18);
-  doc.setFontSize(10); doc.setTextColor(120); doc.text(`Tímabil: ${from} – ${to}`, 14, 25);
-  autoTable(doc, {
-    startY: 31,
-    head: [["Starfsmaður", "Dagsetning", "Inn", "Út", "Klst", "Staða"]],
-    body: rows.map((r) => [r.name, r.date, r.in, r.out ?? "—", dec1(r.hours), statusIs(r.approved)]),
-    styles: { fontSize: 9, cellPadding: 2.5 },
-    headStyles: { fillColor: [233, 112, 15], textColor: 255 },
-    columnStyles: { 4: { halign: "right" } },
-    didParseCell: (d) => {
-      if (d.section === "body" && d.column.index === 5) {
-        d.cell.styles.textColor = d.cell.raw === "Bíður" ? [200, 60, 40] : [30, 150, 80];
-        d.cell.styles.fontStyle = "bold";
-      }
-    },
-  });
-  // @ts-expect-error autotable augments the doc at runtime
-  const y = (doc.lastAutoTable?.finalY ?? 40) + 9;
-  doc.setFontSize(10); doc.setTextColor(30);
-  doc.text(`Samtals: ${dec1(t.total)} klst   ·   Samþykktar: ${dec1(t.approved)} klst   ·   Óafgreiddar: ${dec1(t.pending)} klst (${t.pendingCount})`, 14, y);
-
-  logoFooter(doc);
-  doc.save(`vakto-timaskyrsla-${from}_${to}.pdf`);
+/** Tímaskrá/-skýrsla sem PDF í VAKTO-stíl (doc-pdf.ts). Líka til með 0 færslum. `employee` = eins manns tímaskrá. */
+export async function exportTimeReportPdf(rows: TimeReportRow[], company: string, from: string, to: string, employee?: string) {
+  const { downloadTimesheetPdf } = await import("./doc-pdf");
+  await downloadTimesheetPdf({ rows, from, to, company, employee });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

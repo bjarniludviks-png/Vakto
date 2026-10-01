@@ -1,3 +1,4 @@
+import type { PayslipDetail } from "@/lib/doc-pdf";
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -6,7 +7,7 @@ import { computeLine, totals as sumTotals, BURDEN, type PayLine } from "@/lib/pa
 import { initials } from "@/lib/employees";
 import { nf, dec1 } from "@/lib/format";
 
-export type PayrollRow = { n: string; av: string; c: string; h: string; g: string; w: string; p: string; net: string };
+export type PayrollRow = { n: string; av: string; c: string; h: string; g: string; w: string; p: string; net: string; d?: PayslipDetail };
 export type PayrollTotalsView = { count: number; hours: string; gross: string; withholding: string; pensionUnion: string; net: string; cost: string; grossM: string; netM: string; costM: string; withholdingM: string; insuranceM: string };
 export type PayrollView = { rows: PayrollRow[]; totals: PayrollTotalsView; live: boolean };
 

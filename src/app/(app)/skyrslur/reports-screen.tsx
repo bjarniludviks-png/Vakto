@@ -138,7 +138,6 @@ export default function ReportsScreen({ empty = false, live = false, embedded = 
     const rep = await getTimeReport(range.from, range.to);
     setExporting(false);
     if (!rep.ok) { toast("Tókst ekki að sækja gögn"); return; }
-    if (!rep.rows.length) { toast("Engar tímafærslur á tímabilinu"); return; }
     try {
       if (kind === "xlsx") await exportTimeReportXlsx(rep.rows, rep.company || "VAKTO", range.from, range.to);
       else await exportTimeReportPdf(rep.rows, rep.company || "VAKTO", range.from, range.to);
@@ -260,7 +259,6 @@ function LiveReports({ initial, timebank, embedded = false }: { initial: AttRow[
     const rep = await getTimeReport(from, to);
     setExporting(false);
     if (!rep.ok) { toast("Tókst ekki að sækja gögn"); return; }
-    if (!rep.rows.length) { toast("Engar tímafærslur á tímabilinu"); return; }
     try {
       if (kind === "xlsx") await exportTimeReportXlsx(rep.rows, rep.company || "VAKTO", from, to);
       else await exportTimeReportPdf(rep.rows, rep.company || "VAKTO", from, to);
