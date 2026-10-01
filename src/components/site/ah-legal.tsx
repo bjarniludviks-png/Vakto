@@ -11,7 +11,7 @@ export default function AhLegal({ title, updated, children }: { title: string; u
       <main className="ah-legal-main" lang="is">
         <LegalEnNote />
         <h1>{title}</h1>
-        <p className="ah-legal-upd">Síðast uppfært {updated}. VAKTO ehf., kt. 490806-0400, hallo@vakto.is</p>
+        <p className="ah-legal-upd">Síðast uppfært {updated}. BGL Ventures ehf., kt. 490806-0400, hallo@vakto.is</p>
         <div className="ah-legal-body">{children}</div>
       </main>
       <AhFooter />

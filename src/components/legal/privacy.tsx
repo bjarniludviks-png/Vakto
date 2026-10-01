@@ -4,10 +4,10 @@ export const PRIVACY_META = { title: "Persónuverndarstefna", updated: "21. sept
 export function PrivacyBody() {
   return (
     <>
-      <p>VAKTO er vakta- og launakerfi fyrir vinnustaði. Þessi stefna lýsir því hvaða persónuupplýsingar VAKTO ehf., kt. 490806-0400 („VAKTO“, „við“) vinnur, í hvaða tilgangi, hversu lengi og hvaða réttindi þú hefur. Hún byggir á lögum nr. 90/2018 um persónuvernd og vinnslu persónuupplýsinga og almennu persónuverndarreglugerðinni (GDPR).</p>
+      <p>VAKTO er vakta- og launakerfi fyrir vinnustaði. Þessi stefna lýsir því hvaða persónuupplýsingar BGL Ventures ehf., kt. 490806-0400 („VAKTO“, „við“) vinnur, í hvaða tilgangi, hversu lengi og hvaða réttindi þú hefur. Hún byggir á lögum nr. 90/2018 um persónuvernd og vinnslu persónuupplýsinga og almennu persónuverndarreglugerðinni (GDPR).</p>
 
       <h2>1. Tvö hlutverk: ábyrgðaraðili og vinnsluaðili</h2>
-      <p><b>Ábyrgðaraðili.</b> Þegar þú stofnar aðgang, heimsækir vakto.is, notar spjallið á heimasíðunni eða hefur samband við okkur er VAKTO ehf. ábyrgðaraðili þeirra upplýsinga.</p>
+      <p><b>Ábyrgðaraðili.</b> Þegar þú stofnar aðgang, heimsækir vakto.is, notar spjallið á heimasíðunni eða hefur samband við okkur er BGL Ventures ehf. ábyrgðaraðili þeirra upplýsinga.</p>
       <p><b>Vinnsluaðili.</b> Þegar fyrirtæki (viðskiptavinur okkar) skráir starfsfólk sitt, vaktir, stimplanir og launaupplýsingar í VAKTO er fyrirtækið ábyrgðaraðili og VAKTO vinnsluaðili sem vinnur upplýsingarnar eingöngu samkvæmt fyrirmælum þess. Vinnslusamningur (DPA) er hluti af <a href="/skilmalar">skilmálum þjónustunnar</a>. Starfsfólk sem hefur spurningar um eigin upplýsingar í VAKTO ætti fyrst að leita til vinnuveitanda síns.</p>
 
       <h2>2. Hvaða upplýsingar við vinnum</h2>
@@ -77,7 +77,7 @@ export function PrivacyBody() {
       <p>Við getum uppfært þessa stefnu. Efnislegar breytingar eru tilkynntar viðskiptavinum með tölvupósti eða í kerfinu áður en þær taka gildi. Gildandi útgáfa er alltaf á vakto.is/personuvernd.</p>
 
       <h2>11. Samband</h2>
-      <p>VAKTO ehf., kt. 490806-0400, Ísland · <a href="mailto:hallo@vakto.is">hallo@vakto.is</a></p>
+      <p>BGL Ventures ehf., kt. 490806-0400, Ísland · <a href="mailto:hallo@vakto.is">hallo@vakto.is</a></p>
     </>
   );
 }

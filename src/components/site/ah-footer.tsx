@@ -23,7 +23,7 @@ const F = {
       { h: "Lögfræði", links: [["/personuvernd", "Persónuvernd"], ["/skilmalar", "Skilmálar"], ["/vafrakokur", "Vafrakökur"]] },
       { h: "Fylgdu okkur", links: SOCIAL },
     ] as { h: string; links: (string | boolean)[][] }[],
-    copy: "© 2026 VAKTO ehf. · kt. 490806-0400", made: "Hannað og þróað á Íslandi",
+    copy: "© 2026 BGL Ventures ehf. · kt. 490806-0400", made: "Hannað og þróað á Íslandi",
   },
   en: {
     desc: "Scheduling, time clock, payroll and employment contracts. Plus labor as a share of revenue in real time. Built for Icelandic workplaces.",
@@ -33,7 +33,7 @@ const F = {
       { h: "Legal", links: [["/personuvernd", "Privacy"], ["/skilmalar", "Terms"], ["/vafrakokur", "Cookies"]] },
       { h: "Follow us", links: SOCIAL },
     ] as { h: string; links: (string | boolean)[][] }[],
-    copy: "© 2026 VAKTO ehf. · reg. no. 490806-0400", made: "Designed and built in Iceland",
+    copy: "© 2026 BGL Ventures ehf. · reg. no. 490806-0400", made: "Designed and built in Iceland",
   },
 };
 

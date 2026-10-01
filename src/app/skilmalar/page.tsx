@@ -4,7 +4,7 @@ import "@/components/site/home.css";
 import "@/components/site/legal.css";
 import { TermsBody, TERMS_META } from "@/components/legal/terms";
 
-export const metadata: Metadata = { title: "VAKTO — Skilmálar", description: "Þjónustuskilmálar VAKTO ehf." };
+export const metadata: Metadata = { title: "VAKTO — Skilmálar", description: "Þjónustuskilmálar BGL Ventures ehf." };
 
 export default function TermsPage() {
   return (

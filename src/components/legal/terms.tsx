@@ -4,7 +4,7 @@ export const TERMS_META = { title: "Þjónustuskilmálar", updated: "30. septemb
 export function TermsBody() {
   return (
     <>
-      <p>Þessir skilmálar gilda um notkun fyrirtækja („viðskiptavinur“, „þú“) á VAKTO, vakta- og launakerfi sem VAKTO ehf., kt. 490806-0400 („VAKTO“, „við“) rekur á vakto.is og í tengdum öppum. Með því að stofna aðgang samþykkir þú skilmálana fyrir hönd fyrirtækisins.</p>
+      <p>Þessir skilmálar gilda um notkun fyrirtækja („viðskiptavinur“, „þú“) á VAKTO, vakta- og launakerfi sem BGL Ventures ehf., kt. 490806-0400 („VAKTO“, „við“) rekur á vakto.is og í tengdum öppum. Með því að stofna aðgang samþykkir þú skilmálana fyrir hönd fyrirtækisins.</p>
 
       <h2>1. Þjónustan</h2>
       <p>VAKTO veitir aðgang að vefkerfi með vaktaplani, stimpilklukku, tímaskráningu, launaútreikningi, útflutningi í launakerfi, skýrslum, spjalli, fréttaveitu, starfsmannaskírteinum og ráðningarsamningum. Kerfið er þjónusta í áskrift (SaaS) og er þróað áfram; eiginleikar geta bæst við, breyst eða verið teknir út með sanngjörnum fyrirvara ef um verulega skerðingu er að ræða.</p>
@@ -71,7 +71,7 @@ export function TermsBody() {
       <p>Um skilmálana gilda íslensk lög. Rísi ágreiningur sem ekki tekst að leysa með samkomulagi skal reka mál fyrir Héraðsdómi Reykjavíkur.</p>
 
       <h2>14. Samband</h2>
-      <p>VAKTO ehf., kt. 490806-0400, Ísland · <a href="mailto:hallo@vakto.is">hallo@vakto.is</a></p>
+      <p>BGL Ventures ehf., kt. 490806-0400, Ísland · <a href="mailto:hallo@vakto.is">hallo@vakto.is</a></p>
     </>
   );
 }

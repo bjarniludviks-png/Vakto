@@ -336,7 +336,7 @@ export async function sendReceiptEmail(to: string, company: string, o: { total: 
     html: template({
       preheader: "Mánaðargjaldið var tekið af skráða kortinu.",
       heading: "Takk fyrir",
-      body: `Mánaðargjald VAKTO fyrir <b>${company}</b>, tímabilið ${o.periodStart} – ${o.periodEnd}, <b>${kr(o.total)}</b> með VSK, var tekið af skráða kortinu. Reikninginn finnurðu í Stillingum → Áskrift. VAKTO ehf., kt. 490806-0400.`,
+      body: `Mánaðargjald VAKTO fyrir <b>${company}</b>, tímabilið ${o.periodStart} – ${o.periodEnd}, <b>${kr(o.total)}</b> með VSK, var tekið af skráða kortinu. Reikninginn finnurðu í Stillingum → Áskrift. BGL Ventures ehf., kt. 490806-0400.`,
       headingEn: "Thank you",
       bodyEn: `The VAKTO monthly fee for <b>${company}</b>, ${o.periodStart} – ${o.periodEnd}, <b>${kr(o.total)}</b> incl. VAT, was charged to the card on file. Invoices are in Settings → Subscription.`,
       ctaLabel: "Sjá reikninga", ctaLabelEn: "View invoices", ctaHref: `${APP_URL}/stillingar?tab=askrift`,

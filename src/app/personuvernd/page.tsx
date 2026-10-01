@@ -4,7 +4,7 @@ import "@/components/site/home.css";
 import "@/components/site/legal.css";
 import { PrivacyBody, PRIVACY_META } from "@/components/legal/privacy";
 
-export const metadata: Metadata = { title: "VAKTO — Persónuvernd", description: "Hvernig VAKTO ehf. vinnur með persónuupplýsingar." };
+export const metadata: Metadata = { title: "VAKTO — Persónuvernd", description: "Hvernig BGL Ventures ehf. vinnur með persónuupplýsingar." };
 
 export default function PrivacyPage() {
   return (
