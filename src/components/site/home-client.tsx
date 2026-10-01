@@ -176,7 +176,6 @@ function PlanDrag() {
 function HeroVideo() {
   const t = useT();
   const frame = useRef<HTMLDivElement>(null), head = useRef<HTMLDivElement>(null);
-  const cap1 = useRef<HTMLDivElement>(null), cap2 = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
   // Upphafsstaða gluggans: rétt fyrir neðan hnappana, óháð skjástærð (mælt einu sinni per skjástærð).
   const shift = useRef({ key: "", px: 0 });
@@ -194,8 +193,6 @@ function HeroVideo() {
     const a = ease(seg(p, 0, 0.45));
     if (head.current) { head.current.style.opacity = String(1 - seg(p, 0.05, 0.3)); head.current.style.transform = `translate3d(0, ${-60 * seg(p, 0, 0.35)}px, 0)`; }
     if (frame.current) frame.current.style.transform = `translate3d(0, ${(1 - a) * offset}px, 0) scale(${0.8 + a * 0.2})`;
-    if (cap1.current) { const o = seg(p, 0.5, 0.6) * (1 - seg(p, 0.74, 0.8)); cap1.current.style.opacity = String(o); cap1.current.style.transform = `translate3d(0, ${(1 - o) * 18}px, 0)`; }
-    if (cap2.current) { const o = seg(p, 0.8, 0.88); cap2.current.style.opacity = String(o); cap2.current.style.transform = `translate3d(0, ${(1 - o) * 18}px, 0)`; }
   });
   useEffect(() => {
     const v = video.current; if (!v) return;
@@ -225,8 +222,6 @@ function HeroVideo() {
               <video ref={video} src={`${SHOT}/video/hero.mp4`} poster={`${SHOT}/video/hero.jpg`} autoPlay muted loop playsInline preload="auto" aria-label={t.videoAlt} width={1920} height={1200} />
             </div>
           </div>
-          <div className="ah-zcap" ref={cap1}><b>{t.cap1b}</b>{t.cap1}</div>
-          <div className="ah-zcap" ref={cap2}><b>{t.cap2b}</b>{t.cap2}</div>
         </div>
       </div>
     </section>
