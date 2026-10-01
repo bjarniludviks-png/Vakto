@@ -1,0 +1,30 @@
+/* Um okkur (/ny-heimasida/um-okkur) */
+.ah-about{background:#fbfbfd}
+.ab-hero{position:relative;margin-top:62px;background:#cfcac4;overflow:hidden}
+.ab-hero img{width:100%;height:auto;max-height:calc(100dvh - 62px);object-fit:cover;object-position:30% 20%}
+.ab-hero-tx{position:absolute;top:50%;right:max(20px, calc((100vw - 1100px)/2));transform:translateY(-50%);width:min(500px,42vw)}
+.ab-hero-tx h1{font-size:clamp(36px,4.6vw,64px);color:#1d1d1f}
+.ab-hero-tx p{margin:18px 0 0;font-size:clamp(16px,1.4vw,19px);color:#3a3a3f;font-weight:500}
+.ab-story{max-width:760px;margin:0 auto;padding:120px 20px 40px}
+.ab-lead{font-size:clamp(22px,2.4vw,30px);line-height:1.38;letter-spacing:-.02em;color:#1d1d1f;margin:0 0 26px;font-weight:500;text-wrap:pretty}
+.ab-lead+.ab-lead{color:#6e6e73}
+.ab-pains{max-width:1100px;margin:0 auto;padding:60px 20px 40px;display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
+.ab-pain{background:#fff;border-radius:28px;padding:34px 34px 36px;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 20px 50px -30px rgba(40,25,10,.25)}
+.ab-pain:first-child{grid-column:1/-1;background:linear-gradient(165deg,#fff6ee,#fde3c8);box-shadow:0 0 0 1px rgba(233,112,15,.14),0 20px 50px -30px rgba(233,112,15,.4)}
+.ab-pain h2{font-size:clamp(22px,2.2vw,28px);letter-spacing:-.025em;line-height:1.15;margin:0 0 12px}
+.ab-pain p{margin:0;font-size:17px;line-height:1.55;color:#4a4a4f;max-width:560px}
+.ab-quote{max-width:900px;margin:0 auto;padding:120px 20px;text-align:center}
+.ab-quote blockquote{margin:0;font-size:clamp(28px,3.6vw,46px);font-weight:650;letter-spacing:-.03em;line-height:1.15;text-wrap:balance}
+.ab-quote figcaption{margin-top:24px;color:#6e6e73;font-size:16px;font-weight:500}
+.ab-cta{text-align:center;padding:0 20px 140px}
+.ab-cta h2{font-size:clamp(30px,4vw,48px)}
+.ab-cta p{color:#4a4a4f;font-size:18px;margin:16px 0 30px}
+.ab-cta p a{color:#b85309;font-weight:600}
+@media (max-width:760px){
+  .ab-hero img{max-height:none;object-position:center top}
+  .ab-hero-tx{position:static;transform:none;width:auto;padding:36px 20px 0;background:#fbfbfd}
+  .ab-hero{background:#fbfbfd}
+  .ab-story{padding-top:48px}
+  .ab-pains{grid-template-columns:1fr}
+  .ab-quote{padding:80px 20px}
+}

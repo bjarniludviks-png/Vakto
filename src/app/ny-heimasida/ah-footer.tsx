@@ -12,7 +12,7 @@ export function AhLogo() {
 
 const COLS: { h: string; links: [string, string, boolean?][] }[] = [
   { h: "Vara", links: [[`${H}#kerfid`, "Eiginleikar"], [`${H}#kynning`, "Kynntu þér VAKTO"], [`${H}#samningar`, "Samningar"], [`${H}#verd`, "Verð"], [`${H}/prufa`, "Prófa frítt"]] },
-  { h: "Fyrirtækið", links: [["mailto:hallo@vakto.is", "Hafa samband"], [`${H}/innskraning`, "Innskráning"]] },
+  { h: "Fyrirtækið", links: [[`${H}/um-okkur`, "Um okkur"], ["mailto:hallo@vakto.is", "Hafa samband"], [`${H}/innskraning`, "Innskráning"]] },
   { h: "Lögfræði", links: [[`${H}/personuvernd`, "Persónuvernd"], [`${H}/skilmalar`, "Skilmálar"], [`${H}/vafrakokur`, "Vafrakökur"]] },
   { h: "Fylgdu okkur", links: [["https://www.instagram.com/vakto.is", "Instagram", true], ["https://www.facebook.com/vakto.is", "Facebook", true], ["https://www.linkedin.com/company/vakto", "LinkedIn", true]] },
 ];
