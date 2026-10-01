@@ -47,7 +47,7 @@ function useScrub(cb: (p: number, el: HTMLElement) => void, mode: "sticky" | "vi
 
 function Logo() {
   return (
-    <span className="ah-logo">
+    <span className="ah-logo" translate="no">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="12" width="4" height="8" rx="1.3" /><rect x="10" y="8" width="4" height="12" rx="1.3" /><rect x="17" y="4" width="4" height="16" rx="1.3" /></svg>
       VAKTO
     </span>
@@ -83,7 +83,7 @@ function Glow() {
   );
 }
 
-function MacFrame({ src, alt, url, children, imgRef }: { src: string; alt: string; url: string; children?: ReactNode; imgRef?: React.Ref<HTMLImageElement> }) {
+function MacFrame({ src, alt, url, children, imgRef, priority = false }: { src: string; alt: string; url: string; children?: ReactNode; imgRef?: React.Ref<HTMLImageElement>; priority?: boolean }) {
   return (
     <div className="ah-mac">
       <div className="ah-mac-bar">
@@ -92,7 +92,7 @@ function MacFrame({ src, alt, url, children, imgRef }: { src: string; alt: strin
       </div>
       <div className="ah-mac-view">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img ref={imgRef} src={src} alt={alt} decoding="async" />
+        <img ref={imgRef} src={src} alt={alt} width={2880} height={1800} decoding="async" loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : "auto"} />
         {children}
       </div>
     </div>
@@ -104,7 +104,7 @@ function Phone({ src, alt, className = "", dark = false }: { src: string; alt: s
     <div className={`ah-phone${dark ? " ah-phone-dk" : ""} ${className}`}>
       <div className="ah-phone-in">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} loading="lazy" decoding="async" />
+        <img src={src} alt={alt} width={1170} height={2532} loading="lazy" decoding="async" />
       </div>
       <span className="ah-island" aria-hidden="true" />
     </div>
@@ -129,9 +129,10 @@ function HeroZoom() {
     return shift.current.px;
   };
   const ref = useScrub((p) => {
+    const offset = startShift(); // útlitslestur fyrst, öll skrif á eftir (ekkert þvingað endurútlit)
     const a = ease(seg(p, 0, 0.3)), z = ease(seg(p, 0.32, 0.72));
     if (head.current) { head.current.style.opacity = String(1 - seg(p, 0.05, 0.25)); head.current.style.transform = `translate3d(0, ${-60 * seg(p, 0, 0.3)}px, 0)`; }
-    if (frame.current) frame.current.style.transform = `translate3d(0, ${(1 - a) * startShift()}px, 0) scale(${0.82 + a * 0.18})`;
+    if (frame.current) frame.current.style.transform = `translate3d(0, ${(1 - a) * offset}px, 0) scale(${0.82 + a * 0.18})`;
     if (img.current) img.current.style.transform = `scale(${1 + z * 2.1})`;
     if (ring.current) ring.current.style.opacity = String(seg(p, 0.6, 0.72) * (1 - seg(p, 0.94, 1)));
     if (cap1.current) { const o = seg(p, 0.5, 0.6) * (1 - seg(p, 0.76, 0.82)); cap1.current.style.opacity = String(o); cap1.current.style.transform = `translate3d(0, ${(1 - o) * 18}px, 0)`; }
@@ -149,7 +150,7 @@ function HeroZoom() {
           </div>
         </div>
         <div className="ah-hero-frame" ref={frame}>
-          <MacFrame src={`${SHOT}/light/maelabord.jpg`} alt="Mælaborð VAKTO: laun sem hlutfall af veltu, unnir tímar og frávik" url="vakto.is/maelabord" imgRef={img}>
+          <MacFrame src={`${SHOT}/light/maelabord.jpg`} alt="Mælaborð VAKTO: laun sem hlutfall af veltu, unnir tímar og frávik" url="vakto.is/maelabord" imgRef={img} priority>
             <div className="ah-ring-hl" ref={ring} aria-hidden="true" />
           </MacFrame>
           <div className="ah-zcap" ref={cap1}><b>Laun sem % af veltu.</b> Ein tala sem segir hvort vaktin borgar sig.</div>
@@ -166,7 +167,7 @@ function Crop({ src, pos, ratio = "16 / 10", zoom = 1.6, alt }: { src: string; p
   return (
     <div className="ah-crop" style={{ aspectRatio: ratio } as CSSProperties}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={alt} loading="lazy" decoding="async" style={{ objectPosition: pos, transform: `scale(${zoom})`, transformOrigin: pos } as CSSProperties} />
+      <img src={src} alt={alt} width={2880} height={1800} loading="lazy" decoding="async" style={{ objectPosition: pos, transform: `scale(${zoom})`, transformOrigin: pos } as CSSProperties} />
     </div>
   );
 }
@@ -268,7 +269,7 @@ function Contract() {
     if (stamp.current) { const o = ease(seg(p, 0.42, 0.52)); stamp.current.style.opacity = String(o); stamp.current.style.transform = `scale(${1.3 - o * 0.3}) rotate(-6deg)`; }
   }, "view");
   return (
-    <section className="ah-sec ah-contract" ref={ref}>
+    <section className="ah-sec ah-contract" id="samningar" ref={ref}>
       <div className="ah-split">
         <div className="ah-split-tx">
           <h2>Samningur á mínútu, undirritaður á annarri.</h2>
@@ -280,14 +281,14 @@ function Contract() {
             <li>Launaseðlar og tímaskrár í sama stíl</li>
           </ul>
         </div>
-        <div className="ah-papers" aria-label="Ráðningarsamningur úr VAKTO">
+        <div className="ah-papers">
           <div className="ah-paper ah-paper-back" ref={back}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`${SHOT}/skjol/samningur-2.jpg`} alt="" loading="lazy" decoding="async" />
+            <img src={`${SHOT}/skjol/samningur-2.jpg`} alt="" width={1800} height={2545} loading="lazy" decoding="async" />
           </div>
           <div className="ah-paper" ref={front}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`${SHOT}/skjol/samningur-1.jpg`} alt="Fyrsta síða ráðningarsamnings: Kaffi Krónan ræður Ha Vu til starfa" loading="lazy" decoding="async" />
+            <img src={`${SHOT}/skjol/samningur-1.jpg`} alt="Fyrsta síða ráðningarsamnings: Kaffi Krónan ræður Ha Vu til starfa" width={1800} height={2545} loading="lazy" decoding="async" />
             <div className="ah-stamp" ref={stamp}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" /></svg>Undirritað rafrænt</div>
           </div>
         </div>
@@ -380,6 +381,7 @@ export default function AppleHome() {
   }, []);
   return (
     <div className="ah">
+      <a className="ah-skip" href="#efni">Fara beint í efni</a>
       <div ref={top} className="ah-top-sentinel" aria-hidden="true" />
       <Glow />
       <nav className={`ah-nav${scrolled ? " sc" : ""}${overDark ? " dk" : ""}`}>
@@ -392,11 +394,10 @@ export default function AppleHome() {
           <a href="/nyskraning" className="ah-btn ah-btn-sm">Prófa frítt</a>
         </div>
       </nav>
-      <main>
+      <main id="efni">
         <HeroZoom />
         <Features />
         <DarkCompare />
-        <div id="samningar" />
         <Contract />
         <Wallet />
         <Pricing />
