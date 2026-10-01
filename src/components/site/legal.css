@@ -15,3 +15,4 @@
 .ah-legal-body table{width:100%;border-collapse:collapse;font-size:15px;margin:8px 0 22px;display:block;overflow-x:auto}
 .ah-legal-body th,.ah-legal-body td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
 .ah-legal-body th{font-weight:600;color:var(--ink);font-size:14px}
+.ah-legal-en{margin:0 0 28px;padding:14px 18px;border-radius:14px;background:#fff4e9;color:#3a3a3f;font-size:15px;box-shadow:0 0 0 1px rgba(233,112,15,.15)}

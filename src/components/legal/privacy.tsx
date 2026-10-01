@@ -1,4 +1,4 @@
-// Efni síðunnar /personuvernd — notað bæði af núverandi síðu og nýju forsíðunni (/ny-heimasida/personuvernd).
+// Efni síðunnar /personuvernd — birt í AhLegal (src/components/site/ah-legal.tsx) — (/personuvernd).
 export const PRIVACY_META = { title: "Persónuverndarstefna", updated: "21. september 2026" };
 
 export function PrivacyBody() {

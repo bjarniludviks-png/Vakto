@@ -1,4 +1,4 @@
-/* Innskráning og prufa í stíl nýju forsíðunnar (/ny-heimasida/innskraning, /prufa).
+/* Innskráning og prufa í stíl nýju forsíðunnar (/login, /nyskraning).
    Sömu form og /login og /nyskraning (login.css-klasarnir), endurlituð í ljóst innan .ah-auth. */
 .ah-auth{
   --ink:#1d1d1f; --ink2:#4a4a4f; --ink3:#86868b; --line:rgba(0,0,0,.12); --line2:rgba(0,0,0,.06);
@@ -41,3 +41,5 @@
 .ah-auth-mac{width:min(560px,100%)}
 .ah-auth-mac .ah-mac{border-radius:12px}
 .ah-auth-mac .ah-mac-bar{height:30px}
+.ah-auth-top .ah-auth-logo{color:var(--ink)}
+.ah-auth-top-r{display:inline-flex;align-items:center;gap:14px}

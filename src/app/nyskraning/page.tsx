@@ -1,33 +1,12 @@
 import type { Metadata } from "next";
 import "../login/login.css";
-import SignupForm from "./signup-form";
-import Sky from "../login/sky";
+import "@/components/site/home.css";
+import "@/components/site/auth.css";
+import { SignupPage } from "@/components/site/auth-pages";
 
-export const metadata: Metadata = { title: "VAKTO — Stofna aðgang" };
+// Nýskráning („Prófa frítt“) í útliti forsíðunnar (IS/EN, okt. 2026).
+export const metadata: Metadata = { title: "VAKTO: Prófa frítt" };
 
-export default async function SignupPage() {
-  return (
-    <div className="wrap">
-      <div className="left">
-        <SignupForm />
-      </div>
-      <div className="right">
-        <Sky />
-        <div className="tag">14 daga frí prufa</div>
-        <div className="mid">
-          <h2>Stofnaðu aðgang <span className="arr">→</span> fyrsta planið í dag.</h2>
-          <p className="desc">
-            Þú stofnar fyrirtækið, lest starfsfólkið inn úr Excel og birtir fyrsta
-            planið á korteri. Prufan er með öllu innifalið — ekkert læst.
-          </p>
-          <div className="bullets">
-            <div className="bullet"><span className="ck"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" /></svg></span> 14 dagar frítt — kortið skráð núna, ekkert dregið fyrr en prufan er búin</div>
-            <div className="bullet"><span className="ck"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" /></svg></span> Svo 9.990 kr/mán fyrir 5 virka starfsmenn, +1.490 kr á hvern virkan umfram (án VSK) — engin binding</div>
-            <div className="bullet"><span className="ck"><svg viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" /></svg></span> Við hjálpum við uppsetninguna — hallo@vakto.is eða spjallið á forsíðunni</div>
-          </div>
-        </div>
-        <div className="quote">Starfsfólkið fær boð í pósti og skráir sig inn með sama netfangi — sér vaktirnar sínar, stimplar inn og út og fær skírteinið í símann.</div>
-      </div>
-    </div>
-  );
+export default function Page() {
+  return <SignupPage />;
 }

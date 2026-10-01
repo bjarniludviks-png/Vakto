@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import "../../ny/ny.css";
+import "../ny.css";
 import "../og.css";
-import { Starfield } from "../../ny/ny-client";
+import { Starfield } from "../starfield";
 
 // Facebook-prófílmynd (1080×1080): VAKTO-súlurnar á dökka bakgrunninum með ljóma.
 export const metadata: Metadata = { title: "VAKTO — profile image", robots: { index: false, follow: false } };

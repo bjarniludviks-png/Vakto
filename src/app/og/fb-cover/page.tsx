@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import "../../ny/ny.css";
+import "../ny.css";
 import "../og.css";
-import { Starfield } from "../../ny/ny-client";
+import { Starfield } from "../starfield";
 
 // Facebook-forsíðumynd (1640×624) í sama stíl og hetjan á forsíðunni.
 // Ekki í nav/sitemap; renderað í public/social með scripts/render-social.mjs.

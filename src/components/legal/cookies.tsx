@@ -1,4 +1,4 @@
-// Efni síðunnar /vafrakokur — notað bæði af núverandi síðu og nýju forsíðunni (/ny-heimasida/vafrakokur).
+// Efni síðunnar /vafrakokur — birt í AhLegal (src/components/site/ah-legal.tsx) — (/vafrakokur).
 export const COOKIES_META = { title: "Vafrakökur", updated: "21. september 2026" };
 
 export function CookiesBody() {

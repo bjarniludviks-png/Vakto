@@ -15,6 +15,16 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   devIndicators: false,
   poweredByHeader: false,
+  // Gamla forsíðan (/ny) er farin og tilraunaslóðir nýju síðunnar (/ny-heimasida/*) vísa á endanlegu slóðirnar.
+  async redirects() {
+    return [
+      { source: "/ny-heimasida", destination: "/", permanent: true },
+      { source: "/ny-heimasida/innskraning", destination: "/login", permanent: true },
+      { source: "/ny-heimasida/prufa", destination: "/nyskraning", permanent: true },
+      { source: "/ny-heimasida/:path(um-okkur|skilmalar|personuvernd|vafrakokur)", destination: "/:path", permanent: true },
+      { source: "/ny", destination: "/", permanent: true },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

@@ -1,6 +1,6 @@
-/* Um okkur (/ny-heimasida/um-okkur) */
+/* Um okkur (/um-okkur) */
 .ah-about{background:#fbfbfd}
-.ab-hero{position:relative;margin-top:62px;background:#cfcac4;overflow:hidden}
+.ab-hero{position:relative;padding-top:calc(env(safe-area-inset-top,0px) + 58px);background:#cfcac4;overflow:hidden}
 .ab-hero img{width:100%;height:auto;max-height:calc(100dvh - 62px);object-fit:cover;object-position:30% 6%}
 .ab-hero-tx{position:absolute;top:50%;right:max(20px, calc((100vw - 1100px)/2));transform:translateY(-50%);width:min(500px,42vw)}
 .ab-hero-tx h1{font-size:clamp(36px,4.6vw,64px);color:#1d1d1f}
@@ -23,7 +23,6 @@
 @media (max-width:760px){
   .ab-hero img{max-height:none;object-position:center top}
   .ab-hero-tx{position:static;transform:none;width:auto;padding:36px 20px 0;background:#fbfbfd}
-  .ab-hero{background:#fbfbfd}
   .ab-story{padding-top:48px}
   .ab-pains{grid-template-columns:1fr}
   .ab-quote{padding:80px 20px}

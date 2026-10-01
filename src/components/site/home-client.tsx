@@ -1,14 +1,19 @@
 "use client";
 
-// Apple-leg forsíða VAKTO (tilraun). Allt efni er alvöru: skjámyndir úr kerfinu (demo-fyrirtækið,
+// Forsíða vakto.is (IS/EN, texti í home-text.ts). Allt efni er alvöru: skjámyndir úr kerfinu (demo-fyrirtækið,
 // ljóst og dökkt þema, scripts/shots-forsida.mjs), alvöru ráðningarsamningur úr contract-pdf og
 // starfsmannaskírteinið eins og það lítur út í Wallet. Hreyfing: einn rAF-skrunhlustari sem setur
 // transform/opacity beint á einingar (engin layout-eiginleikar), IntersectionObserver fyrir birtingu,
 // og allt slökkt með prefers-reduced-motion.
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import HomeChat from "../ny/home-chat";
+import HomeChat from "./home-chat";
+import SiteNav from "./site-nav";
+import { useSiteLang } from "./lang";
+import { HOME_TEXT } from "./home-text";
 import AhFooter from "./ah-footer";
+
+const useT = () => HOME_TEXT[useSiteLang()];
 
 const SHOT = "/showcase/forsida";
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -135,6 +140,7 @@ export function Phone({ src, alt, className = "", dark = false, live = false }: 
 /** Vaktaplanið í Mac-glugga: músin tekur kvöldvakt Dalyu á fimmtudegi og dregur hana á Jón.
  *  Vaktin sem dregin er og tóma reiturinn eru klipptir úr sömu skjámynd (ekkert teiknað upp á nýtt). */
 function PlanDrag() {
+  const t = useT();
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = box.current; if (!el) return;
@@ -152,7 +158,7 @@ function PlanDrag() {
       <div className="ah-mac-view">
         <div className="ah-stage">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt="Vaktaplan vikunnar: vakt dregin á milli starfsmanna" width={2880} height={1800} loading="lazy" decoding="async" draggable={false} />
+          <img src={src} alt={t.dragAlt} width={2880} height={1800} loading="lazy" decoding="async" draggable={false} />
           <div className="ah-dg-hole" style={{ backgroundImage: `url(${src})` }} aria-hidden="true" />
           <div className="ah-dg" aria-hidden="true">
             <div className="ah-dg-chip" style={{ backgroundImage: `url(${src})` }} />
@@ -167,6 +173,7 @@ function PlanDrag() {
 /* ---------- 1. Hetja + aðdráttur inn í mælaborðið ---------- */
 
 function HeroZoom() {
+  const t = useT();
   const frame = useRef<HTMLDivElement>(null);
   const img = useRef<HTMLImageElement>(null);
   const cap1 = useRef<HTMLDivElement>(null), cap2 = useRef<HTMLDivElement>(null), ring = useRef<HTMLDivElement>(null), head = useRef<HTMLDivElement>(null);
@@ -195,19 +202,19 @@ function HeroZoom() {
     <section className="ah-hero" ref={ref}>
       <div className="ah-sticky">
         <div className="ah-hero-head" ref={head}>
-          <h1>Vaktin, launin og yfirsýnin.<br /><span>Á einum stað.</span></h1>
-          <p className="ah-lede">Vaktaplan, stimpilklukka, launakeyrsla og ráðningarsamningar. Og launakostnaður sem hlutfall af veltu, í rauntíma.</p>
+          <h1>{t.h1a}<br /><span>{t.h1b}</span></h1>
+          <p className="ah-lede">{t.lede}</p>
           <div className="ah-ctas">
-            <a className="ah-btn" href="/ny-heimasida/prufa">Prófa frítt</a>
-            <a className="ah-link" href="#kerfid">Sjá kerfið</a>
+            <a className="ah-btn" href="/nyskraning">{t.try}</a>
+            <a className="ah-link" href="#kerfid">{t.see}</a>
           </div>
         </div>
         <div className="ah-hero-frame" ref={frame}>
-          <MacFrame src={`${SHOT}/light/maelabord.jpg`} alt="Mælaborð VAKTO: laun sem hlutfall af veltu, unnir tímar og frávik" url="vakto.is/maelabord" imgRef={img} priority>
+          <MacFrame src={`${SHOT}/light/maelabord.jpg`} alt={t.heroAlt} url="vakto.is/maelabord" imgRef={img} priority>
             <div className="ah-ring-hl" ref={ring} aria-hidden="true" />
           </MacFrame>
-          <div className="ah-zcap" ref={cap1}><b>Laun sem % af veltu.</b> Ein tala sem segir hvort vaktin borgar sig.</div>
-          <div className="ah-zcap" ref={cap2}><b>Grænt, gult eða rautt.</b> Reiknað úr stimplunum jafnóðum, ekki í lok mánaðar.</div>
+          <div className="ah-zcap" ref={cap1}><b>{t.cap1b}</b>{t.cap1}</div>
+          <div className="ah-zcap" ref={cap2}><b>{t.cap2b}</b>{t.cap2}</div>
         </div>
       </div>
     </section>
@@ -226,35 +233,36 @@ function Crop({ src, pos, ratio = "16 / 10", zoom = 1.6, alt }: { src: string; p
 }
 
 function Features() {
+  const t = useT();
   return (
     <section className="ah-sec" id="kerfid">
       <div className="ah-head">
-        <h2>Allt sem vaktin þarf.</h2>
+        <h2>{t.featH}</h2>
       </div>
       <div className="ah-bento">
         <div className="ah-tile ah-wide">
-          <div className="ah-tile-tx"><h3>Vaktaplan á korteri.</h3><p>Dragðu vaktir til, afritaðu síðustu viku eða biddu gervigreindina um plan sem passar veltuspánni. Launakostnaðurinn reiknast á meðan.</p></div>
+          <div className="ah-tile-tx"><h3>{t.t1h}</h3><p>{t.t1p}</p></div>
           <PlanDrag />
         </div>
         <div className="ah-tile ah-tall ah-tile-warm">
-          <div className="ah-tile-tx"><h3>Stimplað í símanum.</h3><p>Eða á spjaldtölvu við innganginn. Staðsetning staðfest ef þú vilt.</p></div>
-          <div className="ah-tall-ph"><Phone live src={`${SHOT}/light/app-heim.png`} alt="VAKTO-appið: á vakt síðan 05:38, stimpla út" /></div>
+          <div className="ah-tile-tx"><h3>{t.t2h}</h3><p>{t.t2p}</p></div>
+          <div className="ah-tall-ph"><Phone live src={`${SHOT}/light/app-heim.png`} alt={t.t2alt} /></div>
         </div>
         <div className="ah-tile">
-          <div className="ah-tile-tx"><h3>Frávik með krónutölu.</h3><p>Hver mætti seint, hver fór fyrr og hvað það kostaði.</p></div>
-          <Crop src={`${SHOT}/light/timaskraning.jpg`} alt="Tímaskráning með frávikum" pos="62% 12%" zoom={1.4} ratio="16 / 9" />
+          <div className="ah-tile-tx"><h3>{t.t3h}</h3><p>{t.t3p}</p></div>
+          <Crop src={`${SHOT}/light/timaskraning.jpg`} alt={t.t3alt} pos="62% 12%" zoom={1.4} ratio="16 / 9" />
         </div>
         <div className="ah-tile">
-          <div className="ah-tile-tx"><h3>Laun eftir kjarasamningi.</h3><p>Álag, yfirvinna og uppbót reiknuð. Beint í Payday eða DK.</p></div>
-          <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt="Launakeyrsla mánaðarins" pos="62% 12%" zoom={1.4} ratio="16 / 9" />
+          <div className="ah-tile-tx"><h3>{t.t4h}</h3><p>{t.t4p}</p></div>
+          <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt={t.t4alt} pos="62% 12%" zoom={1.4} ratio="16 / 9" />
         </div>
         <div className="ah-tile ah-wide">
-          <div className="ah-tile-tx"><h3>Spjaldtölva við innganginn.</h3><p>Starfsfólk ýtir á nafnið sitt eða skannar skírteinið í símanum. Enginn PIN-kóði að gleyma og enginn stimplar fyrir annan.</p></div>
-          <Crop src={`${SHOT}/light/kiosk.jpg`} alt="Stimpilklukkan á spjaldtölvu: allt starfsfólk og hver er á vakt" pos="50% 40%" zoom={1.12} ratio="16 / 8" />
+          <div className="ah-tile-tx"><h3>{t.t5h}</h3><p>{t.t5p}</p></div>
+          <Crop src={`${SHOT}/light/kiosk.jpg`} alt={t.t5alt} pos="50% 40%" zoom={1.12} ratio="16 / 8" />
         </div>
         <div className="ah-tile">
-          <div className="ah-tile-tx"><h3>Spjall fyrir hópinn.</h3><p>Rásir per deild og stað. Enginn Messenger-hópur með fyrrverandi starfsfólki.</p></div>
-          <div className="ah-peek"><Phone src={`${SHOT}/light/app-spjall.png`} alt="Spjallrásir í VAKTO-appinu" /></div>
+          <div className="ah-tile-tx"><h3>{t.t6h}</h3><p>{t.t6p}</p></div>
+          <div className="ah-peek"><Phone src={`${SHOT}/light/app-spjall.png`} alt={t.t6alt} /></div>
         </div>
       </div>
     </section>
@@ -264,6 +272,7 @@ function Features() {
 /* ---------- 3. Dökkt (samanburður ljóst / dökkt) ---------- */
 
 function DarkCompare() {
+  const t = useT();
   const box = useRef<HTMLDivElement>(null), layer = useRef<HTMLDivElement>(null), handle = useRef<HTMLDivElement>(null);
   const pos = useRef(50);
   const touched = useRef(false);
@@ -282,34 +291,34 @@ function DarkCompare() {
   return (
     <section className="ah-dark" ref={ref}>
       <div className="ah-head">
-        <h2>Fallegt í birtu. Líka á næturvaktinni.</h2>
-        <p className="ah-lede">Kerfið fylgir stillingu tækisins. Dragðu til að bera saman.</p>
+        <h2>{t.darkH}</h2>
+        <p className="ah-lede">{t.darkP}</p>
       </div>
       <div>
         <div
           className="ah-compare" ref={box}
           onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); move(e.clientX); }}
           onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) move(e.clientX); }}
-          role="slider" aria-label="Bera saman ljóst og dökkt" aria-valuemin={0} aria-valuemax={100} aria-valuenow={50} tabIndex={0}
+          role="slider" aria-label={t.cmpAria} aria-valuemin={0} aria-valuemax={100} aria-valuenow={50} tabIndex={0}
           onKeyDown={(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { touched.current = true; paint(pos.current + (e.key === "ArrowLeft" ? -5 : 5)); } }}
         >
-          <MacFrame src={`${SHOT}/light/vaktaplan.jpg`} alt="Vaktaplan í ljósu þema" url="vakto.is/vaktaplan" />
+          <MacFrame src={`${SHOT}/light/vaktaplan.jpg`} alt={t.cmpLight} url="vakto.is/vaktaplan" />
           <div className="ah-compare-dark" ref={layer} style={{ clipPath: "inset(0 0 0 50%)" }}>
-            <MacFrame src={`${SHOT}/dark/vaktaplan.jpg`} alt="Vaktaplan í dökku þema" url="vakto.is/vaktaplan" />
+            <MacFrame src={`${SHOT}/dark/vaktaplan.jpg`} alt={t.cmpDark} url="vakto.is/vaktaplan" />
           </div>
           <div className="ah-handle" ref={handle} style={{ left: "50%" }} aria-hidden="true"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 7-5 5 5 5" /><path d="m15 7 5 5-5 5" /></svg></span></div>
         </div>
       </div>
       <div className="ah-dark-row">
-        <div><Phone dark live src={`${SHOT}/dark/app-heim.png`} alt="Appið í dökku þema: á vakt" /></div>
+        <div><Phone dark live src={`${SHOT}/dark/app-heim.png`} alt={t.appAlt} /></div>
         <div className="ah-dark-copy">
-          <h3>Starfsfólkið fær appið.</h3>
-          <p>Vaktirnar, stimplun, áætluð laun, orlofsstaða, frí og vaktaskipti. Og spjall og fréttaveita fyrir allan hópinn.</p>
+          <h3>{t.appH}</h3>
+          <p>{t.appP}</p>
           <ul className="ah-ticks">
-            <li>iPhone og Android</li><li>Íslenska, enska og víetnamska</li><li>Tilkynning þegar planið breytist</li>
+            {t.appTicks.map((x) => <li key={x}>{x}</li>)}
           </ul>
         </div>
-        <div><Phone dark src={`${SHOT}/dark/app-frettir.png`} alt="Fréttaveita í appinu" className="ah-phone-lo" /></div>
+        <div><Phone dark src={`${SHOT}/dark/app-frettir.png`} alt={t.feedAlt} className="ah-phone-lo" /></div>
       </div>
     </section>
   );
@@ -317,33 +326,23 @@ function DarkCompare() {
 
 /* ---------- 3b. Kynntu þér VAKTO (glærur sem fletta sjálfkrafa) ---------- */
 
-const SLIDES: { t: string; d: string; v: ReactNode }[] = [
-  {
-    t: "VAKTO AI.",
-    d: "Skrifaðu hvað vikan þarf á venjulegri íslensku. VAKTO AI semur drög að vaktaplani sem þú ferð yfir og samþykkir, og les kjarasamninginn fyrir þig með tilvísun í hverja grein.",
+type Slide = { t: string; d: string; v: ReactNode };
+function slidesFor(t: ReturnType<typeof useT>): Slide[] {
+  const [a, b, c, d] = t.slides;
+  return [
     // eslint-disable-next-line @next/next/no-img-element
-    v: <div className="ah-sl-shot"><img src={`${SHOT}/light/ai.jpg`} alt="Tillaga VAKTO AI: Moon færður á kvöldvakt á laugardag, launakostnaður óbreyttur 27,4%" width={1209} height={1656} loading="lazy" decoding="async" draggable={false} /></div>,
-  },
-  {
-    t: "Vaktirnar í vasanum.",
-    d: "Starfsfólk sér planið sitt, sækir um lausar vaktir og býður vaktir í skiptum. Spjallið er á sama stað.",
-    v: <div className="ah-sl-phones"><Phone src={`${SHOT}/light/app-vaktir.png`} alt="Vaktir vikunnar í appinu" /><Phone src={`${SHOT}/light/app-spjall.png`} alt="Spjallrásir í appinu" className="ah-sl-lo" /></div>,
-  },
-  {
-    t: "Fréttaveita fyrir vinnustaðinn.",
-    d: "Nýr matseðill, breyttur opnunartími, mynd úr eldhúsinu. Festu það mikilvæga efst svo það týnist ekki.",
-    v: <div className="ah-sl-phones"><Phone src={`${SHOT}/light/app-frettir.png`} alt="Fréttaveitan í appinu" /></div>,
-  },
-  {
-    t: "Launaseðill sem stenst.",
-    d: "Dagvinna, álag og yfirvinna sundurliðuð. Líka þegar mánuðurinn var 0 tímar og starfsmaðurinn þarf staðfestingu.",
+    { ...a, v: <div className="ah-sl-shot"><img src={`${SHOT}/light/ai.jpg`} alt={a.alt} width={1209} height={1656} loading="lazy" decoding="async" draggable={false} /></div> },
+    { ...b, v: <div className="ah-sl-phones"><Phone src={`${SHOT}/light/app-vaktir.png`} alt={b.alt} /><Phone src={`${SHOT}/light/app-spjall.png`} alt={b.alt2 ?? ""} className="ah-sl-lo" /></div> },
+    { ...c, v: <div className="ah-sl-phones"><Phone src={`${SHOT}/light/app-frettir.png`} alt={c.alt} /></div> },
     // eslint-disable-next-line @next/next/no-img-element
-    v: <div className="ah-sl-paper"><img src={`${SHOT}/skjol/launasedill.jpg`} alt="Launaseðill úr VAKTO" width={1800} height={2545} loading="lazy" decoding="async" draggable={false} /></div>,
-  },
-];
+    { ...d, v: <div className="ah-sl-paper"><img src={`${SHOT}/skjol/launasedill.jpg`} alt={d.alt} width={1800} height={2545} loading="lazy" decoding="async" draggable={false} /></div> },
+  ];
+}
 const SLIDE_MS = 6500;
 
 function Showcase() {
+  const t = useT();
+  const SLIDES = slidesFor(t);
   const track = useRef<HTMLDivElement>(null);
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -358,7 +357,7 @@ function Showcase() {
       raf = 0;
       const first = el.children[0] as HTMLElement | undefined, second = el.children[1] as HTMLElement | undefined;
       const step = first && second ? second.offsetLeft - first.offsetLeft : el.clientWidth;
-      setIdx(clamp(Math.round(el.scrollLeft / step), 0, SLIDES.length - 1));
+      setIdx(clamp(Math.round(el.scrollLeft / step), 0, t.slides.length - 1));
     }); };
     el.addEventListener("scroll", on, { passive: true });
     return () => { io.disconnect(); el.removeEventListener("scroll", on); cancelAnimationFrame(raf); };
@@ -372,11 +371,11 @@ function Showcase() {
   };
   const run = playing && seen;
   return (
-    <section className="ah-sec ah-show" id="kynning" aria-roledescription="glærusýning" aria-label="Kynntu þér VAKTO">
-      <div className="ah-head ah-head-l"><h2>Kynntu þér VAKTO.</h2></div>
+    <section className="ah-sec ah-show" id="kynning" aria-roledescription={t.showRole} aria-label={t.showH}>
+      <div className="ah-head ah-head-l"><h2>{t.showH}</h2></div>
       <div className="ah-track" ref={track} onPointerDown={() => setPlaying(false)}>
         {SLIDES.map((s, i) => (
-          <article className={`ah-slide${i === idx ? " on" : ""}`} key={s.t} aria-roledescription="glæra" aria-label={`${i + 1} af ${SLIDES.length}`}>
+          <article className={`ah-slide${i === idx ? " on" : ""}`} key={s.t} aria-roledescription={t.slideRole} aria-label={`${i + 1} ${t.of} ${SLIDES.length}`}>
             <div className="ah-slide-tx"><h3>{s.t}</h3><p>{s.d}</p></div>
             <div className="ah-slide-v">{s.v}</div>
           </article>
@@ -385,12 +384,12 @@ function Showcase() {
       <div className="ah-ctrl">
         <div className="ah-dotbar">
           {SLIDES.map((s, i) => (
-            <button key={s.t} className={`ah-dot${i === idx ? " on" : ""}`} onClick={() => { setPlaying(false); go(i); }} aria-label={`Glæra ${i + 1}: ${s.t}`} aria-current={i === idx}>
+            <button key={s.t} className={`ah-dot${i === idx ? " on" : ""}`} onClick={() => { setPlaying(false); go(i); }} aria-label={`${t.slideN} ${i + 1}: ${s.t}`} aria-current={i === idx}>
               {i === idx && <i key={idx} style={{ animationDuration: `${SLIDE_MS}ms`, animationPlayState: run ? "running" : "paused" }} onAnimationEnd={() => go(idx + 1)} />}
             </button>
           ))}
         </div>
-        <button className="ah-play" onClick={() => setPlaying((p) => !p)} aria-label={playing ? "Gera hlé" : "Spila"}>
+        <button className="ah-play" onClick={() => setPlaying((p) => !p)} aria-label={playing ? t.pause : t.play}>
           {playing
             ? <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="3.6" height="14" rx="1" /><rect x="13.9" y="5" width="3.6" height="14" rx="1" /></svg>
             : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>}
@@ -403,6 +402,7 @@ function Showcase() {
 /* ---------- 4. Ráðningarsamningur (alvöru skjal) ---------- */
 
 function Contract() {
+  const t = useT();
   const back = useRef<HTMLDivElement>(null), front = useRef<HTMLDivElement>(null), stamp = useRef<HTMLDivElement>(null);
   const ref = useScrub((p) => {
     const t = ease(seg(p, 0.1, 0.55));
@@ -414,13 +414,10 @@ function Contract() {
     <section className="ah-sec ah-contract" id="samningar" ref={ref}>
       <div className="ah-split">
         <div className="ah-split-tx">
-          <h2>Samningur á mínútu, undirritaður á annarri.</h2>
-          <p className="ah-lede">VAKTO fyllir út ráðningarsamning úr gögnum starfsmannsins, eftir formi Vinnumálastofnunar. Báðir skrifa undir í símanum og fá undirritað eintak í pósti.</p>
+          <h2>{t.conH}</h2>
+          <p className="ah-lede">{t.conP}</p>
           <ul className="ah-ticks">
-            <li>Fylgir formi Vinnumálastofnunar, á íslensku og ensku</li>
-            <li>Undirritun með kóða í pósti eða rafrænum skilríkjum</li>
-            <li>Fingrafar skjals og undirritunarskrá fylgja</li>
-            <li>Launaseðlar og tímaskrár í sama stíl</li>
+            {t.conTicks.map((x) => <li key={x}>{x}</li>)}
           </ul>
         </div>
         <div className="ah-papers">
@@ -430,8 +427,8 @@ function Contract() {
           </div>
           <div className="ah-paper" ref={front}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`${SHOT}/skjol/samningur-1.jpg`} alt="Fyrsta síða ráðningarsamnings: Kaffi Krónan ræður Ha Vu til starfa" width={1800} height={2545} loading="lazy" decoding="async" />
-            <div className="ah-stamp" ref={stamp}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" /></svg>Undirritað rafrænt</div>
+            <img src={`${SHOT}/skjol/samningur-1.jpg`} alt={t.conAlt} width={1800} height={2545} loading="lazy" decoding="async" />
+            <div className="ah-stamp" ref={stamp}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" /></svg>{t.stamp}</div>
           </div>
         </div>
       </div>
@@ -442,6 +439,7 @@ function Contract() {
 /* ---------- 5. Starfsmannaskírteini í Wallet ---------- */
 
 function WalletCard() {
+  const t = useT();
   const [qr, setQr] = useState("");
   useEffect(() => {
     import("qrcode").then((Q) => Q.toString("VAKTO-4132-KK", { type: "svg", margin: 0, color: { dark: "#16161a", light: "#ffffff" } })).then(setQr).catch(() => {});
@@ -451,20 +449,21 @@ function WalletCard() {
       <div className="ah-pass-top"><Logo /><span className="ah-pass-co">KAFFI KRÓNAN EHF.<small>kt. 550101-2210</small></span></div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className="ah-pass-av" src={`${SHOT}/skjol/passmynd.jpg`} alt="" width={360} height={360} loading="lazy" decoding="async" />
-      <div className="ah-pass-lbl">STARFSMAÐUR</div>
+      <div className="ah-pass-lbl">{t.passLbl}</div>
       <div className="ah-pass-name">Dalya R.</div>
       <div className="ah-pass-grid">
-        <div><span>STAÐA</span><b>Þjónn</b></div>
-        <div><span>KENNITALA</span><b>040399-3309</b></div>
-        <div><span>NR.</span><b>#4132</b></div>
+        <div><span>{t.passRole}</span><b>{t.passRoleV}</b></div>
+        <div><span>{t.passKt}</span><b>040399-3309</b></div>
+        <div><span>{t.passNo}</span><b>#4132</b></div>
       </div>
       <div className="ah-pass-qr" dangerouslySetInnerHTML={{ __html: qr }} />
-      <div className="ah-pass-foot">VAKTO-4132-KK · skannaðu á stimpilklukku</div>
+      <div className="ah-pass-foot">{t.passFoot}</div>
     </div>
   );
 }
 
 function Wallet() {
+  const t = useT();
   const card = useRef<HTMLDivElement>(null);
   const ref = useScrub((p) => {
     const t = ease(seg(p, 0.1, 0.48));
@@ -475,8 +474,8 @@ function Wallet() {
       <div className="ah-split ah-split-rev">
         <div className="ah-pass-wrap"><div ref={card}><WalletCard /></div></div>
         <div className="ah-split-tx">
-          <h2>Starfsmannaskírteinið er í símanum.</h2>
-          <p className="ah-lede">Í Apple og Google Wallet, með mynd, stöðu og QR-kóða. Kóðinn stimplar inn á spjaldtölvunni við innganginn, svo enginn þarf að muna PIN-kóða.</p>
+          <h2>{t.walH}</h2>
+          <p className="ah-lede">{t.walP}</p>
           <div className="ah-badges" aria-hidden="true">
             <span className="ah-badge"><svg viewBox="0 0 24 24"><path d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.8-1.5 0-2.9.9-3.7 2.3-1.6 2.8-.4 6.9 1.1 9.1.8 1.1 1.7 2.3 2.8 2.3 1.1 0 1.6-.7 3-.7s1.8.7 3 .7 2-1.1 2.7-2.2c.9-1.3 1.2-2.5 1.2-2.6 0 0-2.3-.9-2.2-3.7zM14.2 5.8c.6-.8 1-1.8.9-2.8-.9 0-2 .6-2.6 1.4-.6.7-1.1 1.7-.9 2.7 1 .1 2-.5 2.6-1.3z" /></svg>Apple Wallet</span>
             <span className="ah-badge ah-badge-g">Google Wallet</span>
@@ -490,22 +489,25 @@ function Wallet() {
 /* ---------- 6. Verð ---------- */
 
 function Pricing() {
+  const t = useT();
   return (
     <section className="ah-sec ah-price" id="verd">
       <div className="ah-head">
-        <h2>Eitt verð. Allt innifalið.</h2>
+        <h2>{t.priceH}</h2>
       </div>
       <div className="ah-price-card">
-        <div className="ah-amt">9.990 kr<small>/mán</small></div>
-        <p>5 virkir starfsmenn innifaldir.<br />1.490 kr á hvern virkan starfsmann umfram.</p>
-        <p className="ah-fine">Án VSK. Þú borgar aðeins fyrir þá sem unnu í mánuðinum. 15% afsláttur ef greitt er árlega. 14 daga frí prufa, engin binding.</p>
-        <a className="ah-btn ah-btn-lg" href="/ny-heimasida/prufa">Prófa frítt</a>
+        <div className="ah-amt">{t.amt}<small>{t.per}</small></div>
+        <p>{t.price1}<br />{t.price2}</p>
+        <p className="ah-fine">{t.fine}</p>
+        <a className="ah-btn ah-btn-lg" href="/nyskraning">{t.try}</a>
       </div>
     </section>
   );
 }
 
 export default function AppleHome() {
+  const lang = useSiteLang();
+  const t = HOME_TEXT[lang];
   const [scrolled, setScrolled] = useState(false);
   const [overDark, setOverDark] = useState(false);
   useEffect(() => {
@@ -524,19 +526,10 @@ export default function AppleHome() {
   }, []);
   return (
     <div className="ah">
-      <a className="ah-skip" href="#efni">Fara beint í efni</a>
+      <a className="ah-skip" href="#efni">{t.skip}</a>
       <div ref={top} className="ah-top-sentinel" aria-hidden="true" />
       <Glow />
-      <nav className={`ah-nav${scrolled ? " sc" : ""}${overDark ? " dk" : ""}`}>
-        <a href="/ny-heimasida" aria-label="VAKTO"><Logo /></a>
-        <div className="ah-nav-links">
-          <a href="#kerfid">Kerfið</a><a href="#samningar">Samningar</a><a href="#verd">Verð</a><a href="/ny-heimasida/um-okkur">Um okkur</a>
-        </div>
-        <div className="ah-nav-cta">
-          <a href="/ny-heimasida/innskraning" className="ah-nav-in">Innskráning</a>
-          <a href="/ny-heimasida/prufa" className="ah-btn ah-btn-sm">Prófa frítt</a>
-        </div>
-      </nav>
+      <SiteNav home scrolled={scrolled} dark={overDark} />
       <main id="efni">
         <HeroZoom />
         <Features />
@@ -547,7 +540,7 @@ export default function AppleHome() {
         <Pricing />
       </main>
       <AhFooter />
-      <HomeChat lang="is" skin="ah" />
+      <HomeChat key={lang} lang={lang} skin="ah" />
     </div>
   );
 }

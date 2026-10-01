@@ -1,4 +1,4 @@
-// Efni síðunnar /skilmalar — notað bæði af núverandi síðu og nýju forsíðunni (/ny-heimasida/skilmalar).
+// Efni síðunnar /skilmalar — birt í AhLegal (src/components/site/ah-legal.tsx) — (/skilmalar).
 export const TERMS_META = { title: "Þjónustuskilmálar", updated: "30. september 2026" };
 
 export function TermsBody() {

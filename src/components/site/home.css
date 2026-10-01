@@ -1,4 +1,4 @@
-/* Apple-leg forsíða (tilraun, /ny-heimasida). Allt afmarkað við .ah. */
+/* Forsíða vakto.is og síðurnar í sama útliti (/, /um-okkur, /login, /nyskraning, lögfræði). Allt afmarkað við .ah. */
 .ah{
   --bg:#fbfbfd; --bg2:#f5f5f7; --ink:#1d1d1f; --ink2:#6e6e73; --ink3:#86868b; --line:rgba(0,0,0,.08);
   --brand:#e9700f; --brand2:#f59331; --brandSoft:rgba(233,112,15,.10);
@@ -418,3 +418,10 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 .ah-foot-mail:hover{color:#b85309!important}
 @media (pointer:coarse){.ah-foot nav{gap:4px}.ah-foot nav a{min-height:40px}}
 .ah-nav-links a[aria-current="page"]{color:var(--ink);font-weight:600}
+
+/* Tungumálahnappur í valmynd */
+.ah-lang{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:13px;font-weight:600;color:var(--ink2);background:none;border:0;padding:6px 4px;cursor:pointer;border-radius:8px}
+.ah-lang svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6}
+.ah-lang:hover{color:var(--ink)}
+.ah-nav.dk .ah-lang{color:#a1a1a6}.ah-nav.dk .ah-lang:hover{color:#fff}
+@media (max-width:420px){.ah-nav-cta{gap:10px}.ah-nav-in{font-size:13px}}

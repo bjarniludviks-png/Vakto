@@ -1,55 +1,12 @@
 import type { Metadata } from "next";
 import "./login.css";
-import LoginForm from "./login-form";
-import Sky from "./sky";
-import { LOGIN_I18N, pickLang } from "./login-i18n";
+import "@/components/site/home.css";
+import "@/components/site/auth.css";
+import { LoginPage } from "@/components/site/auth-pages";
 
-export const metadata: Metadata = {
-  title: "VAKTO — Skrá inn",
-};
+// Innskráning í útliti forsíðunnar (IS/EN, okt. 2026). ?lang=en virkar áfram.
+export const metadata: Metadata = { title: "VAKTO: Skrá inn" };
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ lang?: string | string[] }>;
-}) {
-  const sp = await searchParams;
-  const lang = pickLang(sp.lang);
-  const s = LOGIN_I18N[lang];
-
-  return (
-    <div className="wrap">
-      <div className="left">
-        <LoginForm lang={lang} demo={!!(process.env.DEMO_LOGIN_EMAIL && process.env.DEMO_LOGIN_PASSWORD)} />
-      </div>
-
-      <div className="right">
-        <Sky />
-        <div className="tag">{s.tag}</div>
-        <div className="mid">
-          <h2>
-            {s.h2[0]}
-            <br />
-            {s.h2[1]}
-          </h2>
-          <p className="desc">{s.desc}</p>
-          {s.bullets.length > 0 && <div className="bullets">
-            {s.bullets.map((b, i) => (
-              <div className="bullet" key={i}>
-                <span className="ck">
-                  <svg viewBox="0 0 24 24" fill="none">
-                    <path d="M5 12.5l4 4 10-10" />
-                  </svg>
-                </span>{" "}
-                {b}
-              </div>
-            ))}
-          </div>}
-        </div>
-        <div className="quote">
-          {s.quote} {s.quoteBy}
-        </div>
-      </div>
-    </div>
-  );
+export default function Page() {
+  return <LoginPage demo={!!(process.env.DEMO_LOGIN_EMAIL && process.env.DEMO_LOGIN_PASSWORD)} />;
 }
