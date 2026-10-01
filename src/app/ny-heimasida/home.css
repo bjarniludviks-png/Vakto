@@ -1,0 +1,205 @@
+/* Apple-leg forsíða (tilraun, /ny-heimasida). Allt afmarkað við .ah. */
+.ah{
+  --bg:#fbfbfd; --bg2:#f5f5f7; --ink:#1d1d1f; --ink2:#6e6e73; --ink3:#86868b; --line:rgba(0,0,0,.08);
+  --brand:#e9700f; --brand2:#f59331; --brandSoft:rgba(233,112,15,.10);
+  --ease:cubic-bezier(.23,1,.32,1);
+  position:relative; background:var(--bg); color:var(--ink);
+  font-family:'General Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased; overflow-x:clip;
+}
+.ah *{box-sizing:border-box}
+.ah a{color:inherit;text-decoration:none}
+.ah img{display:block;max-width:100%}
+.ah main{position:relative;z-index:1}
+
+/* ---------- appelsínugulur bjarmi ---------- */
+.ah-glow{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.ah-blob{position:absolute;border-radius:50%;filter:blur(90px);will-change:transform,opacity}
+.ah-b1{width:62vw;height:62vw;right:-18vw;top:-22vw;background:radial-gradient(circle at 40% 40%,rgba(245,147,49,.55),rgba(233,112,15,.18) 55%,transparent 70%);opacity:.35}
+.ah-b2{width:55vw;height:55vw;left:-20vw;top:30vh;background:radial-gradient(circle,rgba(233,112,15,.42),rgba(245,147,49,.12) 60%,transparent 72%);opacity:0}
+.ah-b3{width:80vw;height:80vw;left:10vw;bottom:-45vw;background:radial-gradient(circle,rgba(245,147,49,.5),rgba(233,112,15,.15) 55%,transparent 70%);opacity:0}
+
+/* ---------- valmynd ---------- */
+.ah-nav{position:fixed;left:0;right:0;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:calc(env(safe-area-inset-top,0px) + 12px) max(20px, calc((100vw - 1100px)/2)) 12px;
+  transition:background .3s var(--ease),box-shadow .3s var(--ease),backdrop-filter .3s}
+.ah-nav.sc{background:rgba(251,251,253,.72);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);box-shadow:0 1px 0 var(--line)}
+.ah-logo{display:inline-flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.06em;font-size:15px}
+.ah-logo svg{width:20px;height:20px;fill:var(--brand)}
+.ah-nav-links{display:flex;gap:28px;font-size:13.5px;color:var(--ink2)}
+.ah-nav-links a:hover{color:var(--ink)}
+.ah-nav-cta{display:flex;align-items:center;gap:16px;font-size:13.5px}
+.ah-nav-in{color:var(--ink2)}
+@media (max-width:760px){.ah-nav-links,.ah-nav-in{display:none}}
+
+/* ---------- hnappar ---------- */
+.ah-btn{display:inline-flex;align-items:center;justify-content:center;background:var(--brand);color:#fff!important;font-weight:600;font-size:16px;
+  padding:13px 24px;border-radius:999px;box-shadow:0 8px 24px rgba(233,112,15,.28);transition:transform .16s var(--ease),box-shadow .2s var(--ease),background .2s}
+.ah-btn:hover{background:#d9640a;box-shadow:0 10px 30px rgba(233,112,15,.36)}
+.ah-btn:active{transform:scale(.97)}
+.ah-btn-sm{font-size:13px;padding:7px 15px;box-shadow:none}
+.ah-btn-lg{font-size:17px;padding:15px 30px}
+.ah-link{color:var(--brand)!important;font-weight:500;font-size:16px}
+.ah-link:hover{text-decoration:underline}
+
+/* ---------- letur ---------- */
+.ah-eyebrow{color:var(--brand);font-weight:600;font-size:15px;letter-spacing:.01em;margin:0 0 14px}
+.ah h1,.ah h2{font-weight:700;letter-spacing:-.035em;line-height:1.04;margin:0;text-wrap:balance}
+.ah h1{font-size:clamp(44px,7.2vw,92px)}
+.ah h2{font-size:clamp(36px,5.4vw,68px)}
+.ah h1 span,.ah h2 span{color:var(--ink3)}
+.ah h3{font-size:clamp(21px,2.1vw,26px);font-weight:650;letter-spacing:-.02em;margin:0 0 8px}
+.ah-lede{font-size:clamp(17px,1.6vw,21px);line-height:1.45;color:var(--ink2);max-width:640px;margin:22px auto 0;text-wrap:pretty}
+
+/* ---------- birting ---------- */
+.ah-rv{opacity:0;transform:translate3d(0,40px,0);transition:opacity .9s var(--ease),transform .9s var(--ease)}
+.ah-rv.on{opacity:1;transform:none}
+
+/* ---------- Mac-gluggi og sími ---------- */
+.ah-mac{border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 30px 80px -20px rgba(40,25,10,.28),0 10px 30px -10px rgba(40,25,10,.12)}
+.ah-mac-bar{display:flex;align-items:center;gap:14px;height:38px;padding:0 14px;background:#f3f3f5;border-bottom:1px solid var(--line)}
+.ah-dots{display:flex;gap:7px}
+.ah-dots i{width:11px;height:11px;border-radius:50%;background:#ff5f57}
+.ah-dots i:nth-child(2){background:#febc2e}.ah-dots i:nth-child(3){background:#28c840}
+.ah-url{flex:1;max-width:340px;margin:0 auto;transform:translateX(-30px);text-align:center;font-size:12px;color:var(--ink3);background:#fff;border-radius:7px;padding:4px 10px}
+.ah-mac-view{position:relative;overflow:hidden;aspect-ratio:16/10;background:#f3f3f5}
+.ah-mac-view img{width:100%;height:100%;object-fit:cover;object-position:top left;will-change:transform}
+
+.ah-phone{position:relative;width:min(280px,70vw);aspect-ratio:390/844;border-radius:46px;padding:11px;background:#111;margin:0 auto;
+  box-shadow:0 0 0 2px #2a2a2c inset,0 30px 70px -20px rgba(40,25,10,.4)}
+.ah-phone-in{width:100%;height:100%;border-radius:36px;overflow:hidden;background:#fff}
+.ah-phone-in img{width:100%;height:100%;object-fit:cover;object-position:top}
+.ah-island{position:absolute;top:21px;left:50%;transform:translateX(-50%);width:84px;height:24px;border-radius:14px;background:#000}
+
+/* ---------- 1. hetja / aðdráttur ---------- */
+.ah-hero{position:relative;height:360vh}
+.ah-sticky{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px}
+.ah-hero-head{position:absolute;top:calc(env(safe-area-inset-top,0px) + 14vh);left:0;right:0;text-align:center;padding:0 20px;will-change:transform,opacity}
+.ah-ctas{display:flex;gap:26px;justify-content:center;align-items:center;margin-top:32px;flex-wrap:wrap}
+.ah-hero-frame{position:relative;width:min(1080px,92vw);will-change:transform}
+.ah-hero .ah-mac-view img{transform-origin:23% 58%}
+.ah-ring-hl{position:absolute;left:23%;top:58%;width:18%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;
+  box-shadow:0 0 0 3px rgba(233,112,15,.9),0 0 0 14px rgba(233,112,15,.16),0 0 60px rgba(233,112,15,.45);opacity:0;pointer-events:none;
+  animation:ahPulse 2.4s var(--ease) infinite}
+@keyframes ahPulse{50%{box-shadow:0 0 0 3px rgba(233,112,15,.9),0 0 0 24px rgba(233,112,15,.06),0 0 80px rgba(233,112,15,.55)}}
+.ah-zcap{position:absolute;left:50%;bottom:-86px;transform:translateX(-50%);width:min(620px,90vw);text-align:center;font-size:clamp(17px,1.7vw,22px);line-height:1.4;color:var(--ink2);opacity:0}
+.ah-zcap b{color:var(--ink);font-weight:650}
+.ah-zcap{margin-left:calc(min(620px,90vw) / -2);left:50%;transform:none}
+
+/* ---------- kaflar ---------- */
+.ah-sec{position:relative;padding:150px max(20px, calc((100vw - 1100px)/2))}
+.ah-head{text-align:center;margin-bottom:70px}
+
+/* ---------- 2. bento ---------- */
+.ah-bento{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.ah-tile{position:relative;background:rgba(255,255,255,.78);backdrop-filter:blur(2px);border-radius:28px;padding:32px 32px 0;overflow:hidden;
+  box-shadow:0 0 0 1px var(--line),0 20px 50px -30px rgba(40,25,10,.25);display:flex;flex-direction:column;gap:22px}
+.ah-tile p{color:var(--ink2);font-size:16px;line-height:1.5;margin:0;max-width:520px}
+.ah-wide{grid-column:span 2}
+.ah-tall{grid-row:span 2;padding-bottom:32px;justify-content:space-between}
+.ah-tall .ah-phone{width:min(250px,64vw)}
+.ah-crop{position:relative;margin:0 -32px;overflow:hidden;border-top:1px solid var(--line);background:#f3f3f5;margin-top:auto}
+.ah-crop img{width:100%;height:100%;object-fit:cover;transition:transform 1.4s var(--ease)}
+.ah-tile:hover .ah-crop img{scale:1.03}
+@media (max-width:900px){.ah-bento{grid-template-columns:1fr}.ah-wide,.ah-tall{grid-column:auto;grid-row:auto}}
+
+/* ---------- 3. dökkt ---------- */
+.ah-dark{position:relative;background:#000;color:#f5f5f7;padding:150px max(20px, calc((100vw - 1100px)/2));overflow:hidden}
+.ah-dark::before{content:"";position:absolute;inset:auto -20% -40% -20%;height:80%;background:radial-gradient(closest-side,rgba(233,112,15,.32),transparent);pointer-events:none}
+.ah-dark h2 span,.ah-dark .ah-lede{color:#a1a1a6}
+.ah-compare{position:relative;max-width:1080px;margin:0 auto;touch-action:pan-y;cursor:ew-resize;user-select:none;outline:none}
+.ah-compare .ah-mac{box-shadow:0 0 0 1px rgba(255,255,255,.08),0 40px 100px -30px rgba(233,112,15,.35)}
+.ah-compare-dark{position:absolute;inset:0;pointer-events:none}
+.ah-compare-dark .ah-mac-bar{background:#1c1c1e;border-color:rgba(255,255,255,.08)}
+.ah-compare-dark .ah-url{background:#2c2c2e;color:#8e8e93}
+.ah-handle{position:absolute;top:0;bottom:0;width:2px;margin-left:-1px;background:rgba(255,255,255,.9);pointer-events:none}
+.ah-handle span{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:44px;height:44px;border-radius:50%;background:#fff;color:#111;
+  display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.4)}
+.ah-compare:focus-visible .ah-handle span{box-shadow:0 0 0 3px var(--brand),0 6px 20px rgba(0,0,0,.4)}
+.ah-dark-row{display:grid;grid-template-columns:1fr 1.1fr 1fr;align-items:center;gap:40px;margin-top:140px}
+.ah-dark-copy{text-align:left}
+.ah-dark-copy h3{font-size:clamp(28px,3vw,40px);letter-spacing:-.03em}
+.ah-dark-copy p{color:#a1a1a6;font-size:17px;line-height:1.5}
+.ah-phone-lo{margin-top:120px}
+.ah-dark .ah-phone{box-shadow:0 0 0 2px #333 inset,0 30px 80px -20px rgba(233,112,15,.35)}
+@media (max-width:900px){.ah-dark-row{grid-template-columns:1fr;gap:48px}.ah-phone-lo{margin-top:0}.ah-dark-copy{text-align:center}}
+
+.ah-ticks{list-style:none;padding:0;margin:26px 0 0;display:grid;gap:12px}
+.ah-ticks li{position:relative;padding-left:30px;font-size:16px;line-height:1.45}
+.ah-ticks li::before{content:"";position:absolute;left:0;top:2px;width:20px;height:20px;border-radius:50%;background:var(--brandSoft);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e9700f' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E");background-size:13px;background-repeat:no-repeat;background-position:center}
+.ah-dark .ah-ticks li{color:#e5e5ea}
+
+/* ---------- 4. samningur / 5. Wallet ---------- */
+.ah-split{display:grid;grid-template-columns:1fr 1fr;gap:70px;align-items:center}
+.ah-split-tx h2{font-size:clamp(34px,4.4vw,56px)}
+.ah-split-tx .ah-lede{margin:22px 0 0}
+.ah-papers{position:relative;height:640px}
+.ah-paper{position:absolute;left:50%;top:0;width:440px;max-width:86%;margin-left:-220px;border-radius:6px;overflow:hidden;background:#fff;
+  box-shadow:0 0 0 1px rgba(0,0,0,.05),0 30px 70px -20px rgba(40,25,10,.3);will-change:transform}
+.ah-paper-back{top:40px;margin-left:-180px;filter:brightness(.97)}
+.ah-stamp{position:absolute;right:22px;top:205px;display:flex;align-items:center;gap:7px;padding:9px 14px;border-radius:999px;background:#18a06a;color:#fff;
+  font-weight:600;font-size:14px;box-shadow:0 10px 30px rgba(24,160,106,.35);opacity:0}
+.ah-stamp svg{width:16px;height:16px;fill:none;stroke:#fff;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.ah-split-rev .ah-pass-wrap{order:-1}
+.ah-pass-wrap{display:flex;justify-content:center}
+.ah-pass-wrap > div{will-change:transform}
+.ah-pass{position:relative;width:320px;max-width:84vw;border-radius:22px;padding:22px 22px 18px;color:#fff;overflow:hidden;
+  background:linear-gradient(150deg,#f59331 0%,#e9700f 45%,#cf5f0c 100%);box-shadow:0 40px 90px -25px rgba(207,95,12,.6),0 0 0 1px rgba(255,255,255,.15) inset}
+.ah-pass::after{content:"";position:absolute;right:-60px;top:-60px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,.12)}
+.ah-pass-sheen{position:absolute;inset:-50%;background:linear-gradient(115deg,transparent 40%,rgba(255,255,255,.25) 50%,transparent 60%);animation:ahSheen 5s var(--ease) infinite;pointer-events:none}
+@keyframes ahSheen{0%{transform:translateX(-40%)}60%,100%{transform:translateX(40%)}}
+.ah-pass-top{position:relative;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:600;letter-spacing:.04em}
+.ah-pass .ah-logo{font-size:14px}.ah-pass .ah-logo svg{fill:#fff;width:18px;height:18px}
+.ah-pass-av{position:relative;width:74px;height:74px;border-radius:50%;background:rgba(255,255,255,.22);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:600;margin:22px 0 14px}
+.ah-pass-lbl{font-size:10.5px;letter-spacing:.12em;opacity:.8}
+.ah-pass-name{font-size:28px;font-weight:700;letter-spacing:-.02em;margin:2px 0 14px}
+.ah-pass-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.ah-pass-grid span{display:block;font-size:10px;letter-spacing:.1em;opacity:.8}
+.ah-pass-grid b{font-size:14px;font-weight:600}
+.ah-pass-qr{position:relative;background:#fff;border-radius:14px;padding:18px;aspect-ratio:1}
+.ah-pass-qr svg{width:100%;height:100%;display:block}
+.ah-pass-foot{position:relative;text-align:center;font-size:11px;font-weight:500;margin-top:12px;opacity:.92}
+.ah-badges{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap}
+.ah-badge{display:inline-flex;align-items:center;gap:8px;background:#000;color:#fff;border-radius:10px;padding:10px 16px;font-weight:600;font-size:14px}
+.ah-badge svg{width:18px;height:18px;fill:#fff}
+.ah-badge-g{background:#fff;color:#1d1d1f;box-shadow:0 0 0 1px var(--line)}
+@media (max-width:900px){
+  .ah-split{grid-template-columns:1fr;gap:56px}
+  .ah-split-rev .ah-pass-wrap{order:0}
+  .ah-papers{height:520px}
+  .ah-paper{width:340px;margin-left:-170px}.ah-paper-back{margin-left:-140px}
+}
+
+/* ---------- 6. verð ---------- */
+.ah-price{text-align:center;padding-bottom:180px}
+.ah-price-card{max-width:640px;margin:0 auto;background:rgba(255,255,255,.82);backdrop-filter:blur(6px);border-radius:32px;padding:56px 40px;
+  box-shadow:0 0 0 1px var(--line),0 40px 90px -40px rgba(233,112,15,.45)}
+.ah-amt{font-size:clamp(56px,8vw,88px);font-weight:700;letter-spacing:-.045em;line-height:1}
+.ah-amt small{font-size:20px;font-weight:500;color:var(--ink3);letter-spacing:-.01em;margin-left:6px}
+.ah-price-card p{color:var(--ink2);font-size:17px;margin:18px 0 0}
+.ah-price-card .ah-fine{font-size:14px;color:var(--ink3);margin:10px 0 30px}
+
+/* ---------- fótur ---------- */
+.ah-foot{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;
+  padding:28px max(20px, calc((100vw - 1100px)/2)) calc(28px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);font-size:13px;color:var(--ink3)}
+.ah-foot div{display:flex;gap:22px}
+.ah-foot a:hover{color:var(--ink)}
+
+/* ---------- minni hreyfing ---------- */
+@media (prefers-reduced-motion: reduce){
+  .ah-rv{opacity:1;transform:none;transition:none}
+  .ah-hero{height:auto}
+  .ah-sticky{position:relative;height:auto;padding:140px 20px 60px}
+  .ah-hero-head{position:relative;top:auto;margin-bottom:60px}
+  .ah-zcap{display:none}
+  .ah-ring-hl,.ah-pass-sheen{animation:none}
+  .ah-stamp{opacity:1}
+}
+@media (max-width:700px){
+  .ah-hero{height:300vh}
+  .ah-hero-head{top:calc(env(safe-area-inset-top,0px) + 12vh)}
+  .ah-sec,.ah-dark{padding-top:110px;padding-bottom:110px}
+  .ah-tile{padding:26px 22px 0}.ah-crop{margin:0 -22px}
+  .ah-zcap{bottom:-120px}
+}
