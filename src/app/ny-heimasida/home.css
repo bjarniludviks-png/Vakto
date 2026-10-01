@@ -224,3 +224,145 @@
 .ah-pass-foot{font-size:12px;opacity:1}
 .ah-stamp{font-weight:700;background:#138a5b}
 @media (max-width:900px){.ah-split-rev .ah-pass-wrap{order:1}}
+
+/* ---------- alvöru app-skjámyndir + lifandi klukka ---------- */
+.ah-scr{position:relative;container-type:inline-size}
+.ah-phone-in .ah-scr img{width:100%;height:auto;object-fit:initial}
+.ah-live{position:absolute;left:8.7%;top:13.74%;width:46%;height:13.85cqw;background:#1f9d6b;color:#fff;
+  font-weight:700;font-size:10.26cqw;line-height:13.85cqw;letter-spacing:-.02em;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ah-phone-dk .ah-live{background:#2fb47e}
+
+/* ---------- vaktaplan í Mac-glugga, vakt dregin ---------- */
+.ah-mac-tile{margin:auto 0 -48px;border-radius:12px}
+.ah-mac-tile .ah-mac-bar{height:30px}
+.ah-mac-tile .ah-dots i{width:9px;height:9px}
+.ah-mac-tile .ah-url{font-size:11px;padding:3px 10px}
+.ah-stage{position:absolute;inset:0;transform:scale(1.55);transform-origin:66% 47%}
+.ah-stage img{width:100%;height:100%;object-fit:cover;object-position:top left}
+.ah-dg-hole,.ah-dg{position:absolute;left:59.375%;top:35.78%;width:7.5%;height:4.44%}
+.ah-dg-hole,.ah-dg-chip{background-size:1333.3% auto;background-repeat:no-repeat}
+.ah-dg-hole{background-position:64.19% 54.42%;opacity:0}
+.ah-dg-chip{position:absolute;inset:0;background-position:64.19% 37.44%;border-radius:9%/20%;opacity:0}
+.ah-cursor{position:absolute;left:52%;top:46%;width:29%;overflow:visible;transform-origin:20% 10%;opacity:0;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.35))}
+.ah-cursor path{fill:#111;stroke:#fff;stroke-width:1.6;stroke-linejoin:round}
+.ah-mac-tile.run .ah-dg{animation:ah-dgm 8s cubic-bezier(.65,0,.35,1) infinite}
+.ah-mac-tile.run .ah-dg-chip{animation:ah-dgc 8s infinite}
+.ah-mac-tile.run .ah-dg-hole{animation:ah-dgh 8s infinite}
+.ah-mac-tile.run .ah-cursor{animation:ah-cur 8s cubic-bezier(.45,0,.25,1) infinite}
+@keyframes ah-dgm{0%,12%{transform:translateY(0)}36%,62%{transform:translateY(365.6%)}88%,100%{transform:translateY(0)}}
+@keyframes ah-dgh{0%,9.9%{opacity:0}10%,90%{opacity:1}90.1%,100%{opacity:0}}
+@keyframes ah-dgc{
+  0%,9.9%{opacity:0}
+  10%{opacity:1;transform:none;box-shadow:none}
+  12%,36%{opacity:1;transform:scale(1.07) rotate(-1.5deg);box-shadow:0 10px 22px rgba(40,25,10,.28)}
+  38%,60%{opacity:1;transform:none;box-shadow:none}
+  62%,88%{opacity:1;transform:scale(1.07) rotate(-1.5deg);box-shadow:0 10px 22px rgba(40,25,10,.28)}
+  90%{opacity:1;transform:none;box-shadow:none}
+  90.1%,100%{opacity:0}}
+@keyframes ah-cur{
+  0%{opacity:0;transform:translate(260%,220%)}
+  4%{opacity:1}
+  9%{transform:translate(0,0) scale(1)}
+  10.5%{transform:scale(.85)}
+  12%,36%{transform:scale(1)}
+  38%{transform:scale(.85)}
+  40%{transform:scale(1)}
+  46%,54%{transform:translate(150%,90%)}
+  60%{transform:translate(0,0) scale(1)}
+  61%{transform:scale(.85)}
+  62%,88%{transform:scale(1)}
+  90%{transform:scale(.85)}
+  92%{transform:scale(1);opacity:1}
+  98%{transform:translate(260%,220%);opacity:1}
+  100%{transform:translate(260%,220%);opacity:0}}
+
+/* ---------- samanburður: dregið virkar líka á myndum ---------- */
+.ah-compare img{pointer-events:none;-webkit-user-drag:none;user-select:none}
+
+/* ---------- Kynntu þér VAKTO (glærur) ---------- */
+.ah-show{--gut:max(20px, calc((100vw - 1100px)/2));padding-left:0;padding-right:0}
+.ah-head-l{text-align:left;padding:0 var(--gut);margin-bottom:44px}
+.ah-track{display:flex;gap:20px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:0 var(--gut) 12px;scroll-padding-inline:var(--gut);overscroll-behavior-x:contain}
+.ah-track::-webkit-scrollbar{display:none}
+.ah-slide{flex:0 0 min(1100px, calc(100vw - 2 * var(--gut)));scroll-snap-align:start;height:clamp(560px,74vh,700px);border-radius:28px;overflow:hidden;
+  display:flex;flex-direction:column;text-align:center;padding:52px 40px 0;
+  background:radial-gradient(120% 80% at 50% 110%,rgba(245,147,49,.35),transparent 60%),linear-gradient(165deg,#fff6ee,#fde6cf);
+  box-shadow:0 0 0 1px rgba(233,112,15,.12)}
+.ah-slide-tx h3{font-size:clamp(26px,3vw,36px);letter-spacing:-.03em;margin:0 0 12px}
+.ah-slide-tx p{max-width:600px;margin:0 auto;color:#4a4a4f;font-size:clamp(16px,1.5vw,19px);line-height:1.45;text-wrap:pretty}
+.ah-slide-v{flex:1;min-height:0;display:flex;justify-content:center;align-items:flex-start;margin-top:40px}
+.ah-sl-shot img,.ah-sl-paper img{width:min(430px,86%);margin:0 auto;border-radius:16px 16px 0 0;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 30px 70px -20px rgba(40,25,10,.35)}
+.ah-sl-paper img{border-radius:6px 6px 0 0;width:min(460px,88%)}
+.ah-sl-phones{display:flex;gap:32px;justify-content:center;align-items:flex-start}
+.ah-sl-phones .ah-phone{width:min(250px,60vw);margin:0}
+.ah-sl-phones .ah-sl-lo{margin-top:70px}
+.ah-ctrl{display:flex;justify-content:center;align-items:center;gap:12px;margin-top:30px}
+.ah-dotbar{display:flex;align-items:center;gap:12px;height:52px;padding:0 22px;border-radius:999px;background:rgba(0,0,0,.06)}
+.ah-dot{position:relative;width:8px;height:8px;padding:0;border:0;border-radius:999px;background:rgba(0,0,0,.32);overflow:hidden;cursor:pointer;transition:width .45s var(--ease),background .3s}
+.ah-dot::after{content:"";position:absolute;inset:-10px -6px}
+.ah-dot.on{width:52px;background:rgba(0,0,0,.16)}
+.ah-dot i{position:absolute;inset:0;border-radius:inherit;background:#1d1d1f;transform-origin:left;transform:scaleX(0);animation:ah-fill linear forwards}
+@keyframes ah-fill{to{transform:scaleX(1)}}
+.ah-play{width:52px;height:52px;border-radius:50%;border:0;background:rgba(0,0,0,.06);display:grid;place-items:center;cursor:pointer;transition:transform .16s var(--ease)}
+.ah-play:active{transform:scale(.95)}
+.ah-play svg{width:18px;height:18px;fill:#1d1d1f}
+.ah-dot:focus-visible,.ah-play:focus-visible{outline:2px solid var(--brand);outline-offset:3px}
+@media (max-width:700px){
+  .ah-slide{padding:36px 22px 0;height:clamp(540px,78vh,640px)}
+  .ah-sl-phones .ah-sl-lo{display:none}
+}
+
+/* ---------- skírteini: mynd, ehf. og kennitölur ---------- */
+.ah-pass-co{display:flex;flex-direction:column;align-items:flex-end;line-height:1.25;text-align:right}
+.ah-pass-co small{font-size:11px;font-weight:500;letter-spacing:.02em}
+img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0}
+.ah-pass-grid{grid-template-columns:.9fr 1.35fr .7fr}
+
+@media (prefers-reduced-motion: reduce){
+  .ah-mac-tile.run .ah-dg,.ah-mac-tile.run .ah-dg-chip,.ah-mac-tile.run .ah-dg-hole,.ah-mac-tile.run .ah-cursor{animation:none}
+  .ah-dot i{animation:none;transform:none}
+}
+
+/* ---------- spjallgluggi í horninu (HomeChat skin="ah") ---------- */
+.ah-chatfab{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:25;display:inline-flex;align-items:center;gap:9px;font:inherit;font-size:14.5px;font-weight:600;
+  color:var(--ink);background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border:0;border-radius:999px;padding:12px 18px 12px 13px;cursor:pointer;
+  box-shadow:0 0 0 1px rgba(0,0,0,.07),0 12px 34px -10px rgba(233,112,15,.45);transition:transform .16s var(--ease),opacity .2s}
+.ah-chatfab svg{width:20px;height:20px;color:var(--brand)}
+.ah-chatfab:active{transform:scale(.97)}
+.ah-chatfab.hide{opacity:0;pointer-events:none;transform:translateY(8px)}
+.ah-chatbox{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:26;width:min(390px,calc(100vw - 24px));height:min(620px,calc(100dvh - 40px));display:flex;flex-direction:column;
+  background:rgba(251,251,253,.92);backdrop-filter:saturate(180%) blur(24px);-webkit-backdrop-filter:saturate(180%) blur(24px);border-radius:24px;overflow:hidden;color:var(--ink);
+  box-shadow:0 0 0 1px rgba(0,0,0,.07),0 30px 80px -20px rgba(40,25,10,.4);transform-origin:bottom right;animation:ah-chat-in .32s var(--ease)}
+@keyframes ah-chat-in{from{opacity:0;transform:scale(.96) translateY(10px)}to{opacity:1;transform:none}}
+.ah-chatbox .hd{display:flex;align-items:center;gap:11px;padding:16px 16px 12px}
+.ah-chatbox .hd .av{width:36px;height:36px;border-radius:11px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.06);display:flex;align-items:center;justify-content:center}
+.ah-chatbox .hd .av svg{width:19px;height:19px}
+.ah-chatbox .hd b{display:block;font-size:15px}
+.ah-chatbox .hd small{display:block;font-size:12.5px;color:var(--ink3)}
+.ah-chatbox .hd .x{margin-left:auto;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.05);border:0;color:var(--ink2);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.ah-chatbox .hd .x svg{width:14px;height:14px}
+.ah-chatbox .log{flex:1;overflow-y:auto;padding:6px 14px 14px;display:flex;flex-direction:column;gap:8px}
+.ah-chatbox .m{max-width:84%;font-size:14.5px;line-height:1.45;padding:9px 13px;border-radius:19px;white-space:pre-wrap;word-break:break-word}
+.ah-chatbox .m.a{align-self:flex-start;background:#e9e9eb;color:var(--ink);border-bottom-left-radius:6px}
+.ah-chatbox .m.o{align-self:flex-start;background:#fde6cf;color:var(--ink);border-bottom-left-radius:6px}
+.ah-chatbox .m.u{align-self:flex-end;background:var(--brand);color:#fff;border-bottom-right-radius:6px}
+.ah-chatbox .m .who{display:block;font-size:11px;font-weight:600;color:var(--ink3);margin-bottom:2px}
+.ah-chatbox .m.o .who{color:#b85309}
+.ah-chatbox .m.typing{color:var(--ink3);letter-spacing:.2em}
+.ah-chatbox .note{font-size:13px;color:#14532d;background:rgba(24,160,106,.1);border-radius:14px;padding:10px 13px}
+.ah-chatbox .note.err{background:rgba(200,50,30,.08);color:#9b2c1c}
+.ah-chatbox .hand{display:flex;flex-direction:column;gap:8px;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.06);border-radius:16px;padding:12px}
+.ah-chatbox .hand input,.ah-chatbox .hand textarea{font:inherit;font-size:16px;color:var(--ink);background:#f5f5f7;border:0;border-radius:11px;padding:10px 12px;width:100%;resize:none}
+.ah-chatbox .hand .row{display:flex;gap:8px;justify-content:flex-end}
+.ah-chatbox .hand button{font:inherit;font-size:14px;font-weight:600;color:#fff;background:var(--brand);border:0;border-radius:999px;padding:9px 16px;cursor:pointer}
+.ah-chatbox .hand button.ghost{background:rgba(0,0,0,.05);color:var(--ink2)}
+.ah-chatbox .ft{padding:8px 12px 12px;display:flex;flex-direction:column;gap:8px}
+.ah-chatbox .human{align-self:flex-start;font:inherit;font-size:13px;font-weight:600;color:#b85309;background:rgba(233,112,15,.1);border:0;border-radius:999px;padding:6px 12px;cursor:pointer}
+.ah-chatbox .in{display:flex;gap:8px;align-items:center;background:#fff;border-radius:999px;padding:4px 4px 4px 16px;box-shadow:0 0 0 1px rgba(0,0,0,.08)}
+.ah-chatbox .in input{flex:1;font:inherit;font-size:16px;color:var(--ink);background:none;border:0;padding:8px 0;min-width:0;outline:none}
+.ah-chatbox .in button{width:36px;height:36px;border-radius:50%;background:var(--brand);border:0;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ah-chatbox .in button:disabled{opacity:.35;cursor:default}
+.ah-chatbox .in button svg{width:16px;height:16px}
+.ah-chatbox .in:focus-within{box-shadow:0 0 0 2px rgba(233,112,15,.5)}
+@media (max-width:520px){.ah-chatbox{right:0;left:0;bottom:0;width:100%;height:min(88dvh,640px);border-radius:24px 24px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}}
+@media (prefers-reduced-motion: reduce){.ah-chatbox{animation:none}}

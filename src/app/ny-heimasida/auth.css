@@ -1,0 +1,40 @@
+/* Innskráning og prufa í stíl nýju forsíðunnar (/ny-heimasida/innskraning, /prufa).
+   Sömu form og /login og /nyskraning (login.css-klasarnir), endurlituð í ljóst innan .ah-auth. */
+.ah-auth{
+  --ink:#1d1d1f; --ink2:#4a4a4f; --ink3:#86868b; --line:rgba(0,0,0,.12); --line2:rgba(0,0,0,.06);
+  --brand:#e9700f; --brand-2:#b85309; --brand-deep:#cf5f0c; --brand-soft:rgba(233,112,15,.22); --bad:#c8321e;
+  position:relative;min-height:100vh;min-height:100dvh;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);
+  background:#fbfbfd;color:var(--ink);font-family:'General Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.011em;overflow:hidden}
+.ah-auth-l{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:96px 28px 40px}
+.ah-auth-top{position:absolute;top:calc(env(safe-area-inset-top,0px) + 18px);left:28px;right:28px;display:flex;justify-content:space-between;align-items:center;font-size:14px}
+.ah-auth-top a{color:var(--ink2);text-decoration:none}
+.ah-auth-top a:hover{color:var(--ink)}
+.ah-auth .form{max-width:400px}
+.ah-auth .brand{display:none}
+.ah-auth .form h1{color:var(--ink);font-size:clamp(30px,3vw,38px);letter-spacing:-.035em}
+.ah-auth .field input,.ah-auth .field select{background:#fff;border-color:var(--line);color:var(--ink);border-radius:12px;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.ah-auth .field select option{background:#fff;color:var(--ink)}
+.ah-auth .field input:focus,.ah-auth .field select:focus{outline:3px solid var(--brand-soft);border-color:var(--brand)}
+.ah-auth .btn{background:var(--brand);border:0;border-radius:999px;box-shadow:0 8px 24px rgba(233,112,15,.28);padding:15px}
+.ah-auth .btn:hover{background:#d9640a;box-shadow:0 10px 30px rgba(233,112,15,.36);transform:none}
+.ah-auth .btn:active{transform:scale(.98)}
+.ah-auth .soc{background:#fff;border-color:var(--line);border-radius:999px}
+.ah-auth .soc:hover{background:#f5f5f7}
+.ah-auth .soc .ic{background:rgba(0,0,0,.05)}
+.ah-auth .planopt{background:#fff}
+.ah-auth .pweye:hover{color:var(--ink)}
+.ah-auth-r{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:40px;padding:80px 48px;
+  background:radial-gradient(90% 70% at 50% 100%,rgba(245,147,49,.45),transparent 65%),linear-gradient(165deg,#fff6ee,#fde3c8);border-left:1px solid rgba(233,112,15,.12)}
+.ah-auth-r h2{font-size:clamp(30px,3.2vw,44px);font-weight:700;letter-spacing:-.035em;line-height:1.06;text-align:center;margin:0;max-width:520px;text-wrap:balance}
+.ah-auth-r p{margin:14px auto 0;max-width:440px;text-align:center;color:#4a4a4f;font-size:17px;line-height:1.45;text-wrap:pretty}
+.ah-auth-r .ah-phone{width:min(270px,60vw)}
+.ah-auth-r ul{list-style:none;margin:0;padding:0;display:grid;gap:12px;max-width:440px}
+.ah-auth-r li{position:relative;padding-left:30px;font-size:15.5px;line-height:1.45;color:#3a3a3f}
+.ah-auth-r li::before{content:"";position:absolute;left:0;top:1px;width:20px;height:20px;border-radius:50%;background:rgba(233,112,15,.14);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e9700f' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E");background-size:13px;background-repeat:no-repeat;background-position:center}
+@media (max-width:900px){
+  .ah-auth{grid-template-columns:1fr;overflow:visible}
+  .ah-auth-l{min-height:100dvh;padding:88px 22px 40px}
+  .ah-auth-r{padding:64px 22px 72px;border-left:0;border-top:1px solid rgba(233,112,15,.12)}
+}
+.ah-auth-top .ah-logo{color:var(--ink)}

@@ -7,6 +7,7 @@
 // og allt slökkt með prefers-reduced-motion.
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import HomeChat from "../ny/home-chat";
 
 const SHOT = "/showcase/forsida";
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -92,21 +93,72 @@ function MacFrame({ src, alt, url, children, imgRef, priority = false }: { src: 
       </div>
       <div className="ah-mac-view">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img ref={imgRef} src={src} alt={alt} width={2880} height={1800} decoding="async" loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : "auto"} />
+        <img ref={imgRef} src={src} alt={alt} width={2880} height={1800} draggable={false} decoding="async" loading={priority ? "eager" : "lazy"} fetchPriority={priority ? "high" : "auto"} />
         {children}
       </div>
     </div>
   );
 }
 
-function Phone({ src, alt, className = "", dark = false }: { src: string; alt: string; className?: string; dark?: boolean }) {
+/** Teljari ofan á símamyndinni (alvöru app, opin stimplun): heldur áfram að tikka eins og í appinu. */
+function LiveClock() {
+  const el = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const start = Date.now() - (4 * 3600 + 36 * 60 + 6) * 1000;
+    const tick = () => {
+      const s = Math.floor((Date.now() - start) / 1000);
+      if (el.current) el.current.textContent = `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+    };
+    tick();
+    const id = window.setInterval(tick, 1000);
+    return () => window.clearInterval(id);
+  }, []);
+  return <span className="ah-live" aria-hidden="true"><span ref={el}>4:36:06</span></span>;
+}
+
+export function Phone({ src, alt, className = "", dark = false, live = false }: { src: string; alt: string; className?: string; dark?: boolean; live?: boolean }) {
   return (
     <div className={`ah-phone${dark ? " ah-phone-dk" : ""} ${className}`}>
       <div className="ah-phone-in">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt} width={1170} height={2532} loading="lazy" decoding="async" />
+        <div className="ah-scr">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt={alt} width={1170} height={2532} loading="lazy" decoding="async" draggable={false} />
+          {live && <LiveClock />}
+        </div>
       </div>
       <span className="ah-island" aria-hidden="true" />
+    </div>
+  );
+}
+
+/** Vaktaplanið í Mac-glugga: músin tekur kvöldvakt Dalyu á fimmtudegi og dregur hana á Jón.
+ *  Vaktin sem dregin er og tóma reiturinn eru klipptir úr sömu skjámynd (ekkert teiknað upp á nýtt). */
+function PlanDrag() {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = box.current; if (!el) return;
+    const io = new IntersectionObserver(([e]) => el.classList.toggle("run", e.isIntersecting), { threshold: 0.35 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+  const src = `${SHOT}/light/vaktaplan.jpg`;
+  return (
+    <div className="ah-mac ah-mac-tile" ref={box}>
+      <div className="ah-mac-bar">
+        <span className="ah-dots"><i /><i /><i /></span>
+        <span className="ah-url" aria-hidden="true">vakto.is/vaktaplan</span>
+      </div>
+      <div className="ah-mac-view">
+        <div className="ah-stage">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt="Vaktaplan vikunnar: vakt dregin á milli starfsmanna" width={2880} height={1800} loading="lazy" decoding="async" draggable={false} />
+          <div className="ah-dg-hole" style={{ backgroundImage: `url(${src})` }} aria-hidden="true" />
+          <div className="ah-dg" aria-hidden="true">
+            <div className="ah-dg-chip" style={{ backgroundImage: `url(${src})` }} />
+            <svg className="ah-cursor" viewBox="0 0 24 24"><path d="M5 2.5v17.2l4.3-4.1 2.8 6.5 3-1.3-2.8-6.4h6.1z" /></svg>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -145,7 +197,7 @@ function HeroZoom() {
           <h1>Vaktin, launin og yfirsýnin.<br /><span>Á einum stað.</span></h1>
           <p className="ah-lede">Vaktaplan, stimpilklukka, launakeyrsla og ráðningarsamningar. Og launakostnaður sem hlutfall af veltu, í rauntíma.</p>
           <div className="ah-ctas">
-            <a className="ah-btn" href="/nyskraning">Prófa frítt</a>
+            <a className="ah-btn" href="/ny-heimasida/prufa">Prófa frítt</a>
             <a className="ah-link" href="#kerfid">Sjá kerfið</a>
           </div>
         </div>
@@ -181,11 +233,11 @@ function Features() {
       <div className="ah-bento">
         <div className="ah-tile ah-wide">
           <div className="ah-tile-tx"><h3>Vaktaplan á korteri.</h3><p>Dragðu vaktir til, afritaðu síðustu viku eða biddu gervigreindina um plan sem passar veltuspánni. Launakostnaðurinn reiknast á meðan.</p></div>
-          <Crop src={`${SHOT}/light/vaktaplan.jpg`} alt="Vaktaplan vikunnar" pos="62% 38%" zoom={1.45} ratio="16 / 8" />
+          <PlanDrag />
         </div>
         <div className="ah-tile ah-tall ah-tile-warm">
           <div className="ah-tile-tx"><h3>Stimplað í símanum.</h3><p>Eða á spjaldtölvu við innganginn. Staðsetning staðfest ef þú vilt.</p></div>
-          <Phone src={`${SHOT}/light/phone-mitt.png`} alt="Mitt svæði í appinu: stimpla mig inn" />
+          <Phone live src={`${SHOT}/light/app-heim.png`} alt="VAKTO-appið: á vakt síðan 05:38, stimpla út" />
         </div>
         <div className="ah-tile">
           <div className="ah-tile-tx"><h3>Frávik með krónutölu.</h3><p>Hver mætti seint, hver fór fyrr og hvað það kostaði.</p></div>
@@ -196,8 +248,12 @@ function Features() {
           <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt="Launakeyrsla mánaðarins" pos="65% 35%" zoom={1.4} />
         </div>
         <div className="ah-tile ah-wide">
-          <div className="ah-tile-tx"><h3>Innsýn sem skiptir máli.</h3><p>Velta, launakostnaður og laun % mánuð fyrir mánuð. Engar skýrslur til að setja saman, þær eru þegar til.</p></div>
-          <Crop src={`${SHOT}/light/innsyn.jpg`} alt="Innsýn: velta og launakostnaður" pos="62% 60%" zoom={1.35} ratio="16 / 8" />
+          <div className="ah-tile-tx"><h3>Spjaldtölva við innganginn.</h3><p>Starfsfólk ýtir á nafnið sitt eða skannar skírteinið í símanum. Enginn PIN-kóði að gleyma og enginn stimplar fyrir annan.</p></div>
+          <Crop src={`${SHOT}/light/kiosk.jpg`} alt="Stimpilklukkan á spjaldtölvu: allt starfsfólk og hver er á vakt" pos="50% 40%" zoom={1.12} ratio="16 / 8" />
+        </div>
+        <div className="ah-tile">
+          <div className="ah-tile-tx"><h3>Spjall fyrir hópinn.</h3><p>Rásir per deild og stað. Enginn Messenger-hópur með fyrrverandi starfsfólki.</p></div>
+          <Crop src={`${SHOT}/light/spjall.jpg`} alt="Spjall í VAKTO" pos="60% 40%" zoom={1.5} />
         </div>
       </div>
     </section>
@@ -231,8 +287,8 @@ function DarkCompare() {
       <div>
         <div
           className="ah-compare" ref={box}
-          onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture?.(e.pointerId); move(e.clientX); }}
-          onPointerMove={(e) => { if (e.buttons) move(e.clientX); }}
+          onPointerDown={(e) => { e.preventDefault(); e.currentTarget.setPointerCapture(e.pointerId); move(e.clientX); }}
+          onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) move(e.clientX); }}
           role="slider" aria-label="Bera saman ljóst og dökkt" aria-valuemin={0} aria-valuemax={100} aria-valuenow={50} tabIndex={0}
           onKeyDown={(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { touched.current = true; paint(pos.current + (e.key === "ArrowLeft" ? -5 : 5)); } }}
         >
@@ -244,7 +300,7 @@ function DarkCompare() {
         </div>
       </div>
       <div className="ah-dark-row">
-        <div><Phone dark src={`${SHOT}/dark/phone-mitt.png`} alt="Appið í dökku þema" /></div>
+        <div><Phone dark live src={`${SHOT}/dark/app-heim.png`} alt="Appið í dökku þema: á vakt" /></div>
         <div className="ah-dark-copy">
           <h3>Starfsfólkið fær appið.</h3>
           <p>Vaktirnar, stimplun, áætluð laun, orlofsstaða, frí og vaktaskipti. Og spjall og fréttaveita fyrir allan hópinn.</p>
@@ -252,7 +308,92 @@ function DarkCompare() {
             <li>iPhone og Android</li><li>Íslenska, enska og víetnamska</li><li>Tilkynning þegar planið breytist</li>
           </ul>
         </div>
-        <div><Phone dark src={`${SHOT}/dark/phone-frettir.png`} alt="Fréttaveita í appinu" className="ah-phone-lo" /></div>
+        <div><Phone dark src={`${SHOT}/dark/app-frettir.png`} alt="Fréttaveita í appinu" className="ah-phone-lo" /></div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- 3b. Kynntu þér VAKTO (glærur sem fletta sjálfkrafa) ---------- */
+
+const SLIDES: { t: string; d: string; v: ReactNode }[] = [
+  {
+    t: "VAKTO AI.",
+    d: "Skrifaðu hvað vikan þarf á venjulegri íslensku. VAKTO AI semur drög að vaktaplani sem þú ferð yfir og samþykkir, og les kjarasamninginn fyrir þig með tilvísun í hverja grein.",
+    // eslint-disable-next-line @next/next/no-img-element
+    v: <div className="ah-sl-shot"><img src={`${SHOT}/light/ai.jpg`} alt="Tillaga VAKTO AI: Moon færður á kvöldvakt á laugardag, launakostnaður óbreyttur 27,4%" width={1209} height={1656} loading="lazy" decoding="async" draggable={false} /></div>,
+  },
+  {
+    t: "Vaktirnar í vasanum.",
+    d: "Starfsfólk sér planið sitt, sækir um lausar vaktir og býður vaktir í skiptum. Spjallið er á sama stað.",
+    v: <div className="ah-sl-phones"><Phone src={`${SHOT}/light/app-vaktir.png`} alt="Vaktir vikunnar í appinu" /><Phone src={`${SHOT}/light/app-spjall.png`} alt="Spjallrásir í appinu" className="ah-sl-lo" /></div>,
+  },
+  {
+    t: "Fréttaveita fyrir vinnustaðinn.",
+    d: "Nýr matseðill, breyttur opnunartími, mynd úr eldhúsinu. Festu það mikilvæga efst svo það týnist ekki.",
+    v: <div className="ah-sl-phones"><Phone src={`${SHOT}/light/app-frettir.png`} alt="Fréttaveitan í appinu" /></div>,
+  },
+  {
+    t: "Launaseðill sem stenst.",
+    d: "Dagvinna, álag og yfirvinna sundurliðuð. Líka þegar mánuðurinn var 0 tímar og starfsmaðurinn þarf staðfestingu.",
+    // eslint-disable-next-line @next/next/no-img-element
+    v: <div className="ah-sl-paper"><img src={`${SHOT}/skjol/launasedill.jpg`} alt="Launaseðill úr VAKTO" width={1800} height={2545} loading="lazy" decoding="async" draggable={false} /></div>,
+  },
+];
+const SLIDE_MS = 6500;
+
+function Showcase() {
+  const track = useRef<HTMLDivElement>(null);
+  const [idx, setIdx] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  const [seen, setSeen] = useState(false);
+  useEffect(() => {
+    const el = track.current; if (!el) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches; // engin sjálfvirk flettun
+    const io = new IntersectionObserver(([e]) => { if (reduced) setPlaying(false); setSeen(e.isIntersecting); }, { threshold: 0.4 });
+    io.observe(el);
+    let raf = 0;
+    const on = () => { if (raf) return; raf = requestAnimationFrame(() => {
+      raf = 0;
+      const first = el.children[0] as HTMLElement | undefined, second = el.children[1] as HTMLElement | undefined;
+      const step = first && second ? second.offsetLeft - first.offsetLeft : el.clientWidth;
+      setIdx(clamp(Math.round(el.scrollLeft / step), 0, SLIDES.length - 1));
+    }); };
+    el.addEventListener("scroll", on, { passive: true });
+    return () => { io.disconnect(); el.removeEventListener("scroll", on); cancelAnimationFrame(raf); };
+  }, []);
+  const go = (i: number) => {
+    const el = track.current; if (!el) return;
+    const n = (i + SLIDES.length) % SLIDES.length;
+    const first = el.children[0] as HTMLElement, slide = el.children[n] as HTMLElement;
+    el.scrollTo({ left: slide.offsetLeft - first.offsetLeft, behavior: "smooth" });
+    setIdx(n);
+  };
+  const run = playing && seen;
+  return (
+    <section className="ah-sec ah-show" aria-roledescription="glærusýning" aria-label="Kynntu þér VAKTO">
+      <div className="ah-head ah-head-l"><h2>Kynntu þér VAKTO.</h2></div>
+      <div className="ah-track" ref={track} onPointerDown={() => setPlaying(false)}>
+        {SLIDES.map((s, i) => (
+          <article className={`ah-slide${i === idx ? " on" : ""}`} key={s.t} aria-roledescription="glæra" aria-label={`${i + 1} af ${SLIDES.length}`}>
+            <div className="ah-slide-tx"><h3>{s.t}</h3><p>{s.d}</p></div>
+            <div className="ah-slide-v">{s.v}</div>
+          </article>
+        ))}
+      </div>
+      <div className="ah-ctrl">
+        <div className="ah-dotbar">
+          {SLIDES.map((s, i) => (
+            <button key={s.t} className={`ah-dot${i === idx ? " on" : ""}`} onClick={() => { setPlaying(false); go(i); }} aria-label={`Glæra ${i + 1}: ${s.t}`} aria-current={i === idx}>
+              {i === idx && <i key={idx} style={{ animationDuration: `${SLIDE_MS}ms`, animationPlayState: run ? "running" : "paused" }} onAnimationEnd={() => go(idx + 1)} />}
+            </button>
+          ))}
+        </div>
+        <button className="ah-play" onClick={() => setPlaying((p) => !p)} aria-label={playing ? "Gera hlé" : "Spila"}>
+          {playing
+            ? <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6.5" y="5" width="3.6" height="14" rx="1" /><rect x="13.9" y="5" width="3.6" height="14" rx="1" /></svg>
+            : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>}
+        </button>
       </div>
     </section>
   );
@@ -306,13 +447,14 @@ function WalletCard() {
   }, []);
   return (
     <div className="ah-pass">
-      <div className="ah-pass-top"><Logo /><span>KAFFI KRÓNAN</span></div>
-      <div className="ah-pass-av">DA</div>
+      <div className="ah-pass-top"><Logo /><span className="ah-pass-co">KAFFI KRÓNAN EHF.<small>kt. 550101-2210</small></span></div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="ah-pass-av" src={`${SHOT}/skjol/passmynd.jpg`} alt="" width={360} height={360} loading="lazy" decoding="async" />
       <div className="ah-pass-lbl">STARFSMAÐUR</div>
       <div className="ah-pass-name">Dalya R.</div>
       <div className="ah-pass-grid">
         <div><span>STAÐA</span><b>Þjónn</b></div>
-        <div><span>DEILD</span><b>Salur</b></div>
+        <div><span>KENNITALA</span><b>040399-3309</b></div>
         <div><span>NR.</span><b>#4132</b></div>
       </div>
       <div className="ah-pass-qr" dangerouslySetInnerHTML={{ __html: qr }} />
@@ -356,7 +498,7 @@ function Pricing() {
         <div className="ah-amt">9.990 kr<small>/mán</small></div>
         <p>5 virkir starfsmenn innifaldir.<br />1.490 kr á hvern virkan starfsmann umfram.</p>
         <p className="ah-fine">Án VSK. Þú borgar aðeins fyrir þá sem unnu í mánuðinum. 15% afsláttur ef greitt er árlega. 14 daga frí prufa, engin binding.</p>
-        <a className="ah-btn ah-btn-lg" href="/nyskraning">Prófa frítt</a>
+        <a className="ah-btn ah-btn-lg" href="/ny-heimasida/prufa">Prófa frítt</a>
       </div>
     </section>
   );
@@ -390,13 +532,14 @@ export default function AppleHome() {
           <a href="#kerfid">Kerfið</a><a href="#samningar">Samningar</a><a href="#verd">Verð</a>
         </div>
         <div className="ah-nav-cta">
-          <a href="/login" className="ah-nav-in">Innskráning</a>
-          <a href="/nyskraning" className="ah-btn ah-btn-sm">Prófa frítt</a>
+          <a href="/ny-heimasida/innskraning" className="ah-nav-in">Innskráning</a>
+          <a href="/ny-heimasida/prufa" className="ah-btn ah-btn-sm">Prófa frítt</a>
         </div>
       </nav>
       <main id="efni">
         <HeroZoom />
         <Features />
+        <Showcase />
         <DarkCompare />
         <Contract />
         <Wallet />
@@ -407,6 +550,7 @@ export default function AppleHome() {
         <div><a href="/skilmalar">Skilmálar</a><a href="/personuvernd">Persónuvernd</a><a href="/vafrakokur">Vafrakökur</a></div>
         <span>© 2026 VAKTO</span>
       </footer>
+      <HomeChat lang="is" skin="ah" />
     </div>
   );
 }

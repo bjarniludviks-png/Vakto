@@ -33,7 +33,7 @@ const S: Record<Lang, Record<string, string>> = {
   },
 };
 
-export default function HomeChat({ lang }: { lang: Lang }) {
+export default function HomeChat({ lang, skin = "ny" }: { lang: Lang; skin?: "ny" | "ah" }) {
   const s = S[lang];
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -116,12 +116,12 @@ export default function HomeChat({ lang }: { lang: Lang }) {
 
   return (
     <>
-      <button className={`ny-chatfab${open ? " hide" : ""}`} onClick={() => setOpen(true)} aria-label={s.open}>
+      <button className={`${skin}-chatfab${open ? " hide" : ""}`} onClick={() => setOpen(true)} aria-label={s.open}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1.1-4.2A8 8 0 1 1 21 12Z" /></svg>
         <span>{s.open}</span>
       </button>
       {open && (
-        <div className="ny-chatbox" role="dialog" aria-label={s.title}>
+        <div className={`${skin}-chatbox`} role="dialog" aria-label={s.title}>
           <div className="hd">
             <span className="av"><svg viewBox="0 0 28 28" fill="none"><rect x="3" y="15" width="5.4" height="10" rx="1.6" fill="#f59331" /><rect x="11.3" y="9" width="5.4" height="16" rx="1.6" fill="#e9700f" /><rect x="19.6" y="3" width="5.4" height="22" rx="1.6" fill="#cf5f0c" /></svg></span>
             <div><b>{s.title}</b><small>{status === "human" ? s.humanMode : s.sub}</small></div>
