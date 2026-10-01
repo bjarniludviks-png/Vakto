@@ -937,7 +937,7 @@ function ContractTab({ employeeId }: { employeeId: string }) {
     if (status === "sent" && !window.confirm(t("Undirrita samninginn fyrir hönd fyrirtækisins og senda hann starfsmanninum? Eftir það er ekki hægt að breyta textanum."))) return;
     const res = await setContractStatus(c.id, status);
     if (res.needSigner) { setSignerFor({ id: c.id, ...res.needSigner }); return; }
-    toast(res.ok ? (status === "sent" ? t("Undirritað og sent — starfsmaðurinn fær tölvupóst") : t("Staða uppfærð")) : (res.error ?? "Villa"));
+    toast(res.ok ? (status === "sent" ? t("Undirritað og sent — starfsmaðurinn fær tölvupóst") : t("Staða uppfærð")) : (res.error ?? "Villa"), res.ok ? "ok" : "error");
     load();
   }
   async function remove(c: ContractRow) {

@@ -3,23 +3,26 @@
 import { useEffect, useState } from "react";
 
 /** Lightweight toast matching the prototype `.toast` style. */
-let emit: ((msg: string) => void) | null = null;
+let emit: ((msg: string, kind: "ok" | "error") => void) | null = null;
 
-export function toast(message: string) {
-  emit?.(message);
+/** kind "error": viðvörunarmerki í stað haks og stendur lengur (villur þarf að ná að lesa). */
+export function toast(message: string, kind: "ok" | "error" = "ok") {
+  emit?.(message, kind);
 }
 
 export function ToastHost() {
   const [msg, setMsg] = useState<string | null>(null);
   const [show, setShow] = useState(false);
+  const [kind, setKind] = useState<"ok" | "error">("ok");
 
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>;
-    emit = (m: string) => {
+    emit = (m: string, k: "ok" | "error") => {
       setMsg(m);
+      setKind(k);
       setShow(true);
       clearTimeout(t);
-      t = setTimeout(() => setShow(false), 2200);
+      t = setTimeout(() => setShow(false), k === "error" ? 7000 : 2200);
     };
     return () => {
       emit = null;
@@ -29,7 +32,7 @@ export function ToastHost() {
 
   return (
     <div className={`toast${show ? " show" : ""}`} id="toast">
-      <span className="ck">✓</span>
+      <span className="ck" style={kind === "error" ? { color: "#ff9f8a" } : undefined}>{kind === "error" ? "!" : "✓"}</span>
       {msg}
     </div>
   );

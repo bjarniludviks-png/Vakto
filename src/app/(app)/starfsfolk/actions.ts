@@ -683,6 +683,36 @@ export type ContractRow = {
 /** Skyldureitur sem vantar — samningur er ekki sendur fyrr en hann er fylltur (sjá CONTRACT_BLANK í setContractStatus). */
 const CONTRACT_BLANK = "____________";
 
+/** Samningstexti úr NÚVERANDI gögnum starfsmanns og fyrirtækis (starf og vinnustaður leyst upp eftir id). */
+async function contractContentFor(supabase: Awaited<ReturnType<typeof createClient>>, emp: Record<string, unknown>, comp: Record<string, unknown>): Promise<string> {
+  let positionName: string | undefined;
+  if (emp.position_id) {
+    const { data: pos } = await supabase.from("positions").select("name").eq("id", emp.position_id as string).maybeSingle();
+    positionName = (pos?.name as string) ?? undefined;
+  }
+  let locationName: string | undefined;
+  if (emp.location_id) {
+    const { data: loc } = await supabase.from("locations").select("name").eq("id", emp.location_id as string).maybeSingle();
+    locationName = (loc?.name as string) ?? undefined;
+  }
+  return contractMarkdown(emp, comp, {
+    unionName: (emp.union_name as string) || (emp.union_agreement as string) || undefined,
+    contractType: (emp.contract_type as string) || undefined,
+    locationName,
+    positionName,
+  });
+}
+
+/** Fyllir AUÐA skyldureiti í geymdum drögum úr nýjum texta (sami merkimiði). Annað í drögunum helst óbreytt. */
+function fillBlankFields(stored: string, fresh: string): string {
+  const freshVal = new Map<string, string>();
+  for (const m of fresh.matchAll(/\*\*([^*]+?):\*\*[ \t]*([^\n]*)/g)) freshVal.set(m[1], m[2].trim());
+  return stored.replace(/\*\*([^*]+?):\*\*[ \t]*_{6,}/g, (all, label: string) => {
+    const v = freshVal.get(label);
+    return v && !/^_{6,}$/.test(v) ? `**${label}:** ${v}` : all;
+  });
+}
+
 /**
  * Ráðningarsamningur eftir formi Vinnumálastofnunar (nóv. 2021) — sömu kaflar, sama röð,
  * tvítyngd heiti. Formið tilgreinir 9 lágmarksatriði (91/533/EBE): aðila, starfsstöð,
@@ -765,22 +795,7 @@ export async function generateContract(employeeId: string): Promise<ActionResult
     if (emp.contract_type === "contractor" || emp.role === "contractor") {
       return { ok: false, error: "Verktakar fá verktakasamning, ekki ráðningarsamning — þetta form á aðeins við um launafólk." };
     }
-    let positionName: string | undefined;
-    if (emp.position_id) {
-      const { data: pos } = await supabase.from("positions").select("name").eq("id", emp.position_id).maybeSingle();
-      positionName = (pos?.name as string) ?? undefined;
-    }
-    let locationName: string | undefined;
-    if (emp.location_id) {
-      const { data: loc } = await supabase.from("locations").select("name").eq("id", emp.location_id).maybeSingle();
-      locationName = (loc?.name as string) ?? undefined;
-    }
-    const content = contractMarkdown(emp, comp ?? {}, {
-      unionName: (emp.union_name as string) || (emp.union_agreement as string) || undefined,
-      contractType: (emp.contract_type as string) || undefined,
-      locationName,
-      positionName,
-    });
+    const content = await contractContentFor(supabase, emp, comp ?? {});
     const { data: { user } } = await supabase.auth.getUser();
     const { data: created, error } = await supabase.from("contracts").insert({
       company_id: company,
@@ -878,8 +893,28 @@ export async function setContractStatus(
     }
     // Skyldureitir (lágmarksatriði 91/533/EBE) verða að vera fylltir áður en samningur er sendur.
     if (status === "sent") {
-      const { data: cur } = await supabase.from("contracts").select("content").eq("id", id).maybeSingle();
-      const missing = [...String(cur?.content ?? "").matchAll(/\*\*([^*]+?):\*\*\s*_{6,}/g)].map((m) => m[1].split(" / ")[0]);
+      const { data: cur } = await supabase.from("contracts").select("content, employee_id, company_id, status").eq("id", id).maybeSingle();
+      let content = String(cur?.content ?? "");
+      // Drögin voru búin til áður en t.d. heimilisfang eða lífeyrissjóður var skráður → fylla auða reiti úr nýjustu gögnum.
+      if (/\*\*[^*]+?:\*\*\s*_{6,}/.test(content) && cur?.employee_id && cur.status === "draft") {
+        const [{ data: emp }, { data: comp }] = await Promise.all([
+          supabase.from("employees").select("*").eq("id", cur.employee_id as string).maybeSingle(),
+          supabase.from("companies").select("*").eq("id", cur.company_id as string).maybeSingle(),
+        ]);
+        if (emp) {
+          const filled = fillBlankFields(content, await contractContentFor(supabase, emp, comp ?? {}));
+          if (filled !== content) {
+            await supabase.from("contracts").update({ content: filled }).eq("id", id);
+            content = filled;
+          }
+        }
+      }
+      const WHERE: Record<string, string> = {
+        "Heimili á Íslandi": "flipinn Persónulegt", "Kennitala eða fæðingardagur": "flipinn Persónulegt",
+        "Starfsheiti og stutt lýsing á starfi": "starf í flipanum Vinna", "Vinnustaður": "staður í flipanum Vinna",
+        "Lífeyrissjóður": "flipinn Laun", "Kjarasamningur": "flipinn Laun", "Stéttarfélag": "flipinn Laun",
+      };
+      const missing = [...content.matchAll(/\*\*([^*]+?):\*\*\s*_{6,}/g)].map((m) => { const k = m[1].split(" / ")[0]; return WHERE[k] ? `${k} (${WHERE[k]})` : k; });
       if (missing.length) return { ok: false, error: `Fylltu út áður en samningurinn er sendur: ${missing.join(", ")}` };
     }
     const patch: Record<string, unknown> = { status };
