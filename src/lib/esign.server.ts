@@ -15,7 +15,7 @@ import "server-only";
 
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendContractCodeEmail, sendSignedContractEmail } from "@/lib/email";
+import { sendContractCodeEmail, sendSignedContractEmail, sendTaktikalSignEmail } from "@/lib/email";
 import { buildContractPdf, type SignatureRecord } from "@/lib/contract-pdf";
 import { createSigningProcess, fetchSignedPdf, TAKTIKAL_EVENT, type TaktikalWebhook } from "@/lib/taktikal.server";
 
@@ -190,12 +190,13 @@ export async function startTaktikalSigning(
 ): Promise<{ ok: boolean; employerUrl?: string; error?: string }> {
   const admin = createAdminClient();
   const { data: c } = await admin.from("contracts")
-    .select("id, company_id, title, content, status, employees(full_name, kennitala, email, phone)")
+    .select("id, company_id, title, content, status, employees(full_name, kennitala, email, phone), companies(name)")
     .eq("id", contractId).maybeSingle();
   if (!c || c.status !== "sent") return { ok: false, error: "Samningurinn er ekki í undirritunarferli" };
+  const company = ((Array.isArray(c.companies) ? c.companies[0] : c.companies) as { name?: string } | null)?.name?.trim() || "vinnuveitanda";
   const emp = (Array.isArray(c.employees) ? c.employees[0] : c.employees) as { full_name?: string; kennitala?: string; email?: string; phone?: string } | null;
   if (!emp?.kennitala || emp.kennitala.replace(/\D/g, "").length !== 10) return { ok: false, error: "Kennitölu starfsmanns vantar — hún þarf fyrir rafræn skilríki" };
-  if (!emp.email) return { ok: false, error: "Netfang starfsmanns vantar — Taktikal sendir undirritunartengil þangað" };
+  if (!emp.email) return { ok: false, error: "Netfang starfsmanns vantar — undirritunartengillinn er sendur þangað" };
   if (employer.ssn.replace(/\D/g, "").length !== 10) return { ok: false, error: "Sláðu inn þína kennitölu (10 stafir)" };
 
   const { data: existing } = await admin.from("contract_taktikal").select("employer_url, status").eq("contract_id", contractId).maybeSingle();
@@ -203,12 +204,12 @@ export async function startTaktikalSigning(
     return { ok: true, employerUrl: existing.employer_url as string };
   }
 
-  const doc = await buildContractPdf(c.content as string, []);
+  const doc = await buildContractPdf(c.content as string, [], { stampStrip: true });
   const pdfBase64 = Buffer.from(doc.output("arraybuffer")).toString("base64");
   const safe = (emp.full_name ?? "starfsmadur").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "_");
   const proc = await createSigningProcess({
     pdfBase64, fileName: `Radningarsamningur_${safe}.pdf`, ownerEmail: employer.email, contractId,
-    employer: { name: employer.name, ssn: employer.ssn, email: employer.email, phone: employer.phone, reason: "Fyrir hönd vinnuveitanda" },
+    employer: { name: employer.name, ssn: employer.ssn, email: employer.email, phone: employer.phone, reason: `Fyrir hönd: ${company}` },
     employee: { name: emp.full_name ?? "Starfsmaður", ssn: emp.kennitala, email: emp.email, phone: emp.phone },
   });
   await admin.from("contract_taktikal").upsert({
@@ -263,7 +264,10 @@ export async function handleTaktikalEvent(p: TaktikalWebhook): Promise<boolean> 
       signer_email: s.Email ?? null, method: "taktikal_qes", doc_sha256: hash, signed_at: s.SignedAt || now,
     });
     have.add(role);
-    if (role === "employer") await admin.from("contracts").update({ employer_signed_at: s.SignedAt || now, employer_signed_by: s.Name }).eq("id", t.contract_id);
+    if (role === "employer") {
+      await admin.from("contracts").update({ employer_signed_at: s.SignedAt || now, employer_signed_by: s.Name }).eq("id", t.contract_id);
+      if (!have.has("employee")) { try { await inviteTaktikalEmployee(t.contract_id as string); } catch (e) { console.error("taktikal invite", e); } }
+    }
   }
 
   const allSigned = have.has("employer") && have.has("employee");
@@ -287,6 +291,19 @@ export async function handleTaktikalEvent(p: TaktikalWebhook): Promise<boolean> 
     }
   }
   return true;
+}
+
+/** Vinnuveitandi hefur skrifað undir → VAKTO sendir starfsmanni boð (með nafni fyrirtækisins) á undirritunarsíðu Taktikal. */
+async function inviteTaktikalEmployee(contractId: string) {
+  const admin = createAdminClient();
+  const { data: c } = await admin.from("contracts")
+    .select("employees(full_name, email), companies(name), contract_taktikal(employee_url)").eq("id", contractId).maybeSingle();
+  if (!c) return;
+  const one = <T,>(v: T | T[] | null | undefined) => (Array.isArray(v) ? v[0] : v) ?? null;
+  const emp = one(c.employees as { full_name?: string; email?: string } | null);
+  const co = one(c.companies as { name?: string } | null);
+  const tk = one(c.contract_taktikal as { employee_url?: string } | null);
+  if (emp?.email && tk?.employee_url) await sendTaktikalSignEmail(emp.email, emp.full_name ?? "", co?.name ?? "Vinnuveitandinn þinn", tk.employee_url);
 }
 
 async function deliverTaktikalCopy(contractId: string, pdf: Buffer) {

@@ -306,6 +306,26 @@ export async function sendContractEmail(to: string, name: string, company: strin
   });
 }
 
+/** Taktikal: boð til starfsmanns um að undirrita með rafrænum skilríkjum — sent af VAKTO (ekki Taktikal)
+ *  svo nafn fyrirtækisins komi fram. Tengillinn fer beint á undirritunarsíðu Taktikal. */
+export async function sendTaktikalSignEmail(to: string, name: string, company: string, url: string) {
+  const first = (name || "").split(/\s+/)[0] || "";
+  return sendEmail({
+    to,
+    subject: `${company}: ráðningarsamningur til undirritunar / Employment contract to sign`,
+    html: template({
+      preheader: `${company} hefur skrifað undir ráðningarsamninginn þinn. Nú er komið að þér.`,
+      heading: `Ráðningarsamningur frá ${company}${first ? ", " + first : ""}`,
+      body: `<b>${company}</b> hefur skrifað undir ráðningarsamninginn þinn. Lestu hann yfir og undirritaðu með rafrænum skilríkjum í símanum. Það tekur mínútu. Þú færð undirritað eintak sent þegar því er lokið.`,
+      headingEn: `Employment contract from ${company}`,
+      bodyEn: `<b>${company}</b> has signed your employment contract. Read it through and sign with your electronic ID on your phone. It takes a minute. You will receive a signed copy when done.`,
+      ctaLabel: "Lesa og undirrita",
+      ctaLabelEn: "Read and sign",
+      ctaHref: url,
+    }),
+  });
+}
+
 export async function sendContractSignedEmail(to: string, employeeName: string) {
   return sendEmail({
     to,

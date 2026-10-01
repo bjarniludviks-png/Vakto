@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyWebhook, type TaktikalWebhook } from "@/lib/taktikal.server";
+import { webhookRejectReason, type TaktikalWebhook } from "@/lib/taktikal.server";
 import { handleTaktikalEvent } from "@/lib/esign.server";
 
 // Webhook frá Taktikal (skráð á flæðið í Taktikal-stjórnborðinu: Stillingar → Flæði).
@@ -10,8 +10,9 @@ export const maxDuration = 60;
 export async function POST(req: Request) {
   let p: TaktikalWebhook;
   try { p = (await req.json()) as TaktikalWebhook; } catch { return new NextResponse(null, { status: 406 }); }
-  if (!verifyWebhook(p)) {
-    console.warn("taktikal webhook: signature rejected", p?.Id);
+  const reason = webhookRejectReason(p);
+  if (reason) {
+    console.warn("taktikal webhook: rejected", p?.Id, reason);
     return new NextResponse(null, { status: 406 });
   }
   try {

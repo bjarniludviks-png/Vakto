@@ -77,8 +77,25 @@ export function parseContract(content: string): { title: string; sections: Secti
   return { title, sections };
 }
 
+/** Setningin í bútum: nöfn vinnuveitanda og starfsmanns feitletruð (fyrsta tilvik hvors). */
+export function boldNames(text: string, names: { employer: string; employee: string } | null): { t: string; b: boolean }[] {
+  if (!names) return [{ t: text, b: false }];
+  const out: { t: string; b: boolean }[] = [];
+  let rest = text;
+  for (const n of [names.employer, names.employee]) {
+    const i = n ? rest.indexOf(n) : -1;
+    if (i < 0) continue;
+    if (i > 0) out.push({ t: rest.slice(0, i), b: false });
+    out.push({ t: n, b: true });
+    rest = rest.slice(i + n.length);
+  }
+  if (rest) out.push({ t: rest, b: false });
+  return out;
+}
+
 export type ContractSummary = {
   sentence: [string, string] | null;             // IS, EN
+  names: { employer: string; employee: string } | null; // feitletruð í setningunni
   tiles: { label: string; value: string }[];     // 4 lykiltölur (tómar = „—“)
 };
 
@@ -92,22 +109,37 @@ export function contractSummary(sections: Section[]): ContractSummary {
     }
     return "";
   };
+  // Eldri snið (fyrir vmst-2021) nota önnur heiti — leitað í öllum köflum eftir fyrsta heiti sem passar.
+  const any = (...labels: string[]) => {
+    for (const label of labels) for (const s of sections) {
+      const r = s.rows.find(([k]) => splitLang(k)[0].startsWith(label));
+      if (r && !isBlank(r[1]) && r[1].trim() && r[1].trim() !== "—") return r[1].trim();
+    }
+    return "";
+  };
   const is = (v: string) => splitLang(v)[0];
   const employer = find("Vinnuveitandi", "Nafn");
   const name = [find("Starfsmaður", "Skírnarnafn"), find("Starfsmaður", "Eftirnafn")].filter(Boolean).join(" ");
   const start = find("Ráðningartími", "Fyrsti starfsdagur");
-  const role = is(find("Starfssvið", "Starfsheiti"));
-  const ratio = is(find("Vinnutími", "Starfshlutfall")).replace(/^(Fullt starf|Hlutastarf)\s*/, "");
+  // Kennitala sýnd aðeins ef hún er 10 tölustafir (ekki fæðingardagur eða „—“).
+  const kt = (v: string) => { const d = v.replace(/\D/g, ""); return d.length === 10 ? `${d.slice(0, 6)}-${d.slice(6)}` : ""; };
+  const ktEr = kt(find("Vinnuveitandi", "Kennitala"));
+  const ktEe = kt(find("Starfsmaður", "Kennitala"));
+  const role = is(find("Starfssvið", "Starfsheiti") || any("Starfsheiti", "Staða"));
+  const ratio = is(find("Vinnutími", "Starfshlutfall") || any("Starfshlutfall")).replace(/^(Fullt starf|Hlutastarf)\s*/, "");
   const arr = is(find("Vinnutími", "Fyrirkomulag")).toLowerCase();
-  const pay = find("Laun", "Dagvinna");
-  const monthly = find("Laun", "Laun kr.");
-  const agreement = find("Kjarasamningur", "Kjarasamningur");
+  const pay = find("Laun", "Dagvinna") || any("Dagvinna", "Taxti", "Tímakaup");
+  const monthly = find("Laun", "Laun kr.") || any("Mánaðarlaun");
+  const agreement = find("Kjarasamningur", "Kjarasamningur") || any("Kjarasamningur", "Stéttarfélag");
   const sentence: [string, string] | null = employer && name
-    ? [`${employer} ræður ${name} til starfa${start ? ` frá ${start}` : ""} á þeim kjörum sem hér fara á eftir.`,
+    ? [`${employer}${ktEr ? ` (kt. ${ktEr})` : ""} ræður ${name}${ktEe ? ` (kt. ${ktEe})` : ""} til starfa${start ? ` frá ${start}` : ""} á þeim kjörum sem hér fara á eftir.`,
        `${employer} employs ${name}${start ? ` from ${start}` : ""} on the terms set out below.`]
     : null;
+  const names = sentence ? { employer, employee: name } : null;
+  if (!role && !ratio && !arr && !pay && !monthly && !agreement) return { sentence, names, tiles: [] };
   return {
     sentence,
+    names,
     tiles: [
       { label: "Starf · Role", value: role || "—" },
       { label: "Starfshlutfall · Ratio", value: [ratio, arr].filter(Boolean).join(" · ") || "—" },
@@ -143,7 +175,9 @@ export async function downloadContractPdf(title: string, content: string, signat
   doc.save(`${ascii || "Radningarsamningur"}.pdf`);
 }
 
-export async function buildContractPdf(content: string, signatures: SignatureRecord[] = []): Promise<jsPDF> {
+/** `stampStrip`: Taktikal setur undirskriftarstimpla sína neðst á síðustu síðu (BottomLastPage) —
+ *  þá er beltið haldið auðu, fóturinn færður upp og undirskriftarlínum skipt út fyrir tilvísun. */
+export async function buildContractPdf(content: string, signatures: SignatureRecord[] = [], opts: { stampStrip?: boolean } = {}): Promise<jsPDF> {
   const { jsPDF } = await import("jspdf");
   const fonts = await import("./fonts/general-sans");
   const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -169,14 +203,32 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
   const parsed = parseContract(content);
   const [tIs, tEn] = splitLang(parsed.title);
   const summary = contractSummary(parsed.sections);
-  const empName = summary.sentence ? (summary.sentence[0].split(" ræður ")[1] ?? "").split(" til starfa")[0] : "";
+  const empName = summary.names?.employee ?? "";
 
   // ---- Hlýr haus: merki, titill, samantekt, fjórar lykiltölur ----
   let y = 0;
   {
     const inner = CW;
-    font("normal", 10, INK2);
-    const sIs = summary.sentence ? wrap(summary.sentence[0], inner * 0.78) : [];
+    // Íslenska setningin með feitletruðum nöfnum: orð fyrir orð, hvert með sínu letri.
+    type Run = { t: string; b: boolean };
+    const richWrap = (runs: Run[], width: number): Run[][] => {
+      const words: Run[] = [];
+      for (const r of runs) for (const w of r.t.split(/(\s+)/)) if (w) words.push({ t: w, b: r.b });
+      const lines: Run[][] = [[]]; let lw = 0;
+      for (const w of words) {
+        font(w.b ? "bold" : "normal", 10, INK2);
+        const ww = doc.getTextWidth(w.t);
+        if (/^\s+$/.test(w.t)) { if (lines[lines.length - 1].length) { lines[lines.length - 1].push(w); lw += ww; } continue; }
+        if (lw + ww > width && lines[lines.length - 1].length) {
+          const cur = lines[lines.length - 1];
+          while (cur.length && /^\s+$/.test(cur[cur.length - 1].t)) cur.pop();
+          lines.push([]); lw = 0;
+        }
+        lines[lines.length - 1].push(w); lw += ww;
+      }
+      return lines.filter((l) => l.length);
+    };
+    const sIs = summary.sentence ? richWrap(boldNames(summary.sentence[0], summary.names), inner * 0.78) : [];
     font("italic", 9, WARM_MUT);
     const sEn = summary.sentence ? wrap(summary.sentence[1], inner * 0.78) : [];
     // Lykiltölur: gildið má fara í tvær línur (annars „…“); allir kassar jafnháir þeim hæsta.
@@ -190,7 +242,7 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
       return [ls[0], `${last.trimEnd()}…`];
     });
     const maxLines = Math.max(1, ...tileLines.map((l) => l.length));
-    const tileH = 27 + maxLines * 12.5;
+    const tileH = summary.tiles.length ? 27 + maxLines * 12.5 : -4;
     const headH = 34 + 20 + 30 + 14 + (sIs.length ? sIs.length * 13.5 + sEn.length * 12 + 14 : 0) + tileH + 4 + 24;
     doc.setFillColor(...WARM); doc.rect(0, 0, W, headH, "F");
     y = 34;
@@ -203,7 +255,11 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
     if (tEn) { font("italic", 10, WARM_MUT); doc.text(tEn, M, y); }
     y += 20;
     if (sIs.length) {
-      font("normal", 10, INK2); sIs.forEach((l) => { doc.text(l, M, y); y += 13.5; });
+      sIs.forEach((line) => {
+        let x = M;
+        for (const w of line) { font(w.b ? "bold" : "normal", 10, w.b ? INK : INK2); doc.text(w.t, x, y); x += doc.getTextWidth(w.t); }
+        y += 13.5;
+      });
       font("italic", 9, WARM_MUT); sEn.forEach((l) => { doc.text(l, M, y); y += 12; });
       y += 12;
     }
@@ -319,9 +375,22 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
       doc.setDrawColor(...INK); doc.setLineWidth(0.8); doc.line(x, y + 48, x + colW, y + 48);
       font("medium", 7.4, MUT); doc.text(`${labelIs} · ${labelEn}`, x, y + 59);
     };
-    sig(RX, emp, "Undirskrift atvinnurekanda", "Employer");
-    sig(RX + colW + COLG, ee, "Undirskrift starfsmanns", "Employee");
-    y += 80;
+    if (opts.stampStrip) {
+      let ty = y + 8;
+      font("normal", 9.6, INK);
+      wrap("Undirritað með rafrænum skilríkjum (fullgild undirskrift). Undirskriftir beggja aðila birtast neðst á þessari síðu.", RW)
+        .forEach((l) => { doc.text(l, RX, ty); ty += 12; });
+      font("italic", 8.3, MUT);
+      wrap("Signed with electronic ID (qualified signature). Both parties' signatures appear at the bottom of this page.", RW)
+        .forEach((l) => { doc.text(l, RX - 0, ty - 1.5); ty += 10.5; });
+      y = Math.max(ty, y + 22) + 14;
+    } else {
+      sig(RX, emp, "Undirskrift atvinnurekanda", "Employer");
+      sig(RX + colW + COLG, ee, "Undirskrift starfsmanns", "Employee");
+      y += 80;
+    }
+    // Stimplabelti Taktikal (~45 pt) + fótur fyrir ofan það verða að komast fyrir á síðustu síðu.
+    if (opts.stampStrip && y > H - 100) { doc.addPage(); y = 50; }
   }
 
   // ---- Undirritunarskrá (audit trail) ----
@@ -356,7 +425,7 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
   const pages = doc.getNumberOfPages();
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
-    const by = H - 26;
+    const by = opts.stampStrip && i === pages ? H - 62 : H - 26;
     doc.setDrawColor(...RULE); doc.setLineWidth(0.7); doc.line(M, by - 12, W - M, by - 12);
     mark(M, by + 0.5, 0.8);
     font("bold", 8.5, INK); doc.text("VAKTO", M + 16, by);

@@ -218,7 +218,7 @@
   (`lib/ai/schema.ts`) — API krefst additionalProperties:false, ≤24 valkvæðra og ≤16 nullable reita; án þess
   hafnaði það `aiSuggestRules` og `readAgreement` og kerfið féll hljóðlaust á sniðmát. „Ágiska með AI (án samnings)“
   sýnir viðvörun og krefst staðfestingar áður en vistað er.
-- 🟡 **Taktikal — fullgild undirskrift með rafrænum skilríkjum (30. sept 2026, migration 0062, ÓPRÓFAÐ gegn Taktikal):**
+- ✅ **Taktikal — fullgild undirskrift með rafrænum skilríkjum (30. sept 2026, migration 0062, sannreynt e2e gegn Taktikal DEV á preview):**
   `lib/taktikal.server.ts` (Signing API `POST /api/management/signing`, Basic Auth companyKey:apiKey, PDF
   `GET /api/pdf/{process}/{signee}.pdf`, webhook-HMAC). Fyrirtæki velur í Stillingum (`companies.esign_provider`,
   sést aðeins ef `TAKTIKAL_ENABLED=1`). Sending → `SignerModal` (kennitala/sími undirritara) → `startTaktikalSigning`
@@ -227,6 +227,15 @@
   AllSigned er PDF frá Taktikal vistað og sent báðum. Env: `TAKTIKAL_COMPANY_KEY/API_KEY/WEBHOOK_KEY` (á Vercel),
   `TAKTIKAL_BASE_URL` (þróun: onboardingdev), `TAKTIKAL_FLOW_KEY` (annars fyrsta flæði). Webhook-slóð þarf að skrá á
   flæðið í Taktikal. Samningur BGL: 26.300 kr/mán + 130 kr/undirskrift + Auðkenni ~119 kr.
+  **Lærdómur úr DEV-prófun:** webhook `TimeStamp` er 18 stafa JSON-tala sem JS les ónákvæmt → tíminn er lesinn úr
+  `SignedData` (strengur). Taktikal setur stimpla aðeins `TopFirstPage`/`BottomLastPage` (engin hnit) → PDF-ið fær
+  `stampStrip` (autt belti neðst, fótur færður upp, texti í stað undirskriftarlína). DEV-prófunaraðilar: kt. 5000101886 er
+  AÐEINS Auðkennisapp (virkar ekki) — nota SIM-aðila, t.d. 6000101991/3333333 og 6000101994/6666666. Tölvupóstar og
+  undirritunarsíða Taktikal sýna nafn Taktikal-aðgangsins (verður „VAKTO") — ekki stillanlegt per beiðni. Því sendir
+  Taktikal ENGAN póst: signees fá `communicationDeliveryType: None`, VAKTO sendir starfsmanni boðið (`sendTaktikalSignEmail`,
+  „<Fyrirtæki>: ráðningarsamningur til undirritunar") eftir undirskrift vinnuveitanda, og stimpillinn segir „Fyrir hönd:
+  <fyrirtæki>". **Á flæðinu í Taktikal-gáttinni (Stillingar → Flæði → Afhending) má AÐEINS webhook vera virkt** — eyða
+  „Afhending til eiganda ferlisins" og „Staðfestingarpóstur á viðskiptavin" (gert á DEV 30.9.2026 og á prod 1.10.2026, prod-flæði f48d19790c61).
 - ✅ **Verð v2 (30. sept 2026, migration 0063 á staging + prod):** 9.990 kr/mán með 5 VIRKUM starfsmönnum +
   1.490 kr á hvern virkan umfram + 490 kr á fullgilda undirskrift (Taktikal) — allt án VSK. **Eina verðskráin er
   `src/lib/pricing.ts`** (`PLANS`, `invoiceFor`, `planFor`) — reikningar, Stillingar, /admin og texti lesa þaðan. „Virkur“ =
