@@ -460,3 +460,5 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
   .ah-papers{height:470px}
   .ah-bento{gap:14px}
 }
+.ah-menu{background:#fbfbfd}
+.ah-nav.open{z-index:40}
