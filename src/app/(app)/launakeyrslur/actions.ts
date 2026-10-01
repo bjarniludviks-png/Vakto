@@ -66,7 +66,9 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
   const uppKind = uppbotForMonth(Number(from.slice(5, 7)));
 
   const lines = employees
-    .filter((e) => (byEmp.get(e.id)?.length ?? 0) > 0 || e.payType === "monthly")
+    // Allir starfsmenn í starfi fá línu — líka með 0 tíma (svo hægt sé að sækja launaseðil sem sýnir 0).
+    // Óvirkir koma aðeins með ef þeir unnu á tímabilinu. Payday-útflutningur sleppir núlllínum sjálfur.
+    .filter((e) => (byEmp.get(e.id)?.length ?? 0) > 0 || e.payType === "monthly" || e.status !== "inactive")
     .map((e) => {
       const ub = uppKind ? computeUppbot(resolveUppbot(e.union)[uppKind], e.employmentRatio) : 0;
       return computeFromPunches(e, byEmp.get(e.id) ?? [], resolveRuleSet(e.union, ruleMap.get(e.id)), ub);
@@ -87,11 +89,24 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
     const colorOf = (id: string) => employees.find((e) => e.id === id)?.avatarColor ?? "#5b50e6";
     const { lines, needsMigration } = await approvedLines(supabase, ctx.company, from, to);
     const t = sumTotals(lines);
+    const { data: co } = await supabase.from("companies").select("name, kennitala").eq("id", ctx.company).maybeSingle();
+    const empOf = (id: string) => employees.find((e) => e.id === id);
     return {
-      rows: lines.map((l) => ({
-        n: l.name.split(/\s+/)[0], av: initials(l.name), c: colorOf(l.employeeId),
-        h: dec1(l.hours), g: nf(l.gross), w: "−" + nf(l.withholding), p: "−" + nf(l.pension + l.union), net: nf(l.net),
-      })),
+      rows: lines.map((l) => {
+        const e = empOf(l.employeeId);
+        return {
+          n: l.name.split(/\s+/)[0], av: initials(l.name), c: colorOf(l.employeeId),
+          h: dec1(l.hours), g: nf(l.gross), w: "−" + nf(l.withholding), p: "−" + nf(l.pension + l.union), net: nf(l.net),
+          d: {
+            name: l.name, kennitala: e?.kennitala ?? null, title: e?.title || e?.position || null, union: e?.union ?? null, bankAccount: e?.bankAccount ?? null,
+            company: (co?.name as string) ?? "", companyKt: (co?.kennitala as string) ?? null,
+            period: `${niceISO(from)} – ${niceISO(to)}`, from, to,
+            payType: e?.payType === "monthly" ? "monthly" : "hourly", rate: e?.rate ?? 0,
+            hours: l.hours, dayPay: l.dayPay, premiums: l.premiums, overtime: l.overtime, uppbot: l.uppbot,
+            gross: l.gross, pension: l.pension, union: l.union, withholding: l.withholding, net: l.net,
+          },
+        };
+      }),
       totals: {
         count: lines.length, hours: dec1(t.hours), gross: nf(t.gross), withholding: "−" + nf(t.withholding),
         pensionUnion: "−" + nf(t.pension + t.union), net: nf(t.net), cost: nf(t.cost),

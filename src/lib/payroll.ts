@@ -30,10 +30,12 @@ type EmpPick = Pick<Employee, "id" | "fullName" | "payType" | "rate" | "employme
 
 // baseGross = pay from worked/contracted hours. uppbot is added on top (taxable +
 // pension-bearing) and tracked separately so it shows as its own launaliður.
-function finalize(e: EmpPick, hours: number, baseGross: number, uppbot = 0): PayLine {
-  const dayPay = Math.round(baseGross * 0.78);
-  const premiums = Math.round(baseGross * 0.15);
-  const overtime = Math.round(baseGross - dayPay - premiums);
+// split = raunveruleg sundurliðun (úr stimplunum). Án hennar er notuð gróf skipting sem má
+// ALDREI birta á launaseðli — aðeins fyrir yfirlitstölur (computeLine, demo).
+function finalize(e: EmpPick, hours: number, baseGross: number, uppbot = 0, split?: { dayPay: number; premiums: number; overtime: number }): PayLine {
+  const dayPay = split ? Math.round(split.dayPay) : Math.round(baseGross * 0.78);
+  const premiums = split ? Math.round(split.premiums) : Math.round(baseGross * 0.15);
+  const overtime = split ? Math.round(baseGross) - dayPay - premiums : Math.round(baseGross - dayPay - premiums);
   const gross = Math.round(baseGross) + Math.round(uppbot);
   const pension = Math.round(gross * PENSION_RATE);
   const union = Math.round(gross * UNION_RATE);
@@ -116,12 +118,12 @@ function bandPct(dt: Date, bands: Band[]): number {
  * night/holiday) + weekly overtime. Monthly staff keep their salary. */
 export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clockOut: string }[], rules: CustomRules, uppbot = 0): PayLine {
   if (e.payType === "monthly") {
-    return finalize(e, Math.round(MONTHLY_HOURS * (e.employmentRatio / 100)), e.rate, uppbot);
+    return finalize(e, Math.round(MONTHLY_HOURS * (e.employmentRatio / 100)), e.rate, uppbot, { dayPay: e.rate, premiums: 0, overtime: 0 });
   }
   const otWeekly = rules.otWeekly && rules.otWeekly > 0 ? rules.otWeekly : OT_WEEKLY;
   const otMonthly = rules.otMonthly && rules.otMonthly > 0 ? rules.otMonthly : Infinity;
   const bands = rules.bands ?? [];
-  let hours = 0, gross = 0, monthAcc = 0;
+  let hours = 0, gross = 0, monthAcc = 0, base = 0, premExtra = 0, otExtra = 0;
   const weekHrs = new Map<string, number>();
   const sorted = punches.slice().sort((a, b) => a.clockIn.localeCompare(b.clockIn));
   for (const p of sorted) {
@@ -132,16 +134,20 @@ export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clock
       const wk = mondayKey(dt);
       const acc = weekHrs.get(wk) ?? 0;
       const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-      let pct = Math.max(premiumPct(dt, STORHATID.has(iso), rules), bandPct(dt, bands));
+      const prem = Math.max(premiumPct(dt, STORHATID.has(iso), rules), bandPct(dt, bands));
+      let pct = prem;
+      const isOt = (acc >= otWeekly || monthAcc >= otMonthly) && rules.overtime > prem;
       if (acc >= otWeekly || monthAcc >= otMonthly) pct = Math.max(pct, rules.overtime); // yfirvinna (viku/mánuði)
       gross += e.rate * STEP * (1 + pct / 100);
+      base += e.rate * STEP;
+      if (isOt) otExtra += e.rate * STEP * (pct / 100); else premExtra += e.rate * STEP * (pct / 100);
       hours += STEP;
       monthAcc += STEP;
       weekHrs.set(wk, acc + STEP);
       t += STEP * 3600000;
     }
   }
-  return finalize(e, Math.round(hours * 10) / 10, Math.round(gross), uppbot);
+  return finalize(e, Math.round(hours * 10) / 10, Math.round(gross), uppbot, { dayPay: base, premiums: premExtra, overtime: otExtra });
 }
 
 /** Operational classification of worked hours + their extra cost (from punches)
