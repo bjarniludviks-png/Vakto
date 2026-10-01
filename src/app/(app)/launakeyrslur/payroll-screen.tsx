@@ -158,7 +158,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
             <thead><tr><th>{t("Starfsmaður")}</th><th className="r">{t("Tímar")}</th><th className="r">{t("Brúttó")}</th><th className="r">{t("Staðgreiðsla")}</th><th className="r">{t("Lífeyrir+félag")}</th><th className="r">{t("Útborgað")}</th></tr></thead>
             <tbody>
               {ROWS.length ? ROWS.map((r) => (
-                <tr className="rowlink" key={r.n} onClick={() => setSlip({ name: r.n, period: periodLabel, hours: r.h, gross: r.g, withholding: r.w.replace("−", ""), pension: r.p.replace("−", ""), net: r.net })}>
+                <tr className="rowlink" key={r.n} onClick={() => setSlip({ name: r.d?.name ?? r.n, period: periodLabel, hours: r.h, gross: r.g, withholding: r.w.replace("−", ""), pension: r.p.replace("−", ""), net: r.net, d: r.d })}>
                   <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.n}</span></td>
                   <td className="r">{r.h}</td>
                   <td className="r">{r.g}</td>

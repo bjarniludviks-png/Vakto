@@ -103,7 +103,7 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
             period: `${niceISO(from)} – ${niceISO(to)}`, from, to,
             payType: e?.payType === "monthly" ? "monthly" : "hourly", rate: e?.rate ?? 0,
             hours: l.hours, dayPay: l.dayPay, premiums: l.premiums, overtime: l.overtime, uppbot: l.uppbot,
-            gross: l.gross, pension: l.pension, union: l.union, withholding: l.withholding, net: l.net,
+            gross: l.gross, pension: l.pension, unionFee: l.union, withholding: l.withholding, net: l.net,
           },
         };
       }),

@@ -25,7 +25,7 @@ function rangeFor(p: Period): { from: string; to: string } {
   return { from: isoOf(new Date(t.getFullYear(), t.getMonth(), 1)), to: isoOf(new Date(t.getFullYear(), t.getMonth() + 1, 0)) };
 }
 
-export default function EmployeeTimesheet({ id, name, initial, initialMissed, needsMigration, from: f0, to: t0 }: { id: string; name: string; initial: PunchRow[]; initialMissed: MissedShift[]; needsMigration: boolean; from: string; to: string }) {
+export default function EmployeeTimesheet({ id, name, company, initial, initialMissed, needsMigration, from: f0, to: t0 }: { id: string; name: string; company?: string; initial: PunchRow[]; initialMissed: MissedShift[]; needsMigration: boolean; from: string; to: string }) {
   const { t } = useLang();
   const [period, setPeriod] = useState<Period>("Mánuður");
   const [from, setFrom] = useState(f0);
@@ -68,13 +68,13 @@ export default function EmployeeTimesheet({ id, name, initial, initialMissed, ne
   }
   const [exporting, setExporting] = useState(false);
   async function doExport(kind: "xlsx" | "pdf") {
-    if (!rows.length) { toast("Engar skráningar á tímabilinu"); return; }
+    // Líka með 0 færslum — skjalið staðfestir þá að ekkert var unnið á tímabilinu.
     setExporting(true);
     // Reuse the shared time-report export; the employee name is the report title.
     const data = rows.map((r) => ({ name, date: r.date, in: r.in, out: r.out, hours: r.hours, approved: r.approved }));
     try {
       if (kind === "xlsx") await exportTimeReportXlsx(data, name || "VAKTO", from, to);
-      else await exportTimeReportPdf(data, name || "VAKTO", from, to);
+      else await exportTimeReportPdf(data, company ?? "", from, to, name || "Starfsmaður");
       toast(kind === "xlsx" ? "Excel-skýrsla sótt" : "PDF-skýrsla sótt");
     } catch { toast("Villa við útflutning"); } finally { setExporting(false); }
   }
