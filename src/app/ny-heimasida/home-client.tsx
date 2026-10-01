@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import HomeChat from "../ny/home-chat";
+import AhFooter from "./ah-footer";
 
 const SHOT = "/showcase/forsida";
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -371,7 +372,7 @@ function Showcase() {
   };
   const run = playing && seen;
   return (
-    <section className="ah-sec ah-show" aria-roledescription="glærusýning" aria-label="Kynntu þér VAKTO">
+    <section className="ah-sec ah-show" id="kynning" aria-roledescription="glærusýning" aria-label="Kynntu þér VAKTO">
       <div className="ah-head ah-head-l"><h2>Kynntu þér VAKTO.</h2></div>
       <div className="ah-track" ref={track} onPointerDown={() => setPlaying(false)}>
         {SLIDES.map((s, i) => (
@@ -545,11 +546,7 @@ export default function AppleHome() {
         <Wallet />
         <Pricing />
       </main>
-      <footer className="ah-foot">
-        <Logo />
-        <div><a href="/skilmalar">Skilmálar</a><a href="/personuvernd">Persónuvernd</a><a href="/vafrakokur">Vafrakökur</a></div>
-        <span>© 2026 VAKTO</span>
-      </footer>
+      <AhFooter />
       <HomeChat lang="is" skin="ah" />
     </div>
   );

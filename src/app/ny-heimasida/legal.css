@@ -1,0 +1,17 @@
+/* Lögfræðisíður í útliti nýju forsíðunnar */
+.ah-legal{min-height:100dvh}
+.ah-legal-main{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:140px 20px 100px}
+.ah-legal-main h1{font-size:clamp(38px,5vw,60px);letter-spacing:-.04em}
+.ah-legal-upd{margin:16px 0 48px;color:#6e6e73;font-size:15px}
+.ah-legal-body{font-size:17px;line-height:1.65;color:#3a3a3f}
+.ah-legal-body h2{font-size:clamp(22px,2.4vw,28px);letter-spacing:-.025em;line-height:1.2;margin:52px 0 14px;color:var(--ink)}
+.ah-legal-body h3{font-size:19px;margin:28px 0 8px}
+.ah-legal-body p{margin:0 0 16px}
+.ah-legal-body ul,.ah-legal-body ol{margin:0 0 18px;padding-left:22px}
+.ah-legal-body li{margin:0 0 9px}
+.ah-legal-body b,.ah-legal-body strong{color:var(--ink);font-weight:600}
+.ah-legal-body a{color:#b85309!important;text-decoration:underline!important;text-underline-offset:2px}
+.ah-legal-body .lg-note{background:#fff4e9;border-radius:16px;padding:18px 20px;margin:0 0 28px;color:#3a3a3f;box-shadow:0 0 0 1px rgba(233,112,15,.15)}
+.ah-legal-body table{width:100%;border-collapse:collapse;font-size:15px;margin:8px 0 22px;display:block;overflow-x:auto}
+.ah-legal-body th,.ah-legal-body td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.ah-legal-body th{font-weight:600;color:var(--ink);font-size:14px}
