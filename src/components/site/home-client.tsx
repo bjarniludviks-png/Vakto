@@ -62,7 +62,7 @@ function Logo() {
 }
 
 /** Appelsínugulur bjarmi í bakgrunni: daufur efst, fyllir síðuna og færist til þegar skrunað er. */
-function Glow() {
+export function Glow() {
   const a = useRef<HTMLDivElement>(null), b = useRef<HTMLDivElement>(null), c = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;

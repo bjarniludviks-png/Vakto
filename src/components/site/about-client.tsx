@@ -4,6 +4,7 @@
 import AhFooter from "./ah-footer";
 import SiteNav from "./site-nav";
 import { useSiteLang } from "./lang";
+import { Glow } from "./home-client";
 
 const A = {
   is: {
@@ -42,6 +43,7 @@ export default function AboutClient() {
   const t = A[useSiteLang()];
   return (
     <div className="ah ah-about">
+      <Glow />
       <SiteNav current="about" />
       <main id="efni">
         <section className="ab-hero">

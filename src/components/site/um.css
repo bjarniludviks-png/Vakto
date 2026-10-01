@@ -27,3 +27,5 @@
   .ab-pains{grid-template-columns:1fr}
   .ab-quote{padding:80px 20px}
 }
+/* Appelsínuguli bjarminn (Glow) sést í gegn eins og á forsíðunni; hetjumyndin og spjöldin eru ógegnsæ ofan á */
+.ah-about .ah-foot{position:relative;z-index:1}
