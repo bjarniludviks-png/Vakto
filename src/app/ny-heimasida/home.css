@@ -79,7 +79,7 @@
 /* ---------- 1. hetja / aðdráttur ---------- */
 .ah-hero{position:relative;height:360vh}
 .ah-sticky{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px}
-.ah-hero-head{position:absolute;top:calc(env(safe-area-inset-top,0px) + 14vh);left:0;right:0;text-align:center;padding:0 20px;will-change:transform,opacity}
+.ah-hero-head{position:absolute;top:calc(env(safe-area-inset-top,0px) + 11vh);left:0;right:0;text-align:center;padding:0 20px;will-change:transform,opacity}
 .ah-ctas{display:flex;gap:26px;justify-content:center;align-items:center;margin-top:32px;flex-wrap:wrap}
 .ah-hero-frame{position:relative;width:min(1080px,92vw);will-change:transform}
 .ah-hero .ah-mac-view img{transform-origin:23.6% 58.5%}

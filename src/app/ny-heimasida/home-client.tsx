@@ -139,7 +139,7 @@ function HeroZoom() {
   const ref = useScrub((p) => {
     const a = ease(seg(p, 0, 0.3)), z = ease(seg(p, 0.32, 0.72));
     if (head.current) { head.current.style.opacity = String(1 - seg(p, 0.05, 0.25)); head.current.style.transform = `translate3d(0, ${-60 * seg(p, 0, 0.3)}px, 0)`; }
-    if (frame.current) frame.current.style.transform = `translate3d(0, ${(1 - a) * 34}vh, 0) scale(${0.82 + a * 0.18})`;
+    if (frame.current) frame.current.style.transform = `translate3d(0, ${(1 - a) * 44}vh, 0) scale(${0.82 + a * 0.18})`;
     if (img.current) img.current.style.transform = `scale(${1 + z * 2.1})`;
     if (ring.current) ring.current.style.opacity = String(seg(p, 0.6, 0.72) * (1 - seg(p, 0.94, 1)));
     if (cap1.current) { const o = seg(p, 0.5, 0.6) * (1 - seg(p, 0.76, 0.82)); cap1.current.style.opacity = String(o); cap1.current.style.transform = `translate3d(0, ${(1 - o) * 18}px, 0)`; }
@@ -196,11 +196,11 @@ function Features() {
         </Reveal>
         <Reveal className="ah-tile">
           <div className="ah-tile-tx"><h3>Frávik með krónutölu.</h3><p>Hver mætti seint, hver fór fyrr og hvað það kostaði.</p></div>
-          <Crop src={`${SHOT}/light/timaskraning.jpg`} alt="Tímaskráning með frávikum" pos="66% 36%" zoom={1.55} />
+          <Crop src={`${SHOT}/light/timaskraning.jpg`} alt="Tímaskráning með frávikum" pos="65% 35%" zoom={1.4} />
         </Reveal>
         <Reveal className="ah-tile" delay={80}>
           <div className="ah-tile-tx"><h3>Laun eftir kjarasamningi.</h3><p>Álag, yfirvinna og uppbót reiknuð. Beint í Payday eða DK.</p></div>
-          <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt="Launakeyrsla mánaðarins" pos="52% 32%" zoom={1.55} />
+          <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt="Launakeyrsla mánaðarins" pos="65% 35%" zoom={1.4} />
         </Reveal>
         <Reveal className="ah-tile ah-wide">
           <div className="ah-tile-tx"><h3>Innsýn sem skiptir máli.</h3><p>Velta, launakostnaður og laun % mánuð fyrir mánuð. Engar skýrslur til að setja saman, þær eru þegar til.</p></div>
