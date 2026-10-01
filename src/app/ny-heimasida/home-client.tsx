@@ -23,7 +23,7 @@ function useScrub(cb: (p: number, el: HTMLElement) => void, mode: "sticky" | "vi
     const el = ref.current;
     if (!el) return;
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return; // kyrrstætt upphafsútlit
-    let raf = 0;
+    let raf = 0, live = false;
     const run = () => {
       raf = 0;
       const r = el.getBoundingClientRect();
@@ -33,10 +33,14 @@ function useScrub(cb: (p: number, el: HTMLElement) => void, mode: "sticky" | "vi
       cbRef.current(p, el);
     };
     const on = () => { if (!raf) raf = requestAnimationFrame(run); };
+    // Skrunhlustari aðeins virkur á meðan kaflinn er á skjánum; rAF-samræmt; skrifar transform/opacity beint (engin React-state).
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !live) { live = true; window.addEventListener("scroll", on, { passive: true }); window.addEventListener("resize", on); on(); }
+      else if (!e.isIntersecting && live) { live = false; window.removeEventListener("scroll", on); window.removeEventListener("resize", on); run(); }
+    });
+    io.observe(el);
     run();
-    window.addEventListener("scroll", on, { passive: true });
-    window.addEventListener("resize", on);
-    return () => { window.removeEventListener("scroll", on); window.removeEventListener("resize", on); cancelAnimationFrame(raf); };
+    return () => { io.disconnect(); window.removeEventListener("scroll", on); window.removeEventListener("resize", on); cancelAnimationFrame(raf); };
   }, [mode]);
   return ref;
 }
@@ -145,12 +149,11 @@ function HeroZoom() {
     <section className="ah-hero" ref={ref}>
       <div className="ah-sticky">
         <div className="ah-hero-head" ref={head}>
-          <p className="ah-eyebrow">VAKTO</p>
           <h1>Vaktin, launin og yfirsýnin.<br /><span>Á einum stað.</span></h1>
-          <p className="ah-lede">Vaktaplan, stimpilklukka, launakeyrsla og ráðningarsamningar — og launakostnaður sem hlutfall af veltu, í rauntíma.</p>
+          <p className="ah-lede">Vaktaplan, stimpilklukka, launakeyrsla og ráðningarsamningar. Og launakostnaður sem hlutfall af veltu, í rauntíma.</p>
           <div className="ah-ctas">
-            <a className="ah-btn" href="/nyskraning">Prófa frítt í 14 daga</a>
-            <a className="ah-link" href="#kerfid">Sjá kerfið <span aria-hidden="true">↓</span></a>
+            <a className="ah-btn" href="/nyskraning">Prófa frítt</a>
+            <a className="ah-link" href="#kerfid">Sjá kerfið</a>
           </div>
         </div>
         <div className="ah-hero-frame" ref={frame}>
@@ -158,7 +161,7 @@ function HeroZoom() {
             <div className="ah-ring-hl" ref={ring} aria-hidden="true" />
           </MacFrame>
           <div className="ah-zcap" ref={cap1}><b>Laun sem % af veltu.</b> Ein tala sem segir hvort vaktin borgar sig.</div>
-          <div className="ah-zcap" ref={cap2}><b>Grænt, gult eða rautt.</b> Reiknað úr stimplunum jafnóðum — ekki í lok mánaðar.</div>
+          <div className="ah-zcap" ref={cap2}><b>Grænt, gult eða rautt.</b> Reiknað úr stimplunum jafnóðum, ekki í lok mánaðar.</div>
         </div>
       </div>
     </section>
@@ -180,7 +183,6 @@ function Features() {
   return (
     <section className="ah-sec" id="kerfid">
       <Reveal className="ah-head">
-        <p className="ah-eyebrow">Kerfið</p>
         <h2>Allt sem vaktin þarf.<br /><span>Ekkert sem hún þarf ekki.</span></h2>
       </Reveal>
       <div className="ah-bento">
@@ -188,20 +190,20 @@ function Features() {
           <div className="ah-tile-tx"><h3>Vaktaplan á korteri.</h3><p>Dragðu vaktir til, afritaðu síðustu viku eða biddu gervigreindina um plan sem passar veltuspánni. Launakostnaðurinn reiknast á meðan.</p></div>
           <Crop src={`${SHOT}/light/vaktaplan.jpg`} alt="Vaktaplan vikunnar" pos="62% 38%" zoom={1.45} ratio="16 / 8" />
         </Reveal>
-        <Reveal className="ah-tile ah-tall" delay={80}>
+        <Reveal className="ah-tile ah-tall ah-tile-warm" delay={80}>
           <div className="ah-tile-tx"><h3>Stimplað í símanum.</h3><p>Eða á spjaldtölvu við innganginn. Staðsetning staðfest ef þú vilt.</p></div>
           <Phone src={`${SHOT}/light/phone-mitt.png`} alt="Mitt svæði í appinu: stimpla mig inn" />
         </Reveal>
         <Reveal className="ah-tile">
-          <div className="ah-tile-tx"><h3>Frávik með krónutölu.</h3><p>Hver mætti seint, hver fór fyrr — og hvað það kostaði.</p></div>
+          <div className="ah-tile-tx"><h3>Frávik með krónutölu.</h3><p>Hver mætti seint, hver fór fyrr og hvað það kostaði.</p></div>
           <Crop src={`${SHOT}/light/timaskraning.jpg`} alt="Tímaskráning með frávikum" pos="66% 36%" zoom={1.55} />
         </Reveal>
         <Reveal className="ah-tile" delay={80}>
-          <div className="ah-tile-tx"><h3>Laun eftir kjarasamningi.</h3><p>Álag, yfirvinna og uppbót reiknuð — beint í Payday eða DK.</p></div>
+          <div className="ah-tile-tx"><h3>Laun eftir kjarasamningi.</h3><p>Álag, yfirvinna og uppbót reiknuð. Beint í Payday eða DK.</p></div>
           <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt="Launakeyrsla mánaðarins" pos="52% 32%" zoom={1.55} />
         </Reveal>
         <Reveal className="ah-tile ah-wide">
-          <div className="ah-tile-tx"><h3>Innsýn sem skiptir máli.</h3><p>Velta, launakostnaður og laun % mánuð fyrir mánuð. Engar skýrslur til að setja saman — þær eru þegar til.</p></div>
+          <div className="ah-tile-tx"><h3>Innsýn sem skiptir máli.</h3><p>Velta, launakostnaður og laun % mánuð fyrir mánuð. Engar skýrslur til að setja saman, þær eru þegar til.</p></div>
           <Crop src={`${SHOT}/light/innsyn.jpg`} alt="Innsýn: velta og launakostnaður" pos="62% 60%" zoom={1.35} ratio="16 / 8" />
         </Reveal>
       </div>
@@ -212,19 +214,24 @@ function Features() {
 /* ---------- 3. Dökkt (samanburður ljóst / dökkt) ---------- */
 
 function DarkCompare() {
-  const box = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState(50);
+  const box = useRef<HTMLDivElement>(null), layer = useRef<HTMLDivElement>(null), handle = useRef<HTMLDivElement>(null);
+  const pos = useRef(50);
   const touched = useRef(false);
-  const ref = useScrub((p) => { if (!touched.current) setPos(Math.round(100 - ease(seg(p, 0.12, 0.4)) * 50)); }, "view");
+  const paint = (v: number) => {
+    pos.current = clamp(v, 0, 100);
+    if (layer.current) layer.current.style.clipPath = `inset(0 0 0 ${pos.current}%)`;
+    if (handle.current) handle.current.style.left = `${pos.current}%`;
+    box.current?.setAttribute("aria-valuenow", String(Math.round(pos.current)));
+  };
+  const ref = useScrub((p) => { if (!touched.current) paint(100 - ease(seg(p, 0.12, 0.4)) * 50); }, "view");
   const move = (clientX: number) => {
     const r = box.current?.getBoundingClientRect(); if (!r) return;
     touched.current = true;
-    setPos(clamp(((clientX - r.left) / r.width) * 100, 0, 100));
+    paint(((clientX - r.left) / r.width) * 100);
   };
   return (
     <section className="ah-dark" ref={ref}>
       <Reveal className="ah-head">
-        <p className="ah-eyebrow">Ljóst og dökkt</p>
         <h2>Fallegt í birtu.<br /><span>Líka á næturvaktinni.</span></h2>
         <p className="ah-lede">Kerfið fylgir stillingu tækisins. Dragðu til að bera saman.</p>
       </Reveal>
@@ -233,21 +240,21 @@ function DarkCompare() {
           className="ah-compare" ref={box}
           onPointerDown={(e) => { (e.target as HTMLElement).setPointerCapture?.(e.pointerId); move(e.clientX); }}
           onPointerMove={(e) => { if (e.buttons) move(e.clientX); }}
-          role="slider" aria-label="Bera saman ljóst og dökkt" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pos)} tabIndex={0}
-          onKeyDown={(e) => { if (e.key === "ArrowLeft") { touched.current = true; setPos((v) => clamp(v - 5, 0, 100)); } if (e.key === "ArrowRight") { touched.current = true; setPos((v) => clamp(v + 5, 0, 100)); } }}
+          role="slider" aria-label="Bera saman ljóst og dökkt" aria-valuemin={0} aria-valuemax={100} aria-valuenow={50} tabIndex={0}
+          onKeyDown={(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { touched.current = true; paint(pos.current + (e.key === "ArrowLeft" ? -5 : 5)); } }}
         >
           <MacFrame src={`${SHOT}/light/vaktaplan.jpg`} alt="Vaktaplan í ljósu þema" url="vakto.is/vaktaplan" />
-          <div className="ah-compare-dark" style={{ clipPath: `inset(0 0 0 ${pos}%)` }}>
+          <div className="ah-compare-dark" ref={layer} style={{ clipPath: "inset(0 0 0 50%)" }}>
             <MacFrame src={`${SHOT}/dark/vaktaplan.jpg`} alt="Vaktaplan í dökku þema" url="vakto.is/vaktaplan" />
           </div>
-          <div className="ah-handle" style={{ left: `${pos}%` }} aria-hidden="true"><span>‹ ›</span></div>
+          <div className="ah-handle" ref={handle} style={{ left: "50%" }} aria-hidden="true"><span>‹ ›</span></div>
         </div>
       </Reveal>
       <div className="ah-dark-row">
         <Reveal><Phone dark src={`${SHOT}/dark/phone-mitt.png`} alt="Appið í dökku þema" /></Reveal>
         <Reveal delay={100} className="ah-dark-copy">
           <h3>Starfsfólkið fær appið.</h3>
-          <p>Vaktirnar, stimplun, áætluð laun, orlofsstaða, frí og vaktaskipti — og spjall og fréttaveita fyrir allan hópinn.</p>
+          <p>Vaktirnar, stimplun, áætluð laun, orlofsstaða, frí og vaktaskipti. Og spjall og fréttaveita fyrir allan hópinn.</p>
           <ul className="ah-ticks">
             <li>iPhone og Android</li><li>Íslenska, enska og víetnamska</li><li>Tilkynning þegar planið breytist</li>
           </ul>
@@ -276,7 +283,7 @@ function Contract() {
           <h2>Samningur á mínútu.<br /><span>Undirritaður á annarri.</span></h2>
           <p className="ah-lede">VAKTO fyllir út ráðningarsamning úr gögnum starfsmannsins, eftir formi Vinnumálastofnunar. Báðir skrifa undir í símanum og fá undirritað eintak í pósti.</p>
           <ul className="ah-ticks">
-            <li>Fylgir formi Vinnumálastofnunar — íslenska og enska</li>
+            <li>Fylgir formi Vinnumálastofnunar, á íslensku og ensku</li>
             <li>Undirritun með kóða í pósti eða rafrænum skilríkjum</li>
             <li>Fingrafar skjals og undirritunarskrá fylgja</li>
             <li>Launaseðlar og tímaskrár í sama stíl</li>
@@ -334,9 +341,8 @@ function Wallet() {
       <div className="ah-split ah-split-rev">
         <div className="ah-pass-wrap"><div ref={card}><WalletCard /></div></div>
         <Reveal className="ah-split-tx">
-          <p className="ah-eyebrow">Starfsmannaskírteini</p>
           <h2>Skírteinið er í símanum.<br /><span>Í Apple og Google Wallet.</span></h2>
-          <p className="ah-lede">Hver starfsmaður fær skírteini með mynd, stöðu og QR-kóða. Kóðinn stimplar inn á spjaldtölvunni við innganginn — enginn PIN-kóði til að gleyma.</p>
+          <p className="ah-lede">Hver starfsmaður fær skírteini með mynd, stöðu og QR-kóða. Kóðinn stimplar inn á spjaldtölvunni við innganginn. Enginn PIN-kóði til að gleyma.</p>
           <div className="ah-badges" aria-hidden="true">
             <span className="ah-badge"><svg viewBox="0 0 24 24"><path d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.8-1.5 0-2.9.9-3.7 2.3-1.6 2.8-.4 6.9 1.1 9.1.8 1.1 1.7 2.3 2.8 2.3 1.1 0 1.6-.7 3-.7s1.8.7 3 .7 2-1.1 2.7-2.2c.9-1.3 1.2-2.5 1.2-2.6 0 0-2.3-.9-2.2-3.7zM14.2 5.8c.6-.8 1-1.8.9-2.8-.9 0-2 .6-2.6 1.4-.6.7-1.1 1.7-.9 2.7 1 .1 2-.5 2.6-1.3z" /></svg>Apple Wallet</span>
             <span className="ah-badge ah-badge-g">Google Wallet</span>
@@ -353,14 +359,13 @@ function Pricing() {
   return (
     <section className="ah-sec ah-price" id="verd">
       <Reveal className="ah-head">
-        <p className="ah-eyebrow">Verð</p>
         <h2>Eitt verð. Allt innifalið.</h2>
       </Reveal>
       <Reveal className="ah-price-card">
         <div className="ah-amt">9.990 kr<small>/mán</small></div>
         <p>5 virkir starfsmenn innifaldir · 1.490 kr á hvern virkan umfram</p>
         <p className="ah-fine">Án VSK. Þú borgar aðeins fyrir þá sem unnu í mánuðinum. 15% afsláttur ef greitt er árlega. 14 daga frí prufa, engin binding.</p>
-        <a className="ah-btn ah-btn-lg" href="/nyskraning">Prófa frítt í 14 daga</a>
+        <a className="ah-btn ah-btn-lg" href="/nyskraning">Prófa frítt</a>
       </Reveal>
     </section>
   );
@@ -376,14 +381,16 @@ export default function AppleHome() {
     io.observe(dark);
     return () => io.disconnect();
   }, []);
+  const top = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    const on = () => setScrolled(window.scrollY > 8);
-    on();
-    window.addEventListener("scroll", on, { passive: true });
-    return () => window.removeEventListener("scroll", on);
+    const el = top.current; if (!el) return;
+    const io = new IntersectionObserver(([e]) => setScrolled(!e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
   }, []);
   return (
     <div className="ah">
+      <div ref={top} className="ah-top-sentinel" aria-hidden="true" />
       <Glow />
       <nav className={`ah-nav${scrolled ? " sc" : ""}${overDark ? " dk" : ""}`}>
         <a href="/ny-heimasida" aria-label="VAKTO"><Logo /></a>

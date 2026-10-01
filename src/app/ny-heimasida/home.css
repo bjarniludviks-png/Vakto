@@ -11,6 +11,7 @@
 .ah a{color:inherit;text-decoration:none}
 .ah img{display:block;max-width:100%}
 .ah main{position:relative;z-index:1}
+.ah-top-sentinel{position:absolute;top:0;left:0;width:1px;height:8px;pointer-events:none}
 
 /* ---------- appelsínugulur bjarmi ---------- */
 .ah-glow{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
@@ -100,6 +101,7 @@
   box-shadow:0 0 0 1px var(--line),0 20px 50px -30px rgba(40,25,10,.25);display:flex;flex-direction:column;gap:22px}
 .ah-tile p{color:var(--ink2);font-size:16px;line-height:1.5;margin:0;max-width:520px}
 .ah-wide{grid-column:span 2}
+.ah-tile-warm{background:linear-gradient(165deg,rgba(255,244,233,.92),rgba(253,226,200,.85));box-shadow:0 0 0 1px rgba(233,112,15,.14),0 20px 50px -30px rgba(233,112,15,.45)}
 .ah-tall{grid-row:span 2;padding-bottom:32px;justify-content:space-between}
 .ah-tall .ah-phone{width:min(250px,64vw)}
 .ah-crop{position:relative;margin:0 -32px;overflow:hidden;border-top:1px solid var(--line);background:#f3f3f5;margin-top:auto}
@@ -108,7 +110,7 @@
 @media (max-width:900px){.ah-bento{grid-template-columns:1fr}.ah-wide,.ah-tall{grid-column:auto;grid-row:auto}}
 
 /* ---------- 3. dökkt ---------- */
-.ah-dark{position:relative;background:#000;color:#f5f5f7;padding:150px max(20px, calc((100vw - 1100px)/2));overflow:hidden}
+.ah-dark{position:relative;background:#0a0a0b;color:#f5f5f7;padding:150px max(20px, calc((100vw - 1100px)/2));overflow:hidden}
 .ah-dark::before{content:"";position:absolute;inset:auto -20% -40% -20%;height:80%;background:radial-gradient(closest-side,rgba(233,112,15,.32),transparent);pointer-events:none}
 .ah-dark h2 span,.ah-dark .ah-lede{color:#a1a1a6}
 .ah-compare{position:relative;max-width:1080px;margin:0 auto;touch-action:pan-y;cursor:ew-resize;user-select:none;outline:none}
