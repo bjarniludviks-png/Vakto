@@ -425,3 +425,38 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 .ah-lang:hover{color:var(--ink)}
 .ah-nav.dk .ah-lang{color:#a1a1a6}.ah-nav.dk .ah-lang:hover{color:#fff}
 @media (max-width:420px){.ah-nav-cta{gap:10px}.ah-nav-in{font-size:13px}}
+
+/* ---------- Valmynd í síma (þrjú strik) ---------- */
+.ah-burger{display:none;position:relative;width:40px;height:40px;margin-right:-8px;border:0;background:none;cursor:pointer;border-radius:10px;color:var(--ink)}
+.ah-burger i{position:absolute;left:11px;right:11px;height:1.8px;border-radius:2px;background:currentColor;transition:transform .3s var(--ease),top .3s var(--ease)}
+.ah-burger i:first-child{top:15px}.ah-burger i:last-child{top:23px}
+.ah-nav.open .ah-burger i:first-child{top:19px;transform:rotate(45deg)}
+.ah-nav.open .ah-burger i:last-child{top:19px;transform:rotate(-45deg)}
+.ah-nav.dk .ah-burger{color:#f5f5f7}
+.ah-menu{position:absolute;left:0;right:0;top:100%;height:calc(100dvh - 100% - env(safe-area-inset-top,0px));border-top:1px solid var(--line);background:rgba(251,251,253,.98);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);
+  padding:18px 28px calc(30px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;overflow-y:auto;animation:ah-menu-in .32s var(--ease)}
+.ah-menu[hidden]{display:none}
+.ah-menu a{font-size:28px;font-weight:650;letter-spacing:-.025em;color:var(--ink);padding:12px 0;border-bottom:1px solid var(--line)}
+.ah-menu-lang{margin-top:22px}
+.ah-menu-lang .ah-lang{font-size:16px;color:var(--ink2)}
+.ah-menu-lang .ah-lang svg{width:20px;height:20px}
+@keyframes ah-menu-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.ah-menu{animation:none}.ah-burger i{transition:none}}
+@media (max-width:760px){
+  .ah-burger{display:block}
+  .ah-nav-desk{display:none!important}
+  .ah-nav-cta{gap:6px}
+}
+@media (min-width:761px){.ah-menu{display:none!important}}
+
+/* ---------- Þéttari bil í síma ---------- */
+@media (max-width:700px){
+  .ah-sec,.ah-dark{padding-top:72px;padding-bottom:72px}
+  .ah-head{margin-bottom:32px}
+  .ah-head-l{margin-bottom:24px}
+  .ah-dark-row{margin-top:72px;gap:40px}
+  .ah-price{padding-bottom:96px}
+  .ah-split{gap:40px}
+  .ah-papers{height:470px}
+  .ah-bento{gap:14px}
+}
