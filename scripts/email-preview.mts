@@ -15,7 +15,7 @@ const orig = M._resolveFilename;
 M._resolveFilename = function (req: string, ...a: unknown[]) { return req === "server-only" ? stub : orig.call(this, req, ...a); };
 
 process.env.EMAIL_PREVIEW = "1";
-const E = await import("../src/lib/email.ts");
+const E = await import("../src/lib/email");
 const out = process.argv[2] ?? "email-preview";
 fs.mkdirSync(out, { recursive: true });
 
