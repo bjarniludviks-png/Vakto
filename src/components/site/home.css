@@ -468,3 +468,14 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 .ah-hero-v .ah-mac-view video{display:block;width:100%;height:100%;object-fit:cover;object-position:top left;background:#f3f3f5}
 @media (max-width:700px){.ah-hero-v{height:150vh}}
 @media (prefers-reduced-motion: reduce){.ah-hero-v{height:auto}}
+
+/* ---------- Sími: hetjan rúllar eðlilega (engin sticky-skrunlengd = ekkert autt bil) ---------- */
+@media (max-width:700px){
+  .ah-hero-v{height:auto}
+  .ah-hero-v .ah-sticky{position:relative;height:auto;overflow:visible;padding:calc(env(safe-area-inset-top,0px) + 104px) 20px 8px}
+  .ah-hero-v .ah-hero-head{position:relative;top:auto;padding:0;opacity:1!important;transform:none!important}
+  .ah-hero-v .ah-hero-frame{width:100%;margin-top:36px;transform:none!important}
+  .ah-hero-v + .ah-sec{padding-top:56px}
+}
+/* Fótur í síma: þéttari tenglar en samt 32px snertiflötur */
+@media (pointer:coarse){.ah-foot nav{gap:0}.ah-foot nav a{min-height:32px}.ah-foot h2{margin-bottom:6px}.ah-foot-grid{gap:28px 24px}}
