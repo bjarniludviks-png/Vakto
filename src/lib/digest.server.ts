@@ -41,8 +41,10 @@ export async function sendDigests(now = new Date()): Promise<{ sent: number }> {
       .from("users").select("email, full_name, role").eq("company_id", company).in("role", ["owner", "manager"]);
     const emails = (recipients ?? []).map((r) => r.email as string).filter(Boolean);
     if (!emails.length) continue;
-    const { data: emps } = await admin.from("employees").select("id, full_name, rate").eq("company_id", company);
-    const rate = new Map((emps ?? []).map((e) => [e.id as string, Number(e.rate) || 0]));
+    const { data: emps } = await admin.from("employees").select("id, full_name, rate, pay_type, status").eq("company_id", company);
+    // Aðeins tímakaup er margfaldað með tímum — mánaðarlaun eru föst laun, ekki kr/klst.
+    const rate = new Map((emps ?? []).filter((e) => e.pay_type !== "monthly").map((e) => [e.id as string, Number(e.rate) || 0]));
+    const monthlySalaries = (emps ?? []).filter((e) => e.pay_type === "monthly" && e.status !== "inactive").reduce((a, e) => a + (Number(e.rate) || 0), 0);
     const nameOf = new Map((emps ?? []).map((e) => [e.id as string, e.full_name as string]));
 
     for (const p of periods) {
@@ -81,6 +83,9 @@ export async function sendDigests(now = new Date()): Promise<{ sent: number }> {
         const day = (pu.clock_in as string).slice(0, 10);
         if (!scheduled.has(`${eid}:${day}`)) unschedBy.set(eid, (unschedBy.get(eid) ?? 0) + 1);
       }
+      // Mánaðarlaunafólk: laun hlutfallslega fyrir lengd tímabilsins (mánuður = full laun).
+      const days = Math.round((new Date(p.to).getTime() - new Date(p.from).getTime()) / 86400000) + 1;
+      cost += monthlySalaries * (p.kind === "monthly" ? 1 : days / 30.44) * 1.302;
       const unsched = [...unschedBy.values()].reduce((a, b) => a + b, 0);
       const dev = hours - planned;
       const devTxt = `${dev >= 0 ? "+" : "−"}${dec1(Math.abs(dev))} klst`;
