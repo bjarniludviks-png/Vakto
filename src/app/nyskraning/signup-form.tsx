@@ -38,7 +38,7 @@ const L = {
     emailPh: "netfang@fyrirtaeki.is",
     sending: "Sendi kóða…",
     sendCode: "Senda staðfestingarkóða",
-    trialNote: "{s.trialNote}",
+    trialNote: "14 daga frí prufa · engin binding · kort skráð í síðasta skrefi, ekkert dregið fyrr en prufan er búin.",
     haveAcc: "Ertu með aðgang?",
     signIn: "Skrá inn",
     codeH: "Sláðu inn kóðann",
