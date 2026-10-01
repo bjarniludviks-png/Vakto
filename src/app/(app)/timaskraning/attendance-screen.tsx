@@ -10,7 +10,7 @@ import { useLang } from "@/components/app/lang";
 import { TimeField } from "@/components/app/fields";
 import { EmptyState } from "@/components/app/empty-state";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
-import { PunchFlags, rowSeverity, rowAccent, spanText } from "./punch-flags";
+import { PunchFlags, spanText } from "./punch-flags";
 import { PunchDateTimeFields } from "./[id]/timesheet-screen";
 import { dec1 } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
@@ -373,7 +373,7 @@ function EmployeePunchesModal({ employeeId, name, from, to, onClose, onChanged }
           <div className="att" style={{ maxHeight: "52vh", overflowY: "auto" }}>
             {loading ? <div className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Hleð…")}</div>
               : rows.length ? rows.map((p) => (
-                <div className="it" key={p.punchId} style={rowAccent(rowSeverity(p))}>
+                <div className="it" key={p.punchId}>
                   <div className="tx">
                     <b>{niceISO(p.date)}</b>
                     <span>{spanText(p, t("opin"))}{p.open ? "" : ` · ${dec1(p.hours)} ${t("klst")}`}{p.sched ? ` · ${t("áætl.")} ${p.sched.start}–${p.sched.end}` : ""}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>

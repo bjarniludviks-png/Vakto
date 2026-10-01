@@ -91,19 +91,6 @@ function PunchMapModal({ geo, title, onClose }: { geo: PunchGeo; title?: string;
   );
 }
 
-/** Worst severity of a row's flags — drives the left accent bar. */
-export function rowSeverity(p: Pick<PunchRow, "flags">): "bad" | "warn" | null {
-  if (p.flags.some((f) => f.kind === "bad")) return "bad";
-  if (p.flags.length) return "warn";
-  return null;
-}
-
-/** Inline style for an `.att .it` row: colored accent on the left when flagged. */
-export function rowAccent(sev: "bad" | "warn" | null): React.CSSProperties {
-  if (!sev) return {};
-  return { boxShadow: `inset 3px 0 0 var(--${sev})`, paddingLeft: 12, marginLeft: -12, paddingRight: 12, marginRight: -12, borderRadius: 4 };
-}
-
 /** "08:00 – 02:15 (+1)" when a shift crossed midnight. */
 export function spanText(p: Pick<PunchRow, "in" | "out" | "outDate" | "date">, openWord: string): string {
   const out = p.out ?? openWord;

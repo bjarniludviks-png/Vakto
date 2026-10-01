@@ -9,7 +9,7 @@ import { TimeField, DateField } from "@/components/app/fields";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
 import { getEmployeePunches, adjustPunch, deletePunch, setPunchApproved, approveEmployeePunches, approvePunchList, type PunchRow, type MissedShift } from "../actions";
-import { PunchFlags, rowSeverity, rowAccent, spanText } from "../punch-flags";
+import { PunchFlags, spanText } from "../punch-flags";
 import { exportTimeReportXlsx, exportTimeReportPdf } from "@/lib/export-report";
 import { AsyncButton } from "@/components/app/async-button";
 
@@ -151,7 +151,7 @@ export default function EmployeeTimesheet({ id, name, company, initial, initialM
         </div>
         <div className="cb att" style={{ opacity: loading ? 0.5 : 1 }}>
           {items.length ? items.map((it) => it.kind === "missed" ? (
-            <div className="it" key={`m-${it.m.date}-${it.m.start}`} style={rowAccent("bad")}>
+            <div className="it" key={`m-${it.m.date}-${it.m.start}`}>
               <div className="tx">
                 <b>{niceISO(it.m.date)}</b>
                 <span>{t("Áætluð vakt")} {it.m.start} – {it.m.end} · {dec1(it.m.hours)} {t("klst")} · {t("engin stimplun")}</span>
@@ -159,7 +159,7 @@ export default function EmployeeTimesheet({ id, name, company, initial, initialM
               <div className="itact"><span className="tag bad">{t("vantar stimplun")}</span></div>
             </div>
           ) : (() => { const p = it.p; return (
-            <div className="it" key={p.punchId} style={rowAccent(rowSeverity(p))}>
+            <div className="it" key={p.punchId}>
               {!p.open && !p.approved && (
                 <input type="checkbox" style={{ flexShrink: 0 }} checked={selP.has(p.punchId)}
                   onChange={(e) => setSelP((sv) => { const n = new Set(sv); if (e.target.checked) n.add(p.punchId); else n.delete(p.punchId); return n; })} />
