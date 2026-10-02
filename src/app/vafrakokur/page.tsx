@@ -4,7 +4,7 @@ import "@/components/site/home.css";
 import "@/components/site/legal.css";
 import { CookiesBody, COOKIES_META } from "@/components/legal/cookies";
 
-export const metadata: Metadata = { title: "VAKTO — Vafrakökur", description: "Hvaða vafrakökur og geymslu vakto.is notar." };
+export const metadata: Metadata = { title: "VAKTO: Vafrakökur", description: "Hvaða vafrakökur og geymslu vakto.is notar.", alternates: { canonical: "/vafrakokur" } };
 
 export default function CookiesPage() {
   return (

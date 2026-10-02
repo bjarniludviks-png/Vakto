@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { SITE_URL } from "@/lib/site";
 
 const DESC = "Vaktakerfi fyrir íslenska vinnustaði: vaktaplan, stimpilklukka, launaútreikningur eftir kjarasamningi og laun sem % af veltu í rauntíma. Skírteini, spjall og ráðningarsamningar í símanum. 14 daga frí prufa.";
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is"),
-  title: "VAKTO — Einfaldasta vaktakerfið. Vaktaplan, stimpilklukka og laun.",
+  metadataBase: new URL(SITE_URL),
+  title: "VAKTO: vaktakerfi, vaktaplan, stimpilklukka og laun",
   description: DESC,
   keywords: ["vaktakerfi", "vaktaplan", "vaktaskipulag", "stimpilklukka", "tímaskráning", "launaútreikningur", "launakerfi", "laun% af veltu", "starfsmannakerfi", "veitingastaðir", "Payday"],
   manifest: "/manifest.webmanifest",
@@ -12,12 +13,13 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "VAKTO",
-    title: "VAKTO — Einfaldasta vaktakerfið. Vaktaplan, stimpilklukka og laun.",
+    title: "VAKTO: vaktakerfi, vaktaplan, stimpilklukka og laun",
     description: DESC,
     locale: "is_IS",
     url: "/",
   },
   twitter: { card: "summary_large_image", title: "VAKTO", description: DESC },
+  ...(process.env.NEXT_PUBLIC_GSC_VERIFICATION ? { verification: { google: process.env.NEXT_PUBLIC_GSC_VERIFICATION } } : {}),
 };
 
 export const viewport: Viewport = {

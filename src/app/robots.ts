@@ -1,12 +1,12 @@
 import type { MetadataRoute } from "next";
 
-const BASE = process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is";
+import { SITE_URL as BASE } from "@/lib/site";
 
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       // Public marketing/auth pages are crawlable; the authenticated app is not.
-      { userAgent: "*", allow: ["/", "/login", "/nyskraning", "/personuvernd", "/skilmalar", "/vafrakokur"], disallow: ["/maelabord", "/vaktaplan", "/timaskraning", "/launakeyrslur", "/starfsfolk", "/skyrslur", "/frammistada", "/mitt-svaedi", "/spjall", "/stillingar", "/hjalp", "/kiosk", "/api/", "/og/"] },
+      { userAgent: "*", allow: ["/", "/um-okkur", "/login", "/nyskraning", "/personuvernd", "/skilmalar", "/vafrakokur"], disallow: ["/admin", "/maelabord", "/vaktaplan", "/timaskraning", "/launakeyrslur", "/starfsfolk", "/skyrslur", "/frammistada", "/mitt-svaedi", "/spjall", "/stillingar", "/hjalp", "/kiosk", "/api/", "/og/"] },
     ],
     sitemap: `${BASE}/sitemap.xml`,
   };

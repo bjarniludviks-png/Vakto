@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AhLogo } from "./ah-footer";
 import { LangToggle, useLangSync } from "./lang";
+import SiteAnalytics from "./analytics";
 
 const N = {
   is: { product: "Kerfið", contracts: "Samningar", price: "Verð", about: "Um okkur", login: "Innskráning", try: "Prófa frítt", open: "Opna valmynd", close: "Loka valmynd" },
@@ -38,6 +39,7 @@ export default function SiteNav({ home = false, scrolled = true, dark = false, c
           <i /><i />
         </button>
       </div>
+      <SiteAnalytics />
       <div id="ah-menu" className="ah-menu" hidden={!open}>
         <a href={`${a}#kerfid`} onClick={close}>{t.product}</a>
         <a href={`${a}#samningar`} onClick={close}>{t.contracts}</a>

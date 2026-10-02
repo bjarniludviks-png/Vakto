@@ -1,14 +1,15 @@
 import type { MetadataRoute } from "next";
-
-const BASE = process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is";
+import { SITE_URL } from "@/lib/site";
 
 export default function sitemap(): MetadataRoute.Sitemap {
+  const now = new Date();
   return [
-    { url: `${BASE}/`, changeFrequency: "weekly", priority: 1 },
-    { url: `${BASE}/nyskraning`, changeFrequency: "monthly", priority: 0.8 },
-    { url: `${BASE}/login`, changeFrequency: "yearly", priority: 0.3 },
-    { url: `${BASE}/personuvernd`, changeFrequency: "yearly", priority: 0.3 },
-    { url: `${BASE}/skilmalar`, changeFrequency: "yearly", priority: 0.3 },
-    { url: `${BASE}/vafrakokur`, changeFrequency: "yearly", priority: 0.2 },
+    { url: `${SITE_URL}/`, lastModified: now, changeFrequency: "weekly", priority: 1 },
+    { url: `${SITE_URL}/um-okkur`, lastModified: now, changeFrequency: "monthly", priority: 0.7 },
+    { url: `${SITE_URL}/nyskraning`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
+    { url: `${SITE_URL}/login`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${SITE_URL}/personuvernd`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${SITE_URL}/skilmalar`, changeFrequency: "yearly", priority: 0.3 },
+    { url: `${SITE_URL}/vafrakokur`, changeFrequency: "yearly", priority: 0.2 },
   ];
 }

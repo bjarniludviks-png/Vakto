@@ -1,5 +1,5 @@
 // Efni síðunnar /personuvernd — birt í AhLegal (src/components/site/ah-legal.tsx) — (/personuvernd).
-export const PRIVACY_META = { title: "Persónuverndarstefna", updated: "21. september 2026" };
+export const PRIVACY_META = { title: "Persónuverndarstefna", updated: "2. október 2026" };
 
 export function PrivacyBody() {
   return (
@@ -28,7 +28,8 @@ export function PrivacyBody() {
         <li>Starfsmannaskírteini: nafn, staða, deild, starfsmannanúmer og QR-kóði. Sé skírteinið sett í Apple Wallet eða Google Wallet gilda skilmálar Apple/Google um geymslu þess í símanum.</li>
         <li>Push-tilkynningar: auðkenni tækis (push subscription) ef starfsmaður kveikir á tilkynningum.</li>
       </ul>
-      <p>VAKTO safnar ekki staðsetningargögnum (GPS) og notar engar greiningar- eða auglýsingavafrakökur á vakto.is. Sjá <a href="/vafrakokur">vafrakökur</a>.</p>
+      <ul><li>Staðsetning við stimplun: aðeins ef vinnuveitandi kveikir á staðsetningarkröfu. Þá er staðsetning símans skráð einu sinni þegar stimplað er inn og út, til að staðfesta að starfsmaður sé á vinnustaðnum. Engin rakning fer fram á milli stimplana og ekki í bakgrunni.</li></ul>
+      <p>VAKTO notar engar auglýsingavafrakökur. Á opna vefnum notum við Google Analytics aðeins ef gestur samþykkir það; inni í kerfinu er það aldrei notað. Sjá <a href="/vafrakokur">vafrakökur</a>.</p>
 
       <h2>3. Tilgangur og lagagrundvöllur</h2>
       <ul>
@@ -36,6 +37,7 @@ export function PrivacyBody() {
         <li>Öryggi, aðgangsstýring, aðgerðaskrá og varnir gegn misnotkun: lögmætir hagsmunir (6. gr. 1. mgr. f).</li>
         <li>Reikningagerð og bókhald: lagaskylda (6. gr. 1. mgr. c), m.a. bókhaldslög.</li>
         <li>Spjallið á heimasíðunni: lögmætir hagsmunir af því að svara fyrirspurnum. Samtöl eru send til gervigreindarþjónustu (sjá kafla 5) og geymd í allt að 12 mánuði.</li>
+        <li>Greining á notkun opna vefsins (Google Analytics): samþykki (6. gr. 1. mgr. a), sem má draga til baka hvenær sem er.</li>
         <li>Tölvupóstar um þjónustuna (t.d. plan birt, samningur bíður, prufa að renna út): efndir samnings. Við sendum ekki markaðspóst nema með samþykki.</li>
       </ul>
 
@@ -51,6 +53,7 @@ export function PrivacyBody() {
           <tr><td>Resend Inc.</td><td>Sending tölvupósta úr kerfinu</td><td>Bandaríkin/ESB undir SCC</td></tr>
           <tr><td>Straumur (Kvika banki hf.)</td><td>Greiðslusíða og kortageymsla (tokenization) fyrir áskriftargjöld. Kortanúmer fara aldrei um kerfi VAKTO; VAKTO geymir aðeins tilvísun (token), síðustu fjóra tölustafi og gildistíma.</td><td>Ísland</td></tr>
           <tr><td>Anthropic PBC</td><td>Gervigreind: svör spjallsins á heimasíðunni og tillögur að vaktaplani (aðeins þegar stjórnandi biður um það). Gögn eru ekki notuð til að þjálfa líkön.</td><td>Bandaríkin undir SCC</td></tr>
+          <tr><td>Google Ireland Ltd. / Google LLC</td><td>Google Analytics 4 á opna vefnum, aðeins með samþykki gests. Ekki notað inni í kerfinu.</td><td>ESB/Bandaríkin undir EU–US Data Privacy Framework og SCC</td></tr>
           <tr><td>Apple Inc. / Google LLC</td><td>Wallet-skírteini, eingöngu ef starfsmaður velur að bæta skírteininu í veskið sitt</td><td>Samkvæmt skilmálum Apple/Google</td></tr>
         </tbody>
       </table>

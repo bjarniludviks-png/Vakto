@@ -7,6 +7,7 @@ import SignupForm from "@/app/nyskraning/signup-form";
 import { AhLogo } from "./ah-footer";
 import { MacFrame, Phone } from "./home-client";
 import { LangToggle, useLangSync } from "./lang";
+import SiteAnalytics from "./analytics";
 
 const T = {
   is: {
@@ -30,6 +31,7 @@ function Top({ href, label }: { href: string; label: string }) {
     <div className="ah-auth-top">
       <Link href="/" aria-label="VAKTO" className="ah-auth-logo"><AhLogo /></Link>
       <span className="ah-auth-top-r"><LangToggle /><Link href={href}>{label}</Link></span>
+      <SiteAnalytics />
     </div>
   );
 }
