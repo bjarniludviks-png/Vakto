@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { PeriodPicker } from "@/components/app/period-picker";
 import { useLang } from "@/components/app/lang";
-import { dec1, krCompact } from "@/lib/format";
+import { dec1, kr, krCompact } from "@/lib/format";
 import { getDashboardPeriod, getLaborTrend, type PeriodData, type TrendPoint } from "./actions";
 import { OnboardingCard, useOnboardingHidden, onboardingProgress, ONBOARDING_TOTAL } from "./onboarding";
 import type { Onboarding } from "./dashboard.server";
@@ -32,7 +32,7 @@ const durSince = (iso: string, now: number) => { const m = Math.max(0, Math.floo
 const WD = ["Sun", "Mán", "Þri", "Mið", "Fim", "Fös", "Lau"];
 const mins = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} klst ${m % 60} mín` : `${m} mín`);
 
-function Spark({ points, target }: { points: TrendPoint[]; target: number }) {
+function Spark({ points, target, t }: { points: TrendPoint[]; target: number; t: (s: string) => string }) {
   const vals = points.map((p) => p.pct).filter((v): v is number => v != null);
   if (vals.length < 2) return null;
   const W = 320, H = 130, pad = 8;
@@ -44,12 +44,25 @@ function Spark({ points, target }: { points: TrendPoint[]; target: number }) {
   const area = `${line} L${pts[pts.length - 1][0].toFixed(1)} ${H} L${pts[0][0].toFixed(1)} ${H}Z`;
   const last = pts[pts.length - 1];
   return (
+    <div className="db2-sparkwrap">
     <svg className="db2-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
       <line x1="0" x2={W} y1={y(target)} y2={y(target)} stroke="var(--bad)" strokeDasharray="4 5" strokeWidth="1.2" opacity=".55" />
       <path d={area} fill="var(--brand)" opacity=".13" />
       <path d={line} fill="none" stroke="var(--brand)" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
       <circle cx={last[0]} cy={last[1]} r="5" fill="var(--brand)" stroke="var(--panel)" strokeWidth="2.5" />
     </svg>
+    <div className="db2-hz">
+      {points.map((p, i) => (
+        <div key={i} className={`db2-hzc${i === 0 ? " first" : i === points.length - 1 ? " last" : ""}`}>
+          {p.pct != null && <>
+            <i className="db2-hzline" />
+            <i className="db2-hzdot" style={{ top: `${(y(p.pct) / H) * 100}%` }} />
+            <span className="db2-tip">{t("Vika frá")} {p.label}<br /><b style={{ color: p.pct <= target ? "#6ee7a8" : "#ff8a80" }}>{dec1(p.pct)} %</b> {t("af veltu")} · {t("markmið")} {dec1(target)} %</span>
+          </>}
+        </div>
+      ))}
+    </div>
+    </div>
   );
 }
 
@@ -156,8 +169,14 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
           <div className="db2-k">{t("Laun sem hlutfall af veltu")}</div>
           <div className="db2-big" style={{ color: col }}>{lp == null ? "—" : <>{dec1(lp)}<small>%</small></>}</div>
           {pd && (lp != null ? (
-            <p className="db2-verdict">{verdict} {t("Velta")} {krCompact(pd.revenue)} {t("og launakostnaður")} {krCompact(pd.cost)} {t("með gjöldum.")}
-              {pd.revenueSource === "estimated" && <> <span className="db2-muted">({t("áætluð velta")} · <Link href="/stillingar?new=revenue">{t("breyta")}</Link>)</span></>}</p>
+            <>
+            <p className="db2-verdict">{verdict}</p>
+            <div className="db2-hstats">
+              <div><span>{t("Velta")}{pd.revenueSource === "estimated" && <> · <Link href="/stillingar?new=revenue">{t("áætluð")}</Link></>}</span><b>{kr(pd.revenue)}</b></div>
+              <div><span>{t("Launakostnaður")}</span><b>{kr(pd.cost)}</b></div>
+              {pd.actual > 0 && <div><span>{t("Velta á unna klst")}</span><b>{kr(pd.revenue / pd.actual)}</b></div>}
+            </div>
+            </>
           ) : (
             <p className="db2-verdict">{t("Skráðu veltu tímabilsins til að sjá hlutfallið.")} <Link href="/stillingar?new=revenue">{t("Skrá veltu")}</Link></p>
           ))}
@@ -172,7 +191,7 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
         <div className="db2-hero-r">
           <div className="db2-row-sb"><span className="db2-k">{t("Síðustu 8 vikur")}</span>
             {trendDelta != null && <span className={`db2-pill ${trendDelta <= 0 ? "good" : "bad"}`}>{trendDelta <= 0 ? "▼" : "▲"} {dec1(Math.abs(trendDelta))} {t("stig")}</span>}</div>
-          {trend && tp.length >= 2 ? <Spark points={trend.points} target={target} />
+          {trend && tp.length >= 2 ? <Spark points={trend.points} target={target} t={t} />
             : <div className="db2-muted db2-empty">{t("Þróunin birtist þegar velta og stimplanir hafa safnast í nokkrar vikur.")}</div>}
           <div className="db2-legend"><span><i style={{ background: "var(--brand)" }} />{t("Laun % af veltu")}</span><span><i style={{ background: "var(--bad)", opacity: .6 }} />{t("Markmið")}</span></div>
         </div>
@@ -191,8 +210,8 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
           )}
           <div className="db2-s">{t("Yfirvinna")} {pd ? dec1(pd.overtime) : "0"} {t("klst")}{pd && pd.overtimePay > 0 ? ` · ${krCompact(pd.overtimePay)}` : ""} · {t("álag")} {pd ? dec1(pd.premium) : "0"} {t("klst")}</div>
           {week.length > 0 && (
-            <div className="db2-minibars" aria-hidden="true">
-              {week.map((s, i) => <div key={i} title={`${s.label}: ${dec1(s.actual)} / ${dec1(s.planned)}`}><span style={{ height: `${Math.max(6, (s.actual / weekMax) * 100)}%`, background: s.actual > s.planned + 0.05 ? "var(--bad)" : s.actual > 0 ? "var(--brand)" : "var(--line)" }} /></div>)}
+            <div className="db2-minibars">
+              {week.map((s, i) => <div key={i}><span className="db2-tip">{s.label}<br />{t("Unnið")} {dec1(s.actual)} / {dec1(s.planned)} {t("klst")}</span><span style={{ height: `${Math.max(6, (s.actual / weekMax) * 100)}%`, background: s.actual > s.planned + 0.05 ? "var(--bad)" : s.actual > 0 ? "var(--brand)" : "var(--line)" }} /></div>)}
             </div>
           )}
         </section>
@@ -231,7 +250,13 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
                 const diffH = Math.round((s.actual - s.planned) * 10) / 10;
                 const over = s.actual > s.planned + 0.05;
                 return (
-                  <div className="db2-day2" key={i} title={`${s.label} · ${t("Á plani")} ${dec1(s.planned)} · ${t("Unnið")} ${dec1(s.actual)}`}>
+                  <div className="db2-day2" key={i}>
+                    <span className="db2-tip">
+                      <b>{isToday ? t("Í dag") : `${t(WD[d.getDay()])} ${s.label}`}</b><br />
+                      {t("Á plani")} {dec1(s.planned)} {t("klst")} · {t("Unnið")} {dec1(s.actual)} {t("klst")}
+                      {!isToday && (s.planned > 0 || s.actual > 0) && <><br />{t("Frávik")} {diffH > 0 ? "+" : diffH < 0 ? "−" : "±"}{dec1(Math.abs(diffH))} {t("klst")}{pd && pd.costPerHour > 0 && Math.abs(diffH) >= 0.1 ? ` · ≈ ${diffH > 0 ? "+" : "−"}${krCompact(Math.abs(diffH) * pd.costPerHour)}` : ""}</>}
+                      {isToday && <><br />{t("Dagurinn er enn í gangi")}</>}
+                    </span>
                     <div className="db2-cols">
                       <div className="db2-col"><em>{s.planned > 0 ? dec1(s.planned) : ""}</em><span className="pl" style={{ height: `${(s.planned / weekMax) * 100}%` }} /></div>
                       <div className="db2-col"><em className={over ? "bad" : ""}>{s.actual > 0 || !isToday ? dec1(s.actual) : ""}</em><span className={`ac${over ? " over" : ""}${isToday ? " live" : ""}`} style={{ height: `${Math.max(s.actual > 0 ? 2 : 0, (s.actual / weekMax) * 100)}%` }} /></div>
