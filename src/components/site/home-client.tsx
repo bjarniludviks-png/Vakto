@@ -258,11 +258,11 @@ function Features() {
         </div>
         <div className="ah-tile">
           <div className="ah-tile-tx"><h3>{t.t3h}</h3><p>{t.t3p}</p></div>
-          <Crop src={`${SHOT}/light/timaskraning.jpg`} alt={t.t3alt} pos="0% 0%" origin="77.5% 87%" zoom={1.5} ratio="16 / 9" />
+          <Crop src={`${SHOT}/light/timaskraning.jpg`} alt={t.t3alt} pos="0% 0%" origin="51.5% 55.5%" zoom={2.05} ratio="16 / 9" />
         </div>
         <div className="ah-tile">
           <div className="ah-tile-tx"><h3>{t.t4h}</h3><p>{t.t4p}</p></div>
-          <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt={t.t4alt} pos="0% 0%" origin="46.7% 137%" zoom={1.2} ratio="16 / 9" />
+          <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt={t.t4alt} pos="0% 0%" origin="18.6% 57%" zoom={1.7} ratio="16 / 9" />
         </div>
         <div className="ah-tile ah-wide">
           <div className="ah-tile-tx"><h3>{t.t5h}</h3><p>{t.t5p}</p></div>
