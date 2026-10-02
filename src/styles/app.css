@@ -1187,3 +1187,4 @@ a.db2-who:hover span{color:var(--brand)}
 .db2-mini .db2-v small{font-size:13px}
 .db2-mini .db2-prog{margin:8px 0 6px;height:6px}
 .db2x .db2-top .btn{flex:none}
+.db2-devline b{white-space:nowrap}.db2-devline span{min-width:0}

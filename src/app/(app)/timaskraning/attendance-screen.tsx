@@ -187,6 +187,13 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
     setLoading(true);
     fetchAttendance(f, tt).then((res) => { if (res.ok) setData(res.rows); }).finally(() => setLoading(false));
   }
+  // Gögn þjónsins ná yfir alla vikuna — sækjum aftur til dagsins í dag.
+  useEffect(() => {
+    let gone = false;
+    fetchAttendance(init0.from, init0.to).then((res) => { if (!gone && res.ok) setData(res.rows); });
+    return () => { gone = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   function changePeriod(p: Period) {
     setPeriod(p);
     if (p !== "Sérsniðið") { const r = rangeFor(p); setFrom(r.from); setTo(r.to); load(r.from, r.to); }
@@ -232,10 +239,10 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
 
       <div className="db2-row4">
         <section className="db2-card db2-tile">
-          {longOpenN > 0 && <span className="db2-pill bad db2-tag">{longOpenN} {t("opnar of lengi")}</span>}
           <div className="db2-k">{t("Á vakt núna")}</div>
           <div className="db2-v">{onNow.length}<small>{t("skráðir inn")}</small></div>
           {onNow.length > 0 && <div className="db2-avs">{onNow.slice(0, 8).map((r) => <span key={r.punchId} className="db2-av" style={{ background: r.c }} title={r.name}>{r.av}</span>)}</div>}
+          {longOpenN > 0 && <span className="db2-pill bad">{longOpenN} {t("opnar of lengi")}</span>}
         </section>
         <section className="db2-card db2-tile">
           <div className="db2-k">{t("Unnir tímar")}</div>
@@ -246,7 +253,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
         <section className="db2-card db2-tile">
           <div className="db2-k">{t("Frávik frá plani")}</div>
           <div className="db2-v" style={{ color: dev > 0.05 ? "var(--bad)" : dev < -0.05 ? "var(--good)" : undefined }}>{sign(dev)}{dec1(Math.abs(dev))}<small>{t("klst")}</small></div>
-          {Math.abs(devCost) >= 1 && <div className={`db2-devline ${devCost > 0 ? "bad" : "good"}`}><span>{devCost > 0 ? t("Kostar umfram plan") : t("Undir áætluðum kostnaði")}</span><b>{devCost > 0 ? "+" : "−"}{krCompact(Math.abs(devCost))}</b></div>}
+          {Math.abs(devCost) >= 1 && <div className={`db2-devline ${devCost > 0 ? "bad" : "good"}`}><span>{devCost > 0 ? t("Umfram plan") : t("Undir plani")}</span><b>{devCost > 0 ? "+" : "−"}{krCompact(Math.abs(devCost))}</b></div>}
         </section>
         <section className="db2-card db2-tile">
           <div className="db2-k">{t("Þarf að skoða")}</div>
