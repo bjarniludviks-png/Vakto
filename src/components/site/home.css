@@ -247,7 +247,7 @@
 .ah-mac-tile .ah-mac-bar{height:30px}
 .ah-mac-tile .ah-dots i{width:9px;height:9px}
 .ah-mac-tile .ah-url{font-size:11px;padding:3px 10px}
-.ah-stage{position:absolute;top:0;left:0;width:100%;aspect-ratio:16/10;transform:scale(1.4);transform-origin:0 116%}
+.ah-stage{position:absolute;top:0;left:0;width:100%;aspect-ratio:16/10;transform:scale(1.4);transform-origin:0 146%}
 .ah-stage img{width:100%;height:100%;object-fit:cover;object-position:top left}
 .ah-dg-hole,.ah-dg{position:absolute;left:50.61%;top:51.01%;width:8.354%;height:4.433%}
 .ah-dg-hole,.ah-dg-chip{background-size:1197% auto;background-repeat:no-repeat}
@@ -385,7 +385,7 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 .ah-chatbox{background:#fbfbfd}
 @media (max-width:900px){.ah-dark-copy .ah-ticks{margin-left:auto;margin-right:auto}}
 @media (max-width:700px){
-  .ah-stage{transform:scale(1.62);transform-origin:0 116%}
+  .ah-stage{transform:scale(1.62);transform-origin:0 109%}
   .ah-mac-tile{margin-bottom:-30px}
   .ah-peek{margin:auto -22px -150px}
   .ah-chatfab{padding:13px}
