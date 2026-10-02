@@ -278,7 +278,10 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
                 <span className="db2-av sm" style={{ background: r.c }}>{r.av}</span>
                 <span className="db2-tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}</span></span>
                 {r.unscheduled && <span className="db2-pill warn" title={t("Stimplaði sig inn án þess að vera á vaktaplani dagsins")}>{t("óáætlað")}</span>}
-                <span className="db2-pill good">{nowMs ? durSince(r.since, nowMs) : t("á vakt")}</span>
+                {(() => {
+                  const long = nowMs > 0 && nowMs - new Date(r.since).getTime() > 14 * 3600000;
+                  return <span className={`db2-pill ${long ? "bad" : "good"}`} title={long ? t("Gleymdist að stimpla út?") : undefined}>{nowMs ? durSince(r.since, nowMs) : t("á vakt")}{long ? ` · ${t("gleymdist útstimplun?")}` : ""}</span>;
+                })()}
                 <svg className="db2-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
               </Link>
             ))}
