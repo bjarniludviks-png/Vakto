@@ -11,6 +11,7 @@ import { DateField } from "@/components/app/fields";
 import { getDashboardPeriod, type PeriodData } from "./actions";
 import { OnboardingCard, useOnboardingHidden, onboardingProgress, ONBOARDING_TOTAL } from "./onboarding";
 import type { Onboarding } from "./dashboard.server";
+import DashboardV2 from "./dashboard-v2";
 
 // Paired demo bars (this period vs previous) — used only in the demo/preview state.
 function Paired({ a, b }: { a: number[]; b: number[] }) {
@@ -106,7 +107,13 @@ function presetRange(k: string): { from: string; to: string } {
   return { from: isoD(mon), to: isoD(sun) };
 }
 
-export default function DashboardScreen({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding, live = false, onNow = [], missing = [], pending = 0 }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean; onNow?: OnNow[]; missing?: Missing[]; pending?: number }) {
+export default function DashboardScreen(props: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean; onNow?: OnNow[]; missing?: Missing[]; pending?: number; firstName?: string }) {
+  // Innskráð fyrirtæki fær nýja mælaborðið (v2); eldra útlitið er aðeins eftir fyrir sýnishorn án gagna.
+  if (props.live) return <DashboardV2 onboarding={props.onboarding} onNow={props.onNow ?? []} missing={props.missing ?? []} pending={props.pending ?? 0} firstName={props.firstName} />;
+  return <DashboardLegacy {...props} />;
+}
+
+function DashboardLegacy({ laborPct = 32.1, laborCostWeek = "1,40", hoursWeek = "374", onboarding, live = false, onNow = [], missing = [], pending = 0 }: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean; onNow?: OnNow[]; missing?: Missing[]; pending?: number }) {
   const { t } = useLang();
   const [chartSeg, setChartSeg] = useState("Vika");
   const [hideOnb, setHideOnb] = useOnboardingHidden();

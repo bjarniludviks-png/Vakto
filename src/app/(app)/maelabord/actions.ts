@@ -2,7 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { getCompanyId, getLaborPeriod, getLaborTarget, laborColor, DEFAULT_LABOR_TARGET, type RevenueSource, type LaborColor } from "@/lib/labor";
+import { getCompanyId, getLaborPeriod, getLaborPeriods, getLaborTarget, laborColor, DEFAULT_LABOR_TARGET, type RevenueSource, type LaborColor } from "@/lib/labor";
 
 export type SeriesPoint = { label: string; planned: number; actual: number };
 export type StaffRow = { name: string; av: string; c: string; dept: string; planned: number; actual: number; deviation: number; over: boolean };
@@ -69,5 +69,33 @@ export async function getDashboardPeriod(fromISO: string, toISO: string): Promis
   } catch (e) {
     console.error("getDashboardPeriod failed:", e);
     return EMPTY;
+  }
+}
+
+export type TrendPoint = { label: string; from: string; pct: number | null };
+
+/** Laun % af veltu fyrir síðustu `weeks` vikur (mán–sun, núverandi vika til dagsins í dag),
+ * reiknað í einni umferð með sama útreikningi og allt annað (lib/labor). */
+export async function getLaborTrend(weeks = 8): Promise<{ ok: boolean; target: number; points: TrendPoint[] }> {
+  if (!isSupabaseConfigured()) return { ok: false, target: DEFAULT_LABOR_TARGET, points: [] };
+  try {
+    const supabase = await createClient();
+    const company = await getCompanyId(supabase);
+    if (!company) return { ok: false, target: DEFAULT_LABOR_TARGET, points: [] };
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const mon = new Date(today); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
+    const ranges: { from: string; to: string; label: string }[] = [];
+    for (let i = weeks - 1; i >= 0; i--) {
+      const a = new Date(mon); a.setDate(a.getDate() - 7 * i);
+      const b = new Date(a); b.setDate(b.getDate() + 6);
+      const end = b > today ? today : b;
+      ranges.push({ from: iso(a), to: iso(end), label: `${a.getDate()}.${a.getMonth() + 1}.` });
+    }
+    const [periods, target] = await Promise.all([getLaborPeriods(supabase, company, ranges), getLaborTarget(supabase, company)]);
+    return { ok: true, target, points: periods.map((p, i) => ({ label: ranges[i].label, from: ranges[i].from, pct: p.pct })) };
+  } catch (e) {
+    console.error("getLaborTrend failed:", e);
+    return { ok: false, target: DEFAULT_LABOR_TARGET, points: [] };
   }
 }
