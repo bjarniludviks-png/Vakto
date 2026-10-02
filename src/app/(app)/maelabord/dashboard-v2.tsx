@@ -13,7 +13,7 @@ import { getDashboardPeriod, getLaborTrend, type PeriodData, type TrendPoint } f
 import { OnboardingCard, useOnboardingHidden, onboardingProgress, ONBOARDING_TOTAL } from "./onboarding";
 import type { Onboarding } from "./dashboard.server";
 
-type OnNow = { punchId: string; name: string; av: string; c: string; dept: string; in: string; since: string; unscheduled?: boolean };
+type OnNow = { punchId: string; employeeId?: string; name: string; av: string; c: string; dept: string; in: string; since: string; unscheduled?: boolean };
 type Missing = { employeeId: string; name: string; av: string; c: string; dept: string; start: string; late: boolean; mins: number };
 
 const isoD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -28,6 +28,8 @@ function presetRange(k: string): { from: string; to: string } {
 }
 const SEGS: { k: string; label: string }[] = [{ k: "idag", label: "Í dag" }, { k: "vika", label: "Vika" }, { k: "30d", label: "30 dagar" }];
 const COLOR = { good: "var(--good)", warn: "var(--warn)", bad: "var(--bad)" } as const;
+const durSince = (iso: string, now: number) => { const m = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000)); return m >= 60 ? `${Math.floor(m / 60)} klst ${m % 60} mín` : `${m} mín`; };
+const WD = ["Sun", "Mán", "Þri", "Mið", "Fim", "Fös", "Lau"];
 const mins = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} klst ${m % 60} mín` : `${m} mín`);
 
 function Spark({ points, target }: { points: TrendPoint[]; target: number }) {
@@ -60,6 +62,13 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
   const [pd, setPd] = useState<PeriodData | null>(null);
   const [week, setWeek] = useState<PeriodData["series"]>([]);
   const [trend, setTrend] = useState<{ target: number; points: TrendPoint[] } | null>(null);
+  const [nowMs, setNowMs] = useState(0);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- klukkan byrjar eftir hydration
+    setNowMs(Date.now());
+    const id = setInterval(() => setNowMs(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     try {
@@ -174,6 +183,12 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
           {pd && Math.abs(dev) >= 0.1 && <span className={`db2-pill ${dev > 0 ? "bad" : "good"} db2-tag`}>{dev > 0 ? "+" : "−"}{dec1(Math.abs(dev))} {dev > 0 ? t("klst yfir plani") : t("klst undir plani")}</span>}
           <div className="db2-k">{t("Unnir tímar")}</div>
           <div className="db2-v">{pd ? dec1(pd.actual) : "—"}<small>/ {pd ? dec1(pd.planned) : "—"} {t("áætl.")}</small></div>
+          {pd && Math.abs(dev) >= 0.1 && (
+            <div className={`db2-devline ${dev > 0 ? "bad" : "good"}`}>
+              <span>{t("Frávik frá plani")}</span>
+              <b>{dev > 0 ? "+" : "−"}{dec1(Math.abs(dev))} {t("klst")} · {pd.deviationCost >= 0 ? "+" : "−"}{krCompact(Math.abs(pd.deviationCost))}</b>
+            </div>
+          )}
           <div className="db2-s">{t("Yfirvinna")} {pd ? dec1(pd.overtime) : "0"} {t("klst")}{pd && pd.overtimePay > 0 ? ` · ${krCompact(pd.overtimePay)}` : ""} · {t("álag")} {pd ? dec1(pd.premium) : "0"} {t("klst")}</div>
           {week.length > 0 && (
             <div className="db2-minibars" aria-hidden="true">
@@ -206,23 +221,28 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
 
       <div className="db2-grid2">
         <section className="db2-card">
-          <div className="db2-ch"><div><div className="db2-ct">{t("Áætlað og unnið, dag fyrir dag")}</div><div className="db2-cs">{t("Síðustu 7 dagar. Grái ramminn er planið, liturinn er raunin, rautt er umfram plan.")}</div></div></div>
-          {week.some((s) => s.planned > 0 || s.actual > 0) ? (
-            <div className="db2-bars">
+          <div className="db2-ch"><div><div className="db2-ct">{t("Áætlað og unnið, dag fyrir dag")}</div><div className="db2-cs">{t("Síðustu 7 dagar. Tölurnar eru klukkustundir, frávik dagsins er undir.")}</div></div></div>
+          {week.some((s) => s.planned > 0 || s.actual > 0) ? (<>
+            <div className="db2-legend db2-legend-pad"><span><i style={{ background: "var(--line)" }} />{t("Á plani")}</span><span><i style={{ background: "var(--brand)" }} />{t("Unnið")}</span><span><i style={{ background: "var(--bad)" }} />{t("Unnið umfram plan")}</span></div>
+            <div className="db2-bars2">
               {week.map((s, i) => {
-                const over = s.actual > s.planned + 0.05 ? ((s.actual - s.planned) / Math.max(s.actual, 0.01)) * 100 : 0;
+                const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - (week.length - 1 - i));
+                const isToday = i === week.length - 1;
+                const diffH = Math.round((s.actual - s.planned) * 10) / 10;
+                const over = s.actual > s.planned + 0.05;
                 return (
-                  <div className="db2-day" key={i} title={`${s.label} · ${t("Áætlað")} ${dec1(s.planned)} · ${t("Raun")} ${dec1(s.actual)}`}>
-                    <div className="db2-pair">
-                      <div className="db2-ghost" style={{ height: `${(s.planned / weekMax) * 100}%` }} />
-                      <div className="db2-act" style={{ height: `${(s.actual / weekMax) * 100}%`, background: over ? `linear-gradient(180deg, var(--bad) 0 ${over}%, var(--brand) ${over}%)` : "var(--brand)" }} />
+                  <div className="db2-day2" key={i} title={`${s.label} · ${t("Á plani")} ${dec1(s.planned)} · ${t("Unnið")} ${dec1(s.actual)}`}>
+                    <div className="db2-cols">
+                      <div className="db2-col"><em>{s.planned > 0 ? dec1(s.planned) : ""}</em><span className="pl" style={{ height: `${(s.planned / weekMax) * 100}%` }} /></div>
+                      <div className="db2-col"><em className={over ? "bad" : ""}>{s.actual > 0 || !isToday ? dec1(s.actual) : ""}</em><span className={`ac${over ? " over" : ""}${isToday ? " live" : ""}`} style={{ height: `${Math.max(s.actual > 0 ? 2 : 0, (s.actual / weekMax) * 100)}%` }} /></div>
                     </div>
-                    <div className="db2-dl">{s.label}</div>
+                    <div className="db2-dl">{isToday ? t("Í dag") : `${t(WD[d.getDay()])} ${s.label}`}</div>
+                    <div className={`db2-dd ${isToday ? "" : diffH > 0.05 ? "bad" : diffH < -0.05 ? "good" : ""}`}>{isToday ? t("í gangi") : s.planned || s.actual ? `${diffH > 0 ? "+" : diffH < 0 ? "−" : "±"}${dec1(Math.abs(diffH))}` : "–"}</div>
                   </div>
                 );
               })}
             </div>
-          ) : <div className="db2-muted db2-empty">{t("Birtist þegar vaktir eru birtar og stimplað er inn.")}</div>}
+          </>          ) : <div className="db2-muted db2-empty">{t("Birtist þegar vaktir eru birtar og stimplað er inn.")}</div>}
         </section>
         <section className="db2-card">
           <div className="db2-ch"><div><div className="db2-ct">{t("Þarf athygli")}</div><div className="db2-cs">{t("Það sem þú getur klárað núna")}</div></div></div>
@@ -248,17 +268,41 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
         </section>
       </div>
 
+      <section className="db2-card" id="a-vakt">
+        <div className="db2-ch"><div><div className="db2-ct">{t("Á vakt núna")}</div><div className="db2-cs">{t("Skráðir inn í rauntíma. Smelltu á nafn til að sjá tímaskráningu.")}</div></div>
+          {onNow.length > 0 && <span className="db2-pill good">{onNow.length} {t("á vakt")}</span>}</div>
+        {onNow.length ? (
+          <div className="db2-list">
+            {onNow.map((r) => (
+              <Link href={r.employeeId ? `/timaskraning/${r.employeeId}` : "/timaskraning"} className="db2-it" key={r.punchId}>
+                <span className="db2-av sm" style={{ background: r.c }}>{r.av}</span>
+                <span className="db2-tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}</span></span>
+                {r.unscheduled && <span className="db2-pill warn" title={t("Stimplaði sig inn án þess að vera á vaktaplani dagsins")}>{t("óáætlað")}</span>}
+                <span className="db2-pill good">{nowMs ? durSince(r.since, nowMs) : t("á vakt")}</span>
+                <svg className="db2-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+              </Link>
+            ))}
+          </div>
+        ) : <div className="db2-muted db2-empty" style={{ padding: "18px 24px" }}>{t("Enginn skráður inn núna.")}</div>}
+      </section>
+
       {(pd?.staff.length ?? 0) > 0 && (
         <section className="db2-card db2-staff">
-          <div className="db2-ch"><div><div className="db2-ct">{t("Starfsfólk á tímabilinu")}</div><div className="db2-cs">{t("Unnir tímar borið saman við plan")}</div></div></div>
+          <div className="db2-ch"><div><div className="db2-ct">{t("Starfsfólk á tímabilinu")}</div><div className="db2-cs">{t("Unnir tímar borið saman við plan, og hvað frávikið kostar. Smelltu á nafn fyrir tímaskráningu.")}</div></div></div>
           <div className="db2-tblwrap"><table>
-            <thead><tr><th>{t("Starfsmaður")}</th><th className="r">{t("Á plani")}</th><th className="r">{t("Unnið")}</th><th className="r">{t("Frávik")}</th></tr></thead>
-            <tbody>{pd!.staff.map((s, i) => (
-              <tr key={i}>
-                <td><span className="db2-who"><span className="db2-av sm" style={{ background: s.c }}>{s.av}</span><span>{s.name}<small>{t(s.dept)}</small></span></span></td>
-                <td className="r">{dec1(s.planned)}</td><td className="r">{dec1(s.actual)}</td>
-                <td className="r" style={{ color: s.deviation > 0.05 ? "var(--bad)" : s.deviation < -0.05 ? "var(--good)" : undefined }}>{s.deviation > 0 ? "+" : ""}{dec1(s.deviation)}</td>
-              </tr>))}</tbody>
+            <thead><tr><th>{t("Starfsmaður")}</th><th className="r">{t("Á plani")}</th><th className="r">{t("Unnið")}</th><th className="r">{t("Frávik (klst)")}</th><th className="r">{t("Kostnaður frávika")}</th></tr></thead>
+            <tbody>{pd!.staff.map((s, i) => {
+              const devCost = s.actual > 0 ? (s.cost / s.actual) * s.deviation : 0;
+              const c = s.deviation > 0.05 ? "var(--bad)" : s.deviation < -0.05 ? "var(--good)" : undefined;
+              return (
+                <tr key={i}>
+                  <td><Link href={`/timaskraning/${s.id}`} className="db2-who"><span className="db2-av sm" style={{ background: s.c }}>{s.av}</span><span>{s.name}<small>{t(s.dept)}</small></span></Link></td>
+                  <td className="r">{dec1(s.planned)}</td><td className="r">{dec1(s.actual)}</td>
+                  <td className="r" style={{ color: c }}>{s.deviation > 0 ? "+" : ""}{dec1(s.deviation)}</td>
+                  <td className="r" style={{ color: c }}>{Math.abs(devCost) >= 1 ? `${devCost > 0 ? "+" : "−"}${krCompact(Math.abs(devCost))}` : "–"}</td>
+                </tr>
+              );
+            })}</tbody>
           </table></div>
         </section>
       )}

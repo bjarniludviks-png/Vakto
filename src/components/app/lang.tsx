@@ -9,6 +9,12 @@ type Dict = Record<string, { is: string; en: string; vi?: string }>;
 // App-shell chrome strings. Per-screen content can adopt useLang() incrementally.
 export const DICT: Dict = {
   // Mælaborð v2
+  "Unnið umfram plan": { is: "Unnið umfram plan", en: "Worked over plan" },
+  "í gangi": { is: "í gangi", en: "in progress" },
+  "Skráðir inn í rauntíma. Smelltu á nafn til að sjá tímaskráningu.": { is: "Skráðir inn í rauntíma. Smelltu á nafn til að sjá tímaskráningu.", en: "Clocked in right now. Click a name to see their timesheet." },
+  "Kostnaður frávika": { is: "Kostnaður frávika", en: "Cost of deviation" },
+  "Unnir tímar borið saman við plan, og hvað frávikið kostar. Smelltu á nafn fyrir tímaskráningu.": { is: "Unnir tímar borið saman við plan, og hvað frávikið kostar. Smelltu á nafn fyrir tímaskráningu.", en: "Hours worked vs plan, and what the deviation costs. Click a name for the timesheet." },
+  "Síðustu 7 dagar. Tölurnar eru klukkustundir, frávik dagsins er undir.": { is: "Síðustu 7 dagar. Tölurnar eru klukkustundir, frávik dagsins er undir.", en: "Last 7 days. Numbers are hours; the day's deviation is shown below." },
   "Álagsgreiðslur": { is: "Álagsgreiðslur", en: "Premium pay" },
   "Innan markmiðs.": { is: "Innan markmiðs.", en: "Within target." },
   "stigum undir": { is: "stigum undir", en: "points below the" },

@@ -1083,3 +1083,27 @@ html.dark .plan-tabs button.on{color:#0f0f12}
   .db2-bars{gap:6px;padding:16px 14px 10px;height:190px}.db2-tblwrap{padding:8px 14px}
 }
 .db2-tblwrap th{text-transform:none;letter-spacing:0}
+/* v2: frávikslína, súlurit hlið við hlið, á vakt-listi */
+.db2-devline{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:2px 0 8px;padding:8px 12px;border-radius:12px;font-size:13px}
+.db2-devline b{font-weight:700;font-variant-numeric:tabular-nums}
+.db2-devline.bad{background:var(--bad-soft);color:var(--bad)}.db2-devline.good{background:var(--good-soft);color:var(--good)}
+.db2-legend-pad{padding:14px 24px 0}
+.db2-bars2{display:flex;gap:10px;align-items:stretch;height:250px;padding:12px 18px 16px}
+.db2-day2{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.db2-cols{flex:1;width:100%;display:flex;gap:4px;align-items:flex-end;justify-content:center}
+.db2-col{flex:1;max-width:30px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:4px}
+.db2-col em{font-style:normal;font-size:10.5px;font-weight:600;color:var(--ink3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.db2-col em.bad{color:var(--bad)}
+.db2-col span{display:block;width:100%;border-radius:6px 6px 3px 3px}
+.db2-col .pl{background:var(--line)}
+.db2-col .ac{background:var(--brand)}
+.db2-col .ac.over{background:var(--bad)}
+.db2-col .ac.live{background:repeating-linear-gradient(135deg,var(--brand) 0 6px,color-mix(in srgb,var(--brand) 70%,var(--panel)) 6px 12px)}
+.db2-dl{font-size:11.5px;color:var(--ink2);font-weight:600;white-space:nowrap}
+.db2-dd{font-size:11.5px;font-weight:700;color:var(--ink3);font-variant-numeric:tabular-nums}
+.db2-dd.bad{color:var(--bad)}.db2-dd.good{color:var(--good)}
+.db2-chev{width:16px;height:16px;fill:none;stroke:var(--ink3);stroke-width:2;flex:none}
+.db2-it .db2-pill{flex:none}
+.db2-who{color:inherit;text-decoration:none}
+a.db2-who:hover span{color:var(--brand)}
+@media (max-width:760px){.db2-bars2{gap:4px;padding:10px 10px 12px;height:230px}.db2-col em{font-size:9px}.db2-dl{font-size:10px}}

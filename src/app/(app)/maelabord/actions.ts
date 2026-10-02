@@ -5,7 +5,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getCompanyId, getLaborPeriod, getLaborPeriods, getLaborTarget, laborColor, DEFAULT_LABOR_TARGET, type RevenueSource, type LaborColor } from "@/lib/labor";
 
 export type SeriesPoint = { label: string; planned: number; actual: number };
-export type StaffRow = { name: string; av: string; c: string; dept: string; planned: number; actual: number; deviation: number; over: boolean };
+export type StaffRow = { id: string; name: string; av: string; c: string; dept: string; planned: number; actual: number; deviation: number; over: boolean; cost: number };
 export type PeriodData = {
   ok: boolean;
   planned: number;
@@ -64,7 +64,7 @@ export async function getDashboardPeriod(fromISO: string, toISO: string): Promis
       levies: p.levies,
       costPerHour: p.actual > 0 ? Math.round(p.cost / p.actual) : 0,
       series: p.series.map((s) => ({ label: s.label, planned: s.planned, actual: s.actual })),
-      staff: p.staff.map((s) => ({ name: s.name, av: s.av, c: s.c, dept: s.dept, planned: s.planned, actual: s.actual, deviation: s.deviation, over: s.over })),
+      staff: p.staff.map((s) => ({ id: s.id, name: s.name, av: s.av, c: s.c, dept: s.dept, planned: s.planned, actual: s.actual, deviation: s.deviation, over: s.over, cost: s.cost })),
     };
   } catch (e) {
     console.error("getDashboardPeriod failed:", e);
