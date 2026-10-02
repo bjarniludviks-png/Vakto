@@ -129,7 +129,7 @@ await navTo("/timaskraning");
 await moveTo(900, 520, 900); await sleep(1800);
 // 4) Launakeyrslur
 await navTo("/launakeyrslur");
-const last = page.getByRole("button", { name: "Síðasti mánuður" });
+const last = page.getByRole("tab", { name: "Síðasti mánuður" });
 if (await last.count()) { const c = await center(last); await click(c.x, c.y, 900); await sleep(2200); }
 await moveTo(800, 600, 800); await sleep(1200);
 // 5) aftur á mælaborð (lykkja)

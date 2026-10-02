@@ -249,17 +249,17 @@
 .ah-mac-tile .ah-url{font-size:11px;padding:3px 10px}
 .ah-stage{position:absolute;top:0;left:0;width:100%;aspect-ratio:16/10;transform:scale(1.4);transform-origin:0 44%}
 .ah-stage img{width:100%;height:100%;object-fit:cover;object-position:top left}
-.ah-dg-hole,.ah-dg{position:absolute;left:50.625%;top:35.78%;width:8.333%;height:4.44%}
-.ah-dg-hole,.ah-dg-chip{background-size:1200% auto;background-repeat:no-repeat}
-.ah-dg-hole{background-position:55.23% 54.42%;opacity:0}
-.ah-dg-chip{position:absolute;inset:0;background-position:55.23% 37.44%;border-radius:9%/20%;opacity:0}
+.ah-dg-hole,.ah-dg{position:absolute;left:50.61%;top:51.01%;width:8.354%;height:4.433%}
+.ah-dg-hole,.ah-dg-chip{background-size:1197% auto;background-repeat:no-repeat}
+.ah-dg-hole{background-position:55.22% 70.42%;opacity:0}
+.ah-dg-chip{position:absolute;inset:0;background-position:55.22% 53.38%;border-radius:9%/20%;opacity:0}
 .ah-cursor{position:absolute;left:52%;top:46%;width:26%;overflow:visible;transform-origin:20% 10%;opacity:0;filter:drop-shadow(0 1px 1.5px rgba(0,0,0,.35))}
 .ah-cursor path{fill:#111;stroke:#fff;stroke-width:1.6;stroke-linejoin:round}
 .ah-mac-tile.run .ah-dg{animation:ah-dgm 8s cubic-bezier(.65,0,.35,1) infinite}
 .ah-mac-tile.run .ah-dg-chip{animation:ah-dgc 8s infinite}
 .ah-mac-tile.run .ah-dg-hole{animation:ah-dgh 8s infinite}
 .ah-mac-tile.run .ah-cursor{animation:ah-cur 8s cubic-bezier(.45,0,.25,1) infinite}
-@keyframes ah-dgm{0%,12%{transform:translateY(0)}36%,62%{transform:translateY(365.6%)}88%,100%{transform:translateY(0)}}
+@keyframes ah-dgm{0%,12%{transform:translateY(0)}36%,62%{transform:translateY(367.4%)}88%,100%{transform:translateY(0)}}
 @keyframes ah-dgh{0%,9.9%{opacity:0}10%,90%{opacity:1}90.1%,100%{opacity:0}}
 @keyframes ah-dgc{
   0%,9.9%{opacity:0}

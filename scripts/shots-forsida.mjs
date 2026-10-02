@@ -40,7 +40,7 @@ for (const theme of ["light", "dark"]) {
   for (const [name, path] of [["maelabord", "/maelabord"], ["vaktaplan", "/vaktaplan"], ["timaskraning", "/timaskraning"], ["launakeyrslur", "/launakeyrslur"], ["innsyn", "/innsyn"], ["spjall", "/spjall"]].filter(([n]) => !ONLY || ONLY.includes(n))) {
     await p.goto(base + path, { waitUntil: "domcontentloaded" });
     await settle(p, name === "maelabord" ? 7000 : 4500);
-    if (name === "launakeyrslur") { await p.getByRole("button", { name: "Síðasti mánuður" }).click().catch(() => {}); await settle(p, 4000); }
+    if (name === "launakeyrslur") { await p.getByRole("tab", { name: "Síðasti mánuður" }).click().catch(() => {}); await settle(p, 4000); }
     await p.screenshot({ path: `${out}/${name}.jpg`, type: "jpeg", quality: 84 });
     console.log("✓", theme, name);
   }

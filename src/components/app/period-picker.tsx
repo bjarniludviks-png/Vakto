@@ -79,6 +79,7 @@ export function PeriodPicker({ from, to, activePreset, onApply, align = "left" }
   const [selTo, setSelTo] = useState(to);
   const [page, setPage] = useState(() => { const d = from ? new Date(from) : new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
   const ref = useRef<HTMLDivElement>(null);
+  const [side, setSide] = useState<"left" | "right">(align);
 
   useEffect(() => {
     if (!open) return;
@@ -92,6 +93,9 @@ export function PeriodPicker({ from, to, activePreset, onApply, align = "left" }
     setPreset(activePreset ?? "custom");
     const d = from ? new Date(from) : new Date();
     setPage(new Date(d.getFullYear(), d.getMonth(), 1));
+    // Opnast inn á skjáinn: ef ekki er pláss til hægri festist glugginn við hægri brún hnappsins.
+    const r = ref.current?.getBoundingClientRect();
+    setSide(r && r.left + 760 > window.innerWidth && r.right > 760 ? "right" : align);
     setOpen(true);
   }
   function pickPreset(k: PresetKey) {
@@ -117,7 +121,7 @@ export function PeriodPicker({ from, to, activePreset, onApply, align = "left" }
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
       </button>
       {open && (
-        <div className={`pp-panel ${align}`}>
+        <div className={`pp-panel ${side}`}>
           <div className="pp-presets">
             {PRESET_LABELS.map(([k, label]) => (
               <button key={k} className={preset === k ? "on" : ""} onClick={() => pickPreset(k)}>{t(label)}</button>
