@@ -151,24 +151,36 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
           </span>
         </div>
         <CustomSections storageKey="vakto-innsyn-rekstur" customizing={customizing} defs={[
-          { id: "kpis", title: "Lykiltölur mánaðar", node: (<>
-        <div className="kperiod">{cur ? `${t("Mánuður")}: ${cur.label}` : t("Nýjasti mánuður")}</div>
-        <div className="kpis">
-          <div className="kpi"><div className="lab">{t("Velta")} <small>/{t("mán")}</small></div><div className="val">{kRevenue} <small>m.kr.</small></div></div>
-          <div className="kpi"><div className="lab">{t("Launakostnaður (byrði)")} <small>/{t("mán")}</small></div><div className="val">{kCost} <small>m.kr.</small></div></div>
-          <div className="kpi"><div className="lab">{t("Laun af tekjum")}</div><div className="val" style={{ color: lpColor }}>{lp > 0 ? dec1(lp) + "%" : "—"}</div></div>
-          <div className="kpi"><div className="lab">{t("Framlegð")} <small>/{t("mán")}</small></div><div className="val">{kMargin} <small>m.kr.</small></div></div>
-        </div>
-          </>) },
+          { id: "kpis", title: "Lykiltölur mánaðar", node: (
+        <section className="db2-card db2-hero">
+          <div className="db2-hero-l">
+            <div className="db2-k">{t("Laun sem hlutfall af veltu")} · {cur ? cur.label : t("Nýjasti mánuður")}</div>
+            <div className="db2-big" style={{ color: lpColor }}>{lp > 0 ? <>{dec1(lp)}<small>%</small></> : "—"}</div>
+            {cur && prev && cur.laborPct > 0 && prev.laborPct > 0 && (
+              <p className="db2-verdict"><b>{cur.laborPct <= prev.laborPct ? t("Betra en mánuðinn á undan.") : t("Hærra en mánuðinn á undan.")}</b> {dec1(Math.abs(cur.laborPct - prev.laborPct))} {t("stig")} {cur.laborPct <= prev.laborPct ? t("lægra") : t("hærra")} {t("en í")} {prev.label} ({dec1(prev.laborPct)} %).</p>
+            )}
+            <div className="db2-hstats">
+              <div><span>{t("Velta")}</span><b>{cur ? krCompact(cur.revenue) : `${kRevenue} m.kr.`}</b>{cur && prev && prev.revenue > 0 && <em className={cur.revenue >= prev.revenue ? "up" : "down"}>{chg(cur.revenue, prev.revenue) > 0 ? "+" : ""}{dec1(chg(cur.revenue, prev.revenue))} %</em>}</div>
+              <div><span>{t("Launakostnaður (byrði)")}</span><b>{cur ? krCompact(cur.cost) : `${kCost} m.kr.`}</b>{cur && prev && prev.cost > 0 && <em className={cur.cost <= prev.cost ? "up" : "down"}>{chg(cur.cost, prev.cost) > 0 ? "+" : ""}{dec1(chg(cur.cost, prev.cost))} %</em>}</div>
+              <div><span>{t("Framlegð")}</span><b>{cur ? krCompact(Math.max(0, cur.revenue - cur.cost)) : `${kMargin} m.kr.`}</b></div>
+            </div>
+          </div>
+          <div className="db2-hero-r">
+            <div className="db2-k">{t("Laun% per mánuð")}</div>
+            {withRev.length
+              ? <><Bars vals={withRev.map((x) => x.laborPct)} t={30} labels={withRev.map((x) => x.label)} /><div className="db2-legend"><span><i style={{ background: "var(--good)" }} />{t("Undir markmiði")}</span><span><i style={{ background: "var(--bad)" }} />{t("Yfir markmiði")}</span></div></>
+              : <p className="db2-muted db2-empty">{t("Skráðu veltu til að sjá laun% per mánuð.")}</p>}
+          </div>
+        </section>
+          ) },
           { id: "charts", title: "Gröf — velta & laun%", node: months.length > 0 && (
-          <div className="grid2">
             <div className="card">
               <div className="ch"><div><div className="ct">{t("Velta vs launakostnaður")}</div><div className="cs">{t("per mánuð · farðu með músina yfir fyrir tölur")}</div></div></div>
               <div className="cb">
                 <Paired
                   a={months.map((x) => m(x.revenue))}
                   b={months.map((x) => m(x.cost))}
-                  height={200}
+                  height={220}
                   labels={months.map((x) => x.label)}
                   aName={t("Velta")}
                   bName={t("Launakostnaður")}
@@ -176,15 +188,6 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
                 <div className="legend"><span><i style={{ background: "var(--teal)" }} />{t("Velta")}</span><span><i style={{ background: "var(--brand)" }} />{t("Launakostnaður")}</span></div>
               </div>
             </div>
-            <div className="card">
-              <div className="ch"><div><div className="ct">{t("Laun% þróun vs 30% markmið")}</div><div className="cs">{t("per mánuð · farðu með músina yfir fyrir tölur")}</div></div></div>
-              <div className="cb">
-                {withRev.length
-                  ? <Bars vals={withRev.map((x) => x.laborPct)} t={30} labels={withRev.map((x) => x.label)} />
-                  : <p className="muted" style={{ fontSize: 13, margin: 0 }}>{t("Skráðu veltu til að sjá laun% per mánuð.")}</p>}
-              </div>
-            </div>
-          </div>
           ) },
           { id: "compare", title: "Samanburður tímabila", node: cur && prev && (
           <div className="card" style={{ marginTop: 20 }}>
@@ -245,7 +248,6 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
             </div>
           </div>
         )}
-        {staffing && <StaffingCard rows={staffing.rows} live={staffing.live} weeks={staffing.weeks} />}
       </>
     );
   }

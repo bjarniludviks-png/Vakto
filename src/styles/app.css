@@ -1140,3 +1140,50 @@ a.db2-who:hover span{color:var(--brand)}
 .db2-hstats span a{color:var(--brand);text-decoration:none;font-weight:600}
 .db2-hstats b{font-size:20px;font-weight:600;letter-spacing:-.02em;color:var(--ink);font-variant-numeric:tabular-nums}
 .db2-minibars span.db2-tip{width:auto;border-radius:9px}
+/* db2 sameiginlegt fyrir aðrar síður (Tímaskráning, Launakeyrslur, Innsýn, Vaktaplan) */
+.db2-row4{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.db2-prog{height:8px;border-radius:99px;background:var(--line2);overflow:hidden;margin:12px 0 10px}
+.db2-prog span{display:block;height:100%;border-radius:99px}
+.db2-itl{display:flex;align-items:center;gap:12px;flex:1;min-width:0;color:inherit;text-decoration:none}
+.db2-acts{display:flex;gap:8px;flex:none}
+.db2-pill.mut{background:var(--line2);color:var(--ink3)}
+.db2-rowlink{cursor:pointer}.db2-rowlink:hover td{background:var(--line2)}
+.db2-rowlink td:first-child{border-radius:10px 0 0 10px}.db2-rowlink td:last-child{border-radius:0 10px 10px 0}
+.db2 .filterbar,.db2 .stoolbar{margin:0}
+@media (max-width:1100px){.db2-row4{grid-template-columns:1fr 1fr}}
+@media (max-width:760px){.db2-row4{grid-template-columns:1fr 1fr;gap:12px}.db2-row4 .db2-tile{padding:16px}.db2-row4 .db2-v{font-size:28px}
+  .db2-it{flex-wrap:wrap}.db2-acts{width:100%;justify-content:flex-end}}
+.db2-big-kr{font-size:clamp(44px,5vw,68px);color:var(--ink)}
+.db2-big-kr small{font-size:.38em;color:var(--ink3);font-weight:600}
+.db2-stack-lg{height:14px;margin:20px 0 12px}
+.db2-heroacts{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+.db2-lines{display:flex;flex-direction:column;margin-top:6px}
+.db2-lines>div{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid color-mix(in srgb,var(--brand) 14%,transparent);font-size:13.5px;color:var(--ink2)}
+.db2-lines b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.db2-lines .tot{border-bottom:0;padding-top:12px}.db2-lines .tot span,.db2-lines .tot b{font-weight:700;color:var(--ink);font-size:15px}
+.db2-dim td{color:var(--ink3)}
+.db2-foot td{font-weight:700;border-bottom:0;padding-top:14px}
+.db2-pad{padding:14px 24px 22px}
+.db2-ic.good{background:var(--good-soft);color:var(--good)}
+.db2-ic{font-size:12px;font-weight:700}
+/* db2x: eldri spjöld (Innsýn, Vaktaplan) fá útlit nýja mælaborðsins án þess að breyta virkni */
+.db2x .db2-top{margin-bottom:22px}
+.db2x .db2-hero{margin-bottom:20px}
+.db2x .card,.db2x .kpi{border:0;border-radius:18px;box-shadow:0 0 0 1px var(--line),0 12px 30px -24px rgba(20,20,30,.25)}
+.db2x .card .ch{padding:22px 24px 0}
+.db2x .card .ct{font-size:16.5px;letter-spacing:-.01em}
+.db2x .card .cb{padding:18px 24px 24px}
+.db2x .kpi{padding:22px 24px}
+.db2x .kpi .lab{font-size:13.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink2)}
+.db2x .kpi .val{font-size:32px;margin-top:8px}
+.db2x .tbl th{text-transform:none;letter-spacing:0;font-size:12px}
+.db2x .legend i{border-radius:3px}
+.db2-hero-r .bars{margin-top:8px}
+.db2-hstats em{display:block;font-style:normal;font-size:12px;font-weight:600;margin-top:1px}
+.db2-hstats em.up{color:var(--good)}.db2-hstats em.down{color:var(--bad)}
+.db2-mini{margin-bottom:16px}
+.db2-mini .db2-tile{padding:16px 20px}
+.db2-mini .db2-v{font-size:26px;margin:6px 0 2px}
+.db2-mini .db2-v small{font-size:13px}
+.db2-mini .db2-prog{margin:8px 0 6px;height:6px}
+.db2x .db2-top .btn{flex:none}

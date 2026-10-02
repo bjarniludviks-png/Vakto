@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { nf, dec1 } from "@/lib/format";
+import { nf, dec1, krCompact } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
 import { AsyncButton } from "@/components/app/async-button";
 import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, assignOpenShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, getWeekBudget, type ShiftInput } from "./actions";
@@ -725,11 +724,11 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   }
 
   return (
-    <>
-      <PageHeader
-        title="Vaktaplan"
-        actions={<button className="btn sm" onClick={publish}>{t("Birta plan")}</button>}
-      />
+    <div className="db2x">
+      <div className="db2-top">
+        <div><h1>{t("Vaktaplan")}</h1><div className="db2-sub">{t("Dragðu vaktir til, sjáðu kostnaðinn strax og birtu planið.")}</div></div>
+        <button className="btn" onClick={publish}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Birta plan")}</button>
+      </div>
 
       <div className="stoolbar">
         <div className="wk">
@@ -798,20 +797,38 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       {/* Slim one-line summary so the grid itself stays at the top of the
           screen — the schedule is the point, the numbers just ride along.
           Day view has its own strip with the same figures, so skip here. */}
-      {view !== "Dagur" && (
-      <div className="kstrip">
-        <span>{t(kpi.hl)} <b>{dec1(kpi.hrs)}</b> {t("klst")}</span>
-        <span>{t("Áætl. launakostnaður")} <b>{nf(view === "Vika" && planCost != null ? planCost : Math.round(kpi.hrs * COST_HR))}</b> kr</span>
-        {view === "Vika" && planPct != null && budgetCap != null && (
-          <span className={planColor} title={budget?.revenueSource === "estimated" || budget?.revenueSource === "mixed" ? t("Veltuspá byggir á meðalveltu vikudaga þar sem rauntölur vantar") : undefined}>
-            {t("Laun % af veltuspá")} <b>{dec1(planPct)} %</b> · {t("markmið")} {dec1(laborTarget)} % · {t("svigrúm")} <b>{nf(budgetCap - (planCost ?? 0))}</b> kr
-          </span>
-        )}
-        <span>{t("Áætl. álagstímar")} <b>{dec1(estHrs.premium)}</b> {t("klst")}</span>
-        <span className={estHrs.overtime > 0 ? "bad" : ""}>{t("Áætl. yfirvinna")} <b>{dec1(estHrs.overtime)}</b> {t("klst")}</span>
-        <span>{t(kpi.sl)} <b>{kpi.shifts}</b>{kpi.open && !liveCompany ? <> · 2 {t("opnar")}</> : null}</span>
-      </div>
-      )}
+      {view !== "Dagur" && (() => {
+        const cost = view === "Vika" && planCost != null ? planCost : Math.round(kpi.hrs * COST_HR);
+        const showBudget = view === "Vika" && planPct != null && budgetCap != null;
+        const room = showBudget ? budgetCap! - (planCost ?? 0) : 0;
+        return (
+        <div className="db2-row4 db2-mini">
+          <section className="db2-card db2-tile">
+            <div className="db2-k">{t(kpi.hl)}</div>
+            <div className="db2-v">{dec1(kpi.hrs)}<small>{t("klst")}</small></div>
+            <div className="db2-s">{t(kpi.sl)} {kpi.shifts}{kpi.open && !liveCompany ? ` · 2 ${t("opnar")}` : ""}</div>
+          </section>
+          <section className="db2-card db2-tile">
+            <div className="db2-k">{t("Áætl. launakostnaður")}</div>
+            <div className="db2-v">{krCompact(cost)}</div>
+            <div className="db2-s">{nf(cost)} kr {t("með gjöldum")}</div>
+          </section>
+          <section className="db2-card db2-tile" title={budget?.revenueSource === "estimated" || budget?.revenueSource === "mixed" ? t("Veltuspá byggir á meðalveltu vikudaga þar sem rauntölur vantar") : undefined}>
+            <div className="db2-k">{t("Laun % af veltuspá")}</div>
+            {showBudget ? (<>
+              <div className="db2-v" style={{ color: `var(--${planColor})` }}>{dec1(planPct!)}<small>% · {t("markmið")} {dec1(laborTarget)} %</small></div>
+              <div className="db2-prog"><span style={{ width: `${Math.min(100, ((planCost ?? 0) / Math.max(1, budgetCap!)) * 100)}%`, background: `var(--${planColor})` }} /></div>
+              <div className="db2-s">{room >= 0 ? <>{t("svigrúm")} <b>{nf(room)} kr</b></> : <span style={{ color: "var(--bad)" }}>{nf(-room)} kr {t("yfir launaáætlun")}</span>}</div>
+            </>) : <div className="db2-s" style={{ marginTop: 10 }}>{view === "Vika" ? t("Skráðu veltu til að sjá hlutfallið.") : t("Sést í vikusýn")}</div>}
+          </section>
+          <section className="db2-card db2-tile">
+            <div className="db2-k">{t("Áætl. yfirvinna")}</div>
+            <div className="db2-v" style={{ color: estHrs.overtime > 0 ? "var(--bad)" : undefined }}>{dec1(estHrs.overtime)}<small>{t("klst")}</small></div>
+            <div className="db2-s">{t("Áætl. álagstímar")} {dec1(estHrs.premium)} {t("klst")}</div>
+          </section>
+        </div>
+        );
+      })()}
 
       {view === "Vika" && (
         <div>
@@ -1056,7 +1073,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
       {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} names={emp.map((e) => e[1])} depts={[...new Set(emp.map((e) => e[2]).filter(Boolean))]} />}
       {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={approveAiProposal} />}
-    </>
+    </div>
   );
 }
 

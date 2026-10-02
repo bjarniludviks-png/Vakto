@@ -6,7 +6,6 @@
 // screen in embedded mode so nothing is duplicated.
 
 import { useState } from "react";
-import { PageHeader } from "@/components/app/page-header";
 import { useLang } from "@/components/app/lang";
 import PerformanceScreen from "../frammistada/performance-screen";
 import ReportsScreen from "../skyrslur/reports-screen";
@@ -35,18 +34,20 @@ export function InsightsTabs({ owner, initialTab, empty, perf, reports, absence 
     ? [["rekstur", "Rekstur & framlegð"], ["timar", "Tímar & mæting"]]
     : [["timar", "Tímar & mæting"]];
   return (
-    <>
-      <PageHeader title="Innsýn" subtitle="Greiningar, skýrslur og AI á einum stað" />
-      {tabs.length > 1 && (
-        <div className="settabs" style={{ marginBottom: 18 }}>
-          {tabs.map(([id, label]) => (
-            <button key={id} className={`etab2${tab === id ? " on" : ""}`} onClick={() => setTab(id)}>{t(label)}</button>
-          ))}
-        </div>
-      )}
+    <div className="db2x">
+      <div className="db2-top">
+        <div><h1>{t("Innsýn")}</h1><div className="db2-sub">{t("Greiningar, skýrslur og AI á einum stað")}</div></div>
+        {tabs.length > 1 && (
+          <div className="db2-seg" role="tablist">
+            {tabs.map(([id, label]) => (
+              <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? "on" : ""} onClick={() => setTab(id)}>{t(label)}</button>
+            ))}
+          </div>
+        )}
+      </div>
       {tab === "rekstur" && owner
         ? <PerformanceScreen embedded empty={empty} live={perf.live} perf={perf.perf} staffing={perf.staffing} history={perf.history} insights={perf.insights} />
         : <><ReportsScreen embedded empty={empty} live={reports.live} rows={reports.rows} timebank={reports.timebank} /><AbsenceCard data={absence} /></>}
-    </>
+    </div>
   );
 }

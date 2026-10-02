@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { PunchFlags, spanText } from "./punch-flags";
 import { PunchDateTimeFields } from "./[id]/timesheet-screen";
-import { dec1 } from "@/lib/format";
+import { dec1, krCompact } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
 import type { OnNowRow, RosterRow } from "./attendance.server";
 import { approveAllTimesheets, approveTimesheet, setClockOut, fetchAttendance, managerClockIn, adjustPunch, getEmployeePunches, setPunchApproved, approveEmployeePunches, decideCorrection, type PunchRow, type CorrectionRow } from "./actions";
@@ -24,10 +24,10 @@ const niceISO = (s: string) => { const [y, m, d] = s.split("-").map(Number); ret
 function rangeFor(period: Period): { from: string; to: string } {
   const t = new Date(); t.setHours(0, 0, 0, 0);
   if (period === "Dagur") return { from: isoOf(t), to: isoOf(t) };
-  if (period === "Mánuður") return { from: isoOf(new Date(t.getFullYear(), t.getMonth(), 1)), to: isoOf(new Date(t.getFullYear(), t.getMonth() + 1, 0)) };
+  // Til dagsins í dag: plan framtíðardaga má ekki birtast sem frávik.
+  if (period === "Mánuður") return { from: isoOf(new Date(t.getFullYear(), t.getMonth(), 1)), to: isoOf(t) };
   const mon = new Date(t); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
-  const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
-  return { from: isoOf(mon), to: isoOf(sun) };
+  return { from: isoOf(mon), to: isoOf(t) };
 }
 
 type TS = { date: string; pos: string; sch: string; act: string; pend: boolean; id?: string };
@@ -153,8 +153,7 @@ export default function AttendanceScreen({ onShift = 5, empty = false, live = fa
 
 function nowHHMM() { const d = new Date(); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
 
-/** Hours a punch has been open. */
-const openHrsOf = (sinceISO: string) => Math.max(0, (Date.now() - Date.parse(sinceISO)) / 3600e3);
+const durSince = (iso: string, now: number) => { const m = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000)); return m >= 60 ? `${Math.floor(m / 60)} klst ${m % 60} mín` : `${m} mín`; };
 
 function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onShift: number; initial: AttRow[]; onNow: OnNowRow[]; roster: RosterRow[]; corrections: CorrectionRow[] }) {
   const { t } = useLang();
@@ -199,12 +198,28 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
   const planned = shown.reduce((a, r) => a + r.planned, 0);
   const actual = shown.reduce((a, r) => a + r.actual, 0);
   const missing = shown.filter((r) => r.planned > 0 && r.actual === 0).length;
+  const devCost = shown.reduce((a, r) => a + (r.actCost - r.estCost), 0);
+  const dev = actual - planned;
+  const [nowMs, setNowMs] = useState(0);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- klukkan byrjar eftir hydration
+    setNowMs(Date.now());
+    const id = setInterval(() => setNowMs(Date.now()), 60000);
+    return () => clearInterval(id);
+  }, []);
+  const openH = (since: string) => (nowMs ? Math.max(0, (nowMs - Date.parse(since)) / 3600e3) : 0);
+  const longOpenN = onNow.filter((r) => openH(r.since) > 12).length;
+  const sign = (n: number) => (n > 0.05 ? "+" : n < -0.05 ? "−" : "±");
 
   return (
-    <>
-      <PageHeader title="Tímaskráning" subtitle="Áætlað vs raun-tímar" actions={
-        <button className="btn ghost sm" onClick={() => toast("Tímaskráning sótt í CSV")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Sækja CSV")}</button>
-      } />
+    <div className="db2">
+      <div className="db2-top">
+        <div><h1>{t("Tímaskráning")}</h1><div className="db2-sub">{t("Hver er á vakt, hvað var unnið og hvað frávikin kosta.")}</div></div>
+        <div className="db2-period">
+          <button className="btn ghost sm" onClick={() => setClockInOpen(true)}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>{t("Stimpla inn starfsmann")}</button>
+          <button className="btn ghost sm" onClick={() => toast("Tímaskráning sótt í CSV")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Sækja CSV")}</button>
+        </div>
+      </div>
       <FilterBar
         periods={["Dagur", "Vika", "Mánuður", "Sérsniðið"]}
         period={period} onPeriod={changePeriod}
@@ -214,60 +229,79 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
         rangeLabel={`${niceISO(from)} – ${niceISO(to)}`}
         storageKey="timaskraning"
       />
-      <div className="kpis">
-        <div className="kpi"><div className="lab">{t("Á vakt núna")}</div><div className="val">{onNow.length}</div></div>
-        <div className="kpi"><div className="lab">{t("Áætl. klst")}</div><div className="val">{dec1(planned)} <small>{t("klst")}</small></div></div>
-        <div className="kpi"><div className="lab">{t("Raun klst")}</div><div className="val">{dec1(actual)} <small>{t("klst")}</small></div></div>
-        <div className="kpi"><div className="lab">{t("Frávik")}</div><div className="val" style={{ color: actual > planned ? "var(--bad)" : actual < planned ? "var(--good)" : undefined }}>{actual >= planned ? "+" : ""}{dec1(actual - planned)} <small>{t("klst")}</small></div></div>
+
+      <div className="db2-row4">
+        <section className="db2-card db2-tile">
+          {longOpenN > 0 && <span className="db2-pill bad db2-tag">{longOpenN} {t("opnar of lengi")}</span>}
+          <div className="db2-k">{t("Á vakt núna")}</div>
+          <div className="db2-v">{onNow.length}<small>{t("skráðir inn")}</small></div>
+          {onNow.length > 0 && <div className="db2-avs">{onNow.slice(0, 8).map((r) => <span key={r.punchId} className="db2-av" style={{ background: r.c }} title={r.name}>{r.av}</span>)}</div>}
+        </section>
+        <section className="db2-card db2-tile">
+          <div className="db2-k">{t("Unnir tímar")}</div>
+          <div className="db2-v">{dec1(actual)}<small>/ {dec1(planned)} {t("áætl.")}</small></div>
+          <div className="db2-prog"><span style={{ width: `${planned > 0 ? Math.min(100, (actual / planned) * 100) : 0}%`, background: actual > planned + 0.05 ? "var(--bad)" : "var(--brand)" }} /></div>
+          <div className="db2-s">{planned > 0 ? `${Math.round((actual / planned) * 100)} % ${t("af plani til dagsins í dag")}` : t("Ekkert plan á tímabilinu")}</div>
+        </section>
+        <section className="db2-card db2-tile">
+          <div className="db2-k">{t("Frávik frá plani")}</div>
+          <div className="db2-v" style={{ color: dev > 0.05 ? "var(--bad)" : dev < -0.05 ? "var(--good)" : undefined }}>{sign(dev)}{dec1(Math.abs(dev))}<small>{t("klst")}</small></div>
+          {Math.abs(devCost) >= 1 && <div className={`db2-devline ${devCost > 0 ? "bad" : "good"}`}><span>{devCost > 0 ? t("Kostar umfram plan") : t("Undir áætluðum kostnaði")}</span><b>{devCost > 0 ? "+" : "−"}{krCompact(Math.abs(devCost))}</b></div>}
+        </section>
+        <section className="db2-card db2-tile">
+          <div className="db2-k">{t("Þarf að skoða")}</div>
+          <div className="db2-v" style={{ color: missing + corrections.length > 0 ? "var(--warn)" : undefined }}>{missing + corrections.length}</div>
+          <div className="db2-s">{missing} {t("vantar stimplun")} · {corrections.length} {t("leiðréttingabeiðnir")}</div>
+        </section>
       </div>
 
-      {/* Who is clocked in right now */}
-      <div className="card" style={{ marginTop: 20 }}>
-        <div className="ch">
-          <div><div className="ct">{t("Á vakt núna")}</div><div className="cs">{t("skráðir inn — leiðréttu tíma eða stimplaðu út")}</div></div>
-          <button className="btn sm" onClick={() => setClockInOpen(true)}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>{t("Stimpla inn starfsmann")}
-          </button>
-        </div>
-        <div className="cb att">
-          {onNow.length ? onNow.map((r) => (
-            <div className="it" key={r.punchId}>
-              <span className="avt" style={{ background: r.c, width: 34, height: 34, cursor: "pointer" }} onClick={() => router.push(`/timaskraning/${r.employeeId}`)}>{r.av}</span>
-              <div className="tx" style={{ cursor: "pointer" }} onClick={() => router.push(`/timaskraning/${r.employeeId}`)}><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : ""}</span></div>
-              {r.unscheduled && <span className="tag" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("óáætlað")}</span>}
-              <div className="itact">
-                {openHrsOf(r.since) > 12
-                  ? <span className="tag" style={{ background: "var(--bad-soft, #fbe9e5)", color: "var(--bad)" }} title={t("Opin stimplun í meira en 12 klst — gleymt að stimpla út?")}>⚠ {Math.round(openHrsOf(r.since))} {t("klst")}</span>
-                  : <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>}
-                <button className="btn ghost sm" onClick={() => setEditPunch(r)}>{t("Leiðrétta")}</button>
-                <AsyncButton className="btn sm" onClick={() => doClockOut(r)}>{t("tk:clockout")}</AsyncButton>
-              </div>
-            </div>
-          )) : <div className="muted" style={{ padding: 16, textAlign: "center" }}>{t("Enginn skráður inn núna.")}</div>}
-        </div>
-      </div>
+      <section className="db2-card">
+        <div className="db2-ch"><div><div className="db2-ct">{t("Á vakt núna")}</div><div className="db2-cs">{t("Skráðir inn í rauntíma. Smelltu á nafn til að sjá allar stimplanir.")}</div></div>
+          {onNow.length > 0 && <span className="db2-pill good">{onNow.length} {t("á vakt")}</span>}</div>
+        {onNow.length ? (
+          <div className="db2-list">
+            {onNow.map((r) => {
+              const long = openH(r.since) > 12;
+              return (
+                <div className="db2-it" key={r.punchId}>
+                  <Link href={`/timaskraning/${r.employeeId}`} className="db2-itl">
+                    <span className="db2-av sm" style={{ background: r.c }}>{r.av}</span>
+                    <span className="db2-tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : ""}</span></span>
+                  </Link>
+                  {r.unscheduled && <span className="db2-pill warn" title={t("Stimplaði sig inn án þess að vera á vaktaplani dagsins")}>{t("óáætlað")}</span>}
+                  <span className={`db2-pill ${long ? "bad" : "good"}`} title={long ? t("Opin stimplun í meira en 12 klst — gleymt að stimpla út?") : undefined}>{nowMs ? durSince(r.since, nowMs) : t("á vakt")}{long ? ` · ${t("gleymdist útstimplun?")}` : ""}</span>
+                  <span className="db2-acts">
+                    <button className="btn ghost sm" onClick={() => setEditPunch(r)}>{t("Leiðrétta")}</button>
+                    <AsyncButton className="btn sm" onClick={() => doClockOut(r)}>{t("tk:clockout")}</AsyncButton>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        ) : <div className="db2-muted db2-empty" style={{ padding: "18px 24px" }}>{t("Enginn skráður inn núna.")}</div>}
+      </section>
 
       {corrections.length > 0 && (
-        <div className="card" style={{ marginTop: 20 }}>
-          <div className="ch"><div><div className="ct">{t("Leiðréttingabeiðnir")}</div><div className="cs">{t("frá starfsfólki — samþykktu eða hafnaðu")}</div></div><span className="badge" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{corrections.length} {t("ný")}</span></div>
-          <div className="cb att">
+        <section className="db2-card">
+          <div className="db2-ch"><div><div className="db2-ct">{t("Leiðréttingabeiðnir")}</div><div className="db2-cs">{t("frá starfsfólki — samþykktu eða hafnaðu")}</div></div><span className="db2-pill warn">{corrections.length} {t("ný")}</span></div>
+          <div className="db2-list">
             {corrections.map((c) => (
-              <div className="it" key={c.id}>
-                <div className="ic warn"><svg className="ei" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></div>
-                <div className="tx"><b>{c.name} · {niceISO(c.date)}</b><span>{c.requestedIn ? `${t("inn")} ${c.requestedIn}` : ""}{c.requestedOut ? ` · ${t("út")} ${c.requestedOut}` : ""}{c.reason ? ` — ${c.reason}` : ""}</span></div>
-                <div className="itact">
+              <div className="db2-it" key={c.id}>
+                <span className="db2-ic warn"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></span>
+                <span className="db2-tx"><b>{c.name} · {niceISO(c.date)}</b><span>{c.requestedIn ? `${t("inn")} ${c.requestedIn}` : ""}{c.requestedOut ? ` · ${t("út")} ${c.requestedOut}` : ""}{c.reason ? ` — ${c.reason}` : ""}</span></span>
+                <span className="db2-acts">
                   <AsyncButton className="btn sm" onClick={() => decideCorr(c.id, true)}>{t("Samþykkja")}</AsyncButton>
                   <AsyncButton className="btn ghost sm" onClick={() => decideCorr(c.id, false)}>{t("Hafna")}</AsyncButton>
-                </div>
+                </span>
               </div>
             ))}
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="card" style={{ marginTop: 20 }}>
-        <div className="ch">
-          <div><div className="ct">{t("Vaktaplan vs raun-tímar")}</div><div className="cs">{niceISO(from)} – {niceISO(to)}{missing ? ` · ${missing} ${t("vantar stimplun")}` : ""}</div></div>
+      <section className="db2-card db2-staff">
+        <div className="db2-ch">
+          <div><div className="db2-ct">{t("Plan og unnið per starfsmann")}</div><div className="db2-cs">{niceISO(from)} – {niceISO(to)} · {t("smelltu á röð til að sjá og samþykkja stimplanir")}</div></div>
           {sel.size > 0 && (
             <button className="btn sm" disabled={bulkBusy} onClick={async () => {
               setBulkBusy(true);
@@ -284,45 +318,48 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
             </button>
           )}
         </div>
-        <div className="cb tbl" style={{ paddingTop: 8, opacity: loading ? 0.5 : 1 }}>
+        <div className="db2-tblwrap" style={{ opacity: loading ? 0.5 : 1 }}>
           <table>
             <thead><tr>
-              <th style={{ width: 34 }}><input type="checkbox" checked={shown.length > 0 && sel.size === shown.length} onChange={(e) => setSel(e.target.checked ? new Set(shown.map((r) => r.id)) : new Set())} /></th>
-              <th>{t("Starfsmaður")}</th><th>{t("Deild")}</th><th className="r">{t("Áætl. klst")}</th><th className="r">{t("Raun klst")}</th><th className="r">{t("Frávik")}</th><th>{t("Staða")}</th>
+              <th style={{ width: 30 }}><input type="checkbox" checked={shown.length > 0 && sel.size === shown.length} onChange={(e) => setSel(e.target.checked ? new Set(shown.map((r) => r.id)) : new Set())} /></th>
+              <th>{t("Starfsmaður")}</th><th className="r">{t("Á plani")}</th><th className="r">{t("Unnið")}</th><th className="r">{t("Frávik (klst)")}</th><th className="r">{t("Kostnaður frávika")}</th><th>{t("Staða")}</th><th style={{ width: 20 }} />
             </tr></thead>
             <tbody>
               {shown.length ? shown.map((r) => {
-                const longOpen = onNow.find((o) => o.employeeId === r.id && openHrsOf(o.since) > 12);
+                const longOpen = onNow.find((o) => o.employeeId === r.id && openH(o.since) > 12);
                 const bigDev = !longOpen && r.deviation > 4;
+                const dc = r.actCost - r.estCost;
+                const col = r.deviation > 0.05 ? "var(--bad)" : r.deviation < -0.05 ? "var(--good)" : undefined;
                 return (
-                <tr key={r.id} className="rowlink" onClick={() => router.push(`/timaskraning/${r.id}`)}>
+                <tr key={r.id} className="db2-rowlink" onClick={() => router.push(`/timaskraning/${r.id}`)}>
                   <td onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={sel.has(r.id)} onChange={(e) => setSel((sv) => { const n = new Set(sv); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} />
                   </td>
-                  <td><span className="who"><span className="avt" style={{ background: r.c }}>{r.av}</span> {r.name}</span></td>
-                  <td>{r.dept}</td>
+                  <td><span className="db2-who"><span className="db2-av sm" style={{ background: r.c }}>{r.av}</span><span>{r.name}<small>{t(r.dept)}</small></span></span></td>
                   <td className="r">{dec1(r.planned)}</td>
                   <td className="r">{dec1(r.actual)}</td>
-                  <td className="r" style={{ color: r.deviation > 0 ? "var(--bad)" : r.deviation < 0 ? "var(--good)" : undefined }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>
+                  <td className="r" style={{ color: col }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>
+                  <td className="r" style={{ color: col }}>{Math.abs(dc) >= 1 ? `${dc > 0 ? "+" : "−"}${krCompact(Math.abs(dc))}` : "–"}</td>
                   <td>
-                    {longOpen ? <span className="pill" style={{ background: "var(--bad-soft, #fbe9e5)", color: "var(--bad)" }} title={t("Opin stimplun í meira en 12 klst — gleymt að stimpla út?")}>⚠ {t("Opin stimplun")}</span>
-                      : bigDev ? <span className="pill" style={{ background: "var(--warn-soft)", color: "var(--warn)" }} title={t("Frávik yfir 4 klst — skoðaðu stimplanirnar")}>⚠ {t("Mikið frávik")}</span>
-                      : r.actual === 0 && r.planned === 0 ? <span className="pill" style={{ background: "var(--line2)", color: "var(--ink3)" }}>{t("engin gögn")}</span>
-                      : r.actual === 0 ? <span className="pill" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Vantar stimplun")}</span>
-                      : <span className="pill" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Á áætlun")}</span>}
+                    {longOpen ? <span className="db2-pill bad" title={t("Opin stimplun í meira en 12 klst — gleymt að stimpla út?")}>{t("Opin stimplun")}</span>
+                      : bigDev ? <span className="db2-pill warn" title={t("Frávik yfir 4 klst — skoðaðu stimplanirnar")}>{t("Mikið frávik")}</span>
+                      : r.actual === 0 && r.planned === 0 ? <span className="db2-pill mut">{t("engin gögn")}</span>
+                      : r.actual === 0 ? <span className="db2-pill warn">{t("Vantar stimplun")}</span>
+                      : <span className="db2-pill good">{t("Á áætlun")}</span>}
                   </td>
+                  <td><svg className="db2-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></td>
                 </tr>
                 );
-              }) : <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
+              }) : <tr><td colSpan={8} className="db2-muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
       {clockInOpen && <ClockInModal roster={roster} onClose={() => setClockInOpen(false)} onDone={() => { setClockInOpen(false); router.refresh(); }} />}
       {editPunch && <AdjustPunchModal row={editPunch} onClose={() => setEditPunch(null)} onDone={() => { setEditPunch(null); router.refresh(); }} />}
       {detail && <EmployeePunchesModal employeeId={detail.id} name={detail.name} from={from} to={to} onClose={() => setDetail(null)} onChanged={() => router.refresh()} />}
-    </>
+    </div>
   );
 }
 
