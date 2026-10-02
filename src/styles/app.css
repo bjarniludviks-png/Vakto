@@ -1082,3 +1082,4 @@ html.dark .plan-tabs button.on{color:#0f0f12}
   .db2-row3{grid-template-columns:1fr}.db2-top h1{font-size:25px}
   .db2-bars{gap:6px;padding:16px 14px 10px;height:190px}.db2-tblwrap{padding:8px 14px}
 }
+.db2-tblwrap th{text-transform:none;letter-spacing:0}

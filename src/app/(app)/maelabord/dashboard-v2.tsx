@@ -22,9 +22,9 @@ function presetRange(k: string): { from: string; to: string } {
   if (k === "idag") return { from: isoD(t), to: isoD(t) };
   if (k === "30d") { const s = new Date(t); s.setDate(s.getDate() - 29); return { from: isoD(s), to: isoD(t) }; }
   if (k === "7d") { const s = new Date(t); s.setDate(s.getDate() - 6); return { from: isoD(s), to: isoD(t) }; }
+  // Vikan til dagsins í dag: plan framtíðardaga má ekki telja sem „undir plani“.
   const mon = new Date(t); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
-  const sun = new Date(mon); sun.setDate(sun.getDate() + 6);
-  return { from: isoD(mon), to: isoD(sun) };
+  return { from: isoD(mon), to: isoD(t) };
 }
 const SEGS: { k: string; label: string }[] = [{ k: "idag", label: "Í dag" }, { k: "vika", label: "Vika" }, { k: "30d", label: "30 dagar" }];
 const COLOR = { good: "var(--good)", warn: "var(--warn)", bad: "var(--bad)" } as const;
@@ -103,7 +103,7 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
     { k: "Grunnlaun", v: base, c: "var(--brand)" },
     { k: "Launatengd gjöld", v: pd.levies, c: "#f7b678" },
     { k: "Yfirvinna", v: pd.overtimePay, c: "var(--bad)" },
-    { k: "Álag", v: pd.premiumPay, c: "#c9c9d2" },
+    { k: "Álagsgreiðslur", v: pd.premiumPay, c: "#c9c9d2" },
   ] : [];
   const late = missing.filter((m) => m.late);
   const onPlanToday = onNow.filter((r) => !r.unscheduled).length + missing.length;
@@ -157,7 +157,7 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
               {lp != null && <div className="db2-gpin" style={{ left: gp(lp) }} />}
               <div className="db2-gtarget" style={{ left: gp(target) }}>{t("markmið")} {dec1(target)} %</div>
             </div>
-            <div className="db2-gscale"><span>0 %</span><span>{gaugeMax / 2} %</span><span>{gaugeMax} %</span></div>
+            <div className="db2-gscale"><span>0 %</span><span>{dec1(gaugeMax / 2)} %</span><span>{gaugeMax} %</span></div>
           </div>
         </div>
         <div className="db2-hero-r">
