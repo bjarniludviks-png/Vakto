@@ -230,11 +230,12 @@ function HeroVideo() {
 
 /* ---------- 2. Eiginleikar (bento með alvöru skjámyndum) ---------- */
 
-function Crop({ src, pos, ratio = "16 / 10", zoom = 1.6, alt }: { src: string; pos: string; ratio?: string; zoom?: number; alt: string }) {
+// `origin` (valfrjálst) er fasti punkturinn í aðdrættinum: efri vinstri sýnilegi punkturinn verður origin × (1 − 1/zoom).
+function Crop({ src, pos, origin, ratio = "16 / 10", zoom = 1.6, alt }: { src: string; pos: string; origin?: string; ratio?: string; zoom?: number; alt: string }) {
   return (
     <div className="ah-crop" style={{ aspectRatio: ratio } as CSSProperties}>
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={alt} width={2880} height={1800} loading="lazy" decoding="async" style={{ objectPosition: pos, transform: `scale(${zoom})`, transformOrigin: pos } as CSSProperties} />
+      <img src={src} alt={alt} width={2880} height={1800} loading="lazy" decoding="async" style={{ objectPosition: pos, transform: `scale(${zoom})`, transformOrigin: origin ?? pos } as CSSProperties} />
     </div>
   );
 }
@@ -257,11 +258,11 @@ function Features() {
         </div>
         <div className="ah-tile">
           <div className="ah-tile-tx"><h3>{t.t3h}</h3><p>{t.t3p}</p></div>
-          <Crop src={`${SHOT}/light/timaskraning.jpg`} alt={t.t3alt} pos="62% 12%" zoom={1.4} ratio="16 / 9" />
+          <Crop src={`${SHOT}/light/timaskraning.jpg`} alt={t.t3alt} pos="0% 0%" origin="77.5% 87%" zoom={1.5} ratio="16 / 9" />
         </div>
         <div className="ah-tile">
           <div className="ah-tile-tx"><h3>{t.t4h}</h3><p>{t.t4p}</p></div>
-          <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt={t.t4alt} pos="62% 12%" zoom={1.4} ratio="16 / 9" />
+          <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt={t.t4alt} pos="0% 0%" origin="46.7% 137%" zoom={1.2} ratio="16 / 9" />
         </div>
         <div className="ah-tile ah-wide">
           <div className="ah-tile-tx"><h3>{t.t5h}</h3><p>{t.t5p}</p></div>

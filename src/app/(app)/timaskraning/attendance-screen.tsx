@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { AsyncButton } from "@/components/app/async-button";
@@ -183,15 +183,21 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
     router.refresh();
   }
 
+  // Aðeins svar við nýjustu beiðni gildir (tímabil sem FilterBar man getur komið á undan).
+  const reqRef = useRef("");
   function load(f: string, tt: string) {
+    const key = `${f}|${tt}`;
+    reqRef.current = key;
     setLoading(true);
-    fetchAttendance(f, tt).then((res) => { if (res.ok) setData(res.rows); }).finally(() => setLoading(false));
+    fetchAttendance(f, tt).then((res) => { if (res.ok && reqRef.current === key) setData(res.rows); }).finally(() => { if (reqRef.current === key) setLoading(false); });
   }
   // Gögn þjónsins ná yfir alla vikuna — sækjum aftur til dagsins í dag.
+  // FilterBar (barn) keyrir sín effect á undan: ef það hefur þegar sótt munað tímabil sleppum við.
   useEffect(() => {
-    let gone = false;
-    fetchAttendance(init0.from, init0.to).then((res) => { if (!gone && res.ok) setData(res.rows); });
-    return () => { gone = true; };
+    if (reqRef.current) return;
+    const key = `${init0.from}|${init0.to}`;
+    reqRef.current = key;
+    fetchAttendance(init0.from, init0.to).then((res) => { if (res.ok && reqRef.current === key) setData(res.rows); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   function changePeriod(p: Period) {
