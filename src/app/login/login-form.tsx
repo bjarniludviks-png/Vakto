@@ -14,6 +14,7 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [remember, setRemember] = useState(true);
 
   async function forgot() {
     setError(null);
@@ -29,6 +30,17 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
         : "Ef aðgangur er til fyrir netfangið er póstur með hlekk á leiðinni."
     );
   }
+
+  // „Muna eftir mér": síðasta netfang fyllt út og val notandans munað.
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("vakto-login-email");
+      const eph = localStorage.getItem("vakto-ephemeral") === "1";
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage er aðeins til í vafranum
+      if (saved) setEmail(saved);
+      if (eph) setRemember(false);
+    } catch {}
+  }, []);
 
   // Carry the marketing-site language choice into the app after login.
   useEffect(() => {
@@ -60,6 +72,17 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
         setError(error.message);
         return;
       }
+      try {
+        if (remember) {
+          localStorage.setItem("vakto-login-email", email.trim());
+          localStorage.removeItem("vakto-ephemeral");
+        } else {
+          // Lotan lifir aðeins meðan vafrinn er opinn: lotu-vafrakaka (án gildistíma) hverfur þegar vafranum er lokað.
+          localStorage.removeItem("vakto-login-email");
+          localStorage.setItem("vakto-ephemeral", "1");
+          document.cookie = "vakto-alive=1; path=/; SameSite=Lax; Secure";
+        }
+      } catch {}
       // Full navigation (not client transition) so the app shell loads with its
       // route-scoped CSS + fresh session — avoids the "needs a refresh" flash.
       window.location.assign("/maelabord");
@@ -121,6 +144,11 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
           </button>
         </div>
       </div>
+
+      <label className="remember">
+        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+        <span>{lang === "en" ? "Remember me" : "Muna eftir mér"}</span>
+      </label>
 
       {error && (
         <div

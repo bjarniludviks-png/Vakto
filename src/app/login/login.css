@@ -148,3 +148,7 @@ body{font-family:"General Sans","Plus Jakarta Sans",ui-sans-serif,system-ui,-app
 .chk input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--brand);flex:none;cursor:pointer}
 .chk a{color:var(--brand-2);font-weight:600;text-decoration:none}
 .linkbtn{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--brand-2);cursor:pointer}
+
+/* „Muna eftir mér" */
+.remember{display:flex;align-items:center;gap:9px;margin:-2px 0 16px;font-size:13.5px;color:var(--ink2,#6e6e73);cursor:pointer;user-select:none}
+.remember input{width:17px;height:17px;margin:0;accent-color:#e9700f;cursor:pointer}

@@ -116,6 +116,15 @@ export async function updateSession(request: NextRequest) {
     pathname === "/sitemap.xml" ||
     pathname === "/favicon.ico";
 
+  // Innskráður notandi á /login fer beint inn (lotan geymist í 400 daga) — nema villuskilaboð séu á leiðinni.
+  if (user && pathname === "/login" && !request.nextUrl.searchParams.has("error")) {
+    const { data: me } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
+    const dest = request.nextUrl.clone();
+    dest.pathname = homeFor(((me?.role as Role) ?? "employee"));
+    dest.search = "";
+    return NextResponse.redirect(dest);
+  }
+
   if (!user && !isPublic) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";

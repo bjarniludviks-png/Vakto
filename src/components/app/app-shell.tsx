@@ -71,6 +71,16 @@ export default function AppShell({
       if (rail) setRailed(true);
     });
   }, []);
+  // „Muna eftir mér" var ekki hakað: lotan lifir aðeins meðan vafrinn er opinn.
+  // Lotu-vafrakakan „vakto-alive" hverfur þegar vafranum er lokað → skrá út við næstu opnun.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("vakto-ephemeral") === "1" && !document.cookie.split("; ").includes("vakto-alive=1")) {
+        localStorage.removeItem("vakto-ephemeral");
+        createClient().auth.signOut().finally(() => window.location.assign("/login"));
+      }
+    } catch { /* einkagluggi o.fl. */ }
+  }, []);
   function toggleRail() {
     setRailed((r) => { try { localStorage.setItem("vakto-rail", r ? "0" : "1"); } catch {} return !r; });
   }
