@@ -16,7 +16,7 @@ const is = {
   t2h: "Stimplað í símanum.", t2p: "Eða á spjaldtölvu við innganginn. Staðsetning staðfest ef þú vilt.", t2alt: "VAKTO-appið: á vakt síðan 05:38, stimpla út",
   t3h: "Frávik með krónutölu.", t3p: "Hver mætti seint, hver fór fyrr og hvað það kostaði.", t3alt: "Tímaskráning með frávikum",
   t4h: "Laun eftir kjarasamningi.", t4p: "Álag, yfirvinna og uppbót reiknuð. Beint í Payday eða DK.", t4alt: "Launakeyrsla mánaðarins",
-  t5h: "Spjaldtölva við innganginn.", t5p: "Starfsfólk ýtir á nafnið sitt eða skannar skírteinið í símanum. Enginn PIN-kóði að gleyma og enginn stimplar fyrir annan.", t5alt: "Stimpilklukkan á spjaldtölvu: allt starfsfólk og hver er á vakt",
+  t5h: "Spjaldtölva við innganginn.", t5p: "Starfsfólk ýtir á nafnið sitt og slær inn sinn kóða, eða skannar skírteinið úr símanum. Allir sjá hver er á vakt og stimplunin fer beint í tímaskráninguna.", t5alt: "Stimpilklukkan á spjaldtölvu: allt starfsfólk og hver er á vakt",
   t6h: "Spjall fyrir hópinn.", t6p: "Rásir per deild og stað. Enginn Messenger-hópur með fyrrverandi starfsfólki.", t6alt: "Spjallrásir í VAKTO-appinu",
   darkH: "Fallegt í birtu. Líka á næturvaktinni.", darkP: "Kerfið fylgir stillingu tækisins. Dragðu til að bera saman.",
   cmpAria: "Bera saman ljóst og dökkt", cmpLight: "Vaktaplan í ljósu þema", cmpDark: "Vaktaplan í dökku þema",
@@ -37,10 +37,10 @@ const is = {
   conAlt: "Fyrsta síða ráðningarsamnings: Kaffi Krónan ræður Ha Vu til starfa", stamp: "Undirritað rafrænt",
   passLbl: "STARFSMAÐUR", passRole: "STAÐA", passRoleV: "Þjónn", passKt: "KENNITALA", passNo: "NR.", passFoot: "VAKTO-4132-KK · skannaðu á stimpilklukku",
   walH: "Starfsmannaskírteinið er í símanum.",
-  walP: "Í Apple og Google Wallet, með mynd, stöðu og QR-kóða. Kóðinn stimplar inn á spjaldtölvunni við innganginn, svo enginn þarf að muna PIN-kóða.",
+  walP: "Í Apple og Google Wallet, með mynd, stöðu og QR-kóða. Kóðinn stimplar inn á spjaldtölvunni við innganginn, án þess að slá inn PIN.",
   priceH: "Eitt verð. Allt innifalið.", amt: "9.990 kr", per: "/mán",
   price1: "5 virkir starfsmenn innifaldir.", price2: "1.490 kr á hvern virkan starfsmann umfram.",
-  fine: "Án VSK. Þú borgar aðeins fyrir þá sem unnu í mánuðinum. 15% afsláttur ef greitt er árlega. 14 daga frí prufa, engin binding.",
+  fine: "Án VSK. Þú borgar aðeins fyrir þá sem unnu í mánuðinum. Undirskrift með rafrænum skilríkjum 490 kr. 15% afsláttur ef greitt er árlega. 14 daga frí prufa, engin binding.",
 };
 
 const en: typeof is = {
@@ -58,7 +58,7 @@ const en: typeof is = {
   t2h: "Clock in on the phone.", t2p: "Or on a tablet by the entrance. Location verified if you want.", t2alt: "The VAKTO app: on shift since 05:38, clock out",
   t3h: "Deviations in krónur.", t3p: "Who came in late, who left early and what it cost.", t3alt: "Time tracking with deviations",
   t4h: "Pay by the union agreement.", t4p: "Premiums, overtime and bonuses calculated. Straight to Payday or DK.", t4alt: "This month's payroll",
-  t5h: "A tablet at the entrance.", t5p: "Staff tap their name or scan the ID card on their phone. No PIN to forget, and nobody clocks in for someone else.", t5alt: "The time clock on a tablet: all staff and who is on shift",
+  t5h: "A tablet at the entrance.", t5p: "Staff tap their name and enter their own code, or scan the ID card from their phone. Everyone sees who is on shift, and every punch goes straight into the timesheet.", t5alt: "The time clock on a tablet: all staff and who is on shift",
   t6h: "Chat for the whole team.", t6p: "Channels per department and location. No Messenger group with former staff in it.", t6alt: "Chat channels in the VAKTO app",
   darkH: "Beautiful in daylight. And on the night shift.", darkP: "VAKTO follows your device setting. Drag to compare.",
   cmpAria: "Compare light and dark", cmpLight: "Schedule in light mode", cmpDark: "Schedule in dark mode",
@@ -79,10 +79,10 @@ const en: typeof is = {
   conAlt: "First page of an employment contract: Kaffi Krónan hires Ha Vu", stamp: "Signed electronically",
   passLbl: "EMPLOYEE", passRole: "ROLE", passRoleV: "Server", passKt: "ID NUMBER", passNo: "NO.", passFoot: "VAKTO-4132-KK · scan at the time clock",
   walH: "The employee ID card lives on the phone.",
-  walP: "In Apple and Google Wallet, with photo, role and QR code. The code clocks in on the tablet by the entrance, so nobody has to remember a PIN.",
+  walP: "In Apple and Google Wallet, with photo, role and QR code. The code clocks in on the tablet by the entrance, no PIN needed.",
   priceH: "One price. Everything included.", amt: "ISK 9,990", per: "/mo",
   price1: "5 active employees included.", price2: "ISK 1,490 per additional active employee.",
-  fine: "Excl. VAT. You only pay for those who worked that month. 15% off when paid annually. 14-day free trial, no commitment.",
+  fine: "Excl. VAT. You only pay for those who worked that month. Signing with electronic ID ISK 490. 15% off when paid annually. 14-day free trial, no commitment.",
 };
 
 export const HOME_TEXT: Record<SiteLang, typeof is> = { is, en };

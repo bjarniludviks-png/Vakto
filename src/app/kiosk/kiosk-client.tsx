@@ -149,8 +149,24 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
     if (!scan) return;
     let stream: MediaStream | null = null, raf = 0, done = false;
     const BD = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> } }).BarcodeDetector;
-    if (!BD) { setScanErr(s.scanUnsupported); return; }
-    const detector = new BD({ formats: ["qr_code"] });
+    // Safari (iPad) hefur ekki BarcodeDetector → lesum rammann með jsQR í staðinn.
+    let detect: (v: HTMLVideoElement) => Promise<string | null>;
+    if (BD) {
+      const detector = new BD({ formats: ["qr_code"] });
+      detect = async (v) => (await detector.detect(v))[0]?.rawValue ?? null;
+    } else {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      let jsQR: typeof import("jsqr").default | null = null;
+      detect = async (v) => {
+        if (!ctx || !v.videoWidth) return null;
+        jsQR ??= (await import("jsqr")).default;
+        const w = Math.min(640, v.videoWidth), h = Math.round((v.videoHeight / v.videoWidth) * w);
+        canvas.width = w; canvas.height = h;
+        ctx.drawImage(v, 0, 0, w, h);
+        return jsQR(ctx.getImageData(0, 0, w, h).data, w, h, { inversionAttempts: "dontInvert" })?.data ?? null;
+      };
+    }
     (async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
@@ -159,10 +175,10 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
       const tick = async () => {
         if (done || !videoRef.current) return;
         try {
-          const codes = await detector.detect(videoRef.current);
-          if (codes[0]?.rawValue) {
+          const raw = await detect(videoRef.current);
+          if (raw) {
             done = true;
-            const res = await kioskPunchByToken(kioskKey!, codes[0].rawValue);
+            const res = await kioskPunchByToken(kioskKey!, raw);
             if (res.ok) { setScan(false); finish({ id: res.name ?? "", initials: "", name: res.name ?? "", color: "#e9700f" }, !!res.into, res.time ?? nowHM()); return; }
             setScanErr(res.error ?? s.err); done = false;
           }

@@ -49,7 +49,7 @@ export const VAKTO_KNOWLEDGE = `
 - Innskráning með netfangi og lykilorði (og innskráningarhlekk). Engin greiðslukortagögn geymd hjá VAKTO.
 
 ## Skilmálar og persónuvernd
-- Skilmálar: vakto.is/skilmalar (m.a. vinnslusamningur/DPA, engin binding, 14 daga prufa). Persónuverndarstefna: vakto.is/personuvernd. Vafrakökur: vakto.is/vafrakokur (engar greiningar- eða auglýsingakökur).
+- Skilmálar: vakto.is/skilmalar (m.a. vinnslusamningur/DPA, engin binding, 14 daga prufa). Persónuverndarstefna: vakto.is/personuvernd. Vafrakökur: vakto.is/vafrakokur (nauðsynlegar kökur; Google Analytics aðeins ef gestur samþykkir í vafrakökuborðanum, engar auglýsingakökur).
 
 ## Samband
 - Netfang: hallo@vakto.is. BGL Ventures ehf., kt. 490806-0400, Ísland.
