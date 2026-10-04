@@ -153,7 +153,7 @@ export default function AttendanceScreen({ onShift = 5, empty = false, live = fa
 
 function nowHHMM() { const d = new Date(); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; }
 
-const durSince = (iso: string, now: number) => { const m = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000)); return m >= 60 ? `${Math.floor(m / 60)} klst ${m % 60} mín` : `${m} mín`; };
+const durSince = (iso: string, now: number, t: (s: string) => string = (x) => x) => { const m = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000)); return m >= 60 ? `${Math.floor(m / 60)} ${t("klst")} ${m % 60} ${t("mín")}` : `${m} ${t("mín")}`; };
 
 function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onShift: number; initial: AttRow[]; onNow: OnNowRow[]; roster: RosterRow[]; corrections: CorrectionRow[] }) {
   const { t } = useLang();
@@ -282,7 +282,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
                     <span className="db2-tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : ""}</span></span>
                   </Link>
                   {r.unscheduled && <span className="db2-pill warn" title={t("Stimplaði sig inn án þess að vera á vaktaplani dagsins")}>{t("óáætlað")}</span>}
-                  <span className={`db2-pill ${long ? "bad" : "good"}`} title={long ? t("Opin stimplun í meira en 12 klst — gleymt að stimpla út?") : undefined}>{nowMs ? durSince(r.since, nowMs) : t("á vakt")}{long ? ` · ${t("gleymdist útstimplun?")}` : ""}</span>
+                  <span className={`db2-pill ${long ? "bad" : "good"}`} title={long ? t("Opin stimplun í meira en 12 klst — gleymt að stimpla út?") : undefined}>{nowMs ? durSince(r.since, nowMs, t) : t("á vakt")}{long ? ` · ${t("gleymdist útstimplun?")}` : ""}</span>
                   <span className="db2-acts">
                     <button className="btn ghost sm" onClick={() => setEditPunch(r)}>{t("Leiðrétta")}</button>
                     <AsyncButton className="btn sm" onClick={() => doClockOut(r)}>{t("tk:clockout")}</AsyncButton>

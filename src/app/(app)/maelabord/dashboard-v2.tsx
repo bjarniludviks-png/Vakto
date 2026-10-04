@@ -28,9 +28,9 @@ function presetRange(k: string): { from: string; to: string } {
 }
 const SEGS: { k: string; label: string }[] = [{ k: "idag", label: "Í dag" }, { k: "vika", label: "Vika" }, { k: "30d", label: "30 dagar" }];
 const COLOR = { good: "var(--good)", warn: "var(--warn)", bad: "var(--bad)" } as const;
-const durSince = (iso: string, now: number) => { const m = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000)); return m >= 60 ? `${Math.floor(m / 60)} klst ${m % 60} mín` : `${m} mín`; };
+const durSince = (iso: string, now: number, t: (s: string) => string = (x) => x) => { const m = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000)); return m >= 60 ? `${Math.floor(m / 60)} ${t("klst")} ${m % 60} ${t("mín")}` : `${m} ${t("mín")}`; };
 const WD = ["Sun", "Mán", "Þri", "Mið", "Fim", "Fös", "Lau"];
-const mins = (m: number) => (m >= 60 ? `${Math.floor(m / 60)} klst ${m % 60} mín` : `${m} mín`);
+const mins = (m: number, t: (s: string) => string = (x) => x) => (m >= 60 ? `${Math.floor(m / 60)} ${t("klst")} ${m % 60} ${t("mín")}` : `${m} ${t("mín")}`);
 
 function Spark({ points, target, t }: { points: TrendPoint[]; target: number; t: (s: string) => string }) {
   const vals = points.map((p) => p.pct).filter((v): v is number => v != null);
@@ -132,7 +132,7 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
 
   const attention = useMemo(() => {
     const items: { icon: "clock" | "up" | "cal" | "rev" | "ok"; tone: string; title: string; sub: string; href: string; cta: string }[] = [];
-    for (const m of late.slice(0, 3)) items.push({ icon: "clock", tone: "warn", title: `${m.name} ${t("er ekki mætt/ur")}`, sub: `${t("Á plani")} ${m.start} · ${mins(m.mins)} ${t("of seint")}`, href: "/timaskraning", cta: t("Skoða") });
+    for (const m of late.slice(0, 3)) items.push({ icon: "clock", tone: "warn", title: `${m.name} ${t("er ekki mætt/ur")}`, sub: `${t("Á plani")} ${m.start} · ${mins(m.mins, t)} ${t("of seint")}`, href: "/timaskraning", cta: t("Skoða") });
     for (const s of (pd?.staff ?? []).filter((s) => s.deviation >= 1).sort((a, b) => b.deviation - a.deviation).slice(0, 3))
       items.push({ icon: "up", tone: "bad", title: `${s.name} ${t("er")} ${dec1(s.deviation)} ${t("klst yfir plani")}`, sub: `${dec1(s.actual)} ${t("unnið")} · ${dec1(s.planned)} ${t("á plani")}`, href: "/timaskraning", cta: t("Skoða") });
     if (pending > 0) items.push({ icon: "cal", tone: "info", title: `${pending} ${pending === 1 ? t("beiðni bíður") : t("beiðnir bíða")}`, sub: t("Frí, vaktaskipti eða lausar vaktir"), href: "/vaktaplan", cta: t("Afgreiða") });
@@ -234,7 +234,7 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
               {missing.slice(0, 4).map((m) => <span key={m.employeeId} className="db2-av off" title={`${m.name} · ${t("á plani")} ${m.start}`}>{m.av}</span>)}
             </div>
           )}
-          <div className="db2-s">{late[0] ? <>{late[0].name} {t("átti að mæta")} {late[0].start} · {mins(late[0].mins)} {t("of seint")}</> : onNow.length ? t("Allir á plani eru mættir.") : t("Enginn skráður inn núna.")}</div>
+          <div className="db2-s">{late[0] ? <>{late[0].name} {t("átti að mæta")} {late[0].start} · {mins(late[0].mins, t)} {t("of seint")}</> : onNow.length ? t("Allir á plani eru mættir.") : t("Enginn skráður inn núna.")}</div>
         </section>
       </div>
 
@@ -305,7 +305,7 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
                 {r.unscheduled && <span className="db2-pill warn" title={t("Stimplaði sig inn án þess að vera á vaktaplani dagsins")}>{t("óáætlað")}</span>}
                 {(() => {
                   const long = nowMs > 0 && nowMs - new Date(r.since).getTime() > 14 * 3600000;
-                  return <span className={`db2-pill ${long ? "bad" : "good"}`} title={long ? t("Gleymdist að stimpla út?") : undefined}>{nowMs ? durSince(r.since, nowMs) : t("á vakt")}{long ? ` · ${t("gleymdist útstimplun?")}` : ""}</span>;
+                  return <span className={`db2-pill ${long ? "bad" : "good"}`} title={long ? t("Gleymdist að stimpla út?") : undefined}>{nowMs ? durSince(r.since, nowMs, t) : t("á vakt")}{long ? ` · ${t("gleymdist útstimplun?")}` : ""}</span>;
                 })()}
                 <svg className="db2-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
               </Link>

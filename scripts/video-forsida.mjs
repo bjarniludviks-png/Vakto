@@ -13,6 +13,9 @@ const env = Object.fromEntries(fs.readFileSync(".env.local", "utf8").split("\n")
 if (!env.NEXT_PUBLIC_SUPABASE_URL.includes("aptpckmrqepvcqhgkjoo")) throw new Error("aðeins staging");
 const base = (process.argv[2] ?? "https://vakto-git-live-fixes-bjarniludviks-5304s-projects.vercel.app").replace(/\/$/, "");
 const FFMPEG = process.env.FFMPEG ?? "ffmpeg";
+// LANG=en → ensk útgáfa (hero-en.mp4) fyrir ensku forsíðuna.
+const LANG = process.env.LANG_SITE === "en" ? "en" : "is";
+const SUFFIX = LANG === "en" ? "-en" : "";
 const OUT = "public/showcase/forsida/video";
 const TMP = fs.mkdtempSync(path.join(process.env.TMPDIR ?? "/tmp", "vakto-vid-"));
 fs.mkdirSync(OUT, { recursive: true });
@@ -26,10 +29,10 @@ const FROM = iso(lastMon), TO = iso(new Date(lastMon.getTime() + 6 * 86400000));
 
 const W = 1440, H = 900, DSF = 1.5;
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ locale: "is-IS", viewport: { width: W, height: H }, deviceScaleFactor: DSF });
-await ctx.addInitScript(({ from, to }) => {
+const ctx = await browser.newContext({ locale: LANG === "en" ? "en-GB" : "is-IS", viewport: { width: W, height: H }, deviceScaleFactor: DSF });
+await ctx.addInitScript(({ from, to, lang }) => {
   try {
-    localStorage.setItem("vakto-theme", "light"); localStorage.setItem("vakto-lang", "is"); localStorage.setItem("vakto-rail", "1");
+    localStorage.setItem("vakto-theme", "light"); localStorage.setItem("vakto-lang", lang); localStorage.setItem("vakto-rail", "1");
     localStorage.setItem("vakto-onb-hidden", "1");
     localStorage.setItem("vakto-dash-period", "custom"); localStorage.setItem("vakto-dash-from", from); localStorage.setItem("vakto-dash-to", to);
     localStorage.setItem("vakto:period:timaskraning", JSON.stringify({ preset: "custom", from, to }));
@@ -54,10 +57,10 @@ await ctx.addInitScript(({ from, to }) => {
     document.documentElement.appendChild(g); src.style.opacity = ".25";
   };
   window.__ghostEnd = () => { document.getElementById("__ghost")?.remove(); };
-}, { from: FROM, to: TO });
+}, { from: FROM, to: TO, lang: LANG });
 
 const page = await ctx.newPage();
-let cur = { x: 900, y: 700 };
+let cur = { x: 1010, y: 300 };
 const sleep = (ms) => page.waitForTimeout(ms);
 const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 async function moveTo(x, y, ms = 700) {
@@ -94,11 +97,16 @@ await sleep(300);
 
 // 1) Mælaborð
 startRec();
-await moveTo(560, 470, 1400); await sleep(1500);
-const navTo = async (href) => { const l = page.locator(`aside a[href="${href}"]`).first(); const c = await center(l); await click(c.x, c.y, 900); stopRec(); await settle(3500); startRec(); };
+const hz = await page.locator(".db2-hz").first().boundingBox().catch(() => null);
+if (hz) {
+  await moveTo(hz.x + hz.width * 0.12, hz.y + hz.height * 0.55, 450);
+  await moveTo(hz.x + hz.width * 0.55, hz.y + hz.height * 0.5, 900);
+  await moveTo(hz.x + hz.width * 0.95, hz.y + hz.height * 0.5, 700); await sleep(350);
+} else { await moveTo(560, 470, 700); await sleep(500); }
+const navTo = async (href) => { const l = page.locator(`aside a[href="${href}"]`).first(); const c = await center(l); await click(c.x, c.y, 600); stopRec(); await settle(3500); startRec(); };
 // 2) Vaktaplan + drag
 await navTo("/vaktaplan");
-await sleep(600);
+await sleep(250);
 const cells = await page.evaluate(() => {
   const rows = [...document.querySelectorAll("table tr")];
   const find = (name) => rows.find((r) => (r.querySelector("td,th")?.textContent ?? "").includes(name));
@@ -113,28 +121,30 @@ const cells = await page.evaluate(() => {
   return { sx: ra.left + ra.width / 2, sy: ra.top + ra.height / 2, dx: rb.left + rb.width / 2, dy: rb.top + rb.height / 2, col };
 });
 if (!cells) throw new Error("fann ekki Dalya/Jón í vaktaplaninu");
-await moveTo(cells.sx, cells.sy, 1100); await sleep(250);
+await moveTo(cells.sx, cells.sy, 750); await sleep(150);
 await page.evaluate(() => window.__fcPress(true));
 await page.evaluate(([x, y]) => window.__ghost('[data-rec="src"]', x, y), [cells.sx, cells.sy]);
 await sleep(200);
-await moveTo(cells.dx, cells.dy, 1300); await sleep(200);
+await moveTo(cells.dx, cells.dy, 950); await sleep(150);
 await page.evaluate(() => window.__fcPress(false));
 await page.dragAndDrop('[data-rec="src"]', '[data-rec="dst"]').catch((e) => console.log("drag:", e.message));
 await page.evaluate(() => window.__ghostEnd());
 await page.mouse.move(cells.dx, cells.dy);
-await sleep(2200);
-await moveTo(cells.dx + 260, cells.dy - 330, 900); await sleep(900);
+await sleep(1300);
+await moveTo(cells.dx + 260, cells.dy - 330, 650); await sleep(500);
 // 3) Tímaskráning
 await navTo("/timaskraning");
-await moveTo(900, 520, 900); await sleep(1800);
+const dev = await page.locator(".db2-devline").first().boundingBox().catch(() => null);
+if (dev) { await moveTo(dev.x + dev.width / 2, dev.y + dev.height / 2, 600); await sleep(700); }
+await moveTo(900, 560, 600); await sleep(900);
 // 4) Launakeyrslur
 await navTo("/launakeyrslur");
-const last = page.getByRole("tab", { name: "Síðasti mánuður" });
-if (await last.count()) { const c = await center(last); await click(c.x, c.y, 900); await sleep(2200); }
-await moveTo(800, 600, 800); await sleep(1200);
+const last = page.getByRole("tab", { name: /Síðasti mánuður|Last month|Previous month/ });
+if (await last.count()) { const c = await center(last); await click(c.x, c.y, 600); await sleep(1700); }
+await moveTo(700, 330, 600); await sleep(800);
 // 5) aftur á mælaborð (lykkja)
 await navTo("/maelabord");
-await sleep(1200);
+await sleep(700);
 stopRec();
 clearInterval(keepAlive);
 await cdp.send("Page.stopScreencast");
@@ -162,7 +172,7 @@ frames.forEach((f, i) => {
 list.push(`file '${path.join(TMP, `f${String(frames.length - 1).padStart(5, "0")}.jpg`)}'`);
 fs.writeFileSync(path.join(TMP, "list.txt"), list.join("\n"));
 const run = (args) => { const r = spawnSync(FFMPEG, args, { stdio: ["ignore", "ignore", "pipe"] }); if (r.status !== 0) { console.log(r.stderr.toString().slice(-1500)); throw new Error("ffmpeg"); } };
-run(["-y", "-f", "concat", "-safe", "0", "-i", path.join(TMP, "list.txt"), "-vf", "fps=30,scale=1920:-2:flags=lanczos,format=yuv420p", "-c:v", "libx264", "-preset", "slow", "-crf", "24", "-profile:v", "high", "-movflags", "+faststart", "-an", `${OUT}/hero.mp4`]);
-run(["-y", "-i", `${OUT}/hero.mp4`, "-frames:v", "1", "-q:v", "3", `${OUT}/hero.jpg`]);
-console.log("komið:", `${OUT}/hero.mp4`, (fs.statSync(`${OUT}/hero.mp4`).size / 1e6).toFixed(2), "MB");
+run(["-y", "-f", "concat", "-safe", "0", "-i", path.join(TMP, "list.txt"), "-vf", "fps=30,scale=1920:-2:flags=lanczos,format=yuv420p", "-c:v", "libx264", "-preset", "slow", "-crf", "24", "-profile:v", "high", "-movflags", "+faststart", "-an", `${OUT}/hero${SUFFIX}.mp4`]);
+run(["-y", "-i", `${OUT}/hero${SUFFIX}.mp4`, "-frames:v", "1", "-q:v", "3", `${OUT}/hero${SUFFIX}.jpg`]);
+console.log("komið:", `${OUT}/hero${SUFFIX}.mp4`, (fs.statSync(`${OUT}/hero${SUFFIX}.mp4`).size / 1e6).toFixed(2), "MB");
 fs.rmSync(TMP, { recursive: true, force: true });

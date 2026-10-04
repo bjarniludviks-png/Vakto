@@ -22,17 +22,19 @@ async function settle(page, ms = 3500) {
   await page.waitForTimeout(ms);
   await page.addStyleTag({ content: ".toast,[class*='toast'],[class*='cookie'],.chat-fab,.support-fab{display:none!important} *{caret-color:transparent!important}" }).catch(() => {});
 }
+const LANG = process.env.LANG_SITE === "en" ? "en" : "is"; // LANG_SITE=en → enskar myndir í public/showcase/forsida/en/
+const ROOT = LANG === "en" ? "public/showcase/forsida/en" : "public/showcase/forsida";
 const browser = await chromium.launch();
 for (const theme of ["light", "dark"]) {
-  const out = `public/showcase/forsida/${theme}`; fs.mkdirSync(out, { recursive: true });
-  const c = await browser.newContext({ locale: "is-IS", viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
-  await c.addInitScript(({ th, from, to }) => { try {
-    localStorage.setItem("vakto-theme", th); localStorage.setItem("vakto-lang", "is");
+  const out = `${ROOT}/${theme}`; fs.mkdirSync(out, { recursive: true });
+  const c = await browser.newContext({ locale: LANG === "en" ? "en-GB" : "is-IS", viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 });
+  await c.addInitScript(({ th, from, to, lg }) => { try {
+    localStorage.setItem("vakto-theme", th); localStorage.setItem("vakto-lang", lg);
     localStorage.setItem("vakto-dash-period", "custom"); localStorage.setItem("vakto-dash-from", from); localStorage.setItem("vakto-dash-to", to);
     localStorage.setItem("vakto:period:timaskraning", JSON.stringify({ preset: "custom", from, to }));
     localStorage.setItem("vakto-onb-hidden", "1");
     localStorage.setItem("vakto-rail", "1"); // hliðarvalmynd lokuð, aðeins íkon
-  } catch {} }, { th: theme, from: FROM, to: TO });
+  } catch {} }, { th: theme, from: FROM, to: TO, lg: LANG });
   const p = await c.newPage();
   await p.goto(await link(env.DEMO_LOGIN_EMAIL, "/maelabord"), { waitUntil: "domcontentloaded" });
   await settle(p, 6000);
@@ -40,7 +42,7 @@ for (const theme of ["light", "dark"]) {
   for (const [name, path] of [["maelabord", "/maelabord"], ["vaktaplan", "/vaktaplan"], ["timaskraning", "/timaskraning"], ["launakeyrslur", "/launakeyrslur"], ["innsyn", "/innsyn"], ["spjall", "/spjall"]].filter(([n]) => !ONLY || ONLY.includes(n))) {
     await p.goto(base + path, { waitUntil: "domcontentloaded" });
     await settle(p, name === "maelabord" ? 7000 : 4500);
-    if (name === "launakeyrslur") { await p.getByRole("tab", { name: "Síðasti mánuður" }).click().catch(() => {}); await settle(p, 4000); }
+    if (name === "launakeyrslur") { await p.getByRole("tab", { name: /Síðasti mánuður|Last month/ }).click().catch(() => {}); await settle(p, 4000); }
     await p.screenshot({ path: `${out}/${name}.jpg`, type: "jpeg", quality: 84 });
     console.log("✓", theme, name);
   }
@@ -48,7 +50,7 @@ for (const theme of ["light", "dark"]) {
   if (process.env.ONLY) continue;
   // sími
   const m = await browser.newContext({ locale: "is-IS", viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
-  await m.addInitScript(({ th }) => { try { localStorage.setItem("vakto-theme", th); localStorage.setItem("vakto-lang", "is"); localStorage.setItem("vakto-welcome-v1", "1"); } catch {} }, { th: theme });
+  await m.addInitScript(({ th, lg }) => { try { localStorage.setItem("vakto-theme", th); localStorage.setItem("vakto-lang", lg); localStorage.setItem("vakto-welcome-v1", "1"); } catch {} }, { th: theme, lg: LANG });
   const mp = await m.newPage();
   await mp.goto(await link("demo.dalya.r@vakto.is", "/mitt-svaedi"), { waitUntil: "domcontentloaded" });
   await settle(mp, 5000);
