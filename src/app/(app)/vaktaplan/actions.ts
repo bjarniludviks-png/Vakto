@@ -108,7 +108,7 @@ export async function getWeekBudget(monISO: string): Promise<WeekBudget | null> 
   }
 }
 
-export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][]; times: Record<string, { start: string; end: string }>; names?: string[]; inits?: string[]; unavail?: Record<string, number[]> }> {
+export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][]; times: Record<string, { start: string; end: string }>; cellTypes?: Record<string, string>; names?: string[]; inits?: string[]; unavail?: Record<string, number[]> }> {
   if (!isSupabaseConfigured()) return { ok: false, grid: [], times: {} };
   try {
     const supabase = await createClient();
@@ -123,18 +123,22 @@ export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; gri
       return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
     });
     const { data: shifts } = await supabase
-      .from("shifts").select("employee_id, date, start_time, end_time")
+      .from("shifts").select("employee_id, date, start_time, end_time, shift_types(name)")
       .eq("company_id", ctx.company).in("date", dates);
 
     const idIndex = new Map(employees.map((e, i) => [e.id, i]));
     const grid: string[][] = employees.map(() => Array(7).fill("off"));
     const times: Record<string, { start: string; end: string }> = {};
+    // Vaktategund hverrar vaktar fylgir með (annars tekur gridið tegundir úr vikunni sem var opin → rangir litir).
+    const cellTypes: Record<string, string> = {};
     for (const s of shifts ?? []) {
       const r = idIndex.get(s.employee_id as string);
       const c = dates.indexOf(s.date as string);
       if (r !== undefined && c >= 0) {
         grid[r][c] = weekCodeForStart(s.start_time as string);
         times[`${r}:${c}`] = { start: ((s.start_time as string) ?? "").slice(0, 5), end: ((s.end_time as string) ?? "").slice(0, 5) };
+        const tn = (s.shift_types as unknown as { name?: string } | null)?.name;
+        if (tn) cellTypes[`${r}:${c}`] = tn;
       }
     }
     // The client's grid rows may be a SUBSET of the full roster (only staff on
@@ -142,7 +146,7 @@ export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; gri
     const names = employees.map((e) => e.fullName.split(/\s+/)[0]);
     const inits = employees.map((e) => empInitials(e.fullName));
     const unavail = await getWeekUnavail(dates);
-    return { ok: true, grid, times, names, inits, unavail };
+    return { ok: true, grid, times, cellTypes, names, inits, unavail };
   } catch {
     return { ok: false, grid: [], times: {} };
   }

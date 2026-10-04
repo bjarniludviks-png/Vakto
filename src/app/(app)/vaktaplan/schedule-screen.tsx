@@ -112,7 +112,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [monthClip, setMonthClip] = useState<{ first: string; start: string; end: string } | null>(null);
   const [drag, setDrag] = useState<{ r: number; c: number } | null>(null);
   // Copied shift: code + real times, so pasting preserves them and saves.
-  const [clip, setClip] = useState<{ code: string; start?: string; end?: string } | null>(null);
+  const [clip, setClip] = useState<{ code: string; start?: string; end?: string; type?: string } | null>(null);
   // Company departments for the filter (live sync with Settings).
   const [deptList, setDeptList] = useState<string[]>(initial ? [] : ["Eldhús", "Sal", "Stjórnun"]);
   const [deptColors, setDeptColors] = useState<Record<string, string>>({});
@@ -222,9 +222,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
    * different order — remap by (initials, first name) so shifts never land on
    * the wrong employee. Employees with shifts who aren't on the plan yet are
    * pulled in from the pool. */
-  function applyWeek(res: { grid: string[][]; times?: Record<string, { start: string; end: string }>; names?: string[]; inits?: string[]; unavail?: Record<string, number[]> }) {
+  function applyWeek(res: { grid: string[][]; times?: Record<string, { start: string; end: string }>; cellTypes?: Record<string, string>; names?: string[]; inits?: string[]; unavail?: Record<string, number[]> }) {
     if (res.unavail) setUnavail(res.unavail);
-    if (!res.names || !res.inits) { setGrid(res.grid); setCellTimes(res.times ?? {}); return; }
+    if (!res.names || !res.inits) { setGrid(res.grid); setCellTimes(res.times ?? {}); setCellTypes(res.cellTypes ?? {}); return; }
     const { names, inits } = res;
     const keyOf = (e: Emp) => `${e[0]}|${e[1]}`;
     const have = new Set(emp.map(keyOf));
@@ -240,11 +240,15 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     const rows = added.length ? [...emp, ...added] : emp;
     const g: string[][] = rows.map(() => Array(7).fill("off"));
     const t2: Record<string, { start: string; end: string }> = {};
+    const ty2: Record<string, string> = {};
     rows.forEach((e, r) => {
       const j = names.findIndex((n, jj) => n === e[1] && inits[jj] === e[0]);
       if (j >= 0 && res.grid[j]) {
         g[r] = [...res.grid[j]];
-        for (let c = 0; c < 7; c++) { const k = `${j}:${c}`; const tt = res.times?.[k]; if (tt) t2[`${r}:${c}`] = tt; }
+        for (let c = 0; c < 7; c++) {
+          const k = `${j}:${c}`; const tt = res.times?.[k]; if (tt) t2[`${r}:${c}`] = tt;
+          const tn = res.cellTypes?.[k]; if (tn) ty2[`${r}:${c}`] = tn;
+        }
       }
     });
     if (added.length) {
@@ -253,6 +257,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     }
     setGrid(g);
     setCellTimes(t2);
+    setCellTypes(ty2);
   }
 
   // Live companies: load the visible week's shifts from the DB when the week
@@ -274,6 +279,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     if (!window.confirm(t("Eyða ÖLLUM vöktum þessarar viku og byrja upp á nýtt? Þetta fjarlægir líka birtar vaktir."))) return;
     setGrid((g) => g.map((row) => row.map(() => "off")));
     setCellTimes({});
+    setCellTypes({});
     if (liveCompany) {
       const dates = weekDays.map((d) => fmtISO(d));
       const res = await deleteWeekShifts(dates);
@@ -422,7 +428,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
             date: fmtISO(weekDays[c]),
             startTime: tt ? tt.start : `${a.padStart(2, "0")}:00`,
             endTime: tt ? tt.end : `${b.padStart(2, "0")}:00`,
-            shiftTypeName: o.s || "Dagvakt",
+            shiftTypeName: cellTypes[ckey(r, c)] || o.s || "Dagvakt",
           });
         }
       });
@@ -542,6 +548,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       return ng;
     });
     setCellTimes((m) => { const n = { ...m }; const a = n[from], b = n[to]; if (b) n[from] = b; else delete n[from]; if (a) n[to] = a; else delete n[to]; return n; });
+    setCellTypes((m) => { const n = { ...m }; const a = n[from], b = n[to]; if (b) n[from] = b; else delete n[from]; if (a) n[to] = a; else delete n[to]; return n; });
     setDrag(null);
   }
   function cellClick(r: number, c: number) {
@@ -549,7 +556,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = clip.code; return ng; });
       if (clip.code !== "off" && clip.start && clip.end) {
         setCellTimes((m) => ({ ...m, [ckey(r, c)]: { start: clip.start!, end: clip.end! } }));
-        if (liveCompany) void saveShift({ employeeName: emp[r][1], date: fmtISO(weekDays[c]), startTime: clip.start, endTime: clip.end, shiftTypeName: "" });
+        setCellTypes((m) => { const n = { ...m }; if (clip.type) n[ckey(r, c)] = clip.type; else delete n[ckey(r, c)]; return n; });
+        if (liveCompany) void saveShift({ employeeName: emp[r][1], date: fmtISO(weekDays[c]), startTime: clip.start, endTime: clip.end, shiftTypeName: clip.type ?? "" });
       } else if (clip.code !== "off") {
         setCellTimes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
       }
@@ -881,7 +889,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                               const items: { label: string; danger?: boolean; color?: string; act: () => void }[] = [];
                               if (s !== "off") {
                                 items.push({ label: t("Breyta"), act: () => { setSel({ r, c }); setModal("shift"); } });
-                                items.push({ label: t("Afrita"), act: () => { setClip({ code: s, start: tt?.start, end: tt?.end }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } });
+                                items.push({ label: t("Afrita"), act: () => { setClip({ code: s, start: tt?.start, end: tt?.end, type: cellTypes[ckey(r, c)] }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } });
                               } else {
                                 items.push({ label: t("Ný vakt"), act: () => { setSel({ r, c }); setModal("shift"); } });
                               }
@@ -947,7 +955,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         const tt = timeOf(r, curCol);
         openCtx(ev, [
           { label: t("Breyta"), act: () => { setSel({ r, c: curCol }); setModal("shift"); } },
-          { label: t("Afrita"), act: () => { setClip({ code, start: tt?.start, end: tt?.end }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } },
+          { label: t("Afrita"), act: () => { setClip({ code, start: tt?.start, end: tt?.end, type: cellTypes[ckey(r, curCol)] }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } },
           ...types.map((ty) => ({ label: t(ty.nm), color: ty.fg, act: () => assignType(r, curCol, ty.nm) })),
           { label: t("Eyða vakt"), danger: true, act: () => delCell(r, curCol) },
         ]);
@@ -1070,7 +1078,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
           </div>
         </>
       )}
-      {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
+      {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end, type: cellTypes[ckey(sel.r, sel.c)] }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
       {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} names={emp.map((e) => e[1])} depts={[...new Set(emp.map((e) => e[2]).filter(Boolean))]} />}
       {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={approveAiProposal} />}
     </div>
