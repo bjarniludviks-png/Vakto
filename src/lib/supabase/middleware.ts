@@ -92,6 +92,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/adgangur-lokadur") ||
     pathname.startsWith("/og/") ||
     pathname.startsWith("/um-okkur") ||
+    pathname.startsWith("/fjarfestar") ||
     pathname.startsWith("/personuvernd") || pathname.startsWith("/skilmalar") || pathname.startsWith("/vafrakokur") ||
     pathname.startsWith("/kiosk") ||
     // PWA / icon assets must be reachable without auth (home-screen install).
