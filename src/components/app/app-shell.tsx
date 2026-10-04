@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getMyCompanies, switchCompany, type CompanyOption } from "@/app/(app)/company-actions";
 import { TopSearch } from "./top-search";
 import { ChatBadge } from "./chat-badge";
+import { AssistantPanel } from "./assistant-panel";
 import { ImpersonationBar } from "./impersonation-bar";
 
 export type Account = {
@@ -349,6 +350,7 @@ export default function AppShell({
       )}
 
       <ToastHost />
+      {(role === "owner" || role === "manager") && (account.role === "owner" || account.role === "manager") && <AssistantPanel />}
     </>
   );
 }

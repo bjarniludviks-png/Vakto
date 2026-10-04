@@ -1188,3 +1188,55 @@ a.db2-who:hover span{color:var(--brand)}
 .db2-mini .db2-prog{margin:8px 0 6px;height:6px}
 .db2x .db2-top .btn{flex:none}
 .db2-devline b{white-space:nowrap}.db2-devline span{min-width:0}
+/* ============ VAKTO AI (aðstoðarmaður í horninu) ============ */
+.vai-fab{position:fixed;right:22px;bottom:calc(22px + env(safe-area-inset-bottom,0px));z-index:60;width:54px;height:54px;border-radius:50%;border:0;background:var(--brand);color:#fff;display:grid;place-items:center;cursor:pointer;box-shadow:0 12px 30px -8px rgba(233,112,15,.6);transition:transform .16s cubic-bezier(.23,1,.32,1)}
+.vai-fab:active{transform:scale(.95)}
+.vai-fab svg{width:24px;height:24px;fill:currentColor}
+.vai-fab.on{background:var(--ink)}
+.vai-panel{position:fixed;right:22px;bottom:calc(88px + env(safe-area-inset-bottom,0px));z-index:61;width:min(410px,calc(100vw - 32px));height:min(620px,calc(100vh - 120px));display:flex;flex-direction:column;background:var(--panel);border-radius:22px;box-shadow:0 0 0 1px var(--line),0 30px 80px -20px rgba(20,20,30,.35);overflow:hidden;transform-origin:bottom right;animation:vai-in .2s cubic-bezier(.23,1,.32,1)}
+@keyframes vai-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
+.vai-head{display:flex;align-items:center;gap:10px;padding:14px 14px 12px 16px;border-bottom:1px solid var(--line2)}
+.vai-head b{font-size:15px;font-weight:650;color:var(--ink)}
+.vai-badge{width:30px;height:30px;border-radius:10px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center}
+.vai-badge svg{width:17px;height:17px;fill:currentColor}
+.vai-sp{flex:1}
+.vai-ico{width:32px;height:32px;border:0;border-radius:9px;background:none;color:var(--ink3);display:grid;place-items:center;cursor:pointer}
+.vai-ico:hover{background:var(--line2);color:var(--ink)}
+.vai-ico svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.vai-list{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:12px}
+.vai-hello p{font-size:14px;line-height:1.55;color:var(--ink2);margin:0 0 14px}
+.vai-chips{display:flex;flex-direction:column;gap:7px}
+.vai-chips button{text-align:left;font:inherit;font-size:13.5px;color:var(--ink);background:var(--line2);border:0;border-radius:12px;padding:10px 12px;cursor:pointer}
+.vai-chips button:hover{background:color-mix(in srgb,var(--brand) 10%,var(--panel))}
+.vai-msg{display:flex;flex-direction:column;gap:8px}
+.vai-msg.user{align-items:flex-end}
+.vai-bub{max-width:88%;font-size:14px;line-height:1.55;padding:10px 13px;border-radius:16px}
+.vai-msg.user .vai-bub{background:var(--brand);color:#fff;border-bottom-right-radius:6px;white-space:pre-wrap}
+.vai-msg.assistant .vai-bub{background:var(--line2);color:var(--ink);border-bottom-left-radius:6px}
+.vai-bub p{margin:0 0 6px}.vai-bub p:last-child{margin:0}
+.vai-li{position:relative;padding-left:14px;margin:2px 0}
+.vai-li::before{content:"";position:absolute;left:3px;top:.65em;width:5px;height:5px;border-radius:50%;background:var(--brand)}
+.vai-think{display:flex;align-items:center;gap:8px;color:var(--ink3)}
+.vai-dots{display:inline-flex;gap:3px}.vai-dots i{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.4;animation:vai-dot 1s infinite}
+.vai-dots i:nth-child(2){animation-delay:.15s}.vai-dots i:nth-child(3){animation-delay:.3s}
+@keyframes vai-dot{0%,100%{opacity:.25}50%{opacity:1}}
+.vai-acts{display:flex;flex-direction:column;gap:8px;max-width:94%}
+.vai-act{display:flex;flex-direction:column;gap:9px;padding:11px 12px;border-radius:14px;background:var(--panel);box-shadow:0 0 0 1px var(--line);font-size:13.5px;color:var(--ink)}
+.vai-act.pending{box-shadow:0 0 0 1.5px color-mix(in srgb,var(--brand) 55%,transparent)}
+.vai-act-tx small{display:block;color:var(--bad);margin-top:4px}
+.vai-act-b{display:flex;gap:7px}
+.vai-ok{font-size:12.5px;font-weight:600;color:var(--good)}
+.vai-muted{font-size:12.5px;color:var(--ink3)}
+.vai-act.done,.vai-act.cancelled{opacity:.75}
+.vai-all{align-self:flex-start}
+.vai-in{display:flex;gap:8px;align-items:flex-end;padding:10px 12px 8px;border-top:1px solid var(--line2)}
+.vai-in textarea{flex:1;resize:none;max-height:120px;font:inherit;font-size:14px;line-height:1.45;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:var(--bg,var(--panel));color:var(--ink);outline:none}
+.vai-in textarea:focus{border-color:var(--brand)}
+.vai-in button{flex:none;width:40px;height:40px;border-radius:12px;border:0;background:var(--brand);color:#fff;display:grid;place-items:center;cursor:pointer}
+.vai-in button:disabled{opacity:.4;cursor:default}
+.vai-in button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.vai-note{font-size:11px;color:var(--ink3);text-align:center;padding:0 12px 10px}
+@media (max-width:600px){
+  .vai-fab{right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+  .vai-panel{right:0;left:0;bottom:0;top:0;width:auto;height:auto;border-radius:0;padding-top:env(safe-area-inset-top,0px)}
+}
