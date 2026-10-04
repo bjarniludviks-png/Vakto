@@ -76,7 +76,7 @@ export function isAiConfigured() {
   return Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
-export async function getAiScheduleProposal(prompt: string, context: string): Promise<AiProposal> {
+export async function getAiScheduleProposal(prompt: string, context: string, lang = "is"): Promise<AiProposal> {
   if (!isAiConfigured()) return { ...DEMO, summary: prompt ? `„${prompt}" — ${DEMO.summary}` : DEMO.summary };
 
   const client = new Anthropic();
@@ -89,7 +89,7 @@ export async function getAiScheduleProposal(prompt: string, context: string): Pr
     messages: [
       {
         role: "user",
-        content: `Núverandi staða vaktaplans (þessi vika):\n${context}\n\nBeiðni notanda:\n${prompt || "Bestun vaktaplans"}`,
+        content: `Núverandi staða vaktaplans (þessi vika):\n${context}\n\nBeiðni notanda:\n${prompt || "Bestun vaktaplans"}${lang === "en" ? "\n\nThe user's interface is in English: write the summary and every item (title, detail, tag) in English." : lang === "vi" ? "\n\nGiao diện của người dùng là tiếng Việt: viết phần tóm tắt và mọi mục bằng tiếng Việt." : ""}`,
       },
     ],
   });

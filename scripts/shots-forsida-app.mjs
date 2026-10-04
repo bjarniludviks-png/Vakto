@@ -9,7 +9,8 @@ const env = Object.fromEntries(fs.readFileSync(".env.local", "utf8").split("\n")
 const URL_ = env.NEXT_PUBLIC_SUPABASE_URL;
 if (!URL_.includes("aptpckmrqepvcqhgkjoo")) throw new Error("aðeins staging");
 const APP = process.env.APP_URL ?? "http://localhost:8099";
-const OUT = "public/showcase/forsida";
+const LANG = process.env.LANG_SITE === "en" ? "en" : "is"; // LANG_SITE=en → enskar myndir
+const OUT = LANG === "en" ? "public/showcase/forsida/en" : "public/showcase/forsida";
 const admin = createClient(URL_, env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 const anon = createClient(URL_, env.NEXT_PUBLIC_SUPABASE_ANON_KEY, { auth: { persistSession: false } });
 const EMAIL = "demo.dalya.r@vakto.is";
@@ -24,8 +25,8 @@ const SHOTS = (process.env.SHOTS ?? "heim:/,vaktir:/vaktir,frettir:/frettir,spja
 const browser = await chromium.launch();
 try {
   for (const theme of ["light", "dark"]) {
-    const c = await browser.newContext({ locale: "is-IS", viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, colorScheme: theme });
-    await c.addInitScript(({ k, v }) => { try { localStorage.setItem(k, v); } catch {} }, { k: storageKey, v: JSON.stringify(auth.session) });
+    const c = await browser.newContext({ locale: LANG === "en" ? "en-GB" : "is-IS", viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, colorScheme: theme });
+    await c.addInitScript(({ k, v, lg }) => { try { localStorage.setItem(k, v); localStorage.setItem("@vakto-lang", lg); } catch {} }, { k: storageKey, v: JSON.stringify(auth.session), lg: LANG });
     const p = await c.newPage();
     for (const [name, route] of SHOTS) {
       await p.goto(APP + route, { waitUntil: "networkidle" }).catch(() => {});

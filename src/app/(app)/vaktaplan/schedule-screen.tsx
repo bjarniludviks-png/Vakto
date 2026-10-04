@@ -136,7 +136,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [aiQuery, setAiQuery] = useState("");
   const [aiProposal, setAiProposal] = useState<AiProposal | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const { t } = useLang();
+  const { t, lang } = useLang();
 
   const vis = useMemo(
     () => emp.map((_, r) => r).filter((r) => {
@@ -476,7 +476,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       const res = await fetch("/api/ai/schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, context }),
+        body: JSON.stringify({ prompt, context, lang }),
       });
       const data = (await res.json()) as AiProposal & { ok?: boolean; error?: string };
       if (!res.ok || data.ok === false) { toast(t("Tókst ekki að ná í AI — reyndu aftur.")); setAiProposal(null); return; }
@@ -1484,7 +1484,7 @@ function ShiftEditModal({
 }
 
 function AiPromptModal({ query, setQuery, onClose, onGen, names = [], depts = [] }: { query: string; setQuery: (s: string) => void; onClose: () => void; onGen: () => void; names?: string[]; depts?: string[] }) {
-  const { t: tr } = useLang();
+  const { t: tr, lang } = useLang();
   const [listening, setListening] = useState(false);
   const recRef = useRef<{ stop: () => void } | null>(null);
   const speechOk = typeof window !== "undefined" && ("webkitSpeechRecognition" in window || "SpeechRecognition" in window);
@@ -1515,7 +1515,12 @@ function AiPromptModal({ query, setQuery, onClose, onGen, names = [], depts = []
   }
 
   // Relevant examples built from the REAL roster (names + departments).
-  const ex = [
+  const ex = lang === "en" ? [
+    names[0] ? `Put ${names[0]} on morning shifts 05:00–12:00 every weekday` : "Morning shifts 05:00–12:00 every weekday",
+    "Minimise overtime this week",
+    depts.length >= 2 ? `Staff the weekend with 2 in ${depts[0]} and 2 in ${depts[1]}` : "Staff the weekend with 2 on mornings and 2 in the afternoon",
+    names[1] ? `Give ${names[1]} Friday off and move the shift to someone else` : "Copy this week to the next 4 weeks",
+  ] : [
     names[0] ? `Settu ${names[0]} á morgunvaktir 05:00–12:00 alla virka daga` : "Morgunvaktir 05:00–12:00 alla virka daga",
     "Lágmarkaðu yfirvinnu í þessari viku",
     depts.length >= 2 ? `Mannaðu helgina með 2 í ${depts[0]} og 2 í ${depts[1]}` : "Mannaðu helgina með 2 á morgunvakt og 2 eftir hádegi",

@@ -47,7 +47,7 @@ export function LoginPage({ demo }: { demo: boolean }) {
       </div>
       <div className="ah-auth-r">
         <div><h2>{t.lh}</h2><p>{t.lp}</p></div>
-        <Phone live src="/showcase/forsida/light/app-heim.png" alt={t.lalt} />
+        <Phone live src={`/showcase/forsida${lang === "en" ? "/en" : ""}/light/app-heim.png`} alt={t.lalt} />
       </div>
     </div>
   );
@@ -65,7 +65,7 @@ export function SignupPage() {
       <div className="ah-auth-r">
         <div><h2>{t.sh}</h2><p>{t.sp}</p></div>
         <ul>{t.sli.map((x) => <li key={x}>{x}</li>)}</ul>
-        <div className="ah-auth-mac"><MacFrame src="/showcase/forsida/light/maelabord.jpg" alt={t.salt} url="vakto.is/maelabord" /></div>
+        <div className="ah-auth-mac"><MacFrame src={`/showcase/forsida${lang === "en" ? "/en" : ""}/light/maelabord.jpg`} alt={t.salt} url="vakto.is/maelabord" /></div>
       </div>
     </div>
   );

@@ -16,6 +16,8 @@ import AhFooter from "./ah-footer";
 const useT = () => HOME_TEXT[useSiteLang()];
 
 const SHOT = "/showcase/forsida";
+// Skjámyndir og myndband á tungumáli síðunnar (enskar útgáfur í /showcase/forsida/en). Skjölin (skjol/) eru sameiginleg.
+const useShot = () => (useSiteLang() === "en" ? `${SHOT}/en` : SHOT);
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const seg = (p: number, a: number, b: number) => clamp((p - a) / (b - a));
 const ease = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -140,6 +142,7 @@ export function Phone({ src, alt, className = "", dark = false, live = false }: 
 /** Vaktaplanið í Mac-glugga: músin tekur kvöldvakt Dalyu á fimmtudegi og dregur hana á Jón.
  *  Vaktin sem dregin er og tóma reiturinn eru klipptir úr sömu skjámynd (ekkert teiknað upp á nýtt). */
 function PlanDrag() {
+  const base = useShot();
   const t = useT();
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -148,9 +151,9 @@ function PlanDrag() {
     io.observe(el);
     return () => io.disconnect();
   }, []);
-  const src = `${SHOT}/light/vaktaplan.jpg`;
+  const src = `${base}/light/vaktaplan.jpg`;
   return (
-    <div className="ah-mac ah-mac-tile" ref={box}>
+    <div className={`ah-mac ah-mac-tile${base.endsWith("/en") ? " ah-dg-en" : ""}`} ref={box}>
       <div className="ah-mac-bar">
         <span className="ah-dots"><i /><i /><i /></span>
         <span className="ah-url" aria-hidden="true">vakto.is/vaktaplan</span>
@@ -174,6 +177,7 @@ function PlanDrag() {
    við skrun (enginn aðdráttur inn í myndina); myndbandið spilar aðeins á meðan það sést. ---------- */
 
 function HeroVideo() {
+  const base = useShot();
   const t = useT();
   const frame = useRef<HTMLDivElement>(null), head = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
@@ -219,7 +223,7 @@ function HeroVideo() {
               <span className="ah-url" aria-hidden="true">vakto.is</span>
             </div>
             <div className="ah-mac-view">
-              <video ref={video} src={`${SHOT}/video/hero.mp4`} poster={`${SHOT}/video/hero.jpg`} autoPlay muted loop playsInline preload="auto" aria-label={t.videoAlt} width={1920} height={1200} />
+              <video ref={video} src={`${SHOT}/video/hero${base.endsWith("/en") ? "-en" : ""}.mp4`} poster={`${SHOT}/video/hero${base.endsWith("/en") ? "-en" : ""}.jpg`} autoPlay muted loop playsInline preload="auto" aria-label={t.videoAlt} width={1920} height={1200} />
             </div>
           </div>
         </div>
@@ -241,6 +245,7 @@ function Crop({ src, pos, origin, ratio = "16 / 10", zoom = 1.6, alt }: { src: s
 }
 
 function Features() {
+  const base = useShot();
   const t = useT();
   return (
     <section className="ah-sec" id="kerfid">
@@ -254,23 +259,23 @@ function Features() {
         </div>
         <div className="ah-tile ah-tall ah-tile-warm">
           <div className="ah-tile-tx"><h3>{t.t2h}</h3><p>{t.t2p}</p></div>
-          <div className="ah-tall-ph"><Phone live src={`${SHOT}/light/app-heim.png`} alt={t.t2alt} /></div>
+          <div className="ah-tall-ph"><Phone live src={`${base}/light/app-heim.png`} alt={t.t2alt} /></div>
         </div>
         <div className="ah-tile">
           <div className="ah-tile-tx"><h3>{t.t3h}</h3><p>{t.t3p}</p></div>
-          <Crop src={`${SHOT}/light/timaskraning.jpg`} alt={t.t3alt} pos="0% 0%" origin="51.5% 55.5%" zoom={2.05} ratio="16 / 9" />
+          <Crop src={`${base}/light/timaskraning.jpg`} alt={t.t3alt} pos="0% 0%" origin="51.5% 55.5%" zoom={2.05} ratio="16 / 9" />
         </div>
         <div className="ah-tile">
           <div className="ah-tile-tx"><h3>{t.t4h}</h3><p>{t.t4p}</p></div>
-          <Crop src={`${SHOT}/light/launakeyrslur.jpg`} alt={t.t4alt} pos="0% 0%" origin="18.6% 57%" zoom={1.7} ratio="16 / 9" />
+          <Crop src={`${base}/light/launakeyrslur.jpg`} alt={t.t4alt} pos="0% 0%" origin="18.6% 57%" zoom={1.7} ratio="16 / 9" />
         </div>
         <div className="ah-tile ah-wide">
           <div className="ah-tile-tx"><h3>{t.t5h}</h3><p>{t.t5p}</p></div>
-          <Crop src={`${SHOT}/light/kiosk.jpg`} alt={t.t5alt} pos="50% 40%" zoom={1.12} ratio="16 / 8" />
+          <Crop src={`${base}/light/kiosk.jpg`} alt={t.t5alt} pos="50% 40%" zoom={1.12} ratio="16 / 8" />
         </div>
         <div className="ah-tile">
           <div className="ah-tile-tx"><h3>{t.t6h}</h3><p>{t.t6p}</p></div>
-          <div className="ah-peek"><Phone src={`${SHOT}/light/app-spjall.png`} alt={t.t6alt} /></div>
+          <div className="ah-peek"><Phone src={`${base}/light/app-spjall.png`} alt={t.t6alt} /></div>
         </div>
       </div>
     </section>
@@ -280,6 +285,7 @@ function Features() {
 /* ---------- 3. Dökkt (samanburður ljóst / dökkt) ---------- */
 
 function DarkCompare() {
+  const base = useShot();
   const t = useT();
   const box = useRef<HTMLDivElement>(null), layer = useRef<HTMLDivElement>(null), handle = useRef<HTMLDivElement>(null);
   const pos = useRef(50);
@@ -310,15 +316,15 @@ function DarkCompare() {
           role="slider" aria-label={t.cmpAria} aria-valuemin={0} aria-valuemax={100} aria-valuenow={50} tabIndex={0}
           onKeyDown={(e) => { if (e.key === "ArrowLeft" || e.key === "ArrowRight") { touched.current = true; paint(pos.current + (e.key === "ArrowLeft" ? -5 : 5)); } }}
         >
-          <MacFrame src={`${SHOT}/light/vaktaplan.jpg`} alt={t.cmpLight} url="vakto.is/vaktaplan" />
+          <MacFrame src={`${base}/light/vaktaplan.jpg`} alt={t.cmpLight} url="vakto.is/vaktaplan" />
           <div className="ah-compare-dark" ref={layer} style={{ clipPath: "inset(0 0 0 50%)" }}>
-            <MacFrame src={`${SHOT}/dark/vaktaplan.jpg`} alt={t.cmpDark} url="vakto.is/vaktaplan" />
+            <MacFrame src={`${base}/dark/vaktaplan.jpg`} alt={t.cmpDark} url="vakto.is/vaktaplan" />
           </div>
           <div className="ah-handle" ref={handle} style={{ left: "50%" }} aria-hidden="true"><span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 7-5 5 5 5" /><path d="m15 7 5 5-5 5" /></svg></span></div>
         </div>
       </div>
       <div className="ah-dark-row">
-        <div><Phone dark live src={`${SHOT}/dark/app-heim.png`} alt={t.appAlt} /></div>
+        <div><Phone dark live src={`${base}/dark/app-heim.png`} alt={t.appAlt} /></div>
         <div className="ah-dark-copy">
           <h3>{t.appH}</h3>
           <p>{t.appP}</p>
@@ -326,7 +332,7 @@ function DarkCompare() {
             {t.appTicks.map((x) => <li key={x}>{x}</li>)}
           </ul>
         </div>
-        <div><Phone dark src={`${SHOT}/dark/app-frettir.png`} alt={t.feedAlt} className="ah-phone-lo" /></div>
+        <div><Phone dark src={`${base}/dark/app-frettir.png`} alt={t.feedAlt} className="ah-phone-lo" /></div>
       </div>
     </section>
   );
@@ -335,13 +341,13 @@ function DarkCompare() {
 /* ---------- 3b. Kynntu þér VAKTO (glærur sem fletta sjálfkrafa) ---------- */
 
 type Slide = { t: string; d: string; v: ReactNode };
-function slidesFor(t: ReturnType<typeof useT>): Slide[] {
+function slidesFor(t: ReturnType<typeof useT>, base = SHOT): Slide[] {
   const [a, b, c, d] = t.slides;
   return [
     // eslint-disable-next-line @next/next/no-img-element
-    { ...a, v: <div className="ah-sl-shot"><img src={`${SHOT}/light/ai.jpg`} alt={a.alt} width={1209} height={1656} loading="lazy" decoding="async" draggable={false} /></div> },
-    { ...b, v: <div className="ah-sl-phones"><Phone src={`${SHOT}/light/app-vaktir.png`} alt={b.alt} /><Phone src={`${SHOT}/light/app-spjall.png`} alt={b.alt2 ?? ""} className="ah-sl-lo" /></div> },
-    { ...c, v: <div className="ah-sl-phones"><Phone src={`${SHOT}/light/app-frettir.png`} alt={c.alt} /></div> },
+    { ...a, v: <div className="ah-sl-shot"><img src={`${base}/light/ai.jpg`} alt={a.alt} width={1209} height={1656} loading="lazy" decoding="async" draggable={false} /></div> },
+    { ...b, v: <div className="ah-sl-phones"><Phone src={`${base}/light/app-vaktir.png`} alt={b.alt} /><Phone src={`${base}/light/app-spjall.png`} alt={b.alt2 ?? ""} className="ah-sl-lo" /></div> },
+    { ...c, v: <div className="ah-sl-phones"><Phone src={`${base}/light/app-frettir.png`} alt={c.alt} /></div> },
     // eslint-disable-next-line @next/next/no-img-element
     { ...d, v: <div className="ah-sl-paper"><img src={`${SHOT}/skjol/launasedill.jpg`} alt={d.alt} width={1800} height={2545} loading="lazy" decoding="async" draggable={false} /></div> },
   ];
@@ -350,7 +356,7 @@ const SLIDE_MS = 6500;
 
 function Showcase() {
   const t = useT();
-  const SLIDES = slidesFor(t);
+  const SLIDES = slidesFor(t, useShot());
   const track = useRef<HTMLDivElement>(null);
   const [idx, setIdx] = useState(0);
   const [playing, setPlaying] = useState(true);
