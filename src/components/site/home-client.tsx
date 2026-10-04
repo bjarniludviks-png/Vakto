@@ -417,6 +417,7 @@ function Showcase() {
 
 function Contract() {
   const t = useT();
+  const base = useShot();
   const back = useRef<HTMLDivElement>(null), front = useRef<HTMLDivElement>(null), stamp = useRef<HTMLDivElement>(null);
   const ref = useScrub((p) => {
     const t = ease(seg(p, 0.1, 0.55));
@@ -437,11 +438,11 @@ function Contract() {
         <div className="ah-papers">
           <div className="ah-paper ah-paper-back" ref={back}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`${SHOT}/skjol/samningur-2.jpg`} alt="" width={1800} height={2545} loading="lazy" decoding="async" />
+            <img src={`${base}/skjol/samningur-2.jpg`} alt="" width={1800} height={2545} loading="lazy" decoding="async" />
           </div>
           <div className="ah-paper" ref={front}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={`${SHOT}/skjol/samningur-1.jpg`} alt={t.conAlt} width={1800} height={2545} loading="lazy" decoding="async" />
+            <img src={`${base}/skjol/samningur-1.jpg`} alt={t.conAlt} width={1800} height={2545} loading="lazy" decoding="async" />
             <div className="ah-stamp" ref={stamp}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7" /></svg>{t.stamp}</div>
           </div>
         </div>
@@ -519,6 +520,20 @@ function Pricing() {
   );
 }
 
+/* ---------- Systurkerfið: sama fyrirtæki smíðar INVENTRA ---------- */
+function Sister() {
+  const t = useT();
+  return (
+    <section className="ah-sister" aria-label="INVENTRA">
+      <a href="https://inventra.is" target="_blank" rel="noopener" className="ah-sister-in">
+        <span className="ah-sister-logo" aria-hidden="true"><i style={{ height: 9 }} /><i style={{ height: 14 }} /><i style={{ height: 19 }} /><b>INVENTRA</b></span>
+        <span className="ah-sister-tx"><b>{t.sisH}</b> {t.sisP}</span>
+        <span className="ah-sister-go">{t.sisGo} →</span>
+      </a>
+    </section>
+  );
+}
+
 export default function AppleHome() {
   const lang = useSiteLang();
   const t = HOME_TEXT[lang];
@@ -552,6 +567,7 @@ export default function AppleHome() {
         <Contract />
         <Wallet />
         <Pricing />
+        <Sister />
       </main>
       <AhFooter />
       <HomeChat key={lang} lang={lang} skin="ah" />

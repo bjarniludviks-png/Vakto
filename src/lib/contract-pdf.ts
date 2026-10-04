@@ -177,7 +177,7 @@ export async function downloadContractPdf(title: string, content: string, signat
 
 /** `stampStrip`: Taktikal setur undirskriftarstimpla sína neðst á síðustu síðu (BottomLastPage) —
  *  þá er beltið haldið auðu, fóturinn færður upp og undirskriftarlínum skipt út fyrir tilvísun. */
-export async function buildContractPdf(content: string, signatures: SignatureRecord[] = [], opts: { stampStrip?: boolean } = {}): Promise<jsPDF> {
+export async function buildContractPdf(content: string, signatures: SignatureRecord[] = [], opts: { stampStrip?: boolean; primary?: "is" | "en" } = {}): Promise<jsPDF> {
   const { jsPDF } = await import("jspdf");
   const fonts = await import("./fonts/general-sans");
   const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -201,8 +201,16 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
   };
 
   const parsed = parseContract(content);
-  const [tIs, tEn] = splitLang(parsed.title);
-  const summary = contractSummary(parsed.sections);
+  // primary "en": enska fyrst (stór) og íslenska grá undir — fyrir erlent starfsfólk og ensku vefsíðuna.
+  const EN = opts.primary === "en";
+  const SL = (x: string): [string, string] => { const p = splitLang(x); return EN && p[1] ? [p[1], p[0]] : p; };
+  const [tIs, tEn] = SL(parsed.title);
+  const summary0 = contractSummary(parsed.sections);
+  const summary = EN ? {
+    ...summary0,
+    sentence: summary0.sentence ? [summary0.sentence[1], summary0.sentence[0]] as [string, string] : null,
+    tiles: summary0.tiles.map((t) => ({ ...t, label: t.label.split(" · ").reverse().join(" · ") })),
+  } : summary0;
   const empName = summary.names?.employee ?? "";
 
   // ---- Hlýr haus: merki, titill, samantekt, fjórar lykiltölur ----
@@ -283,9 +291,9 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
 
   type FieldLay = { lIs: string[]; lEn: string; vIs: string[]; vEn: string[]; blank: boolean; h: number };
   const layField = (label: string, value: string, w: number): FieldLay => {
-    const [li, le] = splitLang(label);
+    const [li, le] = SL(label);
     const blank = isBlank(value);
-    const [vi, ve] = splitLang(blank ? "" : (value || "—"));
+    const [vi, ve] = SL(blank ? "" : (value || "—"));
     font("medium", 7.3, MUT);
     const lIs = wrap(le ? `${li} · ${le}` : li, w);
     font("normal", 9.6, INK);
@@ -310,12 +318,12 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
   };
 
   const drawSection = (num: number | null, title: string, rows: [string, string][], paras: string[]) => {
-    const [sIs, sEn] = splitLang(title);
+    const [sIs, sEn] = SL(title);
     const groups = pairFields(rows).map((g) => g.length === 2
       ? { cells: g.map(([k, v]) => layField(k, v, (RW - COLG) / 2)), two: true }
       : { cells: [layField(g[0][0], g[0][1], RW)], two: false });
     const paraLays = paras.map((p) => {
-      const [pi, pe] = splitLang(p);
+      const [pi, pe] = SL(p);
       font("normal", 8.8, INK2); const a = wrap(pi, RW);
       font("italic", 8.2, MUT); const b = pe ? wrap(pe, RW) : [];
       return { a, b, h: a.length * 11.6 + b.length * 10.6 + (b.length ? 3 : 0) + 8 };
