@@ -9,6 +9,8 @@ type Dict = Record<string, { is: string; en: string; vi?: string }>;
 // App-shell chrome strings. Per-screen content can adopt useLang() incrementally.
 export const DICT: Dict = {
   // Mælaborð v2
+  "Verktaki er sjálfstæður atvinnurekandi: samningurinn fjallar um verkið, þóknun án VSK og reikninga. Ef verktakinn vinnur í raun eins og starfsmaður (fastar vaktir, undir stjórn, eingöngu fyrir ykkur) gæti hann talist launþegi.": { is: "Verktaki er sjálfstæður atvinnurekandi: samningurinn fjallar um verkið, þóknun án VSK og reikninga. Ef verktakinn vinnur í raun eins og starfsmaður (fastar vaktir, undir stjórn, eingöngu fyrir ykkur) gæti hann talist launþegi.", en: "A contractor is self-employed: the agreement covers the work, the fee excl. VAT and invoicing. If the contractor in practice works like an employee (fixed shifts, under direction, only for you) they may be treated as an employee." },
+  "Verksamningur": { is: "Verksamningur", en: "Contractor agreement" },
   "Undir plani": { is: "Undir plani", en: "Below plan" },
   "Umfram plan": { is: "Umfram plan", en: "Above plan" },
   "Dragðu vaktir til, sjáðu kostnaðinn strax og birtu planið.": { is: "Dragðu vaktir til, sjáðu kostnaðinn strax og birtu planið.", en: "Drag shifts around, see the cost instantly and publish the plan." },

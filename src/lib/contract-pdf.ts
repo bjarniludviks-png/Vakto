@@ -63,7 +63,7 @@ export function parseContract(content: string): { title: string; sections: Secti
     if (line.startsWith("## ")) { cur = { title: line.slice(3), rows: [], paras: [] }; sections.push(cur); continue; }
     // Stop at the plain-text signature block — we draw a proper one instead.
     if (/^_?Undirritun/.test(line)) break;
-    if (/^(Vinnuveitandi|Starfsmaður)\s*:\s*_+/.test(line)) continue;
+    if (/^(Vinnuveitandi|Starfsmaður|Verkkaupi|Verktaki)\s*:\s*_+/.test(line)) continue;
     const kv = line.match(/^\*\*(.+?):\*\*\s*(.*)$/);
     if (!cur) { cur = { title: "", rows: [], paras: [] }; sections.push(cur); }
     if (kv) cur.rows.push([kv[1], kv[2]]);
@@ -118,6 +118,26 @@ export function contractSummary(sections: Section[]): ContractSummary {
     return "";
   };
   const is = (v: string) => splitLang(v)[0];
+  // Verksamningur (verktaki): annað sett af köflum og lykiltölum.
+  if (sections.some((s) => splitLang(s.title)[0].startsWith("Verkkaupi"))) {
+    const kt0 = (v: string) => { const d = v.replace(/\D/g, ""); return d.length === 10 ? `${d.slice(0, 6)}-${d.slice(6)}` : ""; };
+    const client = find("Verkkaupi", "Nafn"), who = find("Verktaki", "Nafn"), start = find("Verkefni", "Upphaf");
+    const ktC = kt0(find("Verkkaupi", "Kennitala")), ktV = kt0(find("Verktaki", "Kennitala"));
+    const hourly = find("Þóknun", "Tímagjald"), fixed = find("Þóknun", "Fast mánaðargjald");
+    const sentence: [string, string] | null = client && who
+      ? [`${client}${ktC ? ` (kt. ${ktC})` : ""} semur við ${who}${ktV ? ` (kt. ${ktV})` : ""} sem sjálfstæðan verktaka${start ? ` frá ${start}` : ""} á þeim kjörum sem hér fara á eftir.`,
+         `${client} engages ${who} as an independent contractor${start ? ` from ${start}` : ""} on the terms set out below.`]
+      : null;
+    return {
+      sentence, names: sentence ? { employer: client, employee: who } : null,
+      tiles: [
+        { label: "Verk · Work", value: is(find("Verkefni", "Lýsing á verki")) || "—" },
+        hourly ? { label: "Tímagjald · Hourly", value: `${hourly}/klst.` } : { label: "Mánaðargjald · Monthly", value: fixed ? `${fixed}/mán.` : "—" },
+        { label: "VSK · VAT", value: "Án VSK" },
+        { label: "Samband · Relationship", value: "Verktaki" },
+      ],
+    };
+  }
   const employer = find("Vinnuveitandi", "Nafn");
   const name = [find("Starfsmaður", "Skírnarnafn"), find("Starfsmaður", "Eftirnafn")].filter(Boolean).join(" ");
   const start = find("Ráðningartími", "Fyrsti starfsdagur");
@@ -201,6 +221,7 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
   };
 
   const parsed = parseContract(content);
+  const VERK = parsed.sections.some((x) => splitLang(x.title)[0].startsWith("Verkkaupi"));
   // primary "en": enska fyrst (stór) og íslenska grá undir — fyrir erlent starfsfólk og ensku vefsíðuna.
   const EN = opts.primary === "en";
   const SL = (x: string): [string, string] => { const p = splitLang(x); return EN && p[1] ? [p[1], p[0]] : p; };
@@ -393,8 +414,8 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
         .forEach((l) => { doc.text(l, RX - 0, ty - 1.5); ty += 10.5; });
       y = Math.max(ty, y + 22) + 14;
     } else {
-      sig(RX, emp, "Undirskrift atvinnurekanda", "Employer");
-      sig(RX + colW + COLG, ee, "Undirskrift starfsmanns", "Employee");
+      sig(RX, emp, VERK ? "Undirskrift verkkaupa" : "Undirskrift atvinnurekanda", VERK ? "Client" : "Employer");
+      sig(RX + colW + COLG, ee, VERK ? "Undirskrift verktaka" : "Undirskrift starfsmanns", VERK ? "Contractor" : "Employee");
       y += 80;
     }
     // Stimplabelti Taktikal (~45 pt) + fótur fyrir ofan það verða að komast fyrir á síðustu síðu.
@@ -418,7 +439,7 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
     y += 22;
     drawSection(null, "Fingrafar skjals / Document fingerprint", [["SHA-256", signatures[signatures.length - 1].sha256]], []);
     for (const s of signatures) {
-      drawSection(null, s.role === "employer" ? "Vinnuveitandi / Employer" : "Starfsmaður / Employee", [
+      drawSection(null, s.role === "employer" ? (VERK ? "Verkkaupi / Client" : "Vinnuveitandi / Employer") : (VERK ? "Verktaki / Contractor" : "Starfsmaður / Employee"), [
         ["Nafn / Name", s.name],
         ["Netfang / Email", s.email ?? "—"],
         ["Aðferð / Method", METHOD[s.method] ?? s.method],

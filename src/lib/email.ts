@@ -292,11 +292,11 @@ export async function sendContractEmail(to: string, name: string, company: strin
   const first = (name || "").split(/\s+/)[0] || "";
   return sendEmail({
     to,
-    subject: "Ráðningarsamningur til undirritunar / Contract to sign",
+    subject: "Samningur til undirritunar / Contract to sign",
     html: template({
-      preheader: `${company} sendi þér ráðningarsamning.`,
+      preheader: `${company} sendi þér samning.`,
       heading: `Samningurinn þinn er tilbúinn${first ? ", " + first : ""}`,
-      body: `<b>${company}</b> sendi þér ráðningarsamning. Opnaðu Mitt svæði, lestu hann yfir og undirritaðu rafrænt. Það tekur mínútu.`,
+      body: `<b>${company}</b> sendi þér samning. Opnaðu Mitt svæði, lestu hann yfir og undirritaðu rafrænt. Það tekur mínútu.`,
       headingEn: "Your contract is ready",
       bodyEn: `<b>${company}</b> sent you an employment contract. Open My area, read it through and sign electronically. It takes a minute.`,
       ctaLabel: "Lesa og samþykkja",
@@ -312,11 +312,11 @@ export async function sendTaktikalSignEmail(to: string, name: string, company: s
   const first = (name || "").split(/\s+/)[0] || "";
   return sendEmail({
     to,
-    subject: `${company}: ráðningarsamningur til undirritunar / Employment contract to sign`,
+    subject: `${company}: samningur til undirritunar / Contract to sign`,
     html: template({
-      preheader: `${company} hefur skrifað undir ráðningarsamninginn þinn. Nú er komið að þér.`,
-      heading: `Ráðningarsamningur frá ${company}${first ? ", " + first : ""}`,
-      body: `<b>${company}</b> hefur skrifað undir ráðningarsamninginn þinn. Lestu hann yfir og undirritaðu með rafrænum skilríkjum í símanum. Það tekur mínútu. Þú færð undirritað eintak sent þegar því er lokið.`,
+      preheader: `${company} hefur skrifað undir samninginn þinn. Nú er komið að þér.`,
+      heading: `Samningur frá ${company}${first ? ", " + first : ""}`,
+      body: `<b>${company}</b> hefur skrifað undir samninginn þinn. Lestu hann yfir og undirritaðu með rafrænum skilríkjum í símanum. Það tekur mínútu. Þú færð undirritað eintak sent þegar því er lokið.`,
       headingEn: `Employment contract from ${company}`,
       bodyEn: `<b>${company}</b> has signed your employment contract. Read it through and sign with your electronic ID on your phone. It takes a minute. You will receive a signed copy when done.`,
       ctaLabel: "Lesa og undirrita",
@@ -331,9 +331,9 @@ export async function sendContractSignedEmail(to: string, employeeName: string) 
     to,
     subject: `${employeeName} undirritaði samninginn / signed the contract`,
     html: template({
-      preheader: `${employeeName} samþykkti ráðningarsamninginn rafrænt.`,
+      preheader: `${employeeName} samþykkti samninginn rafrænt.`,
       heading: "Samningur undirritaður",
-      body: `<b>${employeeName}</b> samþykkti ráðningarsamninginn rafrænt í VAKTO. Undirritað eintak með tímastimpli er í skjalasafni starfsmannsins.`,
+      body: `<b>${employeeName}</b> samþykkti samninginn rafrænt í VAKTO. Undirritað eintak með tímastimpli er í skjalasafni starfsmannsins.`,
       headingEn: "Contract signed",
       bodyEn: `<b>${employeeName}</b> signed the employment contract electronically in VAKTO. The signed, timestamped copy is in the employee's documents.`,
       ctaLabel: "Opna starfsmannaspjald",
@@ -451,7 +451,7 @@ export async function sendSuspendedEmail(to: string, company: string) {
   });
 }
 
-/** 6 stafa kóði til að staðfesta rafræna undirritun ráðningarsamnings (0058). */
+/** 6 stafa kóði til að staðfesta rafræna undirritun samnings (0058). */
 export async function sendContractCodeEmail(to: string, code: string, company: string) {
   return sendEmail({
     to,
@@ -459,7 +459,7 @@ export async function sendContractCodeEmail(to: string, code: string, company: s
     html: template({
       preheader: `Undirritunarkóði: ${code}`,
       heading: "Staðfestu undirritunina",
-      body: `Sláðu þennan kóða inn til að undirrita ráðningarsamninginn við <b>${company}</b>. Hann gildir í 10 mínútur. Ef þú baðst ekki um kóðann skaltu ekki nota hann og láta vinnuveitandann vita.`,
+      body: `Sláðu þennan kóða inn til að undirrita samninginn við <b>${company}</b>. Hann gildir í 10 mínútur. Ef þú baðst ekki um kóðann skaltu ekki nota hann og láta vinnuveitandann vita.`,
       code,
       headingEn: "Confirm your signature",
       bodyEn: `Enter this code to sign your employment contract with <b>${company}</b>. It is valid for 10 minutes. If you didn't request it, don't use it and tell your employer.`,
@@ -472,14 +472,14 @@ export async function sendSignedContractEmail(to: string, o: { employeeName: str
   return sendEmail({
     to,
     subject: o.forEmployer
-      ? `${o.employeeName} undirritaði ráðningarsamninginn / signed the contract`
-      : `Undirritaður ráðningarsamningur við ${o.company} / your signed contract`,
+      ? `${o.employeeName} undirritaði samninginn / signed the contract`
+      : `Undirritaður samningur við ${o.company} / your signed contract`,
     html: template({
       preheader: "Undirritað eintak fylgir sem PDF.",
       heading: "Samningurinn er undirritaður",
       body: o.forEmployer
-        ? `<b>${o.employeeName}</b> undirritaði ráðningarsamninginn rafrænt. Undirritað eintak með undirritunarskrá (tími, IP, tæki og fingrafar skjals) fylgir sem PDF og er í skjalasafni starfsmannsins.`
-        : `Þú undirritaðir ráðningarsamninginn við <b>${o.company}</b>. Undirritað eintak fylgir sem PDF. Geymdu það. Það er líka í skjalasafninu þínu í VAKTO.`,
+        ? `<b>${o.employeeName}</b> undirritaði samninginn rafrænt. Undirritað eintak með undirritunarskrá (tími, IP, tæki og fingrafar skjals) fylgir sem PDF og er í skjalasafni starfsmannsins.`
+        : `Þú undirritaðir samninginn við <b>${o.company}</b>. Undirritað eintak fylgir sem PDF. Geymdu það. Það er líka í skjalasafninu þínu í VAKTO.`,
       headingEn: "The contract is signed",
       bodyEn: o.forEmployer
         ? `<b>${o.employeeName}</b> signed the employment contract electronically. The signed copy with its signature record (time, IP, device and document fingerprint) is attached and saved in the employee's documents.`

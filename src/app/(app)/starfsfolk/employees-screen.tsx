@@ -795,7 +795,7 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
     return <DocsTab employeeId={e.id} />;
   }
   if (tab === "Samningur") {
-    return <ContractTab employeeId={e.id} />;
+    return <ContractTab employeeId={e.id} contractor={e.role === "contractor"} />;
   }
   const fld = (label: string, name: string, value: string | null | undefined, placeholder: string, extra?: React.InputHTMLAttributes<HTMLInputElement>) => (
     <div className="emp-fld"><label htmlFor={`f-${name}`}>{label}</label><input id={`f-${name}`} name={name} defaultValue={value ?? ""} placeholder={placeholder} {...extra} /></div>
@@ -915,7 +915,7 @@ const CONTRACT_STATUS: Record<string, { label: string; tag: string }> = {
 
 /** Employment contracts: generate from employee data, send for e-signature
  * (0058: employer signs on send, employee confirms with an emailed code). */
-function ContractTab({ employeeId }: { employeeId: string }) {
+function ContractTab({ employeeId, contractor = false }: { employeeId: string; contractor?: boolean }) {
   const { t } = useLang();
   const [contracts, setContracts] = useState<ContractRow[]>([]);
   const [live, setLive] = useState(false);
@@ -949,7 +949,8 @@ function ContractTab({ employeeId }: { employeeId: string }) {
 
   return (
     <>
-      <Sec first>Ráðningarsamningur</Sec>
+      <Sec first>{contractor ? t("Verksamningur") : t("Ráðningarsamningur")}</Sec>
+      {contractor && <p className="muted" style={{ fontSize: 12, margin: "-4px 0 10px", lineHeight: 1.5 }}>{t("Verktaki er sjálfstæður atvinnurekandi: samningurinn fjallar um verkið, þóknun án VSK og reikninga. Ef verktakinn vinnur í raun eins og starfsmaður (fastar vaktir, undir stjórn, eingöngu fyrir ykkur) gæti hann talist launþegi.")}</p>}
       {contracts.length === 0 && (
         <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
           {live ? t("Enginn samningur til — búðu hann til úr gögnum starfsmannsins með einum smelli.") : t("Samningar birtast hér þegar migration 0028 hefur verið keyrð í Supabase.")}

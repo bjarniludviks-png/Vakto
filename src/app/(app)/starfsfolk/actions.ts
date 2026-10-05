@@ -695,6 +695,7 @@ async function contractContentFor(supabase: Awaited<ReturnType<typeof createClie
     const { data: loc } = await supabase.from("locations").select("name").eq("id", emp.location_id as string).maybeSingle();
     locationName = (loc?.name as string) ?? undefined;
   }
+  if (isContractor(emp)) return contractorMarkdown(emp, comp, { locationName, positionName });
   return contractMarkdown(emp, comp, {
     unionName: (emp.union_name as string) || (emp.union_agreement as string) || undefined,
     contractType: (emp.contract_type as string) || undefined,
@@ -711,6 +712,54 @@ function fillBlankFields(stored: string, fresh: string): string {
     const v = freshVal.get(label);
     return v && !/^_{6,}$/.test(v) ? `**${label}:** ${v}` : all;
   });
+}
+
+const isContractor = (e: Record<string, unknown>) => e.contract_type === "contractor" || e.role === "contractor";
+
+/**
+ * Verksamningur (verktaki, ekki launþegi) — sama snið og ráðningarsamningurinn (tvítyngd heiti, skyldureitir).
+ * Lykilatriði: sjálfstæði verktaka (engin launatengd réttindi, hann ber sjálfur skatta og gjöld), þóknun og
+ * reikningar án VSK, trúnaður, hugverk og uppsögn. Sniðmátið kemur ekki í stað lögfræðiráðgjafar.
+ */
+function contractorMarkdown(e: Record<string, unknown>, c: Record<string, unknown>, extras: { locationName?: string; positionName?: string }): string {
+  const req = (k: string, v: unknown) => `**${k}:** ${v == null || v === "" ? CONTRACT_BLANK : v}\n\n`;
+  const opt = (k: string, v: unknown) => `**${k}:** ${v == null || v === "" ? "—" : v}\n\n`;
+  const kr = (n: unknown) => `${nf(Math.round(Number(n) || 0))} kr.`;
+  const dmy = (iso: unknown) => { const m = String(iso ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${+m[3]}.${+m[2]}.${m[1]}` : ""; };
+  const address = [c.address, [c.postal_code, c.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  const place = [extras.locationName && extras.locationName !== c.name ? extras.locationName : c.name, address].filter(Boolean).join(", ");
+  const monthly = e.pay_type === "monthly";
+  return `# Verksamningur / Contractor agreement
+
+## Verkkaupi / Client
+${req("Nafn / Name", c.name)}${req("Kennitala / ID No.", c.kennitala)}${req("Lögheimili / Address", address)}${opt("Sími / Telephone", c.phone)}${opt("Netfang / Email", c.email)}
+## Verktaki / Contractor
+${req("Nafn / Name", e.full_name)}${req("Kennitala / ID No.", e.kennitala)}${req("Heimilisfang / Address", [e.address, [e.postal_code, e.city].filter(Boolean).join(" ")].filter(Boolean).join(", "))}${opt("Netfang / Email", e.email)}${opt("Sími / Telephone", e.phone)}${opt("Bankareikningur / Bank account", e.bank_account)}
+## Verkefni / Scope of work
+${req("Lýsing á verki / Description of work", e.title || extras.positionName)}${req("Vinnustaður / Place of work", place)}${req("Upphaf / Start date", dmy(e.hire_date))}${req("Gildistími / Term", "Ótímabundinn, uppsegjanlegur skv. kaflanum Uppsögn / Until further notice, terminable as set out under Termination")}
+## Þóknun og reikningar / Fee and invoicing
+${monthly ? req("Fast mánaðargjald án VSK / Fixed monthly fee excl. VAT", e.rate ? kr(e.rate) : "") : req("Tímagjald án VSK / Hourly rate excl. VAT", e.rate ? kr(e.rate) : "")}${req("Virðisaukaskattur / VAT", "Bætist við ef verktaki er virðisaukaskattsskyldur / Added if the contractor is VAT-registered")}${req("Reikningar / Invoicing", monthly ? "Verktaki gefur út reikning mánaðarlega / The contractor invoices monthly" : "Verktaki gefur út reikning mánaðarlega fyrir unnar stundir skv. tímaskráningu í VAKTO / The contractor invoices monthly for hours registered in VAKTO")}${req("Greiðslufrestur / Payment terms", "14 dagar frá dagsetningu reiknings / 14 days from the invoice date")}
+## Sjálfstæði verktaka / Independent contractor
+Verktaki er sjálfstæður atvinnurekandi en ekki launþegi verkkaupa. Hann ber sjálfur ábyrgð á staðgreiðslu skatta, tryggingagjaldi, lífeyrisgreiðslum og tryggingum vegna starfseminnar. Verktaki á ekki rétt á orlofi, veikindalaunum eða öðrum launatengdum réttindum frá verkkaupa. Hann ræður sjálfur hvernig verkið er unnið innan ramma samningsins, leggur til eigin búnað eftir því sem við á og er frjálst að vinna fyrir aðra. / The contractor is self-employed and not an employee of the client. The contractor is responsible for their own income tax, social security contributions, pension and insurance. The contractor is not entitled to holiday pay, sick pay or other employment rights from the client, decides how the work is carried out within this agreement, provides their own equipment where relevant and is free to work for others.
+
+## Trúnaður / Confidentiality
+Verktaki skal gæta trúnaðar um öll viðskipta- og persónuleg málefni verkkaupa, viðskiptavina hans og starfsfólks sem hann fær vitneskju um. Trúnaðarskyldan helst eftir að samningi lýkur. / The contractor shall keep confidential all business and personal matters of the client, its customers and staff that come to their knowledge. This duty continues after the agreement ends.
+
+## Afurðir verksins / Work product
+Afurðir verksins verða eign verkkaupa þegar greitt hefur verið fyrir þær, nema um annað sé samið skriflega. / Work product becomes the property of the client once paid for, unless otherwise agreed in writing.
+
+## Uppsögn / Termination
+${req("Uppsagnarfrestur / Notice period", "14 dagar, skriflega / 14 days, in writing")}Hvor aðili getur rift samningnum fyrirvaralaust ef hinn vanefnir hann verulega. Unnin verk til uppsagnardags skulu greidd. / Either party may terminate without notice if the other materially breaches the agreement. Work performed up to the termination date shall be paid for.
+
+## Lög og varnarþing / Governing law
+Um samninginn gilda íslensk lög. Rísi ágreiningur skal hann rekinn fyrir Héraðsdómi Reykjavíkur. / This agreement is governed by Icelandic law. Disputes shall be brought before the District Court of Reykjavík.
+
+_Undirritun / Signatures:_
+
+Verkkaupi: ______________________　Dags: ________
+
+Verktaki: ______________________　Dags: ________
+`;
 }
 
 /**
@@ -792,16 +841,14 @@ export async function generateContract(employeeId: string): Promise<ActionResult
       supabase.from("companies").select("*").eq("id", company).maybeSingle(),
     ]);
     if (!emp) return { ok: false, error: "Starfsmaður fannst ekki" };
-    if (emp.contract_type === "contractor" || emp.role === "contractor") {
-      return { ok: false, error: "Verktakar fá verktakasamning, ekki ráðningarsamning — þetta form á aðeins við um launafólk." };
-    }
+    const verk = isContractor(emp);
     const content = await contractContentFor(supabase, emp, comp ?? {});
     const { data: { user } } = await supabase.auth.getUser();
     const { data: created, error } = await supabase.from("contracts").insert({
       company_id: company,
       employee_id: employeeId,
-      template: "vmst-2021",
-      title: `Ráðningarsamningur — ${emp.full_name}`,
+      template: verk ? "verktaki-2026" : "vmst-2021",
+      title: `${verk ? "Verksamningur" : "Ráðningarsamningur"} — ${emp.full_name}`,
       content,
       status: "draft",
       created_by: user?.id ?? null,
@@ -913,6 +960,8 @@ export async function setContractStatus(
         "Heimili á Íslandi": "flipinn Persónulegt", "Kennitala eða fæðingardagur": "flipinn Persónulegt",
         "Starfsheiti og stutt lýsing á starfi": "starf í flipanum Vinna", "Vinnustaður": "staður í flipanum Vinna",
         "Lífeyrissjóður": "flipinn Laun", "Kjarasamningur": "flipinn Laun", "Stéttarfélag": "flipinn Laun",
+        "Heimilisfang": "flipinn Persónulegt", "Kennitala": "flipinn Persónulegt", "Lýsing á verki": "starf í flipanum Vinna",
+        "Upphaf": "upphafsdagur í flipanum Vinna", "Tímagjald án VSK": "taxti í flipanum Laun", "Fast mánaðargjald án VSK": "flipinn Laun",
       };
       const missing = [...content.matchAll(/\*\*([^*]+?):\*\*\s*_{6,}/g)].map((m) => { const k = m[1].split(" / ")[0]; return WHERE[k] ? `${k} (${WHERE[k]})` : k; });
       if (missing.length) return { ok: false, error: `Fylltu út áður en samningurinn er sendur: ${missing.join(", ")}` };
