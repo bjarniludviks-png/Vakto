@@ -9,7 +9,7 @@ cd "$(dirname "$0")/.."
 TOKEN=$(grep '^SUPABASE_ACCESS_TOKEN=' .env.local | cut -d= -f2-)
 PROD_REF="lsnthbnqcelfgeyuxgfn"
 # Migrations sem vantar á prod í þessu release (tómt = sleppa grunn-skrefum).
-MIGRATIONS=""   # 0063_pricing_v2 keyrt á prod 30.9.2026 gegnum Supabase-tengingu; 0056_security_hardening + 0055_geofence keyrt á prod 27.9.2026 gegnum Supabase-tengingu (aðgangslykill útrunninn); 0054 handvirkt 24.9.2026
+MIGRATIONS=""   # 0064_integrations keyrt á prod 5.10.2026 gegnum SQL-ritil; 0063_pricing_v2 keyrt á prod 30.9.2026 gegnum Supabase-tengingu; 0056_security_hardening + 0055_geofence keyrt á prod 27.9.2026 gegnum Supabase-tengingu (aðgangslykill útrunninn); 0054 handvirkt 24.9.2026
 [ -n "$TOKEN" ] || [ -z "$MIGRATIONS" ] || { echo "Vantar SUPABASE_ACCESS_TOKEN í .env.local"; exit 1; }
 
 run_sql() {
