@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { IntegrationsPanel } from "./integrations-panel";
 import { DateField } from "@/components/app/fields";
 import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
@@ -59,14 +60,16 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
   const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
   const [deptEdit, setDeptEdit] = useState<{ id: string; name: string; location: string; staff: number; color: string | null; members: string[] } | null>(null);
   const [rowEdit, setRowEdit] = useState<EditRow | null>(null);
-  const [section, setSection] = useState<string>(initialSection ?? (initialModal === "revenue" || initialModal === "avgrevenue" ? "velta" : "fyrirtaeki"));
+  // Gamlar slóðir (?s=velta, launareglur) vísa á nýju flipana.
+  const LEGACY: Record<string, string> = { velta: "tengingar", launareglur: "reglur" };
+  const [section, setSection] = useState<string>((initialSection && (LEGACY[initialSection] ?? initialSection)) ?? (initialModal === "revenue" || initialModal === "avgrevenue" ? "tengingar" : "fyrirtaeki"));
   const SECTIONS: [string, string][] = [
-    ["fyrirtaeki", "Fyrirtæki"], ["tengingar", "Samþættingar"], ["velta", "Veltuskráning"],
-    ["launareglur", "Launareglur"], ["notendur", "Notendur"], ["askrift", "Áskrift"],
+    ["fyrirtaeki", "Fyrirtæki"], ["stadir", "Staðir og teymi"], ["reglur", "Reglur og laun"],
+    ["tengingar", "Tengingar"], ["notendur", "Notendur"], ["askrift", "Áskrift"],
   ];
   return (
     <>
-      <PageHeader title="Stillingar" subtitle="Fyrirtæki, tengingar, notendur og áskrift" />
+      <PageHeader title="Stillingar" subtitle="Fyrirtækið, reglurnar, tengingarnar og áskriftin" />
       <div className="settabs">
         {SECTIONS.map(([id, label]) => (
           <button key={id} className={`etab2${section === id ? " on" : ""}`} onClick={() => setSection(id)}>{t(label)}</button>
@@ -77,6 +80,12 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
       {section === "fyrirtaeki" && <>
       <div className="grid2b">
         <CompanyCard info={data.company} />
+        <CompanyDocsCard />
+      </div>
+      </>}
+
+      {section === "reglur" && <>
+      <div className="grid2b" style={{ marginBottom: 16, gridTemplateColumns: "1fr" }}>
         <div className="card">
           <div className="ch"><div className="ct">{t("Land & launareglur")}</div></div>
           <div className="cb">
@@ -135,61 +144,9 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
       </div>
       </>}
 
-      {section === "tengingar" && (
-        <div className="card">
-          <div className="ch">
-            <div>
-              <div className="ct">{t("Samþættingar (API)")}</div>
-              <div className="cs">{t("búðu til samþættingu fyrir hvaða kerfi sem er — nefndu hana (t.d. SalesCloud) og settu lykilinn í kerfið sem á að senda sölutölur")}</div>
-            </div>
-            <button className="btn sm" onClick={() => setKeyModal(true)}>{t("+ Ný tenging")}</button>
-          </div>
-          <div className="cb att">
-            {data.apiKeys.length === 0 && (
-              <div className="muted" style={{ fontSize: 13, padding: "8px 2px" }}>
-                {t("Engin API-tenging enn — búðu til lykil og láttu sölukerfið þitt POST-a á")} <code style={{ fontSize: 12 }}>/api/v1/revenue</code>
-              </div>
-            )}
-            {data.apiKeys.map((k) => (
-              <div className="it" key={k.id}>
-                <div className={`ic ${k.revoked ? "mut" : "good"}`}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M21 2l-9.6 9.6M15.5 7.5l3 3L22 7l-3-3zM11.4 11.6a5 5 0 1 0 1 1z" /></svg></div>
-                <div className="tx">
-                  <b style={k.revoked ? { textDecoration: "line-through", color: "var(--ink3)" } : undefined}>{k.name}</b>
-                  <span>{k.prefix} · {t("stofnuð")} {k.created}{k.lastUsed ? ` · ${t("síðast notuð")} ${k.lastUsed}` : ` · ${t("aldrei notuð")}`}</span>
-                </div>
-                {k.revoked
-                  ? <span className="tag mut">{t("afturkölluð")}</span>
-                  : <button className="btn ghost sm" style={{ color: "var(--bad)" }} onClick={async () => { const r = await revokeApiKey(k.id); toast(r.ok ? t("Tenging afturkölluð") : (r.error ?? "Villa")); }}>{t("Afturkalla")}</button>}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {section === "tengingar" && <IntegrationsPanel apiKeys={data.apiKeys} onNewKey={() => setKeyModal(true)} />}
 
-      {section === "tengingar" && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="ch"><div><div className="ct">{t("Tæki & tilkynningar")}</div><div className="cs">{t("stimpilklukkan á staðnum, push í símana og launaskil")}</div></div></div>
-          <div className="cb att">
-            <div className="it"><div className="ic good">P</div><div className="tx"><b>Payday</b><span>{t("tímaskrá flutt út sem Excel — hlaðið upp í Payday")}</span></div><span className="tag info">{t("Excel")}</span></div>
-            <div className="it"><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" /></svg></div><div className="tx"><b>{t("Push-tilkynningar")}</b><span>{t("vaktir, beiðnir og samþykki beint í símann")}</span></div><PushToggle /></div>
-            <div className="it rowlink" onClick={() => copyKioskLink(data.kioskToken)}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><rect x="4" y="3" width="16" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg></div><div className="tx"><b>{t("Kiosk-stimpilklukka")}</b><span>{t("opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð")}</span></div><span className="tag info">{t("afrita slóð")}</span></div>
-          </div>
-        </div>
-      )}
-
-      {section === "velta" && (
-        <div className="card">
-          <div className="ch"><div><div className="ct">{t("Velta & sölutölur")}</div><div className="cs">{t("fóðraðu laun%-útreikninginn — sjálfvirkt gegnum samþættingu eða handvirkt")}</div></div></div>
-          <div className="cb att">
-            <div className="it rowlink" onClick={() => setKeyModal(true)}><div className="ic info">IN</div><div className="tx"><b>{t("Sölukerfi (INVENTRA, Dineout, SalesCloud …)")}</b><span>{t("sendu veltu sjálfkrafa með API-lykli · smelltu til að búa til tengingu")}</span></div><span className="tag mut">{t("ekki tengt")}</span></div>
-            <div className="it rowlink" onClick={() => setModal("revenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" /></svg></div><div className="tx"><b>{t("Skrá veltu handvirkt")}</b><span>{t("án Inventra — sláðu inn veltu til að sjá laun vs velta")}</span></div><span className="tag info">{t("slá inn")}</span></div>
-            <div className="it rowlink" onClick={() => setModal("avgrevenue")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M3 3v18h18M7 15l4-4 3 3 5-6" /></svg></div><div className="tx"><b>{t("Meðalvelta per vikudag")}</b><span>{t("áætluð velta per vikudag — laun% án tengingar")}</span></div><span className="tag info">{t("slá inn")}</span></div>
-            <div className="it rowlink" onClick={() => setSection("tengingar")}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M21 2l-9.6 9.6M15.5 7.5l3 3L22 7l-3-3zM11.4 11.6a5 5 0 1 0 1 1z" /></svg></div><div className="tx"><b>{t("Sjálfvirkt gegnum API")}</b><span>{t("búðu til samþættingu — sölukerfið þitt sendir þá veltuna sjálft")}</span></div><span className="tag info">{t("opna Samþættingar")}</span></div>
-          </div>
-        </div>
-      )}
-
-      {section === "launareglur" && (<>
+      {section === "reglur" && (<>
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="ch">
           <div><div className="ct">{t("Reglusniðmát")}</div><div className="cs">{t("þín eigin vinnureglur — fyrir hvaða land, grein eða stéttarfélag sem er")}</div></div>
@@ -214,8 +171,8 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
       )}
 
 
-      {section === "fyrirtaeki" && <>
-      <div className="grid2b" style={{ marginTop: 16 }}>
+      {section === "stadir" && <>
+      <div className="grid2b">
         <div className="card">
           <div className="ch"><div className="ct">{t("Staðir")}</div><button className="btn sm" onClick={() => setModal("location")}>{t("+ Bæta við stað")}</button></div>
           <div className="cb att">
@@ -259,7 +216,13 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
         <GeofenceCard mode={data.geofenceMode ?? "off"} locations={data.locations} onEdit={(l) => l.id && setRowEdit({ kind: "location", id: l.id, name: l.name, lat: l.lat ?? null, lng: l.lng ?? null, radius: l.radius ?? 150 })} />
       </div>
 
-      <CompanyDocsCard />
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="ch"><div><div className="ct">{t("Tæki á staðnum")}</div><div className="cs">{t("stimpilklukkan við innganginn og tilkynningar í símann")}</div></div></div>
+        <div className="cb att">
+          <div className="it rowlink" onClick={() => copyKioskLink(data.kioskToken)}><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><rect x="4" y="3" width="16" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg></div><div className="tx"><b>{t("Kiosk-stimpilklukka")}</b><span>{t("opnaðu á spjaldtölvu — PIN = síðustu 4 í kennitölu · smelltu til að afrita slóð")}</span></div><span className="tag info">{t("afrita slóð")}</span></div>
+          <div className="it"><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0" /></svg></div><div className="tx"><b>{t("Push-tilkynningar")}</b><span>{t("vaktir, beiðnir og samþykki beint í símann")}</span></div><PushToggle /></div>
+        </div>
+      </div>
       </>}
 
       {section === "notendur" && (

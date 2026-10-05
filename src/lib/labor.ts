@@ -97,7 +97,7 @@ function monthShareOf(days: string[]): number {
 
 function mapSource(raw: unknown): "manual" | "api" | "inventra" {
   const s = String(raw ?? "manual").toLowerCase();
-  return s === "inventra" ? "inventra" : s === "api" ? "api" : "manual";
+  return s === "inventra" ? "inventra" : s === "api" || s === "shopify" || s === "woocommerce" ? "api" : "manual";
 }
 
 type EmpRow = {
