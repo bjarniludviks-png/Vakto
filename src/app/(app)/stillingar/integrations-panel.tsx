@@ -74,7 +74,7 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
     <div className="tg">
       <section className="card">
         <div className="ch"><div><div className="ct">{L("Velta", "Revenue")}</div><div className="cs">{L("Laun % af veltu þarf veltutölur. Veldu leiðina sem hentar, þú getur skipt hvenær sem er.", "Labor % of revenue needs revenue figures. Pick what suits you, you can switch at any time.")}</div></div>
-          {v?.yesterday ? <span className="tag good">{L("Laun % reiknast", "Labor % is live")}</span> : <span className="tag mut">{L("Engin velta enn", "No revenue yet")}</span>}
+          {v?.yesterday ? <span className="tg-pill good">{L("Laun % reiknast", "Labor % is live")}</span> : <span className="tg-pill mut">{L("Engin velta enn", "No revenue yet")}</span>}
         </div>
         <div className="cb tg-rev">
           <div>
@@ -93,7 +93,7 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
               return (
                 <div key={i.id} className="tg-conn">
                   <div className="tg-conn-h">{app && <Logo app={app} size={36} />}<span><b>{app?.name ?? i.provider}</b><small>{i.site.replace(/^https:\/\//, "")}{i.location ? ` · ${i.location}` : ""}</small></span>
-                    <span className={`tag ${i.status === "connected" ? "good" : "bad"}`}>{i.status === "connected" ? L("Tengt", "Connected") : L("Villa", "Error")}</span></div>
+                    <span className={`tg-pill ${i.status === "connected" ? "good" : "bad"}`}>{i.status === "connected" ? L("Tengt", "Connected") : L("Villa", "Error")}</span></div>
                   {i.status === "error" && i.lastError && <div className="tg-err">{i.lastError}</div>}
                   <div className="tg-conn-n"><span>{L("Velta í gær", "Revenue yesterday")}</span><b>{i.lastAmount != null ? `${nf(i.lastAmount)} kr` : "—"}</b></div>
                   <div className="tg-small">{L("Síðast sótt", "Last fetched")} {fmtTime(i.lastSync)} · {L("sótt sjálfkrafa daglega", "fetched automatically every day")}</div>
@@ -149,10 +149,10 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
                   <div className="tg-app-h"><Logo app={a} /><span><b>{a.name}</b><small>{en ? a.sub[1] : a.sub[0]}</small></span></div>
                   <p>{en ? a.d[1] : a.d[0]}</p>
                   <div className="tg-app-f">
-                    {a.kind === "connect" && (c.length ? <span className="tag good">{L("Tengt", "Connected")}</span> : <span className="tag mut">{L("Ekki tengt", "Not connected")}</span>)}
-                    {a.kind === "apikey" && <span className="tag mut">{L("Með lykli", "With a key")}</span>}
-                    {a.kind === "export" && <span className="tag warn">{L("Útflutningur", "Export")}</span>}
-                    {a.kind === "soon" && <span className="tag info">{L("Væntanlegt", "Coming soon")}</span>}
+                    {a.kind === "connect" && (c.length ? <span className="tg-pill good">{L("Tengt", "Connected")}</span> : <span className="tg-pill mut">{L("Ekki tengt", "Not connected")}</span>)}
+                    {a.kind === "apikey" && <span className="tg-pill mut">{L("Með lykli", "With a key")}</span>}
+                    {a.kind === "export" && <span className="tg-pill warn">{L("Útflutningur", "Export")}</span>}
+                    {a.kind === "soon" && <span className="tg-pill info">{L("Væntanlegt", "Coming soon")}</span>}
                     {a.kind === "connect" && <button className={`btn sm${c.length ? " ghost" : ""}`} onClick={() => setConnect(a)}>{c.length ? L("Bæta við", "Add another") : L("Tengja", "Connect")}</button>}
                     {a.kind === "apikey" && <button className="btn sm" onClick={onNewKey}>{L("Búa til lykil", "Create key")}</button>}
                     {a.kind === "export" && <a className="btn ghost sm" href="/launakeyrslur">{L("Flytja út", "Export")}</a>}
@@ -182,7 +182,7 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
               <div className="it" key={k.id}>
                 <div className={`ic ${k.revoked ? "mut" : "good"}`}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M21 2l-9.6 9.6M15.5 7.5l3 3L22 7l-3-3zM11.4 11.6a5 5 0 1 0 1 1z" /></svg></div>
                 <div className="tx"><b style={k.revoked ? { textDecoration: "line-through", color: "var(--ink3)" } : undefined}>{k.name}</b><span>{k.prefix} · {t("stofnuð")} {k.created}{k.lastUsed ? ` · ${t("síðast notuð")} ${k.lastUsed}` : ` · ${t("aldrei notuð")}`}</span></div>
-                {k.revoked ? <span className="tag mut">{t("afturkölluð")}</span>
+                {k.revoked ? <span className="tg-pill mut">{t("afturkölluð")}</span>
                   : <button className="btn ghost sm" style={{ color: "var(--bad)" }} onClick={async () => { const r = await revokeApiKey(k.id); toast(r.ok ? t("Tenging afturkölluð") : (r.error ?? "Villa")); }}>{t("Afturkalla")}</button>}
               </div>
             ))}
