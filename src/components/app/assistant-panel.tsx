@@ -115,7 +115,7 @@ export function AssistantPanel() {
 
   return (
     <>
-      <button className={`vai-fab${open ? " on" : ""}`} onClick={() => setOpen((o) => !o)} aria-label={s.open} title={`${s.name} (⌘J)`}><Spark /></button>
+      <button className={`vai-fab${open ? " on" : ""}${path?.startsWith("/spjall") ? " up" : ""}`} onClick={() => setOpen((o) => !o)} aria-label={s.open} title={`${s.name} (⌘J)`}><Spark /></button>
       {open && (
         <div className="vai-panel" role="dialog" aria-label={s.name}>
           <div className="vai-head">

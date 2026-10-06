@@ -641,9 +641,9 @@ html.dark .mblock.day{background:#23264a;color:#c7ccff} html.dark .mblock.eve{ba
 
 /* field */
 .field{margin-bottom:14px}
-.field label{font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ink3);display:block;margin-bottom:6px}
-.field input,.field select{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 12px;font:inherit;font-size:13.5px;background:#fff;color:var(--ink)}
-.field input:focus,.field select:focus{outline:2px solid var(--brand-soft);border-color:var(--brand)}
+.field label{font-size:12.5px;font-weight:600;color:var(--ink2);display:block;margin-bottom:6px}
+.field input,.field select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:14px;background:var(--panel);color:var(--ink);transition:border-color .15s,box-shadow .15s}
+.field input:focus,.field select:focus{outline:none;border-color:var(--brand-2);box-shadow:0 0 0 3px var(--brand-soft)}
 .range{width:100%;accent-color:var(--brand)}
 .statline{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line2);font-size:13px}
 .statline:last-child{border:none} .statline .k{color:var(--ink2)} .statline .v{font-weight:650;font-variant-numeric:tabular-nums}
@@ -1383,3 +1383,48 @@ a.db2-who:hover span{color:var(--brand)}
   .ne-row{grid-template-columns:1fr}
   .ne-roles{grid-template-columns:1fr 1fr}
 }
+
+/* ── Starfsfólk (listi) ── */
+.db2-pill.info{background:var(--brand-soft);color:var(--brand)}
+.db2-who .db2-pill{margin-left:4px;padding:2px 8px;font-size:11px}
+.db2-muted{color:var(--ink3)}
+.emp-ch{flex-wrap:wrap}
+.emp-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.emp-search{position:relative}
+.emp-search svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--ink3);pointer-events:none}
+.emp-search input{border:1px solid var(--line);border-radius:10px;padding:8px 12px 8px 32px;font:inherit;font-size:13px;width:220px;background:var(--panel);color:var(--ink)}
+.emp-search input:focus,.emp-sel:focus{outline:none;border-color:var(--brand-2);box-shadow:0 0 0 3px var(--brand-soft)}
+.emp-sel{border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px;background:var(--panel);color:var(--ink)}
+.emp-rowact{display:inline-flex;align-items:center;gap:6px;justify-content:flex-end}
+.emp-del{border:none;background:none;color:var(--ink3);cursor:pointer;padding:5px;border-radius:8px;opacity:0;transition:opacity .15s,background .15s,color .15s}
+.db2-rowlink:hover .emp-del,.emp-del:focus-visible{opacity:1}
+.emp-del:hover{color:var(--bad);background:var(--bad-soft)}
+@media(hover:none){.emp-del{opacity:1}}
+.emp-pop{position:absolute;top:calc(100% + 10px);right:0;z-index:80;width:300px;background:#1f2026;color:#f4f2ee;border-radius:14px;padding:14px 16px;box-shadow:0 18px 50px -12px rgba(0,0,0,.5);font-size:13.5px;line-height:1.55}
+@media(max-width:640px){.emp-search input{width:100%}.emp-tools,.emp-search{width:100%}}
+
+/* ── Starfsmannaspjald ── */
+.ep-head{display:flex;gap:16px;align-items:center}
+.ep-av{flex:none;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:700;font-size:19px}
+.ep-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;font-size:14px;color:var(--ink3)}
+.ep-tabs{display:flex;gap:4px;background:var(--panel);border-radius:14px;padding:5px;box-shadow:0 0 0 1px var(--line);overflow-x:auto;width:max-content;max-width:100%}
+.ep-tabs button{font:inherit;font-size:13.5px;font-weight:600;padding:8px 16px;border-radius:10px;border:0;background:none;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.ep-tabs button:hover:not(.on){background:var(--line2);color:var(--ink)}
+.ep-tabs button.on{background:var(--ink);color:var(--panel)}
+.ep-card{max-width:880px}
+.ep-body{padding:8px 28px 12px}
+.ep .sec{font-size:15.5px;font-weight:650;letter-spacing:-.01em;text-transform:none;color:var(--ink);margin:30px 0 6px;padding-top:24px;border-top:1px solid var(--line2)}
+.ep .sec[style*="margin-top: 0"]{border-top:none;padding-top:14px}
+.ep .statline{padding:12px 0;font-size:13.5px}
+.ep .statline .k{color:var(--ink2)}
+.ep-bar{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 28px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--panel) 92%,transparent);backdrop-filter:blur(8px);border-radius:0 0 18px 18px}
+.ep-state{font-size:12.5px;color:var(--ink3)}
+.ep-bar.dirty .ep-state{color:var(--warn);font-weight:600}
+@media(max-width:560px){.ep-body{padding:4px 16px 10px}.ep-bar{padding:12px 16px}.ep-av{width:48px;height:48px;font-size:16px}.ep-tabs{width:100%}}
+
+.rep-dl{display:inline-flex;align-items:center;gap:6px;flex:none;border:1px solid var(--line);border-radius:9px;padding:6px 11px;font-size:12.5px;font-weight:600;color:var(--ink2);background:var(--panel);transition:color .15s,border-color .15s}
+.rep-dl svg{width:13px;height:13px}
+.rowlink:hover .rep-dl{color:var(--brand);border-color:var(--brand-2)}
+
+/* Í spjallinu situr hnappurinn ofan við sendingarreitinn */
+.vai-fab.up{bottom:96px}

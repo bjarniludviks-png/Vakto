@@ -76,6 +76,8 @@ export default function EmployeesScreen({
   const { t } = useLang();
   const [importing, setImporting] = useState(false);
   const [importInfo, setImportInfo] = useState(false);
+  const [search, setSearch] = useState("");
+  const [deptF, setDeptF] = useState("all");
   const importRef = useRef<HTMLInputElement>(null);
 
   /** Payday-style: downloadable template that matches the import columns. */
@@ -187,164 +189,127 @@ export default function EmployeesScreen({
     router.refresh();
   }
 
-  return (
-    <>
-      <PageHeader
-        title="Starfsfólk"
-        subtitle={`${count} ${t("emp:subtitle")} · ${num1(fte)} ${t("emp:fteword")}`}
-        actions={
-          <div style={{ display: "flex", gap: 8 }}>
-            <input ref={importRef} type="file" accept=".xlsx,.xls" hidden onChange={(e) => onImportFile(e.target.files?.[0])} />
-            <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 4 }}>
-              <button className="btn ghost sm" disabled={importing} onClick={() => importRef.current?.click()}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 16V4m0 0L7 9m5-5l5 5M5 20h14" /></svg>
-                {importing ? t("Flyt inn…") : t("Flytja inn (Excel)")}
-              </button>
-              <button
-                className="iconbtn"
-                aria-label={t("Upplýsingar um innflutning")}
-                title={t("Upplýsingar um innflutning")}
-                style={{ width: 26, height: 26 }}
-                onClick={() => setImportInfo((v) => !v)}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></svg>
-              </button>
-              {importInfo && (
-                <div
-                  style={{
-                    position: "absolute", top: "calc(100% + 10px)", right: 0, zIndex: 80, width: 300,
-                    background: "#1f2026", color: "#f4f2ee", borderRadius: 14, padding: "14px 16px",
-                    boxShadow: "0 18px 50px -12px rgba(0,0,0,.5)", fontSize: 13.5, lineHeight: 1.55,
-                  }}
-                  onMouseLeave={() => setImportInfo(false)}
-                >
-                  {t("Þú getur lesið starfsfólk beint inn úr Excel. Sæktu sniðmátið, fylltu það út og hladdu því svo upp hér.")}
-                  <button
-                    className="btn sm"
-                    style={{ marginTop: 10, width: "100%", justifyContent: "center" }}
-                    onClick={() => { downloadTemplate(); setImportInfo(false); }}
-                  >
-                    {t("Sækja sniðmát (.xlsx)")}
-                  </button>
-                </div>
-              )}
-            </div>
-            <button className="btn sm" onClick={() => router.push("/starfsfolk/nyr")}>
-              {t("emp:new")}
-            </button>
-          </div>
-        }
-      />
+  const inactiveN = employees.filter((e) => e.status === "inactive").length;
+  const depts = [...new Set(employees.map((e) => e.department).filter(Boolean))] as string[];
+  const q = search.trim().toLowerCase();
+  const list = employees.filter((e) =>
+    (showInactive || e.status !== "inactive") &&
+    (deptF === "all" || e.department === deptF) &&
+    (!q || e.fullName.toLowerCase().includes(q) || (e.title ?? "").toLowerCase().includes(q)));
+  const avBg = (e: Employee) => (e.department && deptColors[e.department]) || e.avatarColor;
+  const roleTag = (e: Employee) =>
+    e.role === "contractor" ? <span className="db2-pill mut">{t("emp:role:contractor")}</span>
+      : e.role === "manager" ? <span className="db2-pill info">{t("emp:role:manager")}</span>
+      : e.role === "owner" ? <span className="db2-pill info">{t("emp:role:owner")}</span> : null;
 
-      <div className="kpis">
-        <div className="kpi">
-          <div className="lab">{t("emp:kpi:count")}</div>
-          <div className="val">{count}</div>
-        </div>
-        <div className="kpi">
-          <div className="lab">{t("emp:kpi:fte")}</div>
-          <div className="val">{num1(fte)}</div>
-        </div>
-        <div className="kpi">
-          <div className="lab">{t("emp:kpi:over")}</div>
-          <div className="val" style={{ color: "var(--warn)" }}>{overRatio}</div>
-        </div>
-        <div className="kpi">
-          <div className="lab">{t("emp:kpi:leave")}</div>
-          <div className="val">{onLeave}</div>
+  return (
+    <div className="db2">
+      <div className="db2-top">
+        <div><h1>{t("Starfsfólk")}</h1><div className="db2-sub">{count} {t("emp:subtitle")} · {num1(fte)} {t("emp:fteword")}</div></div>
+        <div className="db2-period">
+          <input ref={importRef} type="file" accept=".xlsx,.xls" hidden onChange={(e) => onImportFile(e.target.files?.[0])} />
+          <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 4 }}>
+            <button className="btn ghost sm" disabled={importing} onClick={() => importRef.current?.click()}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 16V4m0 0L7 9m5-5l5 5M5 20h14" /></svg>
+              {importing ? t("Flyt inn…") : t("Flytja inn (Excel)")}
+            </button>
+            <button className="iconbtn" aria-label={t("Upplýsingar um innflutning")} title={t("Upplýsingar um innflutning")} style={{ width: 26, height: 26 }} onClick={() => setImportInfo((v) => !v)}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></svg>
+            </button>
+            {importInfo && (
+              <div className="emp-pop" onMouseLeave={() => setImportInfo(false)}>
+                {t("Þú getur lesið starfsfólk beint inn úr Excel. Sæktu sniðmátið, fylltu það út og hladdu því svo upp hér.")}
+                <button className="btn sm" style={{ marginTop: 10, width: "100%", justifyContent: "center" }} onClick={() => { downloadTemplate(); setImportInfo(false); }}>
+                  {t("Sækja sniðmát (.xlsx)")}
+                </button>
+              </div>
+            )}
+          </div>
+          <button className="btn sm" onClick={() => router.push("/starfsfolk/nyr")}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 5v14M5 12h14" /></svg>{t("Nýr starfsmaður")}
+          </button>
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <div className="ch">
-          <div><div className="ct">{t("emp:card")}</div>
-          <div className="cs">{t("emp:card:sub")}</div></div>
-          {employees.some((e) => e.status === "inactive") && (
-            <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 12.5, color: "var(--ink2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-              <input type="checkbox" checked={showInactive} onChange={(ev) => setShowInactive(ev.target.checked)} style={{ width: 15, height: 15, accentColor: "var(--brand)" }} />
-              {t("Birta óvirka")} ({employees.filter((e) => e.status === "inactive").length})
-            </label>
-          )}
+      <div className="db2-row4">
+        <section className="db2-card db2-tile">
+          <div className="db2-k">{t("Starfsmenn")}</div>
+          <div className="db2-v">{employees.filter((e) => e.status !== "inactive").length}<small>{t("virkir")}</small></div>
+          <div className="db2-avs">{employees.filter((e) => e.status !== "inactive").slice(0, 7).map((e) => <span key={e.id} className="db2-av" style={{ background: avBg(e) }} title={e.fullName}>{initials(e.fullName)}</span>)}</div>
+        </section>
+        <section className="db2-card db2-tile">
+          <div className="db2-k">{t("Stöðugildi")}</div>
+          <div className="db2-v">{num1(fte)}</div>
+          <div className="db2-s">{t("samanlagt starfshlutfall / 100")}</div>
+        </section>
+        <section className="db2-card db2-tile">
+          <div className="db2-k">{t("Yfir starfshlutfalli")}</div>
+          <div className="db2-v" style={{ color: overRatio ? "var(--warn)" : undefined }}>{overRatio}</div>
+          <div className="db2-s">{overRatio ? t("skráð yfir 100 % starfshlutfall") : t("allir innan samnings")}</div>
+        </section>
+        <section className="db2-card db2-tile">
+          <div className="db2-k">{t("Í leyfi")}</div>
+          <div className="db2-v">{onLeave}</div>
+          <div className="db2-s">{t("þessa viku")}</div>
+        </section>
+      </div>
+
+      <section className="db2-card db2-staff">
+        <div className="db2-ch emp-ch">
+          <div><div className="db2-ct">{t("Allt starfsfólk")}</div><div className="db2-cs">{t("Smelltu á starfsmann til að sjá laun, samninga og skjöl")}</div></div>
+          <div className="emp-tools">
+            <div className="emp-search">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Leita að starfsmanni…")} />
+            </div>
+            {depts.length > 1 && (
+              <select className="emp-sel" value={deptF} onChange={(e) => setDeptF(e.target.value)}>
+                <option value="all">{t("Allar deildir")}</option>
+                {depts.map((d) => <option key={d} value={d}>{t(d)}</option>)}
+              </select>
+            )}
+          </div>
         </div>
-        <div className="cb tbl" style={{ paddingTop: 8 }}>
+        <div className="db2-tblwrap">
           <table>
-            <thead>
-              <tr>
-                <th>{t("emp:th:name")}</th>
-                <th>{t("emp:th:dept")}</th>
-                <th>{t("emp:th:type")}</th>
-                <th className="r">{t("emp:th:rate")}</th>
-                <th className="r">{t("emp:th:ratio")}</th>
-                <th>{t("emp:th:union")}</th>
-                <th>{t("emp:th:status")}</th>
-              <th className="r"></th></tr>
-            </thead>
+            <thead><tr>
+              <th>{t("emp:th:name")}</th><th>{t("emp:th:dept")}</th><th className="r">{t("emp:th:rate")}</th>
+              <th className="r">{t("emp:th:ratio")}</th><th>{t("emp:th:union")}</th><th>{t("emp:th:status")}</th><th style={{ width: 56 }} />
+            </tr></thead>
             <tbody>
-              {employees.filter((e) => showInactive || e.status !== "inactive").map((e) => {
+              {list.length ? list.map((e) => {
                 const b = statusBadge(e);
+                const contractor = e.role === "contractor";
                 return (
-                  <tr key={e.id} className="rowlink" onClick={() => openEmp(e)}>
-                    <td>
-                      <span className="who">
-                        <span className="avt" style={{ background: (e.department && deptColors[e.department]) || e.avatarColor }}>
-                          {initials(e.fullName)}
-                        </span>
-                        {e.title ? (
-                          <span>
-                            {e.fullName}
-                            <small>{e.title}</small>
-                          </span>
-                        ) : (
-                          <span>{e.fullName}</span>
-                        )}
-                      </span>
-                    </td>
-                    <td>{e.department}</td>
-                    <td>
-                      {e.payType === "monthly" ? (
-                        <span className="pill info" style={{ background: "var(--brand-soft)", color: "var(--brand)" }}>
-                          {t("emp:monthly")}
-                        </span>
-                      ) : (
-                        <span className="pill mut" style={{ background: "var(--line2)", color: "var(--ink2)" }}>
-                          {t("emp:hourly")}
-                        </span>
-                      )}
-                    </td>
-                    <td className="r">
-                      {e.payType === "monthly" ? kr(e.rate) : `${nf(e.rate)} kr`}
-                    </td>
-                    <td className="r" style={e.employmentRatio > 120 ? { color: "var(--bad)" } : undefined}>
-                      {e.employmentRatio}%
-                    </td>
-                    <td>{e.union}</td>
-                    <td>
-                      <span className="pill" style={{ background: b.bg, color: b.fg }}>
-                        {t(b.labelKey)}
-                      </span>
-                    </td>
+                  <tr key={e.id} className="db2-rowlink" onClick={() => openEmp(e)}>
+                    <td><span className="db2-who"><span className="db2-av sm" style={{ background: avBg(e) }}>{initials(e.fullName)}</span><span>{e.fullName}{e.title && <small>{e.title}</small>}</span>{roleTag(e)}</span></td>
+                    <td>{e.department ? t(e.department) : <span className="db2-muted">—</span>}</td>
+                    <td className="r">{nf(e.rate)} <span className="db2-muted">{e.payType === "monthly" ? "kr/mán" : "kr/klst"}</span></td>
+                    <td className="r" style={e.employmentRatio > 120 ? { color: "var(--bad)" } : undefined}>{contractor ? <span className="db2-muted">—</span> : `${e.employmentRatio}%`}</td>
+                    <td>{contractor ? <span className="db2-muted">{t("á ekki við")}</span> : e.union}</td>
+                    <td>{e.status === "inactive" ? <span className="db2-pill mut">{t("Óvirkur")}</span> : <span className={`db2-pill ${b.cls}`}>{t(b.labelKey)}</span>}</td>
                     <td className="r" onClick={(ev) => ev.stopPropagation()}>
-                      <button className="x" title={t("Eyða starfsmanni")} style={{ color: "var(--bad)" }}
-                        onClick={() => delEmp(e.id, e.fullName)}>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
-                      </button>
+                      <span className="emp-rowact">
+                        <button className="emp-del" title={t("Eyða starfsmanni")} aria-label={t("Eyða starfsmanni")} onClick={() => delEmp(e.id, e.fullName)}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>
+                        </button>
+                        <svg className="db2-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+                      </span>
                     </td>
                   </tr>
                 );
-              })}
+              }) : <tr><td colSpan={7} className="db2-muted" style={{ textAlign: "center", padding: 24 }}>{q || deptF !== "all" ? t("Enginn starfsmaður passar við leitina.") : t("Engir starfsmenn skráðir enn.")}</td></tr>}
             </tbody>
           </table>
+          {inactiveN > 0 && (
+            <button type="button" className="db2-more" onClick={() => setShowInactive((v) => !v)}>
+              {showInactive ? t("Fela óvirka starfsmenn") : `${t("Sýna")} ${inactiveN} ${t("óvirka starfsmenn")}`}
+            </button>
+          )}
         </div>
-        <div className="cb" style={{ borderTop: "1px solid var(--line2)" }}>
-          <p className="muted" style={{ fontSize: 12 }}>
-            {t("emp:shows")} {count} {t("emp:subtitle")}. {t("emp:footer")}
-            {!live && t("emp:demo")}
-          </p>
-        </div>
-      </div>
-
-      {/* ---------- new employee modal ---------- */}
-    </>
+        {!live && <p className="db2-muted" style={{ fontSize: 12, padding: "0 24px 14px" }}>{t("emp:demo")}</p>}
+      </section>
+    </div>
   );
 }
 

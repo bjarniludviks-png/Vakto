@@ -112,7 +112,7 @@ function ReportLibrary({ from, to, departments }: { from: string; to: string; de
               </svg>
             </div>
             <div className="tx"><b>{t(r.title)}</b><span>{busy === r.kind ? t("Sæki…") : t(r.sub)}</span></div>
-            <span className="badge">{r.fmt}</span>
+            <span className="rep-dl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14" /></svg>{r.fmt}</span>
           </div>
         ))}
       </div>

@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { initials, type Employee } from "@/lib/employees";
@@ -83,44 +82,48 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
   }
 
 
-  return (
-    <>
-      <PageHeader
-        title={e.fullName}
-        subtitle={[e.department, e.title].filter(Boolean).join(" · ") || (e.role === "contractor" ? t("Verktaki") : t("Starfsmaður"))}
-        actions={
-          <Link href="/starfsfolk" className="btn ghost sm">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 5 }}><path d="M19 12H5m0 0l7 7m-7-7l7-7" /></svg>
-            {t("Til baka")}
-          </Link>
-        }
-      />
+  const roleLabel = e.role === "contractor" ? t("emp:role:contractor") : e.role === "manager" ? t("emp:role:manager") : e.role === "owner" ? t("emp:role:owner") : null;
+  const sub = [e.title, e.department ? t(e.department) : null].filter(Boolean).join(" · ");
 
-      <div className="card" style={{ marginTop: 16, maxWidth: 760 }}>
-        <div className="ch" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span className="avt" style={{ background: avtBg, width: 42, height: 42, fontSize: 15 }}>{initials(e.fullName)}</span>
-          <div>
-            <div className="ct">{e.fullName}</div>
-            <div className="cs">{[e.department, e.title].filter(Boolean).join(" · ") || (e.role === "contractor" ? t("Verktaki") : t("Starfsmaður"))}</div>
+  return (
+    <div className="db2 ep">
+      <div className="db2-top">
+        <div>
+          <Link href="/starfsfolk" className="ne-back"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5m0 0l7 7m-7-7l7-7" /></svg>{t("Starfsfólk")}</Link>
+          <div className="ep-head">
+            <span className="ep-av" style={{ background: avtBg }}>{initials(e.fullName)}</span>
+            <div>
+              <h1>{e.fullName}</h1>
+              <div className="ep-meta">
+                {sub && <span>{sub}</span>}
+                {roleLabel && <span className="db2-pill info">{roleLabel}</span>}
+                {e.status === "inactive" ? <span className="db2-pill mut">{t("Óvirkur")}</span> : <span className="db2-pill good">{t("emp:active")}</span>}
+              </div>
+            </div>
           </div>
         </div>
-        <div style={{ display: "flex", gap: 2, padding: "0 16px", borderBottom: "1px solid var(--line)", overflowX: "auto" }}>
-          {tabs.map((x) => (
-            <button key={x} type="button" className={`etab${x === tab ? " on" : ""}`} onClick={() => openTab(x)}>{x}</button>
-          ))}
+        <div className="db2-period">
+          <button className="btn ghost sm" type="button" disabled={saving} onClick={toggleActive}>{e.status === "inactive" ? t("Virkja") : t("Óvirkja")}</button>
         </div>
-        <form className="cb" onSubmit={save} onInput={() => setDirty(true)} onChange={() => setDirty(true)}>
+      </div>
+
+      <div className="ep-tabs" role="tablist">
+        {tabs.map((x) => (
+          <button key={x} type="button" role="tab" aria-selected={x === tab} className={x === tab ? "on" : ""} onClick={() => openTab(x)}>{t(`ep:tab:${x}`)}</button>
+        ))}
+      </div>
+
+      <form className="db2-card ep-card" onSubmit={save} onInput={() => setDirty(true)} onChange={() => setDirty(true)}>
+        <div className="ep-body">
           {tabs.filter((x) => visited.has(x)).map((x) => (
             <div key={x} hidden={x !== tab}><ProfileTabBody e={e} tab={x} /></div>
           ))}
-          <div style={{ display: "flex", gap: 9, marginTop: 22, flexWrap: "wrap" }}>
-            <button className="btn" type="submit" disabled={saving}>{saving ? t("Vista…") : t("Vista")}</button>
-            {dirty && !saving && <span style={{ alignSelf: "center", fontSize: 12.5, color: "var(--warn)", fontWeight: 600 }}>{t("Óvistaðar breytingar")}</span>}
-            <button className="btn ghost" type="button" disabled={saving} onClick={toggleActive}>{e.status === "inactive" ? t("Virkja") : t("Óvirkja")}</button>
-            <span className="muted" style={{ marginLeft: "auto", fontSize: 12, alignSelf: "center" }}>{t("Eyðing er á starfsmannalistanum")}</span>
-          </div>
-        </form>
-      </div>
-    </>
+        </div>
+        <div className={`ep-bar${dirty ? " dirty" : ""}`}>
+          <span className="ep-state">{dirty && !saving ? t("Óvistaðar breytingar") : t("Vista geymir breytingar á öllum flipum í einu")}</span>
+          <button className="btn" type="submit" disabled={saving}>{saving ? t("Vista…") : t("Vista")}</button>
+        </div>
+      </form>
+    </div>
   );
 }

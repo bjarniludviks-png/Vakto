@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
@@ -94,32 +93,36 @@ export default function EmployeeTimesheet({ id, name, company, initial, initialM
   });
 
   return (
-    <>
-      <PageHeader title={name ? `${name} · ${t("Tímaskráning")}` : t("Tímaskráning")} subtitle={`${niceISO(from)} – ${niceISO(to)}`} actions={
-        <>
+    <div className="db2">
+      <div className="db2-top">
+        <div>
+          <Link href="/timaskraning" className="ne-back"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5m0 0l7 7m-7-7l7-7" /></svg>{t("Tímaskráning")}</Link>
+          <h1>{name || t("Tímaskráning")}</h1>
+          <div className="db2-sub">{t("Allar stimplanir, frávik og samþykktir á tímabilinu")}</div>
+        </div>
+        <div className="db2-period">
           <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
-          <button className="btn ghost sm" style={{ marginLeft: 8 }} disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
-          <Link href="/timaskraning" className="btn ghost sm" style={{ marginLeft: 8 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><path d="M15 18l-6-6 6-6" /></svg>{t("Til baka")}</Link>
-        </>
-      } />
+          <button className="btn ghost sm" disabled={exporting} onClick={() => doExport("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
+        </div>
+      </div>
       <FilterBar
         periods={["Dagur", "Vika", "Mánuður", "Ár", "Sérsniðið"]}
         period={period} onPeriod={changePeriod}
         from={from} to={to} onRange={changeRange}
-        rangeLabel={`${dec1(total)} ${t("klst")}`}
+        rangeLabel={`${niceISO(from)} – ${niceISO(to)}`}
         storageKey="timaskraning" defaultPreset="thisMonth"
       />
 
-      <div className="kpis">
-        <div className="kpi"><div className="lab">{t("Unnir tímar")}</div><div className="val">{dec1(total)} <small>{t("klst")}</small></div></div>
-        <div className="kpi"><div className="lab">{t("Vaktir")}</div><div className="val">{rows.length}</div></div>
-        <div className="kpi"><div className="lab">{t("Bíða samþykkis")}</div><div className="val" style={{ color: pending ? "var(--warn)" : undefined }}>{pending}</div></div>
-        <div className="kpi"><div className="lab">{t("Vantar útstimplun")}</div><div className="val" style={{ color: missing ? "var(--bad)" : undefined }}>{missing}</div></div>
+      <div className="db2-row4">
+        <section className="db2-card db2-tile"><div className="db2-k">{t("Unnir tímar")}</div><div className="db2-v">{dec1(total)}<small>{t("klst")}</small></div><div className="db2-s">{niceISO(from)} – {niceISO(to)}</div></section>
+        <section className="db2-card db2-tile"><div className="db2-k">{t("Vaktir")}</div><div className="db2-v">{rows.length}</div><div className="db2-s">{missed.length ? `${missed.length} ${t("vaktir án stimplunar")}` : t("stimplaðar vaktir")}</div></section>
+        <section className="db2-card db2-tile"><div className="db2-k">{t("Bíða samþykkis")}</div><div className="db2-v" style={{ color: pending ? "var(--warn)" : undefined }}>{pending}</div><div className="db2-s">{pending ? t("samþykktu áður en launin eru keyrð") : t("allt samþykkt")}</div></section>
+        <section className="db2-card db2-tile"><div className="db2-k">{t("Vantar útstimplun")}</div><div className="db2-v" style={{ color: missing ? "var(--bad)" : undefined }}>{missing}</div><div className="db2-s">{missing ? t("opnar stimplanir") : t("engar opnar stimplanir")}</div></section>
       </div>
 
       {mig && <div className="ai" style={{ margin: "16px 0 0" }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg><div className="x">{t("Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO.")}</div></div>}
 
-      <div className="card" style={{ marginTop: 16 }}>
+      <div className="card db2-card">
         <div className="ch">
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {pending > 0 && (
@@ -184,7 +187,7 @@ export default function EmployeeTimesheet({ id, name, company, initial, initialM
       </div>
 
       {edit && <PunchEditModal row={edit} onClose={() => setEdit(null)} onDone={() => { setEdit(null); reload(); }} />}
-    </>
+    </div>
   );
 }
 

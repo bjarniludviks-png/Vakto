@@ -39,6 +39,7 @@ function payRange(k: string, cf: string, ct: string, startDay = 1): { from: stri
 export default function PayrollScreen({ view, empty = false, periodStart = 1 }: { view: PayrollView; empty?: boolean; periodStart?: number }) {
   const { t } = useLang();
   const [slip, setSlip] = useState<PayslipData | null>(null);
+  const [showZero, setShowZero] = useState(false);
   const [period, setPeriod] = useState("this");
   const thisMonth = payRange("this", "", "", periodStart);
   const [cf, setCf] = useState(thisMonth.from);
@@ -164,7 +165,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
           <table>
             <thead><tr><th>{t("Starfsmaður")}</th><th className="r">{t("Tímar")}</th><th className="r">{t("Brúttó")}</th><th className="r">{t("Staðgreiðsla")}</th><th className="r">{t("Lífeyrir+félag")}</th><th className="r">{t("Útborgað")}</th><th style={{ width: 20 }} /></tr></thead>
             <tbody>
-              {ROWS.length ? ROWS.map((r) => {
+              {ROWS.length ? ROWS.filter((r) => showZero || num(r.g) !== 0 || ROWS.every((x) => num(x.g) === 0)).map((r) => {
                 const zero = num(r.g) === 0;
                 return (
                 <tr className={`db2-rowlink${zero ? " db2-dim" : ""}`} key={r.n} onClick={() => setSlip({ name: r.d?.name ?? r.n, period: periodLabel, hours: r.h, gross: r.g, withholding: r.w.replace("−", ""), pension: r.p.replace("−", ""), net: r.net, d: r.d })}>
@@ -186,6 +187,11 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
               )}
             </tbody>
           </table>
+          {(() => { const z = ROWS.filter((r) => num(r.g) === 0).length; return z > 0 && z < ROWS.length ? (
+            <button type="button" className="db2-more" onClick={() => setShowZero((v) => !v)}>
+              {showZero ? t("Fela starfsmenn án launa") : `${t("Sýna")} ${z} ${t("starfsmenn án launa á tímabilinu")}`}
+            </button>
+          ) : null; })()}
         </div>
       </section>
 
