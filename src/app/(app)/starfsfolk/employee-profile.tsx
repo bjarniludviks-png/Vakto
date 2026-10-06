@@ -87,7 +87,7 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
     <>
       <PageHeader
         title={e.fullName}
-        subtitle={[e.department, e.title].filter(Boolean).join(" · ") || t("Starfsmaður")}
+        subtitle={[e.department, e.title].filter(Boolean).join(" · ") || (e.role === "contractor" ? t("Verktaki") : t("Starfsmaður"))}
         actions={
           <Link href="/starfsfolk" className="btn ghost sm">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: 5 }}><path d="M19 12H5m0 0l7 7m-7-7l7-7" /></svg>
@@ -101,7 +101,7 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
           <span className="avt" style={{ background: avtBg, width: 42, height: 42, fontSize: 15 }}>{initials(e.fullName)}</span>
           <div>
             <div className="ct">{e.fullName}</div>
-            <div className="cs">{[e.department, e.title].filter(Boolean).join(" · ") || t("Starfsmaður")}</div>
+            <div className="cs">{[e.department, e.title].filter(Boolean).join(" · ") || (e.role === "contractor" ? t("Verktaki") : t("Starfsmaður"))}</div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 2, padding: "0 16px", borderBottom: "1px solid var(--line)", overflowX: "auto" }}>

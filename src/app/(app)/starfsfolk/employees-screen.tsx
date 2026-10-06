@@ -1331,7 +1331,7 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
             <div className="emp-fld"><label>Póstnúmer</label><input name="postalCode" placeholder="101" inputMode="numeric" maxLength={3} /></div>
             <div className="emp-fld"><label>Staður</label><input name="city" placeholder="Reykjavík" /></div>
           </div>
-          <div className="emp-fld"><label>Bankareikningur (laun)</label><BankField name="bankAccount" /></div>
+          <div className="emp-fld"><label>{isContractor ? "Bankareikningur" : "Bankareikningur (laun)"}</label><BankField name="bankAccount" /></div>
 
           <Sec>Starf & aðgangur</Sec>
           <div className="emp-fld">
