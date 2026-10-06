@@ -1470,3 +1470,5 @@ a.db2-who:hover span{color:var(--brand)}
 /* Hringurinn má aldrei klemmast í flex-röð (mynd varð eggjalaga) */
 .db2-av,.ep-av,.avt{flex:none;aspect-ratio:1/1}
 .db2-av.has-photo img,.ep-av.has-photo img,.avt.has-photo img{min-width:0;max-width:none}
+.db2-av.has-photo,.ep-av.has-photo,.avt.has-photo{position:relative;display:inline-block}
+.db2-av.has-photo img,.ep-av.has-photo img,.avt.has-photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
