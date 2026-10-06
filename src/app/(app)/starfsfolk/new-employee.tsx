@@ -17,11 +17,11 @@ import { createEmployee, uploadDocument, getCompanyOptions } from "./actions";
 type Role = "employee" | "manager" | "owner" | "contractor";
 // createEmployee les hlutverkið út frá upphafi merkisins (sjá ROLE_MAP í actions.ts).
 const ROLE_LABEL: Record<Role, string> = { employee: "Starfsmaður", manager: "Vaktstjóri", owner: "Stjórnandi", contractor: "Verktaki" };
-const ROLES: { key: Role; title: string; desc: string; icon: React.ReactNode }[] = [
-  { key: "employee", title: "Starfsmaður", desc: "Appið: vaktir, stimpilklukka, spjall og laun", icon: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></> },
-  { key: "manager", title: "Vaktstjóri", desc: "Vaktaplan, tímaskráning og starfsfólk", icon: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="m16 11 2 2 4-4" /></> },
-  { key: "owner", title: "Stjórnandi", desc: "Fullur aðgangur, líka laun og stillingar", icon: <><path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6z" /><path d="m9 12 2 2 4-4" /></> },
-  { key: "contractor", title: "Verktaki", desc: "Sendir reikning. Engin staðgreiðsla eða orlof", icon: <><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18" /></> },
+const ROLES: { key: Role; title: string; en: string; desc: string; icon: React.ReactNode }[] = [
+  { key: "employee", en: "Employee", title: "Starfsmaður", desc: "Appið: vaktir, stimpilklukka, spjall og laun", icon: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></> },
+  { key: "manager", en: "Shift manager", title: "Vaktstjóri", desc: "Vaktaplan, tímaskráning og starfsfólk", icon: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="m16 11 2 2 4-4" /></> },
+  { key: "owner", en: "Admin", title: "Stjórnandi", desc: "Fullur aðgangur, líka laun og stillingar", icon: <><path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6z" /><path d="m9 12 2 2 4-4" /></> },
+  { key: "contractor", en: "Contractor", title: "Verktaki", desc: "Sendir reikning. Engin staðgreiðsla eða orlof", icon: <><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18" /></> },
 ];
 
 function detectDocType(name: string): string {
@@ -57,7 +57,9 @@ function Fld({ label, hint, children, span }: { label: string; hint?: string; ch
 }
 
 export default function NewEmployee() {
-  const { t } = useLang();
+  const { t, lang } = useLang();
+  // Sum orð hafa annað samhengi í DICT (t.d. „Staða“ = status) → beinar þýðingar hér.
+  const L = (is: string, en: string) => (lang === "is" ? is : en);
   const router = useRouter();
   const staged = useRef<File[]>([]);
   const [docs, setDocs] = useState<{ name: string; meta: string }[]>([]);
@@ -130,7 +132,7 @@ export default function NewEmployee() {
     { id: "ne-1", label: t("Persónuupplýsingar"), done: !!name.trim() },
     { id: "ne-2", label: t("Hlutverk"), done: true },
     { id: "ne-3", label: t("Starf"), done: !!(position || department) },
-    { id: "ne-4", label: contractor ? t("Þóknun") : t("Laun"), done: !!rate.replace(/\D/g, "") },
+    { id: "ne-4", label: contractor ? t("Þóknun") : L("Laun", "Pay"), done: !!rate.replace(/\D/g, "") },
     { id: "ne-5", label: t("Skjöl"), done: docs.length > 0, optional: true },
   ];
 
@@ -148,14 +150,14 @@ export default function NewEmployee() {
         <div className="ne-main">
           <Card n={1} id="ne-1" title={t("Persónuupplýsingar")} sub={t("Fara á launaseðil og samning")}>
             <div className="ne-row">
-              <Fld label={t("Fullt nafn")} span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jón Jónsson" autoFocus autoComplete="off" /></Fld>
-              <Fld label={t("Kennitala")}><input name="kennitala" placeholder="000000-0000" inputMode="numeric" /></Fld>
-              <Fld label={t("Sími")}><input name="phone" placeholder="+354 ..." inputMode="tel" /></Fld>
-              <Fld label={t("Netfang")} hint={t("boð í appið fer hingað")} span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nafn@dæmi.is" /></Fld>
+              <Fld label={L("Fullt nafn", "Full name")} span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jón Jónsson" autoFocus autoComplete="off" /></Fld>
+              <Fld label={L("Kennitala", "ID number (kennitala)")}><input name="kennitala" placeholder="000000-0000" inputMode="numeric" /></Fld>
+              <Fld label={L("Sími", "Phone")}><input name="phone" placeholder="+354 ..." inputMode="tel" /></Fld>
+              <Fld label={L("Netfang", "Email")} hint={t("boð í appið fer hingað")} span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nafn@dæmi.is" /></Fld>
               <Fld label={t("Heimilisfang")} span><input name="address" placeholder={t("Gata og húsnúmer")} /></Fld>
               <Fld label={t("Póstnúmer")}><input name="postalCode" placeholder="101" inputMode="numeric" maxLength={3} /></Fld>
-              <Fld label={t("Staður")}><input name="city" placeholder="Reykjavík" /></Fld>
-              <Fld label={contractor ? t("Bankareikningur") : t("Bankareikningur (laun)")} span><BankField name="bankAccount" /></Fld>
+              <Fld label={L("Staður", "Town")}><input name="city" placeholder="Reykjavík" /></Fld>
+              <Fld label={contractor ? t("Bankareikningur") : L("Bankareikningur (laun)", "Bank account (pay)")} span><BankField name="bankAccount" /></Fld>
             </div>
           </Card>
 
@@ -164,7 +166,7 @@ export default function NewEmployee() {
               {ROLES.map((r) => (
                 <button type="button" role="radio" aria-checked={role === r.key} key={r.key} className={`ne-role${role === r.key ? " on" : ""}`} onClick={() => setRole(r.key)}>
                   <span className="ne-ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{r.icon}</svg></span>
-                  <b>{t(r.title)}</b><span>{t(r.desc)}</span>
+                  <b>{L(r.title, r.en)}</b><span>{t(r.desc)}</span>
                 </button>
               ))}
             </div>
@@ -172,7 +174,7 @@ export default function NewEmployee() {
 
           <Card n={3} id="ne-3" title={t("Starf")} sub={t("Hvar og hvernig viðkomandi vinnur")}>
             <div className="ne-row">
-              <Fld label={t("Staða")}>
+              <Fld label={L("Staða", "Position")}>
                 <select value={position} onChange={(e) => setPosition(e.target.value)}>
                   {opts.positions.map((o) => <option key={o}>{o}</option>)}
                   {!opts.positions.length && <option value="">{t("— engin staða skráð —")}</option>}
@@ -197,7 +199,7 @@ export default function NewEmployee() {
                     {CONTRACT_TYPES.filter((c) => c.key !== "contractor").map((c) => <option key={c.key} value={c.key}>{t(c.is)}</option>)}
                   </select>
                 </Fld>
-                <Fld label={t("Starfshlutfall")}><div className="ne-suf"><input name="employmentRatio" defaultValue="100" inputMode="numeric" /><span>%</span></div></Fld>
+                <Fld label={L("Starfshlutfall", "Employment ratio")}><div className="ne-suf"><input name="employmentRatio" defaultValue="100" inputMode="numeric" /><span>%</span></div></Fld>
                 <Fld label={t("Tímar á mánuði")} hint={t("fullt starf")}><div className="ne-suf"><input name="monthlyHours" placeholder="173" inputMode="decimal" /><span>{t("klst")}</span></div></Fld>
               </>}
               <Fld label={t("Vaktamynstur")}>
@@ -209,7 +211,7 @@ export default function NewEmployee() {
             {(!opts.positions.length || !opts.departments.length) && <p className="ne-note">{t("Stöður, deildir og starfsstöðvar stofnar þú í Stillingar → Staðir og teymi.")}</p>}
           </Card>
 
-          <Card n={4} id="ne-4" title={contractor ? t("Þóknun") : t("Laun")} sub={contractor ? t("Án VSK. Verktaki gefur út reikning") : t("Grunnur launakeyrslunnar")}>
+          <Card n={4} id="ne-4" title={contractor ? t("Þóknun") : L("Laun", "Pay")} sub={contractor ? t("Án VSK. Verktaki gefur út reikning") : t("Grunnur launakeyrslunnar")}>
             <div className="ne-row">
               <Fld label={contractor ? t("Gjaldtaka") : t("Launagerð")} span>
                 <div className="db2-seg ne-seg">
@@ -266,7 +268,7 @@ export default function NewEmployee() {
           <div className="db2-card ne-sum">
             <div className="ne-who">
               <span className="ne-av">{name.trim() ? initials(name) : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>}</span>
-              <div><b>{name.trim() || t("Nýr starfsmaður")}</b><span>{t(ROLE_LABEL[role])}{position ? ` · ${position}` : ""}</span></div>
+              <div><b>{name.trim() || t("Nýr starfsmaður")}</b><span>{L(ROLE_LABEL[role], ROLES.find((r) => r.key === role)!.en)}{position ? ` · ${position}` : ""}</span></div>
             </div>
             <ol className="ne-steps">
               {steps.map((s) => (

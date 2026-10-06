@@ -1352,7 +1352,7 @@ a.db2-who:hover span{color:var(--brand)}
 .ne-who{display:flex;gap:12px;align-items:center}
 .ne-av{flex:none;width:46px;height:46px;border-radius:50%;background:var(--brand);color:#fff;font-weight:600;font-size:16px;display:grid;place-items:center}
 .ne-who b{display:block;font-size:15.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ne-who span{font-size:12.5px;color:var(--ink3)}
+.ne-who div span{font-size:12.5px;color:var(--ink3)}
 .ne-who>div{min-width:0}
 .ne-steps{list-style:none;margin:18px 0 0;padding:14px 0 0;border-top:1px solid var(--line2);display:flex;flex-direction:column;gap:2px}
 .ne-steps a{display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:9px;font-size:13.5px;color:var(--ink2);text-decoration:none}
