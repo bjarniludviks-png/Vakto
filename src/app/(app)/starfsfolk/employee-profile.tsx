@@ -10,7 +10,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { CUSTOM_UNION } from "@/lib/payrules";
 import { PERM_FIELDS } from "@/lib/permissions";
 import { updateEmployee, setEmployeeStatus, getDepartmentColors } from "./actions";
-import { ProfileTabBody, PROFILE_TABS, type ProfileTab } from "./employees-screen";
+import { ProfileTabBody, profileTabsFor, type ProfileTab } from "./employees-screen";
 
 /** Full-page employee profile (replaces the cramped modal). Each section has room
  * to breathe — pay profile, custom rules, benefits, access, documents, etc. */
@@ -33,6 +33,7 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
   const [deptColors, setDeptColors] = useState<Record<string, string>>({});
   useEffect(() => { getDepartmentColors().then(setDeptColors).catch(() => {}); }, []);
   const e = employee;
+  const tabs = profileTabsFor(e.role);
   const avtBg = (e.department && deptColors[e.department]) || e.avatarColor;
 
   async function save(ev: React.FormEvent<HTMLFormElement>) {
@@ -104,12 +105,12 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
           </div>
         </div>
         <div style={{ display: "flex", gap: 2, padding: "0 16px", borderBottom: "1px solid var(--line)", overflowX: "auto" }}>
-          {PROFILE_TABS.map((x) => (
+          {tabs.map((x) => (
             <button key={x} type="button" className={`etab${x === tab ? " on" : ""}`} onClick={() => openTab(x)}>{x}</button>
           ))}
         </div>
         <form className="cb" onSubmit={save} onInput={() => setDirty(true)} onChange={() => setDirty(true)}>
-          {PROFILE_TABS.filter((x) => visited.has(x)).map((x) => (
+          {tabs.filter((x) => visited.has(x)).map((x) => (
             <div key={x} hidden={x !== tab}><ProfileTabBody e={e} tab={x} /></div>
           ))}
           <div style={{ display: "flex", gap: 9, marginTop: 22, flexWrap: "wrap" }}>

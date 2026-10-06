@@ -58,6 +58,9 @@ function statusBadge(e: Employee) {
 
 export const PROFILE_TABS = ["Laun", "Vinna", "Frí", "Samningur", "Skjöl", "Persónulegt"] as const;
 export type ProfileTab = (typeof PROFILE_TABS)[number];
+/** Verktaki á ekki orlof/frí hjá fyrirtækinu → enginn „Frí“-flipi. */
+export const profileTabsFor = (role?: string | null): readonly ProfileTab[] =>
+  role === "contractor" ? PROFILE_TABS.filter((x) => x !== "Frí") : PROFILE_TABS;
 
 export default function EmployeesScreen({
   employees,
@@ -466,6 +469,39 @@ function LaunTab({ e }: { e: Employee }) {
     const amt = Math.max(0, Math.round(Number(bAmt) || 0));
     if (!bName.trim() || !amt) { toast("Sláðu inn heiti og upphæð"); return; }
     saveBenefits([...benefits, { name: bName.trim(), type: bType, amount: amt, taxable: bTax }]); setBAmt("");
+  }
+
+  // Verktaki: engin staðgreiðsla, lífeyrissjóður, stéttarfélag, orlof né kjarasamningur — aðeins þóknun.
+  if (e.role === "contractor") {
+    return (
+      <>
+        <Sec first>{t("Þóknun verktaka")}</Sec>
+        <div className="statline">
+          <span className="k">{t("Gjaldtaka")}</span>
+          <span style={{ display: "inline-flex", gap: 4, background: "var(--line2)", padding: 3, borderRadius: 9 }}>
+            {(["Tímakaup", "Mánaðarlaun"] as const).map((pt) => (
+              <button type="button" key={pt} onClick={() => setPayType(pt)}
+                style={{ border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600, padding: "6px 12px", borderRadius: 7,
+                  background: payType === pt ? "#fff" : "transparent", color: payType === pt ? "var(--ink)" : "var(--ink3)",
+                  boxShadow: payType === pt ? "0 1px 2px rgba(15,23,42,.08)" : "none" }}>{pt === "Tímakaup" ? t("Tímagjald") : t("Fast mánaðargjald")}</button>
+            ))}
+          </span>
+          <input type="hidden" name="payType" value={payType} />
+        </div>
+        <div className="statline">
+          <span className="k">{isMonthly ? t("Mánaðargjald") : t("Tímagjald")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("án VSK")}</span></span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <input name="rate" inputMode="numeric" value={rate ? nf(rate) : ""}
+              onChange={(ev) => setRate(Math.max(0, Number(ev.target.value.replace(/\D/g, "")) || 0))}
+              style={{ ...FLD, width: 130, textAlign: "right" }} />
+            <span className="muted" style={{ minWidth: 46 }}>{isMonthly ? "kr/mán" : "kr/klst"}</span>
+          </span>
+        </div>
+        <p className="muted" style={{ fontSize: 12, margin: "10px 0 0", lineHeight: 1.55 }}>
+          {t("Verktaki gefur út reikning fyrir verkinu og sér sjálfur um skatta, tryggingagjald og lífeyri. Því á ekki við stéttarfélag, lífeyrissjóður, orlof né kjarasamningur. Tímarnir hans nýtast í kostnaðaryfirlit.")}
+        </p>
+      </>
+    );
   }
 
   return (
@@ -1159,7 +1195,7 @@ function DocsTab({ employeeId }: { employeeId: string }) {
 
 /** Pay-type + rate pair for the new-employee form — the unit and example
  * follow the chosen type (kr/klst for hourly, kr/mán for monthly). */
-function PayFields({ preset }: { preset?: { kind: string; rate: string; n: number } | null }) {
+function PayFields({ preset, contractor }: { preset?: { kind: string; rate: string; n: number } | null; contractor?: boolean }) {
   const [kind, setKind] = useState("Tímakaup");
   const [rate, setRate] = useState("2.900");
   // Reglusniðmát valið með launum → forfylla (n breytist við hvert val).
@@ -1178,14 +1214,14 @@ function PayFields({ preset }: { preset?: { kind: string; rate: string; n: numbe
   return (
     <div className="emp-row2">
       <div className="emp-fld">
-        <label>Tegund launa</label>
+        <label>{contractor ? "Gjaldtaka" : "Tegund launa"}</label>
         <select name="payType" value={kind} onChange={(e) => switchKind(e.target.value)}>
-          <option>Tímakaup</option>
-          <option>Mánaðarlaun</option>
+          <option value="Tímakaup">{contractor ? "Tímagjald" : "Tímakaup"}</option>
+          <option value="Mánaðarlaun">{contractor ? "Fast mánaðargjald" : "Mánaðarlaun"}</option>
         </select>
       </div>
       <div className="emp-fld">
-        <label>{monthly ? "Mánaðarlaun (föst laun)" : "Tímakaup"}</label>
+        <label>{contractor ? (monthly ? "Mánaðargjald (án VSK)" : "Tímagjald (án VSK)") : monthly ? "Mánaðarlaun (föst laun)" : "Tímakaup"}</label>
         <div style={{ position: "relative" }}>
           <input name="rate" value={rate} onChange={(e) => setRate(e.target.value)} placeholder={monthly ? "t.d. 650.000" : "t.d. 2.900"} style={{ width: "100%", boxSizing: "border-box", paddingRight: 64 }} />
           <span className="muted" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 12.5, pointerEvents: "none" }}>
@@ -1223,6 +1259,7 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [tpls, setTpls] = useState<RuleTemplate[]>([]);
   const [payPreset, setPayPreset] = useState<{ kind: string; rate: string; n: number } | null>(null);
+  const [isContractor, setIsContractor] = useState(false);
   const [opts, setOpts] = useState<{ departments: string[]; positions: string[]; locations: string[] }>({ departments: [], positions: [], locations: [] });
   useEffect(() => {
     listRuleTemplates().then((r) => setTpls(r.templates)).catch(() => {});
@@ -1299,7 +1336,7 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
           <Sec>Starf & aðgangur</Sec>
           <div className="emp-fld">
             <label>Hlutverk (aðgangur)</label>
-            <select name="role">
+            <select name="role" onChange={(ev) => setIsContractor(ev.target.value.startsWith("Verktaki"))}>
               <option>Starfsmaður — eigin app (stimpilklukka, vaktir, laun)</option>
               <option>Vaktstjóri — vaktir, tímar, starfsfólk, skýrslur</option>
               <option>Stjórnandi — fullur aðgangur</option>
@@ -1331,13 +1368,18 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
             </div>
             <div className="emp-fld"><label>Ráðningardagur</label><DateField name="hireDate" defaultValue="2026-06-23" style={{ width: "100%" }} /></div>
           </div>
-          <div className="emp-row2">
+          {!isContractor && <div className="emp-row2">
             <div className="emp-fld"><label>Starfshlutfall</label><input name="employmentRatio" placeholder="100%" /></div>
             <div className="emp-fld"><label>Æskilegir tímar á mánuði</label><input name="monthlyHours" placeholder="173" /></div>
-          </div>
+          </div>}
 
-          <Sec>Laun</Sec>
-          <PayFields preset={payPreset} />
+          <Sec>{isContractor ? "Þóknun" : "Laun"}</Sec>
+          <PayFields preset={payPreset} contractor={isContractor} />
+          {isContractor ? (
+            <p className="muted" style={{ fontSize: 12, margin: "2px 0 0", lineHeight: 1.55 }}>
+              Verktaki gefur út reikning og sér sjálfur um skatta og lífeyri, svo stéttarfélag, lífeyrissjóður, orlof og kjarasamningur eiga ekki við.
+            </p>
+          ) : <>
           <UnionPensionFields />
           <div className="emp-row2">
             <div className="emp-fld">
@@ -1358,6 +1400,7 @@ function NewEmployeeModal({ onClose }: { onClose: () => void }) {
               </select>
             </div>
           </div>
+          </>}
           <div className="emp-fld">
             <label>Vaktamynstur</label>
             <select name="schedulePattern" defaultValue="open">

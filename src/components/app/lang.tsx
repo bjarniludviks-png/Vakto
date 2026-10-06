@@ -9,6 +9,12 @@ type Dict = Record<string, { is: string; en: string; vi?: string }>;
 // App-shell chrome strings. Per-screen content can adopt useLang() incrementally.
 export const DICT: Dict = {
   // Mælaborð v2
+  "Þóknun verktaka": { is: "Þóknun verktaka", en: "Contractor fee" },
+  "Gjaldtaka": { is: "Gjaldtaka", en: "Billing" },
+  "Tímagjald": { is: "Tímagjald", en: "Hourly rate" },
+  "Fast mánaðargjald": { is: "Fast mánaðargjald", en: "Fixed monthly fee" },
+  "án VSK": { is: "án VSK", en: "excl. VAT" },
+  "Verktaki gefur út reikning fyrir verkinu og sér sjálfur um skatta, tryggingagjald og lífeyri. Því á ekki við stéttarfélag, lífeyrissjóður, orlof né kjarasamningur. Tímarnir hans nýtast í kostnaðaryfirlit.": { is: "Verktaki gefur út reikning fyrir verkinu og sér sjálfur um skatta, tryggingagjald og lífeyri. Því á ekki við stéttarfélag, lífeyrissjóður, orlof né kjarasamningur. Tímarnir hans nýtast í kostnaðaryfirlit.", en: "A contractor invoices for the work and handles their own taxes, social security and pension. A union, pension fund, holiday pay and collective agreement therefore don't apply. Their hours still count toward cost reports." },
   "Samningar": { is: "Samningar", en: "Contracts" },
   "+ Verksamningur (verktaki)": { is: "+ Verksamningur (verktaki)", en: "+ Contractor agreement" },
   "+ Ráðningarsamningur í staðinn": { is: "+ Ráðningarsamningur í staðinn", en: "+ Employment contract instead" },
