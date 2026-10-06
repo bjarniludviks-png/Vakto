@@ -237,6 +237,27 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
         </div>
       </section>
 
+      {(pp?.contractors?.length ?? 0) > 0 && (
+        <section className="db2-card db2-staff">
+          <div className="db2-ch"><div><div className="db2-ct">{t("Verktakar á tímabilinu")}</div><div className="db2-cs">{t("Ekki í launakeyrslu. Verktakinn sendir reikning; hér er áætluð upphæð án VSK úr samþykktum tímum.")}</div></div></div>
+          <div className="db2-tblwrap">
+            <table>
+              <thead><tr><th>{t("emp:role:contractor")}</th><th className="r">{t("Tímar")}</th><th className="r">{t("Gjald")}</th><th className="r">{t("Áætlaður reikningur")}</th></tr></thead>
+              <tbody>
+                {pp!.contractors!.map((c) => (
+                  <tr key={c.id}>
+                    <td><span className="db2-who"><Av id={c.id} c={c.c} av={c.av} /><span>{c.name}</span></span></td>
+                    <td className="r">{c.monthly ? <span className="db2-muted">—</span> : dec1(c.hours)}</td>
+                    <td className="r db2-muted">{c.monthly ? t("fast mánaðargjald") : t("tímagjald")}</td>
+                    <td className="r" style={{ fontWeight: 600 }}>{nf(c.amount)} kr</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       <div className="db2-grid2">
         <section className="db2-card">
           <div className="db2-ch"><div><div className="db2-ct">{t("Launakeyrslur — yfirlit")}</div><div className="db2-cs">{t("sundurliðun eftir mánuðum · færðu músina yfir súlu")}</div></div>

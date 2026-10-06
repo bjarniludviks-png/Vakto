@@ -34,7 +34,7 @@ async function getLines(from?: string, to?: string): Promise<{ lines: PayLine[];
       : { data: null };
     const company = profile?.company_id as string | undefined;
     const { data: emps } = company
-      ? await supabase.from("employees").select("id, full_name, kennitala, pay_type, rate, employment_ratio, union_agreement").eq("company_id", company)
+      ? await supabase.from("employees").select("id, full_name, kennitala, pay_type, rate, employment_ratio, union_agreement, role").eq("company_id", company).neq("role", "contractor")
       : { data: null };
     if (!emps?.length) {
       const kt: Record<string, string> = {};

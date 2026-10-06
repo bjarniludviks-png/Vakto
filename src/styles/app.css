@@ -1472,3 +1472,33 @@ a.db2-who:hover span{color:var(--brand)}
 .db2-av.has-photo img,.ep-av.has-photo img,.avt.has-photo img{min-width:0;max-width:none}
 .db2-av.has-photo,.ep-av.has-photo,.avt.has-photo{position:relative;display:inline-block}
 .db2-av.has-photo img,.ep-av.has-photo img,.avt.has-photo img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+
+/* ── Mitt svæði í db2-útliti ── */
+.my2-head{display:flex;align-items:center;gap:16px;min-width:0}
+.my2-head .emp-ava{width:58px;height:58px;font-size:19px}
+.my2-body{max-width:980px}
+.my2 .emp-pane.on{display:flex;flex-direction:column;gap:16px}
+.my2 .mini{background:var(--panel);border:none;border-radius:18px;padding:22px 24px;margin:0;box-shadow:0 0 0 1px var(--line),0 12px 30px -24px rgba(20,20,30,.25)}
+.my2 .mini .mh{font-size:16px;font-weight:650;letter-spacing:-.01em;text-transform:none;color:var(--ink);margin-bottom:10px}
+.my2 .mini .mr{font-size:14px;padding:11px 0}
+.my2 .card{border-radius:18px;box-shadow:0 0 0 1px var(--line),0 12px 30px -24px rgba(20,20,30,.25);border:none;margin:0}
+.my2 .emp-stats{gap:16px;margin:0}
+.my2 .emp-stat{text-align:left;border:none;border-radius:18px;padding:20px 22px;box-shadow:0 0 0 1px var(--line),0 12px 30px -24px rgba(20,20,30,.25)}
+.my2 .emp-stat .v{font-size:30px;font-weight:700;letter-spacing:-.035em}
+.my2 .emp-stat .v small{font-size:14px}
+.my2 .emp-stat .l{order:-1;font-size:13.5px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--ink2);margin:0 0 6px}
+.my2 .emp-stat{display:flex;flex-direction:column}
+.my2 .qa-grid{gap:12px;margin:0}
+.my2 .qa-tile{border:none;border-radius:16px;padding:18px 10px 16px;font-size:13px;box-shadow:0 0 0 1px var(--line),0 8px 22px -20px rgba(20,20,30,.3)}
+.my2 .qa-tile:hover{box-shadow:0 0 0 1.5px var(--brand-2),0 8px 22px -20px rgba(20,20,30,.3)}
+.my2 .qa-tile:active{transform:scale(.98)}
+.my2 .punch{margin:0;border-radius:20px;padding:26px 24px 22px}
+.my2 .punch.out{background:var(--panel);color:var(--ink);box-shadow:0 0 0 1px var(--line),0 12px 30px -24px rgba(20,20,30,.25)}
+.my2 .punch.out .st{background:var(--line2);color:var(--ink2)}
+.my2 .punch.out .st::before{background:var(--ink3)}
+.my2 .punch.out .big{color:var(--ink3)}
+.my2 .punch.out button{background:var(--brand);color:#fff;box-shadow:0 8px 20px -10px rgba(233,112,15,.7)}
+.my2 .punch button{border-radius:14px;padding:15px;font-size:15.5px;transition:transform .12s}
+.my2 .punch button:active{transform:scale(.98)}
+.my2 .punch .big{font-size:44px}
+@media(max-width:560px){.my2 .emp-stat{padding:14px 14px}.my2 .emp-stat .v{font-size:22px}.my2 .emp-stats{gap:10px}.my2 .qa-grid{grid-template-columns:repeat(2,1fr)}.my2 .mini{padding:18px}}

@@ -80,7 +80,7 @@ export async function getPayroll(): Promise<PayrollView> {
     }
 
     // Fall back to computing from real employees when there is no persisted run.
-    if (!lines) lines = employees.map((e) => computeLine(e));
+    if (!lines) lines = employees.filter((e) => e.role !== "contractor").map((e) => computeLine(e));
 
     const rows = lines.map((l) => rowFrom(l, colorOf(l.employeeId)));
     const t = sumTotals(lines);

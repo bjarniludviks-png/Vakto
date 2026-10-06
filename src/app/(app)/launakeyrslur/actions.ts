@@ -13,7 +13,8 @@ import { notifyEmployee } from "@/lib/push";
 import type { PayrollView } from "./payroll.server";
 
 export type RunResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
-export type PeriodPayroll = PayrollView & { needsMigration: boolean; periodLabel: string; from: string; to: string };
+export type ContractorBill = { id: string; name: string; av: string; c: string; hours: number; amount: number; monthly: boolean };
+export type PeriodPayroll = PayrollView & { needsMigration: boolean; periodLabel: string; from: string; to: string; contractors?: ContractorBill[] };
 
 const MONTHS_IS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
 const niceISO = (s: string) => { const [y, m, d] = s.split("-").map(Number); return `${d}. ${MONTHS_IS[m - 1]} ${y}`; };
@@ -68,6 +69,8 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
   const lines = employees
     // Allir starfsmenn í starfi fá línu — líka með 0 tíma (svo hægt sé að sækja launaseðil sem sýnir 0).
     // Óvirkir koma aðeins með ef þeir unnu á tímabilinu. Payday-útflutningur sleppir núlllínum sjálfur.
+    // Verktakar senda reikning — þeir fara hvorki í launakeyrslu né launaútflutning.
+    .filter((e) => e.role !== "contractor")
     .filter((e) => (byEmp.get(e.id)?.length ?? 0) > 0 || e.payType === "monthly" || e.status !== "inactive")
     .map((e) => {
       const ub = uppKind ? computeUppbot(resolveUppbot(e.union)[uppKind], e.employmentRatio) : 0;
@@ -91,6 +94,20 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
     const t = sumTotals(lines);
     const { data: co } = await supabase.from("companies").select("name, kennitala").eq("id", ctx.company).maybeSingle();
     const empOf = (id: string) => employees.find((e) => e.id === id);
+    // Verktakar: samþykktir tímar × tímagjald (eða fast mánaðargjald) = áætlaður reikningur, án VSK.
+    const cons = employees.filter((e) => e.role === "contractor" && e.status !== "inactive");
+    let contractors: ContractorBill[] = [];
+    if (cons.length) {
+      const { data: cp } = await supabase.from("punches").select("employee_id, clock_in, clock_out")
+        .eq("company_id", ctx.company).eq("approved", true).not("clock_out", "is", null)
+        .in("employee_id", cons.map((e) => e.id)).gte("clock_in", from).lte("clock_in", to + "T23:59:59");
+      const hrs = new Map<string, number>();
+      for (const p of cp ?? []) hrs.set(p.employee_id as string, (hrs.get(p.employee_id as string) ?? 0) + Math.max(0, (Date.parse(p.clock_out as string) - Date.parse(p.clock_in as string)) / 3.6e6));
+      contractors = cons.map((e) => {
+        const h = Math.round((hrs.get(e.id) ?? 0) * 10) / 10, monthly = e.payType === "monthly";
+        return { id: e.id, name: e.fullName, av: initials(e.fullName), c: e.avatarColor, hours: h, amount: Math.round(monthly ? e.rate : h * e.rate), monthly };
+      }).filter((x) => x.amount > 0 || x.hours > 0);
+    }
     return {
       rows: lines.map((l) => {
         const e = empOf(l.employeeId);
@@ -112,7 +129,7 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
         pensionUnion: "−" + nf(t.pension + t.union), net: nf(t.net), cost: nf(t.cost),
         grossM: million(t.gross), netM: million(t.net), costM: million(t.cost), withholdingM: million(t.withholding), insuranceM: million(Math.round(t.gross * 0.0635)),
       },
-      live: true, needsMigration, periodLabel: `${niceISO(from)} – ${niceISO(to)}`, from, to,
+      live: true, needsMigration, periodLabel: `${niceISO(from)} – ${niceISO(to)}`, from, to, contractors,
     };
   } catch {
     return empty;

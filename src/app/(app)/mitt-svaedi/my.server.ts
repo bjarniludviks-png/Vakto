@@ -29,7 +29,7 @@ export type MyArea = {
   upcoming: MyShift[];      // next shifts from today (max 3)
   weekHours: number;
   nextPayday: string;       // "1. ágúst"
-  pay: { monthly: boolean; dayH: number; dayKr: number; premH: number; premKr: number; otH: number; otKr: number; totalH: number; totalKr: number } | null;
+  pay: { contractor?: boolean; rate?: number; monthly: boolean; dayH: number; dayKr: number; premH: number; premKr: number; otH: number; otKr: number; totalH: number; totalKr: number } | null;
   rights: { required: number; worked: number; bank: number; orlofDays: number; orlofFund: number; union: string; orlof: OrlofBalance | null } | null;
   profile: { name: string; kennitala: string; position: string; dept: string; phone: string; email: string; bank: string; union: string } | null;
   openShifts: MyOpenShift[];
@@ -47,7 +47,7 @@ export async function getMyArea(): Promise<MyArea> {
     if (!user) return EMPTY;
     const { data: emp } = await supabase
       .from("employees")
-      .select("id, company_id, full_name, kennitala, phone, email, bank_account, rate, pay_type, union_agreement, employment_ratio, positions(name), departments(name)")
+      .select("id, company_id, full_name, kennitala, phone, email, bank_account, rate, pay_type, union_agreement, employment_ratio, role, positions(name), departments(name)")
       .eq("user_id", user.id).maybeSingle();
     if (!emp) return EMPTY;
     const empId = emp.id as string, company = emp.company_id as string;
@@ -144,7 +144,11 @@ export async function getMyArea(): Promise<MyArea> {
       .filter((p) => p.clock_in >= monthFrom)
       .map((p) => ({ clockIn: p.clock_in, clockOut: p.clock_out }));
     let pay: MyArea["pay"] = null;
-    if (monthGroup.length || !hourly) {
+    if ((emp as { role?: string }).role === "contractor") {
+      // Verktaki: engin álög, yfirvinna eða frádráttur — aðeins tímar × tímagjald (eða fast gjald).
+      const h = Math.round(monthGroup.reduce((a, p) => a + Math.max(0, (Date.parse(p.clockOut) - Date.parse(p.clockIn)) / 3.6e6), 0) * 10) / 10;
+      pay = { contractor: true, rate, monthly: !hourly, dayH: h, dayKr: 0, premH: 0, premKr: 0, otH: 0, otKr: 0, totalH: h, totalKr: Math.round(hourly ? h * rate : rate) };
+    } else if (monthGroup.length || !hourly) {
       const cls = classifyPay(rate, hourly, monthGroup, rules);
       const line = computeFromPunches(
         { id: empId, fullName: emp.full_name as string, payType: hourly ? "hourly" : "monthly", rate, employmentRatio: ratio },

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
@@ -52,30 +51,32 @@ export default function EmployeeScreen({ card, my: myProp }: { card?: StaffCard;
     : { name: "Mína Huong", role: "Kokkur", department: "Eldhús", company: "Kaffi Krónan", photoUrl: photo, idCode: "demo", initials: "MÍ", color: "#5b50e6", employeeKt: "010190-2389", companyKt: "550101-2210" };
 
   return (
-    <>
-      <PageHeader title="Mitt svæði" subtitle="Vaktir, laun, réttindi og prófíll" />
+    <div className="db2 my2">
       {myProp?.live && <WelcomeTour firstName={card?.name?.split(/\s+/)[0]} />}
 
-      <div className="card" style={{ marginBottom: 18 }}>
-        <div className="cb" style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+      <div className="db2-top">
+        <div className="my2-head">
           <PhotoAvatar photo={photo} setPhoto={setPhoto} big={false} initials={cardData.initials} />
-          <div style={{ flex: 1, minWidth: 0 }}><div className="emp-nm">{card?.name ?? "Mína Huong"}</div><div className="emp-meta">{card ? `${t(card.role)} · ${card.company}` : t("emp:meta")}</div></div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <PushToggle />
-            {perms.card && <button className="btn ghost sm" onClick={() => setShowCard(true)}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ marginRight: 5 }}><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8" cy="11" r="2" /><path d="M14 9h4M14 13h4M5 16h7" /></svg>{t("Skírteini")}
-            </button>}
+          <div style={{ minWidth: 0 }}>
+            <h1>{card?.name ?? "Mína Huong"}</h1>
+            <div className="db2-sub">{card ? `${t(card.role)} · ${card.company}` : t("emp:meta")}</div>
           </div>
+        </div>
+        <div className="db2-period">
+          <PushToggle />
+          {perms.card && <button className="btn ghost sm" onClick={() => setShowCard(true)}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="2" /><circle cx="8" cy="11" r="2" /><path d="M14 9h4M14 13h4M5 16h7" /></svg>{t("Skírteini")}
+          </button>}
         </div>
       </div>
 
-      <div className="settabs">
+      <div className="ep-tabs" role="tablist">
         {NAV.filter(([id]) => (id !== "pay" || perms.pay) && (id !== "sh" || perms.shifts)).map(([id, label]) => (
-          <button key={id} className={`etab2${tab === id ? " on" : ""}`} onClick={() => setTab(id)}>{t(label)}</button>
+          <button key={id} type="button" role="tab" aria-selected={tab === id} className={tab === id ? "on" : ""} onClick={() => setTab(id)}>{t(`my:tab:${id}`)}</button>
         ))}
       </div>
 
-      <div>
+      <div className="my2-body">
         {tab === "ov" && <Overview onReq={setReq} perms={perms} my={my} />}
         {tab === "sh" && perms.shifts && <MyShifts onReq={setReq} perms={perms} my={my} />}
         {tab === "pay" && perms.pay && <Pay my={my} />}
@@ -85,7 +86,7 @@ export default function EmployeeScreen({ card, my: myProp }: { card?: StaffCard;
 
       {req && <ReqModal kind={req} onClose={() => setReq(null)} my={my} />}
       {showCard && <StaffCardModal card={cardData} onClose={() => setShowCard(false)} />}
-    </>
+    </div>
   );
 }
 
@@ -565,7 +566,13 @@ function Pay({ my }: { my?: MyArea }) {
       <div className="mini">
         <div className="mh">{t("Unnir tímar — þessi mánuður")}</div>
         {live ? (
-          p ? (p.monthly ? (
+          p ? (p.contractor ? (
+            <>
+              <div className="mr"><span>{t("Unnir tímar")}</span><b>{dec1(p.totalH)} {t("klst")}</b></div>
+              <div className="mr"><span>{p.monthly ? t("Fast mánaðargjald") : t("Tímagjald")}</span><b>{nf(p.rate ?? 0)} {p.monthly ? "kr/mán" : "kr/klst"}</b></div>
+              <div className="mr" style={{ borderTop: "1px solid var(--line)", marginTop: 3, paddingTop: 7 }}><span style={{ fontWeight: 650 }}>{t("Áætlaður reikningur (án VSK)")}</span><b style={{ fontSize: 15 }}>{nf(p.totalKr)} kr</b></div>
+            </>
+          ) : p.monthly ? (
             <>
               <div className="mr"><span>{t("Mánaðarlaun (föst)")}</span><b>{nf(p.totalKr)} kr</b></div>
               <div className="mr"><span>{t("Unnir tímar")}</span><b>{dec1(p.totalH)} {t("klst")}</b></div>
@@ -587,7 +594,7 @@ function Pay({ my }: { my?: MyArea }) {
           </>
         )}
       </div>
-      <p className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>{t("Áætluð upphæð fyrir unna tíma á tímabilinu. Formlegur launaseðill kemur frá Payday.")}</p>
+      <p className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>{p?.contractor ? t("Áætluð upphæð úr samþykktum tímum. Þú sendir reikning fyrir verkinu og sérð sjálf(ur) um skatta og lífeyri.") : t("Áætluð upphæð fyrir unna tíma á tímabilinu. Formlegur launaseðill kemur frá Payday.")}</p>
     </div>
   );
 }

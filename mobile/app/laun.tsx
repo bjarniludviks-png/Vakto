@@ -54,9 +54,11 @@ export default function Laun() {
       {pay ? (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
           <Tile label="Dagvinna" value={kr(pay.dayKr)} sub={`${dec1(pay.dayH)} klst`} />
-          <Tile label="Kvöld- og helgarálag" value={kr(pay.premKr)} sub={`${dec1(pay.premH)} klst`} />
-          <Tile label="Yfirvinna" value={kr(pay.otKr)} sub={`${dec1(pay.otH)} klst`} />
-          <Tile label="Orlof (10,17%)" value={kr(pay.orlofKr)} sub="lagt til hliðar" />
+          {!me?.contractor && <>
+            <Tile label="Kvöld- og helgarálag" value={kr(pay.premKr)} sub={`${dec1(pay.premH)} klst`} />
+            <Tile label="Yfirvinna" value={kr(pay.otKr)} sub={`${dec1(pay.otH)} klst`} />
+            <Tile label="Orlof (10,17%)" value={kr(pay.orlofKr)} sub="lagt til hliðar" />
+          </>}
         </View>
       ) : null}
 
@@ -79,7 +81,9 @@ export default function Laun() {
       ) : null}
 
       <Muted size={12} style={{ lineHeight: 18 }}>
-        {me?.hourly
+        {me?.contractor
+          ? "Áætluð þóknun án VSK úr tímunum þínum. Þú sendir reikning og sérð sjálf(ur) um skatta og lífeyri."
+          : me?.hourly
           ? trf("Brúttólaun fyrir staðgreiðslu og lífeyri, reiknuð eftir {x} á tímakaupi {n} kr. Endanlegur launaseðill kemur úr launakerfinu.", me.union ? trf("kjarasamningi {x}", me.union) : tr("reglum fyrirtækisins"), kr(me.rate).replace(" kr", ""))
           : "Mánaðarlaun. Endanlegur launaseðill kemur úr launakerfinu."}
       </Muted>

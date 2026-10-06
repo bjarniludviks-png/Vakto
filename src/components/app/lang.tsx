@@ -9,6 +9,19 @@ type Dict = Record<string, { is: string; en: string; vi?: string }>;
 // App-shell chrome strings. Per-screen content can adopt useLang() incrementally.
 export const DICT: Dict = {
   // Mælaborð v2
+  "Áætlaður reikningur (án VSK)": { is: "Áætlaður reikningur (án VSK)", en: "Estimated invoice (excl. VAT)" },
+  "Áætluð upphæð úr samþykktum tímum. Þú sendir reikning fyrir verkinu og sérð sjálf(ur) um skatta og lífeyri.": { is: "Áætluð upphæð úr samþykktum tímum. Þú sendir reikning fyrir verkinu og sérð sjálf(ur) um skatta og lífeyri.", en: "Estimated from approved hours. You invoice for the work and handle your own taxes and pension." },
+  "my:tab:ov": { is: "Yfirlit", en: "Overview" },
+  "my:tab:sh": { is: "Vaktir", en: "Shifts" },
+  "my:tab:pay": { is: "Laun", en: "Pay" },
+  "my:tab:ri": { is: "Réttindi & orlof", en: "Rights & leave" },
+  "my:tab:pr": { is: "Prófíll", en: "Profile" },
+  "Verktakar á tímabilinu": { is: "Verktakar á tímabilinu", en: "Contractors this period" },
+  "Ekki í launakeyrslu. Verktakinn sendir reikning; hér er áætluð upphæð án VSK úr samþykktum tímum.": { is: "Ekki í launakeyrslu. Verktakinn sendir reikning; hér er áætluð upphæð án VSK úr samþykktum tímum.", en: "Not in payroll. The contractor sends an invoice; this is the estimated amount excl. VAT from approved hours." },
+  "Gjald": { is: "Gjald", en: "Rate" },
+  "Áætlaður reikningur": { is: "Áætlaður reikningur", en: "Estimated invoice" },
+  "fast mánaðargjald": { is: "fast mánaðargjald", en: "fixed monthly fee" },
+  "tímagjald": { is: "tímagjald", en: "hourly rate" },
   "Tókst ekki að lesa myndina": { is: "Tókst ekki að lesa myndina", en: "Couldn't read the image" },
   "Skipta um mynd": { is: "Skipta um mynd", en: "Change photo" },
   "Mynd vistuð": { is: "Mynd vistuð", en: "Photo saved" },

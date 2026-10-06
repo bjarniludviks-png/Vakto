@@ -23,6 +23,8 @@ export type Me = {
   photoUrl: string | null;
   avatarColor: string | null;
   rules: CustomRules;
+  /** Verktaki: þóknun án álaga, yfirvinnu og orlofs. */
+  contractor: boolean;
 };
 
 export async function getMe(): Promise<Me | null> {
@@ -31,7 +33,7 @@ export async function getMe(): Promise<Me | null> {
   const { data: e } = await supabase
     .from("employees")
     .select(
-      "id, company_id, full_name, title, kennitala, phone, email, bank_account, rate, pay_type, union_agreement, employment_ratio, photo_url, avatar_color, pay_rule, departments(name), positions(name)"
+      "id, company_id, full_name, title, kennitala, phone, email, bank_account, rate, pay_type, union_agreement, employment_ratio, photo_url, avatar_color, pay_rule, role, departments(name), positions(name)"
     )
     .eq("user_id", auth.user.id)
     .limit(1)
@@ -55,7 +57,10 @@ export async function getMe(): Promise<Me | null> {
     ratio: Number(e.employment_ratio ?? 100),
     photoUrl: e.photo_url,
     avatarColor: e.avatar_color,
-    rules: resolveRuleSet(e.union_agreement, (e.pay_rule as Partial<CustomRules> | null) ?? undefined),
+    rules: e.role === "contractor"
+      ? { eve: 0, weekend: 0, overtime: 0, holiday: 0, night: 0, otWeekly: 100000, bands: [] }
+      : resolveRuleSet(e.union_agreement, (e.pay_rule as Partial<CustomRules> | null) ?? undefined),
+    contractor: e.role === "contractor",
   };
 }
 

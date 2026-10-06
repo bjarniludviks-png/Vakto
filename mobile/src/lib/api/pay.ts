@@ -85,7 +85,7 @@ export function monthPay(
   return {
     earnedKr, earnedH: earnedCls.total, plannedKr, plannedH: plannedCls.total, projectedKr: earnedKr + plannedKr,
     dayKr: Math.round(dayH * rate), dayH, premKr, premH: earnedCls.premium, otKr, otH: earnedCls.overtime,
-    orlofKr: Math.round(earnedKr * 0.1017), shifts: punches.length,
+    orlofKr: me.contractor ? 0 : Math.round(earnedKr * 0.1017), shifts: punches.length,
     weeks, monthLabel: `${tr(MONTHS[m])} ${y}`, payday: `${payday.getDate()}. ${tr(MONTHS[payday.getMonth()])}`,
   };
 }

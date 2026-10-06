@@ -104,6 +104,8 @@ function mapSource(raw: unknown): "manual" | "api" | "inventra" {
 type EmpRow = {
   id: string; fullName: string; payType: "hourly" | "monthly"; rate: number; employmentRatio: number;
   union: string | null; status: string; avatarColor: string; department: string | null; rules: CustomRules;
+  /** Verktaki: þóknun án launatengdra gjalda, álaga og yfirvinnu. */
+  contractor?: boolean;
 };
 
 /** Resolve the signed-in user's company (users.company_id). */
@@ -126,7 +128,7 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
 
   const [empRes, ruleRes, shiftRes, punchRes, locRes, compRes] = await Promise.all([
     supabase.from("employees")
-      .select("id, full_name, pay_type, rate, employment_ratio, union_agreement, status, avatar_color, departments(name)")
+      .select("id, full_name, pay_type, rate, employment_ratio, union_agreement, status, avatar_color, role, departments(name)")
       .eq("company_id", companyId),
     supabase.from("employees").select("id, pay_rule").eq("company_id", companyId), // tolerant: null before migration 0013
     supabase.from("shifts").select("employee_id, date, start_time, end_time")
@@ -150,6 +152,7 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
       union, status: (r.status as string) ?? "active",
       avatarColor: (r.avatar_color as string) ?? colorFor(r.id as string), department: dep?.name ?? null,
       rules: resolveRuleSet(union, ruleMap.get(r.id as string) as never),
+      contractor: r.role === "contractor",
     };
   });
 
@@ -163,6 +166,7 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
   const eff = new Map<string, number>();
   const monthlyCost = new Map<string, number>();
   for (const e of employees) {
+    if (e.contractor) { eff.set(e.id, e.payType === "hourly" ? e.rate : 0); monthlyCost.set(e.id, e.payType === "monthly" ? e.rate : 0); continue; }
     const l = computeLine(e);
     eff.set(e.id, l.hours > 0 ? l.cost / l.hours : 0);
     monthlyCost.set(e.id, l.cost);
@@ -201,7 +205,9 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
     for (const e of employees) {
       if (e.status === "inactive") continue;
       const pl = plannedMap.get(e.id) ?? 0, ac = actualMap.get(e.id) ?? 0;
-      const cls = classifyPay(e.rate, e.payType === "hourly", byEmp.get(e.id) ?? [], e.rules);
+      const cls = e.contractor
+        ? { overtime: 0, premium: 0, overtimePay: 0, premiumPay: 0 }
+        : classifyPay(e.rate, e.payType === "hourly", byEmp.get(e.id) ?? [], e.rules);
       planned += pl; actual += ac; overtime += cls.overtime; premium += cls.premium;
       overtimePay += cls.overtimePay; premiumPay += cls.premiumPay;
       let mine = 0, minePlanned = 0;
