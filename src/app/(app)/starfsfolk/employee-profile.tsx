@@ -8,12 +8,25 @@ import { useLang } from "@/components/app/lang";
 import { initials, type Employee } from "@/lib/employees";
 import { CUSTOM_UNION } from "@/lib/payrules";
 import { PERM_FIELDS } from "@/lib/permissions";
-import { updateEmployee, setEmployeeStatus } from "./actions";
+import { updateEmployee, setEmployeeStatus, uploadEmployeePhoto } from "./actions";
 import { ProfileTabBody, profileTabsFor, type ProfileTab } from "./employees-screen";
 import { Av } from "@/components/app/avatar";
 
 /** Full-page employee profile (replaces the cramped modal). Each section has room
  * to breathe — pay profile, custom rules, benefits, access, documents, etc. */
+/** Minnkar mynd í ferning (512 px, JPEG) svo hún fari undir 1 MB mörk Server Actions. */
+async function squarePhoto(f: File): Promise<string> {
+  const url = URL.createObjectURL(f);
+  try {
+    const img = await new Promise<HTMLImageElement>((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    const out = Math.min(512, side);
+    const c = document.createElement("canvas"); c.width = out; c.height = out;
+    c.getContext("2d")!.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, out, out);
+    return c.toDataURL("image/jpeg", 0.86);
+  } finally { URL.revokeObjectURL(url); }
+}
+
 export default function EmployeeProfile({ employee }: { employee: Employee }) {
   const router = useRouter();
   const { t } = useLang();
@@ -90,7 +103,19 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
         <div>
           <Link href="/starfsfolk" className="ne-back"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5m0 0l7 7m-7-7l7-7" /></svg>{t("Starfsfólk")}</Link>
           <div className="ep-head">
-            <Av id={e.id} className="ep-av" c={avtBg} av={initials(e.fullName)} />
+            <label className="ep-avwrap" title={t("Skipta um mynd")}>
+              <Av id={e.id} className="ep-av" c={avtBg} av={initials(e.fullName)} />
+              <span className="ep-cam"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z" /><circle cx="12" cy="13" r="3.5" /></svg></span>
+              <input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={async (ev) => {
+                const f = ev.target.files?.[0]; ev.target.value = "";
+                if (!f) return;
+                const dataUrl = await squarePhoto(f).catch(() => null);
+                if (!dataUrl) { toast(t("Tókst ekki að lesa myndina")); return; }
+                const r = await uploadEmployeePhoto(e.id, dataUrl);
+                toast(r.ok ? t("Mynd vistuð") : (r.error ?? "Villa"));
+                if (r.ok) router.refresh();
+              }} />
+            </label>
             <div>
               <h1>{e.fullName}</h1>
               <div className="ep-meta">

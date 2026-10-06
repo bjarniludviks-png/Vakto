@@ -1444,11 +1444,12 @@ a.db2-who:hover span{color:var(--brand)}
 .phc-bar span:first-of-type{border-radius:0 0 4px 4px}
 .phc-val{position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);font-size:11px;font-weight:650;color:var(--ink2);white-space:nowrap;font-variant-numeric:tabular-nums}
 .phc-empty{width:min(100%,34px);height:4px;border-radius:4px;background:var(--line2)}
-.phc-col small{position:absolute;bottom:0;left:0;right:0;text-align:center;font-size:11.5px;color:var(--ink3)}
+.phc-col small{position:absolute;bottom:-21px;left:0;right:0;text-align:center;font-size:11.5px;color:var(--ink3)}
 .phc-col.cur small{color:var(--brand);font-weight:650}
 .phc-col:hover .phc-bar{filter:brightness(1.06)}
-.phc-tip{position:absolute;bottom:calc(100% - 20px);left:50%;transform:translate(-50%,6px);opacity:0;pointer-events:none;z-index:5;background:#1f2026;color:#f4f2ee;border-radius:12px;padding:10px 12px;font-size:12px;line-height:1.6;white-space:nowrap;box-shadow:0 14px 34px -10px rgba(0,0,0,.45);transition:opacity .15s,transform .15s cubic-bezier(.23,1,.32,1)}
-.phc-col:hover .phc-tip{opacity:1;transform:translate(-50%,0)}
+.phc-tip{position:absolute;top:6px;left:calc(50% + 24px);transform:translateX(-6px);opacity:0;pointer-events:none;z-index:5;background:#1f2026;color:#f4f2ee;border-radius:12px;padding:10px 12px;font-size:12px;line-height:1.6;white-space:nowrap;box-shadow:0 14px 34px -10px rgba(0,0,0,.45);transition:opacity .15s,transform .15s cubic-bezier(.23,1,.32,1)}
+.phc-col:hover .phc-tip{opacity:1;transform:none}
+.phc-col:nth-child(n+9) .phc-tip{left:auto;right:calc(50% + 24px);transform:translateX(6px)}
 .phc-tip b{display:block;font-size:12.5px;margin-bottom:3px}
 .phc-tip span{display:flex;align-items:center;gap:7px}
 .phc-tip span i{width:8px;height:8px;border-radius:3px;flex:none}
@@ -1461,3 +1462,8 @@ a.db2-who:hover span{color:var(--brand)}
 
 .db2-av.has-photo,.ep-av.has-photo,.avt.has-photo{overflow:hidden;padding:0;background:var(--line2)!important}
 .db2-av img,.ep-av img,.avt img{width:100%;height:100%;object-fit:cover;display:block;border-radius:50%}
+
+.ep-avwrap{position:relative;cursor:pointer;flex:none;border-radius:50%}
+.ep-cam{position:absolute;right:-2px;bottom:-2px;width:24px;height:24px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;box-shadow:0 0 0 3px var(--bg)}
+.ep-cam svg{width:13px;height:13px}
+.ep-avwrap:hover .ep-av{filter:brightness(.92)}

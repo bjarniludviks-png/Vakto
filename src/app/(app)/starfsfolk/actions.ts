@@ -1102,3 +1102,33 @@ export async function taktikalEmployerLink(contractId: string): Promise<{ ok: bo
     return { ok: false };
   }
 }
+
+/** Stjórnandi setur prófílmynd á starfsmann (avatars-fötu fyrirtækisins; RLS leyfir stjórnendum). */
+export async function uploadEmployeePhoto(employeeId: string, dataUrl: string): Promise<ActionResult & { url?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const company = await companyId(supabase);
+    if (!user || !company) return { ok: false, error: "Ekki innskráð(ur)" };
+    const { data: emp } = await supabase.from("employees").select("id").eq("id", employeeId).eq("company_id", company).maybeSingle();
+    if (!emp) return { ok: false, error: "Starfsmaður fannst ekki" };
+    const m = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/.exec(dataUrl);
+    if (!m) return { ok: false, error: "Veldu JPG, PNG eða WebP mynd" };
+    const bytes = Buffer.from(m[2], "base64");
+    if (bytes.length > 5 * 1024 * 1024) return { ok: false, error: "Myndin má mest vera 5 MB" };
+    const ext = m[1].split("/")[1].replace("jpeg", "jpg");
+    const path = `${company}/${employeeId}/photo-${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("avatars").upload(path, bytes, { contentType: m[1], upsert: true });
+    if (upErr) { console.error("[uploadEmployeePhoto]", upErr.message); return { ok: false, error: "Tókst ekki að hlaða myndinni upp" }; }
+    const url = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+    const { error } = await supabase.from("employees").update({ photo_url: url }).eq("id", employeeId).eq("company_id", company);
+    if (error) { console.error("[uploadEmployeePhoto]", error.message); return { ok: false, error: "Tókst ekki að vista myndina" }; }
+    await logAudit(supabase, company, user.id, { action: "employee.photo", entity: "employee", entityId: employeeId, detail: "Prófílmynd uppfærð" });
+    revalidatePath("/starfsfolk", "layout");
+    return { ok: true, url };
+  } catch (e) {
+    console.error("[uploadEmployeePhoto]", e);
+    return { ok: false, error: "Tókst ekki að vista myndina" };
+  }
+}
