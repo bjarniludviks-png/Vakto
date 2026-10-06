@@ -9,6 +9,8 @@ type Dict = Record<string, { is: string; en: string; vi?: string }>;
 // App-shell chrome strings. Per-screen content can adopt useLang() incrementally.
 export const DICT: Dict = {
   // Mælaborð v2
+  "Tilkynningar og fréttir til starfsfólksins": { is: "Tilkynningar og fréttir til starfsfólksins", en: "Announcements and news for your staff" },
+  "Hverjir mega birta færslur": { is: "Hverjir mega birta færslur", en: "Who can post" },
   "Allar stimplanir, frávik og samþykktir á tímabilinu": { is: "Allar stimplanir, frávik og samþykktir á tímabilinu", en: "All punches, deviations and approvals in the period" },
   "vaktir án stimplunar": { is: "vaktir án stimplunar", en: "shifts without a punch" },
   "stimplaðar vaktir": { is: "stimplaðar vaktir", en: "punched shifts" },

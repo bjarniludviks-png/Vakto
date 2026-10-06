@@ -14,10 +14,10 @@ type Step = { key: keyof Omit<Onboarding, "show">; title: string; why: string; c
 const STEPS: Step[] = [
   { key: "hasCompanyInfo", title: "Upplýsingar fyrirtækis", why: "Kennitala og heimilisfang fara á ráðningarsamninga, launaseðla og skírteini starfsfólks.", cta: "Opna Fyrirtækið mitt", href: "/stillingar" },
   { key: "hasLocation", title: "Starfsstöð", why: "Hver vinnustaður fær sitt vaktaplan, stimpilklukku og staðsetningu við stimplun.", cta: "Bæta við starfsstöð", href: "/stillingar?new=location" },
-  { key: "hasStaff", title: "Starfsfólk", why: "Skráðu starfsfólk með netfangi. Það fær boð í VAKTO-appið og getur stimplað sig, séð vaktir og beðið um frí.", cta: "Bæta við starfsmanni", href: "/starfsfolk?new=1" },
+  { key: "hasStaff", title: "Starfsfólk", why: "Skráðu starfsfólk með netfangi. Það fær boð í VAKTO-appið og getur stimplað sig, séð vaktir og beðið um frí.", cta: "Bæta við starfsmanni", href: "/starfsfolk/nyr" },
   { key: "hasPayRules", title: "Kjarasamningur og launareglur", why: "Veldu kjarasamning á hvern starfsmann (t.d. Efling eða VR) svo yfirvinna, álag og orlof reiknist rétt.", cta: "Opna launareglur", href: "/stillingar?tab=launareglur" },
-  { key: "hasSchedule", title: "Fyrsta vaktaplanið", why: "Raðaðu vöktum vikunnar og smelltu á „Birta plan“. Starfsfólk fær tilkynningu í símann.", cta: "Opna vaktaplan", href: "/vaktaplan" },
-  { key: "hasClockIn", title: "Fyrsta stimplunin", why: "Starfsfólk stimplar sig inn í appinu, eða þú setur stimpilklukku á spjaldtölvu á staðnum.", cta: "Setja upp stimpilklukku", href: "/stillingar?tab=tengingar" },
+  { key: "hasSchedule", title: "Fyrsta vaktaplanið", why: "Raðaðu vöktum vikunnar og smelltu á „Gefa út vaktaplan“. Starfsfólk fær tilkynningu í símann.", cta: "Opna vaktaplan", href: "/vaktaplan" },
+  { key: "hasClockIn", title: "Fyrsta stimplunin", why: "Starfsfólk stimplar sig inn í appinu, eða þú setur stimpilklukku á spjaldtölvu á staðnum.", cta: "Setja upp stimpilklukku", href: "/stillingar?tab=stadir" },
   { key: "hasRevenue", title: "Velta og laun %", why: "Skráðu veltu eða meðalveltu á vikudag. Þá sérðu laun sem hlutfall af veltu, mikilvægustu tölu VAKTO.", cta: "Skrá veltu", href: "/stillingar?new=revenue" },
 ];
 
