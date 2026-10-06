@@ -267,7 +267,7 @@ export default function AppShell({
             {menu === "new" && (
               <>
                 <div className="mi" onClick={() => nav("/vaktaplan")}>{t("create:shift")}</div>
-                <div className="mi" onClick={() => nav("/starfsfolk?new=1")}>{t("create:emp")}</div>
+                <div className="mi" onClick={() => nav("/starfsfolk/nyr")}>{t("create:emp")}</div>
                 <div className="mi" onClick={() => nav("/vaktaplan")}>{t("create:plan")}</div>
                 <div className="mi" onClick={() => nav("/stillingar?new=location")}>{t("create:loc")}</div>
               </>

@@ -207,7 +207,13 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
   function changeRange(f: string, tt: string) { setFrom(f); setTo(tt); if (f && tt && f <= tt) load(f, tt); }
 
   const depts = ["all", ...Array.from(new Set(data.map((r) => r.dept).filter((d) => d && d !== "—")))];
-  const shown = data.filter((r) => (deptF === "all" || r.dept === deptF) && (!search || r.name.toLowerCase().includes(search.toLowerCase())));
+  const matched = data.filter((r) => (deptF === "all" || r.dept === deptF) && (!search || r.name.toLowerCase().includes(search.toLowerCase())));
+  // Starfsmenn án plans og án stimplunar á tímabilinu eru faldir sjálfgefið (yfirlitið verður hreinna).
+  const [showEmpty, setShowEmpty] = useState(false);
+  const hasData = (r: AttRow) => r.actual > 0 || r.planned > 0;
+  const emptyN = matched.filter((r) => !hasData(r)).length;
+  const shown = showEmpty || search ? matched : matched.filter(hasData);
+  const tot = shown.reduce((a, r) => ({ planned: a.planned + r.planned, actual: a.actual + r.actual, dev: a.dev + r.deviation, cost: a.cost + (r.actCost - r.estCost) }), { planned: 0, actual: 0, dev: 0, cost: 0 });
   const planned = shown.reduce((a, r) => a + r.planned, 0);
   const actual = shown.reduce((a, r) => a + r.actual, 0);
   const missing = shown.filter((r) => r.planned > 0 && r.actual === 0).length;
@@ -365,7 +371,26 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
                 );
               }) : <tr><td colSpan={8} className="db2-muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
             </tbody>
+            {shown.length > 1 && (() => {
+              const col = tot.dev > 0.05 ? "var(--bad)" : tot.dev < -0.05 ? "var(--good)" : undefined;
+              return (
+                <tfoot><tr className="db2-total">
+                  <td />
+                  <td>{t("Samtals")} <small>· {shown.length} {t("starfsmenn")}</small></td>
+                  <td className="r">{dec1(tot.planned)}</td>
+                  <td className="r">{dec1(tot.actual)}</td>
+                  <td className="r" style={{ color: col }}>{tot.dev > 0 ? "+" : ""}{dec1(tot.dev)}</td>
+                  <td className="r" style={{ color: col }}>{Math.abs(tot.cost) >= 1 ? `${tot.cost > 0 ? "+" : "−"}${krCompact(Math.abs(tot.cost))}` : "–"}</td>
+                  <td colSpan={2} />
+                </tr></tfoot>
+              );
+            })()}
           </table>
+          {emptyN > 0 && !search && (
+            <button type="button" className="db2-more" onClick={() => setShowEmpty((v) => !v)}>
+              {showEmpty ? t("Fela starfsmenn án skráningar") : `${t("Sýna")} ${emptyN} ${t("starfsmenn án skráningar á tímabilinu")}`}
+            </button>
+          )}
         </div>
       </section>
 

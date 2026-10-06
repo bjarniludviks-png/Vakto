@@ -10,12 +10,12 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "@/lib/contract-pdf";
-import { createEmployee, updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getDepartmentColors, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow } from "./actions";
+import { updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getDepartmentColors, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField, BankField } from "@/components/app/fields";
 import { useCountry } from "@/components/app/country";
-import { CONTRACT_TYPES, SCHEDULE_PATTERNS, templateToPayRule, type RuleTemplate } from "@/lib/rules";
+import { templateToPayRule, type RuleTemplate } from "@/lib/rules";
 import { listRuleTemplates } from "../stillingar/actions";
 import { ContractView, ContractEditor } from "@/components/app/contract-view";
 
@@ -65,18 +65,15 @@ export const profileTabsFor = (role?: string | null): readonly ProfileTab[] =>
 export default function EmployeesScreen({
   employees,
   live,
-  openNew,
 }: {
   employees: Employee[];
   live: boolean;
-  openNew?: boolean;
 }) {
   const router = useRouter();
   const [deptColors, setDeptColors] = useState<Record<string, string>>({});
   const [showInactive, setShowInactive] = useState(false);
   useEffect(() => { getDepartmentColors().then(setDeptColors).catch(() => {}); }, []);
   const { t } = useLang();
-  const [showNew, setShowNew] = useState(!!openNew);
   const [importing, setImporting] = useState(false);
   const [importInfo, setImportInfo] = useState(false);
   const importRef = useRef<HTMLInputElement>(null);
@@ -232,7 +229,7 @@ export default function EmployeesScreen({
                 </div>
               )}
             </div>
-            <button className="btn sm" onClick={() => setShowNew(true)}>
+            <button className="btn sm" onClick={() => router.push("/starfsfolk/nyr")}>
               {t("emp:new")}
             </button>
           </div>
@@ -347,7 +344,6 @@ export default function EmployeesScreen({
       </div>
 
       {/* ---------- new employee modal ---------- */}
-      {showNew && <NewEmployeeModal onClose={() => setShowNew(false)} />}
     </>
   );
 }
@@ -1195,255 +1191,3 @@ function DocsTab({ employeeId }: { employeeId: string }) {
 
 /** Pay-type + rate pair for the new-employee form — the unit and example
  * follow the chosen type (kr/klst for hourly, kr/mán for monthly). */
-function PayFields({ preset, contractor }: { preset?: { kind: string; rate: string; n: number } | null; contractor?: boolean }) {
-  const [kind, setKind] = useState("Tímakaup");
-  const [rate, setRate] = useState("2.900");
-  // Reglusniðmát valið með launum → forfylla (n breytist við hvert val).
-  useEffect(() => {
-    if (!preset) return;
-    const id = requestAnimationFrame(() => { setKind(preset.kind); setRate(preset.rate); });
-    return () => cancelAnimationFrame(id);
-  }, [preset]);
-  const monthly = kind === "Mánaðarlaun";
-  function switchKind(next: string) {
-    setKind(next);
-    // swap the untouched default so a stale hourly figure never becomes a monthly salary
-    if (next === "Mánaðarlaun" && (rate === "2.900" || !rate)) setRate("650.000");
-    if (next === "Tímakaup" && (rate === "650.000" || !rate)) setRate("2.900");
-  }
-  return (
-    <div className="emp-row2">
-      <div className="emp-fld">
-        <label>{contractor ? "Gjaldtaka" : "Tegund launa"}</label>
-        <select name="payType" value={kind} onChange={(e) => switchKind(e.target.value)}>
-          <option value="Tímakaup">{contractor ? "Tímagjald" : "Tímakaup"}</option>
-          <option value="Mánaðarlaun">{contractor ? "Fast mánaðargjald" : "Mánaðarlaun"}</option>
-        </select>
-      </div>
-      <div className="emp-fld">
-        <label>{contractor ? (monthly ? "Mánaðargjald (án VSK)" : "Tímagjald (án VSK)") : monthly ? "Mánaðarlaun (föst laun)" : "Tímakaup"}</label>
-        <div style={{ position: "relative" }}>
-          <input name="rate" value={rate} onChange={(e) => setRate(e.target.value)} placeholder={monthly ? "t.d. 650.000" : "t.d. 2.900"} style={{ width: "100%", boxSizing: "border-box", paddingRight: 64 }} />
-          <span className="muted" style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 12.5, pointerEvents: "none" }}>
-            {monthly ? "kr/mán" : "kr/klst"}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Union + pension pair with real type-ahead (suggestions from char one). */
-function UnionPensionFields() {
-  const [union, setUnion] = useState("Efling");
-  const [pension, setPension] = useState("");
-  return (
-    <div className="emp-row2">
-      <div className="emp-fld">
-        <label>Stéttarfélag / samningur</label>
-        <Autocomplete name="union" value={union} onChange={setUnion} suggestions={UNIONS} placeholder="Byrjaðu að skrifa…" style={{ display: "block" }} />
-      </div>
-      <div className="emp-fld">
-        <label>Lífeyrissjóður</label>
-        <Autocomplete name="pensionFund" value={pension} onChange={setPension} suggestions={PENSION_FUNDS} placeholder="Byrjaðu að skrifa…" style={{ display: "block" }} />
-      </div>
-    </div>
-  );
-}
-
-function NewEmployeeModal({ onClose }: { onClose: () => void }) {
-  const router = useRouter();
-  const [docs, setDocs] = useState<{ name: string; meta: string }[]>([]);
-  const staged = useRef<File[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [tpls, setTpls] = useState<RuleTemplate[]>([]);
-  const [payPreset, setPayPreset] = useState<{ kind: string; rate: string; n: number } | null>(null);
-  const [isContractor, setIsContractor] = useState(false);
-  const [opts, setOpts] = useState<{ departments: string[]; positions: string[]; locations: string[] }>({ departments: [], positions: [], locations: [] });
-  useEffect(() => {
-    listRuleTemplates().then((r) => setTpls(r.templates)).catch(() => {});
-    getCompanyOptions().then(setOpts).catch(() => {});
-  }, []);
-  function onFiles(files: FileList | null) {
-    if (!files) return;
-    const list = [...files];
-    staged.current.push(...list);
-    setDocs((d) => [...d, ...list.map((f) => ({ name: f.name, meta: `${Math.max(1, Math.round(f.size / 1024))} KB` }))]);
-    toast(list.length > 1 ? "Skjöl bætt við" : "Skjal bætt við");
-  }
-  function readAsDataUrl(f: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const r = new FileReader();
-      r.onload = () => resolve(r.result as string);
-      r.onerror = () => reject(r.error);
-      r.readAsDataURL(f);
-    });
-  }
-  async function submit(ev: React.FormEvent<HTMLFormElement>) {
-    ev.preventDefault();
-    const fd = new FormData(ev.currentTarget);
-    const g = (k: string) => (fd.get(k) as string)?.trim() || undefined;
-    if (!g("fullName")) { setError("Fullt nafn vantar"); return; }
-    setBusy(true);
-    setError(null);
-    const res = await createEmployee({
-      fullName: g("fullName")!, kennitala: g("kennitala"), email: g("email"), phone: g("phone"),
-      bankAccount: g("bankAccount"), address: g("address"), postalCode: g("postalCode"), city: g("city"), role: g("role") ?? "Starfsmaður", position: g("position"),
-      department: g("department"), location: g("location"), hireDate: g("hireDate"),
-      employmentRatio: g("employmentRatio"), payType: g("payType"), rate: g("rate"), union: g("union"),
-      pensionFund: g("pensionFund"), monthlyHours: g("monthlyHours"),
-      ruleTemplateId: g("ruleTemplateId"), contractType: g("contractType"), schedulePattern: g("schedulePattern"),
-    });
-    if (!res.ok) { setBusy(false); setError(res.error ?? "Tókst ekki að stofna"); return; }
-    // Persist any staged documents now that the employee exists.
-    if (res.id && staged.current.length) {
-      for (const f of staged.current) {
-        const dataUrl = await readAsDataUrl(f);
-        await uploadDocument({ employeeId: res.id, fileName: f.name, dataUrl, type: detectDocType(f.name) });
-      }
-    }
-    setBusy(false);
-    onClose();
-    toast(res.demo ? "Starfsmaður stofnaður (demo — tengdu Supabase)" : res.invited ? "Starfsmaður stofnaður — boð sent í pósti" : res.inviteError ? `Starfsmaður stofnaður — boð ekki sent: ${res.inviteError}` : "Starfsmaður stofnaður");
-    router.refresh();
-  }
-  return (
-    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="mbg" onClick={onClose} />
-      <div className="modal">
-        <div className="mh">
-          <div style={{ fontSize: 16, fontWeight: 700 }}>Nýr starfsmaður</div>
-          <button className="x" onClick={onClose}>✕</button>
-        </div>
-        <form className="mb" onSubmit={submit}>
-          <Sec first>Persónulegt</Sec>
-          <div className="emp-row2">
-            <div className="emp-fld"><label>Fullt nafn</label><input name="fullName" placeholder="Fullt nafn" /></div>
-            <div className="emp-fld"><label>Kennitala</label><input name="kennitala" placeholder="000000-0000" /></div>
-          </div>
-          <div className="emp-row2">
-            <div className="emp-fld"><label>Netfang</label><input name="email" placeholder="netfang@fyrirtaeki.is" /></div>
-            <div className="emp-fld"><label>Sími</label><input name="phone" placeholder="+354 ..." /></div>
-          </div>
-          <div className="emp-fld"><label>Heimilisfang</label><input name="address" placeholder="Gata og húsnúmer" /></div>
-          <div className="emp-row2" style={{ gridTemplateColumns: "minmax(0, 1fr) minmax(0, 2fr)" }}>
-            <div className="emp-fld"><label>Póstnúmer</label><input name="postalCode" placeholder="101" inputMode="numeric" maxLength={3} /></div>
-            <div className="emp-fld"><label>Staður</label><input name="city" placeholder="Reykjavík" /></div>
-          </div>
-          <div className="emp-fld"><label>{isContractor ? "Bankareikningur" : "Bankareikningur (laun)"}</label><BankField name="bankAccount" /></div>
-
-          <Sec>Starf & aðgangur</Sec>
-          <div className="emp-fld">
-            <label>Hlutverk (aðgangur)</label>
-            <select name="role" onChange={(ev) => setIsContractor(ev.target.value.startsWith("Verktaki"))}>
-              <option>Starfsmaður — eigin app (stimpilklukka, vaktir, laun)</option>
-              <option>Vaktstjóri — vaktir, tímar, starfsfólk, skýrslur</option>
-              <option>Stjórnandi — fullur aðgangur</option>
-              <option>Verktaki — eigin tímar &amp; verk (sér-aðgangur)</option>
-            </select>
-          </div>
-          <div className="emp-row2">
-            <div className="emp-fld"><label>Staða</label>
-              <select name="position">
-                {opts.positions.map((o) => <option key={o}>{o}</option>)}
-                {opts.positions.length === 0 && <option value="">— engin staða skráð —</option>}
-              </select>
-              {opts.positions.length === 0 && <span className="muted" style={{ fontSize: 11 }}>Stofnaðu stöður í Stillingar → Fyrirtækið</span>}
-            </div>
-            <div className="emp-fld"><label>Deild</label>
-              <select name="department">
-                {opts.departments.map((o) => <option key={o}>{o}</option>)}
-                {opts.departments.length === 0 && <option value="">— engin deild skráð —</option>}
-              </select>
-              {opts.departments.length === 0 && <span className="muted" style={{ fontSize: 11 }}>Stofnaðu deildir í Stillingar → Fyrirtækið</span>}
-            </div>
-          </div>
-          <div className="emp-row2">
-            <div className="emp-fld"><label>Staðsetning</label>
-              <select name="location">
-                {opts.locations.map((o) => <option key={o}>{o}</option>)}
-                {opts.locations.length === 0 && <option value="">— enginn staður skráður —</option>}
-              </select>
-            </div>
-            <div className="emp-fld"><label>Ráðningardagur</label><DateField name="hireDate" defaultValue="2026-06-23" style={{ width: "100%" }} /></div>
-          </div>
-          {!isContractor && <div className="emp-row2">
-            <div className="emp-fld"><label>Starfshlutfall</label><input name="employmentRatio" placeholder="100%" /></div>
-            <div className="emp-fld"><label>Æskilegir tímar á mánuði</label><input name="monthlyHours" placeholder="173" /></div>
-          </div>}
-
-          <Sec>{isContractor ? "Þóknun" : "Laun"}</Sec>
-          <PayFields preset={payPreset} contractor={isContractor} />
-          {isContractor ? (
-            <p className="muted" style={{ fontSize: 12, margin: "2px 0 0", lineHeight: 1.55 }}>
-              Verktaki gefur út reikning og sér sjálfur um skatta og lífeyri, svo stéttarfélag, lífeyrissjóður, orlof og kjarasamningur eiga ekki við.
-            </p>
-          ) : <>
-          <UnionPensionFields />
-          <div className="emp-row2">
-            <div className="emp-fld">
-              <label>Reglusniðmát</label>
-              <select name="ruleTemplateId" defaultValue="" onChange={(ev) => {
-                const w = tpls.find((x) => x.id === ev.target.value)?.rules.wage;
-                if (w?.dayRate) setPayPreset({ kind: "Tímakaup", rate: nf(Math.round(w.dayRate)), n: Date.now() });
-                else if (w?.monthly) setPayPreset({ kind: "Mánaðarlaun", rate: nf(Math.round(w.monthly)), n: Date.now() });
-              }}>
-                <option value="">— ekkert (grunnreglur) —</option>
-                {tpls.map((tp) => <option key={tp.id} value={tp.id}>{tp.name}</option>)}
-              </select>
-            </div>
-            <div className="emp-fld">
-              <label>Ráðningarform</label>
-              <select name="contractType" defaultValue="fulltime">
-                {CONTRACT_TYPES.map((c) => <option key={c.key} value={c.key}>{c.is}</option>)}
-              </select>
-            </div>
-          </div>
-          </>}
-          <div className="emp-fld">
-            <label>Vaktamynstur</label>
-            <select name="schedulePattern" defaultValue="open">
-              {SCHEDULE_PATTERNS.map((s) => <option key={s.key} value={s.key}>{s.is}</option>)}
-            </select>
-          </div>
-
-          <Sec>Skjöl</Sec>
-          <label className="upz">
-            <input type="file" hidden multiple onChange={(e) => onFiles(e.target.files)} />
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M12 16V4m0 0L7 9m5-5l5 5M5 20h14" />
-            </svg>
-            <div>
-              <b>Hlaða upp skjölum</b>
-              <span>ráðningarsamningur, skattkort, skírteini — PDF eða mynd</span>
-            </div>
-          </label>
-          {docs.length > 0 && (
-            <div className="docs" style={{ marginTop: 10 }}>
-              {docs.map((d, i) => (
-                <div className="docrow" key={i}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-                    <path d="M14 3v6h6" />
-                  </svg>
-                  <span>{d.name}</span>
-                  <span className="dl">{d.meta}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {error && <p style={{ color: "var(--bad)", fontSize: 13, fontWeight: 600, marginTop: 12 }}>{error}</p>}
-
-          <div style={{ display: "flex", gap: 9, marginTop: 18 }}>
-            <button className="btn" type="submit" disabled={busy}>
-              {busy ? "Stofna…" : "Stofna & senda boð"}
-            </button>
-            <button className="btn ghost" type="button" onClick={onClose}>Hætta við</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
