@@ -3,6 +3,7 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { DEMO_EMPLOYEES, type Employee } from "@/lib/employees";
+import { colorFor } from "@/lib/avatar";
 
 type Row = {
   id: string;
@@ -77,7 +78,7 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
       employmentRatio: Number(r.employment_ratio),
       union: r.union_agreement,
       status: r.status,
-      avatarColor: r.avatar_color ?? "#5b50e6",
+      avatarColor: r.avatar_color ?? colorFor(r.id),
       email: r.email,
       kennitala: r.kennitala,
       phone: r.phone,

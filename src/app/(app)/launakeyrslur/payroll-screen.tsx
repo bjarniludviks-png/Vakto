@@ -6,12 +6,54 @@ import { PeriodPicker } from "@/components/app/period-picker";
 import { dec1, nf } from "@/lib/format";
 import { getSettleCandidates, type SettleCandidate } from "./actions";
 import { toast } from "@/components/app/toast";
-import { Stacked } from "@/components/app/charts";
 import { useLang } from "@/components/app/lang";
 import { PayslipModal, type PayslipData } from "@/components/app/payslip-modal";
 import { EmptyState } from "@/components/app/empty-state";
 import type { PayrollView } from "./payroll.server";
 import { runPayroll, getPayrollPeriod, getPayrollHistory, type PeriodPayroll, type PayrollHistory } from "./actions";
+import { Av } from "@/components/app/avatar";
+
+const PH_COLORS = ["#1f9d6b", "#d4a24c", "#e9700f", "#1f9e9e", "#c3c7d3"];
+const mkrFmt = (n: number) => (n >= 1e6 ? `${(Math.round(n / 1e5) / 10).toString().replace(".", ",")} m.kr.` : `${Math.round(n / 1000)} þ.kr.`);
+
+/** Söguleg launakeyrsla: samfelldar staflaðar súlur á mánuð, mælikvarði til vinstri, upphæð ofan á súlu. */
+function PayHistory({ data, cols, colors, names, current }: { data: number[][]; cols: string[]; colors: string[]; names: string[]; current: number }) {
+  const tots = data.map((d) => d.reduce((a, b) => a + b, 0));
+  const raw = Math.max(...tots, 1);
+  const pow = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * pow / 4).find((st) => st * 4 >= raw) ?? pow;
+  const max = step * 4;
+  return (
+    <div className="phc">
+      <div className="phc-axis">{[4, 3, 2, 1, 0].map((k) => <span key={k} style={{ bottom: `${(k / 4) * 100}%` }}>{k ? mkrFmt(step * k).replace(" m.kr.", " m").replace(" þ.kr.", " þ") : "0"}</span>)}</div>
+      <div className="phc-plot">
+        <div className="phc-lines">{[1, 2, 3, 4].map((k) => <i key={k} style={{ bottom: `${(k / 4) * 100}%` }} />)}</div>
+        {data.map((d, i) => {
+          const tot = tots[i];
+          return (
+            <div className={`phc-col${i === current ? " cur" : ""}`} key={i}>
+              <div className="phc-area">
+                {tot > 0 ? (
+                  <div className="phc-bar" style={{ height: `${(tot / max) * 100}%` }}>
+                    <b className="phc-val">{mkrFmt(tot)}</b>
+                    {d.map((v, j) => v > 0 && <span key={j} style={{ flexGrow: v, background: colors[j] }} />)}
+                  </div>
+                ) : <div className="phc-empty" />}
+                {tot > 0 && (
+                  <div className="phc-tip">
+                    <b>{cols[i]} · {mkrFmt(tot)}</b>
+                    {d.map((v, j) => <span key={j}><i style={{ background: colors[j] }} />{names[j]}<em>{mkrFmt(v)}</em></span>)}
+                  </div>
+                )}
+              </div>
+              <small>{cols[i]}</small>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 const MO = ["jan", "feb", "mar", "apr", "maí", "jún", "júl", "ágú", "sep", "okt", "nóv", "des"];
 const BASE = [4.8, 5.8, 3.9, 5.7, 5.6, 4.46, 4.7, 3.4, 6.7, 6.3, 5.2, 5.4];
@@ -169,7 +211,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
                 const zero = num(r.g) === 0;
                 return (
                 <tr className={`db2-rowlink${zero ? " db2-dim" : ""}`} key={r.n} onClick={() => setSlip({ name: r.d?.name ?? r.n, period: periodLabel, hours: r.h, gross: r.g, withholding: r.w.replace("−", ""), pension: r.p.replace("−", ""), net: r.net, d: r.d })}>
-                  <td><span className="db2-who"><span className="db2-av sm" style={{ background: r.c }}>{r.av}</span><span>{r.n}</span></span></td>
+                  <td><span className="db2-who"><Av id={r.id} c={r.c} av={r.av} /><span>{r.n}</span></span></td>
                   <td className="r">{r.h}</td>
                   <td className="r">{r.g}</td>
                   <td className="r db2-muted">{r.w}</td>
@@ -206,18 +248,17 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
             {(() => {
               const liveMonths = hist?.months ?? [];
               const hasData = liveMonths.some((m) => m.net > 0);
-              const mkr = (n: number) => Math.round(n / 100000) / 10;
               const data = view.live
-                ? liveMonths.map((m) => [mkr(m.net), mkr(m.withholding), mkr(m.pension), mkr(m.insurance), mkr(m.orlof)])
-                : PAY;
+                ? liveMonths.map((m) => [m.net, m.withholding, m.pension, m.insurance, m.orlof])
+                : PAY.map((r) => r.map((v) => v * 1e6));
               if (view.live && !hasData) {
                 return <p className="db2-muted db2-empty">{t("Sögulega yfirlitið byggist upp þegar þú keyrir launakeyrslur — engin keyrsla er enn vistuð fyrir")} {histYear}.</p>;
               }
+              const names = [t("Útborgað"), t("Staðgreiðsla"), t("Lífeyrir"), t("Tryggingagjald"), t("Orlof")];
               return (<>
-                <Stacked data={data} cols={MO} segs={["var(--good)", "var(--warn)", "var(--brand)", "var(--teal)", "#c9ccd6"]} segNames={[t("Útborgað"), t("Staðgreiðsla"), t("Lífeyrir"), t("Tryggingagjald"), t("Orlof")]} />
-                <div className="db2-legend" style={{ marginTop: 10 }}>
-                  <span><i style={{ background: "var(--good)" }} />{t("Útborgað")}</span><span><i style={{ background: "var(--warn)" }} />{t("Staðgreiðsla")}</span>
-                  <span><i style={{ background: "var(--brand)" }} />{t("Lífeyrir")}</span><span><i style={{ background: "var(--teal)" }} />{t("Tryggingagjald")}</span><span><i style={{ background: "#c9ccd6" }} />{t("Orlof")}</span>
+                <PayHistory data={data} cols={MO} colors={PH_COLORS} names={names} current={histYear === new Date().getFullYear() ? new Date().getMonth() : -1} />
+                <div className="db2-legend" style={{ marginTop: 14 }}>
+                  {names.map((n, i) => <span key={n}><i style={{ background: PH_COLORS[i] }} />{n}</span>)}
                 </div>
               </>);
             })()}
@@ -226,9 +267,9 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
         <section className="db2-card">
           <div className="db2-ch"><div><div className="db2-ct">{t("Útflutningur")}</div><div className="db2-cs">{t("Vakto reiknar — Payday sér um skil, greiðslur og opinbera skýrslugerð.")}</div></div></div>
           <div className="db2-list">
-            <div className="db2-it"><span className="db2-ic good">P</span><span className="db2-tx"><b>Payday</b><span>{t("tímaskrá (Excel) — hlaðið upp undir Ný launakeyrsla → Hlaða upp tímaskrá")}</span></span><button className="btn sm" onClick={() => download("payday")}>{t("Flytja")}</button></div>
-            <div className="db2-it"><span className="db2-ic info">DK</span><span className="db2-tx"><b>DK</b><span>{t("launaskrá fyrir DK bókhald")}</span></span><button className="btn ghost sm" onClick={() => download("dk")}>{t("Sækja")}</button></div>
-            <div className="db2-it"><span className="db2-ic info">XL</span><span className="db2-tx"><b>Excel</b><span>{t("sundurliðun per starfsmann")}</span></span><button className="btn ghost sm" onClick={() => download("excel")}>{t("Sækja")}</button></div>
+            <div className="db2-it"><span className="pr-logo"><img src="/integrations/payday.png" alt="" /></span><span className="db2-tx"><b>Payday</b><span>{t("tímaskrá (Excel) — hlaðið upp undir Ný launakeyrsla → Hlaða upp tímaskrá")}</span></span><button className="btn sm" onClick={() => download("payday")}>{t("Flytja")}</button></div>
+            <div className="db2-it"><span className="pr-logo"><img src="/integrations/dk.png" alt="" /></span><span className="db2-tx"><b>DK</b><span>{t("launaskrá fyrir DK bókhald")}</span></span><button className="btn ghost sm" onClick={() => download("dk")}>{t("Sækja")}</button></div>
+            <div className="db2-it"><span className="pr-logo xl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5" /><path d="M3.5 9h17M3.5 14.5h17M9.5 3.5v17" /></svg></span><span className="db2-tx"><b>Excel</b><span>{t("sundurliðun per starfsmann")}</span></span><button className="btn ghost sm" onClick={() => download("excel")}>{t("Sækja")}</button></div>
           </div>
         </section>
       </div>

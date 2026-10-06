@@ -95,7 +95,7 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
       rows: lines.map((l) => {
         const e = empOf(l.employeeId);
         return {
-          n: l.name.split(/\s+/)[0], av: initials(l.name), c: colorOf(l.employeeId),
+          id: l.employeeId, n: l.name.split(/\s+/)[0], av: initials(l.name), c: colorOf(l.employeeId),
           h: dec1(l.hours), g: nf(l.gross), w: "−" + nf(l.withholding), p: "−" + nf(l.pension + l.union), net: nf(l.net),
           d: {
             name: l.name, kennitala: e?.kennitala ?? null, title: e?.title || e?.position || null, union: e?.union ?? null, bankAccount: e?.bankAccount ?? null,

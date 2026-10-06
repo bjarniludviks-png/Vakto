@@ -16,6 +16,7 @@ import { dec1, krCompact } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
 import type { OnNowRow, RosterRow } from "./attendance.server";
 import { approveAllTimesheets, approveTimesheet, setClockOut, fetchAttendance, managerClockIn, adjustPunch, getEmployeePunches, setPunchApproved, approveEmployeePunches, decideCorrection, type PunchRow, type CorrectionRow } from "./actions";
+import { Av } from "@/components/app/avatar";
 
 const MONTHS_IS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ágú.", "sep.", "okt.", "nóv.", "des."];
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -253,7 +254,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
         <section className="db2-card db2-tile">
           <div className="db2-k">{t("Á vakt núna")}</div>
           <div className="db2-v">{onNow.length}<small>{t("skráðir inn")}</small></div>
-          {onNow.length > 0 && <div className="db2-avs">{onNow.slice(0, 8).map((r) => <span key={r.punchId} className="db2-av" style={{ background: r.c }} title={r.name}>{r.av}</span>)}</div>}
+          {onNow.length > 0 && <div className="db2-avs">{onNow.slice(0, 8).map((r) => <Av key={r.punchId} id={r.employeeId} className="db2-av" c={r.c} title={r.name} av={r.av} />)}</div>}
           {longOpenN > 0 && <span className="db2-pill bad">{longOpenN} {t("opnar of lengi")}</span>}
         </section>
         <section className="db2-card db2-tile">
@@ -284,7 +285,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
               return (
                 <div className="db2-it" key={r.punchId}>
                   <Link href={`/timaskraning/${r.employeeId}`} className="db2-itl">
-                    <span className="db2-av sm" style={{ background: r.c }}>{r.av}</span>
+                    <Av id={r.employeeId} c={r.c} av={r.av} />
                     <span className="db2-tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : ""}</span></span>
                   </Link>
                   {r.unscheduled && <span className="db2-pill warn" title={t("Stimplaði sig inn án þess að vera á vaktaplani dagsins")}>{t("óáætlað")}</span>}
@@ -354,7 +355,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
                   <td onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={sel.has(r.id)} onChange={(e) => setSel((sv) => { const n = new Set(sv); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} />
                   </td>
-                  <td><span className="db2-who"><span className="db2-av sm" style={{ background: r.c }}>{r.av}</span><span>{r.name}<small>{t(r.dept)}</small></span></span></td>
+                  <td><span className="db2-who"><Av id={r.id} c={r.c} av={r.av} /><span>{r.name}<small>{t(r.dept)}</small></span></span></td>
                   <td className="r">{dec1(r.planned)}</td>
                   <td className="r">{dec1(r.actual)}</td>
                   <td className="r" style={{ color: col }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>

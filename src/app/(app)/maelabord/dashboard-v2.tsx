@@ -12,6 +12,7 @@ import { dec1, kr, krCompact } from "@/lib/format";
 import { getDashboardPeriod, getLaborTrend, type PeriodData, type TrendPoint } from "./actions";
 import { OnboardingCard, useOnboardingHidden, onboardingProgress, ONBOARDING_TOTAL } from "./onboarding";
 import type { Onboarding } from "./dashboard.server";
+import { Av } from "@/components/app/avatar";
 
 type OnNow = { punchId: string; employeeId?: string; name: string; av: string; c: string; dept: string; in: string; since: string; unscheduled?: boolean };
 type Missing = { employeeId: string; name: string; av: string; c: string; dept: string; start: string; late: boolean; mins: number };
@@ -230,7 +231,7 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
           <div className="db2-v">{onNow.length}<small>{onPlanToday > 0 ? `${t("af")} ${onPlanToday} ${t("á plani")}` : t("skráðir inn")}</small></div>
           {onNow.length + missing.length > 0 && (
             <div className="db2-avs">
-              {onNow.slice(0, 7).map((r) => <span key={r.punchId} className="db2-av" style={{ background: r.c }} title={`${r.name} · ${t("inn")} ${r.in}`}>{r.av}</span>)}
+              {onNow.slice(0, 7).map((r) => <Av key={r.punchId} id={r.employeeId} className="db2-av" c={r.c} title={`${r.name} · ${t("inn")} ${r.in}`} av={r.av} />)}
               {missing.slice(0, 4).map((m) => <span key={m.employeeId} className="db2-av off" title={`${m.name} · ${t("á plani")} ${m.start}`}>{m.av}</span>)}
             </div>
           )}
@@ -300,7 +301,7 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
           <div className="db2-list">
             {onNow.map((r) => (
               <Link href={r.employeeId ? `/timaskraning/${r.employeeId}` : "/timaskraning"} className="db2-it" key={r.punchId}>
-                <span className="db2-av sm" style={{ background: r.c }}>{r.av}</span>
+                <Av id={r.employeeId} c={r.c} av={r.av} />
                 <span className="db2-tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}</span></span>
                 {r.unscheduled && <span className="db2-pill warn" title={t("Stimplaði sig inn án þess að vera á vaktaplani dagsins")}>{t("óáætlað")}</span>}
                 {(() => {
@@ -324,7 +325,7 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
               const c = s.deviation > 0.05 ? "var(--bad)" : s.deviation < -0.05 ? "var(--good)" : undefined;
               return (
                 <tr key={i}>
-                  <td><Link href={`/timaskraning/${s.id}`} className="db2-who"><span className="db2-av sm" style={{ background: s.c }}>{s.av}</span><span>{s.name}<small>{t(s.dept)}</small></span></Link></td>
+                  <td><Link href={`/timaskraning/${s.id}`} className="db2-who"><Av id={s.id} c={s.c} av={s.av} /><span>{s.name}<small>{t(s.dept)}</small></span></Link></td>
                   <td className="r">{dec1(s.planned)}</td><td className="r">{dec1(s.actual)}</td>
                   <td className="r" style={{ color: c }}>{s.deviation > 0 ? "+" : ""}{dec1(s.deviation)}</td>
                   <td className="r" style={{ color: c }}>{Math.abs(devCost) >= 1 ? `${devCost > 0 ? "+" : "−"}${krCompact(Math.abs(devCost))}` : "–"}</td>

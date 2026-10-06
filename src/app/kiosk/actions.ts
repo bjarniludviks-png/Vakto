@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { after } from "next/server";
 import { checkNoShows } from "@/lib/noshow.server";
+import { colorFor } from "@/lib/avatar";
 
 
 export type PunchResult = { ok: boolean; demo?: boolean; error?: string };
@@ -48,7 +49,7 @@ export async function getKioskData(kioskKey: string): Promise<KioskData | null> 
       id: e.id as string,
       name: e.full_name as string,
       initials: ini(e.full_name as string),
-      color: (e.avatar_color as string) ?? "#5b50e6",
+      color: (e.avatar_color as string) ?? colorFor(e.id as string),
       on: openMap.has(e.id as string),
       inTime: openMap.has(e.id as string) ? hm(openMap.get(e.id as string)!) : "—",
     }));

@@ -20,6 +20,7 @@ import type { createClient } from "@/lib/supabase/server";
 import { computeLine, classifyPay, BURDEN } from "@/lib/payroll";
 import { resolveRuleSet, type CustomRules } from "@/lib/payrules";
 import { initials } from "@/lib/employees";
+import { colorFor } from "@/lib/avatar";
 
 export type Db = Awaited<ReturnType<typeof createClient>>;
 
@@ -147,7 +148,7 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
       payType: (r.pay_type as "hourly" | "monthly") ?? "hourly",
       rate: Number(r.rate) || 0, employmentRatio: Number(r.employment_ratio) || 100,
       union, status: (r.status as string) ?? "active",
-      avatarColor: (r.avatar_color as string) ?? "#5b50e6", department: dep?.name ?? null,
+      avatarColor: (r.avatar_color as string) ?? colorFor(r.id as string), department: dep?.name ?? null,
       rules: resolveRuleSet(union, ruleMap.get(r.id as string) as never),
     };
   });

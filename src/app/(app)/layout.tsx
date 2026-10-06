@@ -7,6 +7,7 @@ import type { Role } from "@/components/app/nav";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { isVaktoAdmin } from "@/lib/vakto-admin.server";
+import { PhotoProvider } from "@/components/app/avatar";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);
@@ -69,17 +70,28 @@ async function getAccount(): Promise<Account & { country: string }> {
   }
 }
 
+/** Prófílmyndir fyrirtækisins (RLS afmarkar við eigið fyrirtæki). Tómt ef ekkert eða villa. */
+async function getPhotos(): Promise<Record<string, string>> {
+  if (!isSupabaseConfigured()) return {};
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("employees").select("id, photo_url").not("photo_url", "is", null);
+    if (error) return {};
+    return Object.fromEntries((data ?? []).map((r) => [r.id as string, r.photo_url as string]));
+  } catch { return {}; }
+}
+
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [{ country, ...account }, vaktoAdmin] = await Promise.all([getAccount(), isVaktoAdmin()]);
+  const [{ country, ...account }, vaktoAdmin, photos] = await Promise.all([getAccount(), isVaktoAdmin(), getPhotos()]);
   return (
     <LangProvider>
       <CountryProvider value={country}>
         <PullToRefresh />
-        <AppShell account={{ ...account, vaktoAdmin }}>{children}</AppShell>
+        <PhotoProvider photos={photos}><AppShell account={{ ...account, vaktoAdmin }}>{children}</AppShell></PhotoProvider>
       </CountryProvider>
     </LangProvider>
   );

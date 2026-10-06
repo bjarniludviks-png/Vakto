@@ -10,7 +10,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "@/lib/contract-pdf";
-import { updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getDepartmentColors, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow } from "./actions";
+import { updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField, BankField } from "@/components/app/fields";
@@ -18,6 +18,7 @@ import { useCountry } from "@/components/app/country";
 import { templateToPayRule, type RuleTemplate } from "@/lib/rules";
 import { listRuleTemplates } from "../stillingar/actions";
 import { ContractView, ContractEditor } from "@/components/app/contract-view";
+import { Av } from "@/components/app/avatar";
 
 /** Best-effort document type from a filename (for the documents table). */
 function detectDocType(name: string): string {
@@ -70,9 +71,7 @@ export default function EmployeesScreen({
   live: boolean;
 }) {
   const router = useRouter();
-  const [deptColors, setDeptColors] = useState<Record<string, string>>({});
   const [showInactive, setShowInactive] = useState(false);
-  useEffect(() => { getDepartmentColors().then(setDeptColors).catch(() => {}); }, []);
   const { t } = useLang();
   const [importing, setImporting] = useState(false);
   const [importInfo, setImportInfo] = useState(false);
@@ -196,7 +195,7 @@ export default function EmployeesScreen({
     (showInactive || e.status !== "inactive") &&
     (deptF === "all" || e.department === deptF) &&
     (!q || e.fullName.toLowerCase().includes(q) || (e.title ?? "").toLowerCase().includes(q)));
-  const avBg = (e: Employee) => (e.department && deptColors[e.department]) || e.avatarColor;
+  const avBg = (e: Employee) => e.avatarColor;
   const roleTag = (e: Employee) =>
     e.role === "contractor" ? <span className="db2-pill mut">{t("emp:role:contractor")}</span>
       : e.role === "manager" ? <span className="db2-pill info">{t("emp:role:manager")}</span>
@@ -235,7 +234,7 @@ export default function EmployeesScreen({
         <section className="db2-card db2-tile">
           <div className="db2-k">{t("Starfsmenn")}</div>
           <div className="db2-v">{employees.filter((e) => e.status !== "inactive").length}<small>{t("virkir")}</small></div>
-          <div className="db2-avs">{employees.filter((e) => e.status !== "inactive").slice(0, 7).map((e) => <span key={e.id} className="db2-av" style={{ background: avBg(e) }} title={e.fullName}>{initials(e.fullName)}</span>)}</div>
+          <div className="db2-avs">{employees.filter((e) => e.status !== "inactive").slice(0, 7).map((e) => <Av key={e.id} id={e.id} className="db2-av" c={avBg(e)} title={e.fullName} av={initials(e.fullName)} />)}</div>
         </section>
         <section className="db2-card db2-tile">
           <div className="db2-k">{t("Stöðugildi")}</div>
@@ -282,7 +281,7 @@ export default function EmployeesScreen({
                 const contractor = e.role === "contractor";
                 return (
                   <tr key={e.id} className="db2-rowlink" onClick={() => openEmp(e)}>
-                    <td><span className="db2-who"><span className="db2-av sm" style={{ background: avBg(e) }}>{initials(e.fullName)}</span><span>{e.fullName}{e.title && <small>{e.title}</small>}</span>{roleTag(e)}</span></td>
+                    <td><span className="db2-who"><Av id={e.id} c={avBg(e)} av={initials(e.fullName)} /><span>{e.fullName}{e.title && <small>{e.title}</small>}</span>{roleTag(e)}</span></td>
                     <td>{e.department ? t(e.department) : <span className="db2-muted">—</span>}</td>
                     <td className="r">{nf(e.rate)} <span className="db2-muted">{e.payType === "monthly" ? "kr/mán" : "kr/klst"}</span></td>
                     <td className="r" style={e.employmentRatio > 120 ? { color: "var(--bad)" } : undefined}>{contractor ? <span className="db2-muted">—</span> : `${e.employmentRatio}%`}</td>

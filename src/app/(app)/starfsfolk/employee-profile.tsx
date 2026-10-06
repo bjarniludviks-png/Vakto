@@ -8,8 +8,9 @@ import { useLang } from "@/components/app/lang";
 import { initials, type Employee } from "@/lib/employees";
 import { CUSTOM_UNION } from "@/lib/payrules";
 import { PERM_FIELDS } from "@/lib/permissions";
-import { updateEmployee, setEmployeeStatus, getDepartmentColors } from "./actions";
+import { updateEmployee, setEmployeeStatus } from "./actions";
 import { ProfileTabBody, profileTabsFor, type ProfileTab } from "./employees-screen";
+import { Av } from "@/components/app/avatar";
 
 /** Full-page employee profile (replaces the cramped modal). Each section has room
  * to breathe — pay profile, custom rules, benefits, access, documents, etc. */
@@ -29,11 +30,9 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
-  const [deptColors, setDeptColors] = useState<Record<string, string>>({});
-  useEffect(() => { getDepartmentColors().then(setDeptColors).catch(() => {}); }, []);
   const e = employee;
   const tabs = profileTabsFor(e.role);
-  const avtBg = (e.department && deptColors[e.department]) || e.avatarColor;
+  const avtBg = e.avatarColor;
 
   async function save(ev: React.FormEvent<HTMLFormElement>) {
     ev.preventDefault();
@@ -91,7 +90,7 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
         <div>
           <Link href="/starfsfolk" className="ne-back"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5m0 0l7 7m-7-7l7-7" /></svg>{t("Starfsfólk")}</Link>
           <div className="ep-head">
-            <span className="ep-av" style={{ background: avtBg }}>{initials(e.fullName)}</span>
+            <Av id={e.id} className="ep-av" c={avtBg} av={initials(e.fullName)} />
             <div>
               <h1>{e.fullName}</h1>
               <div className="ep-meta">

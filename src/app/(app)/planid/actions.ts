@@ -7,6 +7,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { initials } from "@/lib/employees";
+import { colorFor } from "@/lib/avatar";
 
 export type PlanShift = {
   id: string;
@@ -124,7 +125,7 @@ export async function getCoworkers(): Promise<{ live: boolean; people: Coworker[
         id: e.id as string,
         name: e.full_name as string,
         av: initials(e.full_name as string),
-        color: (e.avatar_color as string) ?? "#5b50e6",
+        color: (e.avatar_color as string) ?? colorFor(e.id as string),
         title: (e.title as string) ?? pos?.name ?? null,
         dept: dep?.name ?? null,
         phone: (e.phone as string) ?? null,
