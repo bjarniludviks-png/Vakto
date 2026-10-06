@@ -684,7 +684,7 @@ export type ContractRow = {
 const CONTRACT_BLANK = "____________";
 
 /** Samningstexti úr NÚVERANDI gögnum starfsmanns og fyrirtækis (starf og vinnustaður leyst upp eftir id). */
-async function contractContentFor(supabase: Awaited<ReturnType<typeof createClient>>, emp: Record<string, unknown>, comp: Record<string, unknown>): Promise<string> {
+async function contractContentFor(supabase: Awaited<ReturnType<typeof createClient>>, emp: Record<string, unknown>, comp: Record<string, unknown>, kind?: "employment" | "contractor"): Promise<string> {
   let positionName: string | undefined;
   if (emp.position_id) {
     const { data: pos } = await supabase.from("positions").select("name").eq("id", emp.position_id as string).maybeSingle();
@@ -695,7 +695,7 @@ async function contractContentFor(supabase: Awaited<ReturnType<typeof createClie
     const { data: loc } = await supabase.from("locations").select("name").eq("id", emp.location_id as string).maybeSingle();
     locationName = (loc?.name as string) ?? undefined;
   }
-  if (isContractor(emp)) return contractorMarkdown(emp, comp, { locationName, positionName });
+  if (kind ? kind === "contractor" : isContractor(emp)) return contractorMarkdown(emp, comp, { locationName, positionName });
   return contractMarkdown(emp, comp, {
     unionName: (emp.union_name as string) || (emp.union_agreement as string) || undefined,
     contractType: (emp.contract_type as string) || undefined,
@@ -830,7 +830,8 @@ Starfsmaður: ______________________　Dags: ________
 }
 
 /** Generate a contract draft from employee + company data. */
-export async function generateContract(employeeId: string): Promise<ActionResult & { content?: string }> {
+/** `kind` velur samningsgerð; sjálfgefið eftir hlutverki (verktaki → verksamningur). */
+export async function generateContract(employeeId: string, kind?: "employment" | "contractor"): Promise<ActionResult & { content?: string }> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -841,8 +842,8 @@ export async function generateContract(employeeId: string): Promise<ActionResult
       supabase.from("companies").select("*").eq("id", company).maybeSingle(),
     ]);
     if (!emp) return { ok: false, error: "Starfsmaður fannst ekki" };
-    const verk = isContractor(emp);
-    const content = await contractContentFor(supabase, emp, comp ?? {});
+    const verk = kind ? kind === "contractor" : isContractor(emp);
+    const content = await contractContentFor(supabase, emp, comp ?? {}, verk ? "contractor" : "employment");
     const { data: { user } } = await supabase.auth.getUser();
     const { data: created, error } = await supabase.from("contracts").insert({
       company_id: company,
@@ -940,7 +941,7 @@ export async function setContractStatus(
     }
     // Skyldureitir (lágmarksatriði 91/533/EBE) verða að vera fylltir áður en samningur er sendur.
     if (status === "sent") {
-      const { data: cur } = await supabase.from("contracts").select("content, employee_id, company_id, status").eq("id", id).maybeSingle();
+      const { data: cur } = await supabase.from("contracts").select("content, employee_id, company_id, status, template").eq("id", id).maybeSingle();
       let content = String(cur?.content ?? "");
       // Drögin voru búin til áður en t.d. heimilisfang eða lífeyrissjóður var skráður → fylla auða reiti úr nýjustu gögnum.
       if (/\*\*[^*]+?:\*\*\s*_{6,}/.test(content) && cur?.employee_id && cur.status === "draft") {
@@ -949,7 +950,7 @@ export async function setContractStatus(
           supabase.from("companies").select("*").eq("id", cur.company_id as string).maybeSingle(),
         ]);
         if (emp) {
-          const filled = fillBlankFields(content, await contractContentFor(supabase, emp, comp ?? {}));
+          const filled = fillBlankFields(content, await contractContentFor(supabase, emp, comp ?? {}, cur.template === "verktaki-2026" ? "contractor" : "employment"));
           if (filled !== content) {
             await supabase.from("contracts").update({ content: filled }).eq("id", id);
             content = filled;

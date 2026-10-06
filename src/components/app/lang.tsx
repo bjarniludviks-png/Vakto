@@ -9,6 +9,11 @@ type Dict = Record<string, { is: string; en: string; vi?: string }>;
 // App-shell chrome strings. Per-screen content can adopt useLang() incrementally.
 export const DICT: Dict = {
   // Mælaborð v2
+  "Samningar": { is: "Samningar", en: "Contracts" },
+  "+ Verksamningur (verktaki)": { is: "+ Verksamningur (verktaki)", en: "+ Contractor agreement" },
+  "+ Ráðningarsamningur í staðinn": { is: "+ Ráðningarsamningur í staðinn", en: "+ Employment contract instead" },
+  "+ Ráðningarsamningur úr gögnum": { is: "+ Ráðningarsamningur úr gögnum", en: "+ Employment contract from data" },
+  "+ Verksamningur úr gögnum": { is: "+ Verksamningur úr gögnum", en: "+ Contractor agreement from data" },
   "Verktaki er sjálfstæður atvinnurekandi: samningurinn fjallar um verkið, þóknun án VSK og reikninga. Ef verktakinn vinnur í raun eins og starfsmaður (fastar vaktir, undir stjórn, eingöngu fyrir ykkur) gæti hann talist launþegi.": { is: "Verktaki er sjálfstæður atvinnurekandi: samningurinn fjallar um verkið, þóknun án VSK og reikninga. Ef verktakinn vinnur í raun eins og starfsmaður (fastar vaktir, undir stjórn, eingöngu fyrir ykkur) gæti hann talist launþegi.", en: "A contractor is self-employed: the agreement covers the work, the fee excl. VAT and invoicing. If the contractor in practice works like an employee (fixed shifts, under direction, only for you) they may be treated as an employee." },
   "Verksamningur": { is: "Verksamningur", en: "Contractor agreement" },
   "Undir plani": { is: "Undir plani", en: "Below plan" },

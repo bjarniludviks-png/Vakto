@@ -925,9 +925,9 @@ function ContractTab({ employeeId, contractor = false }: { employeeId: string; c
   const load = () => listContracts(employeeId).then((r) => { setContracts(r.contracts); setLive(r.live); }).catch(() => {});
   useEffect(() => { load(); }, [employeeId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function create() {
+  async function create(kind?: "employment" | "contractor") {
     setBusy(true);
-    const res = await generateContract(employeeId);
+    const res = await generateContract(employeeId, kind);
     setBusy(false);
     if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
     toast(res.demo ? "Samningur búinn til (demo)" : "Samningur búinn til úr gögnum starfsmannsins");
@@ -949,7 +949,7 @@ function ContractTab({ employeeId, contractor = false }: { employeeId: string; c
 
   return (
     <>
-      <Sec first>{contractor ? t("Verksamningur") : t("Ráðningarsamningur")}</Sec>
+      <Sec first>{t("Samningar")}</Sec>
       {contractor && <p className="muted" style={{ fontSize: 12, margin: "-4px 0 10px", lineHeight: 1.5 }}>{t("Verktaki er sjálfstæður atvinnurekandi: samningurinn fjallar um verkið, þóknun án VSK og reikninga. Ef verktakinn vinnur í raun eins og starfsmaður (fastar vaktir, undir stjórn, eingöngu fyrir ykkur) gæti hann talist launþegi.")}</p>}
       {contracts.length === 0 && (
         <p className="muted" style={{ fontSize: 13, marginBottom: 12 }}>
@@ -977,9 +977,14 @@ function ContractTab({ employeeId, contractor = false }: { employeeId: string; c
           </div>
         ))}
       </div>
-      <button className="btn sm" type="button" disabled={busy} onClick={create} style={{ marginTop: 12 }}>
-        {busy ? t("Bý til…") : t("+ Búa til samning úr gögnum")}
-      </button>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+        <button className="btn sm" type="button" disabled={busy} onClick={() => create(contractor ? "contractor" : "employment")}>
+          {busy ? t("Bý til…") : contractor ? t("+ Verksamningur úr gögnum") : t("+ Ráðningarsamningur úr gögnum")}
+        </button>
+        <button className="btn ghost sm" type="button" disabled={busy} onClick={() => create(contractor ? "employment" : "contractor")}>
+          {contractor ? t("+ Ráðningarsamningur í staðinn") : t("+ Verksamningur (verktaki)")}
+        </button>
+      </div>
       <p className="muted" style={{ fontSize: 11.5, marginTop: 10 }}>{t("„Undirrita & senda“ skráir undirskrift þína og sendir starfsmanninum samninginn. Hann staðfestir með kóða í tölvupósti og báðir fá undirritað PDF með undirritunarskrá (tími, IP, tæki, fingrafar skjals).")}</p>
       {view && <ContractViewModal view={view} onClose={() => setView(null)} onChanged={load} onNeedSigner={(x) => setSignerFor(x)} />}
       {signerFor && <SignerModal init={signerFor} onClose={() => setSignerFor(null)} onDone={load} />}
