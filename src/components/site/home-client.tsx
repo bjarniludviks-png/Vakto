@@ -331,6 +331,16 @@ function DarkCompare() {
           <ul className="ah-ticks">
             {t.appTicks.map((x) => <li key={x}>{x}</li>)}
           </ul>
+          <div className="ah-stores">
+            <a className="ah-store" href="https://play.google.com/store/apps/details?id=is.vakto.app" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5v17l14-8.5z" fill="currentColor" /></svg>
+              {t.storePlay}
+            </a>
+            <span className="ah-store soon" aria-disabled="true">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5" /><path d="M11 18.5h2" /></svg>
+              {t.storeApple}<em>{t.storeSoon}</em>
+            </span>
+          </div>
         </div>
         <div><Phone dark src={`${base}/dark/app-frettir.png`} alt={t.feedAlt} className="ah-phone-lo" /></div>
       </div>

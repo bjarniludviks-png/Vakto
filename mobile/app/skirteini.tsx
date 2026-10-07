@@ -89,14 +89,23 @@ export default function Skirteini() {
       {(ios ? ["apple", "google"] : ["google", "apple"]).map((w) => (
         <Pressable
           key={w}
-          onPress={() => Linking.openURL(`https://www.vakto.is/api/wallet/${w}`).catch(() => toast("Wallet-passinn er á leiðinni"))}
+          onPress={async () => {
+            if (w === "apple") { toast("Apple Wallet er væntanlegt"); return; }
+            try {
+              const { data } = await supabase.auth.getSession();
+              const res = await fetch("https://www.vakto.is/api/wallet/google", { headers: { Authorization: `Bearer ${data.session?.access_token ?? ""}` } });
+              const j = (await res.json().catch(() => ({}))) as { url?: string };
+              if (res.ok && j.url) await Linking.openURL(j.url);
+              else toast(res.status === 501 ? "Google Wallet er væntanlegt" : "Tókst ekki að opna Google Wallet");
+            } catch { toast("Tókst ekki að opna Google Wallet"); }
+          }}
           style={({ pressed }) => ({ backgroundColor: w === "apple" ? "#000" : colors.panel, borderRadius: 16, paddingVertical: 16, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, borderWidth: 1, borderColor: w === "apple" ? "#333" : colors.line, opacity: pressed ? 0.85 : 1 })}
         >
           <Wallet color={w === "apple" ? "#fff" : colors.ink} size={20} />
           <Txt weight="bold" size={16} color={w === "apple" ? "#fff" : colors.ink}>{w === "apple" ? "Bæta í Apple Wallet" : "Bæta í Google Wallet"}</Txt>
         </Pressable>
       ))}
-      <Muted size={12.5} style={{ textAlign: "center", lineHeight: 18 }}>Ýttu á kortið til að sjá mynd og allar upplýsingar. QR-kóðann má skanna í kiosk-stimpilklukkunni. Wallet-passar opnast þegar vottorðin frá Apple og Google eru komin.</Muted>
+      <Muted size={12.5} style={{ textAlign: "center", lineHeight: 18 }}>Ýttu á kortið til að sjá mynd og allar upplýsingar. QR-kóðann má skanna í kiosk-stimpilklukkunni. Skírteinið má líka geyma í Google Wallet.</Muted>
 
       <Sheet open={open} onClose={() => setOpen(false)}>
         {me ? (

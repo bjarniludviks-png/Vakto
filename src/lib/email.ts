@@ -209,9 +209,9 @@ export async function sendInviteEmail(to: string, company: string, roleLabel: st
     html: template({
       preheader: `${company} bauð þér aðgang að VAKTO.`,
       heading: "Þér var boðið í VAKTO",
-      body: `<b>${company}</b> bauð þér aðgang að VAKTO sem <b>${roleLabel}</b>. Þar sérðu vaktirnar þínar, stimplar þig inn og út, sækir um frí og spjallar við teymið, í símanum eða tölvunni. Smelltu á hnappinn til að virkja aðganginn og velja lykilorð.`,
+      body: `<b>${company}</b> bauð þér aðgang að VAKTO sem <b>${roleLabel}</b>. Þar sérðu vaktirnar þínar, stimplar þig inn og út, sækir um frí og spjallar við teymið, í símanum eða tölvunni. Smelltu á hnappinn til að virkja aðganginn og velja lykilorð.<br><br>Með Android-síma geturðu svo sótt <a href=\"https://play.google.com/store/apps/details?id=is.vakto.app\" style=\"color:#e9700f;font-weight:600\">VAKTO-appið í Google Play</a>. iPhone-appið er væntanlegt, þangað til notarðu vakto.is í vafranum.`,
       headingEn: "You've been invited to VAKTO",
-      bodyEn: `<b>${company}</b> invited you to VAKTO (${roleLabel}). See your shifts, clock in and out, request time off and chat with your team, on your phone or computer. Click to activate your account and choose a password.`,
+      bodyEn: `<b>${company}</b> invited you to VAKTO (${roleLabel}). See your shifts, clock in and out, request time off and chat with your team, on your phone or computer. Click to activate your account and choose a password.<br><br>On Android you can then get the <a href=\"https://play.google.com/store/apps/details?id=is.vakto.app\" style=\"color:#e9700f;font-weight:600\">VAKTO app on Google Play</a>. The iPhone app is coming soon; until then, use vakto.is in your browser.`,
       ctaLabel: "Virkja aðganginn minn",
       ctaLabelEn: "Activate my account",
       ctaHref: link,

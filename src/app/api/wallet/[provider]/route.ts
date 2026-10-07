@@ -1,16 +1,27 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { appleConfigured, googleConfigured, buildApplePass, buildGoogleSaveUrl, type PassEmployee } from "@/lib/wallet";
 
 // GET /api/wallet/apple  or  /api/wallet/google — the signed staff ID pass for the
 // currently signed-in employee. Returns 501 with a hint until certs are configured.
-export async function GET(_req: Request, { params }: { params: Promise<{ provider: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ provider: string }> }) {
   const { provider } = await params;
   if (!isSupabaseConfigured()) return NextResponse.json({ error: "Ekki tengt" }, { status: 400 });
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Vefur: innskráningarkaka. App: Supabase-aðgangslykill í Authorization-haus (fær þá JSON með slóðinni).
+  const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || null;
+  let supabase: Awaited<ReturnType<typeof createClient>> | ReturnType<typeof createAdminClient>;
+  let user: { id: string } | null = null;
+  if (bearer) {
+    const admin = createAdminClient();
+    user = (await admin.auth.getUser(bearer)).data.user;
+    supabase = admin;
+  } else {
+    supabase = await createClient();
+    user = (await supabase.auth.getUser()).data.user;
+  }
   if (!user) return NextResponse.json({ error: "Ekki innskráð(ur)" }, { status: 401 });
 
   // Employee linked to this user (+ company name).
@@ -47,10 +58,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ provide
     if (provider === "google") {
       if (!googleConfigured()) return NextResponse.json({ error: "Google Wallet er ekki uppsett enn.", needs: "google" }, { status: 501 });
       const url = await buildGoogleSaveUrl(passEmp);
-      return NextResponse.redirect(url);
+      return bearer ? NextResponse.json({ url }) : NextResponse.redirect(url);
     }
     return NextResponse.json({ error: "Óþekkt veski" }, { status: 400 });
   } catch (e) {
-    return NextResponse.json({ error: e instanceof Error ? e.message : "Villa" }, { status: 500 });
+    console.error("[wallet]", e);
+    return NextResponse.json({ error: "Tókst ekki að búa til skírteinið — reyndu aftur." }, { status: 500 });
   }
 }
