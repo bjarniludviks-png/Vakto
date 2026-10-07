@@ -522,10 +522,10 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 
 /* Hlekkir á appið */
 .ah-stores{display:flex;flex-wrap:wrap;gap:10px;margin-top:28px}
-.ah-store{display:inline-flex;align-items:center;gap:9px;padding:12px 18px;border-radius:999px;background:#fff;color:#1d1d1f;font-size:15px;font-weight:600;text-decoration:none;transition:transform .16s cubic-bezier(.23,1,.32,1),background .16s}
+.ah-stores .ah-store{display:inline-flex;align-items:center;gap:9px;padding:12px 18px;border-radius:999px;background:#fff;color:#1d1d1f;opacity:1;font-size:15px;font-weight:600;text-decoration:none;transition:transform .16s cubic-bezier(.23,1,.32,1),background .16s}
 .ah-store svg{width:17px;height:17px;flex:none}
 .ah-store:hover{background:#f1f1f4}
 .ah-store:active{transform:scale(.97)}
-.ah-store.soon{background:rgba(255,255,255,.1);color:rgba(255,255,255,.72);cursor:default}
+.ah-stores .ah-store.soon{background:rgba(255,255,255,.1);color:rgba(255,255,255,.72);cursor:default}
 .ah-store.soon em{font-style:normal;font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;background:rgba(255,255,255,.14);color:rgba(255,255,255,.8)}
 @media (max-width:900px){.ah-stores{justify-content:center}}
