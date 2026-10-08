@@ -15,7 +15,7 @@ declare global {
 
 export const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
 
-export default function Turnstile({ onToken, theme = "dark" }: { onToken: (token: string | null) => void; theme?: "light" | "dark" | "auto" }) {
+export default function Turnstile({ onToken, theme = "light" }: { onToken: (token: string | null) => void; theme?: "light" | "dark" | "auto" }) {
   const ref = useRef<HTMLDivElement>(null);
   const idRef = useRef<string | null>(null);
   useEffect(() => {
