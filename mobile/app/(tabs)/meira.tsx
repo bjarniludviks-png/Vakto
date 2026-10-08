@@ -1,9 +1,9 @@
 // Ég — laun, skírteini, skjöl, beiðnir, tímar, samstarfsfólk, stillingar, útskráning.
 import React, { useCallback, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
-import { View, Pressable, Alert } from "react-native";
+import { View, Pressable, Alert, Platform } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { IdCard, FolderOpen, FileText, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight } from "lucide-react-native";
+import { IdCard, FolderOpen, Newspaper, FileText, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight } from "lucide-react-native";
 import { Screen, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, List, Row, IconBox, Eyebrow, Bar, Pill, iconColor } from "../../src/components/ui";
 import { colors, useTheme } from "../../src/theme";
@@ -14,6 +14,7 @@ import { listMyRequests } from "../../src/lib/api/requests";
 import type { MonthPay } from "../../src/lib/api/pay";
 import { kr, dec1 } from "../../src/lib/format";
 import { unregisterPush } from "../../src/lib/push";
+import { isManager } from "../../src/lib/api/ops";
 
 export default function Eg() {
   useTheme();
@@ -22,6 +23,8 @@ export default function Eg() {
   const [pay, setPay] = useState<MonthPay | null>(null);
   const [pending, setPending] = useState(0);
   const [reqCount, setReqCount] = useState(0);
+  const [manager, setManager] = useState(false);
+  React.useEffect(() => { if (Platform.OS === "ios") isManager().then(setManager).catch(() => {}); }, [me]);
 
   useFocusEffect(useCallback(() => {
     if (!me) return;
@@ -62,6 +65,7 @@ export default function Eg() {
       </Pressable>
 
       <List>
+        {manager ? <Row icon={<IconBox tone="brand"><Newspaper color={iconColor("brand")} size={19} /></IconBox>} title="Fréttaveita" sub="Færslur og tilkynningar vinnustaðarins" onPress={() => router.push("/frettaveita")} /> : null}
         <Row icon={<IconBox tone="brand"><IdCard color={iconColor("brand")} size={19} /></IconBox>} title="Starfsmannaskírteini" sub="Sýna eða bæta í Wallet" onPress={() => router.push("/skirteini")} />
         <Row icon={<IconBox tone="info"><FolderOpen color={iconColor("info")} size={19} /></IconBox>} title="Skjöl" sub="Ráðningarsamningur, HACCP, handbækur" onPress={() => router.push("/skjol")} />
         <Row icon={<IconBox tone="good"><CheckCircle2 color={iconColor("good")} size={19} /></IconBox>} title="Beiðnir" sub={reqCount ? `${pending} í bið · ${reqCount} alls` : "Frí, vaktaskipti, leiðréttingar"} onPress={() => router.push("/beidnir")} />

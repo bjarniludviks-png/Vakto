@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
 import { View, TextInput, Pressable, ScrollView, RefreshControl, Switch, KeyboardAvoidingView, Platform } from "react-native";
 import { useFocusEffect } from "expo-router";
+import { useSegments } from "expo-router";
 import { Plus, Heart, MessageSquare, Pin, ImagePlus, Send, Trash2 } from "lucide-react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
@@ -15,6 +16,7 @@ import { listPosts, createPost, setPostReaction, addPostComment, setPinned, dele
 import { inputStyle, Field } from "../../src/components/request-sheets";
 
 export default function Frettir() {
+  const standalone = useSegments()[0] !== "(tabs)";
   const { dark } = useTheme();
   const { me } = useMe();
   const toast = useToast();
@@ -77,8 +79,8 @@ export default function Frettir() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <Header title="Fréttaveita" right={canPost ? <IconBtn label="Ný færsla" onPress={() => setCompose(true)}><Plus color={colors.ink} size={24} /></IconBtn> : undefined} />
-      <ScrollView contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.brand} />}>
+      <Header title="Fréttaveita" back={standalone} right={canPost ? <IconBtn label="Ný færsla" onPress={() => setCompose(true)}><Plus color={colors.ink} size={24} /></IconBtn> : undefined} />
+      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.brand} />}>
         {posts && posts.length === 0 ? <Empty icon={<MessageSquare color={colors.brandDeep} size={26} />} title="Engar færslur enn" sub="Ýttu á + til að deila því fyrsta með vinnustaðnum." /> : null}
         {(posts ?? []).map((p) => {
           const total = p.reactions.reduce((a, r) => a + r.count, 0);

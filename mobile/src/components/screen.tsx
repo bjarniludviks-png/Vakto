@@ -96,7 +96,7 @@ export function Screen({
       {noScroll ? (
         <View style={[{ flex: 1 }, contentStyle]}>{children}</View>
       ) : (
-        <ScrollView
+        <ScrollView contentInsetAdjustmentBehavior="automatic"
           contentContainerStyle={[{ padding: 16, gap: 14, paddingBottom: 40 }, contentStyle]}
           keyboardShouldPersistTaps="handled"
           refreshControl={onRefresh ? <RefreshControl refreshing={!!refreshing} onRefresh={onRefresh} tintColor={colors.brand} /> : undefined}
