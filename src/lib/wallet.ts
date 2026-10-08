@@ -72,6 +72,7 @@ export async function buildGoogleSaveUrl(e: PassEmployee): Promise<string> {
     id: objectId, classId,
     genericType: "GENERIC_TYPE_UNSPECIFIED",
     hexBackgroundColor: "#e9700f",
+    logo: { sourceUri: { uri: "https://www.vakto.is/wallet-icon.png" } },
     cardTitle: { defaultValue: { language: "is", value: "VAKTO" } },
     header: { defaultValue: { language: "is", value: e.name } },
     subheader: { defaultValue: { language: "is", value: e.company } },
@@ -86,7 +87,8 @@ export async function buildGoogleSaveUrl(e: PassEmployee): Promise<string> {
     aud: "google",
     typ: "savetowallet",
     iat: Math.floor(Date.now() / 1000),
-    payload: { genericObjects: [genericObject] },
+    // flokkurinn fylgir með svo hann verði til við fyrstu vistun (engin sér API-uppsetning)
+    payload: { genericClasses: [{ id: classId }], genericObjects: [genericObject] },
   };
   const token = jwt.default.sign(claims, process.env.GOOGLE_WALLET_SA_KEY!.replace(/\\n/g, "\n"), { algorithm: "RS256" });
   return `https://pay.google.com/gp/v/save/${token}`;
