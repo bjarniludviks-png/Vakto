@@ -46,10 +46,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
   if (!user) return NextResponse.json({ error: "Ekki innskráð(ur)" }, { status: 401 });
 
   // Employee linked to this user (+ company name).
-  const { data: emp } = await supabase
+  const { data: emp, error: empErr } = await supabase
     .from("employees")
-    .select("id, full_name, position, department:departments(name), photo_url, clock_token, companies(name), positions(name)")
+    .select("id, full_name, title, department:departments(name), photo_url, clock_token, companies(name), positions(name)")
     .eq("user_id", user.id).maybeSingle();
+  if (empErr) console.error("[wallet] employee", empErr.message);
   if (!emp) return NextResponse.json({ error: "Starfsmannaprófíll fannst ekki" }, { status: 404 });
 
   const dept = (Array.isArray(emp.department) ? emp.department[0] : emp.department) as { name?: string } | null;
@@ -58,7 +59,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
   const passEmp: PassEmployee = {
     id: emp.id as string,
     name: (emp.full_name as string) ?? "Starfsmaður",
-    role: pos?.name ?? "Starfsmaður",
+    role: (emp.title as string | null) || pos?.name || "Starfsmaður",
     department: dept?.name ?? "",
     company: comp?.name ?? "VAKTO",
     token: (emp.clock_token as string) ?? (emp.id as string),
