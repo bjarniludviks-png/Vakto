@@ -70,7 +70,7 @@ export function rangeLabel(from: string, to: string): string {
   return sameMonth ? `${a.getDate()}.–${b.getDate()}. ${MONTHS[b.getMonth()]}` : `${a.getDate()}.${a.getMonth() + 1}. – ${b.getDate()}.${b.getMonth() + 1}.`;
 }
 
-export type OnShift = { id: string; empId: string; name: string; color: string | null; photo: string | null; since: string; dept: string | null };
+export type OnShift = { id: string; empId: string; name: string; color: string | null; photo: string | null; since: string; clockIn: string; dept: string | null };
 export type PendingReq = { id: string; kind: "leave" | "swap"; name: string; title: string; sub: string };
 export type OpenShiftRow = { id: string; date: string; start: string | null; end: string | null; dept: string | null };
 
@@ -126,6 +126,7 @@ export async function getOps(companyId: string, sel: PeriodSel): Promise<Ops> {
       color: e?.avatar_color ?? null,
       photo: e?.photo_url ?? null,
       since: sinceLabel(p.clock_in as string),
+      clockIn: p.clock_in as string,
       dept: dep?.name ?? null,
     };
   });
@@ -179,4 +180,37 @@ export async function decideRequest(r: PendingReq, approve: boolean): Promise<{ 
   if (error) return { ok: false, error: error.message };
   if (r.kind === "leave") void notifyServer("leave_decided", r.id);
   return { ok: true };
+}
+
+
+/** Stjórnandi stimplar starfsmann út (gleymdi að stimpla sig út). */
+export async function managerClockOut(punchId: string, at: Date): Promise<{ ok: boolean; error?: string }> {
+  const { data: p } = await supabase.from("punches").select("clock_in").eq("id", punchId).maybeSingle();
+  if (!p) return { ok: false, error: "Stimplun fannst ekki" };
+  if (at.getTime() <= new Date(p.clock_in as string).getTime()) return { ok: false, error: "Útstimplun verður að vera eftir innstimplun" };
+  if (at.getTime() > Date.now() + 60000) return { ok: false, error: "Tíminn er ekki liðinn" };
+  const { error } = await supabase.from("punches").update({ clock_out: at.toISOString() }).eq("id", punchId).is("clock_out", null);
+  return error ? { ok: false, error: "Tókst ekki að stimpla út" } : { ok: true };
+}
+
+export type LocationRow = { id: string; name: string };
+export async function listLocations(companyId: string): Promise<LocationRow[]> {
+  const { data } = await supabase.from("locations").select("id, name").eq("company_id", companyId).order("name");
+  return ((data ?? []) as { id: string; name: string }[]);
+}
+
+/** Handslegin velta dagsins á stað. */
+export async function getManualRevenue(locationId: string, date: string): Promise<number | null> {
+  const { data } = await supabase.from("revenue").select("amount").eq("location_id", locationId).eq("date", date).eq("source", "manual");
+  const rows = (data ?? []) as { amount: number }[];
+  return rows.length ? rows.reduce((a, r) => a + Number(r.amount), 0) : null;
+}
+
+/** Skráir veltu dagsins handvirkt — kemur í stað fyrri handskráningar sama dags. */
+export async function saveManualRevenue(locationId: string, date: string, amount: number): Promise<{ ok: boolean; error?: string }> {
+  if (!(amount > 0)) return { ok: false, error: "Sláðu inn upphæð" };
+  const del = await supabase.from("revenue").delete().eq("location_id", locationId).eq("date", date).eq("source", "manual");
+  if (del.error) return { ok: false, error: "Tókst ekki að vista veltu" };
+  const { error } = await supabase.from("revenue").insert({ location_id: locationId, date, amount: Math.round(amount), source: "manual" });
+  return error ? { ok: false, error: "Tókst ekki að vista veltu" } : { ok: true };
 }

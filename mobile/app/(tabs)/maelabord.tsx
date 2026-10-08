@@ -3,18 +3,19 @@
 // með samanburði við sama tímabil á undan, tímar og yfirvinna, hverjir eru á
 // vakt núna, beiðnir sem bíða og vaktir sem enginn er á.
 import React, { useCallback, useState } from "react";
-import { View, Pressable } from "react-native";
+import { View, Pressable, TextInput } from "react-native";
 import { useFocusEffect } from "expo-router";
-import { Clock, Check, X, CalendarClock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight } from "lucide-react-native";
+import { Clock, Check, X, CalendarClock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Plus, LogOut } from "lucide-react-native";
 import { tr, trf } from "../../src/lib/i18n";
 import { Screen } from "../../src/components/screen";
 import { Card, Txt, Muted, Eyebrow, Avatar, Btn, Divider, Seg, Sheet, useToast } from "../../src/components/ui";
-import { colors, useTheme } from "../../src/theme";
+import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { dec1, kr } from "../../src/lib/format";
+import { dec1, kr, nf } from "../../src/lib/format";
 import {
   getOps, decideRequest, openShiftLabel, myCompanyId, targetGapKr, rangeLabel, addDays,
-  type Ops, type PendingReq, type PeriodId, type PeriodSel,
+  managerClockOut, listLocations, getManualRevenue, saveManualRevenue,
+  type Ops, type PendingReq, type PeriodId, type PeriodSel, type OnShift, type LocationRow,
 } from "../../src/lib/api/ops";
 import { iso } from "../../src/lib/api/me";
 
@@ -27,6 +28,8 @@ export default function Maelabord() {
   const [ops, setOps] = useState<Ops | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [outFor, setOutFor] = useState<OnShift | null>(null);
+  const [revOpen, setRevOpen] = useState(false);
 
   const load = useCallback(async () => {
     const companyId = await myCompanyId(me ?? null);
@@ -112,12 +115,15 @@ export default function Maelabord() {
           <Metric label={tr("Velta")} value={p ? kr(p.revenue) : "—"} delta={p && prev ? p.revenue - prev.revenue : null} goodUp />
           <Metric label={tr("Launakostnaður")} value={p ? kr(p.cost) : "—"} delta={p && prev ? p.cost - prev.cost : null} />
         </View>
+        <View style={{ marginTop: 14 }}>
+          <Btn title={tr("Skrá veltu")} size="sm" variant="ghost" onPress={() => setRevOpen(true)} icon={<Plus color={colors.ink} size={16} />} />
+        </View>
       </Card>
 
       {/* tímar */}
       <Card>
         <Txt weight="bold" size={16}>{tr("Tímar")}</Txt>
-        <View style={{ flexDirection: "row", gap: 12, marginTop: 10 }}>
+        <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
           <Metric
             label={tr("Unnir")}
             value={p ? dec1(p.hours) : "—"}
@@ -141,7 +147,7 @@ export default function Maelabord() {
                 {p.cost >= p.plannedCost ? "+" : "−"}{kr(Math.abs(p.cost - p.plannedCost))}
               </Txt>
             </View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
               <Muted size={12}>{trf("áætlað {n}", kr(p.plannedCost))}</Muted>
               <Muted size={12}>{trf("{n} klst frávik", dec1(p.hours - p.planned))}</Muted>
             </View>
@@ -167,6 +173,10 @@ export default function Maelabord() {
                   <Txt weight="semibold">{x.name}</Txt>
                   <Muted size={12}>{x.dept ? `${x.dept} · ` : ""}{trf("síðan {n}", x.since)}</Muted>
                 </View>
+                <Pressable onPress={() => setOutFor(x)} hitSlop={8} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, opacity: pressed ? 0.6 : 1 })}>
+                  <LogOut color={colors.ink2} size={14} />
+                  <Txt size={12.5} weight="semibold" color={colors.ink2}>{tr("Stimpla út")}</Txt>
+                </Pressable>
               </View>
             ))}
           </View>
@@ -220,12 +230,109 @@ export default function Maelabord() {
           </View>
         )}
       </Card>
+      <ClockOutSheet who={outFor} onClose={() => setOutFor(null)} onDone={() => { setOutFor(null); toast(tr("Stimplað út")); load(); }} />
+      <RevenueSheet open={revOpen} me={me ?? null} onClose={() => setRevOpen(false)} onDone={() => { setRevOpen(false); toast(tr("Velta skráð")); load(); }} />
       <DateSheet
         open={pick}
         onClose={() => setPick(false)}
         onPick={(from, to) => { setSel({ id: "custom", from, to }); setPick(false); }}
       />
     </Screen>
+  );
+}
+
+const inputStyle = { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.panel2, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, fontSize: 22, fontFamily: font.semibold, color: colors.ink } as const;
+
+/** Stjórnandi stimplar út starfsmann sem gleymdi því. Tíminn er í dag, eða í gær ef hann er ekki liðinn í dag. */
+function ClockOutSheet({ who, onClose, onDone }: { who: OnShift | null; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [time, setTime] = useState("");
+  const [busy, setBusy] = useState(false);
+  React.useEffect(() => {
+    if (who) { const n = new Date(); setTime(`${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`); }
+  }, [who]);
+  const onTime = (v: string) => { const d = v.replace(/\D/g, "").slice(0, 4); setTime(d.length > 2 ? `${d.slice(0, 2)}:${d.slice(2)}` : d); };
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
+  let at: Date | null = null;
+  if (m) { at = new Date(); at.setHours(Number(m[1]), Number(m[2]), 0, 0); if (at.getTime() > Date.now() + 60000) at = addDays(at, -1); }
+  async function save() {
+    if (!who || !at) return;
+    setBusy(true);
+    const r = await managerClockOut(who.id, at);
+    setBusy(false);
+    if (!r.ok) { toast(tr(r.error ?? "Tókst ekki")); return; }
+    onDone();
+  }
+  return (
+    <Sheet open={!!who} onClose={onClose} title={tr("Stimpla út")}>
+      {who ? (
+        <View style={{ gap: 14 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <Avatar name={who.name} size={42} color={who.color} photo={who.photo} />
+            <View style={{ flex: 1 }}>
+              <Txt weight="bold" size={16}>{who.name}</Txt>
+              <Muted size={13}>{trf("Stimplaði inn {n}", `${rangeLabel(iso(new Date(who.clockIn)), iso(new Date(who.clockIn)))} · ${who.since}`)}</Muted>
+            </View>
+          </View>
+          <View style={{ gap: 6 }}>
+            <Muted size={12}>{tr("Útstimplun kl.")}</Muted>
+            <TextInput value={time} onChangeText={onTime} keyboardType="number-pad" placeholder="16:00" placeholderTextColor={colors.ink3} maxLength={5} style={[inputStyle, { fontVariant: ["tabular-nums"] }]} />
+            {at && iso(at) !== iso(new Date()) ? <Muted size={12}>{tr("Tíminn er ekki liðinn í dag — skráð á gærdaginn.")}</Muted> : null}
+          </View>
+          <Btn title={tr("Stimpla út")} loading={busy} disabled={!at} onPress={save} />
+        </View>
+      ) : null}
+    </Sheet>
+  );
+}
+
+/** Handskráð velta dagsins — fyrir þá sem eru ekki með sölukerfi tengt. */
+function RevenueSheet({ open, me, onClose, onDone }: { open: boolean; me: Parameters<typeof myCompanyId>[0]; onClose: () => void; onDone: () => void }) {
+  const toast = useToast();
+  const [locs, setLocs] = useState<LocationRow[]>([]);
+  const [loc, setLoc] = useState<string | null>(null);
+  const [back, setBack] = useState(0);
+  const [amount, setAmount] = useState("");
+  const [had, setHad] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const date = iso(addDays(new Date(), -back));
+  React.useEffect(() => {
+    if (!open) return;
+    setBack(0);
+    myCompanyId(me).then(async (c) => { if (!c) return; const l = await listLocations(c); setLocs(l); setLoc((cur) => cur ?? l[0]?.id ?? null); });
+  }, [open, me]);
+  React.useEffect(() => {
+    if (!open || !loc) return;
+    let live = true;
+    getManualRevenue(loc, date).then((v) => { if (!live) return; setHad(v); setAmount(v ? nf(v) : ""); });
+    return () => { live = false; };
+  }, [open, loc, date]);
+  const value = Number(amount.replace(/\D/g, ""));
+  async function save() {
+    if (!loc) return;
+    setBusy(true);
+    const r = await saveManualRevenue(loc, date, value);
+    setBusy(false);
+    if (!r.ok) { toast(tr(r.error ?? "Tókst ekki")); return; }
+    onDone();
+  }
+  return (
+    <Sheet open={open} onClose={onClose} title={tr("Skrá veltu")}>
+      <View style={{ gap: 14 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Pressable onPress={() => setBack(back + 1)} hitSlop={10} style={{ padding: 6 }}><ChevronLeft color={colors.ink2} size={22} /></Pressable>
+          <Txt weight="semibold" size={15}>{back === 0 ? tr("Í dag") : back === 1 ? tr("Í gær") : rangeLabel(date, date)}</Txt>
+          {back === 0 ? <View style={{ width: 34 }} /> : <Pressable onPress={() => setBack(back - 1)} hitSlop={10} style={{ padding: 6 }}><ChevronRight color={colors.ink2} size={22} /></Pressable>}
+        </View>
+        {locs.length > 1 && loc ? <Seg value={loc} onChange={setLoc} items={locs.map((l) => ({ id: l.id, label: l.name }))} /> : null}
+        <View style={{ gap: 6 }}>
+          <Muted size={12}>{tr("Velta dagsins án VSK (kr)")}</Muted>
+          <TextInput value={amount} onChangeText={(v) => { const d = v.replace(/\D/g, "").slice(0, 10); setAmount(d ? nf(Number(d)) : ""); }} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.ink3} style={[inputStyle, { fontVariant: ["tabular-nums"] }]} />
+          {had != null ? <Muted size={12}>{trf("Áður skráð: {n}. Ný tala kemur í staðinn.", kr(had))}</Muted> : null}
+        </View>
+        <Btn title={tr("Vista")} loading={busy} disabled={!(value > 0) || !loc} onPress={save} />
+      </View>
+    </Sheet>
   );
 }
 

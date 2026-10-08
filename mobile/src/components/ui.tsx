@@ -302,7 +302,7 @@ export function Seg<T extends string>({ value, onChange, items }: { value: T; on
 }
 
 export function Divider() {
-  return <View style={{ height: 1, backgroundColor: colors.line2 }} />;
+  return <View style={{ height: 1, backgroundColor: colors.line2, marginVertical: 14 }} />;
 }
 
 /** Key/value line inside a card. */

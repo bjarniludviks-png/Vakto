@@ -205,6 +205,14 @@ const D: Record<string, E> = {
   "mán": ["Mon", "T2"], "þri": ["Tue", "T3"], "mið": ["Wed", "T4"], "fim": ["Thu", "T5"], "fös": ["Fri", "T6"], "lau": ["Sat", "T7"], "sun": ["Sun", "CN"],
   "Mánudagur": ["Monday", "Thứ Hai"], "Þriðjudagur": ["Tuesday", "Thứ Ba"], "Miðvikudagur": ["Wednesday", "Thứ Tư"], "Fimmtudagur": ["Thursday", "Thứ Năm"], "Föstudagur": ["Friday", "Thứ Sáu"], "Laugardagur": ["Saturday", "Thứ Bảy"], "Sunnudagur": ["Sunday", "Chủ Nhật"],
   "janúar": ["January", "tháng 1"], "febrúar": ["February", "tháng 2"], "mars": ["March", "tháng 3"], "apríl": ["April", "tháng 4"], "maí": ["May", "tháng 5"], "júní": ["June", "tháng 6"], "júlí": ["July", "tháng 7"], "ágúst": ["August", "tháng 8"], "september": ["September", "tháng 9"], "október": ["October", "tháng 10"], "nóvember": ["November", "tháng 11"], "desember": ["December", "tháng 12"], "{n} vaktir": ["{n} shifts", "{n} ca"], "{n} vakt": ["{n} shift", "{n} ca"], "{n} alls": ["{n} total", "{n} tổng"],
+  "Skrá veltu": ["Enter revenue", "Nhập doanh thu"], "Stimplað út": ["Clocked out", "Đã chấm công ra"], "Velta skráð": ["Revenue saved", "Đã lưu doanh thu"],
+  "Stimplaði inn {n}": ["Clocked in {n}", "Chấm công vào {n}"], "Útstimplun kl.": ["Clock-out time", "Giờ chấm công ra"],
+  "Tíminn er ekki liðinn í dag — skráð á gærdaginn.": ["That time hasn't passed today — saved on yesterday.", "Giờ này hôm nay chưa tới — ghi vào hôm qua."],
+  "Velta dagsins án VSK (kr)": ["Revenue for the day excl. VAT (kr)", "Doanh thu trong ngày chưa VAT (kr)"],
+  "Áður skráð: {n}. Ný tala kemur í staðinn.": ["Previously entered: {n}. The new figure replaces it.", "Đã nhập trước: {n}. Số mới sẽ thay thế."],
+  "Stimplun fannst ekki": ["Punch not found", "Không tìm thấy lần chấm công"], "Útstimplun verður að vera eftir innstimplun": ["Clock-out must be after clock-in", "Giờ ra phải sau giờ vào"],
+  "Tíminn er ekki liðinn": ["That time hasn't passed yet", "Giờ này chưa tới"], "Tókst ekki að stimpla út": ["Couldn't clock out", "Không chấm công ra được"],
+  "Sláðu inn upphæð": ["Enter an amount", "Nhập số tiền"], "Tókst ekki að vista veltu": ["Couldn't save revenue", "Không lưu được doanh thu"],
 };
 
 const NUM = /\d[\d.,:–\-]*/g;

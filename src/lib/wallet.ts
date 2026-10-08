@@ -26,7 +26,10 @@ export function googleConfigured(): boolean {
   return !!(process.env.GOOGLE_WALLET_ISSUER_ID && process.env.GOOGLE_WALLET_SA_EMAIL && process.env.GOOGLE_WALLET_SA_KEY);
 }
 
-export type PassEmployee = { id: string; name: string; role: string; department: string; company: string; token: string; photoUrl?: string | null };
+export type PassEmployee = { id: string; name: string; role: string; department: string; company: string; token: string; photoUrl?: string | null; kennitala?: string | null; companyKt?: string | null };
+
+/** 0101902389 → 010190-2389 */
+const kt = (v?: string | null) => { const d = (v ?? "").replace(/\D/g, ""); return d.length === 10 ? `${d.slice(0, 6)}-${d.slice(6)}` : (v ?? "").trim(); };
 
 const b64 = (v?: string) => (v ? Buffer.from(v, "base64") : Buffer.alloc(0));
 
@@ -43,7 +46,6 @@ export async function buildApplePass(e: PassEmployee): Promise<Buffer> {
     passTypeIdentifier: process.env.APPLE_PASS_TYPE_ID!,
     teamIdentifier: process.env.APPLE_TEAM_ID!,
     organizationName: "VAKTO",
-    logoText: "VAKTO",
     description: `${e.company} — starfsmannaskírteini`,
     serialNumber: e.id,
     foregroundColor: "rgb(255,255,255)",
@@ -54,9 +56,26 @@ export async function buildApplePass(e: PassEmployee): Promise<Buffer> {
   for (const [name, data] of Object.entries(PASS_IMAGES)) pass.addBuffer(name, Buffer.from(data, "base64"));
   pass.type = "generic";
   pass.setBarcodes({ message: e.token, format: "PKBarcodeFormatQR", messageEncoding: "iso-8859-1", altText: e.name });
+  // mynd starfsmanns efst til hægri (Wallet tekur aðeins PNG)
+  if (e.photoUrl) {
+    try {
+      const res = await fetch(e.photoUrl, { signal: AbortSignal.timeout(4000) });
+      if (res.ok) {
+        const sharp = (await import("sharp")).default;
+        const src = Buffer.from(await res.arrayBuffer());
+        for (const [name, px] of [["thumbnail.png", 90], ["thumbnail@2x.png", 180], ["thumbnail@3x.png", 270]] as const) {
+          pass.addBuffer(name, await sharp(src).rotate().resize(px, px, { fit: "cover" }).png().toBuffer());
+        }
+      }
+    } catch (err) { console.error("[wallet] photo", err); }
+  }
+  const empKt = kt(e.kennitala), coKt = kt(e.companyKt);
+  if (e.department) pass.headerFields.push({ key: "dept", label: "DEILD", value: e.department });
   pass.primaryFields.push({ key: "name", label: "STARFSMAÐUR", value: e.name });
-  pass.secondaryFields.push({ key: "role", label: "STAÐA", value: e.role }, { key: "dept", label: "DEILD", value: e.department || "—" });
+  pass.secondaryFields.push({ key: "role", label: "STAÐA", value: e.role });
+  if (empKt) pass.secondaryFields.push({ key: "kt", label: "KENNITALA", value: empKt });
   pass.auxiliaryFields.push({ key: "company", label: "FYRIRTÆKI", value: e.company });
+  if (coKt) pass.auxiliaryFields.push({ key: "cokt", label: "KT. FÉLAGS", value: coKt });
   pass.backFields.push({ key: "info", label: "Um skírteinið", value: "Sýndu QR-kóðann á stimpilklukkunni til að stimpla inn eða út." });
   return pass.getAsBuffer();
 }
@@ -79,6 +98,8 @@ export async function buildGoogleSaveUrl(e: PassEmployee): Promise<string> {
     textModulesData: [
       { id: "role", header: "Staða", body: e.role },
       { id: "dept", header: "Deild", body: e.department || "—" },
+      ...(kt(e.kennitala) ? [{ id: "kt", header: "Kennitala", body: kt(e.kennitala) }] : []),
+      ...(kt(e.companyKt) ? [{ id: "cokt", header: "Kennitala félags", body: kt(e.companyKt) }] : []),
     ],
     barcode: { type: "QR_CODE", value: e.token, alternateText: e.name },
   };

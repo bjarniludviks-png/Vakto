@@ -2,7 +2,7 @@
 // löngu ýti, „séð af“, svar í þræði, skrifar-vísir.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
-import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable } from "react-native";
+import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChevronLeft, Send, X, Hash, CornerUpLeft, Trash2, ImagePlus, MoreHorizontal, BellOff, Bell, Paperclip, FileText, Images, LogOut } from "lucide-react-native";
@@ -81,6 +81,15 @@ export default function Thread() {
     else { const { data: mem } = await supabase.from("channel_members").select("user_id").eq("channel_id", id); setMemberList((mem ?? []).map((m) => people.get(m.user_id)).filter(Boolean).sort((a, b) => a!.name.localeCompare(b!.name)) as Person[]); }
   }
   const list = useRef<FlatList>(null);
+  // tímastimplar eru faldir hægra megin við skjáinn; strok til vinstri dregur þá inn (eins og í Messenger)
+  const { width: W } = useWindowDimensions();
+  const pull = useRef(new Animated.Value(0)).current;
+  const pan = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_e, g) => g.dx < -10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.6,
+    onPanResponderMove: (_e, g) => pull.setValue(Math.max(-TIME_W, Math.min(0, g.dx * 0.7))),
+    onPanResponderRelease: () => Animated.spring(pull, { toValue: 0, useNativeDriver: true, bounciness: 0, speed: 18 }).start(),
+    onPanResponderTerminate: () => Animated.spring(pull, { toValue: 0, useNativeDriver: true, bounciness: 0, speed: 18 }).start(),
+  })).current;
   const toast = useToast();
   const [uploading, setUploading] = useState(false);
   async function pickAndSend() {
@@ -203,6 +212,7 @@ export default function Thread() {
         <Pressable onPress={openInfo} hitSlop={10} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}><MoreHorizontal color={colors.ink} size={24} /></Pressable>
       </View>
 
+      <Animated.View {...pan.panHandlers} style={{ flex: 1, width: W + TIME_W, transform: [{ translateX: pull }] }}>
       <FlatList
         ref={list}
         data={rows}
@@ -212,19 +222,27 @@ export default function Thread() {
         onLayout={() => list.current?.scrollToEnd({ animated: false })}
         keyboardDismissMode="interactive"
         ListFooterComponent={
-          <View style={{ gap: 6 }}>
+          <View style={{ gap: 6, width: W - 28 }}>
             {typing ? <View style={{ alignSelf: "flex-start", marginLeft: 34, backgroundColor: colors.bubbleThem, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 }}><Muted size={13}>•••</Muted></View> : null}
             {seenBy.length ? <View style={{ flexDirection: "row", alignSelf: "flex-end", gap: 2, marginTop: 4 }}>{seenBy.slice(0, 5).map((r) => <Avatar key={r.userId} name={r.name} size={16} />)}</View> : null}
           </View>
         }
         renderItem={({ item }) =>
           item.kind === "sep" ? (
-            <Txt weight="bold" size={11} color={colors.ink3} style={{ alignSelf: "center", marginVertical: 10, letterSpacing: 0.6, textTransform: "uppercase" }}>{item.label}</Txt>
+            <View style={{ width: W - 28, alignItems: "center" }}>
+              <Txt weight="bold" size={11} color={colors.ink3} style={{ marginVertical: 12, letterSpacing: 0.6, textTransform: "uppercase" }}>{item.label}</Txt>
+            </View>
           ) : (
-            <Bubble item={item} onLong={() => setSel(item.m)} />
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={{ width: W - 28 }}><Bubble item={item} onLong={() => setSel(item.m)} /></View>
+              <View style={{ width: TIME_W + 14, alignItems: "center", paddingBottom: item.last ? 8 : 2 }}>
+                <Txt size={11} color={colors.ink3} style={{ fontVariant: ["tabular-nums"] }}>{item.m.at}</Txt>
+              </View>
+            </View>
           )
         }
       />
+      </Animated.View>
 
       {replyTo ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: colors.panel, borderTopWidth: 1, borderTopColor: colors.line2 }}>
@@ -316,6 +334,8 @@ export default function Thread() {
   );
 }
 
+const TIME_W = 58;
+
 function Bubble({ item, onLong }: { item: Extract<RowItem, { kind: "msg" }>; onLong: () => void }) {
   const { m, first, last, showSender } = item;
   const r = 18, s = 6;
@@ -347,7 +367,6 @@ function Bubble({ item, onLong }: { item: Extract<RowItem, { kind: "msg" }>; onL
             </View>
           ) : null}
         </Pressable>
-        {last ? <Txt size={10.5} color={colors.ink3} style={{ marginBottom: 2 }}>{m.at}</Txt> : null}
       </View>
     </View>
   );

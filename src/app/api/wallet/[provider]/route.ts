@@ -48,14 +48,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
   // Employee linked to this user (+ company name).
   const { data: emp, error: empErr } = await supabase
     .from("employees")
-    .select("id, full_name, title, department:departments(name), photo_url, clock_token, companies(name), positions(name)")
+    .select("id, full_name, title, kennitala, department:departments(name), photo_url, clock_token, companies(name, kennitala), positions(name)")
     .eq("user_id", user.id).maybeSingle();
   if (empErr) console.error("[wallet] employee", empErr.message);
   if (!emp) return NextResponse.json({ error: "Starfsmannaprófíll fannst ekki" }, { status: 404 });
 
   const dept = (Array.isArray(emp.department) ? emp.department[0] : emp.department) as { name?: string } | null;
   const pos = (Array.isArray(emp.positions) ? emp.positions[0] : emp.positions) as { name?: string } | null;
-  const comp = (Array.isArray(emp.companies) ? emp.companies[0] : emp.companies) as { name?: string } | null;
+  const comp = (Array.isArray(emp.companies) ? emp.companies[0] : emp.companies) as { name?: string; kennitala?: string | null } | null;
   const passEmp: PassEmployee = {
     id: emp.id as string,
     name: (emp.full_name as string) ?? "Starfsmaður",
@@ -64,6 +64,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
     company: comp?.name ?? "VAKTO",
     token: (emp.clock_token as string) ?? (emp.id as string),
     photoUrl: (emp.photo_url as string) ?? null,
+    kennitala: (emp.kennitala as string | null) ?? null,
+    companyKt: comp?.kennitala ?? null,
   };
 
   try {
