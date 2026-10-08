@@ -109,6 +109,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/straumur/") ||
     // Mobile-app notifications — authenticated by the caller's Supabase bearer token.
     pathname.startsWith("/api/app/") ||
+    pathname.startsWith("/api/wallet/") || // sannreynir sjálft (kaka, Bearer eða undirrituð slóð)
     // Dagatalsstraumur (ICS) — leynitengill per starfsmann, engin innskráning.
     pathname.startsWith("/api/cal/") ||
     // Taktikal webhook — sannreynt með HMAC-lykli, engin innskráning.

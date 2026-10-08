@@ -43,12 +43,15 @@ export async function buildApplePass(e: PassEmployee): Promise<Buffer> {
     passTypeIdentifier: process.env.APPLE_PASS_TYPE_ID!,
     teamIdentifier: process.env.APPLE_TEAM_ID!,
     organizationName: "VAKTO",
+    logoText: "VAKTO",
     description: `${e.company} — starfsmannaskírteini`,
     serialNumber: e.id,
     foregroundColor: "rgb(255,255,255)",
     backgroundColor: "rgb(233,112,15)", // brand orange
     labelColor: "rgb(255,255,255)",
   });
+  const { PASS_IMAGES } = await import("./wallet-assets");
+  for (const [name, data] of Object.entries(PASS_IMAGES)) pass.addBuffer(name, Buffer.from(data, "base64"));
   pass.type = "generic";
   pass.setBarcodes({ message: e.token, format: "PKBarcodeFormatQR", messageEncoding: "iso-8859-1", altText: e.name });
   pass.primaryFields.push({ key: "name", label: "STARFSMAÐUR", value: e.name });

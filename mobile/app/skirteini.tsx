@@ -86,18 +86,18 @@ export default function Skirteini() {
         </Pressable>
       ) : null}
 
-      {(ios ? ["apple", "google"] : ["google", "apple"]).map((w) => (
+      {[ios ? "apple" : "google"].map((w) => (
         <Pressable
           key={w}
           onPress={async () => {
-            if (w === "apple") { toast("Apple Wallet er væntanlegt"); return; }
+            const nafn = w === "apple" ? "Apple Wallet" : "Google Wallet";
             try {
               const { data } = await supabase.auth.getSession();
-              const res = await fetch("https://www.vakto.is/api/wallet/google", { headers: { Authorization: `Bearer ${data.session?.access_token ?? ""}` } });
+              const res = await fetch(`https://www.vakto.is/api/wallet/${w}`, { headers: { Authorization: `Bearer ${data.session?.access_token ?? ""}` } });
               const j = (await res.json().catch(() => ({}))) as { url?: string };
               if (res.ok && j.url) await Linking.openURL(j.url);
-              else toast(res.status === 501 ? "Google Wallet er væntanlegt" : "Tókst ekki að opna Google Wallet");
-            } catch { toast("Tókst ekki að opna Google Wallet"); }
+              else toast(res.status === 501 ? `${nafn} er væntanlegt` : `Tókst ekki að opna ${nafn}`);
+            } catch { toast(`Tókst ekki að opna ${nafn}`); }
           }}
           style={({ pressed }) => ({ backgroundColor: w === "apple" ? "#000" : colors.panel, borderRadius: 16, paddingVertical: 16, flexDirection: "row", justifyContent: "center", alignItems: "center", gap: 10, borderWidth: 1, borderColor: w === "apple" ? "#333" : colors.line, opacity: pressed ? 0.85 : 1 })}
         >
@@ -105,7 +105,7 @@ export default function Skirteini() {
           <Txt weight="bold" size={16} color={w === "apple" ? "#fff" : colors.ink}>{w === "apple" ? "Bæta í Apple Wallet" : "Bæta í Google Wallet"}</Txt>
         </Pressable>
       ))}
-      <Muted size={12.5} style={{ textAlign: "center", lineHeight: 18 }}>Ýttu á kortið til að sjá mynd og allar upplýsingar. QR-kóðann má skanna í kiosk-stimpilklukkunni. Skírteinið má líka geyma í Google Wallet.</Muted>
+      <Muted size={12.5} style={{ textAlign: "center", lineHeight: 18 }}>Ýttu á kortið til að sjá mynd og allar upplýsingar. QR-kóðann má skanna í kiosk-stimpilklukkunni. Skírteinið má líka geyma í veskinu í símanum.</Muted>
 
       <Sheet open={open} onClose={() => setOpen(false)}>
         {me ? (
