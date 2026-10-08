@@ -2,7 +2,7 @@
 // löngu ýti, „séð af“, svar í þræði, skrifar-vísir.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
-import { View, TextInput, FlatList, KeyboardAvoidingView, Platform, Pressable } from "react-native";
+import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChevronLeft, Send, X, Hash, CornerUpLeft, Trash2, ImagePlus, MoreHorizontal, BellOff, Bell, Paperclip, FileText, Images, LogOut } from "lucide-react-native";
@@ -97,6 +97,13 @@ export default function Thread() {
   }
   const typingRef = useRef<ReturnType<typeof typingChannel> | null>(null);
   const lastTyped = useRef(0);
+
+  // lyklaborðið opnast → nýjustu skilaboðin haldast í sjónmáli
+  useEffect(() => {
+    const toEnd = () => setTimeout(() => list.current?.scrollToEnd({ animated: true }), 60);
+    const subs = [Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", toEnd), Keyboard.addListener("keyboardDidShow", toEnd)];
+    return () => subs.forEach((x) => x.remove());
+  }, []);
 
   const load = useCallback(async () => {
     if (!me || !id) return;
@@ -202,6 +209,8 @@ export default function Thread() {
         keyExtractor={(r) => r.key}
         contentContainerStyle={{ padding: 14, paddingBottom: 8 }}
         onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
+        onLayout={() => list.current?.scrollToEnd({ animated: false })}
+        keyboardDismissMode="interactive"
         ListFooterComponent={
           <View style={{ gap: 6 }}>
             {typing ? <View style={{ alignSelf: "flex-start", marginLeft: 34, backgroundColor: colors.bubbleThem, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 }}><Muted size={13}>•••</Muted></View> : null}
