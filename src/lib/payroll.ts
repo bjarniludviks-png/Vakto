@@ -130,6 +130,8 @@ export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clock
     const end = new Date(p.clockOut).getTime();
     let t = new Date(p.clockIn).getTime();
     while (t < end) {
+      // síðasti bútur stimplunar er nákvæmur — ekki námundað upp í heilt korter
+      const s = Math.min(STEP, (end - t) / 3600000);
       const dt = new Date(t);
       const wk = mondayKey(dt);
       const acc = weekHrs.get(wk) ?? 0;
@@ -138,13 +140,13 @@ export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clock
       let pct = prem;
       const isOt = (acc >= otWeekly || monthAcc >= otMonthly) && rules.overtime > prem;
       if (acc >= otWeekly || monthAcc >= otMonthly) pct = Math.max(pct, rules.overtime); // yfirvinna (viku/mánuði)
-      gross += e.rate * STEP * (1 + pct / 100);
-      base += e.rate * STEP;
-      if (isOt) otExtra += e.rate * STEP * (pct / 100); else premExtra += e.rate * STEP * (pct / 100);
-      hours += STEP;
-      monthAcc += STEP;
-      weekHrs.set(wk, acc + STEP);
-      t += STEP * 3600000;
+      gross += e.rate * s * (1 + pct / 100);
+      base += e.rate * s;
+      if (isOt) otExtra += e.rate * s * (pct / 100); else premExtra += e.rate * s * (pct / 100);
+      hours += s;
+      monthAcc += s;
+      weekHrs.set(wk, acc + s);
+      t += s * 3600000;
     }
   }
   return finalize(e, Math.round(hours * 10) / 10, Math.round(gross), uppbot, { dayPay: base, premiums: premExtra, overtime: otExtra });
@@ -169,21 +171,23 @@ export function classifyPay(rate: number, hourly: boolean, punches: { clockIn: s
     const end = new Date(p.clockOut).getTime();
     let t = new Date(p.clockIn).getTime();
     while (t < end) {
+      // síðasti bútur stimplunar er nákvæmur — ekki námundað upp í heilt korter
+      const s = Math.min(STEP, (end - t) / 3600000);
       const dt = new Date(t);
       const wk = mondayKey(dt);
       const acc = weekHrs.get(wk) ?? 0;
       const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
       const prem = Math.max(premiumPct(dt, STORHATID.has(iso), rules), bandPct(dt, bands));
       const otActive = acc >= otWeekly || monthAcc >= otMonthly;
-      if (prem > 0) premium += STEP;
-      if (otActive) overtime += STEP;
+      if (prem > 0) premium += s;
+      if (otActive) overtime += s;
       if (hourly) {
         const effPct = otActive ? Math.max(prem, otPct) : prem; // engine pays the higher
-        const extra = rate * STEP * (effPct / 100) * (1 + BURDEN);
+        const extra = rate * s * (effPct / 100) * (1 + BURDEN);
         if (otActive && otPct >= prem) overtimePay += extra; else premiumPay += extra;
       }
-      total += STEP; monthAcc += STEP; weekHrs.set(wk, acc + STEP);
-      t += STEP * 3600000;
+      total += s; monthAcc += s; weekHrs.set(wk, acc + s);
+      t += s * 3600000;
     }
   }
   const r1 = (n: number) => Math.round(n * 10) / 10;
