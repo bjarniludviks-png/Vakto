@@ -373,7 +373,7 @@ function DateSheet({ open, onClose, onPick }: { open: boolean; onClose: () => vo
       </View>
       <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 4 }}>
         {cells.map((d, i) => (
-          <View key={i} style={{ width: `${100 / 7}%`, aspectRatio: 1, padding: 2 }}>
+          <View key={i} style={{ width: "14.28%", aspectRatio: 1, padding: 2 }}>
             {d ? (
               <Pressable
                 onPress={() => tap(d)}
