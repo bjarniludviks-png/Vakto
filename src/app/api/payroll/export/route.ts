@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import * as XLSX from "xlsx";
-import { computeLine, computeFromPunches, classifyPay, type PayLine } from "@/lib/payroll";
+import { computeLine, computeFromPunches, hourBuckets, type PayLine } from "@/lib/payroll";
 import { resolveRuleSet } from "@/lib/payrules";
 import { DEMO_EMPLOYEES, type Employee } from "@/lib/employees";
 
@@ -17,7 +17,7 @@ const toEmp = (e: Record<string, unknown>): Employee => ({
 } as Employee);
 
 /** Worked hours split the way Payday's timesheet import wants them. */
-type HourBuckets = { dagvinna: number; yfirvinna: number };
+type HourBuckets = { dagvinna: number; yfirvinna: number; alag: Record<number, number> };
 
 async function getLines(from?: string, to?: string): Promise<{ lines: PayLine[]; kt: Record<string, string>; hours: Map<string, HourBuckets>; live: boolean }> {
   const hours = new Map<string, HourBuckets>();
@@ -69,10 +69,10 @@ async function getLines(from?: string, to?: string): Promise<{ lines: PayLine[];
         .map((e) => {
           const rules = resolveRuleSet(e.union_agreement as string, ruleMap.get(e.id as string));
           const group = byEmp.get(e.id as string) ?? [];
-          // Same overtime threshold logic as the pay engine (weekly/monthly), so
-          // the Payday hours agree with what Vakto shows.
-          const cls = classifyPay(Number(e.rate), e.pay_type === "hourly", group, rules);
-          hours.set(e.id as string, { dagvinna: Math.round((cls.total - cls.overtime) * 100) / 100, yfirvinna: Math.round(cls.overtime * 100) / 100 });
+          // Sama regla og launavélin: dagvinna, yfirvinna og álagstímar per prósentu.
+          // Fastlaunafólk fær laun óháð tímum — engir álagsliðir þar.
+          const hb = hourBuckets(group, rules);
+          hours.set(e.id as string, e.pay_type === "hourly" ? hb : { dagvinna: Math.round((hb.dagvinna + hb.yfirvinna) * 100) / 100, yfirvinna: 0, alag: {} });
           return computeFromPunches(toEmp(e), group, rules);
         });
       return { lines, kt, hours, live: true };
@@ -89,17 +89,19 @@ async function getLines(from?: string, to?: string): Promise<{ lines: PayLine[];
  * Eftirvinna (+ extra columns named exactly like the launaliður in Payday).
  * See hjalp.payday.is/article/131. Kennitala must stay text (leading zeros). */
 function paydayTimesheetXlsx(lines: PayLine[], kt: Record<string, string>, hours: Map<string, HourBuckets>): Buffer {
-  const header = ["Kennitala", "Nafn", "Dagvinna", "Yfirvinna", "Eftirvinna", "Mötuneyti"];
   // Without punch-based buckets (no period / demo) fall back to the line's total as dagvinna.
-  const bucket = (l: PayLine): HourBuckets => hours.get(l.employeeId) ?? { dagvinna: l.hours, yfirvinna: 0 };
+  const bucket = (l: PayLine): HourBuckets => hours.get(l.employeeId) ?? { dagvinna: l.hours, yfirvinna: 0, alag: {} };
+  // Einn dálkur per álagsprósentu sem kemur fyrir („Álag 33%“, „Álag 45%“ …) — nöfnin stemma við launaliði í Payday.
+  const pcts = [...new Set(lines.flatMap((l) => Object.entries(bucket(l).alag).filter(([, h]) => h > 0).map(([p]) => Number(p))))].sort((a, b) => a - b);
+  const header = ["Kennitala", "Nafn", "Dagvinna", "Yfirvinna", "Eftirvinna", "Mötuneyti", ...pcts.map((p) => `Álag ${String(p).replace(".", ",")}%`)];
   const rows = lines
     .filter((l) => bucket(l).dagvinna + bucket(l).yfirvinna > 0)
     .sort((a, b) => a.name.localeCompare(b.name, "is"))
-    .map((l) => { const h = bucket(l); return [kt[l.employeeId] ?? "", l.name, h.dagvinna || null, h.yfirvinna || null, null, null]; });
+    .map((l) => { const h = bucket(l); return [kt[l.employeeId] ?? "", l.name, h.dagvinna || null, h.yfirvinna || null, null, null, ...pcts.map((p) => h.alag[p] || null)]; });
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
   // Force kennitala cells to text so Excel/Payday never drop a leading zero.
   for (let r = 1; r <= rows.length; r++) { const c = ws[`A${r + 1}`]; if (c) { c.t = "s"; c.v = String(c.v); } }
-  ws["!cols"] = [{ wch: 12 }, { wch: 28 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
+  ws["!cols"] = [{ wch: 12 }, { wch: 28 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, ...pcts.map(() => ({ wch: 11 }))];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;

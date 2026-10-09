@@ -194,6 +194,42 @@ export function classifyPay(rate: number, hourly: boolean, punches: { clockIn: s
   return { total: r1(total), overtime: r1(overtime), premium: r1(premium), overtimePay: Math.round(overtimePay), premiumPay: Math.round(premiumPay) };
 }
 
+/** Tímar flokkaðir eins og launakerfi (Payday) vill þá: dagvinna = allir tímar utan yfirvinnu,
+ * álag[pct] = þeir dagvinnutímar sem bera vaktaálag (greitt OFAN Á dagvinnu, pct % af taxta),
+ * yfirvinna = tímar yfir viku-/mánaðarmörkum. Sama regla og computeFromPunches, svo
+ * dagvinna×taxti + Σ álag×pct×taxti + yfirvinna×taxti×(1+yfirv.%) = brúttó. */
+export function hourBuckets(punches: { clockIn: string; clockOut: string }[], rules: CustomRules): { dagvinna: number; yfirvinna: number; alag: Record<number, number> } {
+  const otWeekly = rules.otWeekly && rules.otWeekly > 0 ? rules.otWeekly : OT_WEEKLY;
+  const otMonthly = rules.otMonthly && rules.otMonthly > 0 ? rules.otMonthly : Infinity;
+  const otPct = rules.overtime ?? 0;
+  const bands = rules.bands ?? [];
+  let dagvinna = 0, yfirvinna = 0, monthAcc = 0;
+  const alag: Record<number, number> = {};
+  const weekHrs = new Map<string, number>();
+  const sorted = punches.slice().sort((a, b) => a.clockIn.localeCompare(b.clockIn));
+  for (const p of sorted) {
+    if (!p.clockOut) continue;
+    const end = new Date(p.clockOut).getTime();
+    let t = new Date(p.clockIn).getTime();
+    while (t < end) {
+      const s = Math.min(STEP, (end - t) / 3600000);
+      const dt = new Date(t);
+      const wk = mondayKey(dt);
+      const acc = weekHrs.get(wk) ?? 0;
+      const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+      const prem = Math.max(premiumPct(dt, STORHATID.has(iso), rules), bandPct(dt, bands));
+      const otActive = acc >= otWeekly || monthAcc >= otMonthly;
+      if (otActive && otPct >= prem) yfirvinna += s;
+      else { dagvinna += s; if (prem > 0) alag[prem] = (alag[prem] ?? 0) + s; }
+      monthAcc += s; weekHrs.set(wk, acc + s);
+      t += s * 3600000;
+    }
+  }
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  for (const k of Object.keys(alag)) alag[Number(k)] = r2(alag[Number(k)]);
+  return { dagvinna: r2(dagvinna), yfirvinna: r2(yfirvinna), alag };
+}
+
 export type PayrollTotals = { hours: number; gross: number; withholding: number; pension: number; union: number; net: number; cost: number };
 
 export function totals(lines: PayLine[]): PayrollTotals {
