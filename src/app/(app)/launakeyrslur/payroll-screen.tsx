@@ -82,6 +82,8 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
   const { t } = useLang();
   const [slip, setSlip] = useState<PayslipData | null>(null);
   const [showZero, setShowZero] = useState(false);
+  const [off, setOff] = useState<Set<string>>(new Set());
+  const [kind, setKind] = useState<"all" | "hourly" | "monthly">("all");
   const [period, setPeriod] = useState("this");
   const thisMonth = payRange("this", "", "", periodStart);
   const [cf, setCf] = useState(thisMonth.from);
@@ -109,15 +111,27 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
   }, [view.live, histYear]);
 
   const usePp = view.live && pp;
-  const ROWS = usePp ? pp.rows : view.rows;
-  const T = usePp ? pp.totals : view.totals;
+  const ALL = usePp ? pp.rows : view.rows;
+  // Val: launategund (allir / tímakaup / föst laun) og hök per starfsmann. Samtölur, keyrsla og útflutningur fylgja valinu.
+  const canPick = !!usePp && ALL.every((r) => r.id && r.x);
+  const ROWS = canPick && kind !== "all" ? ALL.filter((r) => (kind === "monthly") === !!r.monthly) : ALL;
+  const picked = canPick ? ROWS.filter((r) => !off.has(r.id!)) : ROWS;
+  const partial = canPick && picked.length !== ALL.length;
+  const sum = (f: (x: NonNullable<(typeof ALL)[number]["x"]>) => number) => picked.reduce((a, r) => a + f(r.x!), 0);
+  const T = !usePp ? view.totals : !canPick || !partial ? pp.totals : {
+    ...pp.totals, count: picked.length, hours: dec1(sum((x) => x.hours)), gross: nf(sum((x) => x.gross)), withholding: "−" + nf(sum((x) => x.withholding)),
+    pensionUnion: "−" + nf(sum((x) => x.pu)), net: nf(sum((x) => x.net)), cost: nf(sum((x) => x.cost)),
+  };
+  const idsQs = partial ? `&ids=${picked.map((r) => r.id).join(",")}` : "";
+  const toggle = (id: string) => setOff((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const periodLabel = usePp ? pp.periodLabel : `${range.from} – ${range.to}`;
-  const qs = `?format=$F&from=${range.from}&to=${range.to}`;
+  const qs = `?format=$F&from=${range.from}&to=${range.to}${idsQs}`;
   function download(format: "payday" | "excel" | "dk") {
     window.location.href = `/api/payroll/export${qs.replace("$F", format)}`;
   }
   async function keyra() {
-    const res = await runPayroll(view.live ? range.from : undefined, view.live ? range.to : undefined, settleIds);
+    if (partial && !picked.length) { toast(t("Enginn starfsmaður er valinn")); return; }
+    const res = await runPayroll(view.live ? range.from : undefined, view.live ? range.to : undefined, settleIds, partial ? picked.map((r) => r.id!) : undefined);
     if (!res.ok) { toast(res.error ?? "Tókst ekki"); return; }
     toast(res.demo ? `Launakeyrsla keyrð (demo — ${res.count} starfsm.)` : `Launakeyrsla keyrð & vistuð — ${res.count} starfsmenn`);
   }
@@ -172,13 +186,13 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
         <div className="db2-hero-l">
           <div className="db2-k">{t("Heildarkostnaður launa")}</div>
           <div className="db2-big db2-big-kr">{nf(cost)}<small>kr</small></div>
-          <p className="db2-verdict">{T.count} {t("starfsmenn")} · {T.hours} {t("klst")}{hoursN > 0 && cost > 0 ? ` · ${nf(Math.round(cost / hoursN))} kr ${t("á klst með gjöldum")}` : ""}. <span className="db2-muted">{t("Aðeins samþykktir tímar.")}</span></p>
+          <p className="db2-verdict">{T.count} {t("starfsmenn")} · {T.hours} {t("klst")}{hoursN > 0 && cost > 0 ? ` · ${nf(Math.round(cost / hoursN))} kr ${t("á klst með gjöldum")}` : ""}. <span className="db2-muted">{t("Aðeins samþykktir tímar.")}</span>{partial ? <> <b className="pr-part">{t("Aðeins valdir starfsmenn")} · {picked.length}/{ALL.length}</b></> : null}</p>
           {partsSum > 0 && (<>
             <div className="db2-stack db2-stack-lg">{parts.map((p) => <span key={p.k} style={{ width: `${(p.v / partsSum) * 100}%`, background: p.c }} />)}</div>
             <div className="db2-keys">{parts.map((p) => <span key={p.k}><i style={{ background: p.c }} />{t(p.k)}<b>{nf(p.v)} kr</b></span>)}</div>
           </>)}
           <div className="db2-heroacts">
-            <button className="btn" onClick={keyra}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12l5 5L20 6" /></svg>{t("Keyra launakeyrslu")}</button>
+            <button className="btn" onClick={keyra}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12l5 5L20 6" /></svg>{t("Keyra launakeyrslu")}{partial ? ` (${picked.length})` : ""}</button>
             <button className="btn ghost" style={settleIds.length ? { borderColor: "var(--brand)", color: "var(--brand)" } : undefined}
               title={t("Jafnar mínus-stöðu tímabanka á GRUNNTAXTA — yfirvinnuálagið helst alltaf hjá starfsmanninum")}
               onClick={() => setTbModal(true)}>
@@ -202,16 +216,24 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
 
       <section className="db2-card db2-staff">
         <div className="db2-ch"><div><div className="db2-ct">{t("Sundurliðun per starfsmann")}</div><div className="db2-cs">{periodLabel} · {t("smelltu á röð til að sjá launaseðil")}</div></div>
+          {canPick && ALL.some((r) => r.monthly) && ALL.some((r) => !r.monthly) && (
+            <div className="db2-seg pr-kind" role="tablist">
+              {([["all", "Allir"], ["hourly", "Tímakaup"], ["monthly", "Föst laun"]] as const).map(([k, l]) => (
+                <button key={k} role="tab" aria-selected={kind === k} className={kind === k ? "on" : ""} onClick={() => setKind(k)}>{t(l)}</button>
+              ))}
+            </div>
+          )}
           <button className="btn ghost sm" onClick={() => download("excel")}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Allir seðlar")}</button></div>
         <div className="db2-tblwrap">
           <table>
-            <thead><tr><th>{t("Starfsmaður")}</th><th className="r">{t("Tímar")}</th><th className="r">{t("Brúttó")}</th><th className="r">{t("Staðgreiðsla")}</th><th className="r">{t("Lífeyrir+félag")}</th><th className="r">{t("Útborgað")}</th><th style={{ width: 20 }} /></tr></thead>
+            <thead><tr>{canPick && <th className="pr-ck"><input type="checkbox" aria-label={t("Velja alla")} checked={ROWS.length > 0 && ROWS.every((r) => !off.has(r.id!))} onChange={(e) => setOff((cur) => { const n = new Set(cur); for (const r of ROWS) { if (e.target.checked) n.delete(r.id!); else n.add(r.id!); } return n; })} /></th>}<th>{t("Starfsmaður")}</th><th className="r">{t("Tímar")}</th><th className="r">{t("Brúttó")}</th><th className="r">{t("Staðgreiðsla")}</th><th className="r">{t("Lífeyrir+félag")}</th><th className="r">{t("Útborgað")}</th><th style={{ width: 20 }} /></tr></thead>
             <tbody>
               {ROWS.length ? ROWS.filter((r) => showZero || num(r.g) !== 0 || ROWS.every((x) => num(x.g) === 0)).map((r) => {
                 const zero = num(r.g) === 0;
                 return (
-                <tr className={`db2-rowlink${zero ? " db2-dim" : ""}`} key={r.n} onClick={() => setSlip({ name: r.d?.name ?? r.n, period: periodLabel, hours: r.h, gross: r.g, withholding: r.w.replace("−", ""), pension: r.p.replace("−", ""), net: r.net, d: r.d })}>
-                  <td><span className="db2-who"><Av id={r.id} c={r.c} av={r.av} /><span>{r.n}</span></span></td>
+                <tr className={`db2-rowlink${zero || (canPick && off.has(r.id!)) ? " db2-dim" : ""}`} key={r.id ?? r.n} onClick={() => setSlip({ name: r.d?.name ?? r.n, period: periodLabel, hours: r.h, gross: r.g, withholding: r.w.replace("−", ""), pension: r.p.replace("−", ""), net: r.net, d: r.d })}>
+                  {canPick && <td className="pr-ck" onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label={r.n} checked={!off.has(r.id!)} onChange={() => toggle(r.id!)} /></td>}
+                  <td><span className="db2-who"><Av id={r.id} c={r.c} av={r.av} /><span>{r.n}</span>{r.monthly ? <span className="db2-pill pr-fixed">{t("Föst laun")}</span> : null}</span></td>
                   <td className="r">{r.h}</td>
                   <td className="r">{r.g}</td>
                   <td className="r db2-muted">{r.w}</td>
@@ -220,9 +242,10 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
                   <td><svg className="db2-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></td>
                 </tr>
                 );
-              }) : <tr><td colSpan={7} className="db2-muted" style={{ textAlign: "center", padding: 26 }}>{t("Engir samþykktir tímar á þessu tímabili — samþykktu vaktir í Tímaskráningu.")}</td></tr>}
+              }) : <tr><td colSpan={8} className="db2-muted" style={{ textAlign: "center", padding: 26 }}>{t("Engir samþykktir tímar á þessu tímabili — samþykktu vaktir í Tímaskráningu.")}</td></tr>}
               {ROWS.length > 0 && (
               <tr className="db2-foot">
+                {canPick && <td />}
                 <td>{t("Samtals")} · {T.count} {t("starfsm.")}</td>
                 <td className="r">{T.hours}</td><td className="r">{T.gross}</td><td className="r">{T.withholding}</td><td className="r">{T.pensionUnion}</td><td className="r">{T.net}</td><td />
               </tr>

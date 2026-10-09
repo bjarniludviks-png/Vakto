@@ -1502,3 +1502,10 @@ a.db2-who:hover span{color:var(--brand)}
 .my2 .punch button:active{transform:scale(.98)}
 .my2 .punch .big{font-size:44px}
 @media(max-width:560px){.my2 .emp-stat{padding:14px 14px}.my2 .emp-stat .v{font-size:22px}.my2 .emp-stats{gap:10px}.my2 .qa-grid{grid-template-columns:repeat(2,1fr)}.my2 .mini{padding:18px}}
+
+/* Launakeyrsla: val á starfsmönnum */
+.db2 .pr-ck{width:34px;padding-right:0}
+.db2 .pr-ck input{width:16px;height:16px;accent-color:var(--brand);cursor:pointer;vertical-align:middle}
+.db2 .pr-kind{margin-left:auto;margin-right:10px}
+.db2 .pr-fixed{margin-left:8px;font-size:11px}
+.db2 .pr-part{color:var(--brand-deep);font-weight:600}

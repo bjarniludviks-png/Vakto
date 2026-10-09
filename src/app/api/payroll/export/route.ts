@@ -111,7 +111,11 @@ export async function GET(request: Request) {
   const format = fmtParam === "excel" ? "excel" : fmtParam === "dk" ? "dk" : "payday";
   const from = url.searchParams.get("from") ?? undefined;
   const to = url.searchParams.get("to") ?? undefined;
-  const { lines, kt, hours } = await getLines(from, to);
+  const got = await getLines(from, to);
+  // ids: aðeins valdir starfsmenn (hakað í launakeyrslu)
+  const ids = (url.searchParams.get("ids") ?? "").split(",").filter(Boolean);
+  const { kt, hours } = got;
+  const lines = ids.length ? got.lines.filter((l) => ids.includes(l.employeeId)) : got.lines;
 
   if (format === "payday") {
     // Payday imports HOURS per launaliður and prices them itself — so this is a

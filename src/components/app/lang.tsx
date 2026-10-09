@@ -9,6 +9,7 @@ type Dict = Record<string, { is: string; en: string; vi?: string }>;
 // App-shell chrome strings. Per-screen content can adopt useLang() incrementally.
 export const DICT: Dict = {
   // Mælaborð v2
+  "Föst laun": { is: "Föst laun", en: "Salaried", vi: "Lương cố định" }, "Velja alla": { is: "Velja alla", en: "Select all", vi: "Chọn tất cả" }, "Aðeins valdir starfsmenn": { is: "Aðeins valdir starfsmenn", en: "Selected staff only", vi: "Chỉ nhân viên đã chọn" }, "Enginn starfsmaður er valinn": { is: "Enginn starfsmaður er valinn", en: "No employee is selected", vi: "Chưa chọn nhân viên nào" },
   "Áætlaður reikningur (án VSK)": { is: "Áætlaður reikningur (án VSK)", en: "Estimated invoice (excl. VAT)" },
   "Áætluð upphæð úr samþykktum tímum. Þú sendir reikning fyrir verkinu og sérð sjálf(ur) um skatta og lífeyri.": { is: "Áætluð upphæð úr samþykktum tímum. Þú sendir reikning fyrir verkinu og sérð sjálf(ur) um skatta og lífeyri.", en: "Estimated from approved hours. You invoice for the work and handle your own taxes and pension." },
   "my:tab:ov": { is: "Yfirlit", en: "Overview" },

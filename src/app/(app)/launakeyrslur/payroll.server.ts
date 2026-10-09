@@ -7,7 +7,11 @@ import { computeLine, totals as sumTotals, BURDEN, type PayLine } from "@/lib/pa
 import { initials } from "@/lib/employees";
 import { nf, dec1 } from "@/lib/format";
 
-export type PayrollRow = { id?: string; n: string; av: string; c: string; h: string; g: string; w: string; p: string; net: string; d?: PayslipDetail };
+export type PayrollRow = { id?: string; n: string; av: string; c: string; h: string; g: string; w: string; p: string; net: string; d?: PayslipDetail;
+  /** Fastlaunamaður — „Tímar“ eru þá raunverulega samþykktir tímar, ekki grunnur launa. */
+  monthly?: boolean;
+  /** Hráar tölur svo skjárinn geti lagt saman valda starfsmenn. */
+  x?: { hours: number; gross: number; withholding: number; pu: number; net: number; cost: number } };
 export type PayrollTotalsView = { count: number; hours: string; gross: string; withholding: string; pensionUnion: string; net: string; cost: string; grossM: string; netM: string; costM: string; withholdingM: string; insuranceM: string };
 export type PayrollView = { rows: PayrollRow[]; totals: PayrollTotalsView; live: boolean };
 

@@ -31,7 +31,7 @@ async function companyOf(supabase: Awaited<ReturnType<typeof createClient>>) {
 
 /** Build payroll lines from APPROVED worked hours in a date range. Falls back to
  * all closed punches (with needsMigration=true) before migration 0008 is run. */
-async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>, company: string, from: string, to: string): Promise<{ lines: PayLine[]; needsMigration: boolean }> {
+async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>, company: string, from: string, to: string): Promise<{ lines: PayLine[]; needsMigration: boolean; worked: Map<string, number> }> {
   const { employees } = await getEmployees();
   let needsMigration = false;
   let punches: { employee_id: string; clock_in: string; clock_out: string }[] = [];
@@ -76,7 +76,10 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
       const ub = uppKind ? computeUppbot(resolveUppbot(e.union)[uppKind], e.employmentRatio) : 0;
       return computeFromPunches(e, byEmp.get(e.id) ?? [], resolveRuleSet(e.union, ruleMap.get(e.id)), ub);
     });
-  return { lines, needsMigration };
+  // Raunverulega samþykktir tímar per starfsmann (fastlaunafólk fær laun óháð þeim, en taflan sýnir þá).
+  const worked = new Map<string, number>();
+  for (const p of punches) worked.set(p.employee_id, (worked.get(p.employee_id) ?? 0) + Math.max(0, (Date.parse(p.clock_out) - Date.parse(p.clock_in)) / 3.6e6));
+  return { lines, needsMigration, worked };
 }
 
 /** Period payroll view from approved hours — drives the screen's period selector. */
@@ -90,8 +93,9 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
     const { employees, live } = await getEmployees();
     if (!live) return empty;
     const colorOf = (id: string) => employees.find((e) => e.id === id)?.avatarColor ?? "#5b50e6";
-    const { lines, needsMigration } = await approvedLines(supabase, ctx.company, from, to);
+    const { lines, needsMigration, worked } = await approvedLines(supabase, ctx.company, from, to);
     const t = sumTotals(lines);
+    const shownHours = (l: PayLine) => (empOf(l.employeeId)?.payType === "monthly" ? Math.round((worked.get(l.employeeId) ?? 0) * 10) / 10 : l.hours);
     const { data: co } = await supabase.from("companies").select("name, kennitala").eq("id", ctx.company).maybeSingle();
     const empOf = (id: string) => employees.find((e) => e.id === id);
     // Verktakar: samþykktir tímar × tímagjald (eða fast mánaðargjald) = áætlaður reikningur, án VSK.
@@ -113,7 +117,9 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
         const e = empOf(l.employeeId);
         return {
           id: l.employeeId, n: l.name.split(/\s+/)[0], av: initials(l.name), c: colorOf(l.employeeId),
-          h: dec1(l.hours), g: nf(l.gross), w: "−" + nf(l.withholding), p: "−" + nf(l.pension + l.union), net: nf(l.net),
+          h: dec1(shownHours(l)), g: nf(l.gross), w: "−" + nf(l.withholding), p: "−" + nf(l.pension + l.union), net: nf(l.net),
+          monthly: e?.payType === "monthly",
+          x: { hours: shownHours(l), gross: l.gross, withholding: l.withholding, pu: l.pension + l.union, net: l.net, cost: l.cost },
           d: {
             name: l.name, kennitala: e?.kennitala ?? null, title: e?.title || e?.position || null, union: e?.union ?? null, bankAccount: e?.bankAccount ?? null,
             company: (co?.name as string) ?? "", companyKt: (co?.kennitala as string) ?? null,
@@ -125,7 +131,7 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
         };
       }),
       totals: {
-        count: lines.length, hours: dec1(t.hours), gross: nf(t.gross), withholding: "−" + nf(t.withholding),
+        count: lines.length, hours: dec1(lines.reduce((a, l) => a + shownHours(l), 0)), gross: nf(t.gross), withholding: "−" + nf(t.withholding),
         pensionUnion: "−" + nf(t.pension + t.union), net: nf(t.net), cost: nf(t.cost),
         grossM: million(t.gross), netM: million(t.net), costM: million(t.cost), withholdingM: million(t.withholding), insuranceM: million(Math.round(t.gross * 0.0635)),
       },
@@ -137,7 +143,8 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
 }
 
 /** Run + persist payroll for a period using approved worked hours. */
-export async function runPayroll(from?: string, to?: string, settleIds: string[] = []): Promise<RunResult> {
+/** onlyIds: keyra aðeins fyrir valda starfsmenn (hakað í töflunni). Tómt/undefined = allir. */
+export async function runPayroll(from?: string, to?: string, settleIds: string[] = [], onlyIds?: string[]): Promise<RunResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true, count: 0 };
   try {
     const supabase = await createClient();
@@ -149,7 +156,8 @@ export async function runPayroll(from?: string, to?: string, settleIds: string[]
     const start = from ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
     const end = to ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()).padStart(2, "0")}`;
 
-    const { lines } = await approvedLines(supabase, company, start, end);
+    const all = (await approvedLines(supabase, company, start, end)).lines;
+    const lines = onlyIds?.length ? all.filter((l) => onlyIds.includes(l.employeeId)) : all;
     if (!lines.length) return { ok: false, error: "Engir samþykktir tímar á tímabilinu" };
 
     // Optional time-bank settlement — MONTHLY staff with a negative balance.
