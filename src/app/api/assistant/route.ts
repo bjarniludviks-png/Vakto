@@ -7,9 +7,9 @@ import { assistantUser, rateLimited } from "@/lib/ai/assistant-auth";
 
 // VAKTO AI — aðstoðarmaður í horninu (stjórnendur og vaktstjórar).
 // Les gögn með verkfærum; breytingar verða að TILLÖGUM sem notandinn staðfestir með hnappi (sjá ./execute).
-export const maxDuration = 60;
+export const maxDuration = 180;
 const MODEL = "claude-sonnet-5";
-const MAX_STEPS = 8;
+const MAX_STEPS = 10;
 const DAYS_IS = ["sunnudagur", "mánudagur", "þriðjudagur", "miðvikudagur", "fimmtudagur", "föstudagur", "laugardagur"];
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   if ("error" in me) return NextResponse.json({ ok: false, error: me.error }, { status: me.status });
   if (rateLimited(me.userId)) return NextResponse.json({ ok: false, error: "Of margar fyrirspurnir í einu — bíddu aðeins." }, { status: 429 });
 
-  let body: { messages?: Msg[]; path?: string; lang?: string } = {};
+  let body: { messages?: Msg[]; path?: string; lang?: string; conversationId?: string } = {};
   try { body = await request.json(); } catch { /* tómt */ }
   const lang = body.lang === "en" ? "en" : body.lang === "vi" ? "vi" : "is";
   const history: Anthropic.MessageParam[] = (body.messages ?? [])
@@ -39,7 +39,8 @@ Fyrirtæki: ${me.company}. Notandi: ${me.name} (${me.role === "owner" ? "stjórn
 Hlutverk þín:
 1. Svara spurningum um reksturinn með tölum úr verkfærunum (laun % af veltu, velta, kostnaður, tímar, frávik, hver er á vakt, vaktaplan, beiðnir). Notaðu ALLTAF verkfæri fyrir tölur — aldrei giska eða búa til tölur.
 2. Undirbúa breytingar: setja/breyta/eyða vakt, afgreiða frí-beiðnir og vaktaskipti, stimpla út. Skrifverkfærin framkvæma EKKERT — þau búa til tillögu sem notandinn staðfestir með „Staðfesta"-hnappi undir svarinu þínu. Segðu því aldrei að breyting sé búin; segðu að tillagan bíði staðfestingar. Skoðaðu fyrst stöðuna (t.d. shifts eða pending_requests) svo nöfn og id séu rétt.
-3. Svara „hvernig geri ég…“ spurningum út frá upplýsingunum hér að neðan. Ef þú veist ekki svarið, vísaðu á hallo@vakto.is.
+3. Setja upp heila viku: þegar beðið er um vaktaplan fyrir viku („settu upp næstu viku“, „allir vinni 36 tíma og fái einn frídag“), kallaðu fyrst á week_planning_context og síðan á plan_week með ÖLLUM vöktum vikunnar í einni tillögu. Virtu óframboð og samþykkt frí (settu aldrei vakt á þá daga), ein vakt per starfsmann per dag, minnst 11 klst hvíld milli vakta, notaðu tíma úr vaktategundum fyrirtækisins þegar þær passa, haltu þig við mönnunarþörf og launamarkmið ef þau eru gefin, og dreifðu helgum sanngjarnt. Fastlaunafólk fær vaktir eins og aðrir. Ef ósk notandans stangast á við óframboð eða frí, segðu frá því í svarinu í stað þess að brjóta á því. Lýstu planinu í 3–6 punktum (tímar per mann, frídagar, áætlaður kostnaður og laun % ef veltuspá er til) — ekki telja upp hverja vakt.
+4. Svara „hvernig geri ég…“ spurningum út frá upplýsingunum hér að neðan. Ef þú veist ekki svarið, vísaðu á hallo@vakto.is.
 
 Reglur: stutt og skýrt, punktalistar frekar en töflur, engin emoji. Upphæðir eins og „12.345 kr.“ og prósentur með kommu („27,6 %“). Breyttu afstæðum dagsetningum („næsta föstudag“, „síðasta vika“) í nákvæma dagsetningu og nefndu hana. Vikan byrjar á mánudegi. Ef eitthvað er óljóst, spurðu einnar spurningar í einu. Laun % af veltu: lægra er betra, miðað við markmið fyrirtækisins.
 Tungumál: svaraðu á ${lang === "en" ? "ensku" : lang === "vi" ? "víetnömsku" : "íslensku"} nema notandinn skrifi greinilega á öðru máli.
@@ -54,7 +55,7 @@ ${VAKTO_KNOWLEDGE}`;
   let reply = "";
   try {
     for (let step = 0; step < MAX_STEPS; step++) {
-      const res = await client.messages.create({ model: MODEL, max_tokens: 1500, system, tools, messages: msgs });
+      const res = await client.messages.create({ model: MODEL, max_tokens: 12000, system, tools, messages: msgs });
       const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
       if (res.stop_reason !== "tool_use") { reply = text; break; }
       msgs.push({ role: "assistant", content: res.content });
@@ -77,5 +78,27 @@ ${VAKTO_KNOWLEDGE}`;
     console.error("[assistant]", e instanceof Error ? e.message : e);
     return NextResponse.json({ ok: false, error: lang === "en" ? "VAKTO AI could not answer right now. Try again." : "VAKTO AI gat ekki svarað núna. Reyndu aftur." }, { status: 502 });
   }
-  return NextResponse.json({ ok: true, reply: reply || (actions.length ? "" : "…"), actions });
+  // Vista samtalið (þolir að töflurnar vanti — þá er sagan aðeins í vafranum).
+  let messageId: string | null = null;
+  let conversationId: string | null = /^[0-9a-f-]{36}$/i.test(body.conversationId ?? "") ? body.conversationId! : null;
+  try {
+    const question = history[history.length - 1].content as string;
+    if (conversationId) {
+      const { data } = await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId).select("id").maybeSingle();
+      if (!data) conversationId = null;
+    }
+    if (!conversationId) {
+      const { data } = await supabase.from("ai_conversations").insert({ company_id: me.companyId, user_id: me.userId, title: question.replace(/\s+/g, " ").slice(0, 70) }).select("id").single();
+      conversationId = (data?.id as string) ?? null;
+    }
+    if (conversationId) {
+      const t0 = Date.now();
+      const { data: saved } = await supabase.from("ai_messages").insert([
+        { conversation_id: conversationId, role: "user", content: question, created_at: new Date(t0).toISOString() },
+        { conversation_id: conversationId, role: "assistant", content: reply, actions: actions.length ? actions.map((a) => ({ ...a, state: "pending" })) : null, created_at: new Date(t0 + 1).toISOString() },
+      ]).select("id, role");
+      messageId = (saved ?? []).find((r) => r.role === "assistant")?.id as string ?? null;
+    }
+  } catch (e) { console.error("[assistant] save", e instanceof Error ? e.message : e); }
+  return NextResponse.json({ ok: true, reply: reply || (actions.length ? "" : "…"), actions, conversationId, messageId });
 }

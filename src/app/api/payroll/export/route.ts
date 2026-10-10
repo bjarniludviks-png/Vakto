@@ -36,6 +36,7 @@ export async function GET(request: Request) {
   const from = url.searchParams.get("from") ?? undefined;
   const to = url.searchParams.get("to") ?? undefined;
   const got = await getExportLines(from, to);
+  if (got.denied) return new Response("Forbidden", { status: 403 });
   // ids: aðeins valdir starfsmenn (hakað í launakeyrslu)
   const ids = (url.searchParams.get("ids") ?? "").split(",").filter(Boolean);
   const { kt, hours } = got;

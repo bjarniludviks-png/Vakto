@@ -17,7 +17,7 @@ const toEmp = (e: Record<string, unknown>): Employee => ({
 /** Worked hours split the way Payday's timesheet import wants them. */
 export type HourBuckets = { dagvinna: number; yfirvinna: number; alag: Record<number, number> };
 
-export async function getExportLines(from?: string, to?: string): Promise<{ lines: PayLine[]; kt: Record<string, string>; hours: Map<string, HourBuckets>; monthly: Set<string>; live: boolean }> {
+export async function getExportLines(from?: string, to?: string): Promise<{ lines: PayLine[]; kt: Record<string, string>; hours: Map<string, HourBuckets>; monthly: Set<string>; live: boolean; denied?: boolean }> {
   const hours = new Map<string, HourBuckets>();
   const monthly = new Set<string>();
   if (!isSupabaseConfigured()) {
@@ -29,17 +29,15 @@ export async function getExportLines(from?: string, to?: string): Promise<{ line
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const { data: profile } = user
-      ? await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle()
+      ? await supabase.from("users").select("company_id, role").eq("id", user.id).maybeSingle()
       : { data: null };
-    const company = profile?.company_id as string | undefined;
+    // Laun allra starfsmanna: aðeins stjórnendur og vaktstjórar.
+    if (!profile?.company_id || (profile.role !== "owner" && profile.role !== "manager")) return { lines: [], kt: {}, hours, monthly, live: true, denied: true };
+    const company = profile.company_id as string;
     const { data: emps } = company
       ? await supabase.from("employees").select("id, full_name, kennitala, pay_type, rate, employment_ratio, union_agreement, role").eq("company_id", company).neq("role", "contractor")
       : { data: null };
-    if (!emps?.length) {
-      const kt: Record<string, string> = {};
-      DEMO_EMPLOYEES.forEach((e) => { if (e.kennitala) kt[e.id] = e.kennitala; });
-      return { lines: DEMO_EMPLOYEES.map(computeLine), kt, hours, monthly, live: false };
-    }
+    if (!emps?.length) return { lines: [], kt: {}, hours, monthly, live: true }; // aldrei sýnigögn fyrir innskráð fyrirtæki
     const kt: Record<string, string> = {};
     emps.forEach((e) => { if (e.kennitala) kt[e.id as string] = e.kennitala as string; if (e.pay_type === "monthly") monthly.add(e.id as string); });
 
@@ -79,8 +77,9 @@ export async function getExportLines(from?: string, to?: string): Promise<{ line
 
     const lines = emps.map((e) => computeLine(toEmp(e)));
     return { lines, kt, hours, monthly, live: true };
-  } catch {
-    return { lines: DEMO_EMPLOYEES.map(computeLine), kt: {}, hours, monthly, live: false };
+  } catch (e) {
+    console.error("[payroll-export]", e);
+    return { lines: [], kt: {}, hours, monthly, live: true };
   }
 }
 

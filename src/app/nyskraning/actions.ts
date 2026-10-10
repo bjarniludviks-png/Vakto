@@ -13,20 +13,23 @@ const TERMS_VERSION = "2026-09-30";
 
 export type SignupResult = { ok: boolean; demo?: boolean; error?: string };
 
-/** Record the chosen plan + start a 14-day trial on the signed-in user's company.
- * Tolerant of migration 0020 not being run yet (best-effort). */
-export async function setCompanyPlan(plan: string): Promise<{ ok: boolean }> {
+/** Setur áskrift + 14 daga prufu á fyrirtæki sem hefur ENGA prufu enn (eldri nýskráningar).
+ * Breytir aldrei fyrirtæki sem þegar er með prufu eða greiðslustöðu — annars gæti hver sem er
+ * framlengt prufuna sína með því að kalla á þetta aftur. Aðeins eigandi; skrifað á þjóninum. */
+export async function setCompanyPlan(): Promise<{ ok: boolean }> {
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const { createClient } = await import("@/lib/supabase/server");
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { ok: false };
-    const { data: profile } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
-    if (!profile?.company_id) return { ok: false };
-    // Free has no trial clock; Pro gets 14 days.
-    const trialEnds = plan === "free" ? null : new Date(Date.now() + 14 * 86400000).toISOString();
-    await supabase.from("companies").update({ plan, trial_ends_at: trialEnds }).eq("id", profile.company_id);
+    const { data: profile } = await supabase.from("users").select("company_id, role").eq("id", user.id).maybeSingle();
+    if (!profile?.company_id || profile.role !== "owner") return { ok: false };
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    const { data: co } = await admin.from("companies").select("trial_ends_at, billing_status").eq("id", profile.company_id).maybeSingle();
+    if (!co || co.trial_ends_at || co.billing_status) return { ok: true };
+    await admin.from("companies").update({ plan: "vakto", trial_ends_at: new Date(Date.now() + 14 * 86400000).toISOString() }).eq("id", profile.company_id);
     return { ok: true };
   } catch {
     return { ok: false };
@@ -99,7 +102,7 @@ export async function startCardSetup(origin: string): Promise<{ ok: boolean; url
     const { data: profile } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
     const companyId = profile?.company_id as string | undefined;
     if (!companyId) return { ok: false, error: "Fyrirtæki fannst ekki" };
-    await setCompanyPlan("vakto");
+    await setCompanyPlan();
     if (!straumurConfigured()) return { ok: true, skip: true };
     const base = /^https?:\/\/[^/]+$/.test(origin) ? origin : (process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is");
     const { url } = await createCardSetupCheckout(companyId, { returnUrl: `${base}/nyskraning/kort?ok=1`, email: user.email ?? undefined });

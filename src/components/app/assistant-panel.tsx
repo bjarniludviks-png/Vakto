@@ -1,30 +1,33 @@
 "use client";
 
-// VAKTO AI — spjall í horninu (stjórnendur og vaktstjórar). Saga geymd í sessionStorage.
+// VAKTO AI — spjall í horninu (stjórnendur og vaktstjórar). Samtöl vistast á þjóninum (ai_conversations)
+// svo hægt sé að opna þau aftur; opna samtalið er líka geymt í sessionStorage milli síðna.
 // Breytingar koma sem tillögur með „Staðfesta"-hnappi; ekkert er framkvæmt án hans.
 import { Fragment, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useLang } from "./lang";
 
 type Action = { tool: string; input: Record<string, unknown>; summary: string; state?: "pending" | "busy" | "done" | "error" | "cancelled"; error?: string };
-type Msg = { role: "user" | "assistant"; content: string; actions?: Action[] };
+type Msg = { id?: string; role: "user" | "assistant"; content: string; actions?: Action[] };
+type Conv = { id: string; title: string; updated_at: string };
 
 const KEY = "vakto-assistant";
+const KEY_ID = "vakto-assistant-id";
 const S = {
   is: {
-    name: "VAKTO AI", open: "Opna VAKTO AI", close: "Loka", reset: "Nýtt samtal", ph: "Spurðu um reksturinn eða biddu um breytingu…",
+    name: "VAKTO AI", open: "Opna VAKTO AI", close: "Loka", reset: "Nýtt samtal", history: "Fyrri samtöl", noHistory: "Engin vistuð samtöl enn.", del: "Eyða samtali", back: "Til baka", ph: "Spurðu um reksturinn eða biddu um breytingu…",
     send: "Senda", thinking: "Hugsa…", confirm: "Staðfesta", cancel: "Hætta við", all: "Staðfesta allt", done: "Gert", cancelled: "Hætt við",
-    hello: "Hæ! Ég get svarað spurningum um laun, tíma og vaktir, og undirbúið breytingar sem þú staðfestir.",
+    hello: "Hæ! Ég get svarað spurningum um laun, tíma og vaktir, sett upp vaktaplan fyrir heila viku og undirbúið breytingar sem þú staðfestir.",
     err: "Tókst ekki að ná sambandi. Reyndu aftur.",
-    chips: ["Hvernig er laun % af veltu þessa vikuna?", "Hver er á vakt núna?", "Hvaða beiðnir bíða?", "Hver fór mest yfir plan í síðustu viku?"],
+    chips: ["Hvernig er laun % af veltu þessa vikuna?", "Settu upp næstu viku: allir með einn frídag", "Hver er á vakt núna?", "Hvaða beiðnir bíða?"],
     note: "VAKTO AI getur gert mistök. Breytingar eru aðeins gerðar þegar þú staðfestir.",
   },
   en: {
-    name: "VAKTO AI", open: "Open VAKTO AI", close: "Close", reset: "New conversation", ph: "Ask about the business or request a change…",
+    name: "VAKTO AI", open: "Open VAKTO AI", close: "Close", reset: "New conversation", history: "Earlier conversations", noHistory: "No saved conversations yet.", del: "Delete conversation", back: "Back", ph: "Ask about the business or request a change…",
     send: "Send", thinking: "Thinking…", confirm: "Confirm", cancel: "Cancel", all: "Confirm all", done: "Done", cancelled: "Cancelled",
-    hello: "Hi! I can answer questions about labor cost, hours and shifts, and prepare changes for you to confirm.",
+    hello: "Hi! I can answer questions about labor cost, hours and shifts, plan a whole week, and prepare changes for you to confirm.",
     err: "Could not connect. Try again.",
-    chips: ["What's labor % of revenue this week?", "Who is on shift now?", "Which requests are waiting?", "Who went most over plan last week?"],
+    chips: ["What's labor % of revenue this week?", "Plan next week: everyone gets one day off", "Who is on shift now?", "Which requests are waiting?"],
     note: "VAKTO AI can make mistakes. Changes only happen when you confirm.",
   },
 };
@@ -55,6 +58,8 @@ export function AssistantPanel() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [convId, setConvId] = useState<string | null>(null);
+  const [hist, setHist] = useState<Conv[] | null>(null); // null = listinn er lokaður
   const list = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
 
@@ -63,9 +68,35 @@ export function AssistantPanel() {
       const raw = sessionStorage.getItem(KEY);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage er aðeins til í vafranum
       if (raw) setMsgs(JSON.parse(raw));
+      setConvId(sessionStorage.getItem(KEY_ID));
     } catch { /* ekkert */ }
   }, []);
   useEffect(() => { try { sessionStorage.setItem(KEY, JSON.stringify(msgs.slice(-40))); } catch { /* ekkert */ } }, [msgs]);
+  useEffect(() => { try { if (convId) sessionStorage.setItem(KEY_ID, convId); else sessionStorage.removeItem(KEY_ID); } catch { /* ekkert */ } }, [convId]);
+
+  function fresh() { setMsgs([]); setConvId(null); setHist(null); }
+  async function openHistory() {
+    if (hist) { setHist(null); return; }
+    setHist([]);
+    try { const d = await (await fetch("/api/assistant/conversations")).json(); setHist(d.conversations ?? []); } catch { /* listinn helst tómur */ }
+  }
+  async function openConv(id: string) {
+    try {
+      const d = await (await fetch(`/api/assistant/conversations?id=${id}`)).json();
+      setMsgs((d.messages ?? []).map((m: { id: string; role: Msg["role"]; content: string; actions: Action[] | null }) => ({ id: m.id, role: m.role, content: m.content, actions: m.actions ?? undefined })));
+      setConvId(id); setHist(null);
+    } catch { /* ekkert */ }
+  }
+  async function delConv(id: string) {
+    setHist((h) => h?.filter((c) => c.id !== id) ?? null);
+    if (id === convId) { setMsgs([]); setConvId(null); }
+    try { await fetch(`/api/assistant/conversations?id=${id}`, { method: "DELETE" }); } catch { /* ekkert */ }
+  }
+  /** Vistar stöðu tillögu (staðfest / hætt við) svo hún sé rétt þegar samtalið er opnað aftur. */
+  function saveState(mi: number, ai: number, state: "done" | "cancelled" | "error") {
+    const id = msgs[mi]?.id; if (!id) return;
+    void fetch("/api/assistant/conversations", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messageId: id, index: ai, state }) }).catch(() => {});
+  }
   useEffect(() => { list.current?.scrollTo({ top: list.current.scrollHeight, behavior: "smooth" }); }, [msgs, busy, open]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -85,11 +116,12 @@ export function AssistantPanel() {
     try {
       const res = await fetch("/api/assistant", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ path, lang, messages: next.map(({ role, content }) => ({ role, content })) }),
+        body: JSON.stringify({ path, lang, conversationId: convId, messages: next.map(({ role, content }) => ({ role, content })) }),
       });
       const data = await res.json();
       if (!res.ok || !data.ok) { setMsgs([...next, { role: "assistant", content: data?.error ?? s.err }]); return; }
-      setMsgs([...next, { role: "assistant", content: data.reply ?? "", actions: (data.actions ?? []).map((a: Action) => ({ ...a, state: "pending" })) }]);
+      if (data.conversationId) setConvId(data.conversationId);
+      setMsgs([...next, { id: data.messageId ?? undefined, role: "assistant", content: data.reply ?? "", actions: (data.actions ?? []).map((a: Action) => ({ ...a, state: "pending" })) }]);
     } catch {
       setMsgs([...next, { role: "assistant", content: s.err }]);
     } finally { setBusy(false); }
@@ -105,7 +137,7 @@ export function AssistantPanel() {
       const res = await fetch("/api/assistant/execute", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tool: a.tool, input: a.input, lang }) });
       const data = await res.json();
       patchAction(mi, ai, data.ok ? { state: "done" } : { state: "error", error: data.error ?? s.err });
-      if (data.ok) router.refresh();
+      if (data.ok) { saveState(mi, ai, "done"); router.refresh(); }
     } catch { patchAction(mi, ai, { state: "error", error: s.err }); }
   }
   async function confirmAll(mi: number) {
@@ -122,10 +154,22 @@ export function AssistantPanel() {
             <span className="vai-badge"><Spark /></span>
             <b>{s.name}</b>
             <span className="vai-sp" />
-            {msgs.length > 0 && <button className="vai-ico" onClick={() => setMsgs([])} title={s.reset} aria-label={s.reset}><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg></button>}
+            <button className={`vai-ico${hist ? " on" : ""}`} onClick={openHistory} title={s.history} aria-label={s.history}><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></button>
+            {msgs.length > 0 && <button className="vai-ico" onClick={fresh} title={s.reset} aria-label={s.reset}><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg></button>}
             <button className="vai-ico" onClick={() => setOpen(false)} aria-label={s.close}><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg></button>
           </div>
-          <div className="vai-list" ref={list}>
+          {hist && (
+            <div className="vai-hist">
+              <div className="vai-hist-h"><b>{s.history}</b><button className="btn ghost sm" onClick={() => setHist(null)}>{s.back}</button></div>
+              {hist.length === 0 ? <p className="vai-muted">{s.noHistory}</p> : hist.map((c) => (
+                <div key={c.id} className={`vai-conv${c.id === convId ? " on" : ""}`}>
+                  <button className="vai-conv-t" onClick={() => openConv(c.id)}><b>{c.title || s.name}</b><small>{(() => { const d = new Date(c.updated_at); return `${d.getDate()}.${d.getMonth() + 1}.`; })()}</small></button>
+                  <button className="vai-ico" onClick={() => delConv(c.id)} title={s.del} aria-label={s.del}><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg></button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="vai-list" ref={list} hidden={!!hist}>
             {msgs.length === 0 && (
               <div className="vai-hello">
                 <p>{s.hello}</p>
@@ -142,7 +186,7 @@ export function AssistantPanel() {
                         <span className="vai-act-tx">{a.summary}{a.state === "error" && <small>{a.error}</small>}</span>
                         {a.state === "pending" && (<span className="vai-act-b">
                           <button className="btn sm" onClick={() => confirm(i, j)}>{s.confirm}</button>
-                          <button className="btn ghost sm" onClick={() => patchAction(i, j, { state: "cancelled" })}>{s.cancel}</button>
+                          <button className="btn ghost sm" onClick={() => { patchAction(i, j, { state: "cancelled" }); saveState(i, j, "cancelled"); }}>{s.cancel}</button>
                         </span>)}
                         {a.state === "busy" && <span className="vai-dots"><i /><i /><i /></span>}
                         {a.state === "done" && <span className="vai-ok">✓ {s.done}</span>}
