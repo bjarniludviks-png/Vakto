@@ -8,7 +8,7 @@ import { toast } from "@/components/app/toast";
 import { nf } from "@/lib/format";
 import { addRevenue, revokeApiKey } from "./actions";
 import {
-  getTengingar, connectIntegration, syncNow, disconnectIntegration, setRevenueMode, saveMonthlyEstimate,
+  getTengingar, connectIntegration, connectPayday, syncNow, disconnectIntegration, setRevenueMode, saveMonthlyEstimate,
   relearnPattern, notifyInterest, type TengingarView, type RevenueMode,
 } from "./integration-actions";
 
@@ -52,6 +52,7 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
   const [q, setQ] = useState("");
   const [country, setCountry] = useState("IS");
   const [connect, setConnect] = useState<App | null>(null);
+  const [payday, setPayday] = useState(false);
   const [csv, setCsv] = useState(false);
   const appsRef = useRef<HTMLDivElement>(null);
 
@@ -151,10 +152,13 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
                   <div className="tg-app-f">
                     {a.kind === "connect" && (c.length ? <span className="tg-pill good">{L("Tengt", "Connected")}</span> : <span className="tg-pill mut">{L("Ekki tengt", "Not connected")}</span>)}
                     {a.kind === "apikey" && <span className="tg-pill mut">{L("Með lykli", "With a key")}</span>}
-                    {a.kind === "export" && <span className="tg-pill warn">{L("Útflutningur", "Export")}</span>}
+                    {a.kind === "export" && (a.id === "payday" && v?.payday ? <span className="tg-pill good">{L("Tengt", "Connected")}</span> : <span className="tg-pill warn">{L("Útflutningur", "Export")}</span>)}
                     {a.kind === "soon" && <span className="tg-pill info">{L("Væntanlegt", "Coming soon")}</span>}
                     {a.kind === "connect" && <button className={`btn sm${c.length ? " ghost" : ""}`} onClick={() => setConnect(a)}>{c.length ? L("Bæta við", "Add another") : L("Tengja", "Connect")}</button>}
                     {a.kind === "apikey" && <button className="btn sm" onClick={onNewKey}>{L("Búa til lykil", "Create key")}</button>}
+                    {a.kind === "export" && a.id === "payday" && (v?.payday
+                      ? <button className="btn ghost sm" style={{ color: "var(--bad)" }} onClick={async () => { await disconnectIntegration(v.payday!.id); toast(L("Payday aftengt", "Payday disconnected")); void load(); }}>{L("Aftengja", "Disconnect")}</button>
+                      : <button className="btn sm" onClick={() => setPayday(true)}>{L("Tengja", "Connect")}</button>)}
                     {a.kind === "export" && <a className="btn ghost sm" href="/launakeyrslur">{L("Flytja út", "Export")}</a>}
                     {a.kind === "soon" && (wanted
                       ? <span className="tg-small">{L("Við látum þig vita", "We'll let you know")}</span>
@@ -190,6 +194,7 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
         )}
       </section>
 
+      {payday && <PaydayModal L={L} onClose={() => setPayday(false)} onDone={() => { setPayday(false); void load(); }} />}
       {connect && <ConnectModal app={connect} L={L} locations={v?.locations ?? []} onClose={() => setConnect(null)} onDone={() => { setConnect(null); setMode("system"); void load(); }} />}
       {csv && <CsvModal L={L} locations={v?.locations ?? []} onClose={() => setCsv(false)} onDone={() => { setCsv(false); void load(); }} />}
     </div>
@@ -232,6 +237,39 @@ function EstimateEntry({ L, current, onSaved }: { L: Lf; current: number; onSave
       <label className="tg-field"><span>{L("Velta á mánuði án VSK, ca. (kr)", "Monthly revenue excl. VAT, roughly")}</span><input inputMode="numeric" placeholder="9.500.000" value={amt} onChange={(e) => setAmt(e.target.value.replace(/[^\d]/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, "."))} /></label>
       <button className="btn sm" disabled={busy || !digits(amt)} onClick={async () => { setBusy(true); const r = await saveMonthlyEstimate(digits(amt)); setBusy(false); toast(r.ok ? L("Áætlun vistuð", "Estimate saved") : (r.error ?? "Villa"), r.ok ? "ok" : "error"); if (r.ok) onSaved(); }}>{L("Vista", "Save")}</button>
       <div className="tg-small">{L("Meira um helgar, minna í byrjun viku. Laun % er merkt áætlað þar til raunvelta kemur inn.", "More at weekends, less early in the week. Labor % is marked as estimated until real revenue arrives.")}</div>
+    </div>
+  );
+}
+
+function PaydayModal({ L, onClose, onDone }: { L: Lf; onClose: () => void; onDone: () => void }) {
+  const [id, setId] = useState("");
+  const [secret, setSecret] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const app = APPS.find((a) => a.id === "payday")!;
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal" style={{ maxWidth: 480 }}>
+        <div className="mh"><Logo app={app} size={36} /><div style={{ fontSize: 16, fontWeight: 650 }}>{L("Tengja", "Connect")} Payday</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="mb tg-modal">
+          <ol className="tg-steps">
+            <li>{L("Í Payday: Stillingar → Fyrirtæki → API. Búðu til aðgang (nefndu hann VAKTO).", "In Payday: Settings → Company → API. Create an application (name it VAKTO).")}</li>
+            <li>{L("Afritaðu Client ID og Client Secret og límdu hér.", "Copy the Client ID and Client Secret and paste them here.")}</li>
+            <li>{L("Í Launakeyrslum birtist þá „Senda í Payday“: samþykktir tímar fara beint inn sem tímaskrá.", "Payroll then shows “Send to Payday”: approved hours go straight in as a timesheet.")}</li>
+          </ol>
+          <label className="tg-field"><span>Client ID</span><input value={id} onChange={(e) => setId(e.target.value)} autoComplete="off" /></label>
+          <label className="tg-field"><span>Client Secret</span><input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} autoComplete="off" /></label>
+          {err && <div className="tg-err">{err}</div>}
+          <button className="btn" disabled={busy} onClick={async () => {
+            setBusy(true); setErr(null);
+            const r = await connectPayday({ clientId: id, clientSecret: secret });
+            setBusy(false);
+            if (r.ok) { toast(L("Payday tengt", "Payday connected")); onDone(); } else setErr(r.error ?? "Villa");
+          }}>{busy ? L("Prófa lykla…", "Checking keys…") : L("Tengja Payday", "Connect Payday")}</button>
+          <div className="tg-small">{L("Lyklarnir eru geymdir dulkóðaðir. VAKTO sendir aðeins tíma; Payday sér áfram um laun, skil og greiðslur. Heiti launaliða í Payday þurfa að vera Dagvinna, Yfirvinna og Álag 33% / 45%.", "Keys are stored encrypted. VAKTO only sends hours; Payday still handles pay, filings and payments. Pay items in Payday must be named Dagvinna, Yfirvinna and Álag 33% / 45%.")}</div>
+        </div>
+      </div>
     </div>
   );
 }

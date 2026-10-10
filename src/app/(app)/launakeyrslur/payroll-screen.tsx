@@ -10,7 +10,7 @@ import { useLang } from "@/components/app/lang";
 import { PayslipModal, type PayslipData } from "@/components/app/payslip-modal";
 import { EmptyState } from "@/components/app/empty-state";
 import type { PayrollView } from "./payroll.server";
-import { runPayroll, getPayrollPeriod, getPayrollHistory, type PeriodPayroll, type PayrollHistory } from "./actions";
+import { runPayroll, getPayrollPeriod, getPayrollHistory, getPaydayStatus, sendToPayday, type PeriodPayroll, type PayrollHistory } from "./actions";
 import { Av } from "@/components/app/avatar";
 
 const PH_COLORS = ["#1f9d6b", "#d4a24c", "#e9700f", "#1f9e9e", "#c3c7d3"];
@@ -83,6 +83,9 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
   const [slip, setSlip] = useState<PayslipData | null>(null);
   const [showZero, setShowZero] = useState(false);
   const [off, setOff] = useState<Set<string>>(new Set());
+  const [pdConn, setPdConn] = useState(false);
+  const [pdBusy, setPdBusy] = useState(false);
+  useEffect(() => { if (view.live) getPaydayStatus().then((r) => setPdConn(r.connected)).catch(() => {}); }, [view.live]);
   const [kind, setKind] = useState<"all" | "hourly" | "monthly">("all");
   const [period, setPeriod] = useState("this");
   const thisMonth = payRange("this", "", "", periodStart);
@@ -128,6 +131,14 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
   const qs = `?format=$F&from=${range.from}&to=${range.to}${idsQs}`;
   function download(format: "payday" | "excel" | "dk") {
     window.location.href = `/api/payroll/export${qs.replace("$F", format)}`;
+  }
+  async function sendaPayday() {
+    if (partial && !picked.length) { toast(t("Enginn starfsmaður er valinn")); return; }
+    setPdBusy(true);
+    const r = await sendToPayday(range.from, range.to, partial ? picked.map((x) => x.id!) : undefined);
+    setPdBusy(false);
+    if (!r.ok) { toast(r.error ?? "Tókst ekki"); return; }
+    toast(`${t("Tímaskrá send í Payday")} — ${r.count} ${t("starfsmenn")}${r.skipped?.length ? ` · ${t("kennitölu vantar hjá")} ${r.skipped.join(", ")}` : ""}`);
   }
   async function keyra() {
     if (partial && !picked.length) { toast(t("Enginn starfsmaður er valinn")); return; }
@@ -311,7 +322,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
         <section className="db2-card">
           <div className="db2-ch"><div><div className="db2-ct">{t("Útflutningur")}</div><div className="db2-cs">{t("Vakto reiknar — Payday sér um skil, greiðslur og opinbera skýrslugerð.")}</div></div></div>
           <div className="db2-list">
-            <div className="db2-it"><span className="pr-logo"><img src="/integrations/payday.png" alt="" /></span><span className="db2-tx"><b>Payday</b><span>{t("tímaskrá (Excel) — hlaðið upp undir Ný launakeyrsla → Hlaða upp tímaskrá")}</span></span><button className="btn sm" onClick={() => download("payday")}>{t("Flytja")}</button></div>
+            <div className="db2-it"><span className="pr-logo"><img src="/integrations/payday.png" alt="" /></span><span className="db2-tx"><b>Payday</b><span>{pdConn ? t("beintengt — samþykktir tímar tímakaupsfólks fara beint inn sem tímaskrá") : t("tímaskrá (Excel) — hlaðið upp undir Ný launakeyrsla → Hlaða upp tímaskrá")}</span></span>{pdConn ? <><button className="btn sm" disabled={pdBusy} onClick={sendaPayday}>{pdBusy ? t("Sendi…") : t("Senda í Payday")}</button><button className="btn ghost sm" onClick={() => download("payday")}>Excel</button></> : <button className="btn sm" onClick={() => download("payday")}>{t("Flytja")}</button>}</div>
             <div className="db2-it"><span className="pr-logo"><img src="/integrations/dk.png" alt="" /></span><span className="db2-tx"><b>DK</b><span>{t("launaskrá fyrir DK bókhald")}</span></span><button className="btn ghost sm" onClick={() => download("dk")}>{t("Sækja")}</button></div>
             <div className="db2-it"><span className="pr-logo xl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5" /><path d="M3.5 9h17M3.5 14.5h17M9.5 3.5v17" /></svg></span><span className="db2-tx"><b>Excel</b><span>{t("sundurliðun per starfsmann")}</span></span><button className="btn ghost sm" onClick={() => download("excel")}>{t("Sækja")}</button></div>
           </div>

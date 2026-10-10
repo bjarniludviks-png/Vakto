@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
 import { encrypt, normalizeSite, testConnection, type Provider } from "@/lib/integrations/providers.server";
 import { syncIntegration, refreshWeekdayPattern } from "@/lib/integrations/sync.server";
+import { paydayToken } from "@/lib/integrations/payday.server";
 
 export type IntegrationView = { id: string; provider: string; site: string; status: "connected" | "error"; lastSync: string | null; lastError: string | null; lastAmount: number | null; location: string | null };
 export type RevenueMode = "system" | "manual" | "estimate";
@@ -12,6 +13,8 @@ export type TengingarView = {
   ok: boolean; mode: RevenueMode | null; weekday: Record<string, number> | null; learned: boolean;
   integrations: IntegrationView[]; locations: { id: string; name: string }[]; interest: string[];
   yesterday: { amount: number; sources: string[] } | null; needsMigration?: boolean;
+  /** Bein tenging við Payday (tímaskrá send í launakeyrslu). */
+  payday?: { id: string; lastSync: string | null; lastError: string | null } | null;
 };
 type R = { ok: boolean; error?: string };
 
@@ -49,7 +52,8 @@ export async function getTengingar(): Promise<TengingarView> {
     mode: (co.data?.revenue_mode as RevenueMode | null) ?? null,
     weekday: (co.data?.weekday_revenue as Record<string, number> | null) ?? null,
     learned: !!co.data?.weekday_revenue_learned,
-    integrations: (ints.data ?? []).map((i) => ({
+    payday: (() => { const p = (ints.data ?? []).find((i) => i.provider === "payday"); return p ? { id: p.id as string, lastSync: (p.last_sync_at as string) ?? null, lastError: (p.last_error as string) ?? null } : null; })(),
+    integrations: (ints.data ?? []).filter((i) => i.provider !== "payday").map((i) => ({
       id: i.id as string, provider: i.provider as string, site: i.site as string, status: i.status as "connected" | "error",
       lastSync: (i.last_sync_at as string | null) ?? null, lastError: (i.last_error as string | null) ?? null,
       lastAmount: i.last_amount == null ? null : Number(i.last_amount), location: i.location_id ? ln.get(i.location_id as string) ?? null : null,
@@ -78,6 +82,21 @@ export async function connectIntegration(input: { provider: Provider; site: stri
   await logAudit(supabase, company, userId, { action: "integration.connect", entity: "company_integrations", entityId: data.id as string, detail: `${input.provider} tengt — ${site}` });
   revalidatePath("/stillingar"); revalidatePath("/maelabord");
   return r.ok ? { ok: true, total: r.total } : { ok: false, error: `Tengt, en fyrsta sókn tókst ekki: ${r.error}` };
+}
+
+/** Tengir Payday: lyklarnir eru prófaðir (sóttur aðgangslykill) og geymdir dulkóðaðir. */
+export async function connectPayday(input: { clientId: string; clientSecret: string }): Promise<R> {
+  const c = await ctxOf(); if ("error" in c) return { ok: false, error: c.error };
+  const creds = { key: input.clientId.trim(), secret: input.clientSecret.trim() };
+  if (!creds.key || !creds.secret) return { ok: false, error: "Vantar Client ID og Client Secret" };
+  try { await paydayToken(creds); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Tenging tókst ekki" }; }
+  const { data, error } = await c.supabase.from("company_integrations").upsert({
+    company_id: c.company, provider: "payday", site: "payday.is", secret_enc: encrypt(creds), status: "connected", last_error: null,
+  }, { onConflict: "company_id,provider,site" }).select("id").single();
+  if (error || !data) { console.error("[integrations] payday", error?.message); return { ok: false, error: "Tókst ekki að vista tenginguna — reyndu aftur." }; }
+  await logAudit(c.supabase, c.company, c.userId, { action: "integration.connect", entity: "company_integrations", entityId: data.id as string, detail: "Payday tengt" });
+  revalidatePath("/stillingar"); revalidatePath("/launakeyrslur");
+  return { ok: true };
 }
 
 export async function syncNow(id: string): Promise<R> {

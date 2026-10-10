@@ -59,7 +59,7 @@ export async function refreshWeekdayPattern(companyId: string): Promise<boolean>
 /** Cron: samstillir allar tengingar (síðustu dagar) og uppfærir lærð mynstur. */
 export async function syncAllIntegrations(): Promise<{ synced: number; failed: number }> {
   const db = createAdminClient();
-  const { data } = await db.from("company_integrations").select("id, company_id, provider, site, location_id, secret_enc");
+  const { data } = await db.from("company_integrations").select("id, company_id, provider, site, location_id, secret_enc").neq("provider", "payday"); // Payday tekur við tímum, sendir ekki veltu
   let synced = 0, failed = 0;
   for (const row of (data ?? []) as Row[]) { const r = await syncIntegration(row, 7); if (r.ok) synced++; else failed++; }
   const { data: cos } = await db.from("companies").select("id");

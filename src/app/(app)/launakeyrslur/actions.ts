@@ -298,3 +298,62 @@ export async function getPayrollHistory(year: number): Promise<PayrollHistory> {
     return { live: false, months: emptyMonths() };
   }
 }
+
+
+/** Er Payday beintengt hjá fyrirtækinu? (Stjórnendur sjá tenginguna; aðrir fá false.) */
+export async function getPaydayStatus(): Promise<{ connected: boolean; lastSync: string | null }> {
+  if (!isSupabaseConfigured()) return { connected: false, lastSync: null };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { connected: false, lastSync: null };
+    const { data } = await supabase.from("company_integrations").select("last_sync_at").eq("company_id", ctx.company).eq("provider", "payday").maybeSingle();
+    return { connected: !!data, lastSync: (data?.last_sync_at as string) ?? null };
+  } catch { return { connected: false, lastSync: null }; }
+}
+
+/** Sendir samþykkta tíma tímabilsins beint í Payday sem tímaskrá (sömu tölur og Excel-útflutningurinn).
+ *  Fastlaunafólk er ekki sent — laun þess ráðast ekki af tímum. onlyIds: aðeins hakaðir starfsmenn. */
+export async function sendToPayday(from: string, to: string, onlyIds?: string[]): Promise<{ ok: boolean; error?: string; count?: number; skipped?: string[] }> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data: integ } = await supabase.from("company_integrations").select("id, secret_enc").eq("company_id", ctx.company).eq("provider", "payday").maybeSingle();
+    if (!integ?.secret_enc) return { ok: false, error: "Payday er ekki tengt — tengdu það í Stillingum → Tengingar." };
+    const [{ getExportLines }, { decrypt }, { paydayUploadTimesheet }] = await Promise.all([
+      import("@/lib/payroll-export.server"), import("@/lib/integrations/providers.server"), import("@/lib/integrations/payday.server"),
+    ]);
+    const got = await getExportLines(from, to);
+    if (!got.live) return { ok: false, error: "Engin gögn á tímabilinu" };
+    const skipped: string[] = [];
+    const rows = got.lines
+      .filter((l) => !onlyIds?.length || onlyIds.includes(l.employeeId))
+      .filter((l) => !got.monthly.has(l.employeeId))
+      .map((l) => {
+        const h = got.hours.get(l.employeeId) ?? { dagvinna: l.hours, yfirvinna: 0, alag: {} };
+        const items = [
+          { name: "Dagvinna", quantity: h.dagvinna }, { name: "Yfirvinna", quantity: h.yfirvinna },
+          ...Object.entries(h.alag).map(([pct, q]) => ({ name: `Álag ${String(pct).replace(".", ",")}%`, quantity: q })),
+        ].filter((i) => i.quantity > 0);
+        return { ssn: (got.kt[l.employeeId] ?? "").replace(/\D/g, ""), name: l.name, items };
+      })
+      .filter((r) => r.items.length > 0)
+      .filter((r) => { if (r.ssn.length === 10) return true; skipped.push(r.name); return false; });
+    if (!rows.length) return { ok: false, error: skipped.length ? `Kennitölu vantar hjá: ${skipped.join(", ")}` : "Engir samþykktir tímar hjá tímakaupsfólki á tímabilinu" };
+    try {
+      await paydayUploadTimesheet(decrypt(integ.secret_enc as string), rows);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Sending tókst ekki";
+      await supabase.from("company_integrations").update({ status: "error", last_error: msg.slice(0, 300) }).eq("id", integ.id);
+      return { ok: false, error: msg };
+    }
+    await supabase.from("company_integrations").update({ status: "connected", last_error: null, last_sync_at: new Date().toISOString() }).eq("id", integ.id);
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "payroll.payday", entity: "company_integrations", entityId: integ.id as string, detail: `Tímaskrá send í Payday (${from}–${to}) — ${rows.length} starfsmenn` });
+    return { ok: true, count: rows.length, skipped };
+  } catch (e) {
+    console.error("[payday] send", e);
+    return { ok: false, error: "Sending í Payday tókst ekki — reyndu aftur." };
+  }
+}
