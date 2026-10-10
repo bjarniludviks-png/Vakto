@@ -213,6 +213,7 @@ const D: Record<string, E> = {
   "Stimplun fannst ekki": ["Punch not found", "Không tìm thấy lần chấm công"], "Útstimplun verður að vera eftir innstimplun": ["Clock-out must be after clock-in", "Giờ ra phải sau giờ vào"],
   "Tíminn er ekki liðinn": ["That time hasn't passed yet", "Giờ này chưa tới"], "Tókst ekki að stimpla út": ["Couldn't clock out", "Không chấm công ra được"],
   "Sláðu inn upphæð": ["Enter an amount", "Nhập số tiền"], "Tókst ekki að vista veltu": ["Couldn't save revenue", "Không lưu được doanh thu"],
+  "Verkefni vaktarinnar": ["Tasks for this shift", "Việc cần làm trong ca"], "Starfsmaðurinn hakar við verkefnin í appinu.": ["The employee ticks the tasks off in the app.", "Nhân viên đánh dấu công việc trong ứng dụng."],
 };
 
 const NUM = /\d[\d.,:–\-]*/g;

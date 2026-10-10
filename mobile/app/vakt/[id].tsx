@@ -15,6 +15,9 @@ import { applyForShift, listMyRequests } from "../../src/lib/api/requests";
 import { startDM, peopleMap } from "../../src/lib/api/chat";
 import { dec1, kr } from "../../src/lib/format";
 import { OfferSheet, CantSheet } from "../../src/components/request-sheets";
+import { getTasksFor, setTaskDone, type Task } from "../../src/lib/api/tasks";
+import { TaskChecklist } from "../../src/components/tasks";
+import { isManager } from "../../src/lib/api/ops";
 
 const DAY_L = ["Sun", "Mán", "Þri", "Mið", "Fim", "Fös", "Lau"];
 const DAY_FULL = ["Sunnudagur", "Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur"];
@@ -34,6 +37,8 @@ export default function VaktScreen() {
   const [s, setS] = useState<Shift | null>(null);
   const [co, setCo] = useState<Co[]>([]);
   const [applied, setApplied] = useState(false);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [manager, setManager] = useState(false);
   const [sheet, setSheet] = useState<null | "more" | "offer" | "cant">(null);
 
   const load = useCallback(async () => {
@@ -47,6 +52,10 @@ export default function VaktScreen() {
     const comp = (Array.isArray(data.companies) ? data.companies[0] : data.companies) as { name?: string } | null;
     const sh: Shift = { id: data.id, date: data.date, start: hm(data.start_time), end: hm(data.end_time), empId: data.employee_id, empName: emp?.full_name ?? null, empColor: emp?.avatar_color ?? null, empPhoto: emp?.photo_url ?? null, dept: dep?.name ?? null, deptColor: dep?.color ?? null, typeName: st?.name ?? null, typeColor: st?.color ?? null, location: loc?.name ?? null, company: comp?.name ?? "" };
     setS(sh);
+    // verkefni vaktarinnar: starfsmaðurinn sjálfur og stjórnendur sjá þau
+    const mgr = await isManager().catch(() => false);
+    setManager(mgr);
+    setTasks(sh.empId && (sh.empId === me.empId || mgr) ? await getTasksFor(sh.empId, sh.date) : []);
     const { data: same } = await supabase.from("shifts").select("id, employee_id, start_time, end_time, employees(full_name, avatar_color, photo_url)").eq("company_id", me.companyId).eq("date", sh.date).not("employee_id", "is", null).neq("id", sh.id).order("start_time");
     const s1 = sh.start ?? "00:00", e1r = sh.end ?? "24:00", e1 = e1r <= s1 ? "24:00" : e1r;
     setCo(((same ?? []) as Record<string, unknown>[]).filter((x) => { const s2 = hm(x.start_time as string) ?? "00:00", e2r = hm(x.end_time as string) ?? "24:00", e2 = e2r <= s2 ? "24:00" : e2r; return s2 < e1 && s1 < e2; }).map((x) => { const e = (Array.isArray(x.employees) ? x.employees[0] : x.employees) as { full_name?: string; avatar_color?: string; photo_url?: string } | null; return { id: x.id as string, empId: x.employee_id as string, name: e?.full_name ?? "—", color: e?.avatar_color ?? null, photo: e?.photo_url ?? null, start: hm(x.start_time as string) ?? "", end: hm(x.end_time as string) ?? "" }; }));
@@ -118,6 +127,27 @@ export default function VaktScreen() {
               <Muted size={13}>{c.start}–{c.end}</Muted>
             </Pressable>
           ))}
+        </Card>
+      ) : null}
+
+      {tasks.length ? (
+        <Card>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <Eyebrow>{tr("Verkefni vaktarinnar")}</Eyebrow>
+            <Muted>{tasks.filter((x) => x.done).length}/{tasks.length}</Muted>
+          </View>
+          <TaskChecklist
+            tasks={tasks}
+            onToggle={mine ? async (task) => {
+              const next = !task.done;
+              setTasks((ts) => ts.map((x) => (x.id === task.id ? { ...x, done: next } : x)));
+              if (!(await setTaskDone(task.id, next))) {
+                setTasks((ts) => ts.map((x) => (x.id === task.id ? { ...x, done: !next } : x)));
+                toast("Tókst ekki að vista");
+              }
+            } : undefined}
+          />
+          {!mine && manager ? <Muted size={12} style={{ marginTop: 6 }}>{tr("Starfsmaðurinn hakar við verkefnin í appinu.")}</Muted> : null}
         </Card>
       ) : null}
 

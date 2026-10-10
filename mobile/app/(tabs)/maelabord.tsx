@@ -5,7 +5,7 @@
 import React, { useCallback, useState } from "react";
 import { View, Pressable, TextInput } from "react-native";
 import { useFocusEffect } from "expo-router";
-import { Clock, Check, X, CalendarClock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Plus, LogOut } from "lucide-react-native";
+import { Clock, Check, X, CalendarClock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Plus, LogOut, ListChecks } from "lucide-react-native";
 import { tr, trf } from "../../src/lib/i18n";
 import { Screen } from "../../src/components/screen";
 import { Card, Txt, Muted, Eyebrow, Avatar, Btn, Divider, Seg, Sheet, useToast } from "../../src/components/ui";
@@ -18,6 +18,8 @@ import {
   type Ops, type PendingReq, type PeriodId, type PeriodSel, type OnShift, type LocationRow,
 } from "../../src/lib/api/ops";
 import { iso } from "../../src/lib/api/me";
+import { getCompanyTasks, type StaffTasks } from "../../src/lib/api/tasks";
+import { TaskChecklist } from "../../src/components/tasks";
 
 export default function Maelabord() {
   useTheme();
@@ -29,11 +31,14 @@ export default function Maelabord() {
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [outFor, setOutFor] = useState<OnShift | null>(null);
+  const [staffTasks, setStaffTasks] = useState<StaffTasks[]>([]);
+  const [openTasks, setOpenTasks] = useState<string | null>(null);
   const [revOpen, setRevOpen] = useState(false);
 
   const load = useCallback(async () => {
     const companyId = await myCompanyId(me ?? null);
     if (!companyId) return;
+    getCompanyTasks(companyId).then(setStaffTasks).catch(() => {});
     setOps(await getOps(companyId, sel));
   }, [me, sel]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -182,6 +187,33 @@ export default function Maelabord() {
           </View>
         )}
       </Card>
+
+      {/* verkefni dagsins — hver er búinn með hvað */}
+      {staffTasks.length > 0 ? (
+        <Card>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <ListChecks color={colors.ink3} size={16} />
+            <Txt weight="bold" size={16}>{tr("Verkefni dagsins")}</Txt>
+            <Muted>{staffTasks.reduce((a, x) => a + x.tasks.filter((k) => k.done).length, 0)}/{staffTasks.reduce((a, x) => a + x.tasks.length, 0)}</Muted>
+          </View>
+          <View style={{ marginTop: 10, gap: 4 }}>
+            {staffTasks.map((x) => {
+              const done = x.tasks.filter((k) => k.done).length, all = done === x.tasks.length;
+              return (
+                <View key={x.empId}>
+                  <Pressable onPress={() => setOpenTasks(openTasks === x.empId ? null : x.empId)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 7, opacity: pressed ? 0.7 : 1 })}>
+                    <Avatar name={x.name} size={34} color={x.color} photo={x.photo} />
+                    <Txt weight="semibold" style={{ flex: 1 }} numberOfLines={1}>{x.name}</Txt>
+                    <Txt weight="semibold" size={13} color={all ? colors.good : colors.ink2} style={{ fontVariant: ["tabular-nums"] }}>{done}/{x.tasks.length}</Txt>
+                    <ChevronRight color={colors.ink3} size={16} style={{ transform: [{ rotate: openTasks === x.empId ? "90deg" : "0deg" }] }} />
+                  </Pressable>
+                  {openTasks === x.empId ? <View style={{ paddingLeft: 44, paddingBottom: 6 }}><TaskChecklist tasks={x.tasks} /></View> : null}
+                </View>
+              );
+            })}
+          </View>
+        </Card>
+      ) : null}
 
       {/* beiðnir */}
       <Card>
