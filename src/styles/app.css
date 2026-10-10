@@ -1509,3 +1509,6 @@ a.db2-who:hover span{color:var(--brand)}
 .db2 .pr-kind{margin-left:auto;margin-right:10px}
 .db2 .pr-fixed{margin-left:8px;font-size:11px;padding:3px 8px;background:var(--line2);color:var(--ink2)}
 .db2 .pr-part{color:var(--brand-deep);font-weight:600}
+
+.mbub .mfile{display:inline-flex;align-items:center;gap:8px;color:inherit;text-decoration:none;font-weight:600}
+.mbub .mfile span{text-decoration:underline;text-underline-offset:2px;word-break:break-all}

@@ -2,7 +2,7 @@
 // löngu ýti, „séð af“, svar í þræði, skrifar-vísir.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
-import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions } from "react-native";
+import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions, Modal } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChevronLeft, Send, X, Hash, CornerUpLeft, Trash2, ImagePlus, MoreHorizontal, BellOff, Bell, Paperclip, FileText, Images, LogOut } from "lucide-react-native";
@@ -64,7 +64,7 @@ export default function Thread() {
     setUploading(true);
     const up = await uploadChatFile(me, f.uri, f.name, f.mimeType ?? "application/octet-stream");
     if (!up.ok || !up.url) { setUploading(false); toast(up.error ?? "Skráin hlóðst ekki upp"); return; }
-    const res = (f.mimeType ?? "").startsWith("image/") ? await sendChatImage(me, id, up.url) : await sendChatFile(me, id, up.url, f.name);
+    const res = (f.mimeType ?? "").startsWith("image/") || IMG_RE.test(f.name) ? await sendChatImage(me, id, up.url) : await sendChatFile(me, id, up.url, f.name);
     setUploading(false);
     if (!res.ok) toast(res.error ?? "Tókst ekki að senda"); else load();
   }
@@ -81,6 +81,7 @@ export default function Thread() {
     else { const { data: mem } = await supabase.from("channel_members").select("user_id").eq("channel_id", id); setMemberList((mem ?? []).map((m) => people.get(m.user_id)).filter(Boolean).sort((a, b) => a!.name.localeCompare(b!.name)) as Person[]); }
   }
   const list = useRef<FlatList>(null);
+  const [viewer, setViewer] = useState<string | null>(null);
   // tímastimplar eru faldir hægra megin við skjáinn; strok til vinstri dregur þá inn (eins og í Messenger)
   const { width: W } = useWindowDimensions();
   const pull = useRef(new Animated.Value(0)).current;
@@ -234,7 +235,7 @@ export default function Thread() {
             </View>
           ) : (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={{ width: W - 28 }}><Bubble item={item} onLong={() => setSel(item.m)} /></View>
+              <View style={{ width: W - 28 }}><Bubble item={item} onLong={() => setSel(item.m)} onImage={setViewer} /></View>
               <View style={{ width: TIME_W + 14, alignItems: "center", paddingBottom: item.last ? 8 : 2 }}>
                 <Txt size={11} color={colors.ink3} style={{ fontVariant: ["tabular-nums"] }}>{item.m.at}</Txt>
               </View>
@@ -330,14 +331,28 @@ export default function Thread() {
         </>
         )}
       </Sheet>
+      {/* mynd í fullri stærð — opnast í appinu, ekki í vafra */}
+      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)} statusBarTranslucent>
+        <Pressable onPress={() => setViewer(null)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,.94)", justifyContent: "center" }}>
+          {viewer ? <Image source={{ uri: viewer }} style={{ width: "100%", height: "82%" }} contentFit="contain" /> : null}
+          <Pressable onPress={() => setViewer(null)} hitSlop={12} accessibilityLabel={tr("Loka")} style={{ position: "absolute", top: insets.top + 10, right: 16, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,.16)", alignItems: "center", justifyContent: "center" }}>
+            <X color="#fff" size={20} />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
 
 const TIME_W = 58;
 
-function Bubble({ item, onLong }: { item: Extract<RowItem, { kind: "msg" }>; onLong: () => void }) {
+/** Mynd? Líka skjal með myndarendingu (eldri skilaboð og skrár úr „Skrár“ án MIME-tegundar). */
+const IMG_RE = /\.(jpe?g|png|gif|webp|heic|heif)(\?|$)/i;
+const isImage = (m: ChatMessage) => !!m.url && (m.kind === "image" || (m.kind === "file" && (IMG_RE.test(m.url) || IMG_RE.test(m.body))));
+
+function Bubble({ item, onLong, onImage }: { item: Extract<RowItem, { kind: "msg" }>; onLong: () => void; onImage: (url: string) => void }) {
   const { m, first, last, showSender } = item;
+  const img = isImage(m);
   const r = 18, s = 6;
   const radius = m.me
     ? { borderTopLeftRadius: r, borderBottomLeftRadius: r, borderTopRightRadius: first ? r : s, borderBottomRightRadius: last ? r : s }
@@ -347,15 +362,15 @@ function Bubble({ item, onLong }: { item: Extract<RowItem, { kind: "msg" }>; onL
       {showSender ? <Txt size={11} weight="semibold" color={colors.ink3} style={{ marginLeft: 42, marginBottom: 2 }}>{m.senderFull}</Txt> : null}
       <View style={{ flexDirection: m.me ? "row-reverse" : "row", alignItems: "flex-end", gap: 8, maxWidth: "86%", alignSelf: m.me ? "flex-end" : "flex-start" }}>
         {!m.me ? <View style={{ width: 26, opacity: last ? 1 : 0 }}><Avatar name={m.senderFull} size={26} color={m.color} photo={m.photo} /></View> : null}
-        <Pressable onLongPress={onLong} delayLongPress={250} style={{ backgroundColor: m.me ? colors.brand : colors.bubbleThem, paddingHorizontal: 13, paddingVertical: 9, ...radius, position: "relative", flexShrink: 1 }}>
+        <Pressable onLongPress={onLong} delayLongPress={250} style={{ backgroundColor: m.me ? colors.brand : colors.bubbleThem, paddingHorizontal: img ? 4 : 13, paddingVertical: img ? 4 : 9, ...radius, position: "relative", flexShrink: 1 }}>
           {m.replyTo ? (
             <View style={{ borderLeftWidth: 2, borderLeftColor: m.me ? "rgba(255,255,255,.6)" : colors.brand, paddingLeft: 8, marginBottom: 6 }}>
               <Txt size={11.5} weight="bold" color={m.me ? "rgba(255,255,255,.9)" : colors.brandDeep}>{m.replyTo.sender}</Txt>
               <Txt size={12.5} color={m.me ? "rgba(255,255,255,.85)" : colors.ink2} numberOfLines={2}>{m.replyTo.body}</Txt>
             </View>
           ) : null}
-          {m.kind === "image" && m.url ? <Pressable onPress={() => m.url && Linking.openURL(m.url)}><Image source={{ uri: m.url }} style={{ width: 210, height: 150, borderRadius: 12, marginBottom: m.body ? 6 : 0 }} contentFit="cover" /></Pressable> : null}
-          {m.kind === "file" && m.url ? (
+          {img && m.url ? <Pressable onPress={() => m.url && onImage(m.url)} onLongPress={onLong} delayLongPress={250}><Image source={{ uri: m.url }} style={{ width: 230, height: 230, borderRadius: 12, marginBottom: m.kind === "image" && m.body ? 6 : 0 }} contentFit="cover" transition={120} /></Pressable> : null}
+          {img ? (m.kind === "image" && m.body ? <Txt size={15} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 20 }}>{m.body}</Txt> : null) : m.kind === "file" && m.url ? (
             <Pressable onPress={() => m.url && Linking.openURL(m.url)} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 2 }}>
               <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: m.me ? "rgba(255,255,255,.2)" : colors.panel, alignItems: "center", justifyContent: "center" }}><FileText color={m.me ? "#fff" : colors.ink2} size={18} /></View>
               <View style={{ flexShrink: 1 }}><Txt weight="bold" size={14} color={m.me ? "#fff" : colors.ink} numberOfLines={2}>{m.body || "Skjal"}</Txt><Txt size={11.5} color={m.me ? "rgba(255,255,255,.8)" : colors.ink3}>Ýttu til að opna</Txt></View>

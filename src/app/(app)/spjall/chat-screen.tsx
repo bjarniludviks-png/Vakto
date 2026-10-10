@@ -21,6 +21,9 @@ type ChatInitial = { ok: boolean; items: Conversation[]; meId: string; meName?: 
 type SupabaseBrowser = ReturnType<typeof createBrowserClient>;
 
 /** "Í dag" / "Í gær" / "24. ágúst" day separators between messages. */
+/** Mynd? Líka skjal með myndarendingu (sent úr appinu sem skrá). */
+const IMG_RE = /\.(jpe?g|png|gif|webp|heic|heif)(\?|$)/i;
+
 function dayLabel(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
@@ -533,11 +536,12 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
                       {m.replyTo && (
                         <span className="mreply"><b>{m.replyTo.sender}</b><span>{m.replyTo.body}</span></span>
                       )}
-                      {m.kind === "image" && m.url
+                      {m.url && (m.kind === "image" || (m.kind === "file" && (IMG_RE.test(m.url) || IMG_RE.test(m.body))))
                         // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={m.url} alt="" />
+                        ? <a href={m.url} target="_blank" rel="noreferrer"><img src={m.url} alt="" /></a>
                         : m.kind === "audio" && m.url ? <audio controls src={m.url} style={{ height: 36 }} />
-                          : m.body}
+                          : m.kind === "file" && m.url ? <a className="mfile" href={m.url} target="_blank" rel="noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg><span>{m.body || t("Skjal")}</span></a>
+                            : m.body}
                       {g.last && <span className="tm">{m.at}</span>}
                       {m.reactions.length > 0 && (
                         <span className="mreacts" onClick={() => react(m, m.reactions[0].emoji)}>

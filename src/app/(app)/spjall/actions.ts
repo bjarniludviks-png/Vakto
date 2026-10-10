@@ -263,7 +263,7 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
     const lastAtByCh = new Map<string, string>();
     for (const m of msgs ?? []) {
       if (lastByCh.has(m.channel_id as string)) continue;
-      lastByCh.set(m.channel_id as string, m.kind === "image" ? "📷 Mynd" : m.kind === "audio" ? "🎤 Talskilaboð" : (m.body as string));
+      lastByCh.set(m.channel_id as string, m.kind === "image" ? "📷 Mynd" : m.kind === "audio" ? "🎤 Talskilaboð" : m.kind === "file" ? `📎 ${(m.body as string) || "Skjal"}` : (m.body as string));
       lastAtByCh.set(m.channel_id as string, m.created_at as string);
     }
 
