@@ -214,6 +214,12 @@ const D: Record<string, E> = {
   "Tíminn er ekki liðinn": ["That time hasn't passed yet", "Giờ này chưa tới"], "Tókst ekki að stimpla út": ["Couldn't clock out", "Không chấm công ra được"],
   "Sláðu inn upphæð": ["Enter an amount", "Nhập số tiền"], "Tókst ekki að vista veltu": ["Couldn't save revenue", "Không lưu được doanh thu"],
   "Verkefni vaktarinnar": ["Tasks for this shift", "Việc cần làm trong ca"], "Starfsmaðurinn hakar við verkefnin í appinu.": ["The employee ticks the tasks off in the app.", "Nhân viên đánh dấu công việc trong ứng dụng."],
+  "Velkomin aftur": ["Welcome back", "Chào mừng trở lại"], "Skráðu þig inn til að sjá vaktirnar þínar.": ["Sign in to see your shifts.", "Đăng nhập để xem ca làm của bạn."],
+  "Gleymdirðu lykilorðinu?": ["Forgot your password?", "Quên mật khẩu?"], "Vaktir, tímar og laun á einum stað": ["Shifts, hours and pay in one place", "Ca làm, giờ công và lương ở một nơi"],
+  "Sláðu inn netfangið þitt fyrst — þá sendum við þér hlekk.": ["Enter your email first and we'll send you a link.", "Hãy nhập email trước, chúng tôi sẽ gửi liên kết."],
+  "Ef netfangið er skráð hjá VAKTO færðu póst með hlekk til að velja nýtt lykilorð.": ["If that email is registered with VAKTO, you'll get a link to choose a new password.", "Nếu email đã đăng ký với VAKTO, bạn sẽ nhận được liên kết để đặt mật khẩu mới."],
+  "Ertu ekki með aðgang? Vinnuveitandinn þinn býður þér í VAKTO og þú færð boð í tölvupósti.": ["No account? Your employer invites you to VAKTO and you'll get the invitation by email.", "Chưa có tài khoản? Chủ lao động sẽ mời bạn vào VAKTO qua email."],
+  "Tenging við VAKTO er ekki uppsett í þessari útgáfu.": ["This build isn't connected to VAKTO.", "Bản này chưa kết nối với VAKTO."], "Sýna lykilorð": ["Show password", "Hiện mật khẩu"], "Fela lykilorð": ["Hide password", "Ẩn mật khẩu"],
 };
 
 const NUM = /\d[\d.,:–\-]*/g;
