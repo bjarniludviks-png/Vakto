@@ -237,7 +237,8 @@ export async function buildPayslipPdf(d: PayslipDetail): Promise<Doc> {
   const fine = k.wrap("Reiknað í VAKTO út frá samþykktum vinnustundum og launareglum fyrirtækisins. Staðgreiðsla er áætluð (samsett skatthlutfall og persónuafsláttur); endanlegur launaseðill kemur úr launakerfi fyrirtækisins. · Calculated in VAKTO from approved hours and the company's pay rules; income tax is an estimate.", k.CW);
   fine.forEach((l, i) => doc.text(l, k.M, k.state.y + i * 10));
 
-  k.footer(`Launaseðill · ${d.name}`);
+  k.state.y += k.note(k.M, k.state.y + 6, k.CW, "Áætlun VAKTO. Staðgreiðsla, lífeyrir og félagsgjöld eru reiknuð með einföldum föstum hlutföllum. Endanlegur launaseðill kemur úr launakerfi vinnuveitanda.", "VAKTO estimate. Tax, pension and union fees use simple fixed rates. The final payslip is issued by the employer's payroll system.") + 10;
+  k.footer(`Launaseðill (áætlun) · ${d.name}`);
   return doc;
 }
 

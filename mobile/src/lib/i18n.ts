@@ -220,6 +220,14 @@ const D: Record<string, E> = {
   "Ef netfangið er skráð hjá VAKTO færðu póst með hlekk til að velja nýtt lykilorð.": ["If that email is registered with VAKTO, you'll get a link to choose a new password.", "Nếu email đã đăng ký với VAKTO, bạn sẽ nhận được liên kết để đặt mật khẩu mới."],
   "Ertu ekki með aðgang? Vinnuveitandinn þinn býður þér í VAKTO og þú færð boð í tölvupósti.": ["No account? Your employer invites you to VAKTO and you'll get the invitation by email.", "Chưa có tài khoản? Chủ lao động sẽ mời bạn vào VAKTO qua email."],
   "Tenging við VAKTO er ekki uppsett í þessari útgáfu.": ["This build isn't connected to VAKTO.", "Bản này chưa kết nối với VAKTO."], "Sýna lykilorð": ["Show password", "Hiện mật khẩu"], "Fela lykilorð": ["Hide password", "Ẩn mật khẩu"],
+  "Tilkynna færslu": ["Report post", "Báo cáo bài viết"], "Tilkynna skilaboð": ["Report message", "Báo cáo tin nhắn"], "Stjórnendur fá tilkynningu": ["Managers are notified", "Quản lý sẽ được thông báo"],
+  "Fela færslur frá {x}": ["Hide posts from {x}", "Ẩn bài viết của {x}"], "Fela skilaboð frá {x}": ["Hide messages from {x}", "Ẩn tin nhắn của {x}"], "Fela": ["Hide", "Ẩn"], "Færsla": ["Post", "Bài viết"],
+  "Tilkynning send til stjórnenda": ["Report sent to managers", "Đã gửi báo cáo cho quản lý"], "Falið. Þú getur opnað aftur í Stillingum.": ["Hidden. You can undo this in Settings.", "Đã ẩn. Bạn có thể hoàn tác trong Cài đặt."],
+  "Þú sérð ekki lengur skilaboð eða færslur frá viðkomandi. Þú getur opnað aftur í Stillingum.": ["You'll no longer see messages or posts from this person. You can undo this in Settings.", "Bạn sẽ không còn thấy tin nhắn hay bài viết của người này. Có thể hoàn tác trong Cài đặt."],
+  "Faldir notendur": ["Hidden people", "Người đã ẩn"], "{n} faldir — ýttu til að sýna alla aftur": ["{n} hidden — tap to show everyone again", "{n} đã ẩn — chạm để hiện lại tất cả"], "Sýna alla aftur?": ["Show everyone again?", "Hiện lại tất cả?"],
+  "Skilaboð og færslur frá þeim sem þú faldir birtast aftur.": ["Messages and posts from people you hid will show again.", "Tin nhắn và bài viết của những người bạn đã ẩn sẽ hiện lại."], "Sýna aftur": ["Show again", "Hiện lại"], "Allir sýnilegir aftur": ["Everyone is visible again", "Đã hiện lại tất cả"],
+  "Tilkynnt efni": ["Reported content", "Nội dung bị báo cáo"], "Skilaboð í spjalli": ["Chat message", "Tin nhắn"], "Færsla í fréttaveitu": ["News post", "Bài đăng"], "Athugasemd": ["Comment", "Bình luận"], "Merkja afgreitt": ["Mark resolved", "Đánh dấu đã xử lý"],
+  "Nýtt verkefni…": ["New task…", "Việc mới…"], "Bæta við verkefni": ["Add task", "Thêm việc"], "Fjarlægja verkefni": ["Remove task", "Xóa việc"], "Tókst ekki að bæta við verkefni": ["Couldn't add the task", "Không thêm được việc"],
 };
 
 const NUM = /\d[\d.,:–\-]*/g;

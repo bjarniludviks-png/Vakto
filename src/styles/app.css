@@ -1523,3 +1523,5 @@ a.db2-who:hover span{color:var(--brand)}
 .vai-conv-t small{color:var(--ink3);font-size:11.5px}
 .vai-ico.on{color:var(--brand)}
 .vai-list[hidden]{display:none}
+
+.ps-note{margin:14px 0 0;font-size:12px;line-height:1.45;color:var(--ink3)}

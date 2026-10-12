@@ -2,10 +2,10 @@
 // ný færsla með mynd og „festa efst“ (stjórnendur).
 import React, { useCallback, useEffect, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
-import { View, TextInput, Pressable, ScrollView, RefreshControl, Switch, KeyboardAvoidingView, Platform } from "react-native";
+import { View, TextInput, Pressable, ScrollView, RefreshControl, Switch, KeyboardAvoidingView, Platform, Alert } from "react-native";
 import { useFocusEffect } from "expo-router";
 import { useSegments } from "expo-router";
-import { Plus, Heart, MessageSquare, Pin, ImagePlus, Send, Trash2 } from "lucide-react-native";
+import { Plus, Heart, MessageSquare, Pin, ImagePlus, Send, Trash2, Flag } from "lucide-react-native";
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import { Header, IconBtn } from "../../src/components/screen";
@@ -14,6 +14,7 @@ import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { listPosts, createPost, setPostReaction, addPostComment, setPinned, deletePost, canPin as canPinFn, feedOptions, uploadImage, REACTIONS, type FeedPost, type FeedAudience } from "../../src/lib/api/feed";
 import { inputStyle, Field } from "../../src/components/request-sheets";
+import { reportContent, blockUser, blockedUsers } from "../../src/lib/api/moderation";
 
 export default function Frettir() {
   const standalone = useSegments()[0] !== "(tabs)";
@@ -37,10 +38,23 @@ export default function Frettir() {
 
   const load = useCallback(async () => {
     if (!me) return;
-    try { setPosts(await listPosts(me)); } catch (e) { console.warn("feed", e); }
+    try {
+      const [all, blocked] = await Promise.all([listPosts(me), blockedUsers()]);
+      setPosts(all.filter((p) => !p.senderId || !blocked.has(p.senderId)));
+    } catch (e) { console.warn("feed", e); }
   }, [me]);
   useFocusEffect(useCallback(() => { load(); const t = setInterval(load, 20000); return () => clearInterval(t); }, [load]));
   useEffect(() => { canPinFn().then(setCanPin); if (me) feedOptions(me).then((o) => { setCanPost(o.canPost); setAudiences(o.audiences); }); }, [me]);
+
+  /** Tilkynna færslu til stjórnenda, eða fela allt frá höfundinum hjá þér. */
+  function moderate(p: FeedPost) {
+    if (!me) return;
+    Alert.alert(tr("Færsla"), p.sender, [
+      { text: tr("Tilkynna færslu"), onPress: async () => { const r = await reportContent(me, "post", p.id, p.senderId, p.body); toast(r.ok ? "Tilkynning send til stjórnenda" : (r.error ?? "Tókst ekki")); } },
+      ...(p.senderId ? [{ text: trf("Fela færslur frá {x}", p.sender.split(/\s+/)[0]), style: "destructive" as const, onPress: async () => { if (await blockUser(p.senderId!)) { toast("Falið. Þú getur opnað aftur í Stillingum."); load(); } } }] : []),
+      { text: tr("Hætta við"), style: "cancel" as const },
+    ]);
+  }
 
   async function pickImage() {
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: false });
@@ -97,6 +111,9 @@ export default function Frettir() {
                   <Pressable onPress={async () => { await setPinned(p.id, !p.pinned); load(); }} hitSlop={8} style={{ padding: 6 }}>
                     <Pin color={p.pinned ? colors.brandDeep : colors.ink3} size={18} fill={p.pinned ? colors.brandDeep : "transparent"} />
                   </Pressable>
+                ) : null}
+                {!p.me && !p.system ? (
+                  <Pressable onPress={() => moderate(p)} hitSlop={8} accessibilityLabel={tr("Tilkynna færslu")} style={{ padding: 6 }}><Flag color={colors.ink3} size={17} /></Pressable>
                 ) : null}
                 {p.me || canPin ? (
                   <Pressable onPress={async () => { await deletePost(p.id); toast("Færslu eytt"); load(); }} hitSlop={8} style={{ padding: 6 }}><Trash2 color={colors.ink3} size={17} /></Pressable>

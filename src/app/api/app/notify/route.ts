@@ -9,7 +9,7 @@ import { checkNoShows } from "@/lib/noshow.server";
 // Auth: the caller's Supabase access token (Bearer). We verify the caller is a
 // party to the row before notifying anyone — this endpoint never writes data.
 
-type Kind = "leave_request" | "leave_decided" | "swap_request" | "punch";
+type Kind = "leave_request" | "leave_decided" | "swap_request" | "punch" | "content_report";
 
 export async function POST(req: Request) {
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -42,6 +42,14 @@ export async function POST(req: Request) {
   if (kind === "punch") {
     if (!me) return NextResponse.json({ ok: false }, { status: 403 });
     after(() => checkNoShows(me.company_id as string));
+    return NextResponse.json({ ok: true });
+  }
+
+  // Tilkynnt efni í spjalli/fréttaveitu → stjórnendur fá tilkynningu (efnið sjálft er ekki sent í push).
+  if (kind === "content_report") {
+    const { data: rep } = await admin.from("content_reports").select("company_id, reporter_id, status").eq("id", id).maybeSingle();
+    if (!rep || rep.reporter_id !== uid || rep.status !== "open") return NextResponse.json({ ok: false }, { status: 403 });
+    after(() => notifyManagers(rep.company_id as string, { title: "Efni tilkynnt", body: "Starfsmaður tilkynnti skilaboð eða færslu. Opnaðu Mælaborð í appinu til að skoða.", url: "/spjall", tag: "reports" }));
     return NextResponse.json({ ok: true });
   }
 

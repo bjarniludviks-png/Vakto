@@ -59,6 +59,23 @@ export async function getKioskData(kioskKey: string): Promise<KioskData | null> 
   }
 }
 
+// Læsing eftir of margar rangar tilraunir (geymt í grunni svo hún haldi milli þjóna). Þolir að töfluna vanti.
+const LOCK_MIN = 10;
+type Admin = ReturnType<typeof createAdminClient>;
+async function tooManyFails(admin: Admin, companyId: string, employeeId: string | null, max: number): Promise<boolean> {
+  try {
+    const since = new Date(Date.now() - LOCK_MIN * 60000).toISOString();
+    let q = admin.from("kiosk_fails").select("id", { count: "exact", head: true }).eq("company_id", companyId).gte("at", since);
+    q = employeeId ? q.eq("employee_id", employeeId) : q.is("employee_id", null);
+    const { count, error } = await q;
+    return !error && (count ?? 0) >= max;
+  } catch { return false; }
+}
+async function noteFail(admin: Admin, companyId: string, employeeId: string | null): Promise<void> {
+  try { await admin.from("kiosk_fails").insert({ company_id: companyId, employee_id: employeeId }); } catch { /* tafla ekki til */ }
+}
+const LOCKED = `Of margar rangar tilraunir — reyndu aftur eftir ${LOCK_MIN} mínútur.`;
+
 /** Clock in/out via PIN = last 4 digits of kennitala. Toggles based on open punch. */
 export async function kioskPunchByPin(
   kioskKey: string, employeeId: string, pin: string,
@@ -72,9 +89,10 @@ export async function kioskPunchByPin(
     const { data: emp } = await admin
       .from("employees").select("id, kennitala").eq("id", employeeId).eq("company_id", companyId).maybeSingle();
     if (!emp) return { ok: false, error: "Starfsmaður fannst ekki" };
+    if (await tooManyFails(admin, companyId, employeeId, 5)) return { ok: false, error: LOCKED };
     const code = last4(emp.kennitala as string | null);
     if (!code) return { ok: false, error: "Engin kennitala skráð á starfsmann" };
-    if (code !== pin) return { ok: false, error: "Rangur kóði — reyndu aftur" };
+    if (code !== pin) { await noteFail(admin, companyId, employeeId); return { ok: false, error: "Rangur kóði — reyndu aftur" }; }
 
     const { data: open } = await admin
       .from("punches").select("id").eq("employee_id", employeeId)
@@ -82,16 +100,16 @@ export async function kioskPunchByPin(
     const now = new Date().toISOString();
     if (open) {
       const { error } = await admin.from("punches").update({ clock_out: now }).eq("id", open.id);
-      if (error) return { ok: false, error: error.message };
+      if (error) { console.error("[kiosk]", error.message); return { ok: false, error: "Stimplun tókst ekki — reyndu aftur." }; }
       return { ok: true, into: false, time: hm(now) };
     }
     const { error } = await admin.from("punches").insert({
       company_id: companyId, employee_id: employeeId, clock_in: now, source: "kiosk",
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) { console.error("[kiosk]", error.message); return { ok: false, error: "Stimplun tókst ekki — reyndu aftur." }; }
     return { ok: true, into: true, time: hm(now) };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    console.error("[kiosk]", e); return { ok: false, error: "Stimplun tókst ekki — reyndu aftur." };
   }
 }
 
@@ -108,27 +126,28 @@ export async function kioskPunchByKennitala(
     const co = await companyByKey(admin, kioskKey);
     if (!co) return { ok: false, error: "Kiosk-slóðin er ógild" };
     const companyId = co.id;
+    if (await tooManyFails(admin, companyId, null, 10)) return { ok: false, error: LOCKED };
     const { data: emps } = await admin
       .from("employees").select("id, full_name, kennitala")
       .eq("company_id", companyId).in("status", ["active", "over_ratio"]);
     const emp = (emps ?? []).find((e) => ((e.kennitala as string) ?? "").replace(/\D/g, "") === digits);
-    if (!emp) return { ok: false, error: "Engin(n) starfsmaður fannst með þessa kennitölu" };
+    if (!emp) { await noteFail(admin, companyId, null); return { ok: false, error: "Engin(n) starfsmaður fannst með þessa kennitölu" }; }
     const { data: open } = await admin
       .from("punches").select("id").eq("employee_id", emp.id)
       .is("clock_out", null).order("clock_in", { ascending: false }).limit(1).maybeSingle();
     const now = new Date().toISOString();
     if (open) {
       const { error } = await admin.from("punches").update({ clock_out: now }).eq("id", open.id);
-      if (error) return { ok: false, error: error.message };
+      if (error) { console.error("[kiosk]", error.message); return { ok: false, error: "Stimplun tókst ekki — reyndu aftur." }; }
       return { ok: true, into: false, time: hm(now), name: emp.full_name as string, employeeId: emp.id as string };
     }
     const { error } = await admin.from("punches").insert({
       company_id: companyId, employee_id: emp.id, clock_in: now, source: "kiosk",
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) { console.error("[kiosk]", error.message); return { ok: false, error: "Stimplun tókst ekki — reyndu aftur." }; }
     return { ok: true, into: true, time: hm(now), name: emp.full_name as string, employeeId: emp.id as string };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    console.error("[kiosk]", e); return { ok: false, error: "Stimplun tókst ekki — reyndu aftur." };
   }
 }
 
@@ -153,13 +172,13 @@ export async function kioskPunchByToken(
     const now = new Date().toISOString();
     if (open) {
       const { error } = await admin.from("punches").update({ clock_out: now }).eq("id", open.id);
-      if (error) return { ok: false, error: error.message };
+      if (error) { console.error("[kiosk]", error.message); return { ok: false, error: "Stimplun tókst ekki — reyndu aftur." }; }
       return { ok: true, into: false, time: hm(now), name };
     }
     const { error } = await admin.from("punches").insert({ company_id: companyId, employee_id: emp.id, clock_in: now, source: "kiosk" });
-    if (error) return { ok: false, error: error.message };
+    if (error) { console.error("[kiosk]", error.message); return { ok: false, error: "Stimplun tókst ekki — reyndu aftur." }; }
     return { ok: true, into: true, time: hm(now), name };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    console.error("[kiosk]", e); return { ok: false, error: "Stimplun tókst ekki — reyndu aftur." };
   }
 }

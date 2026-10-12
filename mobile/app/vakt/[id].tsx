@@ -2,12 +2,12 @@
 // áætluð laun (eigin vakt), bjóða vakt / forföll / sækja um / skilaboð.
 import React, { useCallback, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
-import { View, Pressable, Share } from "react-native";
+import { View, Pressable, Share, TextInput } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { MoreHorizontal, ArrowLeftRight, MessageCircle, Share2 } from "lucide-react-native";
+import { MoreHorizontal, ArrowLeftRight, MessageCircle, Share2, Plus, X } from "lucide-react-native";
 import { Screen, IconBtn } from "../../src/components/screen";
 import { Card, Txt, Muted, Pill, Btn, Avatar, AvatarStack, Sheet, Eyebrow, KV, Row, useToast } from "../../src/components/ui";
-import { colors, deptColor, useTheme } from "../../src/theme";
+import { colors, deptColor, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { supabase } from "../../src/lib/supabase";
 import { estimateShift } from "../../src/lib/api/pay";
@@ -15,7 +15,7 @@ import { applyForShift, listMyRequests } from "../../src/lib/api/requests";
 import { startDM, peopleMap } from "../../src/lib/api/chat";
 import { dec1, kr } from "../../src/lib/format";
 import { OfferSheet, CantSheet } from "../../src/components/request-sheets";
-import { getTasksFor, setTaskDone, type Task } from "../../src/lib/api/tasks";
+import { getTasksFor, setTaskDone, addTask, deleteTask, type Task } from "../../src/lib/api/tasks";
 import { TaskChecklist } from "../../src/components/tasks";
 import { isManager } from "../../src/lib/api/ops";
 
@@ -39,6 +39,7 @@ export default function VaktScreen() {
   const [applied, setApplied] = useState(false);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [manager, setManager] = useState(false);
+  const [draft, setDraft] = useState("");
   const [sheet, setSheet] = useState<null | "more" | "offer" | "cant">(null);
 
   const load = useCallback(async () => {
@@ -83,6 +84,12 @@ export default function VaktScreen() {
     const r = await applyForShift(me, label);
     if (!r.ok) { setApplied(false); toast(r.error ?? "Tókst ekki"); return; }
     toast("Umsókn send — vaktstjóri fær tilkynningu");
+  }
+  async function addDraft() {
+    if (!me || !sh.empId || !draft.trim()) return;
+    const t = await addTask(me.companyId, sh.empId, sh.date, draft);
+    if (!t) { toast("Tókst ekki að bæta við verkefni"); return; }
+    setTasks((ts) => [...ts, t]); setDraft("");
   }
   async function message() {
     if (!me || !sh.empName) return;
@@ -130,24 +137,44 @@ export default function VaktScreen() {
         </Card>
       ) : null}
 
-      {tasks.length ? (
+      {tasks.length || (manager && s.empId) ? (
         <Card>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
             <Eyebrow>{tr("Verkefni vaktarinnar")}</Eyebrow>
-            <Muted>{tasks.filter((x) => x.done).length}/{tasks.length}</Muted>
+            {tasks.length ? <Muted>{tasks.filter((x) => x.done).length}/{tasks.length}</Muted> : null}
           </View>
-          <TaskChecklist
-            tasks={tasks}
-            onToggle={mine ? async (task) => {
-              const next = !task.done;
-              setTasks((ts) => ts.map((x) => (x.id === task.id ? { ...x, done: next } : x)));
-              if (!(await setTaskDone(task.id, next))) {
-                setTasks((ts) => ts.map((x) => (x.id === task.id ? { ...x, done: !next } : x)));
-                toast("Tókst ekki að vista");
-              }
-            } : undefined}
-          />
-          {!mine && manager ? <Muted size={12} style={{ marginTop: 6 }}>{tr("Starfsmaðurinn hakar við verkefnin í appinu.")}</Muted> : null}
+          {manager && !mine ? (
+            // stjórnandi: sér stöðuna, getur fjarlægt og bætt við
+            <View>
+              {tasks.map((task) => (
+                <View key={task.id} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ flex: 1 }}><TaskChecklist tasks={[task]} /></View>
+                  <Pressable hitSlop={10} accessibilityLabel={tr("Fjarlægja verkefni")} onPress={async () => { if (await deleteTask(task.id)) setTasks((ts) => ts.filter((x) => x.id !== task.id)); else toast("Tókst ekki"); }} style={{ padding: 4 }}><X color={colors.ink3} size={16} /></Pressable>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <TaskChecklist
+              tasks={tasks}
+              onToggle={mine ? async (task) => {
+                const next = !task.done;
+                setTasks((ts) => ts.map((x) => (x.id === task.id ? { ...x, done: next } : x)));
+                if (!(await setTaskDone(task.id, next))) {
+                  setTasks((ts) => ts.map((x) => (x.id === task.id ? { ...x, done: !next } : x)));
+                  toast("Tókst ekki að vista");
+                }
+              } : undefined}
+            />
+          )}
+          {manager && s.empId ? (
+            <View style={{ flexDirection: "row", gap: 8, alignItems: "center", marginTop: 10 }}>
+              <TextInput value={draft} onChangeText={setDraft} placeholder={tr("Nýtt verkefni…")} placeholderTextColor={colors.ink3} returnKeyType="done" onSubmitEditing={addDraft}
+                style={{ flex: 1, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.panel2, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14.5, fontFamily: font.regular, color: colors.ink }} />
+              <Pressable onPress={addDraft} disabled={!draft.trim()} accessibilityLabel={tr("Bæta við verkefni")} style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: draft.trim() ? colors.brand : colors.line2, alignItems: "center", justifyContent: "center" }}>
+                <Plus color={draft.trim() ? "#fff" : colors.ink3} size={18} />
+              </Pressable>
+            </View>
+          ) : null}
         </Card>
       ) : null}
 

@@ -27,7 +27,7 @@ const is = {
   feedAlt: "Fréttaveita í appinu",
   showH: "Kynntu þér VAKTO.", showRole: "glærusýning", slideRole: "glæra", of: "af", slideN: "Glæra", pause: "Gera hlé", play: "Spila",
   slides: [
-    { t: "VAKTO AI.", d: "Skrifaðu hvað vikan þarf á venjulegri íslensku. VAKTO AI semur drög að vaktaplani sem þú ferð yfir og samþykkir, og les kjarasamninginn fyrir þig með tilvísun í hverja grein.", alt: "Tillaga VAKTO AI: Moon færður á kvöldvakt á laugardag, launakostnaður óbreyttur 27,4%" },
+    { t: "VAKTO AI.", d: "Spurðu eins og þú talar: „Hvernig er laun % þessa vikuna?“ eða „Settu upp næstu viku, allir með einn frídag.“ VAKTO AI svarar með þínum tölum og setur upp heilt vaktaplan sem þú ferð yfir og samþykkir. Ekkert breytist fyrr en þú staðfestir. Hann les líka kjarasamninginn með tilvísun í hverja grein.", alt: "Tillaga VAKTO AI: Moon færður á kvöldvakt á laugardag, launakostnaður óbreyttur 27,4%" },
     { t: "Vaktirnar í vasanum.", d: "Starfsfólk sér planið sitt, sækir um lausar vaktir og býður vaktir í skiptum. Spjallið er á sama stað.", alt: "Vaktir vikunnar í appinu", alt2: "Spjallrásir í appinu" },
     { t: "Fréttaveita fyrir vinnustaðinn.", d: "Nýr matseðill, breyttur opnunartími, mynd úr eldhúsinu. Festu það mikilvæga efst svo það týnist ekki.", alt: "Fréttaveitan í appinu" },
     { t: "Launaseðill sem stenst.", d: "Dagvinna, álag og yfirvinna sundurliðuð. Líka þegar mánuðurinn var 0 tímar og starfsmaðurinn þarf staðfestingu.", alt: "Launaseðill úr VAKTO" },
@@ -71,7 +71,7 @@ const en: typeof is = {
   feedAlt: "News feed in the app",
   showH: "Get to know VAKTO.", showRole: "slideshow", slideRole: "slide", of: "of", slideN: "Slide", pause: "Pause", play: "Play",
   slides: [
-    { t: "VAKTO AI.", d: "Describe what the week needs in plain language. VAKTO AI drafts a schedule for you to review and approve, and reads the union agreement for you with a reference to every clause.", alt: "VAKTO AI suggestion: Moon moved to Saturday's evening shift, labor cost unchanged at 27.4%" },
+    { t: "VAKTO AI.", d: "Ask the way you talk: “What's labor % this week?” or “Plan next week, everyone gets one day off.” VAKTO AI answers with your own numbers and builds a full schedule for you to review and approve. Nothing changes until you confirm. It also reads the union agreement with a reference to every clause.", alt: "VAKTO AI suggestion: Moon moved to Saturday's evening shift, labor cost unchanged at 27.4%" },
     { t: "Shifts in your pocket.", d: "Staff see their schedule, apply for open shifts and offer shifts to swap. The chat is right there too.", alt: "This week's shifts in the app", alt2: "Chat channels in the app" },
     { t: "A news feed for the workplace.", d: "A new menu, changed opening hours, a photo from the kitchen. Pin what matters so it doesn't get lost.", alt: "The news feed in the app" },
     { t: "A payslip that holds up.", d: "Day rate, premiums and overtime itemised. Even when the month was zero hours and the employee needs proof.", alt: "Payslip from VAKTO" },

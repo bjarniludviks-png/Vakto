@@ -73,11 +73,45 @@ export function uppbotForMonth(month1to12: number): "orlof" | "desember" | null 
   return null;
 }
 
-// ⚠️ Icelandic stórhátíðardagar 2026 — UNCONFIRMED placeholders, verify before real pay.
-export const STORHATID = new Set<string>([
-  "2026-01-01", "2026-04-02", "2026-04-03", "2026-04-06", "2026-05-25",
-  "2026-06-17", "2026-12-24", "2026-12-25", "2026-12-26", "2026-12-31",
-]);
+// Helgidagar reiknaðir fyrir hvaða ár sem er (páskar með Gauss/Meeus-reglunni).
+// ⚠️ ÓSTAÐFEST gagnvart einstökum kjarasamningum — skiptingin fylgir almennu reglunni á vinnumarkaði:
+//   Stórhátíðardagar (stórhátíðarálag): nýársdagur, föstudagurinn langi, páskadagur, hvítasunnudagur,
+//     17. júní, aðfangadagur frá kl. 12, jóladagur, gamlársdagur frá kl. 12.
+//   Aðrir frídagar (sama álag og um helgar): skírdagur, annar í páskum, sumardagurinn fyrsti, 1. maí,
+//     uppstigningardagur, annar í hvítasunnu, frídagur verslunarmanna, annar í jólum.
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const isoOf = (d: Date) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+function easter(y: number): Date {
+  const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(y, month - 1, day);
+}
+const yearCache = new Map<number, { stor: Set<string>; half: Set<string>; fri: Set<string> }>();
+function holidaysOf(y: number) {
+  const hit = yearCache.get(y); if (hit) return hit;
+  const E = easter(y), plus = (n: number) => isoOf(new Date(y, E.getMonth(), E.getDate() + n));
+  const sumar = (() => { for (let d = 19; d <= 25; d++) if (new Date(y, 3, d).getDay() === 4) return `${y}-04-${pad2(d)}`; return `${y}-04-23`; })();
+  const versl = (() => { for (let d = 1; d <= 7; d++) if (new Date(y, 7, d).getDay() === 1) return `${y}-08-${pad2(d)}`; return `${y}-08-01`; })();
+  const out = {
+    stor: new Set([`${y}-01-01`, plus(-2), plus(0), plus(49), `${y}-06-17`, `${y}-12-25`]),
+    half: new Set([`${y}-12-24`, `${y}-12-31`]),                       // stórhátíð frá kl. 12
+    fri: new Set([plus(-3), plus(1), sumar, `${y}-05-01`, plus(39), plus(50), versl, `${y}-12-26`]),
+  };
+  yearCache.set(y, out); return out;
+}
+/** Stórhátíðarálag á þessari stundu? (Aðfangadagur og gamlársdagur aðeins frá kl. 12.) */
+export function isStorhatid(dt: Date): boolean {
+  const h = holidaysOf(dt.getFullYear()), iso = isoOf(dt);
+  return h.stor.has(iso) || (h.half.has(iso) && dt.getHours() >= 12);
+}
+/** Almennur frídagur (ekki stórhátíð) — greiddur með helgarálagi. */
+export function isFridagur(dt: Date): boolean {
+  return holidaysOf(dt.getFullYear()).fri.has(isoOf(dt));
+}
+/** Dagsetning (YYYY-MM-DD) sem er stórhátíðardagur að hluta eða öllu leyti. */
+export const STORHATID = { has(iso: string): boolean { const h = holidaysOf(Number(iso.slice(0, 4))); return h.stor.has(iso) || h.half.has(iso); } };
 const OT_WEEKLY = 40; // yfirvinna yfir 40 klst/viku
 const STEP = 0.25;
 
@@ -88,7 +122,7 @@ function mondayKey(d: Date): string {
 function premiumPct(dt: Date, holiday: boolean, r: RuleSet): number {
   if (holiday) return r.holiday;
   const wd = dt.getDay();
-  if (wd === 0 || wd === 6) return r.weekend;
+  if (wd === 0 || wd === 6 || isFridagur(dt)) return r.weekend;
   const h = dt.getHours();
   if (h < 6 || h >= 23) return r.night;
   if (h < 8 || h >= 17) return r.eve;
@@ -133,8 +167,7 @@ export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clock
       const dt = new Date(t);
       const wk = mondayKey(dt);
       const acc = weekHrs.get(wk) ?? 0;
-      const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-      let pct = Math.max(premiumPct(dt, STORHATID.has(iso), rules), bandPct(dt, bands));
+      let pct = Math.max(premiumPct(dt, isStorhatid(dt), rules), bandPct(dt, bands));
       if (acc >= otWeekly || monthAcc >= otMonthly) pct = Math.max(pct, rules.overtime); // yfirvinna (viku/mánuði)
       gross += e.rate * s * (1 + pct / 100);
       hours += s;
@@ -170,8 +203,7 @@ export function classifyPay(rate: number, hourly: boolean, punches: { clockIn: s
       const dt = new Date(t);
       const wk = mondayKey(dt);
       const acc = weekHrs.get(wk) ?? 0;
-      const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-      const prem = Math.max(premiumPct(dt, STORHATID.has(iso), rules), bandPct(dt, bands));
+      const prem = Math.max(premiumPct(dt, isStorhatid(dt), rules), bandPct(dt, bands));
       const otActive = acc >= otWeekly || monthAcc >= otMonthly;
       if (prem > 0) premium += s;
       if (otActive) overtime += s;

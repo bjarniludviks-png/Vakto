@@ -29,6 +29,7 @@ export const VAKTO_KNOWLEDGE = `
 - Ráðningarsamningar búnir til úr starfsmannagögnum, starfsmaður les og samþykkir rafrænt í appinu (rafrænt samþykki skráð með nafni og tímastimpli).
 - Spjall (eins og Messenger): rásir sjálfkrafa per deild og stað, bein skilaboð, hópar, myndir, talskilaboð, viðbrögð, svör, „séð“, ólesið-teljari, push-tilkynningar.
 - Fréttaveita: tilkynningar með myndum og skjölum, viðbrögð, athugasemdir og svör við athugasemdum, fest tilkynning.
+- VAKTO AI (fyrir stjórnendur og vaktstjóra, neistatáknið neðst í horninu á vefnum eða ⌘J): svarar spurningum um reksturinn með raunverulegum tölum (laun % af veltu, tímar, frávik, hver er á vakt, beiðnir), setur upp vaktaplan fyrir heila viku eftir lýsingu („allir vinni 35 tíma og fái einn frídag“) og undirbýr stakar breytingar (vaktir, frí-beiðnir, vaktaskipti, útstimplun). Allar breytingar eru tillögur sem stjórnandinn staðfestir með hnappi; ekkert er framkvæmt án staðfestingar. Samtöl vistast og má opna aftur undir klukkutákninu.
 - Handbækur/skjöl: hægt að hlaða upp skjölum fyrirtækisins og starfsmanna (t.d. handbók) sem starfsfólk sér í appinu.
 
 ## Verð (án VSK)

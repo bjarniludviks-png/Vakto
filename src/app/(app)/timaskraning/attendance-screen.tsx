@@ -218,6 +218,17 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
   const planned = shown.reduce((a, r) => a + r.planned, 0);
   const actual = shown.reduce((a, r) => a + r.actual, 0);
   const missing = shown.filter((r) => r.planned > 0 && r.actual === 0).length;
+  /** Sýnilegar raðir sem CSV (; og UTF-8 BOM svo Excel lesi íslenska stafi og kommutölur rétt). */
+  function downloadCsv() {
+    if (!shown.length) { toast(t("Ekkert til að sækja á þessu tímabili")); return; }
+    const num = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
+    const cell = (v: string) => (/[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+    const lines = [["Starfsmaður", "Deild", "Áætlaðir tímar", "Unnir tímar", "Frávik (klst)", "Áætlaður kostnaður", "Raunkostnaður"].join(";"),
+      ...shown.map((r) => [cell(r.name), cell(r.dept ?? ""), num(r.planned), num(r.actual), num(r.deviation), String(Math.round(r.estCost)), String(Math.round(r.actCost))].join(";"))];
+    const url = URL.createObjectURL(new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
+    const a = document.createElement("a"); a.href = url; a.download = "vakto-timaskraning.csv"; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
   const devCost = shown.reduce((a, r) => a + (r.actCost - r.estCost), 0);
   const dev = actual - planned;
   const [nowMs, setNowMs] = useState(0);
@@ -237,7 +248,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
         <div><h1>{t("Tímaskráning")}</h1><div className="db2-sub">{t("Hver er á vakt, hvað var unnið og hvað frávikin kosta.")}</div></div>
         <div className="db2-period">
           <button className="btn ghost sm" onClick={() => setClockInOpen(true)}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>{t("Stimpla inn starfsmann")}</button>
-          <button className="btn ghost sm" onClick={() => toast("Tímaskráning sótt í CSV")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Sækja CSV")}</button>
+          <button className="btn ghost sm" onClick={downloadCsv}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Sækja CSV")}</button>
         </div>
       </div>
       <FilterBar

@@ -43,13 +43,13 @@ export async function setCompanyPlan(): Promise<{ ok: boolean }> {
 export async function requestSignupCode(email: string, captchaToken?: string | null): Promise<{ ok: boolean; error?: string }> {
   if (!isSupabaseConfigured()) return { ok: true };
   if (!(await verifyTurnstile(captchaToken))) return { ok: false, error: "Bot-vörnin samþykkti ekki beiðnina — endurhladdu síðuna og reyndu aftur." };
-  try { return await requestEmailCode(email); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Villa" }; }
+  try { return await requestEmailCode(email); } catch (e) { { console.error("[signup]", e); return { ok: false, error: "Nýskráning tókst ekki — reyndu aftur eða hafðu samband við hallo@vakto.is." }; } }
 }
 
 /** Skref 2: staðfesta kóðann → sönnun sem skref 3 framvísar. */
 export async function verifySignupCode(email: string, code: string): Promise<{ ok: boolean; proof?: string; error?: string }> {
   if (!isSupabaseConfigured()) return { ok: true, proof: "demo" };
-  try { return await verifyEmailCode(email, code); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Villa" }; }
+  try { return await verifyEmailCode(email, code); } catch (e) { { console.error("[signup]", e); return { ok: false, error: "Nýskráning tókst ekki — reyndu aftur eða hafðu samband við hallo@vakto.is." }; } }
 }
 
 export async function createOwnerAccount(input: { fullName: string; companyName: string; email: string; password: string; country?: string; proof?: string; termsAccepted?: boolean }): Promise<SignupResult> {
@@ -84,7 +84,7 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
     await sendWelcomeEmail(email, fullName, companyName); // no-op until Resend is configured
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    { console.error("[signup]", e); return { ok: false, error: "Nýskráning tókst ekki — reyndu aftur eða hafðu samband við hallo@vakto.is." }; }
   }
 }
 

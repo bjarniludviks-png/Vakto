@@ -1,9 +1,9 @@
 // Stillingar — tilkynningar, prófíll, lykilorð, um appið.
 import React, { useEffect, useState } from "react";
 import { tr, trf, useLang, setLang, LANGS } from "../src/lib/i18n";
-import { View, Switch, Linking, Pressable } from "react-native";
+import { View, Switch, Linking, Pressable, Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { Bell, BellOff, UserRound, KeyRound, LifeBuoy, FileText, CalendarPlus } from "lucide-react-native";
+import { Bell, BellOff, UserRound, KeyRound, LifeBuoy, FileText, CalendarPlus, Ban } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
 import { List, Row, IconBox, Muted, useToast, Txt, Seg } from "../src/components/ui";
 import { colors, useTheme, setThemeMode } from "../src/theme";
@@ -11,6 +11,7 @@ import { useMe } from "../src/lib/me-context";
 import { registerForPush, unregisterPush, pushEnabled } from "../src/lib/push";
 import { getDnd, setDnd, dndLabel, onMuteChange } from "../src/lib/mute";
 import { supabase } from "../src/lib/supabase";
+import { blockedUsers, unblockAll } from "../src/lib/api/moderation";
 
 export default function Stillingar() {
   const { mode, dark } = useTheme();
@@ -43,6 +44,8 @@ export default function Stillingar() {
     if (v) { const t = await registerForPush(me); setPush(!!t); if (!t) toast("Leyfðu tilkynningar í stillingum símans"); }
     else { await unregisterPush(); setPush(false); toast("Slökkt á push-tilkynningum"); }
   }
+  const [blockedN, setBlockedN] = useState(0);
+  useEffect(() => { blockedUsers(true).then((b) => setBlockedN(b.size)).catch(() => {}); }, []);
   async function resetPw() {
     if (!me?.email) { toast("Ekkert netfang skráð"); return; }
     const { error } = await supabase.auth.resetPasswordForEmail(me.email, { redirectTo: "https://www.vakto.is/nytt-lykilord" });
@@ -83,7 +86,8 @@ export default function Stillingar() {
       <Muted style={{ paddingHorizontal: 2 }}>AÐGANGUR</Muted>
       <List>
         <Row icon={<IconBox><UserRound color={colors.ink2} size={19} /></IconBox>} title="Prófíll" sub="Sími, netfang, bankareikningur, mynd" onPress={() => router.push("/profill")} />
-        <Row icon={<IconBox><KeyRound color={colors.ink2} size={19} /></IconBox>} title="Breyta lykilorði" sub={me?.email ? trf("Sendir hlekk á {x}", me.email) : "Sendir hlekk í pósti"} onPress={resetPw} chevron={false} last />
+        <Row icon={<IconBox><KeyRound color={colors.ink2} size={19} /></IconBox>} title="Breyta lykilorði" sub={me?.email ? trf("Sendir hlekk á {x}", me.email) : "Sendir hlekk í pósti"} onPress={resetPw} chevron={false} last={blockedN === 0} />
+        {blockedN > 0 ? <Row icon={<IconBox><Ban color={colors.ink2} size={19} /></IconBox>} title="Faldir notendur" sub={trf("{n} faldir — ýttu til að sýna alla aftur", blockedN)} chevron={false} last onPress={() => Alert.alert(tr("Sýna alla aftur?"), tr("Skilaboð og færslur frá þeim sem þú faldir birtast aftur."), [{ text: tr("Hætta við"), style: "cancel" }, { text: tr("Sýna aftur"), onPress: async () => { if (await unblockAll()) { setBlockedN(0); toast("Allir sýnilegir aftur"); } } }])} /> : null}
       </List>
       {me?.empId ? <>
         <Muted style={{ paddingHorizontal: 2 }}>DAGATAL</Muted>

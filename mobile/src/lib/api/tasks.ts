@@ -43,3 +43,15 @@ export async function getCompanyTasks(companyId: string, date = iso(new Date()))
   }
   return [...by.values()].sort((a, b) => a.name.localeCompare(b.name, "is"));
 }
+
+/** Stjórnandi bætir verkefni á vakt starfsmanns (RLS: aðeins stjórnendur). */
+export async function addTask(companyId: string, empId: string, date: string, title: string): Promise<Task | null> {
+  const t = title.trim().slice(0, 200);
+  if (!t) return null;
+  const { data, error } = await supabase.from("shift_tasks").insert({ company_id: companyId, employee_id: empId, date, title: t }).select("id, title, done").single();
+  return error || !data ? null : { id: data.id as string, title: data.title as string, done: !!data.done };
+}
+export async function deleteTask(id: string): Promise<boolean> {
+  const { error } = await supabase.from("shift_tasks").delete().eq("id", id);
+  return !error;
+}

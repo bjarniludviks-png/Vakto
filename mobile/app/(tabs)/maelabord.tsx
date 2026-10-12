@@ -5,7 +5,7 @@
 import React, { useCallback, useState } from "react";
 import { View, Pressable, TextInput } from "react-native";
 import { useFocusEffect } from "expo-router";
-import { Clock, Check, X, CalendarClock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Plus, LogOut, ListChecks } from "lucide-react-native";
+import { Clock, Check, X, CalendarClock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Plus, LogOut, ListChecks, Flag } from "lucide-react-native";
 import { tr, trf } from "../../src/lib/i18n";
 import { Screen } from "../../src/components/screen";
 import { Card, Txt, Muted, Eyebrow, Avatar, Btn, Divider, Seg, Sheet, useToast } from "../../src/components/ui";
@@ -20,6 +20,7 @@ import {
 import { iso } from "../../src/lib/api/me";
 import { getCompanyTasks, type StaffTasks } from "../../src/lib/api/tasks";
 import { TaskChecklist } from "../../src/components/tasks";
+import { openReports, resolveReport, type Report } from "../../src/lib/api/moderation";
 
 export default function Maelabord() {
   useTheme();
@@ -33,12 +34,14 @@ export default function Maelabord() {
   const [outFor, setOutFor] = useState<OnShift | null>(null);
   const [staffTasks, setStaffTasks] = useState<StaffTasks[]>([]);
   const [openTasks, setOpenTasks] = useState<string | null>(null);
+  const [reports, setReports] = useState<Report[]>([]);
   const [revOpen, setRevOpen] = useState(false);
 
   const load = useCallback(async () => {
     const companyId = await myCompanyId(me ?? null);
     if (!companyId) return;
     getCompanyTasks(companyId).then(setStaffTasks).catch(() => {});
+    openReports(companyId).then(setReports).catch(() => {});
     setOps(await getOps(companyId, sel));
   }, [me, sel]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -211,6 +214,28 @@ export default function Maelabord() {
                 </View>
               );
             })}
+          </View>
+        </Card>
+      ) : null}
+
+      {/* tilkynnt efni úr spjalli og fréttaveitu */}
+      {reports.length > 0 ? (
+        <Card>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Flag color={colors.bad} size={16} />
+            <Txt weight="bold" size={16}>{tr("Tilkynnt efni")}</Txt>
+            <Muted>{reports.length}</Muted>
+          </View>
+          <View style={{ marginTop: 10, gap: 12 }}>
+            {reports.map((r) => (
+              <View key={r.id} style={{ gap: 6 }}>
+                <Muted size={12}>{tr(r.kind === "message" ? "Skilaboð í spjalli" : r.kind === "post" ? "Færsla í fréttaveitu" : "Athugasemd")}</Muted>
+                <Txt size={14} numberOfLines={4}>{r.excerpt || "—"}</Txt>
+                <View style={{ alignSelf: "flex-start" }}>
+                  <Btn title={tr("Merkja afgreitt")} size="sm" variant="ghost" onPress={async () => { if (await resolveReport(r.id)) setReports((x) => x.filter((y) => y.id !== r.id)); }} />
+                </View>
+              </View>
+            ))}
           </View>
         </Card>
       ) : null}

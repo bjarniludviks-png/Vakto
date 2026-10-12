@@ -14,6 +14,7 @@ export type FeedPost = {
   id: string;
   audience: string | null;
   sender: string;
+  senderId: string | null;
   senderRole: string | null;
   color: string | null;
   photo: string | null;
@@ -105,7 +106,7 @@ export async function listPosts(me: Me): Promise<FeedPost[]> {
       .map((c) => { const s = people.get(c.sender_id); return { id: c.id, sender: (s?.name ?? "Notandi").split(/\s+/)[0], body: c.body, at: ago(c.created_at), color: s?.color ?? null, photo: s?.photo ?? null, me: c.sender_id === myId }; });
     const s = p.sender_id ? people.get(p.sender_id) : null;
     return {
-      id: p.id, audience: audName(p.audience_kind, p.audience_id), sender: p.sender_id ? (s?.name ?? "Notandi") : "VAKTO", senderRole: s?.role ?? null, color: s?.color ?? null, photo: s?.photo ?? null,
+      id: p.id, audience: audName(p.audience_kind, p.audience_id), sender: p.sender_id ? (s?.name ?? "Notandi") : "VAKTO", senderId: p.sender_id, senderRole: s?.role ?? null, color: s?.color ?? null, photo: s?.photo ?? null,
       me: p.sender_id === myId, system: !p.sender_id, body: p.body, at: ago(p.created_at), atISO: p.created_at, pinned: !!p.pinned,
       imageUrl: p.image_url, fileUrl: p.file_url, fileName: p.file_name,
       reactions: [...counts.entries()].map(([emoji, count]) => ({ emoji, count })).sort((a, b) => b.count - a.count), myReaction, comments,
