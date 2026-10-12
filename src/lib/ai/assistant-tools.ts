@@ -88,11 +88,8 @@ export const WRITE_TOOLS: Anthropic.Tool[] = [
         label: { type: "string", description: "Ein setning sem lýsir planinu, t.d. „Allir 35–38 klst., einn frídagur hver, helgar mannaðar 4“" },
         shifts: {
           type: "array",
-          items: {
-            type: "object",
-            properties: { employee: { type: "string", description: "Fornafn eins og í week_planning_context" }, date: DATE, start: TIME, end: TIME, shiftType: { type: "string", description: "Heiti vaktategundar (valfrjálst)" } },
-            required: ["employee", "date", "start", "end"],
-          },
+          description: "Ein vakt per streng á forminu \"Fornafn|YYYY-MM-DD|HH:MM|HH:MM\" (byrjun|endir), valfrjálst fimmta svið er heiti vaktategundar. Dæmi: \"Anna|2026-10-19|09:00|17:00|Dagvakt\".",
+          items: { type: "string" },
         },
       },
       required: ["monday", "label", "shifts"],
@@ -121,9 +118,12 @@ function parseWeekPlan(input: In): { ok: true; mon: string; dates: string[]; shi
   if (!Array.isArray(input.shifts) || !input.shifts.length) return { ok: false, error: "Engar vaktir í planinu" };
   if (input.shifts.length > 400) return { ok: false, error: "Of margar vaktir í einu plani" };
   const out: PlanShift[] = []; const seen = new Set<string>();
-  for (const raw of input.shifts as In[]) {
-    const who = str(raw?.employee), date = str(raw?.date);
-    if (!who || !okDate(date) || !okTime(raw?.start) || !okTime(raw?.end)) return { ok: false, error: "Hver vakt þarf employee, date (YYYY-MM-DD), start og end (HH:MM)" };
+  for (const item of input.shifts as unknown[]) {
+    // Strengur „Nafn|dags|byrjun|endir|tegund“ (þjappað form) eða hlutur með sömu sviðum.
+    const parts = typeof item === "string" ? item.split("|").map((x) => x.trim()) : null;
+    const raw: In = parts ? { employee: parts[0], date: parts[1], start: parts[2], end: parts[3], shiftType: parts[4] ?? "" } : ((item ?? {}) as In);
+    const who = str(raw.employee), date = str(raw.date);
+    if (!who || !okDate(date) || !okTime(raw.start) || !okTime(raw.end)) return { ok: false, error: "Hver vakt þarf að vera \"Nafn|YYYY-MM-DD|HH:MM|HH:MM\"" };
     if (!dates.includes(date)) return { ok: false, error: `Vakt ${date} er utan vikunnar ${dates[0]}–${dates[6]}` };
     const k = `${who.toLowerCase()}|${date}`;
     if (seen.has(k)) return { ok: false, error: `${who} er með tvær vaktir ${date} — aðeins ein vakt per dag` };

@@ -48,57 +48,73 @@ Tungumál: svaraðu á ${lang === "en" ? "ensku" : lang === "vi" ? "víetnömsku
 Um VAKTO:
 ${VAKTO_KNOWLEDGE}`;
 
+  // Svarið getur tekið yfir mínútu (heil vika af vöktum). Til að tengingin slitni ekki sendum við
+  // bil á nokkurra sekúndna fresti og JSON-svarið í lokin — JSON.parse hunsar bilin á undan.
+  const run = async (): Promise<Record<string, unknown>> => {
   const client = new Anthropic();
-  const tools = [...READ_TOOLS, ...WRITE_TOOLS];
-  const actions: PendingAction[] = [];
-  const msgs: Anthropic.MessageParam[] = [...history];
-  let reply = "";
-  try {
-    for (let step = 0; step < MAX_STEPS; step++) {
-      const res = await client.messages.create({ model: MODEL, max_tokens: 12000, system, tools, messages: msgs });
-      const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
-      if (res.stop_reason !== "tool_use") { reply = text; break; }
-      msgs.push({ role: "assistant", content: res.content });
-      const results: Anthropic.ToolResultBlockParam[] = [];
-      for (const b of res.content) {
-        if (b.type !== "tool_use") continue;
-        const input = (b.input ?? {}) as Record<string, unknown>;
-        if (WRITE_NAMES.has(b.name)) {
-          const d = describeWrite(b.name, input, lang);
-          if (d.ok && actions.length < 12) actions.push({ tool: b.name, input, summary: d.summary });
-          results.push({ type: "tool_result", tool_use_id: b.id, is_error: !d.ok, content: d.ok ? `Tillaga skráð og bíður staðfestingar notandans (EKKI framkvæmt): ${d.summary}` : d.error });
-        } else {
-          results.push({ type: "tool_result", tool_use_id: b.id, content: await runReadTool(b.name, input) });
+    const tools = [...READ_TOOLS, ...WRITE_TOOLS];
+    const actions: PendingAction[] = [];
+    const msgs: Anthropic.MessageParam[] = [...history];
+    let reply = "";
+    try {
+      for (let step = 0; step < MAX_STEPS; step++) {
+        const res = await client.messages.create({ model: MODEL, max_tokens: 12000, system, tools, messages: msgs });
+        const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
+        if (res.stop_reason !== "tool_use") { reply = text; break; }
+        msgs.push({ role: "assistant", content: res.content });
+        const results: Anthropic.ToolResultBlockParam[] = [];
+        for (const b of res.content) {
+          if (b.type !== "tool_use") continue;
+          const input = (b.input ?? {}) as Record<string, unknown>;
+          if (WRITE_NAMES.has(b.name)) {
+            const d = describeWrite(b.name, input, lang);
+            if (d.ok && actions.length < 12) actions.push({ tool: b.name, input, summary: d.summary });
+            results.push({ type: "tool_result", tool_use_id: b.id, is_error: !d.ok, content: d.ok ? `Tillaga skráð og bíður staðfestingar notandans (EKKI framkvæmt): ${d.summary}` : d.error });
+          } else {
+            results.push({ type: "tool_result", tool_use_id: b.id, content: await runReadTool(b.name, input) });
+          }
         }
+        msgs.push({ role: "user", content: results });
+        reply = text;
       }
-      msgs.push({ role: "user", content: results });
-      reply = text;
+    } catch (e) {
+      console.error("[assistant]", e instanceof Error ? e.message : e);
+      return { ok: false, error: lang === "en" ? "VAKTO AI could not answer right now. Try again." : "VAKTO AI gat ekki svarað núna. Reyndu aftur." };
     }
-  } catch (e) {
-    console.error("[assistant]", e instanceof Error ? e.message : e);
-    return NextResponse.json({ ok: false, error: lang === "en" ? "VAKTO AI could not answer right now. Try again." : "VAKTO AI gat ekki svarað núna. Reyndu aftur." }, { status: 502 });
-  }
-  // Vista samtalið (þolir að töflurnar vanti — þá er sagan aðeins í vafranum).
-  let messageId: string | null = null;
-  let conversationId: string | null = /^[0-9a-f-]{36}$/i.test(body.conversationId ?? "") ? body.conversationId! : null;
-  try {
-    const question = history[history.length - 1].content as string;
-    if (conversationId) {
-      const { data } = await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId).select("id").maybeSingle();
-      if (!data) conversationId = null;
-    }
-    if (!conversationId) {
-      const { data } = await supabase.from("ai_conversations").insert({ company_id: me.companyId, user_id: me.userId, title: question.replace(/\s+/g, " ").slice(0, 70) }).select("id").single();
-      conversationId = (data?.id as string) ?? null;
-    }
-    if (conversationId) {
-      const t0 = Date.now();
-      const { data: saved } = await supabase.from("ai_messages").insert([
-        { conversation_id: conversationId, role: "user", content: question, created_at: new Date(t0).toISOString() },
-        { conversation_id: conversationId, role: "assistant", content: reply, actions: actions.length ? actions.map((a) => ({ ...a, state: "pending" })) : null, created_at: new Date(t0 + 1).toISOString() },
-      ]).select("id, role");
-      messageId = (saved ?? []).find((r) => r.role === "assistant")?.id as string ?? null;
-    }
-  } catch (e) { console.error("[assistant] save", e instanceof Error ? e.message : e); }
-  return NextResponse.json({ ok: true, reply: reply || (actions.length ? "" : "…"), actions, conversationId, messageId });
+    // Vista samtalið (þolir að töflurnar vanti — þá er sagan aðeins í vafranum).
+    let messageId: string | null = null;
+    let conversationId: string | null = /^[0-9a-f-]{36}$/i.test(body.conversationId ?? "") ? body.conversationId! : null;
+    try {
+      const question = history[history.length - 1].content as string;
+      if (conversationId) {
+        const { data } = await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId).select("id").maybeSingle();
+        if (!data) conversationId = null;
+      }
+      if (!conversationId) {
+        const { data } = await supabase.from("ai_conversations").insert({ company_id: me.companyId, user_id: me.userId, title: question.replace(/\s+/g, " ").slice(0, 70) }).select("id").single();
+        conversationId = (data?.id as string) ?? null;
+      }
+      if (conversationId) {
+        const t0 = Date.now();
+        const { data: saved } = await supabase.from("ai_messages").insert([
+          { conversation_id: conversationId, role: "user", content: question, created_at: new Date(t0).toISOString() },
+          { conversation_id: conversationId, role: "assistant", content: reply, actions: actions.length ? actions.map((a) => ({ ...a, state: "pending" })) : null, created_at: new Date(t0 + 1).toISOString() },
+        ]).select("id, role");
+        messageId = (saved ?? []).find((r) => r.role === "assistant")?.id as string ?? null;
+      }
+    } catch (e) { console.error("[assistant] save", e instanceof Error ? e.message : e); }
+    return { ok: true, reply: reply || (actions.length ? "" : "…"), actions, conversationId, messageId };
+  };
+  const enc = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(ctrl) {
+      const beat = setInterval(() => { try { ctrl.enqueue(enc.encode(" ")); } catch { /* lokað */ } }, 5000);
+      let out: Record<string, unknown>;
+      try { out = await run(); } catch (e) { console.error("[assistant]", e instanceof Error ? e.message : e); out = { ok: false, error: "VAKTO AI gat ekki svarað núna. Reyndu aftur." }; }
+      clearInterval(beat);
+      ctrl.enqueue(enc.encode(JSON.stringify(out)));
+      ctrl.close();
+    },
+  });
+  return new Response(stream, { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" } });
 }
