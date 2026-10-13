@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { userError } from "@/lib/user-error";
 
 export type CompanyOption = { id: string; name: string; role: string; active: boolean };
 export type SearchEmp = { id: string; name: string; dept: string };
@@ -69,10 +70,10 @@ export async function switchCompany(companyId: string): Promise<{ ok: boolean; e
     const { data: mem } = await admin.from("company_members").select("role").eq("user_id", user.id).eq("company_id", companyId).maybeSingle();
     if (!mem) return { ok: false, error: "Þú ert ekki með aðgang að þessu félagi" };
     const { error } = await admin.from("users").update({ company_id: companyId, role: mem.role }).eq("id", user.id);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }

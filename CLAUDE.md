@@ -357,6 +357,12 @@
   er kominn út OG appið (OTA `eas update --branch production` eða nýtt build) les úr `coworkers` — eldri app-útgáfur sýna
   annars auð nöfn á vaktaplani og í spjalli. Ekki senda OTA meðan Apple er að yfirfara build 9.
 - Staging er því strangara en prod: preview af greinum ÁN þessarar breytingar sýnir auð nöfn hjá starfsmönnum.
-- **Eftir (sama eðlis, minni):** `payment_methods` (dálkurinn `token`), `documents`-raðir, `leave_requests` (tegund fjarveru)
-  og `punches` (staðsetning) eru lesanleg öllum í fyrirtækinu. `payment_methods` er lesið í proxy fyrir hvern notanda
-  (kortaskylda) — þrengja þarf það með falli, ekki bara reglu.
+- **0071** (komin á staging + prod): starfsmaður les aðeins SÍNAR raðir í `documents`, `leave_requests` og `punches`
+  (stjórnendur allt; sameiginleg skjöl áfram öllum). `payment_methods`: dálkaheimildir — innskráðir fá aldrei `token`,
+  aðeins service-role. Ekki nota `select("*")` á þá töflu með notandaclient. Fallið `company_has_card()` (já/nei) er
+  notað í proxy fyrir kortaskylduna. Óhætt fyrir eldri app-útgáfur.
+- **0072** (komin á staging, **EKKI á prod**): `payment_methods_read` aðeins fyrir stjórnendur. Keyra á prod þegar vefurinn
+  með `company_has_card()` í proxy er kominn út (eldri proxy les töfluna beint fyrir alla).
+- **Villuboð:** server actions skila `userError(e, "vara-texti")` úr `src/lib/user-error.ts` — okkar íslensku villur fara
+  óbreyttar, tæknitexti (Postgres, net) fer í log og notandi fær skiljanleg skilaboð. Ekki skila `error.message` beint.
+  Undantekning: tengingapróf í `integration-actions.ts` (stjórnandi þarf svarið frá Payday/DK) og `/admin`.

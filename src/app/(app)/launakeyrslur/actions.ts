@@ -11,6 +11,7 @@ import { nf, dec1 } from "@/lib/format";
 import { logAudit } from "@/lib/audit";
 import { notifyEmployee } from "@/lib/push";
 import type { PayrollView } from "./payroll.server";
+import { userError } from "@/lib/user-error";
 
 export type RunResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
 export type ContractorBill = { id: string; name: string; av: string; c: string; hours: number; amount: number; monthly: boolean };
@@ -73,7 +74,7 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
     .filter((e) => e.role !== "contractor")
     .filter((e) => (byEmp.get(e.id)?.length ?? 0) > 0 || e.payType === "monthly" || e.status !== "inactive")
     .map((e) => {
-      const ub = uppKind ? computeUppbot(resolveUppbot(e.union)[uppKind], e.employmentRatio) : 0;
+      const ub = uppKind ? computeUppbot(resolveUppbot(e.union, null, Number(from.slice(0, 4)))[uppKind], e.employmentRatio) : 0;
       return computeFromPunches(e, byEmp.get(e.id) ?? [], resolveRuleSet(e.union, ruleMap.get(e.id)), ub);
     });
   // Raunverulega samþykktir tímar per starfsmann (fastlaunafólk fær laun óháð þeim, en taflan sýnir þá).
@@ -192,7 +193,7 @@ export async function runPayroll(from?: string, to?: string, settleIds: string[]
       .from("payroll_runs")
       .insert({ company_id: company, period_start: start, period_end: end, status: "approved" })
       .select("id").single();
-    if (runErr || !run) return { ok: false, error: runErr?.message ?? "Tókst ekki að stofna keyrslu" };
+    if (runErr || !run) return { ok: false, error: userError(runErr, "Tókst ekki að stofna keyrslu") };
 
     const baseRow = (l: PayLine) => ({
       run_id: run.id, employee_id: l.employeeId, hours: l.hours, gross: l.gross,
@@ -214,7 +215,7 @@ export async function runPayroll(from?: string, to?: string, settleIds: string[]
     if (linesErr) {
       linesErr = (await supabase.from("payroll_lines").insert(lines.map(baseRow))).error;
     }
-    if (linesErr) return { ok: false, error: linesErr.message };
+    if (linesErr) return { ok: false, error: userError(linesErr) };
 
     await logAudit(supabase, company, ctx.userId, {
       action: "payroll.run", entity: "payroll_run", entityId: run.id as string,
@@ -226,7 +227,7 @@ export async function runPayroll(from?: string, to?: string, settleIds: string[]
     revalidatePath("/launakeyrslur");
     return { ok: true, count: lines.length };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 

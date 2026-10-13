@@ -9,6 +9,7 @@ import { after } from "next/server";
 import { checkNoShows } from "@/lib/noshow.server";
 import { headers } from "next/headers";
 import { requestSignCode, signWithCode, metaFrom, taktikalEmployeeLink } from "@/lib/esign.server";
+import { userError } from "@/lib/user-error";
 
 export type PunchResult = { ok: boolean; demo?: boolean; error?: string };
 export type ActionResult = { ok: boolean; demo?: boolean; error?: string };
@@ -76,7 +77,7 @@ export async function requestCorrection(input: { punchId?: string; date: string;
     revalidatePath("/timaskraning");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -140,7 +141,7 @@ export async function myPunch(into: boolean, pos?: PunchPos | null): Promise<Pun
     }
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -179,7 +180,7 @@ export async function submitLeaveRequest(
     revalidatePath("/vaktaplan");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -206,7 +207,7 @@ export async function requestShiftSwap(
       note: input.note,
       status: "pending",
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     void notifyManagers(me.company, { title: "Beiðni um vaktaskipti", body: "Starfsmaður óskaði eftir vaktaskiptum.", url: "/vaktaplan", tag: "requests" });
     await logAudit(supabase, me.company, me.userId, {
       action: "swap.request", entity: "shift_swap", detail: `Vaktaskipti óskað — ${input.note}`,
@@ -215,7 +216,7 @@ export async function requestShiftSwap(
     revalidatePath("/vaktaplan");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -235,7 +236,7 @@ export async function setAvailability(
       weekdays: input.weekdays,
       reason: input.reason ?? null,
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, me.company, me.userId, {
       action: "availability.set", entity: "availability", detail: "Framboð uppfært",
     });
@@ -243,7 +244,7 @@ export async function setAvailability(
     revalidatePath("/vaktaplan");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -262,14 +263,14 @@ export async function updateMyProfile(
     if (input.bankAccount !== undefined) patch.bank_account = input.bankAccount || null;
     if (Object.keys(patch).length === 0) return { ok: true };
     const { error } = await supabase.from("employees").update(patch).eq("id", me.empId);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, me.company, me.userId, {
       action: "employee.profile", entity: "employee", detail: "Prófíll uppfærður (eigin)",
     });
     revalidatePath("/mitt-svaedi");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -286,7 +287,7 @@ export async function applyForShift(input: { note: string }): Promise<ActionResu
       note: `Umsókn um opna vakt: ${input.note}`,
       status: "pending",
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, me.company, me.userId, {
       action: "shift.apply", entity: "shift_swap", detail: `Sótt um opna vakt — ${input.note}`,
     });
@@ -294,7 +295,7 @@ export async function applyForShift(input: { note: string }): Promise<ActionResu
     revalidatePath("/vaktaplan");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -315,13 +316,13 @@ export async function uploadPhoto(dataUrl: string): Promise<ActionResult & { url
 
     const { error: upErr } = await supabase.storage
       .from("avatars").upload(path, bytes, { contentType: mime, upsert: true });
-    if (upErr) return { ok: false, error: upErr.message };
+    if (upErr) return { ok: false, error: userError(upErr) };
 
     const { data: pub } = supabase.storage.from("avatars").getPublicUrl(path);
     const url = pub.publicUrl;
     const { error: updErr } = await supabase
       .from("employees").update({ photo_url: url }).eq("id", me.empId);
-    if (updErr) return { ok: false, error: updErr.message };
+    if (updErr) return { ok: false, error: userError(updErr) };
 
     await logAudit(supabase, me.company, me.userId, {
       action: "employee.photo", entity: "employee", detail: "Prófílmynd uppfærð",
@@ -329,7 +330,7 @@ export async function uploadPhoto(dataUrl: string): Promise<ActionResult & { url
     revalidatePath("/mitt-svaedi");
     return { ok: true, url };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -340,10 +341,10 @@ export async function toggleShiftTask(id: string, done: boolean): Promise<{ ok: 
     const supabase = await createClient();
     const { error } = await supabase.from("shift_tasks")
       .update({ done, done_at: done ? new Date().toISOString() : null }).eq("id", id);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 

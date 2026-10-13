@@ -1,5 +1,5 @@
 // Efni síðunnar /skilmalar — birt í AhLegal (src/components/site/ah-legal.tsx) — (/skilmalar).
-export const TERMS_META = { title: "Þjónustuskilmálar", updated: "30. september 2026" };
+export const TERMS_META = { title: "Þjónustuskilmálar", updated: "13. október 2026" };
 
 export function TermsBody() {
   return (
@@ -19,7 +19,6 @@ export function TermsBody() {
       <h2>3. Verð og greiðslur</h2>
       <ul>
         <li>Áskrift kostar <b>9.990 kr. á mánuði</b> fyrir fyrirtækið með 5 virka starfsmenn innifalda og <b>1.490 kr. á mánuði fyrir hvern virkan starfsmann umfram 5</b>. Virkur starfsmaður er sá sem átti skráða vakt eða stimplaði sig á tímabilinu. Grunngjaldið er greitt fyrirfram en virkir starfsmenn umfram 5 eru gerðir upp eftir á fyrir tímabilið sem lauk. Undirritun samninga með rafrænum skilríkjum er valkvæð og kostar <b>490 kr. á hverja undirskrift</b>. Sé greitt árlega fyrirfram er veittur um 15% afsláttur (8.490 kr. + 1.270 kr. á virkan starfsmann umfram). Öll verð eru án virðisaukaskatts.</li>
-        <li>Notandi er hver starfsmaður eða stjórnandi sem er virkur í kerfinu á reikningstímabilinu. Fjöldi notenda er talinn í lok hvers tímabils.</li>
         <li>Nýir viðskiptavinir fá <b>14 daga fría prufu</b> með öllu innifalið. Greiðslukort er skráð við nýskráningu á öruggri greiðslusíðu Straums (Kvika banka); VAKTO geymir aldrei kortanúmer. Ekkert er dregið af kortinu á meðan prufan stendur. Að prufu lokinni hefst áskriftin sjálfkrafa og mánaðargjaldið er tekið af kortinu á gjalddaga, nema áskriftinni hafi verið sagt upp áður.</li>
         <li>Mánaðargjaldið er tekið af skráðu korti fyrirfram fyrir hvert tímabil og kvittun send í tölvupósti. Takist greiðsla ekki er reynt aftur næstu daga og viðskiptavinur látinn vita; berist greiðsla ekki innan 14 daga má VAKTO loka aðgangi þar til greitt er. Gögn eru varðveitt á meðan.</li>
         <li>VAKTO má breyta verðum með minnst 60 daga fyrirvara; breytingar taka gildi við næsta reikningstímabil eftir fyrirvarann.</li>
@@ -50,7 +49,7 @@ export function TermsBody() {
       </ul>
 
       <h2>7. Launaútreikningar og ábyrgð viðskiptavinar</h2>
-      <p>VAKTO reiknar laun út frá þeim launaprófílum, kjarasamningum, álagsreglum og stimplunum sem viðskiptavinur skráir. Útreikningarnir eru hjálpartæki: <b>viðskiptavinur ber ábyrgð á að yfirfara niðurstöður, að réttir kjarasamningar og taxtar séu skráðir og að laun séu rétt greidd.</b> Formlegir launaseðlar og skil til skattyfirvalda og lífeyrissjóða fara fram í launakerfi viðskiptavinar (t.d. Payday eða DK). Ráðningarsamningar sem búnir eru til í VAKTO byggja á sniðmáti og upplýsingum viðskiptavinar; viðskiptavinur ber ábyrgð á efni þeirra.</p>
+      <p>VAKTO reiknar laun út frá þeim launaprófílum, kjarasamningum, álagsreglum og stimplunum sem viðskiptavinur skráir. Útreikningarnir eru hjálpartæki: <b>viðskiptavinur ber ábyrgð á að yfirfara niðurstöður, að réttir kjarasamningar og taxtar séu skráðir og að laun séu rétt greidd.</b> VAKTO býr til launaseðla og launayfirlit út frá þessum gögnum. Skil á staðgreiðslu, tryggingagjaldi og iðgjöldum til lífeyrissjóða og stéttarfélaga fara ekki fram í VAKTO; viðskiptavinur annast þau sjálfur eða í launakerfi sínu (t.d. Payday eða DK) og ber ábyrgð á að launaseðlar sem hann afhendir starfsfólki séu réttir og uppfylli lög. Ráðningarsamningar sem búnir eru til í VAKTO byggja á sniðmáti og upplýsingum viðskiptavinar; viðskiptavinur ber ábyrgð á efni þeirra.</p>
 
       <h2>8. Leyfileg notkun</h2>
       <p>Óheimilt er að nota VAKTO í ólögmætum tilgangi, að reyna að komast í gögn annarra fyrirtækja, að trufla rekstur kerfisins, að endurselja þjónustuna án samnings eða að hlaða upp efni sem brýtur gegn rétti annarra. Viðskiptavinur ábyrgist að stimplanir og skráningar séu réttar og ekki notaðar til að fara á svig við vinnuverndar- eða kjarasamningsreglur.</p>

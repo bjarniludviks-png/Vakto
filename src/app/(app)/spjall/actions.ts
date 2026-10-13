@@ -7,6 +7,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { initials } from "@/lib/employees";
 import { notifyEmployee, sendPushToUser } from "@/lib/push";
+import { userError } from "@/lib/user-error";
 
 export type Conversation = {
   id: string; name: string; kind: string; av: string; color: string; last: string; lastAt: string | null; dm: boolean; photo: string | null;
@@ -325,11 +326,11 @@ export async function startDM(otherUserId: string): Promise<{ ok: boolean; id?: 
     }
     const { data: ch, error } = await supabase.from("channels")
       .insert({ company_id: ctx.company, name: "", kind: "dm", created_by: ctx.userId }).select("id").single();
-    if (error || !ch) return { ok: false, error: error?.message ?? "Villa" };
+    if (error || !ch) return { ok: false, error: userError(error, "Villa") };
     await supabase.from("channel_members").insert([{ channel_id: ch.id, user_id: ctx.userId }, { channel_id: ch.id, user_id: otherUserId }]);
     return { ok: true, id: ch.id as string };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -343,12 +344,12 @@ export async function createGroup(name: string, memberUserIds: string[]): Promis
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { data: ch, error } = await supabase.from("channels")
       .insert({ company_id: ctx.company, name: nm, kind: "group", created_by: ctx.userId }).select("id").single();
-    if (error || !ch) return { ok: false, error: error?.message ?? "Villa" };
+    if (error || !ch) return { ok: false, error: userError(error, "Villa") };
     const uniq = Array.from(new Set([ctx.userId, ...memberUserIds]));
     await supabase.from("channel_members").insert(uniq.map((u) => ({ channel_id: ch.id, user_id: u })));
     return { ok: true, id: ch.id as string };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -384,10 +385,10 @@ export async function addMembers(channelId: string, userIds: string[]): Promise<
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("channel_members").upsert(userIds.map((u) => ({ channel_id: channelId, user_id: u })), { onConflict: "channel_id,user_id" });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -401,10 +402,10 @@ export async function removeMember(channelId: string, userId: string): Promise<{
     if ((ch?.created_by as string) !== ctx.userId) return { ok: false, error: "Aðeins stofnandi getur fjarlægt" };
     if (await isAutoChannel(supabase, channelId)) return { ok: false, error: "Meðlimir deildar- og staðarrása fylgja starfsmannaskránni" };
     const { error } = await supabase.from("channel_members").delete().eq("channel_id", channelId).eq("user_id", userId);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -416,10 +417,10 @@ export async function leaveChannel(channelId: string): Promise<{ ok: boolean; er
     if ("error" in ctx) return { ok: false, error: ctx.error };
     if (await isAutoChannel(supabase, channelId)) return { ok: false, error: "Ekki er hægt að hætta í deildar- eða staðarrás" };
     const { error } = await supabase.from("channel_members").delete().eq("channel_id", channelId).eq("user_id", ctx.userId);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -509,7 +510,7 @@ export async function sendChatMessage(channelId: string, body: string, kind: "te
     } else {
       ({ data: inserted, error } = await supabase.from("messages").insert(row).select("id").single());
     }
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     // Push to the other channel members AFTER the response is sent — the sender
     // never waits for the member lookup or the push provider.
     after(async () => {
@@ -528,7 +529,7 @@ export async function sendChatMessage(channelId: string, body: string, kind: "te
     });
     return { ok: true, id: inserted?.id };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -559,11 +560,11 @@ export async function deleteMessage(messageId: string): Promise<{ ok: boolean; e
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { data, error } = await supabase.from("messages").delete().eq("id", messageId).eq("sender_id", ctx.userId).select("id");
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     if (!data?.length) return { ok: false, error: "Ekki tókst að eyða skilaboðunum" };
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -588,11 +589,11 @@ export async function renameChannel(channelId: string, name: string): Promise<{ 
     if ("error" in ctx) return { ok: false, error: ctx.error };
     if (await isAutoChannel(supabase, channelId)) return { ok: false, error: "Deildar- og staðarrásir fá heiti sitt úr stillingum" };
     const { data, error } = await supabase.from("channels").update({ name: nm }).eq("id", channelId).eq("kind", "group").select("id");
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     if (!data?.length) return { ok: false, error: "Ekki tókst að breyta heiti" };
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -608,14 +609,14 @@ export async function setChannelPhoto(channelId: string, dataUrl: string, ext: s
     const buf = Buffer.from(dataUrl.slice(comma + 1), "base64");
     const path = `${ctx.company}/channel-${channelId}/${Date.now()}.${ext}`;
     const up = await supabase.storage.from("chat").upload(path, buf, { contentType, upsert: false });
-    if (up.error) return { ok: false, error: up.error.message };
+    if (up.error) return { ok: false, error: userError(up.error) };
     const { data: pub } = supabase.storage.from("chat").getPublicUrl(path);
     const { data, error } = await supabase.from("channels").update({ photo_url: pub.publicUrl }).eq("id", channelId).select("id");
     if (error) return { ok: false, error: "Ekki tókst að vista mynd" };
     if (!data?.length) return { ok: false, error: "Ekki tókst að vista mynd" };
     return { ok: true, url: pub.publicUrl };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -632,11 +633,11 @@ export async function uploadChatMedia(dataUrl: string, ext: string): Promise<{ o
     const buf = Buffer.from(dataUrl.slice(comma + 1), "base64");
     const path = `${ctx.company}/${ctx.userId}/${Date.now()}.${ext}`;
     const { error } = await supabase.storage.from("chat").upload(path, buf, { contentType, upsert: false });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     const { data } = supabase.storage.from("chat").getPublicUrl(path);
     return { ok: true, url: data.publicUrl };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -744,9 +745,9 @@ export async function setPostPinned(postId: string, pinned: boolean): Promise<{ 
     const { data: meRow } = await supabase.from("users").select("role").eq("id", ctx.userId).maybeSingle();
     if (meRow?.role !== "owner" && meRow?.role !== "manager") return { ok: false, error: "Aðeins stjórnendur geta fest tilkynningar" };
     const { error } = await supabase.from("posts").update({ pinned }).eq("id", postId).eq("company_id", ctx.company);
-    return error ? { ok: false, error: error.message } : { ok: true };
+    return error ? { ok: false, error: userError(error) } : { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -764,7 +765,7 @@ export async function createPost(body: string, media?: { imageUrl?: string; file
     const aud = audience && audience.kind !== "all" && audience.id ? { audience_kind: audience.kind, audience_id: audience.id } : {};
     let { error } = await supabase.from("posts").insert({ ...base, ...aud });
     if (error && /column|schema/i.test(error.message)) ({ error } = await supabase.from("posts").insert(base));
-    if (error) return { ok: false, error: /policy|permission|violates/i.test(error.message) ? "Aðeins stjórnendur mega birta í fréttaveituna" : error.message };
+    if (error) return { ok: false, error: /policy|permission|violates/i.test(error.message) ? "Aðeins stjórnendur mega birta í fréttaveituna" : userError(error) };
     // Manager/owner posts push to the team (best-effort, capped).
     const { data: meRow } = await supabase.from("users").select("role, full_name").eq("id", ctx.userId).maybeSingle();
     if (meRow?.role === "owner" || meRow?.role === "manager") {
@@ -780,7 +781,7 @@ export async function createPost(body: string, media?: { imageUrl?: string; file
     }
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -813,6 +814,6 @@ export async function addPostComment(postId: string, body: string, parentId?: st
     if (error) { console.error("addPostComment:", error.message); return { ok: false, error: "Tókst ekki að senda athugasemd" }; }
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }

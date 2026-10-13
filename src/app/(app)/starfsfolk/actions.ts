@@ -14,6 +14,7 @@ import { headers } from "next/headers";
 import { employerSign, metaFrom, startTaktikalSigning } from "@/lib/esign.server";
 import { taktikalEnabled } from "@/lib/taktikal.server";
 import type { SignatureRecord } from "@/lib/contract-pdf";
+import { userError } from "@/lib/user-error";
 
 export type NewEmployeeInput = {
   fullName: string;
@@ -158,7 +159,7 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
     if (error && /column|schema/i.test(error.message)) {
       ({ data: created, error } = await supabase.from("employees").insert(baseRow).select("id").maybeSingle());
     }
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     // Heimilisfang (0059/0060) — sér uppfærsla svo stofnun virki þótt migration vanti.
     if (created?.id && (input.address || input.postalCode || input.city)) {
       const { error: adErr } = await supabase.from("employees").update({
@@ -181,7 +182,7 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
     revalidatePath("/starfsfolk");
     return { ok: true, id: created?.id as string | undefined, invited, inviteError };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -255,7 +256,7 @@ export async function importEmployees(rows: ImportRow[]): Promise<ImportResult> 
     for (let i = 0; i < toInsert.length; i += 100) {
       const chunk = toInsert.slice(i, i + 100);
       const { error } = await supabase.from("employees").insert(chunk);
-      if (error) return { ok: false, error: error.message, inserted };
+      if (error) return { ok: false, error: userError(error), inserted };
       inserted += chunk.length;
     }
 
@@ -266,7 +267,7 @@ export async function importEmployees(rows: ImportRow[]): Promise<ImportResult> 
     revalidatePath("/starfsfolk");
     return { ok: true, inserted, skipped: skipped + dupSkipped };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -292,7 +293,7 @@ export async function uploadDocument(
 
     const { error: upErr } = await supabase.storage
       .from("documents").upload(path, bytes, { contentType: mime, upsert: false });
-    if (upErr) return { ok: false, error: upErr.message };
+    if (upErr) return { ok: false, error: userError(upErr) };
 
     const { error } = await supabase.from("documents").insert({
       company_id: company,
@@ -301,7 +302,7 @@ export async function uploadDocument(
       type: input.type ?? null,
       url: path,
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
 
     const { data: { user } } = await supabase.auth.getUser();
     await logAudit(supabase, company, user?.id ?? null, {
@@ -310,7 +311,7 @@ export async function uploadDocument(
     revalidatePath("/starfsfolk");
     return { ok: true, path };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -343,10 +344,10 @@ export async function getDocumentSignedUrl(path: string): Promise<{ ok: boolean;
     // Path is company-scoped (company/employee/file); ensure it belongs to this company.
     if (!company || !path.startsWith(`${company}/`)) return { ok: false, error: "Óheimilt" };
     const { data, error } = await supabase.storage.from("documents").createSignedUrl(path, 60);
-    if (error || !data?.signedUrl) return { ok: false, error: error?.message ?? "Villa" };
+    if (error || !data?.signedUrl) return { ok: false, error: userError(error, "Villa") };
     return { ok: true, url: data.signedUrl };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -437,7 +438,7 @@ export async function setEmployeeStatus(id: string, active: boolean): Promise<Ac
   try {
     const supabase = await createClient();
     const { error } = await supabase.from("employees").update({ status: active ? "active" : "inactive" }).eq("id", id);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     const { data: { user } } = await supabase.auth.getUser();
     const company = await companyId(supabase);
     if (company) await logAudit(supabase, company, user?.id ?? null, {
@@ -446,7 +447,7 @@ export async function setEmployeeStatus(id: string, active: boolean): Promise<Ac
     revalidatePath("/starfsfolk");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -468,7 +469,7 @@ export async function deleteEmployee(id: string): Promise<ActionResult> {
       return { ok: false, error: "Starfsmaðurinn á stimplanir eða vaktir — ekki er hægt að eyða, en hann var gerður óvirkur. Saga hans (tímar, laun) helst órofin." };
     }
     const { error } = await supabase.from("employees").delete().eq("id", id);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     const { data: { user } } = await supabase.auth.getUser();
     if (company) await logAudit(supabase, company, user?.id ?? null, {
       action: "employee.delete", entity: "employee", entityId: id, detail: "Starfsmanni eytt",
@@ -476,7 +477,7 @@ export async function deleteEmployee(id: string): Promise<ActionResult> {
     revalidatePath("/starfsfolk");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -519,7 +520,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
 
     if (Object.keys(patch).length) {
       const { error } = await supabase.from("employees").update(patch).eq("id", id);
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: userError(error) };
     }
     // Universal fields (0028) — best-effort until the migration runs.
     const uni: Record<string, unknown> = {};
@@ -559,7 +560,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
     revalidatePath("/starfsfolk");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -659,7 +660,7 @@ export async function setOverseenDepartments(employeeId: string, names: string[]
     revalidatePath("/starfsfolk");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -854,12 +855,12 @@ export async function generateContract(employeeId: string, kind?: "employment" |
       status: "draft",
       created_by: user?.id ?? null,
     }).select("id").maybeSingle();
-    if (error) return { ok: false, error: /contracts/.test(error.message) ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : error.message, content };
+    if (error) return { ok: false, error: /contracts/.test(error.message) ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : userError(error), content };
     await logAudit(supabase, company, user?.id ?? null, { action: "contract.create", entity: "contracts", detail: `Samningur búinn til — ${emp.full_name}` });
     revalidatePath("/starfsfolk");
     return { ok: true, id: created?.id as string | undefined, content };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -894,10 +895,10 @@ export async function updateContractContent(id: string, content: string): Promis
     if (!c) return { ok: false, error: "Samningur fannst ekki" };
     if (c.status !== "draft") return { ok: false, error: "Aðeins er hægt að breyta drögum — gerðu nýjan samning." };
     const { error } = await supabase.from("contracts").update({ content }).eq("id", id);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -909,14 +910,14 @@ export async function deleteContract(id: string): Promise<ActionResult> {
     if (!c) return { ok: false, error: "Samningur fannst ekki" };
     if (c.status === "signed") return { ok: false, error: "Undirritaðum samningi verður ekki eytt — merktu hann ógildan (void) og gerðu nýjan." };
     const { error } = await supabase.from("contracts").delete().eq("id", id);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     const { data: { user } } = await supabase.auth.getUser();
     await logAudit(supabase, c.company_id as string, user?.id ?? null, {
       action: "contract.delete", entity: "contracts", entityId: id, detail: `Samningi eytt — ${c.title}`,
     });
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -972,7 +973,7 @@ export async function setContractStatus(
     if (status === "signed") patch.signed_at = new Date().toISOString();
     const { data: row, error } = await supabase.from("contracts").update(patch).eq("id", id)
       .select("employee_id, employees(full_name, email), companies(name)").maybeSingle();
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     // Taktikal: stofna undirritunarferli (vinnuveitandi skrifar fyrst með rafrænum skilríkjum).
     if (status === "sent" && row && useTaktikal && signer) {
       const { data: { user } } = await supabase.auth.getUser();
@@ -1012,7 +1013,7 @@ export async function setContractStatus(
     revalidatePath("/starfsfolk");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 

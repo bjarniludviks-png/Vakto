@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendVerificationCodeEmail } from "@/lib/email";
+import { userError } from "@/lib/user-error";
 
 // Staðfesting netfangs við nýskráningu: 6 stafa kóði í pósti (Resend), hakkaður í
 // email_verifications (0053). Kóðinn gildir í 15 mín, 5 tilraunir, hámark 3 sendingar
@@ -35,7 +36,7 @@ export async function requestEmailCode(emailRaw: string): Promise<CodeResult> {
     email, code_hash: hashCode(email, code),
     expires_at: new Date(Date.now() + CODE_TTL_MIN * 60000).toISOString(),
   });
-  if (error) return { ok: false, error: error.message };
+  if (error) return { ok: false, error: userError(error) };
   const sent = await sendVerificationCodeEmail(email, code);
   if (!sent.ok) return { ok: false, error: "Tókst ekki að senda póstinn — reyndu aftur." };
   return { ok: true };

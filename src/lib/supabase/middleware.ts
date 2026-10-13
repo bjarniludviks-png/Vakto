@@ -148,8 +148,9 @@ export async function updateSession(request: NextRequest) {
         .from("companies").select("billing_status, card_required").eq("id", profile.company_id).maybeSingle();
       // Nýskráð fyrirtæki án korts: allt lokað nema kortasíðan — þegar greiðslusíða Straums er tengd.
       if (co?.card_required && process.env.STRAUMUR_TERMINAL_PAGE && !pathname.startsWith("/nyskraning")) {
-        const { data: pm } = await supabase.from("payment_methods").select("id").eq("company_id", profile.company_id).eq("status", "active").limit(1).maybeSingle();
-        if (!pm) {
+        // company_has_card() (0071): já/nei án þess að starfsfólk fái lesaðgang að kortatöflunni.
+        const { data: hasCard, error: cardErr } = await supabase.rpc("company_has_card");
+        if (!cardErr && !hasCard) {
           const dest = request.nextUrl.clone();
           dest.pathname = "/nyskraning/kort"; dest.search = "?required=1";
           return NextResponse.redirect(dest);

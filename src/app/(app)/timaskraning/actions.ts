@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
 import { getWeekAttendance, type AttRow } from "@/lib/analytics.server";
+import { userError } from "@/lib/user-error";
 
 export type ApproveResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
 
@@ -33,14 +34,14 @@ export async function approveTimesheet(id: string): Promise<ApproveResult> {
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase
       .from("timesheets").update({ status: "approved" }).eq("id", id).eq("company_id", ctx.company);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "timesheet.approve", entity: "timesheet", entityId: id, detail: "Tímaskráning samþykkt",
     });
     revalidatePath("/timaskraning");
     return { ok: true, count: 1 };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -62,14 +63,14 @@ export async function setClockOut(input: { employeeName: string; time: string })
     const day = (open.clock_in as string).slice(0, 10);
     const { error } = await supabase
       .from("punches").update({ clock_out: `${day}T${input.time}:00` }).eq("id", open.id);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "punch.clockout", entity: "punch", detail: `Útstimplun sett — ${input.employeeName} ${input.time}`,
     });
     revalidatePath("/timaskraning");
     return { ok: true, count: 1 };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -92,14 +93,14 @@ export async function managerClockIn(employeeId: string, timeHHMM?: string): Pro
     const { error } = await supabase.from("punches").insert({
       company_id: ctx.company, employee_id: employeeId, clock_in: `${day}T${time}:00`, source: "web",
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "punch.clockin", entity: "punch", detail: `Handvirk innstimplun ${time}`,
     });
     revalidatePath("/timaskraning"); revalidatePath("/maelabord");
     return { ok: true, count: 1 };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -111,14 +112,14 @@ export async function deletePunch(punchId: string): Promise<ApproveResult> {
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("punches").delete().eq("id", punchId).eq("company_id", ctx.company);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "punch.delete", entity: "punch", entityId: punchId, detail: "Stimplun eydd",
     });
     revalidatePath("/timaskraning"); revalidatePath("/maelabord");
     return { ok: true, count: 1 };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -170,7 +171,7 @@ export async function adjustPunch(
     }
 
     const { error } = await supabase.from("punches").update(patch).eq("id", punchId).eq("company_id", ctx.company);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     const dayNote = inDay !== curInDay ? ` · dags. ${inDay}` : "";
     const outNote = newOut ? ` · út ${newOut.slice(0, 10) !== inDay ? newOut.slice(0, 10) + " " : ""}${newOut.slice(11, 16)}` : "";
     await logAudit(supabase, ctx.company, ctx.userId, {
@@ -180,7 +181,7 @@ export async function adjustPunch(
     revalidatePath("/timaskraning"); revalidatePath("/maelabord");
     return { ok: true, count: 1 };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -398,7 +399,7 @@ export async function setPunchApproved(punchId: string, approved: boolean): Prom
     revalidatePath("/timaskraning");
     return { ok: true, count: 1 };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -422,7 +423,7 @@ export async function approveEmployeePunches(employeeId: string, fromISO: string
     revalidatePath("/timaskraning");
     return { ok: true, count };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -485,7 +486,7 @@ export async function decideCorrection(id: string, approve: boolean): Promise<Ap
     }
     const { error } = await supabase.from("punch_corrections")
       .update({ status: approve ? "approved" : "rejected" }).eq("id", id).eq("company_id", ctx.company);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: approve ? "correction.approve" : "correction.reject", entity: "punch_correction", entityId: id,
       detail: approve ? "Leiðrétting samþykkt" : "Leiðréttingu hafnað",
@@ -493,7 +494,7 @@ export async function decideCorrection(id: string, approve: boolean): Promise<Ap
     revalidatePath("/timaskraning"); revalidatePath("/maelabord");
     return { ok: true, count: 1 };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -507,7 +508,7 @@ export async function approveAllTimesheets(): Promise<ApproveResult> {
     const { data, error } = await supabase
       .from("timesheets").update({ status: "approved" })
       .eq("company_id", ctx.company).eq("status", "pending").select("id");
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     const count = data?.length ?? 0;
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "timesheet.approve_all", entity: "timesheet", detail: `Allar tímaskráningar samþykktar — ${count}`,
@@ -515,7 +516,7 @@ export async function approveAllTimesheets(): Promise<ApproveResult> {
     revalidatePath("/timaskraning");
     return { ok: true, count };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -539,7 +540,7 @@ export async function approvePunchList(ids: string[]): Promise<ApproveResult> {
     revalidatePath("/timaskraning");
     return { ok: true, count };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
