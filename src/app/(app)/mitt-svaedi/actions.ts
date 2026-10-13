@@ -195,7 +195,7 @@ export async function requestShiftSwap(
     let requesteeId: string | null = null;
     if (input.requesteeName) {
       const { data: other } = await supabase
-        .from("employees").select("id, full_name").eq("company_id", me.company);
+        .from("coworkers").select("id, full_name").eq("company_id", me.company);
       requesteeId = other?.find((o) =>
         (o.full_name as string).toLowerCase().startsWith(input.requesteeName!.toLowerCase()))?.id as string ?? null;
     }

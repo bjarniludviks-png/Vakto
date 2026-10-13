@@ -40,7 +40,7 @@ export async function getWeekShifts(me: Me, weekStart: Date): Promise<SchedShift
   const { data } = await supabase
     .from("shifts")
     .select(
-      "id, date, start_time, end_time, employee_id, employees(full_name, avatar_color, departments(name, color)), shift_types(name, color)"
+      "id, date, start_time, end_time, employee_id, employees:coworkers(full_name, avatar_color, departments(name, color)), shift_types(name, color)"
     )
     .eq("company_id", me.companyId)
     .gte("date", from)

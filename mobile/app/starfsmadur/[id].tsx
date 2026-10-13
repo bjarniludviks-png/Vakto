@@ -25,7 +25,7 @@ export default function Starfsmadur() {
 
   useFocusEffect(useCallback(() => {
     if (!id) return;
-    supabase.from("employees").select("full_name, title, avatar_color, photo_url, phone, user_id, positions(name), departments(name)").eq("id", id).maybeSingle().then(({ data }) => {
+    supabase.from("coworkers").select("full_name, title, avatar_color, photo_url, phone, user_id, positions(name), departments(name)").eq("id", id).maybeSingle().then(({ data }) => {
       if (!data) return;
       const pos = (Array.isArray(data.positions) ? data.positions[0] : data.positions) as { name?: string } | null;
       const dep = (Array.isArray(data.departments) ? data.departments[0] : data.departments) as { name?: string } | null;

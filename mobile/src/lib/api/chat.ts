@@ -43,7 +43,7 @@ let peopleCache: { companyId: string; at: number; map: Map<string, Person> } | n
 export async function peopleMap(companyId: string, force = false): Promise<Map<string, Person>> {
   if (!force && peopleCache && peopleCache.companyId === companyId && Date.now() - peopleCache.at < 60000) return peopleCache.map;
   const { data } = await supabase
-    .from("employees")
+    .from("coworkers")
     .select("user_id, full_name, avatar_color, photo_url, title, positions(name), departments(name)")
     .eq("company_id", companyId)
     .not("user_id", "is", null);

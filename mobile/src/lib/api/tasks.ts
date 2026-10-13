@@ -31,7 +31,7 @@ export type StaffTasks = { empId: string; name: string; color: string | null; ph
 /** Verkefni dagsins hjá öllum í fyrirtækinu, flokkuð per starfsmann (mælaborð stjórnanda). */
 export async function getCompanyTasks(companyId: string, date = iso(new Date())): Promise<StaffTasks[]> {
   const { data, error } = await supabase.from("shift_tasks")
-    .select("id, title, done, employee_id, employees(full_name, avatar_color, photo_url)")
+    .select("id, title, done, employee_id, employees:coworkers(full_name, avatar_color, photo_url)")
     .eq("company_id", companyId).eq("date", date).order("created_at");
   if (error) return [];
   const by = new Map<string, StaffTasks>();

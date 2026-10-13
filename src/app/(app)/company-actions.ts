@@ -18,7 +18,7 @@ export async function listEmployeesForSearch(): Promise<SearchEmp[]> {
     if (!user) return [];
     const { data: me } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
     if (!me?.company_id) return [];
-    const { data } = await supabase.from("employees")
+    const { data } = await supabase.from("coworkers")
       .select("id, full_name, departments(name)").eq("company_id", me.company_id).order("full_name");
     return (data ?? []).map((e) => {
       const d = (Array.isArray(e.departments) ? e.departments[0] : e.departments) as { name?: string } | null;

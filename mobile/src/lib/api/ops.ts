@@ -100,13 +100,13 @@ export async function getOps(companyId: string, sel: PeriodSel): Promise<Ops> {
   const [periods, openPunchQ, leaveQ, swapQ, openShiftQ, compQ] = await Promise.all([
     getLaborPeriods(companyId, [{ from: r.from, to: r.to }, { from: r.prevFrom, to: r.prevTo }]),
     supabase.from("punches")
-      .select("id, employee_id, clock_in, employees(full_name, avatar_color, photo_url, departments(name))")
+      .select("id, employee_id, clock_in, employees:coworkers(full_name, avatar_color, photo_url, departments(name))")
       .eq("company_id", companyId).is("clock_out", null).order("clock_in"),
     supabase.from("leave_requests")
-      .select("id, type, from_date, to_date, employees(full_name)")
+      .select("id, type, from_date, to_date, employees:coworkers(full_name)")
       .eq("company_id", companyId).eq("status", "pending").order("from_date"),
     supabase.from("shift_swaps")
-      .select("id, note, created_at, employees!shift_swaps_requester_id_fkey(full_name)")
+      .select("id, note, created_at, employees:coworkers!shift_swaps_requester_id_fkey(full_name)")
       .eq("company_id", companyId).eq("status", "pending").order("created_at"),
     supabase.from("shifts")
       .select("id, date, start_time, end_time, shift_types(name)")

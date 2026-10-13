@@ -75,7 +75,7 @@ async function getPhotos(): Promise<Record<string, string>> {
   if (!isSupabaseConfigured()) return {};
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase.from("employees").select("id, photo_url").not("photo_url", "is", null);
+    const { data, error } = await supabase.from("coworkers").select("id, photo_url").not("photo_url", "is", null);
     if (error) return {};
     return Object.fromEntries((data ?? []).map((r) => [r.id as string, r.photo_url as string]));
   } catch { return {}; }

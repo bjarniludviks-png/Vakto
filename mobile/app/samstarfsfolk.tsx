@@ -16,7 +16,7 @@ export default function Samstarfsfolk() {
   const [emps, setEmps] = useState<Emp[]>([]);
   useFocusEffect(useCallback(() => {
     if (!me) return;
-    supabase.from("employees").select("id, full_name, title, avatar_color, photo_url, positions(name), departments(name)").eq("company_id", me.companyId).eq("status", "active").order("full_name").then(({ data }) => {
+    supabase.from("coworkers").select("id, full_name, title, avatar_color, photo_url, positions(name), departments(name)").eq("company_id", me.companyId).eq("status", "active").order("full_name").then(({ data }) => {
       setEmps((data ?? []).filter((e) => e.id !== me.empId).map((e) => {
         const pos = (Array.isArray(e.positions) ? e.positions[0] : e.positions) as { name?: string } | null;
         const dep = (Array.isArray(e.departments) ? e.departments[0] : e.departments) as { name?: string } | null;
