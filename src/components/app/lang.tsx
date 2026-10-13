@@ -798,7 +798,7 @@ export const DICT: Dict = {
   "greidd 1. júní": { is: "greidd 1. júní", en: "paid June 1", vi: "trả ngày 1 tháng 6" },
   "greidd 1. desember": { is: "greidd 1. desember", en: "paid Dec 1", vi: "trả ngày 1 tháng 12" },
   "Hlutfallað eftir starfshlutfalli": { is: "Hlutfallað eftir starfshlutfalli", en: "Prorated by employment ratio", vi: "Tính theo tỷ lệ làm việc" },
-  "Greiðist sjálfkrafa í launakeyrslu réttan mánuð. (Upphæðir óstaðfestar — yfirfarið gegn samningi.)": { is: "Greiðist sjálfkrafa í launakeyrslu réttan mánuð. (Upphæðir óstaðfestar — yfirfarið gegn samningi.)", en: "Paid automatically in the payroll run for that month. (Amounts unconfirmed — verify against the agreement.)", vi: "Tự động trả trong kỳ tính lương của tháng đó. (Số tiền chưa xác nhận — hãy đối chiếu với thỏa ước lao động.)" },
+  "Greiðist sjálfkrafa í launakeyrslu réttan mánuð. Upphæðir samkvæmt kjarasamningum við SA 2024–2028.": { is: "Greiðist sjálfkrafa í launakeyrslu réttan mánuð. Upphæðir samkvæmt kjarasamningum við SA 2024–2028.", en: "Paid automatically in the payroll run for that month. Amounts per the 2024–2028 collective agreements with SA.", vi: "Tự động trả trong kỳ tính lương của tháng đó. Số tiền theo thỏa ước lao động 2024–2028 với SA." },
   "undanþegið staðgr.": { is: "undanþegið staðgr.", en: "tax-exempt", vi: "miễn thuế" },
   "Staðgr.skylt": { is: "Staðgr.skylt", en: "Taxable", vi: "Chịu thuế" },
   "Undanþegið": { is: "Undanþegið", en: "Tax-exempt", vi: "Miễn thuế" },

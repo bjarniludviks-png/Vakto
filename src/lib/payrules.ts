@@ -78,17 +78,26 @@ export function resolveRuleSet(union: string | null | undefined, custom?: Partia
 }
 
 // ---------- desember- & orlofsuppbót (kjarasamningsbundnar árlegar greiðslur) ----------
-// kr/ár fyrir 100% starfshlutfall, fullt orlofs-/almanaksár. Hlutfallað eftir
-// starfshlutfalli (og starfstíma). Orlofsuppbót greiðist 1. júní, desemberuppbót
-// 1. desember. ⚠️ ÓSTAÐFEST — yfirfarið gegn samningi hvers árs áður en greitt er.
+// kr/ár fyrir 100% starfshlutfall, fullt ár (45 unnar vikur). Hlutfallað eftir starfshlutfalli
+// og starfstíma. Orlofsuppbót greiðist 1. júní, desemberuppbót í síðasta lagi 15. desember.
+// Upphæðirnar eru þær sömu í samningum Eflingar, SGS, VR og Matvís við SA 2024–2028
+// (gr. 1.3/1.4; lesið úr samningstextunum 13. okt. 2026). Lykillinn er GREIÐSLUÁRIÐ:
+// orlofsuppbót greidd í júní 2026 er fyrir orlofsárið sem hefst 1. maí 2026.
+// Samningarnir gilda til 1. feb. 2028 — bætið við nýju ári þegar nýr samningur liggur fyrir.
 export type UppbotSet = { orlof: number; desember: number };
 
-export const UNION_UPPBOT: Record<string, UppbotSet> = {
-  "Efling": { orlof: 60000, desember: 112000 },
-  "Efling – veitingar/SGS": { orlof: 60000, desember: 112000 },
-  "VR": { orlof: 56000, desember: 103000 },
-  "Matvís": { orlof: 60000, desember: 112000 },
+export const UPPBOT_BY_YEAR: Record<number, UppbotSet> = {
+  2024: { orlof: 58000, desember: 106000 },
+  2025: { orlof: 60000, desember: 110000 },
+  2026: { orlof: 62000, desember: 114000 },
+  2027: { orlof: 64000, desember: 118000 },
 };
+/** Upphæðir greiðsluársins; utan töflunnar gildir næsta þekkta ár. */
+export function uppbotForYear(year: number): UppbotSet {
+  const years = Object.keys(UPPBOT_BY_YEAR).map(Number).sort((a, b) => a - b);
+  const y = Math.max(years[0], Math.min(years[years.length - 1], year));
+  return UPPBOT_BY_YEAR[y];
+}
 export const ZERO_UPPBOT: UppbotSet = { orlof: 0, desember: 0 };
 
 // ---------- orlof (vacation) handling — mirrors Payday's options ----------
@@ -107,8 +116,8 @@ export function resolveOrlof(o?: Partial<OrlofSet> | null): OrlofSet {
   return { ...DEFAULT_ORLOF, ...(o ?? {}) };
 }
 
-/** Uppbót amounts for an employee's agreement (custom = company can override). */
-export function resolveUppbot(union: string | null | undefined, custom?: Partial<UppbotSet> | null): UppbotSet {
+/** Uppbót amounts for an employee's agreement in a payment year (custom = company can override). */
+export function resolveUppbot(union: string | null | undefined, custom?: Partial<UppbotSet> | null, year: number = new Date().getFullYear()): UppbotSet {
   if (union === CUSTOM_UNION) return { ...ZERO_UPPBOT, ...(custom ?? {}) };
-  return UNION_UPPBOT[union ?? ""] ?? UNION_UPPBOT["Efling"];
+  return uppbotForYear(year);
 }

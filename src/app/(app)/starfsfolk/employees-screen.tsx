@@ -647,7 +647,7 @@ function LaunTab({ e }: { e: Employee }) {
           <div className="statline"><span className="k">{t("Orlofsuppbót")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("greidd 1. júní")}</span></span><b>{nf(upp.orlof)} kr/ár</b></div>
           <div className="statline"><span className="k">{t("Desemberuppbót")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("greidd 1. desember")}</span></span><b>{nf(upp.desember)} kr/ár</b></div>
           <p className="muted" style={{ fontSize: 11.5, margin: "6px 0 0" }}>
-            {t("Hlutfallað eftir starfshlutfalli")} ({e.employmentRatio}%) → ~{nf(Math.round(upp.orlof * r))} / {nf(Math.round(upp.desember * r))} kr. {t("Greiðist sjálfkrafa í launakeyrslu réttan mánuð. (Upphæðir óstaðfestar — yfirfarið gegn samningi.)")}
+            {t("Hlutfallað eftir starfshlutfalli")} ({e.employmentRatio}%) → ~{nf(Math.round(upp.orlof * r))} / {nf(Math.round(upp.desember * r))} kr. {t("Greiðist sjálfkrafa í launakeyrslu réttan mánuð. Upphæðir samkvæmt kjarasamningum við SA 2024–2028.")}
           </p>
         </>);
       })()}</>}

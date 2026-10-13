@@ -74,7 +74,7 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
     .filter((e) => e.role !== "contractor")
     .filter((e) => (byEmp.get(e.id)?.length ?? 0) > 0 || e.payType === "monthly" || e.status !== "inactive")
     .map((e) => {
-      const ub = uppKind ? computeUppbot(resolveUppbot(e.union)[uppKind], e.employmentRatio) : 0;
+      const ub = uppKind ? computeUppbot(resolveUppbot(e.union, null, Number(from.slice(0, 4)))[uppKind], e.employmentRatio) : 0;
       return computeFromPunches(e, byEmp.get(e.id) ?? [], resolveRuleSet(e.union, ruleMap.get(e.id)), ub);
     });
   // Raunverulega samþykktir tímar per starfsmann (fastlaunafólk fær laun óháð þeim, en taflan sýnir þá).
