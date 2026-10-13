@@ -219,6 +219,24 @@ export async function sendInviteEmail(to: string, company: string, roleLabel: st
   });
 }
 
+/** Boð í VAKTO-teymið (aðgangur að admin.vakto.is) — ekki í fyrirtæki viðskiptavinar. */
+export async function sendStaffInviteEmail(to: string, inviter: string, link: string) {
+  return sendEmail({
+    to,
+    subject: "Þér var boðið í VAKTO-teymið / You're invited to the VAKTO team",
+    html: template({
+      preheader: `${inviter} bauð þér aðgang að VAKTO Admin.`,
+      heading: "Velkomin í VAKTO-teymið",
+      body: `<b>${inviter}</b> bauð þér aðgang að VAKTO Admin, stjórnborðinu þar sem við sjáum fyrirtækin, áskriftir og stuðningsspjall. Smelltu á hnappinn til að virkja aðganginn og velja lykilorð. Eftir það skráirðu þig inn á admin.vakto.is.`,
+      headingEn: "Welcome to the VAKTO team",
+      bodyEn: `<b>${inviter}</b> invited you to VAKTO Admin, the console where we see companies, subscriptions and support chat. Click to activate your account and choose a password. After that you sign in at admin.vakto.is.`,
+      ctaLabel: "Virkja aðganginn minn",
+      ctaLabelEn: "Activate my account",
+      ctaHref: link,
+    }),
+  });
+}
+
 /** 6 stafa staðfestingarkóði við nýskráningu (gildir í 15 mín). */
 export async function sendVerificationCodeEmail(to: string, code: string) {
   return sendEmail({

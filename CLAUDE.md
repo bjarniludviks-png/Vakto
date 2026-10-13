@@ -332,3 +332,16 @@
 - Push: appið skráir `expo:<token>` í `push_subscriptions`; `src/lib/push.ts` sendir á Expo push API fyrir þau (virkar líka án VAPID-lykla).
 - `mobile/` er undanskilið í root tsconfig og eslint; appið hefur eigin `npx tsc --noEmit -p mobile`.
 
+
+## VAKTO Admin v2 (13. okt. 2026, grein `admin-v2`, migration 0068 á staging — EKKI enn á prod)
+- `/admin` notar nú sömu skel og kerfið (`.app/.side/.tbar`), með eigin valmynd: Mælaborð (`/admin`), Fyrirtæki
+  (`/admin/fyrirtaeki` + síða per fyrirtæki `/admin/fyrirtaeki/[id]`: notendur, kort, reikningar, „Skrá inn sem“),
+  Spjall, Auglýsingar (`/admin/auglysingar`), Kerfið (`/admin/kerfid`), Stillingar (`/admin/stillingar`). Dökkt útlit = sami
+  `vakto-theme` lykill. Sameiginlegir bitar í `admin/ui.tsx`, stíll í `admin/admin.css` (`adm-` forskeyti).
+- **Teymið:** `platform_admins` (0068) + `is_platform_admin()` (proxy). `VAKTO_ADMIN_EMAILS` gildir áfram og eru alltaf
+  eigendur; eigandi býður/fjarlægir í Stillingum (`inviteTeamMember` o.fl. í `admin/actions.ts`). Nota `getPlatformIdentity()`
+  / `isPlatformAdminEmail()` — ekki `isAdminEmail()` eitt og sér.
+- **Meta:** `src/lib/meta-ads.server.ts` les Marketing API (eingöngu lestur) þegar `META_ACCESS_TOKEN` + `META_AD_ACCOUNT_ID`
+  eru sett; annars sýnir síðan uppsetningarleiðbeiningar. Ekki enn prófað á móti lifandi reikningi.
+- **Kerfið:** `src/lib/system-status.server.ts` — lýsing á öllum þjónustum + hvort env-breytur eru til (aldrei gildin).
+  Uppfæra þegar ný þjónusta bætist við.

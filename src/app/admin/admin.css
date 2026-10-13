@@ -1,0 +1,64 @@
+/* VAKTO Platform chrome — hliðarvalmynd + efnissvæði. Allt með adm- forskeyti svo
+   ekkert rekist á app.css. Litir eingöngu úr tókum → dökkt útlit (html.dark) fylgir sjálfkrafa. */
+.adm-pill{font-size:10.5px;font-weight:700;letter-spacing:.12em;color:var(--brand);border:1px solid color-mix(in srgb,var(--brand) 40%,transparent);border-radius:999px;padding:3px 10px}
+.adm-dot{margin-left:auto;min-width:19px;height:19px;padding:0 6px;border-radius:999px;background:var(--brand);color:#fff;font-size:11px;font-weight:700;display:grid;place-items:center}
+.tmenu a.mi{text-decoration:none}
+/* .tag er aðeins stílað innan .att í app.css — admin notar það víðar */
+.main .tag{display:inline-block;flex-shrink:0;font-size:11px;font-weight:600;padding:3px 8px;border-radius:7px;height:fit-content;line-height:1.35}
+.main .tbl .btn{white-space:nowrap}
+.main .tbl td>b{white-space:nowrap}
+.main .ch .seg{max-width:100%;overflow-x:auto}.main .ch .seg button{white-space:nowrap}
+
+.adm-grid{display:grid;gap:20px;margin-top:20px}
+.adm-grid.c2{grid-template-columns:1.5fr 1fr}
+.adm-grid.e2{grid-template-columns:1fr 1fr}
+.adm-grid.c3{grid-template-columns:repeat(3,1fr)}
+.adm-rowlink{cursor:pointer}
+.adm-rowlink:hover td{background:var(--line2)}
+.adm-list{display:flex;flex-direction:column}
+.adm-list>*{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid var(--line2);font-size:13px;color:inherit;text-decoration:none}
+.adm-list>*:last-child{border-bottom:0}
+.adm-list .gr{flex:1;min-width:0}
+.adm-list .gr small{display:block;color:var(--ink3);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.adm-kv{display:grid;grid-template-columns:150px 1fr;gap:9px 14px;font-size:13px}
+.adm-kv dt{color:var(--ink3)}
+.adm-kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.adm-input{font:inherit;font-size:13px;padding:8px 11px;border-radius:9px;border:1px solid var(--line);background:var(--panel);color:var(--ink)}
+.adm-back{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--ink2);text-decoration:none;margin-bottom:14px}
+.adm-back:hover{color:var(--brand)}
+.adm-card-chip{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.adm-card-chip .logo{width:46px;height:30px;border-radius:6px;background:var(--line2);display:grid;place-items:center;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--ink2)}
+.adm-card-chip .num{font-size:14.5px;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:.04em}
+
+.adm-seg a{font-size:12.5px;font-weight:500;color:var(--ink2);padding:5px 12px;border-radius:7px;text-decoration:none}
+.adm-seg a.on{background:var(--brand);color:#fff;box-shadow:0 2px 6px rgba(233,112,15,.3)}
+.adm-svc{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:14px}
+.adm-svc>div{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.adm-svc h4{margin:0;font-size:14px;font-weight:650;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.adm-svc p{margin:0;font-size:12.5px;line-height:1.5;color:var(--ink2)}
+.adm-svc a{font-size:12px;font-weight:600;color:var(--brand);text-decoration:none;margin-top:auto;padding-top:4px}
+
+/* einfalt súlurit (nýskráningar, eyðsla) — ein lituð röð, tala á sveimi */
+.adm-bars{display:flex;align-items:flex-end;gap:6px;height:150px}
+.adm-bars .b{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:6px;position:relative;min-width:0}
+.adm-bars .c{width:100%;max-width:34px;border-radius:5px 5px 2px 2px;background:var(--brand);min-height:2px}
+.adm-bars .b.z .c{background:var(--line)}
+.adm-bars small{font-size:10px;color:var(--ink3);white-space:nowrap}
+.adm-bars .t{position:absolute;bottom:calc(100% - 12px);font-size:10.5px;font-weight:650;background:var(--ink);color:var(--panel);padding:3px 7px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;z-index:2}
+.adm-bars .b:hover .t{opacity:1}
+.adm-split{display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--line2)}
+.adm-split i{display:block;height:100%}
+.adm-legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:12px;font-size:12px;color:var(--ink2)}
+.adm-legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px}
+.adm-status{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.adm-status i{width:8px;height:8px;border-radius:50%;background:var(--ink3)}
+.adm-status.ok i{background:var(--good)} .adm-status.ok{color:var(--good)}
+.adm-status.off{color:var(--ink3)}
+.adm-status.err i{background:var(--bad)} .adm-status.err{color:var(--bad)}
+
+@media (max-width:1000px){
+  .adm-grid.c2,.adm-grid.e2,.adm-grid.c3{grid-template-columns:1fr}
+}
+@media (max-width:860px){
+  .adm-kv{grid-template-columns:1fr;gap:2px 0}.adm-kv dd{margin-bottom:8px}
+}

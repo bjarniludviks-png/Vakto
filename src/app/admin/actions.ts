@@ -12,11 +12,11 @@ import { redirect } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
-  isVaktoAdmin, isAdminEmail, logPlatform,
+  isVaktoAdmin, isAdminEmail, isPlatformAdminEmail, getPlatformIdentity, logPlatform,
   IMPERSONATION_COOKIE, IMPERSONATION_UI_COOKIE, IMPERSONATION_MAX_AGE,
 } from "@/lib/vakto-admin.server";
 import { logAudit } from "@/lib/audit";
-import { sendResetEmail, emailConfigured } from "@/lib/email";
+import { sendResetEmail, sendStaffInviteEmail, emailConfigured } from "@/lib/email";
 
 export type AdminResult = { ok: boolean; error?: string };
 
@@ -239,7 +239,7 @@ export async function impersonateUser(companyId: string, userId: string): Promis
     ]);
     if (!u?.email || u.company_id !== companyId) return { ok: false, error: "Notandi fannst ekki í þessu fyrirtæki" };
     const me = await adminIdentity();
-    if (!isAdminEmail(me.email)) return { ok: false, error: "Aðgangi hafnað" };
+    if (!(await isPlatformAdminEmail(me.email))) return { ok: false, error: "Aðgangi hafnað" };
     const { data, error } = await db.auth.admin.generateLink({ type: "magiclink", email: u.email as string });
     const hash = data?.properties?.hashed_token;
     if (error || !hash) return { ok: false, error: error?.message ?? "Gat ekki búið til hlekk" };
@@ -287,7 +287,7 @@ export async function impersonateCompanyOwner(companyId: string): Promise<AdminR
 export async function endImpersonation(): Promise<AdminResult> {
   const jar = await cookies();
   const state = decodeState(jar.get(IMPERSONATION_COOKIE)?.value);
-  if (!state || !isAdminEmail(state.adminEmail)) {
+  if (!state || !(await isPlatformAdminEmail(state.adminEmail))) {
     await clearImpersonationCookies();
     return { ok: false, error: "Engin virk stuðningsinnskráning fannst — skráðu þig inn á admin.vakto.is" };
   }
@@ -327,4 +327,110 @@ export async function endImpersonation(): Promise<AdminResult> {
 export async function fetchCompanyDetail(companyId: string) {
   const { getCompanyDetail } = await import("@/lib/vakto-admin.server");
   return getCompanyDetail(companyId);
+}
+
+/* ---------- VAKTO team (0068) ----------
+   Only an owner (env allowlist or an owner row) may change who is on the team.
+   Staff get everything else in /admin, including "Skrá inn sem". */
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Invite a colleague: adds the platform_admins row and, when they have no
+ *  VAKTO login yet, creates one and emails a link to choose a password. */
+export async function inviteTeamMember(input: { email: string; name?: string; role?: string }): Promise<AdminResult & { link?: string; emailed?: boolean }> {
+  const me = await getPlatformIdentity();
+  if (!me || me.role !== "owner") return { ok: false, error: "Aðeins eigandi getur boðið í teymið" };
+  const email = (input.email ?? "").trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) return { ok: false, error: "Ógilt netfang" };
+  const name = (input.name ?? "").trim().slice(0, 120) || null;
+  const role = input.role === "owner" ? "owner" : "staff";
+  try {
+    const db = createAdminClient();
+    const { error } = await db.from("platform_admins").upsert({ email, full_name: name, role, invited_by: me.email });
+    if (error) return { ok: false, error: error.message.includes("platform_admins") ? "Keyrðu migration 0068" : error.message };
+
+    // Existing login (e.g. they already use VAKTO) → nothing to send; they sign in on admin.vakto.is.
+    const { data: existing } = await db.from("users").select("id").ilike("email", email).limit(1).maybeSingle();
+    let link: string | undefined;
+    let emailed = false;
+    if (!existing) {
+      const { data: gen, error: genErr } = await db.auth.admin.generateLink({ type: "invite", email, options: { data: { full_name: name } } });
+      const hash = gen?.properties?.hashed_token;
+      if (genErr || !hash) return { ok: false, error: genErr?.message ?? "Gat ekki búið til boðshlekk" };
+      const { adminOrigin } = await hostInfo();
+      link = `${adminOrigin}/nytt-lykilord?token_hash=${encodeURIComponent(hash)}&type=invite`;
+      if (emailConfigured()) {
+        const r = await sendStaffInviteEmail(email, me.name ?? me.email, link);
+        emailed = r.ok && !r.skipped;
+      }
+    }
+    await logPlatform(db, {
+      adminEmail: me.email, action: "team.invite", target: email,
+      detail: `${role === "owner" ? "Eigandi" : "Starfsmaður"} — ${existing ? "var þegar með aðgang" : emailed ? "boð sent með tölvupósti" : "boðshlekkur búinn til (ekki sendur)"}`,
+    });
+    revalidatePath("/admin/stillingar");
+    return { ok: true, link: emailed ? undefined : link, emailed };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Remove a colleague's access to /admin (their login itself is left alone). */
+export async function removeTeamMember(emailRaw: string): Promise<AdminResult> {
+  const me = await getPlatformIdentity();
+  if (!me || me.role !== "owner") return { ok: false, error: "Aðeins eigandi getur fjarlægt úr teyminu" };
+  const email = (emailRaw ?? "").trim().toLowerCase();
+  if (!email) return { ok: false, error: "Netfang vantar" };
+  if (email === me.email) return { ok: false, error: "Þú getur ekki fjarlægt sjálfa(n) þig" };
+  if (isAdminEmail(email)) return { ok: false, error: "Þetta netfang er í VAKTO_ADMIN_EMAILS á Vercel — fjarlægðu það þar" };
+  try {
+    const db = createAdminClient();
+    const { error } = await db.from("platform_admins").delete().eq("email", email);
+    if (error) return { ok: false, error: error.message };
+    await logPlatform(db, { adminEmail: me.email, action: "team.remove", target: email, detail: "Aðgangur að VAKTO Admin fjarlægður" });
+    revalidatePath("/admin/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** Change a colleague's role (owner ⇄ staff). */
+export async function setTeamRole(emailRaw: string, role: string): Promise<AdminResult> {
+  const me = await getPlatformIdentity();
+  if (!me || me.role !== "owner") return { ok: false, error: "Aðeins eigandi getur breytt hlutverki" };
+  const email = (emailRaw ?? "").trim().toLowerCase();
+  if (email === me.email) return { ok: false, error: "Þú getur ekki breytt eigin hlutverki" };
+  if (isAdminEmail(email)) return { ok: false, error: "Netföng í VAKTO_ADMIN_EMAILS eru alltaf eigendur" };
+  const next = role === "owner" ? "owner" : "staff";
+  try {
+    const db = createAdminClient();
+    const { error } = await db.from("platform_admins").update({ role: next }).eq("email", email);
+    if (error) return { ok: false, error: error.message };
+    await logPlatform(db, { adminEmail: me.email, action: "team.role", target: email, detail: `Hlutverk: ${next === "owner" ? "eigandi" : "starfsmaður"}` });
+    revalidatePath("/admin/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
+/** The signed-in admin's own display name (shown in the team list and audit). */
+export async function saveMyName(nameRaw: string): Promise<AdminResult> {
+  const me = await getPlatformIdentity();
+  if (!me) return { ok: false, error: "Aðgangi hafnað" };
+  const name = (nameRaw ?? "").trim().slice(0, 120);
+  if (!name) return { ok: false, error: "Nafn vantar" };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.auth.updateUser({ data: { full_name: name } });
+    if (error) return { ok: false, error: error.message };
+    const db = createAdminClient();
+    // Row exists for invited staff; env-only owners get one so the name sticks.
+    await db.from("platform_admins").upsert({ email: me.email, full_name: name, role: me.role }, { onConflict: "email" });
+    revalidatePath("/admin", "layout");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
 }
