@@ -44,7 +44,7 @@ async function ctxOf(supabase: Awaited<ReturnType<typeof createClient>>) {
 /** user_id → {name, photo} from employees — names fall back here when a users
  * row is missing (invited accounts may carry the email), photos only live here. */
 async function empNameMap(supabase: Awaited<ReturnType<typeof createClient>>, company: string): Promise<Map<string, { name: string; photo: string | null }>> {
-  const { data } = await supabase.from("employees").select("user_id, full_name, photo_url").eq("company_id", company).not("user_id", "is", null);
+  const { data } = await supabase.from("coworkers").select("user_id, full_name, photo_url").eq("company_id", company).not("user_id", "is", null);
   return new Map((data ?? []).map((e) => [e.user_id as string, { name: e.full_name as string, photo: (e.photo_url as string | null) ?? null }]));
 }
 
@@ -298,7 +298,7 @@ export async function searchPeople(q: string): Promise<Person[]> {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return [];
-    let query = supabase.from("employees").select("user_id, full_name, photo_url").eq("company_id", ctx.company).not("user_id", "is", null).limit(40);
+    let query = supabase.from("coworkers").select("user_id, full_name, photo_url").eq("company_id", ctx.company).not("user_id", "is", null).limit(40);
     if (q.trim()) query = query.ilike("full_name", `%${q.trim()}%`);
     const { data } = await query;
     return (data ?? [])

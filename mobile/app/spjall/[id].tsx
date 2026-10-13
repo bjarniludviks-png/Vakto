@@ -129,7 +129,7 @@ export default function Thread() {
     if (id) isMuted(id).then(setMuted);
     supabase.from("channels").select("kind").eq("id", id).maybeSingle().then(async ({ data }) => {
       setIsGroup(data?.kind !== "dm"); setKind((data?.kind as string) ?? "group");
-      if (data?.kind === "general" && me) { const { count } = await supabase.from("employees").select("id", { count: "exact", head: true }).eq("company_id", me.companyId).not("user_id", "is", null); setMembers(count ?? 0); }
+      if (data?.kind === "general" && me) { const { count } = await supabase.from("coworkers").select("id", { count: "exact", head: true }).eq("company_id", me.companyId).not("user_id", "is", null); setMembers(count ?? 0); }
       else { const { count } = await supabase.from("channel_members").select("user_id", { count: "exact", head: true }).eq("channel_id", id); setMembers(count ?? 0); }
     });
   }, [load, id, me]));

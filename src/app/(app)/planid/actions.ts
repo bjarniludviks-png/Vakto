@@ -73,7 +73,7 @@ export async function getPlan(weekStartISO: string): Promise<{ live: boolean; sh
 
     const { data } = await supabase
       .from("shifts")
-      .select("id, date, start_time, end_time, employee_id, employees(full_name, avatar_color, departments(name, color)), shift_types(name, color)")
+      .select("id, date, start_time, end_time, employee_id, employees:coworkers(full_name, avatar_color, departments(name, color)), shift_types(name, color)")
       .eq("company_id", ctx.company)
       .gte("date", from).lte("date", to)
       .order("date").order("start_time");
@@ -113,7 +113,7 @@ export async function getCoworkers(): Promise<{ live: boolean; people: Coworker[
     const ctx = await planCtx(supabase);
     if ("error" in ctx) return { live: false, people: [] };
     const { data } = await supabase
-      .from("employees")
+      .from("coworkers")
       .select("id, full_name, title, phone, email, photo_url, avatar_color, positions(name), departments(name)")
       .eq("company_id", ctx.company)
       .eq("status", "active")

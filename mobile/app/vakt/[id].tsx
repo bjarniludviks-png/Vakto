@@ -44,7 +44,7 @@ export default function VaktScreen() {
 
   const load = useCallback(async () => {
     if (!id || !me) return;
-    const { data } = await supabase.from("shifts").select("id, date, start_time, end_time, employee_id, employees(full_name, avatar_color, photo_url, departments(name, color)), shift_types(name, color), locations(name), companies(name)").eq("id", id).maybeSingle();
+    const { data } = await supabase.from("shifts").select("id, date, start_time, end_time, employee_id, employees:coworkers(full_name, avatar_color, photo_url, departments(name, color)), shift_types(name, color), locations(name), companies(name)").eq("id", id).maybeSingle();
     if (!data) return;
     const emp = (Array.isArray(data.employees) ? data.employees[0] : data.employees) as { full_name?: string; avatar_color?: string; photo_url?: string; departments?: { name?: string; color?: string } | { name?: string; color?: string }[] } | null;
     const dep = emp?.departments ? (Array.isArray(emp.departments) ? emp.departments[0] : emp.departments) : null;
@@ -57,7 +57,7 @@ export default function VaktScreen() {
     const mgr = await isManager().catch(() => false);
     setManager(mgr);
     setTasks(sh.empId && (sh.empId === me.empId || mgr) ? await getTasksFor(sh.empId, sh.date) : []);
-    const { data: same } = await supabase.from("shifts").select("id, employee_id, start_time, end_time, employees(full_name, avatar_color, photo_url)").eq("company_id", me.companyId).eq("date", sh.date).not("employee_id", "is", null).neq("id", sh.id).order("start_time");
+    const { data: same } = await supabase.from("shifts").select("id, employee_id, start_time, end_time, employees:coworkers(full_name, avatar_color, photo_url)").eq("company_id", me.companyId).eq("date", sh.date).not("employee_id", "is", null).neq("id", sh.id).order("start_time");
     const s1 = sh.start ?? "00:00", e1r = sh.end ?? "24:00", e1 = e1r <= s1 ? "24:00" : e1r;
     setCo(((same ?? []) as Record<string, unknown>[]).filter((x) => { const s2 = hm(x.start_time as string) ?? "00:00", e2r = hm(x.end_time as string) ?? "24:00", e2 = e2r <= s2 ? "24:00" : e2r; return s2 < e1 && s1 < e2; }).map((x) => { const e = (Array.isArray(x.employees) ? x.employees[0] : x.employees) as { full_name?: string; avatar_color?: string; photo_url?: string } | null; return { id: x.id as string, empId: x.employee_id as string, name: e?.full_name ?? "—", color: e?.avatar_color ?? null, photo: e?.photo_url ?? null, start: hm(x.start_time as string) ?? "", end: hm(x.end_time as string) ?? "" }; }));
     if (!sh.empId) {

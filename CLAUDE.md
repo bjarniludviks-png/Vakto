@@ -345,3 +345,18 @@
   eru sett; annars sýnir síðan uppsetningarleiðbeiningar. Ekki enn prófað á móti lifandi reikningi.
 - **Kerfið:** `src/lib/system-status.server.ts` — lýsing á öllum þjónustum + hvort env-breytur eru til (aldrei gildin).
   Uppfæra þegar ný þjónusta bætist við.
+
+## Persónuvernd starfsmannagagna (13. okt. 2026, grein `fix-employee-privacy`)
+- **Vandinn:** `employees_read` hleypti hverjum starfsmanni í alla dálka samstarfsfólks gegnum API-ið (taxti, kennitala,
+  bankareikningur, heimilisfang, `clock_token`). Staðfest á prod og staging.
+- **0069** (komin á staging + prod): sýnin `coworkers` með öruggu dálkunum (nafn, titill, sími, netfang, mynd, deild,
+  staða, hlutverk). **Allt sem starfsmaður les um AÐRA fer í gegnum `coworkers`** — beint (`from("coworkers")`) eða sem
+  tenging með sama lykli og áður: `employees:coworkers(full_name, …)` (FK-vísun virkar: `employees:coworkers!fk(…)`).
+  Stjórnendaskjáir og eigin röð lesa áfram `employees`. Nýr dálkur á `employees` er EKKI í sýninni nema honum sé bætt við.
+- **0070** (komin á staging, **EKKI á prod**): `employees_read` aðeins fyrir stjórnendur. Má fyrst keyra á prod þegar vefurinn
+  er kominn út OG appið (OTA `eas update --branch production` eða nýtt build) les úr `coworkers` — eldri app-útgáfur sýna
+  annars auð nöfn á vaktaplani og í spjalli. Ekki senda OTA meðan Apple er að yfirfara build 9.
+- Staging er því strangara en prod: preview af greinum ÁN þessarar breytingar sýnir auð nöfn hjá starfsmönnum.
+- **Eftir (sama eðlis, minni):** `payment_methods` (dálkurinn `token`), `documents`-raðir, `leave_requests` (tegund fjarveru)
+  og `punches` (staðsetning) eru lesanleg öllum í fyrirtækinu. `payment_methods` er lesið í proxy fyrir hvern notanda
+  (kortaskylda) — þrengja þarf það með falli, ekki bara reglu.

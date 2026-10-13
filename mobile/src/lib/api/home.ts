@@ -57,10 +57,10 @@ export async function getHome(me: Me): Promise<Home> {
   const since14 = new Date(now); since14.setDate(since14.getDate() - 14);
 
   const [mineQ, openPunchQ, todayAllQ, openQ, punchesQ, leavesQ, swapsQ, postsQ, unread] = await Promise.all([
-    supabase.from("shifts").select("id, date, start_time, end_time, shift_types(name, color), employees(departments(name, color))")
+    supabase.from("shifts").select("id, date, start_time, end_time, shift_types(name, color), employees:coworkers(departments(name, color))")
       .eq("employee_id", me.empId).gte("date", today).lte("date", iso(in21)).order("date").order("start_time").limit(12),
     supabase.from("punches").select("clock_in").eq("employee_id", me.empId).is("clock_out", null).order("clock_in", { ascending: false }).limit(1),
-    supabase.from("shifts").select("id, employee_id, start_time, end_time, employees(full_name, avatar_color, photo_url, departments(name))")
+    supabase.from("shifts").select("id, employee_id, start_time, end_time, employees:coworkers(full_name, avatar_color, photo_url, departments(name))")
       .eq("company_id", me.companyId).eq("date", today).not("employee_id", "is", null).order("start_time"),
     supabase.from("shifts").select("id, date, start_time, end_time, created_at").eq("company_id", me.companyId).is("employee_id", null).gte("date", today).order("date").limit(10),
     supabase.from("punches").select("clock_in, clock_out").eq("employee_id", me.empId).gte("clock_in", monthFrom.toISOString()).not("clock_out", "is", null),
