@@ -12,6 +12,7 @@ import { getManagerReport, type ReportKind } from "./actions";
 import { getDashboardPeriod } from "../maelabord/actions";
 import { getPerfHistory } from "../frammistada/perf.server";
 import { dec1, nf, krCompact } from "@/lib/format";
+import { userError } from "@/lib/user-error";
 
 export type AiChart = { labels: string[]; values: number[]; label: string };
 export type AiReportResult = {
@@ -157,6 +158,6 @@ SPURNING: ${question}`,
     if (!parsed?.summary) return fallbackAnswer(question, ctx);
     return { ok: true, live: true, ...parsed };
   } catch (e) {
-    return { ok: false, live: false, title: "Villa", summary: "", error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, live: false, title: "Villa", summary: "", error: userError(e, "Villa") };
   }
 }

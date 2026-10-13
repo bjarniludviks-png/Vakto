@@ -60,14 +60,14 @@ export async function addRevenue(
     const { error } = await supabase.from("revenue").insert({
       location_id: loc.id, date, amount, source: "manual",
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "revenue.manual", entity: "revenue", detail: `Velta skráð handvirkt — ${nf(amount)} kr (${date})`,
     });
     revalidatePath("/maelabord");
     return { ok: true, amount };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -97,14 +97,14 @@ export async function setWeekdayRevenue(map: Record<string, number>): Promise<Se
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("companies").update({ weekday_revenue: clean }).eq("id", ctx.company);
-    if (error) return { ok: false, error: error.message.includes("weekday_revenue") ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : error.message };
+    if (error) return { ok: false, error: error.message.includes("weekday_revenue") ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "revenue.weekday", entity: "company", detail: "Meðalvelta per vikudag uppfærð",
     });
     revalidatePath("/maelabord");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -132,7 +132,7 @@ export async function saveCompanyInfo(
         .update({ name: patch.name, kennitala: patch.kennitala }).eq("id", ctx.company));
       if (!error) error = { message: "Vistað að hluta — keyrðu migration 0026 fyrir heimilisfang/síma/netfang" } as never;
     }
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     // Póstnúmer + staður (0061) — sér uppfærsla svo vistun virki þótt migration vanti.
     if (input.postalCode !== undefined || input.city !== undefined) {
       const { error: pcErr } = await supabase.from("companies")
@@ -145,7 +145,7 @@ export async function saveCompanyInfo(
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -160,14 +160,14 @@ export async function addLocation(input: { name: string }): Promise<SettingsResu
     const { error } = await supabase.from("locations").insert({
       company_id: ctx.company, name: input.name.trim(),
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "location.create", entity: "location", detail: `Nýr staður — ${input.name.trim()}`,
     });
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -182,14 +182,14 @@ export async function addPosition(input: { name: string; baseRate?: string }): P
     const { error } = await supabase.from("positions").insert({
       company_id: ctx.company, name: input.name.trim(), base_rate: num(input.baseRate, 2900),
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "position.create", entity: "position", detail: `Ný staða — ${input.name.trim()}`,
     });
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -211,14 +211,14 @@ export async function addDepartment(input: { name: string; locationName?: string
     if (error && /color|column/i.test(error.message)) {
       ({ error } = await supabase.from("departments").insert({ location_id: loc.id, name: input.name.trim() }));
     }
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "department.create", entity: "department", detail: `Ný deild — ${input.name.trim()} (${loc.name})`,
     });
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -233,20 +233,20 @@ export async function ensureKioskToken(): Promise<{ ok: boolean; token?: string;
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { data, error } = await supabase.from("companies").select("kiosk_token").eq("id", ctx.company).maybeSingle();
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     const existing = (data?.kiosk_token as string | null) ?? null;
     if (existing) return { ok: true, token: existing };
     const token = Array.from(crypto.getRandomValues(new Uint8Array(16)))
       .map((b) => b.toString(16).padStart(2, "0")).join("");
     const { error: upErr } = await supabase.from("companies").update({ kiosk_token: token }).eq("id", ctx.company);
-    if (upErr) return { ok: false, error: upErr.message };
+    if (upErr) return { ok: false, error: userError(upErr) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "company.kiosk_token", entity: "company", detail: "Kiosk-lykill búinn til",
     });
     revalidatePath("/stillingar");
     return { ok: true, token };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -265,7 +265,7 @@ export async function setEsignProvider(provider: "vakto" | "taktikal"): Promise<
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -298,14 +298,14 @@ export async function saveContractTerms(terms: string): Promise<SettingsResult> 
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("companies").update({ contract_terms: terms.trim() || null }).eq("id", ctx.company);
-    if (error) return { ok: false, error: /contract_terms|column/i.test(error.message) ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : error.message };
+    if (error) return { ok: false, error: /contract_terms|column/i.test(error.message) ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "company.contract_terms", entity: "company", detail: "Sérskilmálar ráðningarsamninga uppfærðir",
     });
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -335,12 +335,12 @@ export async function updatePosition(id: string, input: { name: string; baseRate
     const patch: Record<string, unknown> = { name: input.name.trim() };
     if (input.baseRate !== undefined) patch.base_rate = num(input.baseRate, 2900);
     const { error } = await supabase.from("positions").update(patch).eq("id", id).eq("company_id", ctx.company);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, { action: "position.update", entity: "position", entityId: id, detail: `Staða uppfærð — ${input.name.trim()}` });
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -352,12 +352,12 @@ export async function deletePosition(id: string): Promise<SettingsResult> {
     if ("error" in ctx) return { ok: false, error: ctx.error };
     await supabase.from("employees").update({ position_id: null }).eq("position_id", id).eq("company_id", ctx.company);
     const { error } = await supabase.from("positions").delete().eq("id", id).eq("company_id", ctx.company);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, { action: "position.delete", entity: "position", entityId: id, detail: "Stöðu eytt" });
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -370,12 +370,12 @@ export async function updateLocation(id: string, input: { name: string }): Promi
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("locations").update({ name: input.name.trim() }).eq("id", id).eq("company_id", ctx.company);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, { action: "location.update", entity: "location", entityId: id, detail: `Staður uppfærður — ${input.name.trim()}` });
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -389,12 +389,12 @@ export async function deleteLocation(id: string): Promise<SettingsResult> {
     if (deps?.length) return { ok: false, error: "Staðurinn er með deildir — eyddu eða færðu þær fyrst." };
     await supabase.from("employees").update({ location_id: null }).eq("location_id", id).eq("company_id", ctx.company);
     const { error } = await supabase.from("locations").delete().eq("id", id).eq("company_id", ctx.company);
-    if (error) return { ok: false, error: /foreign key|violates/i.test(error.message) ? "Staðurinn er í notkun (velta/vaktir tengdar) — ekki hægt að eyða." : error.message };
+    if (error) return { ok: false, error: /foreign key|violates/i.test(error.message) ? "Staðurinn er í notkun (velta/vaktir tengdar) — ekki hægt að eyða." : userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, { action: "location.delete", entity: "location", entityId: id, detail: "Stað eytt" });
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -449,16 +449,16 @@ export async function uploadCompanyDoc(input: { fileName: string; dataUrl: strin
     const safe = input.fileName.replace(/[^\w.\-]+/g, "_");
     const path = `${ctx.company}/shared/${Date.now()}-${safe}`;
     const { error: upErr } = await supabase.storage.from("documents").upload(path, bytes, { contentType: m[1], upsert: false });
-    if (upErr) return { ok: false, error: upErr.message };
+    if (upErr) return { ok: false, error: userError(upErr) };
     const { error } = await supabase.from("documents").insert({
       company_id: ctx.company, employee_id: null, name: input.fileName, type: "shared", url: path,
     });
-    if (error) return { ok: false, error: /null value|not-null/i.test(error.message) ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : error.message };
+    if (error) return { ok: false, error: /null value|not-null/i.test(error.message) ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, { action: "companydoc.upload", entity: "documents", detail: `Skjal í skjalasafn — ${input.fileName}` });
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -473,11 +473,11 @@ export async function deleteCompanyDoc(id: string): Promise<SettingsResult> {
     if (!doc || doc.company_id !== ctx.company || doc.employee_id !== null) return { ok: false, error: "Skjal fannst ekki" };
     if (doc.url) await admin.storage.from("documents").remove([doc.url as string]);
     const { error } = await admin.from("documents").delete().eq("id", id);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -493,10 +493,10 @@ export async function openCompanyDoc(id: string): Promise<{ ok: boolean; url?: s
     const { data: doc } = await admin.from("documents").select("url, company_id, employee_id").eq("id", id).maybeSingle();
     if (!doc || doc.company_id !== ctx.company || doc.employee_id !== null || !doc.url) return { ok: false, error: "Skjal fannst ekki" };
     const { data, error } = await admin.storage.from("documents").createSignedUrl(doc.url as string, 120);
-    if (error || !data?.signedUrl) return { ok: false, error: error?.message ?? "Villa" };
+    if (error || !data?.signedUrl) return { ok: false, error: userError(error, "Villa") };
     return { ok: true, url: data.signedUrl };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -515,14 +515,14 @@ export async function renameDepartment(id: string, name: string, color?: string 
     if (error && /color|column|schema/i.test(error.message)) {
       ({ error } = await supabase.from("departments").update({ name: name.trim() }).eq("id", id));
     }
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "department.rename", entity: "department", entityId: id, detail: `Deild endurskírð — ${name.trim()}`,
     });
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -538,14 +538,14 @@ export async function deleteDepartment(id: string): Promise<SettingsResult> {
     if (!dep) return { ok: false, error: "Deild fannst ekki" };
     await supabase.from("employees").update({ department_id: null }).eq("department_id", id).eq("company_id", ctx.company);
     const { error } = await supabase.from("departments").delete().eq("id", id);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "department.delete", entity: "department", entityId: id, detail: "Deild eytt",
     });
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -567,14 +567,14 @@ export async function savePayRule(
       pct: Number.isFinite(pct) ? pct : 0,
       confirmed: input.confirmed,
     }, { onConflict: "company_id,code" });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "payrule.save", entity: "pay_rule", detail: `Launaregla staðfest — ${input.label} ${pct}%`,
     });
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -594,7 +594,7 @@ export async function inviteUser(input: { email: string; role: string }): Promis
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -605,6 +605,7 @@ export async function inviteUser(input: { email: string; role: string }): Promis
 
 import type { RuleSet, RuleTemplate } from "@/lib/rules";
 import { RULE_PRESETS } from "@/lib/rules";
+import { userError } from "@/lib/user-error";
 
 export type RuleTemplateInput = {
   id?: string;
@@ -657,12 +658,12 @@ export async function saveRuleTemplate(input: RuleTemplateInput): Promise<Settin
     const res = input.id
       ? await supabase.from("rule_templates").update(row).eq("id", input.id).eq("company_id", ctx.company).select("id").maybeSingle()
       : await supabase.from("rule_templates").insert(row).select("id").maybeSingle();
-    if (res.error) return { ok: false, error: res.error.message.includes("rule_templates") ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : res.error.message };
+    if (res.error) return { ok: false, error: res.error.message.includes("rule_templates") ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : userError(res.error) };
     await logAudit(supabase, ctx.company, ctx.userId, { action: "rules.save", entity: "rule_templates", detail: `Reglusniðmát: ${row.name}` });
     revalidatePath("/stillingar");
     return { ok: true, id: res.data?.id as string | undefined };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -673,11 +674,11 @@ export async function deleteRuleTemplate(id: string): Promise<SettingsResult> {
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("rule_templates").delete().eq("id", id).eq("company_id", ctx.company);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -779,14 +780,14 @@ export async function createApiKey(name: string): Promise<CreateKeyResult> {
     const { error } = await supabase.from("api_keys").insert({
       company_id: ctx.company, name: nm, prefix: key.slice(0, 15) + "…", key_hash: hash,
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "apikey.create", entity: "api_keys", detail: `API-tenging stofnuð — ${nm}`,
     });
     revalidatePath("/stillingar");
     return { ok: true, key };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -798,14 +799,14 @@ export async function revokeApiKey(id: string): Promise<SettingsResult> {
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("api_keys").update({ revoked: true }).eq("id", id).eq("company_id", ctx.company);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "apikey.revoke", entity: "api_keys", detail: `API-tenging afturkölluð`,
     });
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -820,7 +821,7 @@ export async function savePayPeriodStart(day: number): Promise<SettingsResult> {
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("companies").update({ pay_period_start: d }).eq("id", ctx.company);
-    if (error) return { ok: false, error: /pay_period_start/.test(error.message) ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : error.message };
+    if (error) return { ok: false, error: /pay_period_start/.test(error.message) ? "Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO." : userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "company.pay_period", entity: "companies", detail: `Launatímabil stillt — byrjar ${d}.`,
     });
@@ -828,7 +829,7 @@ export async function savePayPeriodStart(day: number): Promise<SettingsResult> {
     revalidatePath("/launakeyrslur");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -861,12 +862,12 @@ export async function setFeedPostPolicy(policy: "everyone" | "managers"): Promis
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { error } = await supabase.from("companies").update({ feed_post_policy: policy }).eq("id", ctx.company);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, { action: "company.feed_policy", entity: "company", detail: `Fréttaveita: ${policy === "managers" ? "aðeins stjórnendur birta" : "allir mega birta"}` });
     revalidatePath("/stillingar"); revalidatePath("/frettaveita");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -898,7 +899,7 @@ export async function saveCompanyLimits(input: { laborTarget?: number; leaveCap?
     revalidatePath("/stillingar"); revalidatePath("/maelabord"); revalidatePath("/vaktaplan");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -921,7 +922,7 @@ export async function saveGeofenceMode(mode: "off" | "flag" | "block"): Promise<
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -947,7 +948,7 @@ export async function saveLocationFence(id: string, input: { lat: number | null;
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -987,6 +988,6 @@ export async function setBillingInterval(interval: "month" | "year"): Promise<Se
     revalidatePath("/stillingar");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }

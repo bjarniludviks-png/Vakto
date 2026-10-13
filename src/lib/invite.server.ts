@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emailConfigured, sendInviteEmail } from "@/lib/email";
+import { userError } from "@/lib/user-error";
 
 /** Íslensk hlutverkaheiti (eins og í formunum) → users.role. */
 export const INVITE_ROLE: Record<string, string> = {
@@ -47,7 +48,7 @@ export async function inviteToCompany(companyId: string, emailRaw: string, roleL
       // VAKTO-boð gegnum Resend (generateLink sendir ekki póst sjálft).
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is";
       const { data: gen, error } = await admin.auth.admin.generateLink({ type: "invite", email: emailAddr, options: { data: { role, company_id: companyId, full_name: fullName } } });
-      if (error) return { ok: false, sent: false, error: error.message };
+      if (error) return { ok: false, sent: false, error: userError(error) };
       userId = gen?.user?.id;
       // token_hash-slóð → /nytt-lykilord staðfestir og notandinn velur lykilorð.
       const hash = gen?.properties?.hashed_token;
@@ -56,7 +57,7 @@ export async function inviteToCompany(companyId: string, emailRaw: string, roleL
     } else {
       // Sjálfgefinn boðspóstur Supabase.
       const { data: invited, error } = await admin.auth.admin.inviteUserByEmail(emailAddr, { data: { role, company_id: companyId } });
-      if (error) return { ok: false, sent: false, error: error.message };
+      if (error) return { ok: false, sent: false, error: userError(error) };
       userId = invited?.user?.id; sent = true;
       if (userId) await admin.from("users").update({ company_id: companyId, role, ...(fullName ? { full_name: fullName } : {}) }).eq("id", userId);
     }
@@ -71,6 +72,6 @@ export async function inviteToCompany(companyId: string, emailRaw: string, roleL
     }
     return { ok: true, userId, sent };
   } catch (e) {
-    return { ok: false, sent: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, sent: false, error: userError(e, "Villa") };
   }
 }

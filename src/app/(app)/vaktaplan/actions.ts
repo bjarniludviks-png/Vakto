@@ -10,6 +10,7 @@ import { getEmployees } from "@/lib/employees.server";
 import { initials as empInitials } from "@/lib/employees";
 import { getWeekUnavail } from "./schedule.server";
 import { getWeekBudget as laborWeekBudget, type WeekBudget } from "@/lib/labor";
+import { userError } from "@/lib/user-error";
 
 export type ShiftInput = {
   employeeName: string; // first name as shown in the grid
@@ -60,7 +61,7 @@ export async function publishSchedule(shifts: ShiftInput[]): Promise<PublishResu
 
     if (rows.length) {
       const { error } = await supabase.from("shifts").insert(rows);
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: userError(error) };
     }
     await logAudit(supabase, company, user.id, {
       action: "schedule.publish", entity: "shifts", detail: `Vaktaplan birt — ${rows.length} vaktir`,
@@ -76,7 +77,7 @@ export async function publishSchedule(shifts: ShiftInput[]): Promise<PublishResu
     revalidatePath("/vaktaplan");
     return { ok: true, count: rows.length };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -186,7 +187,7 @@ export async function saveShiftTypes(list: ShiftTypeInput[]): Promise<DecisionRe
     }
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -217,14 +218,14 @@ export async function saveShift(input: Omit<ShiftInput, "date"> & { date?: strin
       status: "published",
       published: true,
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "shift.save", entity: "shift", detail: `Vakt vistuð — ${input.employeeName} ${input.startTime}–${input.endTime}`,
     });
     revalidatePath("/vaktaplan");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -244,7 +245,7 @@ export async function setStaffingTargets(targets: number[]): Promise<DecisionRes
     revalidatePath("/vaktaplan");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -262,14 +263,14 @@ export async function deleteShift(input: { employeeName: string; dateISO: string
     const { error } = await supabase
       .from("shifts").delete()
       .eq("company_id", ctx.company).eq("employee_id", employee_id).eq("date", input.dateISO);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "shift.delete", entity: "shift", detail: `Vakt eydd — ${input.employeeName} ${input.dateISO}`,
     });
     revalidatePath("/vaktaplan");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -318,7 +319,7 @@ export async function assignOpenShift(input: { employeeName: string; note?: stri
     revalidatePath("/vaktaplan");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -343,7 +344,7 @@ export async function updateLeaveRequest(id: string, approved: boolean): Promise
     const { data: updated, error } = await supabase
       .from("leave_requests").update({ status }).eq("id", id).eq("company_id", ctx.company)
       .select("employee_id, employees(full_name, email)").maybeSingle();
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     // Notify the employee (best-effort): push + email.
     const decEmp = (Array.isArray(updated?.employees) ? updated?.employees[0] : updated?.employees) as { full_name?: string; email?: string } | null;
     if (decEmp?.email) void sendLeaveDecisionEmail(decEmp.email, decEmp.full_name ?? "", approved);
@@ -359,7 +360,7 @@ export async function updateLeaveRequest(id: string, approved: boolean): Promise
     revalidatePath("/vaktaplan");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -373,7 +374,7 @@ export async function approveShiftSwap(id: string): Promise<DecisionResult> {
     const { data: swap, error } = await supabase
       .from("shift_swaps").update({ status: "approved" }).eq("id", id).eq("company_id", ctx.company)
       .select("employee_id").maybeSingle();
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     void notifyEmployee(swap?.employee_id as string | undefined, { title: "Vaktaskipti samþykkt", body: "Beiðni þín um vaktaskipti var samþykkt.", url: "/mitt-svaedi" });
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "swap.approve", entity: "shift_swap", entityId: id, detail: "Vaktaskipti samþykkt",
@@ -381,7 +382,7 @@ export async function approveShiftSwap(id: string): Promise<DecisionResult> {
     revalidatePath("/vaktaplan");
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -401,14 +402,14 @@ export async function deleteWeekShifts(dates: string[]): Promise<{ ok: boolean; 
       .eq("company_id", company).in("date", dates);
     const { error } = await supabase.from("shifts").delete()
       .eq("company_id", company).in("date", dates);
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, company, user.id, {
       action: "schedule.clear", entity: "shifts", detail: `Vika hreinsuð — ${gone?.length ?? 0} vaktir (${dates[0]}…)`,
     });
     revalidatePath("/vaktaplan");
     return { ok: true, count: gone?.length ?? 0 };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -460,10 +461,10 @@ export async function saveShiftTasks(employeeName: string, dateISO: string, titl
     }));
     if (toInsert.length) {
       const { error } = await supabase.from("shift_tasks").insert(toInsert);
-      if (error) return { ok: false, error: error.message };
+      if (error) return { ok: false, error: userError(error) };
     }
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
