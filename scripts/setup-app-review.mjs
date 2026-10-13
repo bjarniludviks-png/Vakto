@@ -1,7 +1,7 @@
 // VAKTO — prufuaðgangar fyrir App Review (Apple/Google): einn starfsmaður og einn vaktstjóri
 // í prufufyrirtækinu. Má keyra aftur — finnur þá aðgangana og setur ný lykilorð.
 //
-//   node scripts/setup-app-review.mjs [env-skrá] [nafn fyrirtækis]
+//   node scripts/setup-app-review.mjs [env-skrá] [nafn eða auðkenni fyrirtækis]
 //   sjálfgefið: ../vakto/.env.local.PROD-BACKUP  "Kaffi Krónan"
 //
 // Lykilorðin eru ALDREI prentuð — þau fara í ~/.vakto-app-review.txt (aðeins læsileg þér).
@@ -27,9 +27,20 @@ console.log(`Gagnagrunnur: ${ref}${ref === "lsnthbnqcelfgeyuxgfn" ? " (PROD)" : 
 const db = createClient(url, service, { auth: { persistSession: false } });
 const die = (msg) => { console.error(msg); process.exit(1); };
 
-const { data: companies, error: coErr } = await db.from("companies").select("id, name").ilike("name", companyName);
+// Annað viðfangið má vera nafn EÐA auðkenni (uuid) fyrirtækis.
+const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(companyName);
+const base = db.from("companies").select("id, name, created_at");
+const { data: companies, error: coErr } = await (isId ? base.eq("id", companyName) : base.ilike("name", companyName));
 if (coErr) die(coErr.message);
-if (companies.length !== 1) die(`Fann ${companies.length} fyrirtæki sem heita „${companyName}“ — gefðu upp nákvæmt nafn.`);
+if (companies.length !== 1) {
+  console.error(`Fann ${companies.length} fyrirtæki sem heita „${companyName}“.`);
+  for (const c of companies) {
+    const n = async (t, extra = (q) => q) => (await extra(db.from(t).select("*", { count: "exact", head: true }).eq("company_id", c.id))).count ?? "?";
+    const soon = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    console.error(`  ${c.id}  stofnað ${String(c.created_at).slice(0, 10)} · ${await n("users")} notendur · ${await n("employees")} starfsmenn · ${await n("posts")} færslur · ${await n("shifts", (q) => q.gte("date", new Date().toISOString().slice(0, 10)).lte("date", soon))} vaktir næstu 7 daga`);
+  }
+  die(`Keyrðu aftur með auðkenninu:  node scripts/setup-app-review.mjs ${envFile} <auðkenni>`);
+}
 const company = companies[0];
 console.log(`Fyrirtæki: ${company.name}`);
 
