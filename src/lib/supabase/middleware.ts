@@ -57,8 +57,11 @@ export async function updateSession(request: NextRequest) {
       pathname === "/favicon.ico" || pathname.startsWith("/icon") || pathname.startsWith("/apple-icon") ||
       pathname === "/manifest.webmanifest" || pathname === "/robots.txt";
     if (user && !adminAllowlist.includes((user.email ?? "").toLowerCase())) {
+      // Not on the env allowlist — invited VAKTO staff live in platform_admins (0068);
+      // is_platform_admin() answers only for the caller's own email.
+      const { data: staff } = await supabase.rpc("is_platform_admin");
       // Signed in but not VAKTO staff → back to the customer product.
-      return NextResponse.redirect("https://vakto.is/maelabord");
+      if (staff !== true) return NextResponse.redirect("https://vakto.is/maelabord");
     }
     if (!user && !adminPublic) {
       const loginUrl = request.nextUrl.clone();

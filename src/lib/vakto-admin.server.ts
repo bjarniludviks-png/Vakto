@@ -77,16 +77,49 @@ const EMPTY: AdminOverview = {
   totals: { companies: 0, users: 0, employees: 0, paying: 0, trials: 0, trialsEnding7d: 0, expired: 0, mrr: 0 },
 };
 
-/** Is the signed-in user allowed into /admin? (email allowlist) */
-export async function isVaktoAdmin(): Promise<boolean> {
-  if (!isSupabaseConfigured()) return false;
+/** Is this email VAKTO staff? Env allowlist (owners) OR a platform_admins row
+ *  (0068 — people the owner invited). Service-role lookup; false on any error. */
+export async function isPlatformAdminEmail(email: string | null | undefined): Promise<boolean> {
+  if (!email) return false;
+  if (isAdminEmail(email)) return true;
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    return isAdminEmail(user?.email);
+    const { data } = await createAdminClient().from("platform_admins")
+      .select("email").eq("email", email.trim().toLowerCase()).maybeSingle();
+    return !!data;
   } catch {
     return false;
   }
+}
+
+export type PlatformIdentity = { id: string | null; email: string; name: string | null; role: "owner" | "staff" };
+
+/** The signed-in VAKTO staff member, or null. 'owner' (env allowlist or an
+ *  owner row) may manage the team; 'staff' may do everything else. */
+export async function getPlatformIdentity(): Promise<PlatformIdentity | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const email = user?.email?.trim().toLowerCase();
+    if (!user || !email) return null;
+    let row: { full_name?: string | null; role?: string | null } | null = null;
+    try {
+      const { data } = await createAdminClient().from("platform_admins")
+        .select("full_name, role").eq("email", email).maybeSingle();
+      row = data;
+    } catch { /* 0068 vantar → env-listinn ræður einn */ }
+    const envOwner = isAdminEmail(email);
+    if (!envOwner && !row) return null;
+    const metaName = (user.user_metadata?.full_name as string | undefined) ?? null;
+    return { id: user.id, email, name: row?.full_name ?? metaName, role: envOwner || row?.role === "owner" ? "owner" : "staff" };
+  } catch {
+    return null;
+  }
+}
+
+/** Is the signed-in user allowed into /admin? */
+export async function isVaktoAdmin(): Promise<boolean> {
+  return (await getPlatformIdentity()) !== null;
 }
 
 /** Platform audit write (0047). Best effort — never throws, never blocks the action. */
@@ -362,5 +395,179 @@ export async function getCompanyDetail(companyId: string): Promise<AdminCompanyD
   } catch (e) {
     console.error("[admin] company detail failed:", e);
     return empty;
+  }
+}
+
+/* ---------- company billing + contact (company page) ---------- */
+
+export type AdminCard = { id: string; brand: string | null; last4: string | null; expiry: string | null; status: string; provider: string; createdAt: string };
+export type AdminInvoice = {
+  id: string; periodStart: string; periodEnd: string; total: number; base: number; extra: number; vat: number;
+  status: string; attempts: number; lastError: string | null; paidAt: string | null; createdAt: string;
+};
+export type AdminCompanyBilling = {
+  ok: boolean;
+  contact: { address: string | null; phone: string | null; email: string | null };
+  interval: string | null;          // companies.billing_interval (month/year)
+  anchor: string | null;            // companies.billing_anchor — fyrsti gjalddagi
+  cardRequired: boolean;
+  termsAcceptedAt: string | null;
+  esignProvider: string | null;
+  cards: AdminCard[];
+  invoices: AdminInvoice[];
+  paidTotal: number;                // samtals greitt (kr með VSK)
+};
+
+/** Card on file (masked — brand, last 4, expiry; the token never leaves the
+ *  server), invoices and contact info. Caller MUST have passed isVaktoAdmin(). */
+export async function getCompanyBilling(companyId: string): Promise<AdminCompanyBilling> {
+  const empty: AdminCompanyBilling = {
+    ok: false, contact: { address: null, phone: null, email: null }, interval: null, anchor: null,
+    cardRequired: false, termsAcceptedAt: null, esignProvider: null, cards: [], invoices: [], paidTotal: 0,
+  };
+  if (!(await isVaktoAdmin()) || !companyId) return empty;
+  try {
+    const db = createAdminClient();
+    const [coRes, pmRes, invRes] = await Promise.all([
+      db.from("companies").select("*").eq("id", companyId).maybeSingle(),
+      db.from("payment_methods").select("id, provider, card_summary, card_brand, card_expiry, status, created_at")
+        .eq("company_id", companyId).order("created_at", { ascending: false }).limit(10),
+      db.from("invoices").select("id, period_start, period_end, total_amount, base_amount, extra_amount, vat_amount, status, attempts, last_error, paid_at, created_at")
+        .eq("company_id", companyId).order("period_start", { ascending: false }).limit(24),
+    ]);
+    const co = (coRes.data ?? {}) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+    const invoices: AdminInvoice[] = (invRes.data ?? []).map((i) => ({
+      id: String(i.id), periodStart: String(i.period_start), periodEnd: String(i.period_end),
+      total: Number(i.total_amount ?? 0), base: Number(i.base_amount ?? 0), extra: Number(i.extra_amount ?? 0), vat: Number(i.vat_amount ?? 0),
+      status: String(i.status), attempts: Number(i.attempts ?? 0), lastError: str(i.last_error), paidAt: str(i.paid_at), createdAt: String(i.created_at),
+    }));
+    return {
+      ok: true,
+      contact: { address: str(co.address), phone: str(co.phone), email: str(co.email) },
+      interval: str(co.billing_interval), anchor: str(co.billing_anchor),
+      cardRequired: co.card_required === true,
+      termsAcceptedAt: str(co.terms_accepted_at), esignProvider: str(co.esign_provider),
+      cards: (pmRes.data ?? []).map((p) => ({
+        id: String(p.id), brand: str(p.card_brand), last4: str(p.card_summary), expiry: str(p.card_expiry),
+        status: String(p.status), provider: String(p.provider ?? "straumur"), createdAt: String(p.created_at),
+      })),
+      invoices,
+      paidTotal: invoices.filter((i) => i.status === "paid").reduce((a, i) => a + i.total, 0),
+    };
+  } catch (e) {
+    console.error("[admin] company billing failed:", e);
+    return empty;
+  }
+}
+
+/* ---------- dashboard extras ---------- */
+
+export type AdminPulse = {
+  supportUnread: number;                 // samtöl þar sem gestur bíður svars
+  supportOpen: { id: string; name: string; email: string; updatedAt: string; last: string }[];
+  failedInvoices: { id: string; companyId: string; companyName: string; total: number; attempts: number; lastError: string | null; createdAt: string }[];
+  paid30d: number;                       // innheimt síðustu 30 daga (kr með VSK)
+  cardsOnFile: number;                   // fyrirtæki með virkt kort
+  openReports: number;                   // tilkynnt efni sem bíður (content_reports)
+};
+
+/** Things that need the owner's attention today. Caller MUST have passed isVaktoAdmin(). */
+export async function getAdminPulse(): Promise<AdminPulse> {
+  const empty: AdminPulse = { supportUnread: 0, supportOpen: [], failedInvoices: [], paid30d: 0, cardsOnFile: 0, openReports: 0 };
+  if (!(await isVaktoAdmin())) return empty;
+  try {
+    const db = createAdminClient();
+    const month = new Date(Date.now() - 30 * 86400000).toISOString();
+    const [thRes, failRes, paidRes, pmRes, repRes, coRes] = await Promise.all([
+      db.from("support_threads").select("id, name, email, status, updated_at, owner_seen_at").neq("status", "closed").order("updated_at", { ascending: false }).limit(40),
+      db.from("invoices").select("id, company_id, total_amount, attempts, last_error, created_at").eq("status", "failed").order("created_at", { ascending: false }).limit(20),
+      db.from("invoices").select("total_amount").eq("status", "paid").gte("paid_at", month).limit(2000),
+      db.from("payment_methods").select("company_id").eq("status", "active").limit(5000),
+      db.from("content_reports").select("id", { count: "exact", head: true }).eq("status", "open"),
+      db.from("companies").select("id, name"),
+    ]);
+    const names = new Map((coRes.data ?? []).map((c) => [String(c.id), String(c.name ?? "—")]));
+    const threads = thRes.data ?? [];
+    const ids = threads.map((t) => String(t.id));
+    const lastUser = new Map<string, { at: string; body: string }>();
+    if (ids.length) {
+      const { data: msgs } = await db.from("support_messages").select("thread_id, role, body, created_at")
+        .in("thread_id", ids).eq("role", "user").order("created_at", { ascending: false }).limit(400);
+      for (const m of msgs ?? []) {
+        const k = String(m.thread_id);
+        if (!lastUser.has(k)) lastUser.set(k, { at: String(m.created_at), body: String(m.body ?? "") });
+      }
+    }
+    const waiting = threads.filter((t) => {
+      const lu = lastUser.get(String(t.id));
+      return !!lu && (!t.owner_seen_at || lu.at > String(t.owner_seen_at));
+    });
+    return {
+      supportUnread: waiting.length,
+      supportOpen: waiting.slice(0, 5).map((t) => ({
+        id: String(t.id), name: String(t.name ?? ""), email: String(t.email ?? ""), updatedAt: String(t.updated_at),
+        last: (lastUser.get(String(t.id))?.body ?? "").slice(0, 140),
+      })),
+      failedInvoices: (failRes.data ?? []).map((i) => ({
+        id: String(i.id), companyId: String(i.company_id), companyName: names.get(String(i.company_id)) ?? "—",
+        total: Number(i.total_amount ?? 0), attempts: Number(i.attempts ?? 0),
+        lastError: (i.last_error as string) ?? null, createdAt: String(i.created_at),
+      })),
+      paid30d: (paidRes.data ?? []).reduce((a, i) => a + Number(i.total_amount ?? 0), 0),
+      cardsOnFile: new Set((pmRes.data ?? []).map((p) => String(p.company_id))).size,
+      openReports: repRes.count ?? 0,
+    };
+  } catch (e) {
+    console.error("[admin] pulse failed:", e);
+    return empty;
+  }
+}
+
+/* ---------- VAKTO team (0068) ---------- */
+
+export type TeamMember = {
+  email: string; name: string | null; role: "owner" | "staff"; invitedBy: string | null; createdAt: string | null;
+  lastSignInAt: string | null; hasAccount: boolean;
+  fromEnv: boolean;   // á VAKTO_ADMIN_EMAILS — ekki hægt að fjarlægja héðan
+};
+export type TeamOverview = { ok: boolean; needsMigration: boolean; members: TeamMember[] };
+
+/** Everyone with access to /admin. Caller MUST have passed isVaktoAdmin(). */
+export async function getPlatformTeam(): Promise<TeamOverview> {
+  if (!(await isVaktoAdmin())) return { ok: false, needsMigration: false, members: [] };
+  try {
+    const db = createAdminClient();
+    const { data, error } = await db.from("platform_admins").select("email, full_name, role, invited_by, created_at").order("created_at");
+    const rows = error ? [] : (data ?? []);
+    const byEmail = new Map<string, TeamMember>();
+    for (const e of ADMIN_EMAILS) {
+      byEmail.set(e, { email: e, name: null, role: "owner", invitedBy: null, createdAt: null, lastSignInAt: null, hasAccount: false, fromEnv: true });
+    }
+    for (const r of rows) {
+      const email = String(r.email);
+      const prev = byEmail.get(email);
+      byEmail.set(email, {
+        email, name: (r.full_name as string) ?? null, role: prev || r.role === "owner" ? "owner" : "staff",
+        invitedBy: (r.invited_by as string) ?? null, createdAt: (r.created_at as string) ?? null,
+        lastSignInAt: null, hasAccount: false, fromEnv: !!prev,
+      });
+    }
+    // Last sign-in from auth.users (service role) — the team is a handful of people.
+    const { data: users } = await db.from("users").select("id, email, full_name").in("email", [...byEmail.keys()]);
+    await Promise.all((users ?? []).map(async (u) => {
+      const m = byEmail.get(String(u.email ?? "").toLowerCase());
+      if (!m) return;
+      m.hasAccount = true;
+      if (!m.name) m.name = (u.full_name as string) ?? null;
+      try {
+        const { data: au } = await db.auth.admin.getUserById(String(u.id));
+        m.lastSignInAt = au?.user?.last_sign_in_at ?? null;
+      } catch { /* ignore */ }
+    }));
+    return { ok: true, needsMigration: !!error, members: [...byEmail.values()] };
+  } catch (e) {
+    console.error("[admin] team failed:", e);
+    return { ok: false, needsMigration: false, members: [] };
   }
 }
