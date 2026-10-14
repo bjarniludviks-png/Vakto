@@ -246,10 +246,10 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
           <table>
             <thead><tr>{canPick && <th className="pr-ck"><input type="checkbox" aria-label={t("Velja alla")} checked={ROWS.length > 0 && ROWS.every((r) => !off.has(r.id!))} onChange={(e) => setOff((cur) => { const n = new Set(cur); for (const r of ROWS) { if (e.target.checked) n.delete(r.id!); else n.add(r.id!); } return n; })} /></th>}<th>{t("Starfsmaður")}</th><th className="r">{t("Tímar")}</th><th className="r">{t("Brúttó")}</th><th className="r">{t("Staðgreiðsla")}</th><th className="r">{t("Lífeyrir+félag")}</th><th className="r">{t("Útborgað")}</th><th style={{ width: 20 }} /></tr></thead>
             <tbody>
-              {ROWS.length ? ROWS.filter((r) => showZero || num(r.g) !== 0 || ROWS.every((x) => num(x.g) === 0)).map((r) => {
+              {ROWS.length ? ROWS.filter((r) => showZero || num(r.g) !== 0 || ROWS.every((x) => num(x.g) === 0)).map((r, i) => {
                 const zero = num(r.g) === 0;
                 return (
-                <tr className={`db2-rowlink${zero || (canPick && off.has(r.id!)) ? " db2-dim" : ""}`} key={r.id ?? r.n} onClick={() => setSlip({ name: r.d?.name ?? r.n, period: periodLabel, hours: r.h, gross: r.g, withholding: r.w.replace("−", ""), pension: r.p.replace("−", ""), net: r.net, d: r.d })}>
+                <tr className={`db2-rowlink${zero || (canPick && off.has(r.id!)) ? " db2-dim" : ""}`} key={r.id ?? `${r.n}-${i}`} onClick={() => setSlip({ name: r.d?.name ?? r.n, period: periodLabel, hours: r.h, gross: r.g, withholding: r.w.replace("−", ""), pension: r.p.replace("−", ""), net: r.net, d: r.d })}>
                   {canPick && <td className="pr-ck" onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label={r.n} checked={!off.has(r.id!)} onChange={() => toggle(r.id!)} /></td>}
                   <td><span className="db2-who"><Av id={r.id} c={r.c} av={r.av} /><span>{r.n}</span>{r.monthly ? <span className="db2-pill pr-fixed">{t("Föst laun")}</span> : null}</span></td>
                   <td className="r">{r.h}</td>
