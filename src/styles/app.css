@@ -1531,3 +1531,17 @@ a.db2-who:hover span{color:var(--brand)}
 .pd-items b{font-size:13px;color:var(--ink)}
 .pd-chips{display:flex;flex-wrap:wrap;gap:6px}
 .pd-chips code{font-family:inherit;font-size:12px;font-weight:600;padding:3px 8px;border-radius:7px;background:var(--panel);border:1px solid var(--line);color:var(--ink)}
+
+/* Mælaborð → Sérsníða (0077) */
+.db2-custom{display:inline-flex;align-items:center;gap:6px}
+.db2-custom svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+.db2-cust{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.db2-cust li{display:flex;align-items:center;gap:6px;padding:9px 10px;border:1px solid var(--line);border-radius:11px;background:var(--panel)}
+.db2-cust li.off{opacity:.55}
+.db2-cust label{flex:1;display:flex;align-items:center;gap:10px;font-size:13.5px;cursor:pointer}
+.db2-cust input{width:16px;height:16px;accent-color:var(--brand)}
+.db2-cust button{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--ink2)}
+.db2-cust button:hover:not(:disabled){background:var(--line2)}
+.db2-cust button:disabled{opacity:.3}
+.db2-cust svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.db2-staff tfoot td{font-weight:650;border-top:1.5px solid var(--line);padding-top:12px}
