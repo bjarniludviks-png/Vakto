@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { isValidKennitala } from "@/lib/kennitala";
 import { checkPromo, createOwnerAccount, requestSignupCode, startCardSetup, verifySignupCode } from "./actions";
 import { passwordStrength, PASSWORD_MIN } from "@/lib/password";
 import Turnstile, { TURNSTILE_SITE_KEY } from "@/components/turnstile";
@@ -170,6 +171,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
   const [proof, setProof] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
+  const [kennitala, setKennitala] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [terms, setTerms] = useState(false);
@@ -235,9 +237,10 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
     setError(null);
     if (!pw.ok) { setError(pw.reason ?? s.weak); return; }
     if (!terms) { setError(s.needTerms); return; }
+    if (!isValidKennitala(kennitala)) { setError(lang === "is" ? "Sláðu inn gilda kennitölu fyrirtækisins (10 tölustafir)." : "Enter a valid Icelandic company ID (kennitala, 10 digits)."); return; }
     setBusy(true);
     try {
-      const res = await createOwnerAccount({ fullName, companyName, email, password, country: "IS", proof: proof ?? undefined, termsAccepted: terms, promo: promo?.code ?? (promoInput.trim() || undefined) });
+      const res = await createOwnerAccount({ fullName, companyName, email, password, country: "IS", proof: proof ?? undefined, termsAccepted: terms, promo: promo?.code ?? (promoInput.trim() || undefined), kennitala });
       if (!res.ok) {
         setError(res.error ?? s.createFail);
         if (/Staðfesting netfangs/.test(res.error ?? "")) { setProof(null); setStep("email"); }
@@ -342,6 +345,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
 
       <div className="field"><div className="lbl"><label htmlFor="fn">{s.fullName}</label></div><input id="fn" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={s.namePh} autoComplete="name" autoFocus required /></div>
       <div className="field"><div className="lbl"><label htmlFor="co">{s.company}</label></div><input id="co" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder={s.coPh} autoComplete="organization" required /></div>
+      <div className="field"><div className="lbl"><label htmlFor="kt">{lang === "is" ? "Kennitala fyrirtækis" : "Company ID (kennitala)"}</label></div><input id="kt" value={kennitala} onChange={(e) => setKennitala(e.target.value.replace(/[^\d-]/g, "").slice(0, 11))} placeholder="000000-0000" inputMode="numeric" autoComplete="off" required /></div>
       <div className="field"><div className="lbl"><label htmlFor="pw">{s.pw}</label></div>
         <div className="pwwrap">
           <input id="pw" type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={s.pwPh.replace("{n}", String(PASSWORD_MIN))} autoComplete="new-password" minLength={PASSWORD_MIN} required />

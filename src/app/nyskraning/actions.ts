@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { provisionCompanyForUser } from "@/lib/provision";
 import { sendWelcomeEmail, sendSignupAlert } from "@/lib/email";
+import { formatKennitala, isValidKennitala } from "@/lib/kennitala";
 import { requestEmailCode, verifyEmailCode, consumeProof } from "@/lib/signup-verify.server";
 import { validatePassword } from "@/lib/password.server";
 import { verifyTurnstile } from "@/lib/turnstile.server";
@@ -69,11 +70,13 @@ export async function verifySignupCode(email: string, code: string): Promise<{ o
   try { return await verifyEmailCode(email, code); } catch (e) { { console.error("[signup]", e); return { ok: false, error: "Nýskráning tókst ekki — reyndu aftur eða hafðu samband við hallo@vakto.is." }; } }
 }
 
-export async function createOwnerAccount(input: { fullName: string; companyName: string; email: string; password: string; country?: string; proof?: string; termsAccepted?: boolean; promo?: string }): Promise<SignupResult> {
+export async function createOwnerAccount(input: { fullName: string; companyName: string; email: string; password: string; country?: string; proof?: string; termsAccepted?: boolean; promo?: string; kennitala?: string }): Promise<SignupResult> {
   const fullName = input.fullName?.trim();
   const companyName = input.companyName?.trim();
   const email = input.email?.trim().toLowerCase();
   if (!fullName || !companyName || !email || !input.password) return { ok: false, error: "Fylltu út alla reiti" };
+  // Íslensk fyrirtæki: kennitala þarf fyrir reikninga (Payday) og samninga.
+  if ((input.country ?? "IS") === "IS" && !isValidKennitala(input.kennitala ?? "")) return { ok: false, error: "Sláðu inn gilda kennitölu fyrirtækisins (10 tölustafir)." };
   if (!input.termsAccepted) return { ok: false, error: "Þú þarft að samþykkja skilmála og persónuverndarstefnu" };
   const pwErr = await validatePassword(input.password);
   if (pwErr) return { ok: false, error: pwErr };
@@ -96,10 +99,10 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
     // Prufan hefst núna; aðgangur opnast ekki fyrr en kort er skráð (middleware + card_required).
     if (prov.companyId) {
       const trialEnds = new Date(Date.now() + (promoDays(input.promo) ?? 14) * 86400000).toISOString();
-      await admin.from("companies").update({ plan: "vakto", trial_ends_at: trialEnds, card_required: true, terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }).eq("id", prov.companyId);
+      await admin.from("companies").update({ plan: "vakto", trial_ends_at: trialEnds, card_required: true, ...(isValidKennitala(input.kennitala ?? "") ? { kennitala: formatKennitala(input.kennitala!) } : {}), terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }).eq("id", prov.companyId);
     }
     await sendWelcomeEmail(email, fullName, companyName); // no-op until Resend is configured
-    await sendSignupAlert({ company: companyName, name: fullName, email, country: input.country, companyId: prov.companyId, promo: promoDays(input.promo) ? input.promo!.trim().toUpperCase() : null }).catch((e) => console.error("[signup-alert]", e));
+    await sendSignupAlert({ company: companyName, name: fullName, email, country: input.country, companyId: prov.companyId, kennitala: isValidKennitala(input.kennitala ?? "") ? formatKennitala(input.kennitala!) : null, promo: promoDays(input.promo) ? input.promo!.trim().toUpperCase() : null }).catch((e) => console.error("[signup-alert]", e));
     return { ok: true };
   } catch (e) {
     { console.error("[signup]", e); return { ok: false, error: "Nýskráning tókst ekki — reyndu aftur eða hafðu samband við hallo@vakto.is." }; }
