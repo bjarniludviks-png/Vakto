@@ -384,7 +384,7 @@ export async function addMembers(channelId: string, userIds: string[]): Promise<
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    const { error } = await supabase.from("channel_members").upsert(userIds.map((u) => ({ channel_id: channelId, user_id: u })), { onConflict: "channel_id,user_id" });
+    const { error } = await supabase.from("channel_members").upsert(userIds.map((u) => ({ channel_id: channelId, user_id: u })), { onConflict: "channel_id,user_id", ignoreDuplicates: true });
     if (error) return { ok: false, error: userError(error) };
     return { ok: true };
   } catch (e) {

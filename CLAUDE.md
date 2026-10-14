@@ -393,8 +393,11 @@
   má aðeins breyta síma, netfangi, bankareikningi, mynd, heimilisfangi, aðstandanda) og `guard_punch_self_write` (stimplun
   inn „núna“ ±15 mín, útstimplun úr opinni stimplun; geofence-dálkarnir out_* leyfðir). Stjórnendur og service-role fara
   framhjá. **Nýr dálkur sem starfsmaður á að geta breytt sjálfur þarf að fara í `allowed`-listann.**
-- **Eftir (minna):** `channel_members_write` leyfir hverjum sem er í fyrirtækinu að bæta sér í hvaða rás sem er (líka
-  einkaspjall); `post_comments_rw`/`post_likes_rw` leyfa breytingu á annarra færslum.
+- **0078** (staging + prod): `channel_members` — bæta við: stofnandi rásar, stjórnandi eða meðlimur hópspjalls (ekki
+  deildar-/staðarrása); fjarlægja: sjálfan sig, stofnandi eða stjórnandi (`can_add_channel_member`/`can_remove_channel_member`).
+  Engin UPDATE-regla: upsert á meðlimi verður að nota `ignoreDuplicates: true`. `post_comments`/`post_likes` aðeins eigin,
+  `posts` höfundi ekki breytt, `api_keys` stofna/eyða aðeins stjórnendur, `audit_log` aðeins í eigin nafni, `shift_tasks`
+  starfsmaður hakar aðeins (`done`/`done_at`). Triggerföllin eru ekki RPC (EXECUTE afturkallað).
 
 ## Sérsniðið mælaborð (14. okt. 2026, migration 0077)
 - „Sérsníða“ á Mælaborði: notandi felur spjöld og raðar þeim; vistast í `users.dashboard_prefs` með `saveDashboardPrefs`
