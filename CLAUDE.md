@@ -363,8 +363,13 @@
   notað í proxy fyrir kortaskylduna. Óhætt fyrir eldri app-útgáfur.
 - **0072** (komin á staging + prod): `payment_methods_read` aðeins fyrir stjórnendur.
 - **0073** (staging; prod þegar PR `pay-and-billing` er komin út): `invoices_read` aðeins fyrir stjórnendur.
-  Kvittun fyrir greidda færslu: `/kvittun/[id]` (prentvæn). Hún er greiðslukvittun, EKKI reikningur skv.
-  rgl. 50/1993 — til þess vantar óslitna númeraröð og VSK-númer BGL Ventures.
+  Kvittun fyrir greidda færslu: `/kvittun/[id]` (prentvæn greiðslukvittun).
+- **Reikningar í Payday BGL (0074, `src/lib/billing-payday.server.ts`):** hver greidd færsla fær reikning í Payday
+  BGL Ventures (númeraröð, bókun, VSK, sending í pósti), merktan greiddan með `VAKTO_PAYDAY_PAYMENT_TYPE`. Kallað eftir
+  greiðslu í `runBillingDay` + sópað upp í lok keyrslu (webhook-greiðslur, endurreynsla). Aðeins í production
+  (`VERCEL_ENV`) — preview á staging-gögnum má ALDREI stofna reikning í raunbókhaldi. Íslenskt fyrirtæki án
+  kennitölu fær ekki reikning fyrr en hún er skráð. PDF: `/kvittun/[id]/reikningur` (proxy, RLS ræður aðgangi).
+  Env (Production): `VAKTO_PAYDAY_CLIENT_ID`, `VAKTO_PAYDAY_CLIENT_SECRET`, `VAKTO_PAYDAY_PAYMENT_TYPE`.
 - **Villuboð:** server actions skila `userError(e, "vara-texti")` úr `src/lib/user-error.ts` — okkar íslensku villur fara
   óbreyttar, tæknitexti (Postgres, net) fer í log og notandi fær skiljanleg skilaboð. Ekki skila `error.message` beint.
   Undantekning: tengingapróf í `integration-actions.ts` (stjórnandi þarf svarið frá Payday/DK) og `/admin`.
