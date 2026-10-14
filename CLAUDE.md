@@ -361,8 +361,10 @@
   (stjórnendur allt; sameiginleg skjöl áfram öllum). `payment_methods`: dálkaheimildir — innskráðir fá aldrei `token`,
   aðeins service-role. Ekki nota `select("*")` á þá töflu með notandaclient. Fallið `company_has_card()` (já/nei) er
   notað í proxy fyrir kortaskylduna. Óhætt fyrir eldri app-útgáfur.
-- **0072** (komin á staging, **EKKI á prod**): `payment_methods_read` aðeins fyrir stjórnendur. Keyra á prod þegar vefurinn
-  með `company_has_card()` í proxy er kominn út (eldri proxy les töfluna beint fyrir alla).
+- **0072** (komin á staging + prod): `payment_methods_read` aðeins fyrir stjórnendur.
+- **0073** (staging; prod þegar PR `pay-and-billing` er komin út): `invoices_read` aðeins fyrir stjórnendur.
+  Kvittun fyrir greidda færslu: `/kvittun/[id]` (prentvæn). Hún er greiðslukvittun, EKKI reikningur skv.
+  rgl. 50/1993 — til þess vantar óslitna númeraröð og VSK-númer BGL Ventures.
 - **Villuboð:** server actions skila `userError(e, "vara-texti")` úr `src/lib/user-error.ts` — okkar íslensku villur fara
   óbreyttar, tæknitexti (Postgres, net) fer í log og notandi fær skiljanleg skilaboð. Ekki skila `error.message` beint.
   Undantekning: tengingapróf í `integration-actions.ts` (stjórnandi þarf svarið frá Payday/DK) og `/admin`.
