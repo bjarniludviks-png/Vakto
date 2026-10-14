@@ -384,3 +384,20 @@
   reikning sem myndast meðan kveikt er; línan „VAKTO AI, viðbót“ fer á kvittun og Payday-reikning.
 - `/api/assistant` notar prompt caching: föstu leiðbeiningarnar + verkfærin eru í skyndiminni, breytilega samhengið
   (fyrirtæki, notandi, dagur, síða) er sér kubbur á eftir. Ekki setja breytileg gildi inn í `instructions`.
+
+## Öryggi: eigin skrif (14. okt. 2026, migration 0076 á staging + prod)
+- **Fannst:** `users_self_update` leyfði notanda að breyta eigin `role` og `company_id` (starfsmaður → eigandi, eða í
+  annað fyrirtæki); `employees_self_update` leyfði breytingu á eigin taxta/hlutverki; `punches_self_update/insert` leyfði
+  stimplanir aftur í tímann; `api_keys_update` var opið öllum í fyrirtækinu. Engin merki um misnotkun.
+- **0076:** innskráðir skrifa ekki í `users` (allt fer um service-role). Triggerar `guard_employee_self_update` (starfsmaður
+  má aðeins breyta síma, netfangi, bankareikningi, mynd, heimilisfangi, aðstandanda) og `guard_punch_self_write` (stimplun
+  inn „núna“ ±15 mín, útstimplun úr opinni stimplun; geofence-dálkarnir out_* leyfðir). Stjórnendur og service-role fara
+  framhjá. **Nýr dálkur sem starfsmaður á að geta breytt sjálfur þarf að fara í `allowed`-listann.**
+- **Eftir (minna):** `channel_members_write` leyfir hverjum sem er í fyrirtækinu að bæta sér í hvaða rás sem er (líka
+  einkaspjall); `post_comments_rw`/`post_likes_rw` leyfa breytingu á annarra færslum.
+
+## Sérsniðið mælaborð (14. okt. 2026, migration 0077)
+- „Sérsníða“ á Mælaborði: notandi felur spjöld og raðar þeim; vistast í `users.dashboard_prefs` með `saveDashboardPrefs`
+  (service-role, eigin röð). Spjöldin og heitin eru í `maelabord/widgets.ts`; `layout()` í `dashboard-v2.tsx` setur
+  samliggjandi lítil spjöld í eina röð svo falið spjald skilur ekki eftir gat. Nýtt spjald: bæta við `DASH_WIDGETS`,
+  `WIDGET_LABEL` og `blocks`.

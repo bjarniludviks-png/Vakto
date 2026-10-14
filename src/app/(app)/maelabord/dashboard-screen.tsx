@@ -12,6 +12,7 @@ import { getDashboardPeriod, type PeriodData } from "./actions";
 import { OnboardingCard, useOnboardingHidden, onboardingProgress, ONBOARDING_TOTAL } from "./onboarding";
 import type { Onboarding } from "./dashboard.server";
 import DashboardV2 from "./dashboard-v2";
+import type { DashPrefs } from "./widgets";
 
 // Paired demo bars (this period vs previous) — used only in the demo/preview state.
 function Paired({ a, b }: { a: number[]; b: number[] }) {
@@ -107,9 +108,9 @@ function presetRange(k: string): { from: string; to: string } {
   return { from: isoD(mon), to: isoD(sun) };
 }
 
-export default function DashboardScreen(props: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean; onNow?: OnNow[]; missing?: Missing[]; pending?: number; firstName?: string }) {
+export default function DashboardScreen(props: { laborPct?: number; laborCostWeek?: string; hoursWeek?: string; onboarding?: Onb; live?: boolean; onNow?: OnNow[]; missing?: Missing[]; pending?: number; firstName?: string; prefs?: DashPrefs | null }) {
   // Innskráð fyrirtæki fær nýja mælaborðið (v2); eldra útlitið er aðeins eftir fyrir sýnishorn án gagna.
-  if (props.live) return <DashboardV2 onboarding={props.onboarding} onNow={props.onNow ?? []} missing={props.missing ?? []} pending={props.pending ?? 0} firstName={props.firstName} />;
+  if (props.live) return <DashboardV2 onboarding={props.onboarding} onNow={props.onNow ?? []} missing={props.missing ?? []} pending={props.pending ?? 0} firstName={props.firstName} prefs={props.prefs ?? null} />;
   return <DashboardLegacy {...props} />;
 }
 

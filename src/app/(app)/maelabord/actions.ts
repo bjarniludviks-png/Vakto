@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { resolvePrefs, type DashPrefs } from "./widgets";
 import { getCompanyId, getLaborPeriod, getLaborPeriods, getLaborTarget, laborColor, DEFAULT_LABOR_TARGET, type RevenueSource, type LaborColor } from "@/lib/labor";
 
 export type SeriesPoint = { label: string; planned: number; actual: number };
@@ -97,5 +98,22 @@ export async function getLaborTrend(weeks = 8): Promise<{ ok: boolean; target: n
   } catch (e) {
     console.error("getLaborTrend failed:", e);
     return { ok: false, target: DEFAULT_LABOR_TARGET, points: [] };
+  }
+}
+
+// ---------- sérsniðið mælaborð (0077) ----------
+/** Vistar röð og falin spjöld innskráðs notanda. Skrifað með service-role, aðeins í eigin röð. */
+export async function saveDashboardPrefs(prefs: DashPrefs): Promise<{ ok: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Innskráning vantar" };
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { error } = await createAdminClient().from("users").update({ dashboard_prefs: resolvePrefs(prefs) }).eq("id", user.id);
+    if (error) return { ok: false, error: "Tókst ekki að vista" };
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Tókst ekki að vista" };
   }
 }
