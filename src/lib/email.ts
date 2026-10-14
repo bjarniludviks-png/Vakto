@@ -510,7 +510,7 @@ export async function sendSignedContractEmail(to: string, o: { employeeName: str
 /** Innri tilkynningar til eiganda VAKTO (nýskráning, morgunyfirlit). Viðtakandi: OWNER_ALERT_EMAIL. */
 export const OWNER_ALERT_EMAIL = process.env.OWNER_ALERT_EMAIL || "bjarni@bgl.is";
 
-export async function sendSignupAlert(o: { company: string; name: string; email: string; country?: string | null; companyId?: string | null }) {
+export async function sendSignupAlert(o: { company: string; name: string; email: string; country?: string | null; companyId?: string | null; promo?: string | null }) {
   const when = new Date().toLocaleString("is-IS", { timeZone: "Atlantic/Reykjavik", dateStyle: "short", timeStyle: "short" });
   return sendEmail({
     to: OWNER_ALERT_EMAIL,
@@ -519,7 +519,7 @@ export async function sendSignupAlert(o: { company: string; name: string; email:
       preheader: `${o.name} skráði ${o.company} í VAKTO.`,
       heading: "Ný skráning",
       body: `<b>${o.name}</b> var að stofna aðgang fyrir <b>${o.company}</b>. Prufan er 14 dagar og aðgangurinn opnast þegar kort hefur verið skráð.`,
-      rows: [["Fyrirtæki", o.company], ["Nafn", o.name], ["Netfang", o.email], ["Land", o.country || "IS"], ["Tími", when]],
+      rows: [["Fyrirtæki", o.company], ["Nafn", o.name], ["Netfang", o.email], ["Land", o.country || "IS"], ["Tilboðskóði", o.promo || "enginn (14 daga prufa)"], ["Tími", when]],
       headingEn: "New signup",
       bodyEn: `${o.name} just created an account for ${o.company}.`,
       ctaLabel: "Opna í admin", ctaLabelEn: "Open in admin",
