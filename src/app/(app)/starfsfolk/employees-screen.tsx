@@ -574,7 +574,7 @@ function LaunTab({ e }: { e: Employee }) {
           <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
             <input
               name={`rule_${f.key}`}
-              type="number" min={0}
+              type="number" min={0} step={0.1}
               value={shown[f.key]}
               readOnly={!custom}
               onChange={custom ? (ev) => setRules((r) => ({ ...r, [f.key]: Math.max(0, Number(ev.target.value) || 0) })) : undefined}
@@ -585,7 +585,7 @@ function LaunTab({ e }: { e: Employee }) {
         </div>
       ))}
       <p className="muted" style={{ fontSize: 11.5, margin: "6px 0 0" }}>
-        {custom ? "Sérsniðnar reglur — gilda fyrir alþjóðamarkað eða sérsamninga." : "Reglur koma sjálfkrafa úr kjarasamningi. Veldu „Eigin reglur\" til að breyta. (Hlutföll óstaðfest — yfirfarið gegn samningi.)"}
+        {custom ? "Sérsniðnar reglur — gilda fyrir alþjóðamarkað eða sérsamninga." : "Reglur koma sjálfkrafa úr kjarasamningi. Veldu „Eigin reglur\" til að breyta. Hlutföll úr samningum við SA 2024–2028 fyrir vaktavinnufólk; dagvinnufólk fær yfirvinnu utan dagvinnu."}
       </p>
 
       {/* The full custom rule object is submitted with the main form (parsed in save). */}

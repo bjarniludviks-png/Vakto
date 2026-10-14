@@ -1,0 +1,64 @@
+/* Áskrift í Stillingum — byggir á .card/.seg/.btn/.tbl úr app.css og litatáknum globals.css. */
+.bill { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; min-width: 0; }
+.bill-top { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 860px) { .bill-top { grid-template-columns: minmax(0, 1fr); } }
+
+.bill .card { margin: 0; }
+.bill-plan, .bill-pay { padding: 22px; display: flex; flex-direction: column; gap: 16px; }
+.bill-eyebrow { font-size: 11.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink3); }
+.bill-plan-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.bill-plan-name { font-size: 17px; font-weight: 650; color: var(--ink); margin-top: 4px; }
+.bill-amount { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.bill-amount b { font-size: 34px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.bill-amount span { color: var(--ink3); font-size: 13px; }
+.bill-facts { display: flex; flex-wrap: wrap; gap: 10px 28px; padding-top: 14px; border-top: 1px solid var(--line); }
+.bill-facts div { display: flex; flex-direction: column; gap: 2px; }
+.bill-facts span { font-size: 12px; color: var(--ink3); }
+.bill-facts b { font-size: 14px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.bill-interval { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+.bill-interval .seg { align-self: flex-start; }
+.bill-interval p, .bill-fine { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--ink3); }
+
+.bill-pill { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.bill-pill.good { background: var(--good-soft); color: var(--good); }
+.bill-pill.warn { background: var(--warn-soft); color: var(--warn); }
+.bill-pill.bad { background: var(--bad-soft); color: var(--bad); }
+.bill-pill.mut { background: var(--line2); color: var(--ink2); }
+
+/* Kortið sjálft */
+.bill-cc { position: relative; aspect-ratio: 1.586; max-width: 340px; width: 100%; border-radius: 16px; padding: 18px 20px; color: #fff;
+  display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;
+  background: linear-gradient(135deg, #2b2d36 0%, #17181c 70%); box-shadow: 0 10px 28px -12px rgba(0,0,0,.45); }
+.bill-cc::after { content: ""; position: absolute; inset: -40% -20% auto auto; width: 70%; height: 120%; border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255,255,255,.12), transparent); pointer-events: none; }
+.bill-cc.visa { background: linear-gradient(135deg, #2a3a8f 0%, #141a52 75%); }
+.bill-cc.mastercard { background: linear-gradient(135deg, #34363f 0%, #121318 75%); }
+.bill-cc-top { display: flex; justify-content: space-between; align-items: center; }
+.bill-cc-chip { width: 36px; height: 27px; border-radius: 6px; background: linear-gradient(135deg, #e9d18a, #b8954a); }
+.bill-cc-num { font-size: 19px; letter-spacing: .12em; font-variant-numeric: tabular-nums; font-weight: 500; }
+.bill-cc-foot { display: flex; justify-content: space-between; font-size: 12px; opacity: .85; }
+.bill-cc.empty { background: var(--line2); color: var(--ink3); box-shadow: none; border: 1.5px dashed var(--line); align-items: center; justify-content: center; font-size: 13.5px; }
+.bill-pay .btn { align-self: flex-start; }
+
+/* Verðskrá */
+.bill-price > div { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; color: var(--ink2); }
+.bill-price > div:last-of-type { border-bottom: 0; }
+.bill-price em { display: block; font-style: normal; font-size: 12px; color: var(--ink3); margin-top: 2px; }
+.bill-price b { color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bill-price p { margin: 10px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--ink3); }
+
+/* Greiðslur */
+.bill-inv { width: 100%; font-size: 13px; }
+.bill-inv-wrap { overflow-x: auto; }
+.bill-inv .num { text-align: right; font-variant-numeric: tabular-nums; }
+.bill-link { color: var(--brand-deep); font-weight: 600; text-decoration: none; }
+.bill-link:hover { text-decoration: underline; }
+html.dark .bill-link { color: var(--brand); }
+.bill-foot { display: flex; justify-content: flex-end; margin-top: 14px; }
+@media (max-width: 640px) {
+  .bill-inv th:nth-child(2), .bill-inv td:nth-child(2) { display: none; }
+  .bill-plan, .bill-pay { padding: 18px; }
+  .bill-amount b { font-size: 28px; }
+  .bill-interval .seg { align-self: stretch; }
+  .bill-interval .seg button { flex: 1; }
+}

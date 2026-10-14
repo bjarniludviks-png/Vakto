@@ -68,6 +68,20 @@ export function computeUppbot(annual: number, employmentRatio: number, monthsSer
   const m = Math.max(0, Math.min(12, monthsServed));
   return Math.round(annual * r * (m / 12));
 }
+/** Mánuðir af 12 sem starfsmaður á rétt á uppbót fyrir, eftir starfstíma á viðmiðunartímabilinu:
+ *  desember = almanaksár greiðsluársins, orlof = 1. maí árið áður til 30. apríl.
+ *  Fullt ár = 45 unnar vikur utan orlofs, sem jafngildir öllu árinu í starfi; því hlutfall
+ *  vikna í starfi af 52. Án ráðningardags er greidd full uppbót (eins og áður). */
+export function uppbotMonths(kind: "orlof" | "desember", payYear: number, hireDate?: string | null): number {
+  if (!hireDate) return 12;
+  const start = kind === "desember" ? Date.UTC(payYear, 0, 1) : Date.UTC(payYear - 1, 4, 1);
+  const end = kind === "desember" ? Date.UTC(payYear, 11, 31) : Date.UTC(payYear, 3, 30);
+  const hired = Date.parse(`${hireDate.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(hired) || hired <= start) return 12;
+  if (hired > end) return 0;
+  const weeks = (end - hired) / (7 * 86400e3) + 1 / 7;
+  return Math.min(12, Math.round((weeks / 52) * 12 * 100) / 100);
+}
 /** Which uppbót (if any) a payroll month pays. orlof → June, desember → December. */
 export function uppbotForMonth(month1to12: number): "orlof" | "desember" | null {
   if (month1to12 === 6) return "orlof";
@@ -90,7 +104,7 @@ function easter(y: number): Date {
   const month = Math.floor((h + l - 7 * m + 114) / 31), day = ((h + l - 7 * m + 114) % 31) + 1;
   return new Date(y, month - 1, day);
 }
-const yearCache = new Map<number, { stor: Set<string>; half: Set<string>; fri: Set<string> }>();
+const yearCache = new Map<number, { stor: Set<string>; half: Set<string>; fri: Set<string>; versl: string }>();
 function holidaysOf(y: number) {
   const hit = yearCache.get(y); if (hit) return hit;
   const E = easter(y), plus = (n: number) => isoOf(new Date(y, E.getMonth(), E.getDate() + n));
@@ -100,13 +114,14 @@ function holidaysOf(y: number) {
     stor: new Set([`${y}-01-01`, plus(-2), plus(0), plus(49), `${y}-06-17`, `${y}-12-25`]),
     half: new Set([`${y}-12-24`, `${y}-12-31`]),                       // stórhátíð frá kl. 12
     fri: new Set([plus(-3), plus(1), sumar, `${y}-05-01`, plus(39), plus(50), versl, `${y}-12-26`]),
+    versl,
   };
   yearCache.set(y, out); return out;
 }
 /** Stórhátíðarálag á þessari stundu? (Aðfangadagur og gamlársdagur aðeins frá kl. 12.) */
-export function isStorhatid(dt: Date): boolean {
+export function isStorhatid(dt: Date, r?: Pick<RuleSet, "verslStor">): boolean {
   const h = holidaysOf(dt.getFullYear()), iso = isoOf(dt);
-  return h.stor.has(iso) || (h.half.has(iso) && dt.getHours() >= 12);
+  return h.stor.has(iso) || (h.half.has(iso) && dt.getHours() >= 12) || (!!r?.verslStor && iso === h.versl);
 }
 /** Almennur frídagur (ekki stórhátíð) — greiddur með helgarálagi. */
 export function isFridagur(dt: Date): boolean {
@@ -126,8 +141,8 @@ function premiumPct(dt: Date, holiday: boolean, r: RuleSet): number {
   const wd = dt.getDay();
   if (wd === 0 || wd === 6 || isFridagur(dt)) return r.weekend;
   const h = dt.getHours();
-  if (h < 6 || h >= 23) return r.night;
-  if (h < 8 || h >= 17) return r.eve;
+  if (h < (r.nightEnd ?? 8)) return r.night;                     // næturálag 00–08 (VR 00–07)
+  if (h < (r.dayStart ?? 8) || h >= (r.dayEnd ?? 17)) return r.eve; // kvöld/eftirvinna
   return 0; // dagvinna
 }
 
@@ -169,7 +184,7 @@ export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clock
       const dt = new Date(t);
       const wk = mondayKey(dt);
       const acc = weekHrs.get(wk) ?? 0;
-      const prem = Math.max(premiumPct(dt, isStorhatid(dt), rules), bandPct(dt, bands));
+      const prem = Math.max(premiumPct(dt, isStorhatid(dt, rules), rules), bandPct(dt, bands));
       let pct = prem;
       const isOt = (acc >= otWeekly || monthAcc >= otMonthly) && rules.overtime > prem;
       if (acc >= otWeekly || monthAcc >= otMonthly) pct = Math.max(pct, rules.overtime); // yfirvinna (viku/mánuði)
@@ -209,7 +224,7 @@ export function classifyPay(rate: number, hourly: boolean, punches: { clockIn: s
       const dt = new Date(t);
       const wk = mondayKey(dt);
       const acc = weekHrs.get(wk) ?? 0;
-      const prem = Math.max(premiumPct(dt, isStorhatid(dt), rules), bandPct(dt, bands));
+      const prem = Math.max(premiumPct(dt, isStorhatid(dt, rules), rules), bandPct(dt, bands));
       const otActive = acc >= otWeekly || monthAcc >= otMonthly;
       if (prem > 0) premium += s;
       if (otActive) overtime += s;
@@ -248,7 +263,7 @@ export function hourBuckets(punches: { clockIn: string; clockOut: string }[], ru
       const dt = new Date(t);
       const wk = mondayKey(dt);
       const acc = weekHrs.get(wk) ?? 0;
-      const prem = Math.max(premiumPct(dt, isStorhatid(dt), rules), bandPct(dt, bands));
+      const prem = Math.max(premiumPct(dt, isStorhatid(dt, rules), rules), bandPct(dt, bands));
       const otActive = acc >= otWeekly || monthAcc >= otMonthly;
       if (otActive && otPct >= prem) yfirvinna += s;
       else { dagvinna += s; if (prem > 0) alag[prem] = (alag[prem] ?? 0) + s; }

@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { IntegrationsPanel } from "./integrations-panel";
+import { BillingPanel } from "./billing-panel";
 import { DateField } from "@/components/app/fields";
 import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, aiContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, saveCompanyLimits, setEsignProvider, startCardChange, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, setBillingInterval, type GeoHit } from "./actions";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, aiContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, saveCompanyLimits, setEsignProvider, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit } from "./actions";
 import dynamic from "next/dynamic";
 import type { SettingsData, CompanyInfo, GeofenceMode } from "./settings.server";
 import type { AgreementResult, AgreementSource } from "@/lib/ai/agreement";
@@ -18,7 +19,6 @@ const GeoMap = dynamic(() => import("@/components/app/geo-map"), { ssr: false })
 import { type PayRule } from "@/lib/payrules";
 import { type RuleSet, type RuleTemplate, RULE_PRESETS, summarizeRules } from "@/lib/rules";
 import { dec1, nf } from "@/lib/format";
-import { PLANS, ESIGN_PRICE } from "@/lib/pricing";
 
 type SettingsModal = "location" | "department" | "position" | "invite" | "revenue" | "avgrevenue" | null;
 
@@ -245,81 +245,7 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
       </div>
       )}
 
-      {section === "askrift" && (
-      <div className="card owner-only">
-        <div className="ch"><div><div className="ct">{t("Áskrift & greiðslur")}</div><div className="cs">{t("staða áskriftarinnar þinnar")}</div></div>
-          <span className="badge" style={data.company?.billingStatus === "paying" ? { background: "var(--good-soft)", color: "var(--good)" } : data.company?.billingStatus === "suspended" || data.company?.billingStatus === "unpaid" ? { background: "var(--bad-soft, #fdecea)", color: "var(--bad)" } : { background: "var(--warn-soft)", color: "var(--warn)" }}>
-            {data.company?.billingStatus === "paying" ? t("virk") : data.company?.billingStatus === "suspended" ? t("lokað") : data.company?.billingStatus === "unpaid" ? t("ógreitt") : data.company?.billingStatus === "free" ? t("frí") : t("prufa")}
-          </span>
-        </div>
-        <div className="cb">
-          {data.pricing && (
-            <div className="statline" style={{ alignItems: "center" }}><span className="k">{t("Greiðsla")}</span>
-              <span className="v">
-                <span className="seg">
-                  {(["month", "year"] as const).map((iv) => (
-                    <button key={iv} type="button" className={data.pricing!.interval === iv ? "on" : ""} disabled={data.pricing!.interval === iv}
-                      onClick={async () => {
-                        const r = await setBillingInterval(iv);
-                        toast(r.ok ? (iv === "year" ? t("Árleg greiðsla tekur gildi á næsta gjalddaga") : t("Mánaðarleg greiðsla vistuð")) : (r.error ?? t("Tókst ekki")));
-                        if (r.ok) router.refresh();
-                      }}>{iv === "month" ? t("Mánaðarlega") : t("Árlega · 15% afsláttur")}</button>
-                  ))}
-                </span>
-              </span>
-            </div>
-          )}
-          {data.pricing && (() => {
-            const pr = data.pricing!;
-            const msg = pr.paidYearUntil
-              ? (pr.interval === "year" ? `${t("Árið er greitt til")} ${pr.paidYearUntil}.` : `${t("Greitt ár gildir til")} ${pr.paidYearUntil}${t("; mánaðarleg greiðsla tekur við eftir það.")}`)
-              : pr.interval === "year" ? `${t("Árgjaldið")} (${nf(pr.yearFeeTotal)} kr ${t("m. VSK")}) ${t("verður tekið á næsta gjalddaga")}${pr.nextDue ? ` (${pr.nextDue})` : ""}. ${t("Virkir umfram 5 eru gerðir upp mánaðarlega á árlegum kjörum.")}`
-              : null;
-            return msg ? <p className="muted" style={{ fontSize: 12.5, margin: "4px 0 8px", lineHeight: 1.5 }}>{msg}</p> : null;
-          })()}
-          {data.pricing?.plan === "v1" ? (
-            <>
-              <div className="statline"><span className="k">{t("Verð")}</span><span className="v">{nf(data.pricing.interval === "year" ? PLANS.v1.baseYear : PLANS.v1.base)} kr/mán · {PLANS.v1.included} {t("notendur")} · +{nf(data.pricing.interval === "year" ? PLANS.v1.extraYear : PLANS.v1.extra)} kr {t("á notanda umfram (án VSK)")}</span></div>
-              {data.pricing.v1Until && <div className="statline"><span className="k">{t("Eldra verð gildir til")}</span><span className="v">{data.pricing.v1Until}</span></div>}
-              <div className="statline"><span className="k">{t("Notendur núna")}</span><span className="v">{data.users.length}</span></div>
-            </>
-          ) : (
-            <>
-              <div className="statline"><span className="k">{t("Verð")}</span><span className="v">{nf(data.pricing?.interval === "year" ? PLANS.v2.baseYear : PLANS.v2.base)} kr/mán · {PLANS.v2.included} {t("virkir starfsmenn")} · +{nf(data.pricing?.interval === "year" ? PLANS.v2.extraYear : PLANS.v2.extra)} kr {t("á hvern virkan umfram (án VSK)")}</span></div>
-              <div className="statline"><span className="k">{t("Virkir síðustu 30 daga")}</span><span className="v">{data.pricing?.units ?? "—"}</span></div>
-            </>
-          )}
-          {data.pricing && <div className="statline"><span className="k">{t("Áætlað á mánuði")}</span><span className="v">{nf(data.pricing.estimateTotal)} kr {t("m. VSK")}</span></div>}
-          <div className="statline"><span className="k">{t("Rafræn skilríki (valkvætt)")}</span><span className="v">{nf(ESIGN_PRICE)} kr {t("á undirskrift (án VSK)")}</span></div>
-          {data.company?.trialEndsAt && data.company?.billingStatus !== "paying" && <div className="statline"><span className="k">{t("Prufa gildir til")}</span><span className="v">{data.company.trialEndsAt}</span></div>}
-          <div className="statline"><span className="k">{t("Kort")}</span><span className="v">{data.card ? `${data.card.brand === "VI" ? "Visa" : data.card.brand === "MC" ? "Mastercard" : (data.card.brand ?? t("Kort"))} •••• ${data.card.last4 ?? "····"}${data.card.expiry ? ` · ${data.card.expiry}` : ""}` : t("Ekkert kort skráð")}</span></div>
-          <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-            <button className="btn" onClick={async () => { const r = await startCardChange(window.location.origin); if (r.ok && r.url) window.location.assign(r.url); else toast(r.error ?? t("Tókst ekki")); }}>{data.card ? t("Skipta um kort") : t("Skrá kort")}</button>
-            <a className="btn ghost" href="mailto:hallo@vakto.is?subject=Uppsögn%20áskriftar">{t("Segja upp áskrift")}</a>
-          </div>
-          <p className="muted" style={{ fontSize: 12.5, marginTop: 12, lineHeight: 1.5 }}>{t("Mánaðargjaldið er tekið af skráða kortinu á gjalddaga og kvittun send í pósti. Kortið er geymt hjá Straumi (Kvika); VAKTO geymir aldrei kortanúmer. Engin binding.")}</p>
-          {data.pricing?.plan !== "v1" && <p className="muted" style={{ fontSize: 12.5, marginTop: 6, lineHeight: 1.5 }}>{t("Virkur starfsmaður = átti vakt eða stimplaði sig á tímabilinu. Grunngjaldið er greitt fyrirfram; virkir umfram 5 og undirskriftir eru gerð upp eftir á fyrir mánuðinn sem lauk.")}</p>}
-          {(data.invoices?.length ?? 0) > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div className="ct" style={{ fontSize: 13.5, marginBottom: 6 }}>{t("Reikningar")}</div>
-              <table className="tbl" style={{ width: "100%", fontSize: 13 }}>
-                <thead><tr><th>{t("Tímabil")}</th><th>{t("Virkir / notendur")}</th><th style={{ textAlign: "right" }}>{t("Upphæð m. VSK")}</th><th>{t("Staða")}</th></tr></thead>
-                <tbody>
-                  {data.invoices!.map((inv) => (
-                    <tr key={inv.id}>
-                      <td>{inv.periodStart} – {inv.periodEnd}</td>
-                      <td>{inv.active ?? inv.users}{inv.esigns ? ` · ${inv.esigns} ${t("undirskr.")}` : ""}</td>
-                      <td style={{ textAlign: "right" }}>{nf(inv.total)} kr</td>
-                      <td>{inv.status === "paid" ? t("Greitt") : inv.status === "failed" ? t("Greiðsla tókst ekki") : inv.status === "refunded" ? t("Endurgreitt") : t("Í bið")}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-      )}
+      {section === "askrift" && <BillingPanel data={data} />}
 
       </div>
 

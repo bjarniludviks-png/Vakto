@@ -36,14 +36,21 @@ export function allConfirmed(rules: PayRule[]): boolean {
 }
 
 // ---------- per-employee rule sets (union preset or custom) ----------
-export type RuleSet = { eve: number; weekend: number; overtime: number; holiday: number; night: number };
+export type RuleSet = {
+  eve: number; weekend: number; overtime: number; holiday: number; night: number;
+  // Tímagluggar (heilar klst., virkir dagar). Sjálfgefið skv. vaktaálagsgreinum SA-samninga:
+  // næturálag 00–08, dagvinna 08–17, kvöldálag 17–24. VR: næturvinna 00–07, dagvinna 09–18.
+  nightEnd?: number; dayStart?: number; dayEnd?: number;
+  verslStor?: boolean; // frídagur verslunarmanna er stórhátíðardagur (VR, gr. 2.3.2)
+};
 
-export const RULE_FIELDS: { key: keyof RuleSet; label: string; hint: string }[] = [
-  { key: "eve", label: "Kvöld-/morgunálag", hint: "t.d. fyrir 08:00 og eftir 17:00" },
+export type RulePctKey = "eve" | "weekend" | "overtime" | "holiday" | "night";
+export const RULE_FIELDS: { key: RulePctKey; label: string; hint: string }[] = [
+  { key: "eve", label: "Kvöld-/morgunálag", hint: "virka daga utan dagvinnu, t.d. 17–24" },
   { key: "weekend", label: "Helgarálag", hint: "laugardaga & sunnudaga" },
   { key: "overtime", label: "Yfirvinna", hint: "yfir umsaminni vinnuviku" },
   { key: "holiday", label: "Stórhátíðarálag", hint: "stórhátíðardagar" },
-  { key: "night", label: "Næturálag", hint: "yfir nóttina" },
+  { key: "night", label: "Næturálag", hint: "t.d. 00–08" },
 ];
 
 export const CUSTOM_UNION = "Eigin reglur";
@@ -61,12 +68,21 @@ export type CustomRules = RuleSet & {
 export const DEFAULT_OT_WEEKLY = 40;
 export const DEFAULT_MONTHLY_HOURS = 173.33;
 
-// ⚠️ UNCONFIRMED placeholders — verify against each agreement before real pay.
+// Úr samningum við SA 2024–2028 (lesnir 13. okt. 2026). Álag er % ofan á dagvinnutímakaup.
+// Yfirvinna og stórhátíðarkaup eru í samningunum % af mánaðarlaunum á klst.; hér umreiknað
+// með deilitölu samningsins (1,0385% × deilitala − 100%). Einfaldanir sem ein tala nær ekki:
+//  • Vaktaálag gildir um vaktavinnufólk. Dagvinnufólk fær yfirvinnukaup utan dagvinnu —
+//    notið „Eigin reglur“ fyrir það.
+//  • Efling almennur: vaktaálag fer eftir köflum (33/45/90 er kafli 21–23: mötuneyti, ræsting, gæsla).
+//  • Matvís: yfirvinna 1 (fyrstu 4 klst./viku umfram 36, ~56%) er ekki reiknuð sér; yfirvinna 2
+//    (~79,4%) gildir yfir 40 klst. Matreiðslu- og framreiðslumenn: 31% álag á 2% hærri grunn.
+//  • VR: eftirvinna/næturvinna (verslun, deilitala 167,94); skrifstofa er sér.
 export const UNION_PRESETS: Record<string, RuleSet> = {
-  "Efling": { eve: 33, weekend: 45, overtime: 90, holiday: 90, night: 45 },
-  "Efling – veitingar/SGS": { eve: 33, weekend: 45, overtime: 90, holiday: 90, night: 55 },
-  "VR": { eve: 33, weekend: 45, overtime: 80, holiday: 90, night: 40 },
-  "Matvís": { eve: 33, weekend: 45, overtime: 95, holiday: 100, night: 50 },
+  "Efling": { eve: 33, weekend: 45, overtime: 80, holiday: 90, night: 45 },
+  "Efling – veitingar/SGS": { eve: 33, weekend: 45, overtime: 78.6, holiday: 90, night: 45 },
+  "VR": { eve: 38.3, weekend: 38.3, overtime: 74.4, holiday: 130.9, night: 48.2, nightEnd: 7, dayStart: 9, dayEnd: 18, verslStor: true },
+  "VR – skrifstofa": { eve: 39.4, weekend: 39.4, overtime: 65.4, holiday: 119, night: 49.3, nightEnd: 7, dayStart: 9, dayEnd: 18, verslStor: true },
+  "Matvís": { eve: 33, weekend: 45, overtime: 79.4, holiday: 90, night: 45 },
 };
 export const ZERO_RULESET: RuleSet = { eve: 0, weekend: 0, overtime: 0, holiday: 0, night: 0 };
 
