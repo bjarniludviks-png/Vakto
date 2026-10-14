@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { computeFromPunches, computeUppbot, uppbotForMonth, totals as sumTotals, type PayLine } from "@/lib/payroll";
+import { computeFromPunches, computeUppbot, uppbotForMonth, uppbotMonths, totals as sumTotals, type PayLine } from "@/lib/payroll";
 import { resolveRuleSet, resolveUppbot } from "@/lib/payrules";
 import { getEmployees } from "@/lib/employees.server";
 import { initials } from "@/lib/employees";
@@ -74,7 +74,7 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
     .filter((e) => e.role !== "contractor")
     .filter((e) => (byEmp.get(e.id)?.length ?? 0) > 0 || e.payType === "monthly" || e.status !== "inactive")
     .map((e) => {
-      const ub = uppKind ? computeUppbot(resolveUppbot(e.union, null, Number(from.slice(0, 4)))[uppKind], e.employmentRatio) : 0;
+      const ub = uppKind ? computeUppbot(resolveUppbot(e.union, null, Number(from.slice(0, 4)))[uppKind], e.employmentRatio, uppbotMonths(uppKind, Number(from.slice(0, 4)), e.hireDate)) : 0;
       return computeFromPunches(e, byEmp.get(e.id) ?? [], resolveRuleSet(e.union, ruleMap.get(e.id)), ub);
     });
   // Raunverulega samþykktir tímar per starfsmann (fastlaunafólk fær laun óháð þeim, en taflan sýnir þá).
