@@ -181,10 +181,20 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
   const pw = useMemo(() => passwordStrength(password), [password]);
   // Tilboðskóði úr söluposti (?kodi=…): lengri prufa ef hann gildir.
   const [promo, setPromo] = useState<{ code: string; days: number } | null>(null);
+  const [promoInput, setPromoInput] = useState("");
+  const [promoChecked, setPromoChecked] = useState(false);
   useEffect(() => {
     const c = new URLSearchParams(window.location.search).get("kodi");
-    if (c) checkPromo(c).then((r) => { if (r.ok && r.days) setPromo({ code: c, days: r.days }); }).catch(() => {});
+    if (c) checkPromo(c).then((r) => { if (r.ok && r.days) { setPromo({ code: c, days: r.days }); setPromoInput(c.toUpperCase()); } }).catch(() => {});
   }, []);
+  // Kóði sleginn inn sjálfur (t.d. úr söluposti): sannreyndur á þjóninum þegar reiturinn missir fókus.
+  async function applyPromo() {
+    const c = promoInput.trim();
+    if (!c) { setPromo(null); setPromoChecked(false); return; }
+    const r = await checkPromo(c).catch(() => ({ ok: false } as { ok: boolean; days?: number }));
+    setPromo(r.ok && r.days ? { code: c, days: r.days } : null);
+    setPromoChecked(true);
+  }
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -227,7 +237,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
     if (!terms) { setError(s.needTerms); return; }
     setBusy(true);
     try {
-      const res = await createOwnerAccount({ fullName, companyName, email, password, country: "IS", proof: proof ?? undefined, termsAccepted: terms, promo: promo?.code });
+      const res = await createOwnerAccount({ fullName, companyName, email, password, country: "IS", proof: proof ?? undefined, termsAccepted: terms, promo: promo?.code ?? (promoInput.trim() || undefined) });
       if (!res.ok) {
         setError(res.error ?? s.createFail);
         if (/Staðfesting netfangs/.test(res.error ?? "")) { setProof(null); setStep("email"); }
@@ -351,6 +361,10 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
         )}
       </div>
 
+      <div className="field"><div className="lbl"><label htmlFor="pc">{lang === "is" ? "Tilboðskóði (valfrjálst)" : "Offer code (optional)"}</label></div>
+        <input id="pc" value={promoInput} onChange={(e) => setPromoInput(e.target.value.toUpperCase())} onBlur={applyPromo} placeholder={lang === "is" ? "t.d. VAKTO2MAN" : "e.g. VAKTO2MAN"} autoComplete="off" />
+        {promoInput && !promo && promoChecked && <div className="promo-bad">{lang === "is" ? "Kóðinn fannst ekki." : "Code not found."}</div>}
+      </div>
       <label className="chk">
         <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} required />
         <span>{s.agreeA}<a href="/skilmalar" target="_blank" rel="noreferrer">{s.terms}</a>{s.agreeB}<a href="/personuvernd" target="_blank" rel="noreferrer">{s.privacy}</a>{s.agreeC}</span>
