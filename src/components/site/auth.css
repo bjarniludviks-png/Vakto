@@ -43,3 +43,6 @@
 .ah-auth-mac .ah-mac-bar{height:30px}
 .ah-auth-top .ah-auth-logo{color:var(--ink)}
 .ah-auth-top-r{display:inline-flex;align-items:center;gap:14px}
+
+/* Tilboðskóði úr söluposti (?kodi=…) */
+.promo-note{margin:14px 0 4px;padding:10px 14px;border-radius:12px;background:var(--brand-soft);color:var(--brand-deep);font-size:13.5px;font-weight:600}

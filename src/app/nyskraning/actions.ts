@@ -3,7 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { provisionCompanyForUser } from "@/lib/provision";
-import { sendWelcomeEmail } from "@/lib/email";
+import { sendWelcomeEmail, sendSignupAlert } from "@/lib/email";
 import { requestEmailCode, verifyEmailCode, consumeProof } from "@/lib/signup-verify.server";
 import { validatePassword } from "@/lib/password.server";
 import { verifyTurnstile } from "@/lib/turnstile.server";
@@ -12,6 +12,23 @@ import { verifyTurnstile } from "@/lib/turnstile.server";
 const TERMS_VERSION = "2026-09-30";
 
 export type SignupResult = { ok: boolean; demo?: boolean; error?: string };
+
+/** Tilboðskóðar fyrir lengri prufu (t.d. í söluposti: vakto.is/nyskraning?kodi=VAKTO2MAN).
+ *  PROMO_CODES = "KODI:dagar,KODI2:dagar"; sjálfgefið VAKTO2MAN = 61 dagur (tveir mánuðir). */
+function promoDays(code: string | null | undefined): number | null {
+  const c = (code ?? "").trim().toUpperCase();
+  if (!c) return null;
+  const table = (process.env.PROMO_CODES || "VAKTO2MAN:61").split(",").map((x) => x.trim().split(":"));
+  const hit = table.find(([k]) => k?.toUpperCase() === c);
+  const days = hit ? Number(hit[1]) : NaN;
+  return Number.isFinite(days) && days > 14 && days <= 120 ? days : null;
+}
+
+/** Fyrir nýskráningarsíðuna: gildir kóðinn og hversu marga daga gefur hann? */
+export async function checkPromo(code: string): Promise<{ ok: boolean; days?: number }> {
+  const days = promoDays(code);
+  return days ? { ok: true, days } : { ok: false };
+}
 
 /** Setur áskrift + 14 daga prufu á fyrirtæki sem hefur ENGA prufu enn (eldri nýskráningar).
  * Breytir aldrei fyrirtæki sem þegar er með prufu eða greiðslustöðu — annars gæti hver sem er
@@ -52,7 +69,7 @@ export async function verifySignupCode(email: string, code: string): Promise<{ o
   try { return await verifyEmailCode(email, code); } catch (e) { { console.error("[signup]", e); return { ok: false, error: "Nýskráning tókst ekki — reyndu aftur eða hafðu samband við hallo@vakto.is." }; } }
 }
 
-export async function createOwnerAccount(input: { fullName: string; companyName: string; email: string; password: string; country?: string; proof?: string; termsAccepted?: boolean }): Promise<SignupResult> {
+export async function createOwnerAccount(input: { fullName: string; companyName: string; email: string; password: string; country?: string; proof?: string; termsAccepted?: boolean; promo?: string }): Promise<SignupResult> {
   const fullName = input.fullName?.trim();
   const companyName = input.companyName?.trim();
   const email = input.email?.trim().toLowerCase();
@@ -78,10 +95,11 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
     if (!prov.ok) return { ok: false, error: prov.error };
     // Prufan hefst núna; aðgangur opnast ekki fyrr en kort er skráð (middleware + card_required).
     if (prov.companyId) {
-      const trialEnds = new Date(Date.now() + 14 * 86400000).toISOString();
+      const trialEnds = new Date(Date.now() + (promoDays(input.promo) ?? 14) * 86400000).toISOString();
       await admin.from("companies").update({ plan: "vakto", trial_ends_at: trialEnds, card_required: true, terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }).eq("id", prov.companyId);
     }
     await sendWelcomeEmail(email, fullName, companyName); // no-op until Resend is configured
+    await sendSignupAlert({ company: companyName, name: fullName, email, country: input.country, companyId: prov.companyId, promo: promoDays(input.promo) ? input.promo!.trim().toUpperCase() : null }).catch((e) => console.error("[signup-alert]", e));
     return { ok: true };
   } catch (e) {
     { console.error("[signup]", e); return { ok: false, error: "Nýskráning tókst ekki — reyndu aftur eða hafðu samband við hallo@vakto.is." }; }

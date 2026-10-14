@@ -109,6 +109,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/v1/") ||
     pathname.startsWith("/api/cron/") ||
     pathname.startsWith("/api/home-chat") ||
+    pathname === "/api/v" || // heimsóknatalning á opnum síðum (vafrakökulaus)
     pathname.startsWith("/api/straumur/") ||
     // Mobile-app notifications — authenticated by the caller's Supabase bearer token.
     pathname.startsWith("/api/app/") ||

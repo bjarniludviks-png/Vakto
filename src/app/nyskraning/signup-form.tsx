@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { createOwnerAccount, requestSignupCode, startCardSetup, verifySignupCode } from "./actions";
+import { checkPromo, createOwnerAccount, requestSignupCode, startCardSetup, verifySignupCode } from "./actions";
 import { passwordStrength, PASSWORD_MIN } from "@/lib/password";
 import Turnstile, { TURNSTILE_SITE_KEY } from "@/components/turnstile";
 
@@ -179,6 +179,12 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
   const [cooldown, setCooldown] = useState(0);
   const codeRef = useRef<HTMLInputElement>(null);
   const pw = useMemo(() => passwordStrength(password), [password]);
+  // Tilboðskóði úr söluposti (?kodi=…): lengri prufa ef hann gildir.
+  const [promo, setPromo] = useState<{ code: string; days: number } | null>(null);
+  useEffect(() => {
+    const c = new URLSearchParams(window.location.search).get("kodi");
+    if (c) checkPromo(c).then((r) => { if (r.ok && r.days) setPromo({ code: c, days: r.days }); }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -221,7 +227,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
     if (!terms) { setError(s.needTerms); return; }
     setBusy(true);
     try {
-      const res = await createOwnerAccount({ fullName, companyName, email, password, country: "IS", proof: proof ?? undefined, termsAccepted: terms });
+      const res = await createOwnerAccount({ fullName, companyName, email, password, country: "IS", proof: proof ?? undefined, termsAccepted: terms, promo: promo?.code });
       if (!res.ok) {
         setError(res.error ?? s.createFail);
         if (/Staðfesting netfangs/.test(res.error ?? "")) { setProof(null); setStep("email"); }
@@ -252,7 +258,8 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
       <form className="form" onSubmit={finish}>
         <div className="brand"><Bars /><b>VAKTO</b></div>
         <Steps cur="card" s={s} />
-        <h1>{s.trialH}</h1>
+        {promo && <div className="promo-note">{lang === "is" ? `Tilboð: ${promo.days >= 59 ? "tveir mánuðir" : `${promo.days} dagar`} frítt í stað 14 daga.` : `Offer: ${promo.days} days free instead of 14.`}</div>}
+        <h1>{promo ? (lang === "is" ? "Tveir mánuðir frítt" : `${promo.days} days free`) : s.trialH}</h1>
         <div className="sub">{s.trialSub}</div>
 
         <div className="planpick" style={{ gridTemplateColumns: "1fr" }}>
@@ -276,6 +283,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
       <form className="form" onSubmit={sendCode}>
         <div className="brand"><Bars /><b>VAKTO</b></div>
         <Steps cur="email" s={s} />
+        {promo && <div className="promo-note">{lang === "is" ? `Tilboð: ${promo.days >= 59 ? "tveir mánuðir" : `${promo.days} dagar`} frítt í stað 14 daga.` : `Offer: ${promo.days} days free instead of 14.`}</div>}
         <h1>{s.createH}</h1>
         <div className="sub">{s.createSub}</div>
 
@@ -295,6 +303,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
       <form className="form" onSubmit={checkCode}>
         <div className="brand"><Bars /><b>VAKTO</b></div>
         <Steps cur="code" s={s} />
+        {promo && <div className="promo-note">{lang === "is" ? `Tilboð: ${promo.days >= 59 ? "tveir mánuðir" : `${promo.days} dagar`} frítt í stað 14 daga.` : `Offer: ${promo.days} days free instead of 14.`}</div>}
         <h1>{s.codeH}</h1>
         <div className="sub">{s.codeSubA}<b style={{ color: "var(--ink)" }}>{email}</b>{s.codeSubB}</div>
 
@@ -317,6 +326,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
     <form className="form" onSubmit={submitAccount}>
       <div className="brand"><Bars /><b>VAKTO</b></div>
       <Steps cur="account" s={s} />
+        {promo && <div className="promo-note">{lang === "is" ? `Tilboð: ${promo.days >= 59 ? "tveir mánuðir" : `${promo.days} dagar`} frítt í stað 14 daga.` : `Offer: ${promo.days} days free instead of 14.`}</div>}
       <h1>{s.accH}</h1>
       <div className="sub">{s.accSubA}{email}{s.accSubB}</div>
 
