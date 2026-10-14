@@ -41,12 +41,12 @@ export async function esignCount(companyId: string, from: string, to: string): P
 }
 
 /** Áætlaður mánaðarreikningur (með VSK) miðað við síðustu 30 daga — fyrir áminningar og Stillingar. */
-export async function estimateMonthly(companyId: string, plan: PlanId, now = new Date(), interval: BillingInterval = "month") {
+export async function estimateMonthly(companyId: string, plan: PlanId, now = new Date(), interval: BillingInterval = "month", ai = false) {
   const to = iso(new Date(now.getTime() + 86400000)), from = iso(new Date(now.getTime() - 30 * 86400000));
   const units = plan === "v1" ? await usersCount(companyId) : await activeEmployees(companyId, from, to);
   // Árlegt: mánaðarígildi (baseYear + umfram á árlegum kjörum) — sjálft árgjaldið er 12 × baseYear.
-  const a = interval === "year" ? invoiceFor(plan, units, 0, { base: "none", yearly: true }) : invoiceFor(plan, units, 0);
-  if (interval === "year") { const b = invoiceFor(plan, 0, 0, { base: "year" }); const monthBase = Math.round(b.base / 12); const net = monthBase + a.extra; const vat = Math.round(net * 0.24); return { units, ...a, base: monthBase, vat, total: net + vat }; }
+  const a = interval === "year" ? invoiceFor(plan, units, 0, { base: "none", yearly: true, ai }) : invoiceFor(plan, units, 0, { ai });
+  if (interval === "year") { const b = invoiceFor(plan, 0, 0, { base: "year" }); const monthBase = Math.round(b.base / 12); const net = monthBase + a.extra + a.ai; const vat = Math.round(net * 0.24); return { units, ...a, base: monthBase, vat, total: net + vat }; }
   return { units, ...a };
 }
 
@@ -99,7 +99,7 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
   const admin = createAdminClient();
   const out: BillingRunResult = { reminders: 0, expired: 0, invoices: 0, paid: 0, failed: 0, suspended: 0, retried: 0, paydayInvoices: 0 };
   const { data: companies } = await admin.from("companies")
-    .select("id, name, plan, price_plan, price_v1_until, billing_interval, billing_year_start, trial_ends_at, billing_status, billing_anchor, trial_reminder_sent_at, trial_expired_sent_at")
+    .select("id, name, plan, price_plan, price_v1_until, billing_interval, billing_year_start, trial_ends_at, billing_status, billing_anchor, trial_reminder_sent_at, trial_expired_sent_at, ai_addon")
     .not("plan", "is", null);
   for (const co of companies ?? []) {
     const id = co.id as string, name = (co.name as string) ?? "";
@@ -115,7 +115,7 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
         // Fyrsti reikningur eftir prufu = grunngjald (v2: notkun í prufunni er ekki rukkuð; v1: notendur fyrirfram).
         const plan = planFor(co, now);
         const users = await usersCount(id);
-        const first = invoiceFor(plan, plan === "v1" ? users : 0, 0);
+        const first = invoiceFor(plan, plan === "v1" ? users : 0, 0, { ai: !!co.ai_addon });
         const note = plan === "v1" ? `${users} notendur` : `grunngjald með 5 virkum starfsmönnum`;
         const noteEn = plan === "v1" ? `${users} users` : `base fee incl. 5 active employees`;
         for (const to of await ownerEmails(id)) await sendTrialReminderEmail(to, name, { daysLeft: d, hasCard: !!card, total: first.total, note, noteEn }).catch((e) => console.error("email:", e));
@@ -166,14 +166,14 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
         const { mode: baseMode, startYear } = baseModeFor({ interval, yearStart, periodStart });
         if (startYear) await admin.from("companies").update({ billing_year_start: iso(periodStart) }).eq("id", id);
         const yearlyRates = baseMode !== "month";
-        const p = invoiceFor(plan, units, esigns, { base: baseMode, yearly: yearlyRates });
+        const p = invoiceFor(plan, units, esigns, { base: baseMode, yearly: yearlyRates, ai: !!co.ai_addon });
         const periodEnd = baseMode === "year" ? addMonths(periodStart, 12) : addMonths(periodStart, 1);
         const settled = p.total === 0; // greitt ár og engin notkun umfram → skráð sem uppgert, ekkert tekið af korti
         const { data: inv } = await admin.from("invoices").insert({
           company_id: id, period_start: iso(periodStart), period_end: iso(periodEnd), users_count: users,
           active_employees: plan === "v2" ? active : null, esign_count: esigns, esign_amount: p.esign,
           usage_start: hasUsage ? uFrom : null, usage_end: hasUsage ? uTo : null, billing_interval: yearlyRates ? "year" : "month",
-          base_amount: p.base, extra_amount: p.extra, vat_amount: p.vat, total_amount: p.total, reference: `inv:${crypto.randomUUID()}`,
+          base_amount: p.base, extra_amount: p.extra, ai_amount: p.ai, vat_amount: p.vat, total_amount: p.total, reference: `inv:${crypto.randomUUID()}`,
           ...(settled ? { status: "paid", paid_at: new Date().toISOString() } : {}),
         }).select("id").single();
         if (inv && settled) { await admin.from("invoices").update({ reference: `inv:${inv.id}` }).eq("id", inv.id); continue; }

@@ -991,3 +991,23 @@ export async function setBillingInterval(interval: "month" | "year"): Promise<Se
     return { ok: false, error: userError(e, "Villa") };
   }
 }
+
+/** VAKTO AI-viðbótin (0075) á/af. Gildir strax; rukkuð á hverjum mánaðarreikningi sem myndast á meðan hún er á. */
+export async function setAiAddon(on: boolean): Promise<SettingsResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
+    const { data: profile } = await supabase.from("users").select("company_id, role").eq("id", user.id).maybeSingle();
+    if (!profile?.company_id || profile.role !== "owner") return { ok: false, error: "Aðeins stjórnandi getur breytt áskriftinni" };
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { error } = await createAdminClient().from("companies").update({ ai_addon: !!on, ai_addon_since: on ? new Date().toISOString() : null }).eq("id", profile.company_id);
+    if (error) return dbFail("setAiAddon", error);
+    await logAudit(supabase, profile.company_id as string, user.id, { action: "company.ai_addon", entity: "companies", detail: on ? "VAKTO AI-viðbót: kveikt" : "VAKTO AI-viðbót: slökkt" });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}

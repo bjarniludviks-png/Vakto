@@ -8,7 +8,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useLang } from "./lang";
 
 type Action = { tool: string; input: Record<string, unknown>; summary: string; state?: "pending" | "busy" | "done" | "error" | "cancelled"; error?: string };
-type Msg = { id?: string; role: "user" | "assistant"; content: string; actions?: Action[] };
+type Msg = { id?: string; role: "user" | "assistant"; content: string; actions?: Action[]; upgrade?: boolean };
 type Conv = { id: string; title: string; updated_at: string };
 
 const KEY = "vakto-assistant";
@@ -21,6 +21,7 @@ const S = {
     err: "Tókst ekki að ná sambandi. Reyndu aftur.",
     chips: ["Hvernig er laun % af veltu þessa vikuna?", "Settu upp næstu viku: allir með einn frídag", "Hver er á vakt núna?", "Hvaða beiðnir bíða?"],
     note: "VAKTO AI getur gert mistök. Breytingar eru aðeins gerðar þegar þú staðfestir.",
+    upgrade: "Kveikja á VAKTO AI",
   },
   en: {
     name: "VAKTO AI", open: "Open VAKTO AI", close: "Close", reset: "New conversation", history: "Earlier conversations", noHistory: "No saved conversations yet.", del: "Delete conversation", back: "Back", ph: "Ask about the business or request a change…",
@@ -29,6 +30,7 @@ const S = {
     err: "Could not connect. Try again.",
     chips: ["What's labor % of revenue this week?", "Plan next week: everyone gets one day off", "Who is on shift now?", "Which requests are waiting?"],
     note: "VAKTO AI can make mistakes. Changes only happen when you confirm.",
+    upgrade: "Turn on VAKTO AI",
   },
 };
 
@@ -119,7 +121,7 @@ export function AssistantPanel() {
         body: JSON.stringify({ path, lang, conversationId: convId, messages: next.map(({ role, content }) => ({ role, content })) }),
       });
       const data = await res.json();
-      if (!res.ok || !data.ok) { setMsgs([...next, { role: "assistant", content: data?.error ?? s.err }]); return; }
+      if (!res.ok || !data.ok) { setMsgs([...next, { role: "assistant", content: data?.error ?? s.err, upgrade: !!data?.limit?.canUpgrade }]); return; }
       if (data.conversationId) setConvId(data.conversationId);
       setMsgs([...next, { id: data.messageId ?? undefined, role: "assistant", content: data.reply ?? "", actions: (data.actions ?? []).map((a: Action) => ({ ...a, state: "pending" })) }]);
     } catch {
@@ -179,6 +181,7 @@ export function AssistantPanel() {
             {msgs.map((m, i) => (
               <div key={i} className={`vai-msg ${m.role}`}>
                 {m.content && <div className="vai-bub">{m.role === "assistant" ? <Rich text={m.content} /> : m.content}</div>}
+                {m.upgrade && <div className="vai-acts"><button className="btn sm" onClick={() => { setOpen(false); router.push("/stillingar?tab=askrift#vakto-ai"); }}>{s.upgrade}</button></div>}
                 {m.actions && m.actions.length > 0 && (
                   <div className="vai-acts">
                     {m.actions.map((a, j) => (
