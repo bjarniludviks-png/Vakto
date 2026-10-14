@@ -94,7 +94,7 @@ export default function Frettir() {
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <Header title="Fréttaveita" back={standalone} right={canPost ? <IconBtn label="Ný færsla" onPress={() => setCompose(true)}><Plus color={colors.ink} size={24} /></IconBtn> : undefined} />
-      <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.brand} />}>
+      <ScrollView contentInsetAdjustmentBehavior="automatic" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" contentContainerStyle={{ padding: 16, gap: 14, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.brand} />}>
         {posts && posts.length === 0 ? <Empty icon={<MessageSquare color={colors.brandDeep} size={26} />} title="Engar færslur enn" sub="Ýttu á + til að deila því fyrsta með vinnustaðnum." /> : null}
         {(posts ?? []).map((p) => {
           const total = p.reactions.reduce((a, r) => a + r.count, 0);

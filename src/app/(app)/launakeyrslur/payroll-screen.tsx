@@ -10,7 +10,7 @@ import { useLang } from "@/components/app/lang";
 import { PayslipModal, type PayslipData } from "@/components/app/payslip-modal";
 import { EmptyState } from "@/components/app/empty-state";
 import type { PayrollView } from "./payroll.server";
-import { runPayroll, getPayrollPeriod, getPayrollHistory, getPaydayStatus, sendToPayday, type PeriodPayroll, type PayrollHistory } from "./actions";
+import { runPayroll, getPayrollPeriod, getPayrollHistory, getPaydayStatus, getPaydayItemNames, sendToPayday, type PeriodPayroll, type PayrollHistory } from "./actions";
 import { Av } from "@/components/app/avatar";
 
 const PH_COLORS = ["#1f9d6b", "#d4a24c", "#e9700f", "#1f9e9e", "#c3c7d3"];
@@ -96,6 +96,13 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
   const [tbModal, setTbModal] = useState(false);
 
   const range = payRange(period, cf, ct, periodStart);
+  const [pdItems, setPdItems] = useState<string[]>([]);
+  useEffect(() => {
+    if (!view.live) return;
+    let cancelled = false;
+    getPaydayItemNames(range.from, range.to).then((r) => { if (!cancelled) setPdItems(r); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [view.live, range.from, range.to]);
   useEffect(() => {
     if (!view.live) return;
     if (period === "custom" && (!cf || !ct || cf > ct)) return;
@@ -323,6 +330,14 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
           <div className="db2-ch"><div><div className="db2-ct">{t("Útflutningur")}</div><div className="db2-cs">{t("Vakto reiknar — Payday sér um skil, greiðslur og opinbera skýrslugerð.")}</div></div></div>
           <div className="db2-list">
             <div className="db2-it"><span className="pr-logo"><img src="/integrations/payday.png" alt="" /></span><span className="db2-tx"><b>Payday</b><span>{pdConn ? t("beintengt — samþykktir tímar tímakaupsfólks fara beint inn sem tímaskrá") : t("tímaskrá (Excel) — hlaðið upp undir Ný launakeyrsla → Hlaða upp tímaskrá")}</span></span>{pdConn ? <><button className="btn sm" disabled={pdBusy} onClick={sendaPayday}>{pdBusy ? t("Sendi…") : t("Senda í Payday")}</button><button className="btn ghost sm" onClick={() => download("payday")}>Excel</button></> : <button className="btn sm" onClick={() => download("payday")}>{t("Flytja")}</button>}</div>
+            {pdItems.length > 0 && (
+              <div className="pd-items">
+                <b>{t("Launaliðir í Payday")}</b>
+                <span>{t("Þessir liðir þurfa að vera til í Payday með nákvæmlega sama heiti:")}</span>
+                <span className="pd-chips">{pdItems.map((n) => <code key={n}>{n}</code>)}</span>
+                <span>{t("Álagsliðirnir eiga aðeins að vera álagið sjálft (t.d. 33% af dagvinnutaxta), ekki fullur taxti, því sömu tímar eru líka taldir í Dagvinnu. Annars er tvígreitt.")}</span>
+              </div>
+            )}
             <div className="db2-it"><span className="pr-logo"><img src="/integrations/dk.png" alt="" /></span><span className="db2-tx"><b>DK</b><span>{t("launaskrá fyrir DK bókhald")}</span></span><button className="btn ghost sm" onClick={() => download("dk")}>{t("Sækja")}</button></div>
             <div className="db2-it"><span className="pr-logo xl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5" /><path d="M3.5 9h17M3.5 14.5h17M9.5 3.5v17" /></svg></span><span className="db2-tx"><b>Excel</b><span>{t("sundurliðun per starfsmann")}</span></span><button className="btn ghost sm" onClick={() => download("excel")}>{t("Sækja")}</button></div>
           </div>

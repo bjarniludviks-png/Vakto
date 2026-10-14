@@ -315,6 +315,26 @@ export async function getPaydayStatus(): Promise<{ connected: boolean; lastSync:
 
 /** Sendir samþykkta tíma tímabilsins beint í Payday sem tímaskrá (sömu tölur og Excel-útflutningurinn).
  *  Fastlaunafólk er ekki sent — laun þess ráðast ekki af tímum. onlyIds: aðeins hakaðir starfsmenn. */
+/** Heiti launaliða sem tímaskráin fyrir tímabilið notar — þeir verða að vera til í Payday
+ *  með nákvæmlega sama heiti. Álagsliðir eru aðeins álagið (tímarnir eru líka í Dagvinnu). */
+export async function getPaydayItemNames(from: string, to: string): Promise<string[]> {
+  try {
+    const { getExportLines } = await import("@/lib/payroll-export.server");
+    const got = await getExportLines(from, to);
+    if (!got.live) return [];
+    const names = new Set<string>(["Dagvinna", "Yfirvinna"]);
+    const pcts = new Set<number>();
+    for (const l of got.lines) {
+      if (got.monthly.has(l.employeeId)) continue;
+      for (const [pct, q] of Object.entries(got.hours.get(l.employeeId)?.alag ?? {})) if (q > 0) pcts.add(Number(pct));
+    }
+    for (const p of [...pcts].sort((a, b) => a - b)) names.add(`Álag ${String(p).replace(".", ",")}%`);
+    return [...names];
+  } catch {
+    return [];
+  }
+}
+
 export async function sendToPayday(from: string, to: string, onlyIds?: string[]): Promise<{ ok: boolean; error?: string; count?: number; skipped?: string[] }> {
   if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
   try {

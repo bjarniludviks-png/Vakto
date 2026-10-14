@@ -1525,3 +1525,9 @@ a.db2-who:hover span{color:var(--brand)}
 .vai-list[hidden]{display:none}
 
 .ps-note{margin:14px 0 0;font-size:12px;line-height:1.45;color:var(--ink3)}
+
+/* Launakeyrslur → Útflutningur: launaliðir sem þurfa að vera til í Payday */
+.pd-items{display:flex;flex-direction:column;gap:6px;margin:2px 0 6px;padding:12px 14px;border-radius:12px;background:var(--line2);font-size:12.5px;line-height:1.5;color:var(--ink2)}
+.pd-items b{font-size:13px;color:var(--ink)}
+.pd-chips{display:flex;flex-wrap:wrap;gap:6px}
+.pd-chips code{font-family:inherit;font-size:12px;font-weight:600;padding:3px 8px;border-radius:7px;background:var(--panel);border:1px solid var(--line);color:var(--ink)}
