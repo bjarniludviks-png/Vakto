@@ -12,7 +12,6 @@ import {
   Modal,
   ScrollView,
   Animated,
-  KeyboardAvoidingView,
   Keyboard,
   Platform,
   StyleProp,
@@ -341,10 +340,14 @@ export function Sheet({
   const [mounted, setMounted] = useState(open);
   // Lyklaborðið: þegar það er uppi fellur blaðið þétt að því, annars heldur
   // það neðra bilinu fyrir heimatakkann (annars kemur hvít ræma á milli).
-  const [kbUp, setKbUp] = useState(false);
+  // KeyboardAvoidingView mælir ekki rétt inni í Modal (nýja arkitektúrinn), svo blaðið var undir
+  // lyklaborðinu. Hér er hæð lyklaborðsins lesin beint og blaðinu lyft um hana (iOS; Android
+  // minnkar gluggann sjálft).
+  const [kb, setKb] = useState(0);
+  const kbUp = kb > 0;
   useEffect(() => {
-    const show = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", () => setKbUp(true));
-    const hide = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide", () => setKbUp(false));
+    const show = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", (e) => setKb(Math.max(1, e.endCoordinates?.height ?? 1)));
+    const hide = Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide", () => setKb(0));
     return () => { show.remove(); hide.remove(); };
   }, []);
   const fade = useRef(new Animated.Value(0)).current;
@@ -371,8 +374,8 @@ export function Sheet({
   const Body = scroll ? ScrollView : View;
   return (
     <Modal visible transparent animationType="none" onRequestClose={onClose} statusBarTranslucent>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-        <Animated.View style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(8,8,12,.42)", opacity: fade }}>
+      <View style={{ flex: 1, paddingBottom: Platform.OS === "ios" ? kb : 0 }}>
+        <Animated.View style={{ position: "absolute", left: 0, right: 0, top: 0, bottom: -kb, backgroundColor: "rgba(8,8,12,.42)", opacity: fade }}>
           <Pressable style={{ flex: 1 }} onPress={onClose} />
         </Animated.View>
         <View style={{ flex: 1 }} pointerEvents="box-none">
@@ -387,7 +390,7 @@ export function Sheet({
             >
               <View style={{ width: 40, height: 5, borderRadius: 3, backgroundColor: colors.line }} />
             </View>
-            <Body contentContainerStyle={{ padding: 18, paddingTop: 4, paddingBottom: kbUp ? 10 : 18, gap: 14 }} style={scroll ? undefined : { padding: 18, paddingTop: 4, paddingBottom: kbUp ? 10 : 18, gap: 14 }} keyboardShouldPersistTaps="handled">
+            <Body contentContainerStyle={{ padding: 18, paddingTop: 4, paddingBottom: kbUp ? 10 : 18, gap: 14 }} style={scroll ? undefined : { padding: 18, paddingTop: 4, paddingBottom: kbUp ? 10 : 18, gap: 14 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
               {title ? (
                 <Txt weight="bold" size={19} style={{ letterSpacing: -0.3 }}>
                   {title}
@@ -397,7 +400,7 @@ export function Sheet({
             </Body>
           </Animated.View>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
