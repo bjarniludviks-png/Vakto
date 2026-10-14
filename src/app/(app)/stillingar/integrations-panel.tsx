@@ -267,7 +267,7 @@ function PaydayModal({ L, onClose, onDone }: { L: Lf; onClose: () => void; onDon
             setBusy(false);
             if (r.ok) { toast(L("Payday tengt", "Payday connected")); onDone(); } else setErr(r.error ?? "Villa");
           }}>{busy ? L("Prófa lykla…", "Checking keys…") : L("Tengja Payday", "Connect Payday")}</button>
-          <div className="tg-small">{L("Lyklarnir eru geymdir dulkóðaðir. VAKTO sendir aðeins tíma; Payday sér áfram um laun, skil og greiðslur. Heiti launaliða í Payday þurfa að vera Dagvinna, Yfirvinna og Álag 33% / 45%.", "Keys are stored encrypted. VAKTO only sends hours; Payday still handles pay, filings and payments. Pay items in Payday must be named Dagvinna, Yfirvinna and Álag 33% / 45%.")}</div>
+          <div className="tg-small">{L("Lyklarnir eru geymdir dulkóðaðir. VAKTO sendir aðeins tíma; Payday sér áfram um laun, skil og greiðslur. Heiti launaliða í Payday þurfa að vera nákvæmlega eins og í VAKTO (Dagvinna, Yfirvinna, Álag 33% …; listinn fyrir tímabilið sést í Launakeyrslum). Álagsliðir eiga aðeins að vera álagið, ekki fullur taxti.", "Keys are stored encrypted. VAKTO only sends hours; Payday still handles pay, filings and payments. Pay item names in Payday must match VAKTO exactly (Dagvinna, Yfirvinna, Álag 33% …; Payroll lists them for the period). Premium items must be the premium only, not the full rate.")}</div>
         </div>
       </div>
     </div>
