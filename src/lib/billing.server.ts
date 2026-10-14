@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { chargeToken, straumurConfigured } from "@/lib/straumur";
 import { invoiceFor, planFor, baseModeFor, type PlanId, type BillingInterval } from "@/lib/pricing";
+import { issuePaydayInvoice, issueMissingPaydayInvoices } from "@/lib/billing-payday.server";
 import { sendTrialReminderEmail, sendCardMissingEmail, sendPaymentFailedEmail, sendReceiptEmail, sendSuspendedEmail } from "@/lib/email";
 
 // Áskriftarvélin: prufu-áminningar, mánaðarreikningar, gjaldtaka af skráðu korti, lokun.
@@ -92,11 +93,11 @@ export async function chargeInvoice(invoiceId: string): Promise<"paid" | "failed
   }
 }
 
-export type BillingRunResult = { reminders: number; expired: number; invoices: number; paid: number; failed: number; suspended: number; retried: number };
+export type BillingRunResult = { reminders: number; expired: number; invoices: number; paid: number; failed: number; suspended: number; retried: number; paydayInvoices: number };
 
 export async function runBillingDay(now = new Date()): Promise<BillingRunResult> {
   const admin = createAdminClient();
-  const out: BillingRunResult = { reminders: 0, expired: 0, invoices: 0, paid: 0, failed: 0, suspended: 0, retried: 0 };
+  const out: BillingRunResult = { reminders: 0, expired: 0, invoices: 0, paid: 0, failed: 0, suspended: 0, retried: 0, paydayInvoices: 0 };
   const { data: companies } = await admin.from("companies")
     .select("id, name, plan, price_plan, price_v1_until, billing_interval, billing_year_start, trial_ends_at, billing_status, billing_anchor, trial_reminder_sent_at, trial_expired_sent_at")
     .not("plan", "is", null);
@@ -182,7 +183,7 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
           out.invoices++;
           if (!straumurConfigured()) continue;
           const r = await chargeInvoice(inv.id as string);
-          if (r === "paid") { out.paid++; for (const to of await ownerEmails(id)) await sendReceiptEmail(to, name, { total: p.total, periodStart: iso(periodStart), periodEnd: iso(periodEnd) }).catch((e) => console.error("email:", e)); }
+          if (r === "paid") { out.paid++; await issuePaydayInvoice(inv.id as string, (await ownerEmails(id))[0]); for (const to of await ownerEmails(id)) await sendReceiptEmail(to, name, { total: p.total, periodStart: iso(periodStart), periodEnd: iso(periodEnd) }).catch((e) => console.error("email:", e)); }
           else { out.failed++; await admin.from("companies").update({ billing_status: "unpaid" }).eq("id", id); for (const to of await ownerEmails(id)) await sendPaymentFailedEmail(to, name, p.total).catch((e) => console.error("email:", e)); }
         }
       } else if (existing.status === "failed" && (existing.attempts as number) < 4 && straumurConfigured()) {
@@ -198,5 +199,8 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
       }
     }
   }
+  // Reikningar í Payday BGL fyrir allar greiddar færslur sem vantar enn reikning
+  // (greitt í dag, endurreynt, greitt gegnum webhook, eða Payday var niðri).
+  out.paydayInvoices = await issueMissingPaydayInvoices(async (cid) => (await ownerEmails(cid))[0] ?? null);
   return out;
 }

@@ -5,14 +5,15 @@ import { nf } from "@/lib/format";
 import { ESIGN_PRICE } from "@/lib/pricing";
 import { brandName } from "@/app/(app)/stillingar/card-brand";
 import { PrintButton } from "./print-button";
+import { Logo } from "@/components/app/icons";
 import "./kvittun.css";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Kvittun · VAKTO", robots: { index: false } };
 
 // Greiðslukvittun fyrir eina greidda áskriftarfærslu. RLS (invoices_read, 0073) tryggir að
-// aðeins stjórnendur fyrirtækisins sjái hana. Þetta er kvittun fyrir greiðslu, ekki
-// reikningur í skilningi reglugerðar 50/1993 (vantar númeraröð og VSK-númer seljanda).
+// aðeins stjórnendur fyrirtækisins sjái hana. Formlegi reikningurinn er gefinn út í Payday
+// BGL (0074, billing-payday.server.ts); þegar hann er til birtist númerið og PDF-niðurhal.
 const SELLER = { name: "BGL Ventures ehf.", kt: "490806-0400", email: "hallo@vakto.is", web: "vakto.is" };
 
 const d = (iso: string | null | undefined) => {
@@ -29,7 +30,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
   if (!user) redirect(`/login?next=/kvittun/${id}`);
 
   const { data: inv } = await supabase.from("invoices")
-    .select("id, company_id, period_start, period_end, base_amount, extra_amount, vat_amount, total_amount, status, paid_at, reference, active_employees, users_count, esign_count, esign_amount, billing_interval, usage_start, usage_end")
+    .select("id, company_id, period_start, period_end, base_amount, extra_amount, vat_amount, total_amount, status, paid_at, reference, active_employees, users_count, esign_count, esign_amount, billing_interval, usage_start, usage_end, payday_invoice_id, payday_invoice_number")
     .eq("id", id).maybeSingle();
   if (!inv || inv.status !== "paid") notFound();
 
@@ -50,11 +51,11 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
 
   return (
     <main className="kv">
-      <div className="kv-actions"><PrintButton /></div>
+      <div className="kv-actions">{inv.payday_invoice_id && <a className="kv-btn primary" href={`/kvittun/${inv.id}/reikningur`}>Sækja reikning nr. {inv.payday_invoice_number ?? ""} (PDF)</a>}<PrintButton /></div>
       <article className="kv-paper">
         <header className="kv-head">
-          <div className="kv-logo">VAKTO</div>
-          <div className="kv-title"><h1>Greiðslukvittun</h1><span>Tilvísun {String(inv.reference).replace(/^inv:/, "").slice(0, 8).toUpperCase()}</span></div>
+          <div className="kv-logo"><Logo size={30} /><b>VAKTO</b></div>
+          <div className="kv-title"><h1>Greiðslukvittun</h1><span>Tilvísun {String(inv.reference).replace(/^inv:/, "").slice(0, 8).toUpperCase()}</span>{inv.payday_invoice_number && <span>Reikningur nr. {inv.payday_invoice_number}</span>}</div>
         </header>
 
         <section className="kv-parties">
