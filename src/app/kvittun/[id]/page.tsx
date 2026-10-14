@@ -30,7 +30,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
   if (!user) redirect(`/login?next=/kvittun/${id}`);
 
   const { data: inv } = await supabase.from("invoices")
-    .select("id, company_id, period_start, period_end, base_amount, extra_amount, vat_amount, total_amount, status, paid_at, reference, active_employees, users_count, esign_count, esign_amount, billing_interval, usage_start, usage_end, payday_invoice_id, payday_invoice_number")
+    .select("id, company_id, period_start, period_end, base_amount, extra_amount, vat_amount, total_amount, status, paid_at, reference, active_employees, users_count, esign_count, esign_amount, billing_interval, usage_start, usage_end, payday_invoice_id, payday_invoice_number, ai_amount")
     .eq("id", id).maybeSingle();
   if (!inv || inv.status !== "paid") notFound();
 
@@ -45,6 +45,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
   const lines: { label: string; sub?: string; amount: number }[] = [];
   if ((inv.base_amount as number) > 0) lines.push({ label: yearly ? "VAKTO áskrift, árgjald" : "VAKTO áskrift, grunngjald", sub: `${d(inv.period_start)} – ${d(inv.period_end)}`, amount: inv.base_amount as number });
   if ((inv.extra_amount as number) > 0) lines.push({ label: `Virkir starfsmenn umfram 5 (${extraUnits})`, sub: inv.usage_start ? `${d(inv.usage_start)} – ${d(inv.usage_end)}` : undefined, amount: inv.extra_amount as number });
+  if (((inv.ai_amount as number | null) ?? 0) > 0) lines.push({ label: "VAKTO AI, viðbót", sub: `${d(inv.period_start)} – ${d(inv.period_end)}`, amount: inv.ai_amount as number });
   if ((inv.esign_amount as number) > 0) lines.push({ label: `Undirritanir með rafrænum skilríkjum (${inv.esign_count} × ${nf(ESIGN_PRICE)} kr)`, amount: inv.esign_amount as number });
   const net = (inv.total_amount as number) - (inv.vat_amount as number);
   const addr = [co?.address, [co?.postal_code, co?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");

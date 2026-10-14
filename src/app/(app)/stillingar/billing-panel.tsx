@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { nf } from "@/lib/format";
-import { PLANS, ESIGN_PRICE } from "@/lib/pricing";
-import { setBillingInterval, startCardChange } from "./actions";
+import { PLANS, ESIGN_PRICE, AI_ADDON_PRICE, AI_ADDON_QUESTIONS, AI_FREE_QUESTIONS } from "@/lib/pricing";
+import { setBillingInterval, startCardChange, setAiAddon } from "./actions";
 import type { SettingsData } from "./settings.server";
 import { CardBrandLogo, brandName, brandOf } from "./card-brand";
 import "./billing.css";
@@ -46,6 +46,11 @@ export function BillingPanel({ data }: { data: SettingsData }) {
     const r = await startCardChange(window.location.origin);
     if (r.ok && r.url) window.location.assign(r.url);
     else toast(r.error ?? t("Tókst ekki"));
+  }
+  async function toggleAi(on: boolean) {
+    const r = await setAiAddon(on);
+    toast(r.ok ? (on ? t("Kveikt á VAKTO AI") : t("Slökkt á VAKTO AI-viðbótinni")) : (r.error ?? t("Tókst ekki")));
+    if (r.ok) router.refresh();
   }
   async function pickInterval(iv: "month" | "year") {
     const r = await setBillingInterval(iv);
@@ -115,12 +120,38 @@ export function BillingPanel({ data }: { data: SettingsData }) {
         </section>
       </div>
 
+      {data.ai && (
+        <section className="card bill-ai" id="vakto-ai">
+          <div className="ch">
+            <div><div className="ct">VAKTO AI</div><div className="cs">{t("aðstoðarmaðurinn í horninu: tölur, vaktaplan og breytingar sem þú staðfestir")}</div></div>
+            <span className={`bill-pill ${data.ai.on ? "good" : data.ai.mode === "trial" ? "warn" : "mut"}`}>{data.ai.on ? t("Viðbót á") : data.ai.mode === "trial" ? t("Opið í prufu") : t("Frí útgáfa")}</span>
+          </div>
+          <div className="cb">
+            <div className="bill-ai-use">
+              <div><span>{t("Spurningar í þessum mánuði")}</span><b>{nf(data.ai.used)} / {nf(data.ai.limit)}</b></div>
+              <div className="bill-meter" aria-hidden><i style={{ width: `${Math.min(100, Math.round((data.ai.used / Math.max(1, data.ai.limit)) * 100))}%` }} /></div>
+            </div>
+            <p className="bill-ai-note">
+              {data.ai.on
+                ? `${t("Viðbótin kostar")} ${nf(AI_ADDON_PRICE)} kr/mán ${t("án VSK og bætist á mánaðarreikninginn. Allt að")} ${nf(AI_ADDON_QUESTIONS)} ${t("spurningar á mánuði.")}`
+                : `${t("Án viðbótar fylgja")} ${AI_FREE_QUESTIONS} ${t("spurningar á mánuði frítt")}${data.ai.mode === "trial" ? t(" (í prufu allt að 500)") : ""}. ${t("Viðbótin kostar")} ${nf(AI_ADDON_PRICE)} kr/mán ${t("án VSK, allt að")} ${nf(AI_ADDON_QUESTIONS)} ${t("spurningar á mánuði, engin binding.")}`}
+            </p>
+            <div className="bill-foot" style={{ justifyContent: "flex-start", marginTop: 4 }}>
+              {data.ai.on
+                ? <button className="btn ghost" onClick={() => toggleAi(false)}>{t("Slökkva á viðbót")}</button>
+                : <button className="btn" onClick={() => toggleAi(true)}>{t("Kveikja á VAKTO AI")} · {nf(AI_ADDON_PRICE)} kr/mán</button>}
+            </div>
+          </div>
+        </section>
+      )}
+
       <section className="card">
         <div className="ch"><div><div className="ct">{t("Verðskrá")}</div><div className="cs">{t("öll verð án VSK")}</div></div></div>
         <div className="cb bill-price">
           <div><span>{t("Grunngjald")}<em>{plan.included} {pr?.plan === "v1" ? t("notendur innifaldir") : t("virkir starfsmenn innifaldir")}</em></span><b>{nf(yearly ? plan.baseYear : plan.base)} kr/mán</b></div>
           <div><span>{pr?.plan === "v1" ? t("Hver notandi umfram") : t("Hver virkur starfsmaður umfram")}</span><b>{nf(yearly ? plan.extraYear : plan.extra)} kr/mán</b></div>
           <div><span>{t("Undirritun með rafrænum skilríkjum")}<em>{t("valkvætt")}</em></span><b>{nf(ESIGN_PRICE)} kr</b></div>
+          <div><span>VAKTO AI<em>{t("valkvæð viðbót, allt að")} {nf(AI_ADDON_QUESTIONS)} {t("spurningar á mánuði")}</em></span><b>{nf(AI_ADDON_PRICE)} kr/mán</b></div>
           {pr?.plan !== "v1" && <p>{t("Virkur starfsmaður = átti vakt eða stimplaði sig á tímabilinu. Grunngjaldið er greitt fyrirfram; virkir umfram 5 og undirskriftir eru gerð upp eftir á fyrir mánuðinn sem lauk. Engin binding.")}</p>}
         </div>
       </section>

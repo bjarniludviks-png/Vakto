@@ -62,3 +62,11 @@ html.dark .bill-link { color: var(--brand); }
   .bill-interval .seg { align-self: stretch; }
   .bill-interval .seg button { flex: 1; }
 }
+
+/* VAKTO AI-viðbót */
+.bill-ai-use { display: flex; flex-direction: column; gap: 8px; }
+.bill-ai-use > div:first-child { display: flex; justify-content: space-between; align-items: baseline; font-size: 13.5px; color: var(--ink2); }
+.bill-ai-use b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.bill-meter { height: 8px; border-radius: 999px; background: var(--line2); overflow: hidden; }
+.bill-meter i { display: block; height: 100%; border-radius: inherit; background: var(--brand); }
+.bill-ai-note { margin: 12px 0 0; font-size: 12.5px; line-height: 1.5; color: var(--ink3); }

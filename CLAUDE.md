@@ -374,6 +374,17 @@
   óbreyttar, tæknitexti (Postgres, net) fer í log og notandi fær skiljanleg skilaboð. Ekki skila `error.message` beint.
   Undantekning: tengingapróf í `integration-actions.ts` (stjórnandi þarf svarið frá Payday/DK) og `/admin`.
 
+## VAKTO AI-viðbót (14. okt. 2026, 0075)
+- Valkvæð viðbót: `AI_ADDON_PRICE` 1.990 kr/mán án VSK, allt að 500 spurningar á mánuði (`src/lib/pricing.ts`).
+  Án hennar 25 spurningar á mánuði frítt; í prufu (og `billing_status = free`) allt að 500.
+- Reglurnar: `src/lib/ai/ai-plan.server.ts` (`aiAllowance`, `bumpAiUsage`). Talið í `ai_usage` (fyrirtæki × mánuður)
+  með `ai_usage_bump()` (aðeins service-role) EFTIR hvert svar í `/api/assistant`. Uppurin heimild → 402 með `limit`;
+  spjallið sýnir eiganda hnapp á Stillingar → Áskrift (`#vakto-ai`).
+- `companies.ai_addon` (á/af strax, `setAiAddon`, aðeins eigandi). Greiðslukeyrslan bætir `ai_amount` á hvern
+  reikning sem myndast meðan kveikt er; línan „VAKTO AI, viðbót“ fer á kvittun og Payday-reikning.
+- `/api/assistant` notar prompt caching: föstu leiðbeiningarnar + verkfærin eru í skyndiminni, breytilega samhengið
+  (fyrirtæki, notandi, dagur, síða) er sér kubbur á eftir. Ekki setja breytileg gildi inn í `instructions`.
+
 ## Öryggi: eigin skrif (14. okt. 2026, migration 0076 á staging + prod)
 - **Fannst:** `users_self_update` leyfði notanda að breyta eigin `role` og `company_id` (starfsmaður → eigandi, eða í
   annað fyrirtæki); `employees_self_update` leyfði breytingu á eigin taxta/hlutverki; `punches_self_update/insert` leyfði

@@ -1,5 +1,5 @@
 // Efni síðunnar /skilmalar — birt í AhLegal (src/components/site/ah-legal.tsx) — (/skilmalar).
-export const TERMS_META = { title: "Þjónustuskilmálar", updated: "13. október 2026" };
+export const TERMS_META = { title: "Þjónustuskilmálar", updated: "14. október 2026" };
 
 export function TermsBody() {
   return (
@@ -18,7 +18,7 @@ export function TermsBody() {
 
       <h2>3. Verð og greiðslur</h2>
       <ul>
-        <li>Áskrift kostar <b>9.990 kr. á mánuði</b> fyrir fyrirtækið með 5 virka starfsmenn innifalda og <b>1.490 kr. á mánuði fyrir hvern virkan starfsmann umfram 5</b>. Virkur starfsmaður er sá sem átti skráða vakt eða stimplaði sig á tímabilinu. Grunngjaldið er greitt fyrirfram en virkir starfsmenn umfram 5 eru gerðir upp eftir á fyrir tímabilið sem lauk. Undirritun samninga með rafrænum skilríkjum er valkvæð og kostar <b>490 kr. á hverja undirskrift</b>. Sé greitt árlega fyrirfram er veittur um 15% afsláttur (8.490 kr. + 1.270 kr. á virkan starfsmann umfram). Öll verð eru án virðisaukaskatts.</li>
+        <li>Áskrift kostar <b>9.990 kr. á mánuði</b> fyrir fyrirtækið með 5 virka starfsmenn innifalda og <b>1.490 kr. á mánuði fyrir hvern virkan starfsmann umfram 5</b>. Virkur starfsmaður er sá sem átti skráða vakt eða stimplaði sig á tímabilinu. Grunngjaldið er greitt fyrirfram en virkir starfsmenn umfram 5 eru gerðir upp eftir á fyrir tímabilið sem lauk. Undirritun samninga með rafrænum skilríkjum er valkvæð og kostar <b>490 kr. á hverja undirskrift</b>. VAKTO AI-aðstoðarmaðurinn er innifalinn með allt að 25 spurningum á mánuði; valkvæð viðbót sem kostar <b>1.990 kr. á mánuði</b> veitir allt að 500 spurningar á mánuði, er innheimt með mánaðargjaldinu á meðan kveikt er á henni og má slökkva á hvenær sem er. Sé greitt árlega fyrirfram er veittur um 15% afsláttur (8.490 kr. + 1.270 kr. á virkan starfsmann umfram). Öll verð eru án virðisaukaskatts.</li>
         <li>Nýir viðskiptavinir fá <b>14 daga fría prufu</b> með öllu innifalið. Greiðslukort er skráð við nýskráningu á öruggri greiðslusíðu Straums (Kvika banka); VAKTO geymir aldrei kortanúmer. Ekkert er dregið af kortinu á meðan prufan stendur. Að prufu lokinni hefst áskriftin sjálfkrafa og mánaðargjaldið er tekið af kortinu á gjalddaga, nema áskriftinni hafi verið sagt upp áður.</li>
         <li>Mánaðargjaldið er tekið af skráðu korti fyrirfram fyrir hvert tímabil og kvittun send í tölvupósti. Takist greiðsla ekki er reynt aftur næstu daga og viðskiptavinur látinn vita; berist greiðsla ekki innan 14 daga má VAKTO loka aðgangi þar til greitt er. Gögn eru varðveitt á meðan.</li>
         <li>VAKTO má breyta verðum með minnst 60 daga fyrirvara; breytingar taka gildi við næsta reikningstímabil eftir fyrirvarann.</li>

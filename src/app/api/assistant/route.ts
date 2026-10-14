@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { VAKTO_KNOWLEDGE } from "@/lib/ai/vakto-knowledge";
 import { READ_TOOLS, WRITE_TOOLS, WRITE_NAMES, runReadTool, describeWrite, type PendingAction } from "@/lib/ai/assistant-tools";
 import { assistantUser, rateLimited } from "@/lib/ai/assistant-auth";
+import { aiAllowance, bumpAiUsage } from "@/lib/ai/ai-plan.server";
 
 // VAKTO AI — aðstoðarmaður í horninu (stjórnendur og vaktstjórar).
 // Les gögn með verkfærum; breytingar verða að TILLÖGUM sem notandinn staðfestir með hnappi (sjá ./execute).
@@ -21,6 +22,21 @@ export async function POST(request: Request) {
   if ("error" in me) return NextResponse.json({ ok: false, error: me.error }, { status: me.status });
   if (rateLimited(me.userId)) return NextResponse.json({ ok: false, error: "Of margar fyrirspurnir í einu — bíddu aðeins." }, { status: 429 });
 
+  // Mánaðarheimild (0075): 25 frítt, 500 með viðbót eða í prufu. Þegar hún er búin svarar
+  // aðstoðarmaðurinn ekki; spjallið sýnir þá hnapp á Stillingar → Áskrift.
+  const allowance = await aiAllowance(me.companyId).catch(() => null);
+  if (allowance && allowance.used >= allowance.limit) {
+    const free = allowance.mode === "free";
+    return NextResponse.json({
+      ok: false, limit: { mode: allowance.mode, used: allowance.used, limit: allowance.limit, canUpgrade: free && me.role === "owner" },
+      error: free
+        ? (me.role === "owner"
+          ? `Fríu spurningarnar ${allowance.limit} í þessum mánuði eru búnar. Kveiktu á VAKTO AI-viðbótinni (1.990 kr/mán, allt að 500 spurningar) í Stillingum → Áskrift.`
+          : `Fríu spurningarnar ${allowance.limit} í þessum mánuði eru búnar. Stjórnandi fyrirtækisins getur kveikt á VAKTO AI-viðbótinni í Stillingum → Áskrift.`)
+        : `Spurningarnar ${allowance.limit} í þessum mánuði eru búnar. Heimildin endurnýjast 1. næsta mánaðar; hafðu samband á hallo@vakto.is ef þig vantar meira.`,
+    }, { status: 402 });
+  }
+
   let body: { messages?: Msg[]; path?: string; lang?: string; conversationId?: string } = {};
   try { body = await request.json(); } catch { /* tómt */ }
   const lang = body.lang === "en" ? "en" : body.lang === "vi" ? "vi" : "is";
@@ -33,8 +49,10 @@ export async function POST(request: Request) {
 
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const system = `Þú ert VAKTO AI, aðstoðarmaður inni í vaktakerfinu VAKTO.
-Fyrirtæki: ${me.company}. Notandi: ${me.name} (${me.role === "owner" ? "stjórnandi" : "vaktstjóri"}). Í dag er ${DAYS_IS[now.getDay()]} ${today}. Notandinn er á síðunni ${body.path ?? "/"}.
+  // Föstu leiðbeiningarnar (og verkfærin) eru vistaðar í skyndiminni Anthropic (prompt caching) —
+  // breytilega samhengið (fyrirtæki, notandi, dagur, síða) kemur í sérstökum kubbi á eftir.
+  const context = `Fyrirtæki: ${me.company}. Notandi: ${me.name} (${me.role === "owner" ? "stjórnandi" : "vaktstjóri"}). Í dag er ${DAYS_IS[now.getDay()]} ${today}. Notandinn er á síðunni ${body.path ?? "/"}.`;
+  const instructions = `Þú ert VAKTO AI, aðstoðarmaður inni í vaktakerfinu VAKTO. Fyrirtækið, notandinn, dagurinn í dag og síðan sem notandinn er á koma fram í lok leiðbeininganna.
 
 Hlutverk þín:
 1. Svara spurningum um reksturinn með tölum úr verkfærunum (laun % af veltu, velta, kostnaður, tímar, frávik, hver er á vakt, vaktaplan, beiðnir). Notaðu ALLTAF verkfæri fyrir tölur — aldrei giska eða búa til tölur.
@@ -47,12 +65,17 @@ Tungumál: svaraðu á ${lang === "en" ? "ensku" : lang === "vi" ? "víetnömsku
 
 Um VAKTO:
 ${VAKTO_KNOWLEDGE}`;
+  const system: Anthropic.TextBlockParam[] = [
+    { type: "text", text: instructions, cache_control: { type: "ephemeral" } },
+    { type: "text", text: context },
+  ];
 
   // Svarið getur tekið yfir mínútu (heil vika af vöktum). Til að tengingin slitni ekki sendum við
   // bil á nokkurra sekúndna fresti og JSON-svarið í lokin — JSON.parse hunsar bilin á undan.
   const run = async (): Promise<Record<string, unknown>> => {
   const client = new Anthropic();
-    const tools = [...READ_TOOLS, ...WRITE_TOOLS];
+    const all = [...READ_TOOLS, ...WRITE_TOOLS];
+    const tools: Anthropic.Tool[] = all.map((t, i) => (i === all.length - 1 ? { ...t, cache_control: { type: "ephemeral" } } : t));
     const actions: PendingAction[] = [];
     const msgs: Anthropic.MessageParam[] = [...history];
     let reply = "";
@@ -81,6 +104,7 @@ ${VAKTO_KNOWLEDGE}`;
       console.error("[assistant]", e instanceof Error ? e.message : e);
       return { ok: false, error: lang === "en" ? "VAKTO AI could not answer right now. Try again." : "VAKTO AI gat ekki svarað núna. Reyndu aftur." };
     }
+    await bumpAiUsage(me.companyId);
     // Vista samtalið (þolir að töflurnar vanti — þá er sagan aðeins í vafranum).
     let messageId: string | null = null;
     let conversationId: string | null = /^[0-9a-f-]{36}$/i.test(body.conversationId ?? "") ? body.conversationId! : null;

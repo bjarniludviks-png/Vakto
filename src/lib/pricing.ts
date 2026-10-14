@@ -7,9 +7,15 @@
 //   fyrir tímabilið sem lauk, á sama reikningi.
 // v1 (eldri viðskiptavinir til price_v1_until): 5.990 kr/mán með 5 notendum + 590 kr á notanda umfram.
 // Fullgild rafræn undirskrift (Taktikal): 490 kr á hverja undirskrift (samningur = 2 undirskriftir) — öll plön.
+// VAKTO AI (0075): valkvæð viðbót, 1.990 kr/mán með allt að 500 spurningum á mánuði. Án hennar
+//   25 spurningar á mánuði frítt; í prufu allt að 500. Rukkuð á hverjum mánaðarreikningi sem
+//   myndast á meðan kveikt er á henni (líka þegar grunngjaldið er greitt árlega).
 
 export const VAT_RATE = 0.24;
 export const ESIGN_PRICE = 490;
+export const AI_ADDON_PRICE = 1990;
+export const AI_ADDON_QUESTIONS = 500;
+export const AI_FREE_QUESTIONS = 25;
 
 // baseYear/extraYear = verð á mánuði þegar greitt er árlega (~15% afsláttur). Árgjald = 12 × baseYear, fyrirfram.
 export const PLANS = {
@@ -26,21 +32,22 @@ export function planFor(co: { price_plan?: string | null; price_v1_until?: strin
   return "v2";
 }
 
-export type InvoiceAmounts = { base: number; extra: number; extraCount: number; esign: number; esignCount: number; vat: number; total: number };
+export type InvoiceAmounts = { base: number; extra: number; extraCount: number; esign: number; esignCount: number; ai: number; vat: number; total: number };
 
 /** `units` = virkir starfsmenn (v2) eða notendur (v1); `esigns` = fullgildar undirskriftir á uppgjörstímabilinu.
  *  `base`: "month" = mánaðargjald · "year" = árgjald (12 × baseYear) · "none" = grunngjald þegar greitt (árið).
- *  `yearly` = árleg kjör á umfram-einingar (extraYear). */
-export function invoiceFor(plan: PlanId, units: number, esigns = 0, opts: { base?: "month" | "year" | "none"; yearly?: boolean } = {}): InvoiceAmounts {
+ *  `yearly` = árleg kjör á umfram-einingar (extraYear). `ai` = VAKTO AI-viðbótin er á. */
+export function invoiceFor(plan: PlanId, units: number, esigns = 0, opts: { base?: "month" | "year" | "none"; yearly?: boolean; ai?: boolean } = {}): InvoiceAmounts {
   const p = PLANS[plan];
   const mode = opts.base ?? "month";
   const yearly = opts.yearly ?? mode === "year";
   const extraCount = Math.max(0, units - p.included);
   const base = mode === "year" ? 12 * p.baseYear : mode === "none" ? 0 : p.base;
   const extra = extraCount * (yearly ? p.extraYear : p.extra), esign = esigns * ESIGN_PRICE;
-  const net = base + extra + esign;
+  const ai = opts.ai ? AI_ADDON_PRICE : 0;
+  const net = base + extra + esign + ai;
   const vat = Math.round(net * VAT_RATE);
-  return { base, extra, extraCount, esign, esignCount: esigns, vat, total: net + vat };
+  return { base, extra, extraCount, esign, esignCount: esigns, ai, vat, total: net + vat };
 }
 
 /** Hvernig grunngjald tímabils sem hefst `periodStart` er innheimt.
