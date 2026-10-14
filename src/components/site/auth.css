@@ -46,3 +46,4 @@
 
 /* Tilboðskóði úr söluposti (?kodi=…) */
 .promo-note{margin:14px 0 4px;padding:10px 14px;border-radius:12px;background:var(--brand-soft);color:var(--brand-deep);font-size:13.5px;font-weight:600}
+.promo-bad{margin-top:6px;font-size:12.5px;color:var(--bad)}
