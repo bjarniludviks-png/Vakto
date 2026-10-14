@@ -404,3 +404,11 @@
   (service-role, eigin röð). Spjöldin og heitin eru í `maelabord/widgets.ts`; `layout()` í `dashboard-v2.tsx` setur
   samliggjandi lítil spjöld í eina röð svo falið spjald skilur ekki eftir gat. Nýtt spjald: bæta við `DASH_WIDGETS`,
   `WIDGET_LABEL` og `blocks`.
+
+## Tilkynningar til eiganda (14. okt. 2026, migration 0079)
+- **Nýskráning:** `sendSignupAlert` (email.ts) í `createOwnerAccount` → `OWNER_ALERT_EMAIL` (sjálfgefið bjarni@bgl.is).
+- **Heimsóknir:** `VisitBeacon` (root layout) sendir á `/api/v` aðeins á opnum síðum; `site_visits` geymir slóð, uppruna
+  (referrer-lén, utm_*) og daglegt fingrafar (SHA-256 af IP+vafra+degi+leyndarmáli, engin IP geymd, engar vafrakökur).
+  Vélmenni og headless-vafrar síaðir út. Vercel Web Analytics er EKKI virkt á verkefninu.
+- **Morgunyfirlit:** cron `/api/cron/daily-digest` kl. 08:00 UTC → `buildDailyDigest` (heimsóknir gærdagsins, efstu síður,
+  uppruni, nýskráningar m. kortastöðu, prufur, greiðendur, greitt í gær).

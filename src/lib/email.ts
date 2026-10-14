@@ -506,3 +506,60 @@ export async function sendSignedContractEmail(to: string, o: { employeeName: str
     attachments: [{ filename: o.filename, content: o.pdfBase64 }],
   });
 }
+
+/** Innri tilkynningar til eiganda VAKTO (nýskráning, morgunyfirlit). Viðtakandi: OWNER_ALERT_EMAIL. */
+export const OWNER_ALERT_EMAIL = process.env.OWNER_ALERT_EMAIL || "bjarni@bgl.is";
+
+export async function sendSignupAlert(o: { company: string; name: string; email: string; country?: string | null; companyId?: string | null }) {
+  const when = new Date().toLocaleString("is-IS", { timeZone: "Atlantic/Reykjavik", dateStyle: "short", timeStyle: "short" });
+  return sendEmail({
+    to: OWNER_ALERT_EMAIL,
+    subject: `Ný skráning í VAKTO: ${o.company}`,
+    html: template({
+      preheader: `${o.name} skráði ${o.company} í VAKTO.`,
+      heading: "Ný skráning",
+      body: `<b>${o.name}</b> var að stofna aðgang fyrir <b>${o.company}</b>. Prufan er 14 dagar og aðgangurinn opnast þegar kort hefur verið skráð.`,
+      rows: [["Fyrirtæki", o.company], ["Nafn", o.name], ["Netfang", o.email], ["Land", o.country || "IS"], ["Tími", when]],
+      headingEn: "New signup",
+      bodyEn: `${o.name} just created an account for ${o.company}.`,
+      ctaLabel: "Opna í admin", ctaLabelEn: "Open in admin",
+      ctaHref: o.companyId ? `https://admin.vakto.is/admin/fyrirtaeki/${o.companyId}` : "https://admin.vakto.is/admin/fyrirtaeki",
+    }),
+  });
+}
+
+export type DailyDigest = {
+  dayLabel: string;
+  visits: number; visitors: number;
+  topPages: [string, number][]; topSources: [string, number][];
+  signups: { company: string; name: string; card: boolean }[];
+  trials: number; paying: number; paidYesterday: number; failedYesterday: number;
+};
+
+export async function sendDailyDigest(d: DailyDigest) {
+  const list = (xs: [string, number][]) => xs.length
+    ? xs.map(([k, n]) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #f2f2f5;font-size:14px"><span>${k}</span><b>${n}</b></div>`).join("")
+    : `<div style="font-size:14px;color:#86868b;padding:6px 0">Engin gögn</div>`;
+  const signups = d.signups.length
+    ? d.signups.map((s) => `<div style="padding:6px 0;border-top:1px solid #f2f2f5;font-size:14px"><b>${s.company}</b> · ${s.name} · ${s.card ? "kort skráð" : "ekkert kort enn"}</div>`).join("")
+    : `<div style="font-size:14px;color:#86868b;padding:6px 0">Engar nýskráningar</div>`;
+  const kr = (n: number) => `${n.toLocaleString("de-DE")} kr`;
+  return sendEmail({
+    to: OWNER_ALERT_EMAIL,
+    subject: `VAKTO í gær: ${d.visitors} gestir, ${d.signups.length} ${d.signups.length === 1 ? "skráning" : "skráningar"}`,
+    html: template({
+      preheader: `${d.dayLabel}: ${d.visits} heimsóknir, ${d.visitors} gestir, ${d.signups.length} nýskráningar.`,
+      heading: `Gærdagurinn · ${d.dayLabel}`,
+      body: `Yfirlit yfir heimsóknir á vakto.is og stöðu áskrifta.`,
+      rows: [["Heimsóknir (síðuflettingar)", String(d.visits)], ["Einstakir gestir", String(d.visitors)], ["Nýskráningar", String(d.signups.length)],
+        ["Í prufu núna", String(d.trials)], ["Greiðandi fyrirtæki", String(d.paying)], ["Greitt í gær", kr(d.paidYesterday)],
+        ...(d.failedYesterday ? [["Greiðslur sem mistókust", String(d.failedYesterday)] as [string, string]] : [])],
+      extraHtml: `<div style="margin-top:26px;font-size:15px;font-weight:700">Nýskráningar</div>${signups}
+        <div style="margin-top:22px;font-size:15px;font-weight:700">Mest skoðað</div>${list(d.topPages)}
+        <div style="margin-top:22px;font-size:15px;font-weight:700">Hvaðan gestir komu</div>${list(d.topSources)}`,
+      headingEn: "Yesterday at VAKTO",
+      bodyEn: `${d.visits} page views, ${d.visitors} visitors, ${d.signups.length} signups.`,
+      ctaLabel: "Opna admin", ctaLabelEn: "Open admin", ctaHref: "https://admin.vakto.is/admin",
+    }),
+  });
+}

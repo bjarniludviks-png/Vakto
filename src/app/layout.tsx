@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { SITE_URL } from "@/lib/site";
+import { VisitBeacon } from "@/components/site/visit-beacon";
 
 const DESC = "Vaktakerfi fyrir íslenska vinnustaði: vaktaplan, stimpilklukka, launaútreikningur eftir kjarasamningi og laun sem % af veltu í rauntíma. Skírteini, spjall og ráðningarsamningar í símanum. 14 daga frí prufa.";
 export const metadata: Metadata = {
@@ -65,7 +66,7 @@ export default function RootLayout({
           />
         ))}
       </head>
-      <body>{children}</body>
+      <body>{children}<VisitBeacon /></body>
     </html>
   );
 }

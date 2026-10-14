@@ -3,7 +3,7 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { provisionCompanyForUser } from "@/lib/provision";
-import { sendWelcomeEmail } from "@/lib/email";
+import { sendWelcomeEmail, sendSignupAlert } from "@/lib/email";
 import { requestEmailCode, verifyEmailCode, consumeProof } from "@/lib/signup-verify.server";
 import { validatePassword } from "@/lib/password.server";
 import { verifyTurnstile } from "@/lib/turnstile.server";
@@ -82,6 +82,7 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
       await admin.from("companies").update({ plan: "vakto", trial_ends_at: trialEnds, card_required: true, terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }).eq("id", prov.companyId);
     }
     await sendWelcomeEmail(email, fullName, companyName); // no-op until Resend is configured
+    await sendSignupAlert({ company: companyName, name: fullName, email, country: input.country, companyId: prov.companyId }).catch((e) => console.error("[signup-alert]", e));
     return { ok: true };
   } catch (e) {
     { console.error("[signup]", e); return { ok: false, error: "Nýskráning tókst ekki — reyndu aftur eða hafðu samband við hallo@vakto.is." }; }
