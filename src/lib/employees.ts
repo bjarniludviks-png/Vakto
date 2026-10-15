@@ -1,5 +1,6 @@
 // Pure types + helpers — safe to import from Client Components.
-import type { CustomRules } from "@/lib/payrules";
+import type { CustomRules, OrlofSet } from "@/lib/payrules";
+import type { PaySettings } from "@/lib/paysettings";
 
 export type Employee = {
   id: string;
@@ -28,6 +29,8 @@ export type Employee = {
   payRule?: CustomRules | null;
   permissions?: { clock: boolean; shifts: boolean; pay: boolean; requests: boolean; card: boolean; chat: boolean } | null;
   benefits?: { name: string; type: "fixed" | "perkm"; amount: number }[] | null;
+  pay?: Partial<PaySettings> | null;   // 0081: eigin stillingar ofan á companies.pay_defaults (þegar sameinað)
+  orlof?: Partial<OrlofSet> | null;
 };
 
 /** Avatar initials = first two letters of the first name (matches the

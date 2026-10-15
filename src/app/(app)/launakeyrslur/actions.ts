@@ -4,8 +4,9 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { computeFromPunches, computeUppbot, uppbotForMonth, uppbotMonths, totals as sumTotals, type PayLine } from "@/lib/payroll";
-import { resolveRuleSet, resolveUppbot } from "@/lib/payrules";
+import { resolveRuleSet, resolveUppbot, resolveOrlof } from "@/lib/payrules";
 import { getEmployees } from "@/lib/employees.server";
+import { resolvePay } from "@/lib/paysettings";
 import { initials } from "@/lib/employees";
 import { nf, dec1 } from "@/lib/format";
 import { logAudit } from "@/lib/audit";
@@ -118,9 +119,9 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
         const e = empOf(l.employeeId);
         return {
           id: l.employeeId, n: l.name.split(/\s+/)[0], av: initials(l.name), c: colorOf(l.employeeId),
-          h: dec1(shownHours(l)), g: nf(l.gross), w: "−" + nf(l.withholding), p: "−" + nf(l.pension + l.union), net: nf(l.net),
+          h: dec1(shownHours(l)), g: nf(l.gross), w: "−" + nf(l.withholding), p: "−" + nf(l.pension + l.extraPension + l.union), net: nf(l.net),
           monthly: e?.payType === "monthly",
-          x: { hours: shownHours(l), gross: l.gross, withholding: l.withholding, pu: l.pension + l.union, net: l.net, cost: l.cost },
+          x: { hours: shownHours(l), gross: l.gross, withholding: l.withholding, pu: l.pension + l.extraPension + l.union, net: l.net, cost: l.cost, orl: l.orlofAccrued, ep: l.employerPension, ins: l.insurance, fu: l.funds },
           d: {
             name: l.name, kennitala: e?.kennitala ?? null, title: e?.title || e?.position || null, union: e?.union ?? null, bankAccount: e?.bankAccount ?? null,
             company: (co?.name as string) ?? "", companyKt: (co?.kennitala as string) ?? null,
@@ -128,13 +129,18 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
             payType: e?.payType === "monthly" ? "monthly" : "hourly", rate: e?.rate ?? 0,
             hours: l.hours, dayPay: l.dayPay, premiums: l.premiums, overtime: l.overtime, uppbot: l.uppbot,
             gross: l.gross, pension: l.pension, unionFee: l.union, withholding: l.withholding, net: l.net,
+            orlof: l.orlof, orlofToBank: l.orlofToBank, extraPension: l.extraPension, allowanceUsed: l.allowanceUsed,
+            benefits: l.benefits, benefitsInKind: l.benefitsInKind, benefitsFree: l.benefitsFree,
+            pensionPct: resolvePay(e?.pay).pensionPct, extraPensionPct: resolvePay(e?.pay).extraPensionPct,
+            unionFeePct: resolvePay(e?.pay).unionFeePct, orlofPct: resolveOrlof(e?.orlof).pct,
           },
         };
       }),
       totals: {
+        lv: { orl: lines.reduce((a, l) => a + l.orlofAccrued, 0), ep: t.employerPension, ins: t.insurance, fu: t.funds },
         count: lines.length, hours: dec1(lines.reduce((a, l) => a + shownHours(l), 0)), gross: nf(t.gross), withholding: "−" + nf(t.withholding),
         pensionUnion: "−" + nf(t.pension + t.union), net: nf(t.net), cost: nf(t.cost),
-        grossM: million(t.gross), netM: million(t.net), costM: million(t.cost), withholdingM: million(t.withholding), insuranceM: million(Math.round(t.gross * 0.0635)),
+        grossM: million(t.gross), netM: million(t.net), costM: million(t.cost), withholdingM: million(t.withholding), insuranceM: million(t.insurance),
       },
       live: true, needsMigration, periodLabel: `${niceISO(from)} – ${niceISO(to)}`, from, to, contractors,
     };
@@ -171,6 +177,7 @@ export async function runPayroll(from?: string, to?: string, settleIds: string[]
         import("../skyrslur/timebank.server"), import("@/lib/payroll"),
       ]);
       const bank = await getTimeBank();
+      const { employees: emps } = await getEmployees();
       const { data: empsMeta } = await supabase
         .from("employees").select("id, pay_type, rate").eq("company_id", company);
       const metaById = new Map((empsMeta ?? []).map((e) => [e.id as string, e]));
@@ -184,7 +191,9 @@ export async function runPayroll(from?: string, to?: string, settleIds: string[]
         if (baseHourly <= 0) continue;
         const offsetHours = Math.min(-bal, 173);
         const adj = Math.round(offsetHours * baseHourly);
-        lines[i] = applyGrossAdjustment(l, adj);
+        const emp = emps.find((x) => x.id === l.employeeId);
+        if (!emp) continue;
+        lines[i] = applyGrossAdjustment(l, adj, emp, Number(start.slice(0, 4)));
         tb.set(l.employeeId, { hours: Math.round(offsetHours * 10) / 10, adj });
       }
     }
@@ -200,13 +209,24 @@ export async function runPayroll(from?: string, to?: string, settleIds: string[]
       day_pay: l.dayPay, premiums: l.premiums, overtime: l.overtime,
       withholding: l.withholding, pension: l.pension, union_fee: l.union, net: l.net,
     });
+    // 0081: allar launatengdar fjárhæðir á línuna. Án migration fellur innsetningin aftur á eldri dálka.
+    const fullRow = (l: PayLine) => ({
+      orlof: l.orlof, orlof_to_bank: l.orlofToBank, orlof_accrued: l.orlofAccrued, extra_pension: l.extraPension,
+      allowance_used: l.allowanceUsed, employer_pension: l.employerPension, insurance: l.insurance, funds: l.funds, cost: l.cost,
+      benefits: l.benefits, benefits_in_kind: l.benefitsInKind, benefits_free: l.benefitsFree,
+    });
     // Try with the uppbot column (migration 0017); retry without if not yet run.
     let linesErr = (await supabase.from("payroll_lines").insert(
       lines.map((l) => {
         const t2 = tb.get(l.employeeId);
-        return { ...baseRow(l), uppbot: l.uppbot, timebank_hours: t2?.hours ?? 0, timebank_adj: t2?.adj ?? 0 };
+        return { ...baseRow(l), ...fullRow(l), uppbot: l.uppbot, timebank_hours: t2?.hours ?? 0, timebank_adj: t2?.adj ?? 0 };
       }),
     )).error;
+    if (linesErr && /orlof|pension|insurance|funds|allowance|cost|benefits/.test(linesErr.message)) {
+      linesErr = (await supabase.from("payroll_lines").insert(
+        lines.map((l) => { const t2 = tb.get(l.employeeId); return { ...baseRow(l), uppbot: l.uppbot, timebank_hours: t2?.hours ?? 0, timebank_adj: t2?.adj ?? 0 }; }),
+      )).error;
+    }
     if (linesErr && /timebank/.test(linesErr.message)) {
       linesErr = (await supabase.from("payroll_lines").insert(
         lines.map((l) => ({ ...baseRow(l), uppbot: l.uppbot })),
@@ -216,6 +236,17 @@ export async function runPayroll(from?: string, to?: string, settleIds: string[]
       linesErr = (await supabase.from("payroll_lines").insert(lines.map(baseRow))).error;
     }
     if (linesErr) return { ok: false, error: userError(linesErr) };
+
+    // Nýttur uppsafnaður persónuafsláttur gengur af inneign starfsmanns (employees.pay_settings).
+    const used = lines.filter((l) => l.allowanceUsed > 0);
+    if (used.length) {
+      const { data: ps } = await supabase.from("employees").select("id, pay_settings").in("id", used.map((l) => l.employeeId));
+      for (const l of used) {
+        const cur = ((ps ?? []).find((x) => x.id === l.employeeId)?.pay_settings ?? {}) as { accumulatedAllowance?: number };
+        const left = Math.max(0, Math.round((Number(cur.accumulatedAllowance) || 0) - l.allowanceUsed));
+        await supabase.from("employees").update({ pay_settings: { ...cur, accumulatedAllowance: left } }).eq("id", l.employeeId);
+      }
+    }
 
     await logAudit(supabase, company, ctx.userId, {
       action: "payroll.run", entity: "payroll_run", entityId: run.id as string,
@@ -281,7 +312,7 @@ export async function getPayrollHistory(year: number): Promise<PayrollHistory> {
     if (!runs?.length) return { live: true, months: emptyMonths() };
     const runMonth = new Map(runs.map((r) => [r.id as string, new Date(r.period_start as string).getMonth()]));
     const { data: lines } = await supabase.from("payroll_lines")
-      .select("run_id, gross, net, withholding, pension, union_fee")
+      .select("*")
       .in("run_id", runs.map((r) => r.id as string));
     const months = emptyMonths();
     for (const l of lines ?? []) {
@@ -291,8 +322,10 @@ export async function getPayrollHistory(year: number): Promise<PayrollHistory> {
       months[m].net += Number(l.net) || 0;
       months[m].withholding += Number(l.withholding) || 0;
       months[m].pension += (Number(l.pension) || 0) + (Number(l.union_fee) || 0);
-      months[m].insurance += gross * 0.0635;
-      months[m].orlof += gross * 0.1017;
+      // Keyrslur fyrir 0081 geymdu ekki gjöldin — þá staðalhlutföll.
+      months[m].insurance += l.insurance != null ? Number(l.insurance) : gross * 0.0635;
+      months[m].orlof += l.orlof_accrued != null ? Number(l.orlof_accrued) + Number(l.orlof ?? 0) : gross * 0.1017;
+      months[m].pension += Number(l.extra_pension ?? 0);
     }
     return { live: true, months };
   } catch {

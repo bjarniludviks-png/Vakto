@@ -1,10 +1,12 @@
 "use client";
 
-// Velkomin-kynning fyrir starfsmann: birtist einu sinni við fyrstu innskráningu í Mitt svæði
-// (localStorage), þrjú stutt skref um það sem skiptir máli fyrsta daginn.
+// Velkomin-kynning fyrir starfsmann: birtist einu sinni við fyrstu innskráningu í Mitt svæði,
+// þrjú stutt skref um það sem skiptir máli fyrsta daginn. Vistað á aðganginum (users.welcome_seen_at)
+// og í localStorage — localStorage eitt og sér gildir aðeins fyrir einn vafra og eitt lén.
 
 import { useEffect, useState } from "react";
 import { useLang } from "@/components/app/lang";
+import { getWelcomeSeen, markWelcomeSeen } from "./actions";
 
 const KEY = "vakto-welcome-v1";
 
@@ -19,10 +21,17 @@ export function WelcomeTour({ firstName }: { firstName?: string }) {
   const [open, setOpen] = useState(false);
   const [i, setI] = useState(0);
   useEffect(() => {
-    try { if (!localStorage.getItem(KEY)) requestAnimationFrame(() => setOpen(true)); } catch { /* private mode */ }
+    try { if (localStorage.getItem(KEY)) return; } catch { /* private mode */ }
+    let live = true;
+    getWelcomeSeen().then((seen) => {
+      if (!live) return;
+      if (seen) { try { localStorage.setItem(KEY, "1"); } catch { /* ignore */ } }
+      else setOpen(true);
+    });
+    return () => { live = false; };
   }, []);
   if (!open) return null;
-  const close = () => { setOpen(false); try { localStorage.setItem(KEY, "1"); } catch { /* ignore */ } };
+  const close = () => { setOpen(false); try { localStorage.setItem(KEY, "1"); } catch { /* ignore */ } void markWelcomeSeen(); };
   const s = SLIDES[i];
   const last = i === SLIDES.length - 1;
   return (

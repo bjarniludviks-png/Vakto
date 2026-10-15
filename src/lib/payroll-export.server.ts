@@ -1,9 +1,10 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { computeLine, computeFromPunches, hourBuckets, type PayLine } from "@/lib/payroll";
-import { resolveRuleSet } from "@/lib/payrules";
+import { computeLine, computeFromPunches, hourBuckets, computeUppbot, uppbotForMonth, uppbotMonths, type PayLine } from "@/lib/payroll";
+import { resolveRuleSet, resolveUppbot } from "@/lib/payrules";
 import { DEMO_EMPLOYEES, type Employee } from "@/lib/employees";
+import { getEmployees } from "@/lib/employees.server";
 
 // Launalínur + tímar flokkaðir fyrir launakerfi (Payday/DK/Excel). Notað af útflutnings-
 // endapunktinum og beinni sendingu í Payday, svo báðar leiðir skili nákvæmlega sömu tölum.
@@ -35,9 +36,12 @@ export async function getExportLines(from?: string, to?: string): Promise<{ line
     if (!profile?.company_id || (profile.role !== "owner" && profile.role !== "manager")) return { lines: [], kt: {}, hours, monthly, live: true, denied: true };
     const company = profile.company_id as string;
     const { data: emps } = company
-      ? await supabase.from("employees").select("id, full_name, kennitala, pay_type, rate, employment_ratio, union_agreement, role").eq("company_id", company).neq("role", "contractor")
+      ? await supabase.from("employees").select("id, full_name, kennitala, pay_type, rate, employment_ratio, union_agreement, role, hire_date").eq("company_id", company).neq("role", "contractor")
       : { data: null };
     if (!emps?.length) return { lines: [], kt: {}, hours, monthly, live: true }; // aldrei sýnigögn fyrir innskráð fyrirtæki
+    // Launaliðir (skattkort, lífeyrir, orlof …) eins og í launakeyrslunni.
+    const payOf = new Map((await getEmployees()).employees.map((x) => [x.id, { pay: x.pay, orlof: x.orlof, benefits: x.benefits }]));
+    const toEmpP = (e: Record<string, unknown>): Employee => ({ ...toEmp(e), ...(payOf.get(e.id as string) ?? {}) });
     const kt: Record<string, string> = {};
     emps.forEach((e) => { if (e.kennitala) kt[e.id as string] = e.kennitala as string; if (e.pay_type === "monthly") monthly.add(e.id as string); });
 
@@ -70,12 +74,16 @@ export async function getExportLines(from?: string, to?: string): Promise<{ line
           // Fastlaunafólk fær laun óháð tímum — engir álagsliðir þar.
           const hb = hourBuckets(group, rules);
           hours.set(e.id as string, e.pay_type === "hourly" ? hb : { dagvinna: Math.round((hb.dagvinna + hb.yfirvinna) * 100) / 100, yfirvinna: 0, alag: {} });
-          return computeFromPunches(toEmp(e), group, rules);
+          // Desember-/orlofsuppbót í júní/desember — sama regla og launakeyrslan.
+          const y = Number(from.slice(0, 4)), uk = uppbotForMonth(Number(from.slice(5, 7)));
+          const hire = (e as { hire_date?: string | null }).hire_date ?? null;
+          const ub = uk ? computeUppbot(resolveUppbot(e.union_agreement as string, null, y)[uk], Number(e.employment_ratio), uppbotMonths(uk, y, hire)) : 0;
+          return computeFromPunches(toEmpP(e), group, rules, ub, y);
         });
       return { lines, kt, hours, monthly, live: true };
     }
 
-    const lines = emps.map((e) => computeLine(toEmp(e)));
+    const lines = emps.map((e) => computeLine(toEmpP(e)));
     return { lines, kt, hours, monthly, live: true };
   } catch (e) {
     console.error("[payroll-export]", e);

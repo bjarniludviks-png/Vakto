@@ -131,6 +131,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
   const T = !usePp ? view.totals : !canPick || !partial ? pp.totals : {
     ...pp.totals, count: picked.length, hours: dec1(sum((x) => x.hours)), gross: nf(sum((x) => x.gross)), withholding: "−" + nf(sum((x) => x.withholding)),
     pensionUnion: "−" + nf(sum((x) => x.pu)), net: nf(sum((x) => x.net)), cost: nf(sum((x) => x.cost)),
+    lv: { orl: sum((x) => x.orl ?? 0), ep: sum((x) => x.ep ?? 0), ins: sum((x) => x.ins ?? 0), fu: sum((x) => x.fu ?? 0) },
   };
   const idsQs = partial ? `&ids=${picked.map((r) => r.id).join(",")}` : "";
   const toggle = (id: string) => setOff((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -170,7 +171,8 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
   const gross = num(T.gross), net = num(T.net), wh = num(T.withholding), pu = num(T.pensionUnion);
   const cost = num(T.cost) || Math.round(gross * 1.302);
   const levies = Math.max(0, cost - gross);
-  const orlof = Math.round(gross * 0.1017), pens = Math.round(gross * 0.115), trygg = Math.round(gross * 0.0635);
+  // Raunveruleg gjöld úr útreikningi starfsmanna (T.lv); gömul gögn án þeirra → staðalhlutföll.
+  const orlof = T.lv ? T.lv.orl : Math.round(gross * 0.1017), pens = T.lv ? T.lv.ep : Math.round(gross * 0.115), trygg = T.lv ? T.lv.ins : Math.round(gross * 0.0635);
   const parts = [
     { k: "Útborgað", v: net, c: "var(--good)" },
     { k: "Staðgreiðsla", v: wh, c: "var(--warn)" },
@@ -223,10 +225,10 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
           <div className="db2-v">{nf(net)}<small>kr</small></div>
           <div className="db2-lines">
             <div><span>{t("Brúttólaun")}</span><b>{nf(gross)} kr</b></div>
-            <div><span>{t("Orlof 10,17%")}</span><b>+{nf(orlof)} kr</b></div>
-            <div><span>{t("Mótframlag lífeyris 11,5%")}</span><b>+{nf(pens)} kr</b></div>
+            {orlof > 0 && <div><span>{t("Uppsafnað orlof")}</span><b>+{nf(orlof)} kr</b></div>}
+            <div><span>{t("Mótframlag í lífeyrissjóði")}</span><b>+{nf(pens)} kr</b></div>
             <div><span>{t("Tryggingagjald 6,35%")}</span><b>+{nf(trygg)} kr</b></div>
-            {levies - orlof - pens - trygg > 0 && <div><span>{t("Önnur launatengd gjöld (sjóðir o.fl.)")}</span><b>+{nf(levies - orlof - pens - trygg)} kr</b></div>}
+            {levies - orlof - pens - trygg > 0 && <div><span>{t("Sjóðir stéttarfélaga")}</span><b>+{nf(levies - orlof - pens - trygg)} kr</b></div>}
             <div className="tot"><span>{t("Heildarkostnaður")}</span><b>{nf(cost)} kr</b></div>
           </div>
         </div>
