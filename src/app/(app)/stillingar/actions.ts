@@ -606,6 +606,7 @@ export async function inviteUser(input: { email: string; role: string }): Promis
 import type { RuleSet, RuleTemplate } from "@/lib/rules";
 import { RULE_PRESETS } from "@/lib/rules";
 import { userError } from "@/lib/user-error";
+import type { PaySettings } from "@/lib/paysettings";
 
 export type RuleTemplateInput = {
   id?: string;
@@ -1009,5 +1010,39 @@ export async function setAiAddon(on: boolean): Promise<SettingsResult> {
     return { ok: true };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
+
+/** Sjálfgefnir launaliðir fyrirtækis (0081 companies.pay_defaults): lífeyrir, félagsgjald, sjóðir og orlof.
+ *  Gilda fyrir alla starfsmenn sem hafa ekki eigin stillingu. */
+export async function savePayDefaults(input: Partial<PaySettings> & { orlof?: { mode: string; pct: number } }): Promise<SettingsResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const clean = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined && v !== null && v !== ""));
+    const { error } = await supabase.from("companies").update({ pay_defaults: clean }).eq("id", ctx.company);
+    if (error) return dbFail("savePayDefaults", error);
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "company.pay_defaults", entity: "companies", detail: "Sjálfgefnir launaliðir uppfærðir" });
+    revalidatePath("/stillingar"); revalidatePath("/launakeyrslur"); revalidatePath("/starfsfolk");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
+export async function getPayDefaults(): Promise<(Partial<PaySettings> & { orlof?: { mode: string; pct: number } }) | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return null;
+    const { data, error } = await supabase.from("companies").select("pay_defaults").eq("id", ctx.company).maybeSingle();
+    if (error) return null;
+    return ((data as { pay_defaults?: Partial<PaySettings> } | null)?.pay_defaults) ?? {};
+  } catch {
+    return null;
   }
 }

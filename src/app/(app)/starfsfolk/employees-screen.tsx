@@ -19,6 +19,9 @@ import { templateToPayRule, type RuleTemplate } from "@/lib/rules";
 import { listRuleTemplates } from "../stillingar/actions";
 import { ContractView, ContractEditor } from "@/components/app/contract-view";
 import { Av } from "@/components/app/avatar";
+import { PaySettingsCard } from "./pay-settings";
+import { computeLine } from "@/lib/payroll";
+import { ORLOF_DAYS, orlofPctForDays, orlofDaysForPct } from "@/lib/paysettings";
 
 /** Best-effort document type from a filename (for the documents table). */
 function detectDocType(name: string): string {
@@ -29,23 +32,10 @@ function detectDocType(name: string): string {
   return "skjal";
 }
 
-/** Lightweight Icelandic kjarasamninga preview (brief §9). */
+/** Áætluð mánaðarlaun starfsmanns með sömu reglum og launakeyrslan (skattþrep, skattkort, lífeyrir, orlof). */
 function payrollPreview(e: Employee) {
-  const PERSONAL = 68691;
-  let gross: number;
-  if (e.payType === "monthly") {
-    gross = e.rate;
-  } else {
-    const hours = Math.round(173 * (e.employmentRatio / 100));
-    gross = hours * e.rate * 1.18; // dagvinna + álög uplift
-  }
-  const pension = gross * 0.04;
-  const unionFee = gross * 0.01;
-  const taxable = Math.max(0, gross - pension);
-  const withholding = Math.max(0, taxable * 0.3162 - PERSONAL);
-  const net = gross - pension - unionFee - withholding;
-  const cost = gross * 1.302; // +30,2% byrði
-  return { gross, net, cost };
+  const l = computeLine(e);
+  return { gross: l.gross, net: l.net, cost: l.cost };
 }
 
 
@@ -416,6 +406,7 @@ function LaunTab({ e }: { e: Employee }) {
   // Orlof (vacation) handling — accrue vs pay out, + orlofsprósenta.
   const [orlofMode, setOrlofMode] = useState<string>(DEFAULT_ORLOF.mode);
   const [orlofPct, setOrlofPct] = useState<number>(DEFAULT_ORLOF.pct);
+  const [orlofCustom, setOrlofCustom] = useState(false);
   useEffect(() => {
     getEmployeeOrlof(e.id).then((o) => { if (o) { setOrlofMode(o.mode); setOrlofPct(o.pct); } });
   }, [e.id]);
@@ -654,10 +645,16 @@ function LaunTab({ e }: { e: Employee }) {
 
       <Sec>{t("Orlof")}</Sec>
       <div className="statline">
-        <span className="k">{t("Orlofsprósenta")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("t.d. 10,17%")}</span></span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <input type="number" min={0} step="0.01" value={orlofPct} onChange={(ev) => saveOrlof(orlofMode, Math.max(0, Number(ev.target.value) || 0))} style={{ ...FLD, width: 80, textAlign: "right" }} />
-          <span className="muted">%</span>
+        <span className="k">{t("Orlofsdagar")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("orlofsprósenta")}</span></span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <select value={orlofCustom ? "other" : (orlofDaysForPct(orlofPct) ?? "other")} onChange={(ev) => { if (ev.target.value === "other") setOrlofCustom(true); else { setOrlofCustom(false); saveOrlof(orlofMode, orlofPctForDays(Number(ev.target.value))); } }} style={{ ...FLD, width: 150 }}>
+            {ORLOF_DAYS.map((d) => <option key={d} value={d}>{d} ({String(orlofPctForDays(d)).replace(".", ",")}%)</option>)}
+            <option value="other">{t("Önnur prósenta")}</option>
+          </select>
+          {(orlofCustom || orlofDaysForPct(orlofPct) == null) && (<>
+            <input type="number" min={0} step="0.01" value={orlofPct} onChange={(ev) => saveOrlof(orlofMode, Math.max(0, Number(ev.target.value) || 0))} style={{ ...FLD, width: 80, textAlign: "right" }} />
+            <span className="muted">%</span>
+          </>)}
         </span>
       </div>
       <div className="statline">
@@ -671,6 +668,8 @@ function LaunTab({ e }: { e: Employee }) {
           : orlofMode === "to_bank" ? t("Orlof leggst inn á orlofsreikning starfsmanns.")
             : t("Orlof safnast upp og birtist á launaseðli sem inneign.")}
       </p>
+
+      {isIS && <PaySettingsCard employeeId={e.id} orlofMode={orlofMode} />}
 
       <Sec>Hlunnindi & styrkir</Sec>
       {benefits.length === 0 && <p className="muted" style={{ fontSize: 12, margin: "2px 0 6px" }}>{t("Engin hlunnindi skráð — bættu við einu eða fleiri hér að neðan.")}</p>}

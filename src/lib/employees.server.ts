@@ -3,6 +3,8 @@ import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { DEMO_EMPLOYEES, type Employee } from "@/lib/employees";
+import type { PaySettings } from "@/lib/paysettings";
+import type { OrlofSet } from "@/lib/payrules";
 import { colorFor } from "@/lib/avatar";
 
 type Row = {
@@ -60,7 +62,20 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
     let ex = await supabase.from("employees").select("id, address, next_of_kin, postal_code, city, hire_date");
     if (ex.error) ex = await supabase.from("employees").select("id, address, next_of_kin, hire_date") as typeof ex; // fyrir 0060
     const extra = new Map((ex.error ? [] : ex.data ?? []).map((x) => [x.id as string, x as Extra]));
+    // Launaliðir (0081) + orlof (0021): sér fyrirspurn svo listinn virki þótt migration vanti.
+    const paq = await supabase.from("employees").select("id, pay_settings, orlof");
+    const payOf = new Map((paq.error ? [] : paq.data ?? []).map((x) => [x.id as string, x as { pay_settings: Partial<PaySettings> | null; orlof: Partial<OrlofSet> | null }]));
+    let coDefaults: Partial<PaySettings> | null = null;
+    if (!paq.error) {
+      const { data: me } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
+      if (me?.company_id) {
+        const cd = await supabase.from("companies").select("pay_defaults").eq("id", me.company_id).maybeSingle();
+        coDefaults = (cd.data as { pay_defaults?: Partial<PaySettings> | null } | null)?.pay_defaults ?? null;
+      }
+    }
     const employees: Employee[] = rows.map((r) => ({
+      pay: { ...(coDefaults ?? {}), ...(payOf.get(r.id)?.pay_settings ?? {}) },
+      orlof: payOf.get(r.id)?.orlof ?? (coDefaults as { orlof?: Partial<OrlofSet> } | null)?.orlof ?? null,
       address: extra.get(r.id)?.address ?? null,
       nextOfKin: extra.get(r.id)?.next_of_kin ?? null,
       postalCode: extra.get(r.id)?.postal_code ?? null,

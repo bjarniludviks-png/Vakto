@@ -50,11 +50,14 @@ export function PayslipModal({ data, onClose }: { data: PayslipData; onClose: ()
               {d.premiums > 0 && <Row label={t("Álag")} v={k(d.premiums)} />}
               {d.overtime > 0 && <Row label={t("Yfirvinnuálag")} v={k(d.overtime)} />}
               {d.uppbot > 0 && <Row label={t("Desember-/orlofsuppbót")} v={k(d.uppbot)} />}
+              {(d.orlof ?? 0) > 0 && <Row label={t("Orlof")} v={k(d.orlof!)} />}
               <Row label={t("Brúttó")} v={k(d.gross)} />
               <div className="hr" />
-              <Row label={t("Lífeyrissjóður (4%)")} v={k(d.pension)} neg />
+              <Row label={t("Lífeyrissjóður")} v={k(d.pension)} neg />
+              {(d.extraPension ?? 0) > 0 && <Row label={t("Viðbótarlífeyrissparnaður")} v={k(d.extraPension!)} neg />}
               <Row label={t("Félagsgjald")} v={k(d.unionFee)} neg />
               <Row label={t("Staðgreiðsla")} v={k(d.withholding)} neg />
+              {(d.orlofToBank ?? 0) > 0 && <Row label={t("Orlof á orlofsreikning")} v={k(d.orlofToBank!)} neg />}
               <div className="hr" />
               <Row label={t("Útborgað")} v={k(d.net)} strong />
             </>);
@@ -67,7 +70,7 @@ export function PayslipModal({ data, onClose }: { data: PayslipData; onClose: ()
           <div className="hr" />
           <Row label={t("Útborgað")} v={`${data.net} kr`} strong />
           </>)}
-          <p className="ps-note">{t("Áætlun VAKTO. Staðgreiðsla, lífeyrir og félagsgjöld eru reiknuð með einföldum föstum hlutföllum; endanlegur launaseðill kemur úr launakerfinu.")}</p>
+          <p className="ps-note">{t("Reiknað í VAKTO eftir skattþrepum ársins, skattkorti og stillingum starfsmanns. Endanlegur launaseðill kemur úr launakerfinu.")}</p>
           <div style={{ display: "flex", gap: 9, marginTop: 18 }}>
             <AsyncButton className="btn" onClick={async () => {
               try {
