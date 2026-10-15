@@ -89,7 +89,7 @@ export async function getAiScheduleProposal(prompt: string, context: string, lan
     messages: [
       {
         role: "user",
-        content: `Núverandi staða vaktaplans (þessi vika):\n${context}\n\nBeiðni notanda:\n${prompt || "Bestun vaktaplans"}${lang === "en" ? "\n\nThe user's interface is in English: write the summary and every item (title, detail, tag) in English." : lang === "vi" ? "\n\nGiao diện của người dùng là tiếng Việt: viết phần tóm tắt và mọi mục bằng tiếng Việt." : ""}`,
+        content: `Núverandi staða vaktaplans (þessi vika):\n${context}\n\nBeiðni notanda:\n${prompt || "Bestun vaktaplans"}${lang === "en" ? "\n\nThe user's interface is in English: write the summary and every item (title, detail, tag) in English." : lang === "vi" ? "\n\nGiao diện của người dùng là tiếng Việt: viết phần tóm tắt và mọi mục bằng tiếng Việt." : lang === "pl" ? "\n\nInterfejs użytkownika jest po polsku: napisz podsumowanie i każdy element (tytuł, szczegóły, etykietę) po polsku." : ""}`,
       },
     ],
   });

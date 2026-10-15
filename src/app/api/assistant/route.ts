@@ -39,7 +39,7 @@ export async function POST(request: Request) {
 
   let body: { messages?: Msg[]; path?: string; lang?: string; conversationId?: string } = {};
   try { body = await request.json(); } catch { /* tómt */ }
-  const lang = body.lang === "en" ? "en" : body.lang === "vi" ? "vi" : "is";
+  const lang = body.lang === "en" ? "en" : body.lang === "vi" ? "vi" : body.lang === "pl" ? "pl" : "is";
   const history: Anthropic.MessageParam[] = (body.messages ?? [])
     .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
     .slice(-20)
@@ -61,7 +61,7 @@ Hlutverk þín:
 4. Svara „hvernig geri ég…“ spurningum út frá upplýsingunum hér að neðan. Ef þú veist ekki svarið, vísaðu á hallo@vakto.is.
 
 Reglur: stutt og skýrt, punktalistar frekar en töflur, engin emoji. Upphæðir eins og „12.345 kr.“ og prósentur með kommu („27,6 %“). Breyttu afstæðum dagsetningum („næsta föstudag“, „síðasta vika“) í nákvæma dagsetningu og nefndu hana. Vikan byrjar á mánudegi. Ef eitthvað er óljóst, spurðu einnar spurningar í einu. Laun % af veltu: lægra er betra, miðað við markmið fyrirtækisins.
-Tungumál: svaraðu á ${lang === "en" ? "ensku" : lang === "vi" ? "víetnömsku" : "íslensku"} nema notandinn skrifi greinilega á öðru máli.
+Tungumál: svaraðu á ${lang === "en" ? "ensku" : lang === "vi" ? "víetnömsku" : lang === "pl" ? "pólsku" : "íslensku"} nema notandinn skrifi greinilega á öðru máli.
 
 Um VAKTO:
 ${VAKTO_KNOWLEDGE}`;
