@@ -10,6 +10,7 @@ import * as DocumentPicker from "expo-document-picker";
 import { Linking, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
+import * as Haptics from "expo-haptics";
 import { Txt, Muted, Avatar, Sheet, Row, useToast } from "../../src/components/ui";
 import { uploadImage } from "../../src/lib/api/feed";
 import { colors, font, useTheme } from "../../src/theme";
@@ -85,6 +86,8 @@ export default function Thread() {
   const [viewer, setViewer] = useState<string | null>(null);
   // tímastimplar eru faldir hægra megin við skjáinn; strok til vinstri dregur þá inn (eins og í Messenger)
   const { width: W } = useWindowDimensions();
+  const inputRef = useRef<TextInput>(null);
+  const replyWith = useCallback((m: ChatMessage) => { setReplyTo(m); setTimeout(() => inputRef.current?.focus(), 60); }, []);
   const pull = useRef(new Animated.Value(0)).current;
   const pan = useRef(PanResponder.create({
     onMoveShouldSetPanResponder: (_e, g) => g.dx < -10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.6,
@@ -236,7 +239,7 @@ export default function Thread() {
             </View>
           ) : (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={{ width: W - 28 }}><Bubble item={item} onLong={() => setSel(item.m)} onImage={setViewer} /></View>
+              <View style={{ width: W - 28 }}><SwipeReply onReply={() => replyWith(item.m)}><Bubble item={item} onLong={() => setSel(item.m)} onImage={setViewer} /></SwipeReply></View>
               <View style={{ width: TIME_W + 14, alignItems: "center", paddingBottom: item.last ? 8 : 2 }}>
                 <Txt size={11} color={colors.ink3} style={{ fontVariant: ["tabular-nums"] }}>{item.m.at}</Txt>
               </View>
@@ -261,6 +264,7 @@ export default function Thread() {
           <Paperclip color={colors.ink2} size={20} />
         </Pressable>
         <TextInput
+          ref={inputRef}
           style={{ flex: 1, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.panel2, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: font.regular, color: colors.ink, maxHeight: 110 }}
           multiline value={text} onChangeText={onType} placeholder={tr("Skrifaðu skilaboð…")} placeholderTextColor={colors.ink3} blurOnSubmit={false}
         />
@@ -281,7 +285,7 @@ export default function Thread() {
           })}
         </View>
         <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
-          <Row icon={<CornerUpLeft color={colors.ink2} size={19} />} title="Svara" onPress={() => { setReplyTo(sel); setSel(null); }} chevron={false} />
+          <Row icon={<CornerUpLeft color={colors.ink2} size={19} />} title="Svara" onPress={() => { if (sel) replyWith(sel); setSel(null); }} chevron={false} />
           {sel && !sel.me ? <Row icon={<Flag color={colors.ink2} size={19} />} title="Tilkynna skilaboð" sub="Stjórnendur fá tilkynningu" onPress={async () => { if (!me || !sel) return; const r = await reportContent(me, "message", sel.id, sel.senderId, sel.body || (sel.kind === "image" ? "Mynd" : "Skjal")); setSel(null); toast(r.ok ? "Tilkynning send til stjórnenda" : (r.error ?? "Tókst ekki")); }} chevron={false} /> : null}
           {sel && !sel.me ? <Row icon={<Ban color={colors.bad} size={19} />} title={trf("Fela skilaboð frá {x}", sel.sender)} danger onPress={() => { const m = sel; setSel(null); Alert.alert(trf("Fela skilaboð frá {x}", m.sender), tr("Þú sérð ekki lengur skilaboð eða færslur frá viðkomandi. Þú getur opnað aftur í Stillingum."), [{ text: tr("Hætta við"), style: "cancel" }, { text: tr("Fela"), style: "destructive", onPress: async () => { if (await blockUser(m.senderId)) load(); } }]); }} chevron={false} last /> : null}
           {sel?.me ? <Row icon={<Trash2 color={colors.bad} size={19} />} title="Eyða skilaboðum" danger onPress={async () => { if (sel) await deleteMessage(sel.id); setSel(null); load(); }} chevron={false} last /> : null}
@@ -352,6 +356,38 @@ const TIME_W = 58;
 /** Mynd? Líka skjal með myndarendingu (eldri skilaboð og skrár úr „Skrár“ án MIME-tegundar). */
 const IMG_RE = /\.(jpe?g|png|gif|webp|heic|heif)(\?|$)/i;
 const isImage = (m: ChatMessage) => !!m.url && (m.kind === "image" || (m.kind === "file" && (IMG_RE.test(m.url) || IMG_RE.test(m.body))));
+
+/** Strjúka skilaboð til hægri → svara þeim (eins og Messenger). Vinstri strok á listanum sýnir tíma,
+ *  svo þetta tekur aðeins hægri hreyfingu. Aðeins innbyggt PanResponder/Animated — engin native-viðbót (OTA). */
+const REPLY_AT = 56;
+function SwipeReply({ onReply, children }: { onReply: () => void; children: React.ReactNode }) {
+  const x = useRef(new Animated.Value(0)).current;
+  const armed = useRef(false);
+  const cb = useRef(onReply);
+  cb.current = onReply;
+  const back = () => { armed.current = false; Animated.spring(x, { toValue: 0, useNativeDriver: true, bounciness: 6, speed: 20 }).start(); };
+  const pr = useRef(PanResponder.create({
+    onMoveShouldSetPanResponder: (_e, g) => g.dx > 10 && Math.abs(g.dx) > Math.abs(g.dy) * 1.6,
+    onPanResponderTerminationRequest: () => false,
+    onPanResponderMove: (_e, g) => {
+      const v = Math.max(0, Math.min(REPLY_AT + 18, g.dx * 0.6));
+      x.setValue(v);
+      if (v >= REPLY_AT && !armed.current) { armed.current = true; void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }
+      else if (v < REPLY_AT && armed.current) armed.current = false;
+    },
+    onPanResponderRelease: () => { if (armed.current) cb.current(); back(); },
+    onPanResponderTerminate: back,
+  })).current;
+  const icon = x.interpolate({ inputRange: [0, REPLY_AT], outputRange: [0, 1], extrapolate: "clamp" });
+  return (
+    <View>
+      <Animated.View pointerEvents="none" style={{ position: "absolute", left: 2, top: 0, bottom: 0, justifyContent: "center", opacity: icon, transform: [{ scale: icon }] }}>
+        <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: colors.panel2, alignItems: "center", justifyContent: "center" }}><CornerUpLeft color={colors.ink2} size={16} /></View>
+      </Animated.View>
+      <Animated.View {...pr.panHandlers} style={{ transform: [{ translateX: x }] }}>{children}</Animated.View>
+    </View>
+  );
+}
 
 function Bubble({ item, onLong, onImage }: { item: Extract<RowItem, { kind: "msg" }>; onLong: () => void; onImage: (url: string) => void }) {
   const { m, first, last, showSender } = item;
