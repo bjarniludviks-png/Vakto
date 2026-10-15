@@ -412,3 +412,11 @@
   Vélmenni og headless-vafrar síaðir út. Vercel Web Analytics er EKKI virkt á verkefninu.
 - **Morgunyfirlit:** cron `/api/cron/daily-digest` kl. 08:00 UTC → `buildDailyDigest` (heimsóknir gærdagsins, efstu síður,
   uppruni, nýskráningar m. kortastöðu, prufur, greiðendur, greitt í gær).
+
+## Póstur daginn eftir nýskráningu (15. okt. 2026, migration 0080 á staging + prod)
+- Cron `/api/cron/signup-followup` virka daga kl. 10:00 UTC → `runSignupFollowups` (`src/lib/signup-followup.server.ts`):
+  fyrirtæki skráð fyrir 20 klst.–10 dögum, `companies.followup_sent_at` autt, ekki `free` og ekki „test/prufa/demo“ í nafni.
+  Póstur frá „Bjarni Lúðvíksson <bjarni@vakto.is>“ (svör til hans), texti eftir stöðu: ekkert starfsfólk / ekkert vaktaplan /
+  komin af stað. Textinn er í `src/lib/signup-followup.ts`; handvirk sending og prufur: `npx tsx scripts/send-followup.mts`.
+  Aðeins í production.
+- Velkomin-kynning Mitt svæðis vistast á aðganginum (`users.welcome_seen_at`), ekki aðeins í localStorage (gilti per vafra og lén).

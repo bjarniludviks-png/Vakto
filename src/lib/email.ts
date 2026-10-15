@@ -14,7 +14,7 @@ export function emailConfigured(): boolean {
   return !!KEY;
 }
 
-export async function sendEmail(input: { to: string; subject: string; html: string; attachments?: { filename: string; content: string }[] }): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+export async function sendEmail(input: { to: string; subject: string; html: string; text?: string; from?: string; replyTo?: string; attachments?: { filename: string; content: string }[] }): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   if (process.env.EMAIL_PREVIEW === "1") {
     ((globalThis as { __emailPreview?: unknown[] }).__emailPreview ??= []).push(input);
     return { ok: true, skipped: true };
@@ -27,7 +27,7 @@ export async function sendEmail(input: { to: string; subject: string; html: stri
     const r = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM, to: [input.to], reply_to: REPLY_TO, subject: input.subject, html: input.html, ...(input.attachments?.length ? { attachments: input.attachments } : {}) }),
+      body: JSON.stringify({ from: input.from ?? FROM, to: [input.to], reply_to: input.replyTo ?? REPLY_TO, subject: input.subject, html: input.html, ...(input.text ? { text: input.text } : {}), ...(input.attachments?.length ? { attachments: input.attachments } : {}) }),
     });
     if (!r.ok) return { ok: false, error: `${r.status} ${await r.text()}` };
     return { ok: true };
