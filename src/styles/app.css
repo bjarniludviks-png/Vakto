@@ -1197,6 +1197,10 @@ a.db2-who:hover span{color:var(--brand)}
 .vai-fab:active{transform:scale(.95)}
 .vai-fab svg{width:24px;height:24px;fill:currentColor}
 .vai-fab.on{background:var(--ink)}
+.vai-fab.pill{width:auto;height:48px;padding:0 20px 0 16px;border-radius:999px;display:inline-flex;align-items:center;gap:8px;font:inherit;font-size:14px;font-weight:650;letter-spacing:.01em}
+.vai-fab.pill svg{width:19px;height:19px}
+.vai-fab svg.x{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;width:22px;height:22px}
+.vai-panel.wide{width:min(760px,calc(100vw - 32px));height:min(820px,calc(100vh - 120px))}
 .vai-panel{position:fixed;right:22px;bottom:calc(88px + env(safe-area-inset-bottom,0px));z-index:61;width:min(410px,calc(100vw - 32px));height:min(620px,calc(100vh - 120px));display:flex;flex-direction:column;background:var(--panel);border-radius:22px;box-shadow:0 0 0 1px var(--line),0 30px 80px -20px rgba(20,20,30,.35);overflow:hidden;transform-origin:bottom right;animation:vai-in .2s cubic-bezier(.23,1,.32,1)}
 @keyframes vai-in{from{opacity:0;transform:translateY(8px) scale(.98)}to{opacity:1;transform:none}}
 .vai-head{display:flex;align-items:center;gap:10px;padding:14px 14px 12px 16px;border-bottom:1px solid var(--line2)}
@@ -1242,6 +1246,8 @@ a.db2-who:hover span{color:var(--brand)}
 .vai-note{font-size:11px;color:var(--ink3);text-align:center;padding:0 12px 10px}
 @media (max-width:600px){
   .vai-fab{right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+  .vai-fab.pill{height:44px;font-size:13.5px}
+  .vai-wide{display:none}
   .vai-panel{right:0;left:0;bottom:0;top:0;width:auto;height:auto;border-radius:0;padding-top:env(safe-area-inset-top,0px)}
 }
 /* ============ Stillingar → Tengingar ============ */
