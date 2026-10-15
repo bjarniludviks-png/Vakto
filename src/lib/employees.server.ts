@@ -63,8 +63,8 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
     if (ex.error) ex = await supabase.from("employees").select("id, address, next_of_kin, hire_date") as typeof ex; // fyrir 0060
     const extra = new Map((ex.error ? [] : ex.data ?? []).map((x) => [x.id as string, x as Extra]));
     // Launaliðir (0081) + orlof (0021): sér fyrirspurn svo listinn virki þótt migration vanti.
-    const paq = await supabase.from("employees").select("id, pay_settings, orlof");
-    const payOf = new Map((paq.error ? [] : paq.data ?? []).map((x) => [x.id as string, x as { pay_settings: Partial<PaySettings> | null; orlof: Partial<OrlofSet> | null }]));
+    const paq = await supabase.from("employees").select("id, pay_settings, orlof, benefits");
+    const payOf = new Map((paq.error ? [] : paq.data ?? []).map((x) => [x.id as string, x as { pay_settings: Partial<PaySettings> | null; orlof: Partial<OrlofSet> | null; benefits: Employee["benefits"] }]));
     let coDefaults: Partial<PaySettings> | null = null;
     if (!paq.error) {
       const { data: me } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
@@ -76,6 +76,7 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
     const employees: Employee[] = rows.map((r) => ({
       pay: { ...(coDefaults ?? {}), ...(payOf.get(r.id)?.pay_settings ?? {}) },
       orlof: payOf.get(r.id)?.orlof ?? (coDefaults as { orlof?: Partial<OrlofSet> } | null)?.orlof ?? null,
+      benefits: payOf.get(r.id)?.benefits ?? null,
       address: extra.get(r.id)?.address ?? null,
       nextOfKin: extra.get(r.id)?.next_of_kin ?? null,
       postalCode: extra.get(r.id)?.postal_code ?? null,

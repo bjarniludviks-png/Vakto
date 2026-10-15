@@ -75,6 +75,7 @@ export async function getPayroll(): Promise<PayrollView> {
               employeeId: l.employee_id as string,
               name: emp?.full_name ?? "Starfsmaður",
               hours: Number(l.hours), gross: Number(l.gross), dayPay: 0, premiums: 0, overtime: 0, uppbot: Number(l.uppbot ?? 0),
+              benefits: Number(l.benefits ?? 0), benefitsInKind: Number(l.benefits_in_kind ?? 0), benefitsFree: Number(l.benefits_free ?? 0),
               orlof: Number(l.orlof ?? 0), orlofToBank: Number(l.orlof_to_bank ?? 0), orlofAccrued: Number(l.orlof_accrued ?? 0),
               withholding: Number(l.withholding), pension: Number(l.pension), extraPension: Number(l.extra_pension ?? 0), union: Number(l.union_fee),
               allowanceUsed: Number(l.allowance_used ?? 0), net: Number(l.net),

@@ -28,6 +28,7 @@ export type PayslipDetail = {
   gross: number; pension: number; unionFee: number; withholding: number; net: number;
   // 0081 — vantar á eldri gögnum
   orlof?: number; orlofToBank?: number; extraPension?: number; allowanceUsed?: number;
+  benefits?: number; benefitsInKind?: number; benefitsFree?: number;
   pensionPct?: number; extraPensionPct?: number; unionFeePct?: number; orlofPct?: number;
 };
 const pctTxt = (n?: number) => (n == null ? "" : ` (${String(Math.round(n * 100) / 100).replace(".", ",")}%)`);
@@ -192,7 +193,7 @@ export async function buildPayslipPdf(d: PayslipDetail): Promise<Doc> {
   const doc = await newDoc();
   const k = kit(doc);
   const unionFee = d.unionFee;
-  const deductions = d.pension + (d.extraPension ?? 0) + unionFee + d.withholding + (d.orlofToBank ?? 0);
+  const deductions = d.pension + (d.extraPension ?? 0) + unionFee + d.withholding + (d.orlofToBank ?? 0) + (d.benefitsInKind ?? 0);
   const empty = d.hours <= 0 && d.gross <= 0;
   const ktE = kt(d.kennitala), ktC = kt(d.companyKt);
 
@@ -222,6 +223,7 @@ export async function buildPayslipPdf(d: PayslipDetail): Promise<Doc> {
     if (d.overtime) rows.push({ label: "Yfirvinnuálag", hint: "Overtime premium", amount: kr(d.overtime) });
     if (d.uppbot) rows.push({ label: "Desember-/orlofsuppbót", hint: "Holiday bonus", amount: kr(d.uppbot) });
     if (d.orlof) rows.push({ label: `Orlof${pctTxt(d.orlofPct)}`, hint: "Holiday pay", amount: kr(d.orlof) });
+    if (d.benefits) rows.push({ label: "Hlunnindi og styrkir", hint: "Benefits & allowances", amount: kr(d.benefits) });
     rows.push({ label: "Brúttólaun · Gross pay", amount: kr(d.gross), strong: true });
     return h + k.amountRows(x, y + h, w, rows);
   });
@@ -231,11 +233,13 @@ export async function buildPayslipPdf(d: PayslipDetail): Promise<Doc> {
     ...(d.extraPension ? [{ label: `Viðbótarlífeyrissparnaður${pctTxt(d.extraPensionPct)}`, hint: "Private pension", amount: `−${kr(d.extraPension)}`, tone: "neg" as const }] : []),
     { label: `Félagsgjald${pctTxt(d.unionFeePct)}`, hint: "Union fee", amount: unionFee ? `−${kr(unionFee)}` : kr(0), tone: "neg" as const },
     { label: "Staðgreiðsla (eftir persónuafslátt)", hint: "Income tax withheld (after personal allowance)", amount: d.withholding ? `−${kr(d.withholding)}` : kr(0), tone: "neg" as const },
+    ...(d.benefitsInKind ? [{ label: "Hlunnindi í fríðu (ekki greidd út)", hint: "Benefits in kind", amount: `−${kr(d.benefitsInKind)}`, tone: "neg" as const }] : []),
     ...(d.orlofToBank ? [{ label: "Orlof lagt inn á orlofsreikning", hint: "Holiday pay to holiday account", amount: `−${kr(d.orlofToBank)}`, tone: "neg" as const }] : []),
     { label: "Frádráttur samtals · Total deductions", amount: deductions ? `−${kr(deductions)}` : kr(0), strong: true },
   ]));
 
   k.section(4, "Útborgað", "Net pay", 50, (x, y, w) => k.amountRows(x, y, w, [
+    ...(d.benefitsFree ? [{ label: "Undanþegið staðgreiðslu (t.d. dagpeningar)", hint: "Tax-exempt allowances", amount: kr(d.benefitsFree) }] : []),
     { label: "Útborgað á reikning · Paid to account", amount: kr(d.net), strong: true, tone: "good" },
   ]));
 

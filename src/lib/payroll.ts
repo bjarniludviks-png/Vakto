@@ -23,6 +23,9 @@ export type PayLine = {
   orlof: number;          // orlofslaun greidd út eða lögð inn á orlofsreikning (hluti af gross)
   orlofToBank: number;    // sá hluti sem fer á orlofsreikning (dreginn frá útborgun)
   orlofAccrued: number;   // orlof sem safnast upp (ekki greitt núna — kostnaður, ekki laun)
+  benefits: number;       // staðgreiðsluskyld hlunnindi og styrkir (hluti af gross)
+  benefitsInKind: number; // þar af hlunnindi í fríðu (húsnæði, fæði, bíll) — skattlögð en ekki greidd út
+  benefitsFree: number;   // undanþegið staðgreiðslu (t.d. dagpeningar) — bætist við útborgun
   withholding: number;
   pension: number;        // lífeyrisiðgjald starfsmanns
   extraPension: number;   // viðbótarlífeyrissparnaður starfsmanns
@@ -35,7 +38,7 @@ export type PayLine = {
   cost: number; // employer cost: gross + launatengd gjöld + uppsafnað orlof
 };
 
-type EmpPick = Pick<Employee, "id" | "fullName" | "payType" | "rate" | "employmentRatio"> & { pay?: Partial<PaySettings> | null; orlof?: Partial<OrlofSet> | null };
+type EmpPick = Pick<Employee, "id" | "fullName" | "payType" | "rate" | "employmentRatio"> & { pay?: Partial<PaySettings> | null; orlof?: Partial<OrlofSet> | null; benefits?: { name: string; type: string; amount: number; taxable?: boolean }[] | null };
 
 /** Frádráttur, staðgreiðsla og launatengd gjöld ofan á gefin laun. Ein regla fyrir alla útreikninga. */
 function deductions(e: EmpPick, base: Omit<PayLine, "withholding" | "pension" | "extraPension" | "union" | "allowanceUsed" | "net" | "employerPension" | "insurance" | "funds" | "cost">, year: number): PayLine {
@@ -50,7 +53,7 @@ function deductions(e: EmpPick, base: Omit<PayLine, "withholding" | "pension" | 
   const afterOwn = Math.max(0, tax - allowance);
   const allowanceUsed = Math.min(afterOwn, Math.round(pay.accumulatedAllowance));
   const withholding = afterOwn - allowanceUsed;
-  const net = Math.round(gross - pension - extraPension - union - withholding - base.orlofToBank);
+  const net = Math.round(gross - pension - extraPension - union - withholding - base.orlofToBank - base.benefitsInKind + base.benefitsFree);
   const ins = taxYear(year).insurance;
   const empPct = pay.employerPensionPct + pay.rehabPct + (pay.extraPensionPct > 0 ? pay.extraEmployerPct : 0);
   const fundPct = pay.sickFundPct + pay.holidayFundPct + pay.educationFundPct + pay.memberFundPct;
@@ -59,7 +62,7 @@ function deductions(e: EmpPick, base: Omit<PayLine, "withholding" | "pension" | 
   const funds = Math.round(gross * fundPct / 100);
   // Uppsafnað orlof er greitt síðar og ber þá sömu gjöld — telst með í kostnaði tímabilsins.
   const accruedCost = Math.round(base.orlofAccrued * (1 + (empPct + ins + fundPct) / 100));
-  const cost = gross + employerPension + insurance + funds + accruedCost;
+  const cost = gross + employerPension + insurance + funds + accruedCost + base.benefitsFree;
   return { ...base, withholding, pension, extraPension, union, allowanceUsed, net, employerPension, insurance, funds, cost };
 }
 
@@ -78,10 +81,18 @@ function finalize(e: EmpPick, hours: number, baseGross: number, uppbot = 0, spli
   const orlofAmt = Math.max(0, Math.round(orlofBase * o.pct / 100));
   const paid = o.mode === "pay_out" || o.mode === "to_bank";
   const orlof = paid ? orlofAmt : 0;
-  const gross = Math.round(baseGross) + Math.round(uppbot) + orlof;
+  // Föst hlunnindi/styrkir (kr/mán). Staðgreiðsluskyld eru í stofni lífeyris og tryggingagjalds (lög 129/1997, 3. gr.),
+  // en orlof reiknast ekki af þeim. Hlunnindi í fríðu eru ekki greidd út. Per-km styrkir krefjast skráðra km (ekki enn).
+  const fixed = (e.benefits ?? []).filter((b) => b.type === "fixed" && Number(b.amount) > 0);
+  const isTax = (b: { name: string; taxable?: boolean }) => (typeof b.taxable === "boolean" ? b.taxable : !/undanþeg/i.test(b.name));
+  const benefits = Math.round(fixed.filter(isTax).reduce((a, b) => a + Number(b.amount), 0));
+  const benefitsInKind = Math.round(fixed.filter((b) => isTax(b) && /hlunnindi/i.test(b.name)).reduce((a, b) => a + Number(b.amount), 0));
+  const benefitsFree = Math.round(fixed.filter((b) => !isTax(b)).reduce((a, b) => a + Number(b.amount), 0));
+  const gross = Math.round(baseGross) + Math.round(uppbot) + orlof + benefits;
   return deductions(e, {
     employeeId: e.id, name: e.fullName, hours, gross, dayPay, premiums, overtime, uppbot: Math.round(uppbot),
     orlof, orlofToBank: o.mode === "to_bank" ? orlof : 0, orlofAccrued: paid ? 0 : orlofAmt,
+    benefits, benefitsInKind, benefitsFree,
   }, year);
 }
 

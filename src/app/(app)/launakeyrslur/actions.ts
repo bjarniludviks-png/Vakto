@@ -130,6 +130,7 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
             hours: l.hours, dayPay: l.dayPay, premiums: l.premiums, overtime: l.overtime, uppbot: l.uppbot,
             gross: l.gross, pension: l.pension, unionFee: l.union, withholding: l.withholding, net: l.net,
             orlof: l.orlof, orlofToBank: l.orlofToBank, extraPension: l.extraPension, allowanceUsed: l.allowanceUsed,
+            benefits: l.benefits, benefitsInKind: l.benefitsInKind, benefitsFree: l.benefitsFree,
             pensionPct: resolvePay(e?.pay).pensionPct, extraPensionPct: resolvePay(e?.pay).extraPensionPct,
             unionFeePct: resolvePay(e?.pay).unionFeePct, orlofPct: resolveOrlof(e?.orlof).pct,
           },
@@ -212,6 +213,7 @@ export async function runPayroll(from?: string, to?: string, settleIds: string[]
     const fullRow = (l: PayLine) => ({
       orlof: l.orlof, orlof_to_bank: l.orlofToBank, orlof_accrued: l.orlofAccrued, extra_pension: l.extraPension,
       allowance_used: l.allowanceUsed, employer_pension: l.employerPension, insurance: l.insurance, funds: l.funds, cost: l.cost,
+      benefits: l.benefits, benefits_in_kind: l.benefitsInKind, benefits_free: l.benefitsFree,
     });
     // Try with the uppbot column (migration 0017); retry without if not yet run.
     let linesErr = (await supabase.from("payroll_lines").insert(
@@ -220,7 +222,7 @@ export async function runPayroll(from?: string, to?: string, settleIds: string[]
         return { ...baseRow(l), ...fullRow(l), uppbot: l.uppbot, timebank_hours: t2?.hours ?? 0, timebank_adj: t2?.adj ?? 0 };
       }),
     )).error;
-    if (linesErr && /orlof|pension|insurance|funds|allowance|cost/.test(linesErr.message)) {
+    if (linesErr && /orlof|pension|insurance|funds|allowance|cost|benefits/.test(linesErr.message)) {
       linesErr = (await supabase.from("payroll_lines").insert(
         lines.map((l) => { const t2 = tb.get(l.employeeId); return { ...baseRow(l), uppbot: l.uppbot, timebank_hours: t2?.hours ?? 0, timebank_adj: t2?.adj ?? 0 }; }),
       )).error;

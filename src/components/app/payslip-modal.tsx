@@ -51,6 +51,7 @@ export function PayslipModal({ data, onClose }: { data: PayslipData; onClose: ()
               {d.overtime > 0 && <Row label={t("Yfirvinnuálag")} v={k(d.overtime)} />}
               {d.uppbot > 0 && <Row label={t("Desember-/orlofsuppbót")} v={k(d.uppbot)} />}
               {(d.orlof ?? 0) > 0 && <Row label={t("Orlof")} v={k(d.orlof!)} />}
+              {(d.benefits ?? 0) > 0 && <Row label={t("Hlunnindi og styrkir")} v={k(d.benefits!)} />}
               <Row label={t("Brúttó")} v={k(d.gross)} />
               <div className="hr" />
               <Row label={t("Lífeyrissjóður")} v={k(d.pension)} neg />
@@ -58,6 +59,8 @@ export function PayslipModal({ data, onClose }: { data: PayslipData; onClose: ()
               <Row label={t("Félagsgjald")} v={k(d.unionFee)} neg />
               <Row label={t("Staðgreiðsla")} v={k(d.withholding)} neg />
               {(d.orlofToBank ?? 0) > 0 && <Row label={t("Orlof á orlofsreikning")} v={k(d.orlofToBank!)} neg />}
+              {(d.benefitsInKind ?? 0) > 0 && <Row label={t("Hlunnindi í fríðu")} v={k(d.benefitsInKind!)} neg />}
+              {(d.benefitsFree ?? 0) > 0 && <Row label={t("Undanþegið staðgreiðslu")} v={k(d.benefitsFree!)} />}
               <div className="hr" />
               <Row label={t("Útborgað")} v={k(d.net)} strong />
             </>);

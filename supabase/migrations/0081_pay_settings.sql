@@ -17,3 +17,9 @@ alter table payroll_lines
 
 -- Starfsmaður má EKKI breyta eigin skattkorti/lífeyri (guard_employee_self_update leyfir aðeins tengiliðareiti),
 -- svo engin breyting þarf á 0076 — pay_settings er ekki á leyfislistanum.
+
+-- Hlunnindi á launalínu (staðgreiðsluskyld / þar af í fríðu / undanþegin).
+alter table payroll_lines
+  add column if not exists benefits numeric default 0,
+  add column if not exists benefits_in_kind numeric default 0,
+  add column if not exists benefits_free numeric default 0;
