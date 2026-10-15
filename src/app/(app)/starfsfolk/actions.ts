@@ -15,6 +15,7 @@ import { employerSign, metaFrom, startTaktikalSigning } from "@/lib/esign.server
 import { taktikalEnabled } from "@/lib/taktikal.server";
 import type { SignatureRecord } from "@/lib/contract-pdf";
 import { userError } from "@/lib/user-error";
+import type { PaySettings } from "@/lib/paysettings";
 
 export type NewEmployeeInput = {
   fullName: string;
@@ -374,6 +375,7 @@ export type UpdateEmployeeInput = {
   permissions?: Record<string, boolean> | null;
   benefits?: { name: string; type: string; amount: number }[] | null;
   orlof?: { mode: string; pct: number } | null;
+  paySettings?: Partial<PaySettings> | null;
   ruleTemplateId?: string | null;
   contractType?: string | null;
   schedulePattern?: string | null;
@@ -387,6 +389,20 @@ export async function getEmployeePension(id: string): Promise<string | null> {
     const { data, error } = await supabase.from("employees").select("pension_fund").eq("id", id).maybeSingle();
     if (error) return null;
     return (data?.pension_fund as string) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Launaliðir starfsmanns (0081) + sjálfgefin gildi fyrirtækis. null fyrir migration. */
+export async function getEmployeePaySettings(id: string): Promise<{ own: Partial<PaySettings>; company: Partial<PaySettings> } | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase.from("employees").select("pay_settings, company_id").eq("id", id).maybeSingle();
+    if (error || !data) return null;
+    const { data: co } = await supabase.from("companies").select("pay_defaults").eq("id", data.company_id as string).maybeSingle();
+    return { own: (data.pay_settings as Partial<PaySettings>) ?? {}, company: ((co as { pay_defaults?: Partial<PaySettings> } | null)?.pay_defaults) ?? {} };
   } catch {
     return null;
   }
@@ -550,7 +566,11 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
     if (input.permissions !== undefined) await supabase.from("employees").update({ permissions: input.permissions }).eq("id", id);
     if (input.benefits !== undefined) await supabase.from("employees").update({ benefits: input.benefits }).eq("id", id);
     if (input.orlof !== undefined) await supabase.from("employees").update({ orlof: input.orlof }).eq("id", id);
-    if (!Object.keys(patch).length && input.payRule === undefined && input.permissions === undefined && input.benefits === undefined && input.orlof === undefined) return { ok: true };
+    if (input.paySettings !== undefined) {
+      const { error: psErr } = await supabase.from("employees").update({ pay_settings: input.paySettings }).eq("id", id);
+      if (psErr) return { ok: false, error: userError(psErr, "Tókst ekki að vista launaliði") };
+    }
+    if (!Object.keys(patch).length && input.payRule === undefined && input.permissions === undefined && input.benefits === undefined && input.orlof === undefined && input.paySettings === undefined) return { ok: true };
 
     const { data: { user } } = await supabase.auth.getUser();
     const company = await companyId(supabase);

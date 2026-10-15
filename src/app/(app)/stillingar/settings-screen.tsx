@@ -1,5 +1,6 @@
 "use client";
 
+import { PayDefaultsCard } from "./pay-defaults";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { IntegrationsPanel } from "./integrations-panel";
@@ -108,8 +109,7 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
             </div>
             <div className="hr" />
             <div className="statline"><span className="k">{t("Tryggingagjald")}</span><span className="v">6,35%</span></div>
-            <div className="statline"><span className="k">{t("Mótframlag lífeyris")}</span><span className="v">11,5%</span></div>
-            <div className="statline"><span className="k">{t("Orlof")}</span><span className="v">10,17%</span></div>
+            <PayDefaultsCard />
             <div className="statline"><span className="k">{t("Laun % af veltu — markmið")}</span>
               <span className="v"><input type="number" min={5} max={80} step={0.5} inputMode="decimal" aria-label={t("Laun % af veltu — markmið")}
                 style={{ width: 64, border: "1px solid var(--line)", borderRadius: 8, padding: "4px 8px", font: "inherit", fontSize: 12.5, textAlign: "right" }}
@@ -905,8 +905,8 @@ function GeofenceCard({ mode, locations, onEdit }: { mode: GeofenceMode; locatio
           ))}
         </div>
         <p className="muted" style={{ fontSize: 12.5, margin: "0 0 8px" }}>{t(GEO_MODES.find(([m]) => m === cur)![2])}</p>
-        {cur !== "off" && locations.map((l) => (
-          <div className="it rowlink" key={l.id ?? l.name} onClick={() => onEdit(l)}>
+        {cur !== "off" && locations.map((l, i) => (
+          <div className="it rowlink" key={l.id ?? `${l.name}-${i}`} onClick={() => onEdit(l)}>
             <div className={`ic ${l.lat != null ? "good" : "mut"}`} style={l.lat != null ? undefined : { background: "var(--line2)" }}><Pin /></div>
             <div className="tx"><b>{l.name}</b><span>{l.lat != null ? `${t("á korti")} · ${t("radíus")} ${l.radius ?? 150} m` : t("smelltu til að merkja staðinn á korti")}</span></div>
             <span className={`tag ${l.lat != null ? "good" : "warn"}`}>{l.lat != null ? t("virkt") : t("vantar")}</span>

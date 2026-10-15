@@ -11,8 +11,8 @@ export type PayrollRow = { id?: string; n: string; av: string; c: string; h: str
   /** Fastlaunamaður — „Tímar“ eru þá raunverulega samþykktir tímar, ekki grunnur launa. */
   monthly?: boolean;
   /** Hráar tölur svo skjárinn geti lagt saman valda starfsmenn. */
-  x?: { hours: number; gross: number; withholding: number; pu: number; net: number; cost: number } };
-export type PayrollTotalsView = { count: number; hours: string; gross: string; withholding: string; pensionUnion: string; net: string; cost: string; grossM: string; netM: string; costM: string; withholdingM: string; insuranceM: string };
+  x?: { hours: number; gross: number; withholding: number; pu: number; net: number; cost: number; orl?: number; ep?: number; ins?: number; fu?: number } };
+export type PayrollTotalsView = { lv?: { orl: number; ep: number; ins: number; fu: number }; count: number; hours: string; gross: string; withholding: string; pensionUnion: string; net: string; cost: string; grossM: string; netM: string; costM: string; withholdingM: string; insuranceM: string };
 export type PayrollView = { rows: PayrollRow[]; totals: PayrollTotalsView; live: boolean };
 
 // Demo rows mirror the prototype (5 shown) — used before Supabase is connected.
@@ -38,7 +38,7 @@ function rowFrom(line: PayLine, color: string): PayrollRow {
     h: dec1(line.hours),
     g: nf(line.gross),
     w: "−" + nf(line.withholding),
-    p: "−" + nf(line.pension + line.union),
+    p: "−" + nf(line.pension + line.extraPension + line.union),
     net: nf(line.net),
   };
 }
@@ -66,7 +66,7 @@ export async function getPayroll(): Promise<PayrollView> {
       if (run) {
         const { data: pl } = await supabase
           .from("payroll_lines")
-          .select("employee_id, hours, gross, withholding, pension, union_fee, net, employees(full_name, avatar_color)")
+          .select("*, employees(full_name, avatar_color)")
           .eq("run_id", run.id);
         if (pl && pl.length) {
           lines = pl.map((l) => {
@@ -74,9 +74,14 @@ export async function getPayroll(): Promise<PayrollView> {
             return {
               employeeId: l.employee_id as string,
               name: emp?.full_name ?? "Starfsmaður",
-              hours: Number(l.hours), gross: Number(l.gross), dayPay: 0, premiums: 0, overtime: 0, uppbot: 0,
-              withholding: Number(l.withholding), pension: Number(l.pension), union: Number(l.union_fee),
-              net: Number(l.net), cost: Math.round(Number(l.gross) * (1 + BURDEN)),
+              hours: Number(l.hours), gross: Number(l.gross), dayPay: 0, premiums: 0, overtime: 0, uppbot: Number(l.uppbot ?? 0),
+              benefits: Number(l.benefits ?? 0), benefitsInKind: Number(l.benefits_in_kind ?? 0), benefitsFree: Number(l.benefits_free ?? 0),
+              orlof: Number(l.orlof ?? 0), orlofToBank: Number(l.orlof_to_bank ?? 0), orlofAccrued: Number(l.orlof_accrued ?? 0),
+              withholding: Number(l.withholding), pension: Number(l.pension), extraPension: Number(l.extra_pension ?? 0), union: Number(l.union_fee),
+              allowanceUsed: Number(l.allowance_used ?? 0), net: Number(l.net),
+              employerPension: Number(l.employer_pension ?? 0), insurance: Number(l.insurance ?? 0), funds: Number(l.funds ?? 0),
+              // Keyrslur fyrir 0081 geymdu ekki kostnað — þá gróft mat.
+              cost: l.cost != null ? Number(l.cost) : Math.round(Number(l.gross) * (1 + BURDEN)),
             };
           });
         }
@@ -102,7 +107,7 @@ export async function getPayroll(): Promise<PayrollView> {
         netM: million(t.net),
         costM: million(t.cost),
         withholdingM: million(t.withholding),
-        insuranceM: million(Math.round(t.gross * 0.0635)),
+        insuranceM: million(t.insurance),
       },
       live: true,
     };

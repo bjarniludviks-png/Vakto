@@ -417,3 +417,30 @@ export async function signContractWithCode(id: string, code: string): Promise<{ 
     return { ok: false, error: "Tókst ekki að undirrita" };
   }
 }
+
+/** Velkomin-kynningin: vistuð á aðganginum (0080 users.welcome_seen_at) svo hún birtist ekki
+ *  aftur í öðrum vafra, á öðru léni (vakto.is / www / admin) eða eftir að vafragögn hreinsast. */
+export async function getWelcomeSeen(): Promise<boolean> {
+  if (!isSupabaseConfigured()) return true;
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return true;
+    const { data, error } = await supabase.from("users").select("welcome_seen_at").eq("id", user.id).maybeSingle();
+    if (error) return true; // fyrir 0080: sýna ekki frekar en að sýna endalaust
+    return !!(data as { welcome_seen_at?: string | null } | null)?.welcome_seen_at;
+  } catch {
+    return true;
+  }
+}
+
+export async function markWelcomeSeen(): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    await createAdminClient().from("users").update({ welcome_seen_at: new Date().toISOString() }).eq("id", user.id);
+  } catch { /* næst */ }
+}

@@ -412,3 +412,24 @@
   Vélmenni og headless-vafrar síaðir út. Vercel Web Analytics er EKKI virkt á verkefninu.
 - **Morgunyfirlit:** cron `/api/cron/daily-digest` kl. 08:00 UTC → `buildDailyDigest` (heimsóknir gærdagsins, efstu síður,
   uppruni, nýskráningar m. kortastöðu, prufur, greiðendur, greitt í gær).
+
+## Póstur daginn eftir nýskráningu (15. okt. 2026, migration 0080 á staging + prod)
+- Cron `/api/cron/signup-followup` virka daga kl. 10:00 UTC → `runSignupFollowups` (`src/lib/signup-followup.server.ts`):
+  fyrirtæki skráð fyrir 20 klst.–10 dögum, `companies.followup_sent_at` autt, ekki `free` og ekki „test/prufa/demo“ í nafni.
+  Póstur frá „Bjarni Lúðvíksson <bjarni@vakto.is>“ (svör til hans), texti eftir stöðu: ekkert starfsfólk / ekkert vaktaplan /
+  komin af stað. Textinn er í `src/lib/signup-followup.ts`; handvirk sending og prufur: `npx tsx scripts/send-followup.mts`.
+  Aðeins í production.
+- Velkomin-kynning Mitt svæðis vistast á aðganginum (`users.welcome_seen_at`), ekki aðeins í localStorage (gilti per vafra og lén).
+
+## Nákvæmur launaútreikningur (15. okt. 2026, migration 0081 á staging + prod)
+- `src/lib/paysettings.ts`: `PaySettings` á starfsmanni (`employees.pay_settings`) ofan á `companies.pay_defaults` ofan á
+  `DEFAULT_PAY` (`resolvePay`). Skattkort %, maki %, uppsafnaður persónuafsláttur (gengur á hann við launakeyrslu),
+  upphafsþrep, lífeyrir 4/11,5 + VIRK 0,1, viðbót 0–4 % + 2 % mótframlag, félagsgjald 0,7, sjúkra-/orlofs-/
+  starfsmennta-/félagsmannasjóðir, orlofsreikningur. `TAX_BY_YEAR` = skattþrep og persónuafsláttur á mánuði —
+  **bæta við nýju ári í desember** (skatturinn.is). Orlofsdagar ↔ % = dagar/(260−dagar).
+- `payroll.ts` `deductions()` er EIN regla fyrir alla útreikninga: staðgreiðsla í þrepum af (brúttó − lífeyrir − viðbót),
+  orlof `pay_out`/`to_bank` bætist við brúttó (to_bank dregið frá útborgun), uppsafnað orlof telst í kostnaði. Fastlaunafólk
+  fær ekki orlof ofan á mánaðarlaun. `BURDEN` (30,2 %) er aðeins fyrir grófar áætlanir án starfsmanns.
+- Launalínur geyma orlof, viðbót, mótframlag, tryggingagjald, sjóði og kostnað (`payroll_lines`, 0081).
+- UI: starfsmannaspjald → Laun → `PaySettingsCard` (`starfsfolk/pay-settings.tsx`); Stillingar → Reglur og laun →
+  `PayDefaultsCard` (`stillingar/pay-defaults.tsx`). Appið (`mobile/src/lib/payroll.ts`) er enn með gamla einfaldaða matið.
