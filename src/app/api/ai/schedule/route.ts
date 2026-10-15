@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     prompt = String(body.prompt ?? "").slice(0, 2000);
     context = String(body.context ?? "").slice(0, 20000);
-    lang = body.lang === "en" ? "en" : body.lang === "vi" ? "vi" : "is";
+    lang = body.lang === "en" ? "en" : body.lang === "vi" ? "vi" : body.lang === "pl" ? "pl" : "is";
   } catch {
     /* empty body is fine */
   }

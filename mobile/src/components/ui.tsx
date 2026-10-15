@@ -290,7 +290,7 @@ export function Seg<T extends string>({ value, onChange, items }: { value: T; on
               ...(on ? { shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 3, shadowOffset: { width: 0, height: 1 }, elevation: 1 } : {}),
             }}
           >
-            <Txt weight="bold" size={13} color={on ? colors.ink : colors.ink2}>
+            <Txt weight="bold" size={13} color={on ? colors.ink : colors.ink2} numberOfLines={1} adjustsFontSizeToFit>
               {it.label}
             </Txt>
           </Pressable>
