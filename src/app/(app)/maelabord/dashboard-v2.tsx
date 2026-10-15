@@ -358,15 +358,16 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
           {onboarding?.show && hideOnb && (
             <button className="btn ghost sm" onClick={() => setHideOnb(false)}>{t("Fyrstu skrefin")} · {onboardingProgress(onboarding)}/{ONBOARDING_TOTAL}</button>
           )}
-          <button className="btn ghost sm db2-custom" onClick={() => setCustomize(true)} aria-label={t("Sérsníða mælaborð")}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>
-            {t("Sérsníða")}
-          </button>
           <div className="db2-seg" role="tablist">
             {SEGS.map((s) => <button key={s.k} role="tab" aria-selected={period === s.k} className={period === s.k ? "on" : ""} onClick={() => setPeriod(s.k)}>{t(s.label)}</button>)}
           </div>
+          <div className="db2-ppwrap">
           <PeriodPicker from={period === "custom" ? customFrom : presetRange(period).from} to={period === "custom" ? customTo : presetRange(period).to}
             onApply={(a, b) => { setCustomFrom(a); setCustomTo(b); setPeriod("custom"); }} />
+          <button className="db2-custom" onClick={() => setCustomize(true)} aria-label={t("Sérsníða mælaborð")} title={t("Sérsníða mælaborð")}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></svg>
+          </button>
+          </div>
         </div>
       </div>
 
