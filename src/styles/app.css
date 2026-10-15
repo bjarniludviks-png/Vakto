@@ -1533,8 +1533,12 @@ a.db2-who:hover span{color:var(--brand)}
 .pd-chips code{font-family:inherit;font-size:12px;font-weight:600;padding:3px 8px;border-radius:7px;background:var(--panel);border:1px solid var(--line);color:var(--ink)}
 
 /* Mælaborð → Sérsníða (0077) */
-.db2-custom{display:inline-flex;align-items:center;gap:6px}
-.db2-custom svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
+/* Sérsníða: aðeins tákn, sama útlit og dagsetningarhnappurinn (.pp-btn) og jafnhátt röðinni */
+.db2-custom{display:inline-flex;align-items:center;justify-content:center;align-self:stretch;aspect-ratio:1;min-width:38px;padding:0;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:11px;cursor:pointer}
+.db2-custom:hover{border-color:var(--ink3)}
+.db2-ppwrap{display:flex;align-items:stretch;gap:10px}
+@media(max-width:760px){.db2-ppwrap{width:100%}.db2-ppwrap .pp{flex:1;min-width:0;width:auto}}
+.db2-custom svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round}
 .db2-cust{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
 .db2-cust li{display:flex;align-items:center;gap:6px;padding:9px 10px;border:1px solid var(--line);border-radius:11px;background:var(--panel)}
 .db2-cust li.off{opacity:.55}
