@@ -905,8 +905,8 @@ function GeofenceCard({ mode, locations, onEdit }: { mode: GeofenceMode; locatio
           ))}
         </div>
         <p className="muted" style={{ fontSize: 12.5, margin: "0 0 8px" }}>{t(GEO_MODES.find(([m]) => m === cur)![2])}</p>
-        {cur !== "off" && locations.map((l) => (
-          <div className="it rowlink" key={l.id ?? l.name} onClick={() => onEdit(l)}>
+        {cur !== "off" && locations.map((l, i) => (
+          <div className="it rowlink" key={l.id ?? `${l.name}-${i}`} onClick={() => onEdit(l)}>
             <div className={`ic ${l.lat != null ? "good" : "mut"}`} style={l.lat != null ? undefined : { background: "var(--line2)" }}><Pin /></div>
             <div className="tx"><b>{l.name}</b><span>{l.lat != null ? `${t("á korti")} · ${t("radíus")} ${l.radius ?? 150} m` : t("smelltu til að merkja staðinn á korti")}</span></div>
             <span className={`tag ${l.lat != null ? "good" : "warn"}`}>{l.lat != null ? t("virkt") : t("vantar")}</span>
