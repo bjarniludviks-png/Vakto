@@ -7,6 +7,7 @@ import { getShiftsInRange, saveShift, deleteShift, updateLeaveRequest, approveSh
 import { getEmployees } from "@/lib/employees.server";
 import { createClient } from "@/lib/supabase/server";
 import { getPendingRequests } from "@/app/(app)/vaktaplan/requests.server";
+import { comparePeriods, laborTrend, payrollRuns } from "./assistant-insights";
 
 // VAKTO AI — verkfæri. LESverkfæri keyra strax (sömu aðgerðir og skjáirnir nota, sama aðgangsstýring).
 // SKRIFverkfæri keyra ALDREI í líkaninu sjálfu: þau verða „tillaga" sem notandinn staðfestir með hnappi,
@@ -45,6 +46,33 @@ export const READ_TOOLS: Anthropic.Tool[] = [
     name: "week_planning_context",
     description: "Allt sem þarf til að setja upp vaktaplan fyrir heila viku: starfsfólk (deild, starfshlutfall, tímakaup/föst laun), núverandi vaktir vikunnar, hverjir eru ekki tiltækir hvaða daga (óframboð), samþykkt frí, vaktategundir með tímum, mönnunarþörf per dag og launaáætlun (veltuspá, launamarkmið, kostnaður per klst). Kallaðu á þetta ÁÐUR en þú notar plan_week.",
     input_schema: { type: "object", properties: { monday: { type: "string", description: "Mánudagur vikunnar, YYYY-MM-DD" } }, required: ["monday"] },
+  },
+  {
+    name: "compare_periods",
+    description: "Ber saman tvö tímabil: velta, launakostnaður, laun % af veltu, unnir og áætlaðir tímar, yfirvinna, álag, kostnaður per klst, fjöldi starfsmanna, með breytingu í kr og %. Líka per deild og per starfsmann (tímar og kostnaður á báðum tímabilum). compare: 'fyrra' (jafnlangt tímabil á undan), 'manudur' (sama tímabil í fyrri mánuði), 'ar' (sama tímabil í fyrra), 'sersnid' (þá compareFrom/compareTo). Notaðu fyrir „hvernig var október miðað við september“, „sama vika í fyrra“, „hver jók tímana mest“.",
+    input_schema: {
+      type: "object",
+      properties: { from: DATE, to: DATE, compare: { type: "string", enum: ["fyrra", "manudur", "ar", "sersnid"] }, compareFrom: DATE, compareTo: DATE },
+      required: ["from", "to"],
+    },
+  },
+  {
+    name: "labor_trend",
+    description: "Þróun yfir tíma: velta, launakostnaður, laun %, tímar, yfirvinna og fjöldi starfsmanna per mánuð, viku eða dag á bilinu from–to (mest 24 bil). Notaðu fyrir „hvernig hefur launakostnaður þróast í ár“, „hvaða mánuður var dýrastur“, „laun % síðustu 8 vikur“.",
+    input_schema: {
+      type: "object",
+      properties: { from: DATE, to: DATE, by: { type: "string", enum: ["month", "week", "day"] } },
+      required: ["from", "to", "by"],
+    },
+  },
+  {
+    name: "payroll_runs",
+    description: "Launakeyrslur sem hafa verið keyrðar (raunveruleg laun, ekki áætlun): tímabil, fjöldi, tímar, heildarlaun (brúttó), útborgað, staðgreiðsla, lífeyrir, orlof, tryggingagjald og heildarkostnaður launagreiðanda. Með employee fást línur þess starfsmanns í hverri keyrslu. Notaðu fyrir „hvað borguðum við í laun í september“, „hver var launakostnaður Önnu í ár“.",
+    input_schema: {
+      type: "object",
+      properties: { from: DATE, to: DATE, employee: { type: "string", description: "Nafn starfsmanns (valfrjálst)" } },
+      required: ["from", "to"],
+    },
   },
 ];
 
@@ -176,6 +204,16 @@ export async function runReadTool(name: string, input: In): Promise<string> {
         staffingTargetsMonToSun: (co.data?.staffing_targets as number[] | null) ?? null,
         budget: budget ? { revenueForecast: budget.revenue, revenueSource: budget.revenueSource, laborTargetPct: budget.target, fixedSalaryCostKr: budget.fixed, avgCostPerHourKr: Math.round(budget.avgRate) } : null,
       });
+    }
+    if (name === "compare_periods" || name === "labor_trend" || name === "payroll_runs") {
+      if (!okDate(input.from) || !okDate(input.to)) return JSON.stringify({ error: "from/to verða að vera YYYY-MM-DD" });
+      const from = str(input.from), to = str(input.to);
+      if (name === "compare_periods") {
+        const mode = (["fyrra", "manudur", "ar", "sersnid"] as const).find((m) => m === input.compare) ?? "fyrra";
+        return JSON.stringify(await comparePeriods(from, to, mode, { from: str(input.compareFrom), to: str(input.compareTo) }));
+      }
+      if (name === "labor_trend") return JSON.stringify(await laborTrend(from, to, input.by === "week" ? "week" : input.by === "day" ? "day" : "month"));
+      return JSON.stringify(await payrollRuns(from, to, str(input.employee) || undefined));
     }
     if (name === "who_is_on_now") {
       const w = await getWhoIsOn();

@@ -19,7 +19,8 @@ const S = {
     send: "Senda", thinking: "Hugsa…", confirm: "Staðfesta", cancel: "Hætta við", all: "Staðfesta allt", done: "Gert", cancelled: "Hætt við",
     hello: "Hæ! Ég get svarað spurningum um laun, tíma og vaktir, sett upp vaktaplan fyrir heila viku og undirbúið breytingar sem þú staðfestir.",
     err: "Tókst ekki að ná sambandi. Reyndu aftur.",
-    chips: ["Hvernig er laun % af veltu þessa vikuna?", "Settu upp næstu viku: allir með einn frídag", "Hver er á vakt núna?", "Hvaða beiðnir bíða?"],
+    chips: ["Hvernig er laun % af veltu þessa vikuna?", "Berðu saman launakostnað og tíma í þessum mánuði og síðasta", "Settu upp næstu viku: allir með einn frídag", "Hver er á vakt núna?"],
+    wide: "Stækka", narrow: "Minnka",
     note: "VAKTO AI getur gert mistök. Breytingar eru aðeins gerðar þegar þú staðfestir.",
     upgrade: "Kveikja á VAKTO AI",
   },
@@ -28,7 +29,8 @@ const S = {
     send: "Send", thinking: "Thinking…", confirm: "Confirm", cancel: "Cancel", all: "Confirm all", done: "Done", cancelled: "Cancelled",
     hello: "Hi! I can answer questions about labor cost, hours and shifts, plan a whole week, and prepare changes for you to confirm.",
     err: "Could not connect. Try again.",
-    chips: ["What's labor % of revenue this week?", "Plan next week: everyone gets one day off", "Who is on shift now?", "Which requests are waiting?"],
+    chips: ["What's labor % of revenue this week?", "Compare labor cost and hours this month vs last month", "Plan next week: everyone gets one day off", "Who is on shift now?"],
+    wide: "Expand", narrow: "Shrink",
     note: "VAKTO AI can make mistakes. Changes only happen when you confirm.",
     upgrade: "Turn on VAKTO AI",
   },
@@ -40,6 +42,8 @@ function Rich({ text }: { text: string }) {
   return (
     <>
       {lines.map((ln, i) => {
+        // Fyrirsagnir („## …“) verða feitletruð lína.
+        if (/^\s*#{1,6}\s+/.test(ln)) return <p key={i} className="vai-h"><b>{ln.replace(/^\s*#{1,6}\s+/, "").replace(/\*\*/g, "")}</b></p>;
         const li = /^\s*[-•*]\s+/.test(ln);
         const parts = ln.replace(/^\s*[-•*]\s+/, "").split(/(\*\*[^*]+\*\*)/g);
         const inner = parts.map((p, k) => (p.startsWith("**") && p.endsWith("**") ? <b key={k}>{p.slice(2, -2)}</b> : <Fragment key={k}>{p}</Fragment>));
@@ -57,6 +61,7 @@ export function AssistantPanel() {
   const path = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [wide, setWide] = useState(false);
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -149,15 +154,16 @@ export function AssistantPanel() {
 
   return (
     <>
-      <button className={`vai-fab${open ? " on" : ""}${path?.startsWith("/spjall") ? " up" : ""}`} onClick={() => setOpen((o) => !o)} aria-label={s.open} title={`${s.name} (⌘J)`}><Spark /></button>
+      <button className={`vai-fab${open ? " on" : " pill"}${path?.startsWith("/spjall") ? " up" : ""}`} onClick={() => setOpen((o) => !o)} aria-label={open ? s.close : s.open} title={`${s.name} (⌘J)`}>{open ? <svg viewBox="0 0 24 24" className="x" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" /></svg> : <><Spark /><span>{s.name}</span></>}</button>
       {open && (
-        <div className="vai-panel" role="dialog" aria-label={s.name}>
+        <div className={`vai-panel${wide ? " wide" : ""}`} role="dialog" aria-label={s.name}>
           <div className="vai-head">
             <span className="vai-badge"><Spark /></span>
             <b>{s.name}</b>
             <span className="vai-sp" />
             <button className={`vai-ico${hist ? " on" : ""}`} onClick={openHistory} title={s.history} aria-label={s.history}><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg></button>
             {msgs.length > 0 && <button className="vai-ico" onClick={fresh} title={s.reset} aria-label={s.reset}><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg></button>}
+            <button className="vai-ico vai-wide" onClick={() => setWide((w) => !w)} title={wide ? s.narrow : s.wide} aria-label={wide ? s.narrow : s.wide}>{wide ? <svg viewBox="0 0 24 24"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7" /></svg> : <svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>}</button>
             <button className="vai-ico" onClick={() => setOpen(false)} aria-label={s.close}><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg></button>
           </div>
           {hist && (
