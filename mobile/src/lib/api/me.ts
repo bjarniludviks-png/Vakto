@@ -1,7 +1,8 @@
 // "Mitt svæði" data — direct-Supabase port of src/app/(app)/mitt-svaedi/my.server.ts
 import { supabase } from "../supabase";
 import { classifyPay, computeFromPunches, STORHATID } from "../payroll";
-import { resolveRuleSet, type CustomRules } from "../payrules";
+import { resolveRuleSet, type CustomRules, type OrlofSet } from "../payrules";
+import type { PaySettings } from "../paysettings";
 
 const MONTHLY_HOURS = 173.33;
 const ORLOF_PCT = 0.1017;
@@ -25,6 +26,10 @@ export type Me = {
   rules: CustomRules;
   /** Verktaki: þóknun án álaga, yfirvinnu og orlofs. */
   contractor: boolean;
+  /** Launaliðir (0081): eigin stillingar ofan á sjálfgildi fyrirtækisins — sami útreikningur og launakeyrslan. */
+  pay: Partial<PaySettings>;
+  orlof: Partial<OrlofSet> | null;
+  benefits: { name: string; type: string; amount: number; taxable?: boolean }[] | null;
 };
 
 export async function getMe(): Promise<Me | null> {
@@ -39,6 +44,13 @@ export async function getMe(): Promise<Me | null> {
     .limit(1)
     .maybeSingle();
   if (!e) return null;
+  // Sér fyrirspurnir svo appið virki þótt dálkana (0081) vanti.
+  const [ext, co] = await Promise.all([
+    supabase.from("employees").select("pay_settings, orlof, benefits").eq("id", e.id).maybeSingle(),
+    supabase.from("companies").select("pay_defaults").eq("id", e.company_id).maybeSingle(),
+  ]);
+  const x = (ext.error ? null : ext.data) as { pay_settings?: Partial<PaySettings> | null; orlof?: Partial<OrlofSet> | null; benefits?: Me["benefits"] } | null;
+  const defaults = ((co.error ? null : co.data?.pay_defaults) ?? {}) as Partial<PaySettings>;
   const dep = (e.departments as { name?: string } | null)?.name ?? null;
   const pos = (e.positions as { name?: string } | null)?.name ?? null;
   return {
@@ -61,6 +73,9 @@ export async function getMe(): Promise<Me | null> {
       ? { eve: 0, weekend: 0, overtime: 0, holiday: 0, night: 0, otWeekly: 100000, bands: [] }
       : resolveRuleSet(e.union_agreement, (e.pay_rule as Partial<CustomRules> | null) ?? undefined),
     contractor: e.role === "contractor",
+    pay: { ...defaults, ...(x?.pay_settings ?? {}) },
+    orlof: x?.orlof ?? (defaults as { orlof?: Partial<OrlofSet> }).orlof ?? null,
+    benefits: x?.benefits ?? null,
   };
 }
 

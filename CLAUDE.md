@@ -432,4 +432,4 @@
   fær ekki orlof ofan á mánaðarlaun. `BURDEN` (30,2 %) er aðeins fyrir grófar áætlanir án starfsmanns.
 - Launalínur geyma orlof, viðbót, mótframlag, tryggingagjald, sjóði og kostnað (`payroll_lines`, 0081).
 - UI: starfsmannaspjald → Laun → `PaySettingsCard` (`starfsfolk/pay-settings.tsx`); Stillingar → Reglur og laun →
-  `PayDefaultsCard` (`stillingar/pay-defaults.tsx`). Appið (`mobile/src/lib/payroll.ts`) er enn með gamla einfaldaða matið.
+  `PayDefaultsCard` (`stillingar/pay-defaults.tsx`). Appið notar sama útreikning: `mobile/src/lib/payroll.ts` + `paysettings.ts` eru AFRIT af vefnum (breyttu báðum saman); Laun-skjárinn sýnir áætlaðan launaseðill (staðgreiðsla, lífeyrir, orlofshamur, útborgað).

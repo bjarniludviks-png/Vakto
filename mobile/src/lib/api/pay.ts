@@ -1,6 +1,7 @@
 // Launamat — per-shift estimate and month projection from confirmed shifts.
 // Uses the same rule engine as the web (payroll.ts / payrules.ts).
-import { classifyPay, computeFromPunches, BURDEN } from "../payroll";
+import { classifyPay, computeFromPunches, BURDEN, type PayLine } from "../payroll";
+import { resolveOrlof, type OrlofMode } from "../payrules";
 import { tr, trf } from "../../../src/lib/i18n";
 import type { Me } from "./me";
 
@@ -40,6 +41,10 @@ export type MonthPay = {
   weeks: { label: string; hours: number; kr: number; planned: boolean }[];
   monthLabel: string;
   payday: string;
+  orlofMode: OrlofMode;
+  orlofPct: number;
+  /** Áætlaður launaseðill mánaðarins (unnið + staðfestar vaktir), sami útreikningur og launakeyrslan. null = verktaki. */
+  slip: PayLine | null;
 };
 
 const MONTHS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
@@ -53,8 +58,9 @@ export function monthPay(
 ): MonthPay {
   const rate = me.rate;
   const earnedCls = classifyPay(rate, me.hourly, punches, me.rules);
-  const earnedLine = punches.length ? computeFromPunches({ id: me.empId, fullName: me.fullName, payType: me.hourly ? "hourly" : "monthly", rate, employmentRatio: me.ratio }, punches, me.rules) : null;
-  const earnedKr = me.hourly ? Math.round(earnedLine?.gross ?? 0) : Math.round((rate * me.ratio) / 100);
+  const emp = { id: me.empId, fullName: me.fullName, payType: (me.hourly ? "hourly" : "monthly") as "hourly" | "monthly", rate, employmentRatio: me.ratio, pay: me.pay, orlof: me.orlof, benefits: me.benefits };
+  // Unnið hingað til = launin sjálf (dagvinna + álag + yfirvinna), án orlofs og hlunninda.
+  const earnedKr = me.hourly ? Math.round(earnedCls.total * rate + (earnedCls.premiumPay + earnedCls.overtimePay) / (1 + BURDEN)) : Math.round(rate);
 
   const planned = futureShifts.filter((s) => s.start && s.end).map((s) => shiftPunch(s.date, s.start!, s.end!));
   const plannedCls = classifyPay(rate, me.hourly, planned, me.rules);
@@ -82,10 +88,14 @@ export function monthPay(
     cur.setDate(cur.getDate() + 7);
   }
   const payday = new Date(y, m + 1, 1);
+  const o = resolveOrlof(me.orlof);
+  const slip = me.contractor ? null : computeFromPunches(emp, [...punches, ...planned], me.rules, 0, y);
   return {
+    orlofMode: o.mode, orlofPct: o.pct, slip,
     earnedKr, earnedH: earnedCls.total, plannedKr, plannedH: plannedCls.total, projectedKr: earnedKr + plannedKr,
     dayKr: Math.round(dayH * rate), dayH, premKr, premH: earnedCls.premium, otKr, otH: earnedCls.overtime,
-    orlofKr: me.contractor ? 0 : Math.round(earnedKr * 0.1017), shifts: punches.length,
+    // Fastlaunafólk fær ekki orlof ofan á laun (heldur launum í orlofi) — aðeins af yfirvinnu.
+    orlofKr: me.contractor ? 0 : Math.round((me.hourly ? earnedKr : otKr) * o.pct / 100), shifts: punches.length,
     weeks, monthLabel: `${tr(MONTHS[m])} ${y}`, payday: `${payday.getDate()}. ${tr(MONTHS[payday.getMonth()])}`,
   };
 }

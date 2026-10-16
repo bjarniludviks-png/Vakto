@@ -30,6 +30,24 @@ export function useLang(): Lang {
 
 type E = [string, string, string]; // [en, vi, pl]
 const D: Record<string, E> = {
+  "greitt út með launum": ["paid out with wages", "trả cùng lương", "wypłacane z pensją"],
+  "lagt inn á orlofsreikning": ["paid into holiday account", "chuyển vào tài khoản nghỉ phép", "wpłacane na konto urlopowe"],
+  "safnast upp": ["accrues", "tích lũy", "narasta"],
+  "Áætlaður launaseðill": ["Estimated payslip", "Phiếu lương dự kiến", "Szacowany pasek wynagrodzenia"],
+  "Allur mánuðurinn: unnið + staðfestar vaktir": ["Whole month: worked + confirmed shifts", "Cả tháng: đã làm + ca đã xác nhận", "Cały miesiąc: przepracowane + potwierdzone zmiany"],
+  "Hlunnindi og styrkir": ["Benefits and allowances", "Phúc lợi và trợ cấp", "Świadczenia i dodatki"],
+  "Heildarlaun": ["Gross pay", "Tổng lương", "Wynagrodzenie brutto"],
+  "Lífeyrissjóður": ["Pension fund", "Quỹ hưu trí", "Fundusz emerytalny"],
+  "Viðbótarlífeyrissparnaður": ["Private pension", "Tiết kiệm hưu trí bổ sung", "Dodatkowe oszczędności emerytalne"],
+  "Félagsgjald": ["Union fee", "Phí công đoàn", "Składka związkowa"],
+  "Staðgreiðsla": ["Tax withheld", "Thuế khấu trừ", "Zaliczka na podatek"],
+  "Á orlofsreikning": ["To holiday account", "Vào tài khoản nghỉ phép", "Na konto urlopowe"],
+  "Hlunnindi í fríðu": ["Benefits in kind", "Phúc lợi hiện vật", "Świadczenia rzeczowe"],
+  "Undanþegið staðgreiðslu": ["Tax-exempt", "Miễn thuế", "Zwolnione z podatku"],
+  "Útborgað (áætlað)": ["Take-home (estimate)", "Thực nhận (ước tính)", "Do wypłaty (szacunek)"],
+  "Staðgreiðsla er reiknuð í þrepum ársins að frádregnum persónuafslætti samkvæmt skattkortinu þínu.": ["Tax is calculated on this year's brackets minus the personal allowance on your tax card.", "Thuế được tính theo các bậc của năm, trừ khoản giảm trừ cá nhân theo thẻ thuế của bạn.", "Podatek liczony jest według progów na ten rok, pomniejszony o ulgę osobistą z Twojej karty podatkowej."],
+  "Reiknað eftir {x} á tímakaupi {n} kr. Endanlegur launaseðill kemur úr launakeyrslunni.": ["Calculated under {x} at an hourly rate of {n} kr. Your final payslip comes from the payroll run.", "Tính theo {x} với mức lương giờ {n} kr. Phiếu lương cuối cùng đến từ đợt tính lương.", "Obliczone według {x} przy stawce {n} kr za godzinę. Ostateczny pasek wynagrodzenia pochodzi z naliczenia płac."],
+  "Mánaðarlaun. Endanlegur launaseðill kemur úr launakeyrslunni.": ["Monthly salary. Your final payslip comes from the payroll run.", "Lương tháng. Phiếu lương cuối cùng đến từ đợt tính lương.", "Pensja miesięczna. Ostateczny pasek wynagrodzenia pochodzi z naliczenia płac."],
   // --- flipar / haus
   // Rekstur (stjórnendaflipi)
   "Valið": ["Custom", "Tùy chọn", "Własny"],
