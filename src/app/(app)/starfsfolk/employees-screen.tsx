@@ -22,6 +22,7 @@ import { Av } from "@/components/app/avatar";
 import { PaySettingsCard } from "./pay-settings";
 import { computeLine } from "@/lib/payroll";
 import { ORLOF_DAYS, orlofPctForDays, orlofDaysForPct } from "@/lib/paysettings";
+import { parseStaffSheet } from "@/lib/staff-import";
 
 /** Best-effort document type from a filename (for the documents table). */
 function detectDocType(name: string): string {
@@ -100,62 +101,18 @@ export default function EmployeesScreen({
     if (!file) return;
     setImporting(true);
     try {
-      const readXlsx = (await import("read-excel-file")).default;
-      const out = (await readXlsx(file)) as unknown;
-      // Browser build returns rows[][]; guard for the sheet-wrapped shape too.
-      const wrapped = out as { data?: unknown[][] }[];
-      const grid: unknown[][] = Array.isArray(wrapped?.[0]?.data) ? wrapped[0].data : (out as unknown[][]);
-      const header = (grid[0] ?? []).map((c) => String(c ?? "").trim().toLowerCase());
-      const col = (...names: string[]) => header.findIndex((h) => names.some((n) => h.includes(n)));
-      const ci = {
-        name: col("nafn", "name"),
-        kt: col("kennitala", "ssn"),
-        phone: col("sími", "simi", "phone"),
-        email: col("tölvupóst", "tolvupost", "netfang", "email"),
-        hire: col("ráðning", "radning", "hire"),
-        active: col("virk", "active"),
-        role: col("hlutverk", "role"),
-        position: col("starfsheiti", "staða", "stada", "position"),
-        department: col("deild", "department"),
-        location: col("staður", "stadur", "starfsstöð", "location"),
-        payType: col("launateg", "pay type", "paytype"),
-        rate: col("taxti", "tímakaup", "timakaup", "laun", "rate"),
-        ratio: col("hlutfall", "ratio"),
-        union: col("stéttarfélag", "stettarfelag", "félag", "union"),
-        bank: col("bankareikning", "banka", "reikning", "bank"),
-      };
-      if (ci.name < 0) { toast("Fann ekki 'Nafn' dálk í skránni"); setImporting(false); return; }
-      const val = (row: unknown[], i: number) => (i >= 0 && row[i] != null ? String(row[i]).trim() : "");
-      const rows = grid.slice(1)
-        .filter((r) => val(r, ci.name))
-        .map((r) => {
-          const a = val(r, ci.active).toLowerCase();
-          return {
-            fullName: val(r, ci.name),
-            kennitala: val(r, ci.kt) || undefined,
-            phone: val(r, ci.phone) || undefined,
-            email: val(r, ci.email) || undefined,
-            hireDate: ci.hire >= 0 && r[ci.hire] instanceof Date ? (r[ci.hire] as Date).toISOString().slice(0, 10) : (val(r, ci.hire) || undefined),
-            active: a ? !["nei", "no", "false", "óvirkur", "ovirkur"].includes(a) : true,
-            role: val(r, ci.role) || undefined,
-            position: val(r, ci.position) || undefined,
-            department: val(r, ci.department) || undefined,
-            location: val(r, ci.location) || undefined,
-            payType: val(r, ci.payType) || undefined,
-            rate: val(r, ci.rate) || undefined,
-            employmentRatio: val(r, ci.ratio) || undefined,
-            union: val(r, ci.union) || undefined,
-            bankAccount: val(r, ci.bank) || undefined,
-          };
-        });
-      if (!rows.length) { toast("Engir starfsmenn í skránni"); setImporting(false); return; }
+      const readXlsx = (await import("read-excel-file/browser")).default;
+      // Útgáfa 9 skilar öllum flipum; parseStaffSheet velur flipann með „Nafn“-dálki.
+      const { rows, error } = parseStaffSheet(await readXlsx(file));
+      if (error) { toast(t(error)); setImporting(false); return; }
       const res = await importEmployees(rows);
       if (!res.ok) { toast(res.error ?? "Innflutningur tókst ekki"); }
       else toast(res.demo
         ? `${res.inserted} starfsmenn lesnir (demo — tengdu Supabase)`
-        : `${res.inserted} starfsmenn fluttir inn${res.skipped ? ` · ${res.skipped} sleppt` : ""}`);
+        : `${res.inserted} starfsmenn fluttir inn${res.skipped ? ` · ${res.skipped} sleppt` : ""}${res.noRate ? ` · ${res.noRate} án taxta, skráðu hann á hvern starfsmann` : ""}`);
       router.refresh();
-    } catch {
+    } catch (e) {
+      console.error("[import]", e);
       toast("Gat ekki lesið skrána — er hún á Excel (.xlsx) formi?");
     } finally {
       setImporting(false);
