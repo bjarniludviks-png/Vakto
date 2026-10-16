@@ -11,25 +11,26 @@ export const VAKTO_KNOWLEDGE = `
 - Vefkerfi (virkar í vafra, líka í síma) fyrir veitingastaði, kaffihús, verslanir, hótel, bakarí og keðjur.
 - Eitt af einföldustu vaktakerfunum: vaktaplan, stimpilklukka, laun — og það sem hin kerfin gera ekki.
 - Starfsmanna-app: Android-appið er komið í Google Play (https://play.google.com/store/apps/details?id=is.vakto.app). iPhone-appið er væntanlegt í App Store; þangað til virkar vakto.is í vafra símans.
-- Íslenska og enska.
+- Íslenska, enska, víetnamska og pólska (hver notandi velur undir hnattartákninu).
 
 ## Grunnurinn (allt sem hin kerfin gera líka)
 - Vaktaplan með drag & drop, vikusýn, vaktategundir (dagvakt, kvöldvakt með álagi, helgarvakt), AI getur stungið upp á plani sem stjórnandi samþykkir.
 - Stimpilklukka: starfsmaður stimplar í símanum eða á sameiginlegri spjaldtölvu (kiosk) með PIN eða með því að skanna QR-kóða skírteinisins.
 - Frí- og leyfisbeiðnir, vaktaskipti, opnar vaktir sem starfsfólk sækir um.
-- Launaútreikningur og launakeyrslur; útflutningur í Payday (Excel-skjal sem Payday les inn) og DK, og almennt Excel.
-- Skýrslur/innsýn í Excel og PDF. Starfsfólk lesið inn úr Excel.
+- Launaútreikningur og launakeyrslur; bein tenging við Payday (samþykktir tímar sendir beint inn sem tímaskrá) eða útflutningur í Payday (Excel), DK og almennt Excel.
+- Skýrslur/innsýn í Excel og PDF.
+- Starfsfólk lesið inn úr Excel: Starfsfólk → Flytja inn (Excel); sniðmát fæst undir i-tákninu við hnappinn. Deildir, staðir og starfsheiti sem vantar eru stofnuð sjálfkrafa. Innlestur sendir ekki boð; eftir hann birtist borði „X starfsmenn hafa ekki aðgang að appinu“ með hnappinum „Senda boð í appið“. Einnig má senda boð á einn starfsmann í prófílnum hans (Aðgangur → Senda boð).
 
 ## Það sem gerir VAKTO öðruvísi
 - Laun sem % af veltu í rauntíma: veltan er skráð handvirkt (eða úr sölukerfi þegar það er tengt) og launahlutfallið birtist á mælaborðinu, litakóðað eftir markmiði fyrirtækisins (grænt/gult/rautt).
 - Tímafrávik með launaáhrifum: of seint, fór fyrr, yfirvinna, gleymd útstimplun — merkt og sýnt hvað það kostar.
 - Áætlun á móti raun per dag og per starfsmann; starfsmaðurinn sér sitt líka.
-- Laun eftir kjarasamningi (dagvinna, álög, yfirvinna, uppbætur, staðgreiðsla, tryggingagjald, lífeyrir) — reiknað og flutt í Payday/DK. Formlegur launaseðill kemur úr launakerfinu (t.d. Payday); í VAKTO sér starfsmaður áætluð laun jafnóðum.
+- Laun eftir kjarasamningi (dagvinna, álög, yfirvinna, uppbætur) með nákvæmum frádrætti: staðgreiðsla í þrepum ársins, persónuafsláttur eftir skattkorti (líka maka og uppsafnaður), lífeyrir og mótframlag, viðbótarlífeyrissparnaður, félagsgjald, sjóðir stéttarfélags, tryggingagjald og hlunnindi. Orlof per starfsmann: greitt út með launum, lagt inn á orlofsreikning eða safnast upp, með prósentu eftir orlofsdögum. Launaliðir eru stilltir á hvern starfsmann (Starfsfólk → Laun) og sjálfgefin gildi í Stillingar → Reglur og laun. VAKTO býr til launaseðla (PDF) og starfsmaður sér áætlaðan launaseðil jafnóðum í appinu.
 - Starfsmannaskírteini í símanum með QR-kóða sem stimplar á kiosk; hægt að setja í Apple Wallet og Google Wallet.
 - Ráðningarsamningar búnir til úr starfsmannagögnum, starfsmaður les og samþykkir rafrænt í appinu (rafrænt samþykki skráð með nafni og tímastimpli).
 - Spjall (eins og Messenger): rásir sjálfkrafa per deild og stað, bein skilaboð, hópar, myndir, talskilaboð, viðbrögð, svör, „séð“, ólesið-teljari, push-tilkynningar.
 - Fréttaveita: tilkynningar með myndum og skjölum, viðbrögð, athugasemdir og svör við athugasemdum, fest tilkynning.
-- VAKTO AI (fyrir stjórnendur og vaktstjóra, neistatáknið neðst í horninu á vefnum eða ⌘J): svarar spurningum um reksturinn með raunverulegum tölum (laun % af veltu, tímar, frávik, hver er á vakt, beiðnir), setur upp vaktaplan fyrir heila viku eftir lýsingu („allir vinni 35 tíma og fái einn frídag“) og undirbýr stakar breytingar (vaktir, frí-beiðnir, vaktaskipti, útstimplun). Allar breytingar eru tillögur sem stjórnandinn staðfestir með hnappi; ekkert er framkvæmt án staðfestingar. Samtöl vistast og má opna aftur undir klukkutákninu.
+- VAKTO AI (fyrir stjórnendur og vaktstjóra, neistatáknið neðst í horninu á vefnum eða ⌘J): svarar spurningum um reksturinn með raunverulegum tölum (laun % af veltu, tímar, frávik, hver er á vakt, beiðnir), setur upp vaktaplan fyrir heila viku eftir lýsingu („allir vinni 35 tíma og fái einn frídag“) ber saman tímabil (t.d. „október miðað við september“ eða „sama vika í fyrra“: velta, launakostnaður, laun %, tímar, yfirvinna, per deild og starfsmann), sýnir þróun per mánuð eða viku, les keyrð laun úr launakeyrslum og undirbýr stakar breytingar (vaktir, frí-beiðnir, vaktaskipti, útstimplun). Allar breytingar eru tillögur sem stjórnandinn staðfestir með hnappi; ekkert er framkvæmt án staðfestingar. Samtöl vistast og má opna aftur undir klukkutákninu.
 - Handbækur/skjöl: hægt að hlaða upp skjölum fyrirtækisins og starfsmanna (t.d. handbók) sem starfsfólk sér í appinu.
 
 ## Verð (án VSK)
@@ -43,8 +44,9 @@ export const VAKTO_KNOWLEDGE = `
 ## Að byrja
 - Skráning á vakto.is/nyskraning: nafn, fyrirtæki, netfang, lykilorð → kort skráð hjá Straumi (0 kr) → 14 daga prufan byrjar → inn í kerfið. Tekur um korter að setja upp fyrirtækið, staðina, deildirnar og starfsfólkið (Excel-innlestur).
 - Innskráning: vakto.is/login. Gleymt lykilorð: hlekkur á innskráningarsíðu.
-- Stimpilklukka á spjaldtölvu: stillingar → samþættingar → afrita kiosk-slóð.
-- Samþættingar: opið API fyrir veltu (Stillingar → Samþættingar → Ný tenging gefur API-lykil; sölukerfið POST-ar á https://www.vakto.is/api/v1/revenue með Authorization: Bearer <lykill> og JSON {date, amount, location}). Virkar með hvaða sölukerfi sem getur sent HTTP-beiðni, eða gegnum Zapier/Make. Engin innbyggð Inventra/Dineout/SalesCloud-tenging — veltu má líka skrá handvirkt eða sem meðalveltu per vikudag. Laun: útflutningur í Payday (Excel) og DK (CSV), engin API-tenging við launakerfi.
+- Stimpilklukka á spjaldtölvu: Stillingar → Staðir og teymi → Tæki á staðnum → afrita kiosk-slóð.
+- Mælaborðið má sérsníða: táknið við hliðina á dagsetningunni felur, sýnir og raðar spjöldum.
+- Samþættingar: opið API fyrir veltu (Stillingar → Samþættingar → Ný tenging gefur API-lykil; sölukerfið POST-ar á https://www.vakto.is/api/v1/revenue með Authorization: Bearer <lykill> og JSON {date, amount, location}). Virkar með hvaða sölukerfi sem getur sent HTTP-beiðni, eða gegnum Zapier/Make. Innbyggðar tengingar: Shopify, WooCommerce og INVENTRA (systurkerfi VAKTO). Engin Dineout/Noona/SalesCloud-tenging enn (hægt að smella „Láta mig vita“). Veltu má líka skrá handvirkt eða áætla út frá mánaðarveltu. Laun: bein tenging við Payday (Stillingar → Tengingar → Payday → Tengja), eða útflutningur í Payday (Excel), DK (CSV) og Excel.
 
 ## Öryggi og gögn
 - Gögn hýst hjá Supabase í Evrópu (Írlandi), aðgangsstýring per fyrirtæki (RLS). Hlutverk: stjórnandi, vaktstjóri, starfsmaður, verktaki.
