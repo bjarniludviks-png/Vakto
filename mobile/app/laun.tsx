@@ -12,6 +12,16 @@ import { getMonthPay } from "../src/lib/api/home";
 import type { MonthPay } from "../src/lib/api/pay";
 import { kr, dec1 } from "../src/lib/format";
 
+function Row({ label, value, minus, strong }: { label: string; value: number; minus?: boolean; strong?: boolean }) {
+  if (!value && !strong) return null;
+  return (
+    <View style={{ flexDirection: "row", justifyContent: "space-between", paddingVertical: strong ? 9 : 6, borderTopWidth: strong ? 1 : 0, borderTopColor: colors.line2, marginTop: strong ? 4 : 0 }}>
+      <Txt size={strong ? 14.5 : 13.5} weight={strong ? "bold" : "regular"} color={strong ? colors.ink : colors.ink2}>{label}</Txt>
+      <Txt size={strong ? 14.5 : 13.5} weight={strong ? "bold" : "semibold"} style={{ fontVariant: ["tabular-nums"] }}>{minus && value ? `−${kr(value)}` : kr(value)}</Txt>
+    </View>
+  );
+}
+
 function Tile({ label, value, sub }: { label: string; value: string; sub: string }) {
   return (
     <View style={{ flex: 1, minWidth: "45%", backgroundColor: colors.panel, borderRadius: 16, borderWidth: 1, borderColor: colors.line2, padding: 13 }}>
@@ -57,9 +67,29 @@ export default function Laun() {
           {!me?.contractor && <>
             <Tile label="Kvöld- og helgarálag" value={kr(pay.premKr)} sub={`${dec1(pay.premH)} klst`} />
             <Tile label="Yfirvinna" value={kr(pay.otKr)} sub={`${dec1(pay.otH)} klst`} />
-            <Tile label="Orlof (10,17%)" value={kr(pay.orlofKr)} sub="lagt til hliðar" />
+            <Tile label={`${tr("Orlof")} (${String(pay.orlofPct).replace(".", ",")}%)`} value={kr(pay.orlofKr)} sub={pay.orlofMode === "pay_out" ? tr("greitt út með launum") : pay.orlofMode === "to_bank" ? tr("lagt inn á orlofsreikning") : tr("safnast upp")} />
           </>}
         </View>
+      ) : null}
+
+      {pay?.slip && pay.slip.gross > 0 ? (
+        <Card style={{ paddingVertical: 12 }}>
+          <Eyebrow>Áætlaður launaseðill</Eyebrow>
+          <Muted size={12} style={{ marginTop: 2, marginBottom: 6 }}>{tr("Allur mánuðurinn: unnið + staðfestar vaktir")}</Muted>
+          <Row label={tr("Laun")} value={pay.slip.gross - pay.slip.orlof - pay.slip.benefits - pay.slip.uppbot} />
+          <Row label={tr("Orlof")} value={pay.slip.orlof} />
+          <Row label={tr("Hlunnindi og styrkir")} value={pay.slip.benefits} />
+          <Row label={tr("Heildarlaun")} value={pay.slip.gross} strong />
+          <Row label={tr("Lífeyrissjóður")} value={pay.slip.pension} minus />
+          <Row label={tr("Viðbótarlífeyrissparnaður")} value={pay.slip.extraPension} minus />
+          <Row label={tr("Félagsgjald")} value={pay.slip.union} minus />
+          <Row label={tr("Staðgreiðsla")} value={pay.slip.withholding} minus />
+          <Row label={tr("Á orlofsreikning")} value={pay.slip.orlofToBank} minus />
+          <Row label={tr("Hlunnindi í fríðu")} value={pay.slip.benefitsInKind} minus />
+          <Row label={tr("Undanþegið staðgreiðslu")} value={pay.slip.benefitsFree} />
+          <Row label={tr("Útborgað (áætlað)")} value={pay.slip.net} strong />
+          <Muted size={11.5} style={{ marginTop: 4, lineHeight: 16 }}>{tr("Staðgreiðsla er reiknuð í þrepum ársins að frádregnum persónuafslætti samkvæmt skattkortinu þínu.")}</Muted>
+        </Card>
       ) : null}
 
       {pay && pay.weeks.length ? (
@@ -84,8 +114,8 @@ export default function Laun() {
         {me?.contractor
           ? "Áætluð þóknun án VSK úr tímunum þínum. Þú sendir reikning og sérð sjálf(ur) um skatta og lífeyri."
           : me?.hourly
-          ? trf("Brúttólaun fyrir staðgreiðslu og lífeyri, reiknuð eftir {x} á tímakaupi {n} kr. Endanlegur launaseðill kemur úr launakerfinu.", me.union ? trf("kjarasamningi {x}", me.union) : tr("reglum fyrirtækisins"), kr(me.rate).replace(" kr", ""))
-          : "Mánaðarlaun. Endanlegur launaseðill kemur úr launakerfinu."}
+          ? trf("Reiknað eftir {x} á tímakaupi {n} kr. Endanlegur launaseðill kemur úr launakeyrslunni.", me.union ? trf("kjarasamningi {x}", me.union) : tr("reglum fyrirtækisins"), kr(me.rate).replace(" kr", ""))
+          : "Mánaðarlaun. Endanlegur launaseðill kemur úr launakeyrslunni."}
       </Muted>
       <Btn title="Launaseðlar og skjöl" variant="ghost" icon={<FolderOpen color={colors.ink} size={17} />} onPress={() => router.push("/skjol")} />
     </Screen>
