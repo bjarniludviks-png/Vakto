@@ -1555,3 +1555,12 @@ a.db2-who:hover span{color:var(--brand)}
 .db2-cust button:disabled{opacity:.3}
 .db2-cust svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .db2-staff tfoot td{font-weight:650;border-top:1.5px solid var(--line);padding-top:12px}
+
+/* Starfsfólk: boð í appið fyrir starfsfólk án aðgangs */
+.emp-invite{display:flex;align-items:center;gap:14px;padding:14px 18px;margin-bottom:16px;border:1px solid color-mix(in srgb,var(--brand) 35%,var(--line));background:color-mix(in srgb,var(--brand) 6%,var(--panel))}
+.emp-invite>svg{width:22px;height:22px;flex:none;fill:none;stroke:var(--brand);stroke-width:2;stroke-linecap:round}
+.emp-invite-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.emp-invite-tx b{font-size:14px;color:var(--ink)}
+.emp-invite-tx span{font-size:12.5px;color:var(--ink3)}
+.emp-invite-b{display:flex;gap:8px;flex:none}
+@media(max-width:760px){.emp-invite{flex-wrap:wrap}.emp-invite-b,.emp-invite>.btn{width:100%}.emp-invite-b .btn{flex:1;justify-content:center}}
