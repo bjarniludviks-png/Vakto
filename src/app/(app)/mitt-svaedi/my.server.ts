@@ -20,7 +20,7 @@ const hhmm = (t?: string | null) => (t ? String(t).slice(0, 5) : "");
 
 export type MyDay = { label: string; time: string | null; premium: string | null; today: boolean };
 export type MyShift = { label: string; time: string; premium: string | null; today: boolean };
-export type MyOpenShift = { id: string; label: string; time: string; premium: string | null };
+export type MyOpenShift = { id: string; label: string; time: string; premium: string | null; note: string | null; applied: boolean };
 export type MyArea = {
   live: boolean;
   openSince: string | null; // ISO clock_in of my open punch (null = not on shift)
@@ -80,9 +80,9 @@ export async function getMyArea(): Promise<MyArea> {
       supabase.from("punches").select("clock_in, clock_out")
         .eq("company_id", company).eq("employee_id", empId)
         .gte("clock_in", sixBack).order("clock_in"),
-      supabase.from("shifts").select("id, date, start_time, end_time")
-        .eq("company_id", company).is("employee_id", null)
-        .gte("date", todayISO).order("date").limit(5),
+      supabase.from("shifts").select("id, date, start_time, end_time, note")
+        .eq("company_id", company).is("employee_id", null).eq("published", true)
+        .gte("date", todayISO).order("date").order("start_time").limit(10),
     ]);
 
     // Premium label for a shift (highest applicable band, simplified).
@@ -198,11 +198,17 @@ export async function getMyArea(): Promise<MyArea> {
 
     const position = ((Array.isArray(emp.positions) ? emp.positions[0] : emp.positions) as { name?: string } | null)?.name ?? "";
     const dept = ((Array.isArray(emp.departments) ? emp.departments[0] : emp.departments) as { name?: string } | null)?.name ?? "";
+    // Mínar umsóknir um lausar vaktir (0082) — þolir að migration vanti.
+    const openIds = (openShiftRows ?? []).map((s) => s.id as string);
+    const claimRes = openIds.length ? await supabase.from("shift_claims").select("shift_id").eq("employee_id", empId).in("shift_id", openIds) : { data: [], error: null };
+    const appliedIds = new Set((claimRes.error ? [] : claimRes.data ?? []).map((c) => c.shift_id as string));
     const openShifts: MyOpenShift[] = (openShiftRows ?? []).map((s) => ({
       id: s.id as string,
       label: niceDay(String(s.date)),
       time: `${hhmm(s.start_time as string)}–${hhmm(s.end_time as string)}`,
       premium: premOf(String(s.date), s.start_time as string),
+      note: (s.note as string) ?? null,
+      applied: appliedIds.has(s.id as string),
     }));
 
     // Today's shift checklist (0030) — tolerant of a not-yet-run migration.

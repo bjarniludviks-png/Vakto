@@ -45,9 +45,23 @@ export async function requestShiftSwap(me: Me, note: string): Promise<Result> {
   return { ok: true };
 }
 
-/** Apply for an open shift — same convention as the web (note-encoded). */
-export async function applyForShift(me: Me, note: string): Promise<Result> {
+/** Sækja um lausa vakt: umsókn tengd vaktinni (shift_claims, 0082) sem stjórnandi úthlutar í Vaktaplani.
+ *  Ef taflan er ekki til (eldri grunnur) fer umsóknin sem beiðni með texta eins og áður. */
+export async function applyForShift(me: Me, note: string, shiftId?: string): Promise<Result> {
+  if (shiftId) {
+    const { data, error } = await supabase.from("shift_claims").insert({ company_id: me.companyId, shift_id: shiftId, employee_id: me.empId }).select("id").single();
+    if (!error) { void notifyServer("shift_claim", data.id as string); return { ok: true }; }
+    if (error.code === "23505") return { ok: true };
+    if (error.code === "42501") return { ok: false, error: "Vaktin er ekki lengur laus" };
+    if (error.code !== "42P01" && error.code !== "PGRST205") return { ok: false, error: error.message };
+  }
   return requestShiftSwap(me, `Umsókn um opna vakt: ${note}`);
+}
+
+/** Lausar vaktir sem ég hef sótt um (shift_claims í bið). */
+export async function myOpenShiftClaims(me: Me): Promise<Set<string>> {
+  const { data, error } = await supabase.from("shift_claims").select("shift_id").eq("employee_id", me.empId).eq("status", "pending");
+  return new Set(error ? [] : (data ?? []).map((r) => r.shift_id as string));
 }
 
 export async function setAvailability(

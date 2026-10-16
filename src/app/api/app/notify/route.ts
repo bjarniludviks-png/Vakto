@@ -9,7 +9,7 @@ import { checkNoShows } from "@/lib/noshow.server";
 // Auth: the caller's Supabase access token (Bearer). We verify the caller is a
 // party to the row before notifying anyone — this endpoint never writes data.
 
-type Kind = "leave_request" | "leave_decided" | "swap_request" | "punch" | "content_report";
+type Kind = "leave_request" | "leave_decided" | "swap_request" | "shift_claim" | "punch" | "content_report";
 
 export async function POST(req: Request) {
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -35,6 +35,14 @@ export async function POST(req: Request) {
     after(() => notifyManagers(r.company_id, kind === "leave_request"
       ? { title: "Ný frí-beiðni", body: "Starfsmaður sótti um frí — samþykktu eða hafnaðu.", url: "/vaktaplan", tag: "requests" }
       : { title: "Beiðni um vaktaskipti", body: "Starfsmaður óskaði eftir vaktaskiptum.", url: "/vaktaplan", tag: "requests" }));
+    return NextResponse.json({ ok: true });
+  }
+
+  // Umsókn um lausa vakt (shift_claims, 0082) → stjórnendur fá tilkynningu.
+  if (kind === "shift_claim") {
+    const { data: c } = await admin.from("shift_claims").select("company_id, employee_id, status").eq("id", id).maybeSingle();
+    if (!c || !me || c.employee_id !== me.id || c.status !== "pending") return NextResponse.json({ ok: false }, { status: 403 });
+    after(() => notifyManagers(c.company_id as string, { title: "Umsókn um lausa vakt", body: "Starfsmaður sótti um lausa vakt — úthlutaðu í Vaktaplani.", url: "/vaktaplan", tag: "open-shift" }));
     return NextResponse.json({ ok: true });
   }
 

@@ -10,7 +10,7 @@ import { Card, Txt, Muted, Pill, Btn, Avatar, Seg, Eyebrow, Empty, useToast } fr
 import { colors, deptColor, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { getWeekShifts, weekHoursOf, iso, mondayOf, type SchedShift } from "../../src/lib/api/schedule";
-import { applyForShift, listMyRequests } from "../../src/lib/api/requests";
+import { applyForShift, listMyRequests, myOpenShiftClaims } from "../../src/lib/api/requests";
 import { estimateShift } from "../../src/lib/api/pay";
 import { dec1, kr } from "../../src/lib/format";
 import { LeaveSheet } from "../../src/components/request-sheets";
@@ -39,10 +39,10 @@ export default function Vaktir() {
 
   const load = useCallback(async () => {
     if (!me) return;
-    const [s, reqs] = await Promise.all([getWeekShifts(me, weekStart), listMyRequests(me)]);
+    const [s, reqs, claims] = await Promise.all([getWeekShifts(me, weekStart), listMyRequests(me), myOpenShiftClaims(me)]);
     setShifts(s);
-    // umsóknir sem eru í bið → merkja lausar vaktir
-    const pend = new Set<string>();
+    // umsóknir sem eru í bið → merkja lausar vaktir (shift_claims, og eldri textabeiðnir)
+    const pend = new Set<string>(claims);
     for (const r of reqs) if (r.kind === "swap" && r.status === "pending" && r.label.startsWith("Umsókn um opna vakt")) {
       for (const o of s) if (o.open && r.label.includes(`${o.start ?? ""}–${o.end ?? ""}`) && r.label.includes(`${new Date(o.date + "T12:00:00").getDate()}.`)) pend.add(o.id);
     }
@@ -66,7 +66,7 @@ export default function Vaktir() {
     if (!me || applied.has(s.id)) return;
     setApplied((x) => new Set(x).add(s.id));
     const d = new Date(s.date + "T12:00:00");
-    const r = await applyForShift(me, `${tr(DAY_L[(d.getDay() + 6) % 7])} ${d.getDate()}.${d.getMonth() + 1} ${s.start ?? ""}–${s.end ?? ""}`);
+    const r = await applyForShift(me, `${tr(DAY_L[(d.getDay() + 6) % 7])} ${d.getDate()}.${d.getMonth() + 1} ${s.start ?? ""}–${s.end ?? ""}`, s.id);
     if (!r.ok) { toast(r.error ?? "Tókst ekki"); setApplied((x) => { const n = new Set(x); n.delete(s.id); return n; }); return; }
     toast("Umsókn send — vaktstjóri fær tilkynningu");
   }

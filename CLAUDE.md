@@ -433,3 +433,13 @@
 - Launalínur geyma orlof, viðbót, mótframlag, tryggingagjald, sjóði og kostnað (`payroll_lines`, 0081).
 - UI: starfsmannaspjald → Laun → `PaySettingsCard` (`starfsfolk/pay-settings.tsx`); Stillingar → Reglur og laun →
   `PayDefaultsCard` (`stillingar/pay-defaults.tsx`). Appið notar sama útreikning: `mobile/src/lib/payroll.ts` + `paysettings.ts` eru AFRIT af vefnum (breyttu báðum saman); Laun-skjárinn sýnir áætlaðan launaseðill (staðgreiðsla, lífeyrir, orlofshamur, útborgað).
+
+## Lausar vaktir (16. okt. 2026, migration 0082 á staging — prod við release)
+- Laus vakt = `shifts.employee_id IS NULL` (+ `shifts.note`). Stjórnandi stofnar í Vaktaplani → spjaldið „Lausar vaktir“
+  (`vaktaplan/open-shifts.tsx`, `createOpenShift`/`deleteOpenShift`/`getOpenShifts`/`assignOpenShift` í `vaktaplan/actions.ts`).
+  Starfsfólk fær push (`notifyEmployees`), sækir um í Mitt svæði („Opnar vaktir“, merki með fjölda) eða appinu (Vaktir → Lausar).
+- Umsóknir: `shift_claims` (eigin insert aðeins á lausa, birta, ókomna vakt; engin UPDATE-regla). Úthlutun eingöngu um
+  `approve_shift_claim(claim)` (SECURITY DEFINER: stjórnandi, setur starfsmann ef vaktin er enn laus, hafnar öðrum).
+- `publishSchedule` eyðir ekki lengur lausum vöktum (`.not("employee_id","is",null)`) — þær eru ekki í gridinu.
+- Appið (`mobile/src/lib/api/requests.ts` `applyForShift(me, note, shiftId)`) skrifar í `shift_claims` og kallar `/api/app/notify`
+  með `shift_claim`; eldri app-útgáfur senda áfram textabeiðni í `shift_swaps` (birtist í beiðnaspjaldinu). Krefst OTA.

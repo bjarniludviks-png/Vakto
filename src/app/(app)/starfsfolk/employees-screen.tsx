@@ -989,7 +989,7 @@ function SignerModal({ init, onClose, onDone }: { init: { id: string; ssn: strin
     setBusy(true);
     const res = await setContractStatus(init.id, "sent", { ssn, phone });
     setBusy(false);
-    if (!res.ok) { toast(res.error ?? "Villa"); return; }
+    if (!res.ok) { toast(res.error ?? "Villa", "error"); return; }
     onDone();
     setUrl(res.employerUrl ?? null);
   }

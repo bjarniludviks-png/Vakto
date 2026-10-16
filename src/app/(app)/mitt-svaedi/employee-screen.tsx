@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { toast } from "@/components/app/toast";
+import { useRouter } from "next/navigation";
 import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
 import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, getMyContract, requestContractCode, signContractWithCode, taktikalMyLink, type LeaveType, type MyPunchRow, type MyContract } from "./actions";
@@ -333,7 +334,7 @@ function TasksCard({ initial }: { initial: { id: string; title: string; done: bo
   );
 }
 
-function QuickActions({ onReq }: { onReq: (k: ReqKind) => void }) {
+function QuickActions({ onReq, openCount = 0 }: { onReq: (k: ReqKind) => void; openCount?: number }) {
   const { t } = useLang();
   const S = { fill: "none", stroke: "currentColor", strokeWidth: 1.9 } as const;
   return (
@@ -348,7 +349,7 @@ function QuickActions({ onReq }: { onReq: (k: ReqKind) => void }) {
       </button>
       <button className="qa-tile" onClick={() => onReq("pickup")}>
         <svg viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" /></svg>
-        {t("Opnar vaktir")}
+        {t("Opnar vaktir")}{openCount > 0 && <span className="badge" style={{ marginLeft: 6, background: "var(--brand)", color: "#fff" }}>{openCount}</span>}
       </button>
       <button className="qa-tile" onClick={() => onReq("avail")}>
         <svg viewBox="0 0 24 24" {...S}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
@@ -397,7 +398,7 @@ function Overview({ onReq, perms, my }: { onReq: (k: ReqKind) => void; perms: Pe
     <div className="emp-pane on">
       {perms.clock && <PunchCard live={live} openSince={my?.openSince ?? null} geofence={my?.geofence ?? "off"} />}
       <StatStrip my={my} perms={perms} />
-      {perms.requests && <div style={{ marginBottom: 12 }}><QuickActions onReq={onReq} /></div>}
+      {perms.requests && <div style={{ marginBottom: 12 }}><QuickActions onReq={onReq} openCount={my?.live ? my.openShifts.filter((o) => !o.applied).length : 0} /></div>}
       <div className="mini">
         <div className="mh">{t("Næsta vakt")}</div>
         {live ? (
@@ -465,7 +466,7 @@ function MyShifts({ onReq, perms, my }: { onReq: (k: ReqKind) => void; perms: Pe
         <div className="mr"><span>{t("Næsta útborgun")}</span><b>{live ? (my!.nextPayday || "—") : "1. júlí"}</b></div>
       </div>
       <MyHours canRequest={perms.requests} />
-      {perms.requests && <QuickActions onReq={onReq} />}
+      {perms.requests && <QuickActions onReq={onReq} openCount={my?.live ? my.openShifts.filter((o) => !o.applied).length : 0} />}
     </div>
   );
 }
@@ -715,6 +716,7 @@ const CalIcon = () => <svg className="ei" viewBox="0 0 24 24" fill="none" stroke
 
 function PickupBody({ my }: { my?: MyArea }) {
   const { t } = useLang();
+  const router = useRouter();
   if (my?.live) {
     if (!my.openShifts.length) return <p className="muted" style={{ fontSize: 13, margin: 0 }}>{t("Engar opnar vaktir í boði núna — kíktu aftur síðar.")}</p>;
     return (
@@ -722,8 +724,10 @@ function PickupBody({ my }: { my?: MyArea }) {
         {my.openShifts.map((s) => (
           <div className="it" key={s.id}>
             <div className="ic info"><CalIcon /></div>
-            <div className="tx"><b>{s.label} · {s.time}</b><span>{s.premium ? `${t("álag")} ${s.premium}` : t("dagvinna")}</span></div>
-            <AsyncButton className="btn sm" onClick={async () => { const res = await applyForShift({ note: `${s.label} ${s.time}` }); toast(res.ok ? "Umsókn send — bíður úthlutunar" : (res.error ?? "Villa")); }}>{t("Sækja um")}</AsyncButton>
+            <div className="tx"><b>{s.label} · {s.time}</b><span>{[s.note, s.premium ? `${t("álag")} ${s.premium}` : t("dagvinna")].filter(Boolean).join(" · ")}</span></div>
+            {s.applied
+              ? <span className="tag mut">{t("Umsókn í bið")}</span>
+              : <AsyncButton className="btn sm" onClick={async () => { const res = await applyForShift({ note: `${s.label} ${s.time}`, shiftId: s.id }); if (res.ok) { toast(t("Umsókn send — bíður úthlutunar")); router.refresh(); } else toast(res.error ?? "Villa", "error"); }}>{t("Sækja um")}</AsyncButton>}
           </div>
         ))}
       </div>
