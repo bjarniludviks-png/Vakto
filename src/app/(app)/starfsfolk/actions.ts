@@ -16,6 +16,7 @@ import { taktikalEnabled } from "@/lib/taktikal.server";
 import type { SignatureRecord } from "@/lib/contract-pdf";
 import { userError } from "@/lib/user-error";
 import type { PaySettings } from "@/lib/paysettings";
+import { normKennitala } from "@/lib/staff-import";
 
 export type NewEmployeeInput = {
   fullName: string;
@@ -192,11 +193,11 @@ export type ImportRow = {
   role?: string; position?: string; department?: string; location?: string;
   payType?: string; rate?: string; employmentRatio?: string; union?: string; bankAccount?: string;
 };
-export type ImportResult = { ok: boolean; demo?: boolean; inserted?: number; skipped?: number; error?: string };
+export type ImportResult = { ok: boolean; demo?: boolean; inserted?: number; skipped?: number; noRate?: number; error?: string };
 
 /** Bulk-import employees (e.g. from a Payday Excel export). Chunked for large teams. */
 export async function importEmployees(rows: ImportRow[]): Promise<ImportResult> {
-  const valid = rows.filter((r) => r.fullName?.trim());
+  const valid = rows.filter((r) => r.fullName?.trim()).map((r) => ({ ...r, kennitala: normKennitala(r.kennitala) }));
   const skipped = rows.length - valid.length;
   if (valid.length === 0) return { ok: false, error: "Engir gildir starfsmenn í skránni" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true, inserted: valid.length, skipped };
@@ -216,26 +217,53 @@ export async function importEmployees(rows: ImportRow[]): Promise<ImportResult> 
       }
     }
 
-    // Resolve department/position/location names once per unique value.
+    // Staðir, deildir og starfsheiti úr skránni: tengjast ef þau eru til, annars stofnuð
+    // (nýtt fyrirtæki er tómt og innlestur á ekki að týna deildunum).
     const uniq = (vals: (string | undefined)[]) => [...new Set(vals.map((v) => v?.trim()).filter(Boolean))] as string[];
-    const idMap = async (table: "departments" | "positions" | "locations", names: string[]) => {
-      const m = new Map<string, string | null>();
-      for (const n of names) m.set(n.toLowerCase(), await lookupId(supabase, table, n, company));
-      return m;
+    const locs = new Map<string, string | null>();
+    const ensureLoc = async (name: string) => {
+      const k = name.toLowerCase();
+      if (locs.has(k)) return locs.get(k)!;
+      let id = await lookupId(supabase, "locations", name, company);
+      if (!id) id = ((await supabase.from("locations").insert({ company_id: company, name }).select("id").single()).data?.id as string) ?? null;
+      locs.set(k, id); return id;
     };
-    const [deps, poss, locs] = await Promise.all([
-      idMap("departments", uniq(valid.map((r) => r.department))),
-      idMap("positions", uniq(valid.map((r) => r.position))),
-      idMap("locations", uniq(valid.map((r) => r.location))),
-    ]);
+    for (const n of uniq(valid.map((r) => r.location))) await ensureLoc(n);
+    // Deild þarf stað: staður línunnar, annars fyrsti staður fyrirtækisins, annars „Aðalstöð“.
+    let defaultLoc: string | null = null;
+    const fallbackLoc = async () => {
+      if (defaultLoc) return defaultLoc;
+      const { data } = await supabase.from("locations").select("id").eq("company_id", company).order("created_at").limit(1);
+      defaultLoc = (data?.[0]?.id as string) ?? await ensureLoc("Aðalstöð");
+      return defaultLoc;
+    };
+    const deps = new Map<string, string | null>();
+    for (const r of valid) {
+      const n = r.department?.trim(); if (!n || deps.has(n.toLowerCase())) continue;
+      let id = await lookupId(supabase, "departments", n, company);
+      if (!id) {
+        const loc = (r.location?.trim() ? locs.get(r.location.trim().toLowerCase()) : null) ?? await fallbackLoc();
+        if (loc) id = ((await supabase.from("departments").insert({ location_id: loc, name: n }).select("id").single()).data?.id as string) ?? null;
+      }
+      deps.set(n.toLowerCase(), id);
+    }
+    const poss = new Map<string, string | null>();
+    for (const n of uniq(valid.map((r) => r.position))) {
+      let id = await lookupId(supabase, "positions", n, company);
+      if (!id) id = ((await supabase.from("positions").insert({ company_id: company, name: n }).select("id").single()).data?.id as string) ?? null;
+      poss.set(n.toLowerCase(), id);
+    }
     const pick = (m: Map<string, string | null>, v?: string) => (v?.trim() ? (m.get(v.trim().toLowerCase()) ?? null) : null);
 
-    const toInsert = valid
-      .filter((r) => { const k = r.kennitala?.replace(/\D/g, ""); return !k || !existing.has(k); })
-      .map((r) => ({
+    // Stéttarfélag vantar: algengasta félagið í skránni (t.d. Afl fyrir austan), annars Efling.
+    const unionCount = new Map<string, number>();
+    for (const r of valid) { const u = r.union?.trim(); if (u) unionCount.set(u, (unionCount.get(u) ?? 0) + 1); }
+    const defaultUnion = [...unionCount].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "Efling";
+    const fresh = valid.filter((r) => { const k = r.kennitala?.replace(/\D/g, ""); return !k || !existing.has(k); });
+    const toInsert = fresh.map((r) => ({
         company_id: company,
         full_name: r.fullName.trim(),
-        kennitala: r.kennitala?.trim() || null,
+        kennitala: normKennitala(r.kennitala) ?? null,
         email: r.email?.trim() || null,
         phone: r.phone?.trim() || null,
         bank_account: r.bankAccount?.trim() || null,
@@ -245,9 +273,10 @@ export async function importEmployees(rows: ImportRow[]): Promise<ImportResult> 
         location_id: pick(locs, r.location),
         title: r.position?.trim() || null,
         pay_type: (r.payType ?? "").toLowerCase().startsWith("mán") ? ("monthly" as const) : ("hourly" as const),
-        rate: num(r.rate, 2900),
+        // Enginn taxti í skránni: sjálfgefið tímakaup (2.900) — mánaðarlaunafólk fær 0 svo það sjáist að vantar.
+        rate: num(r.rate, (r.payType ?? "").toLowerCase().startsWith("mán") ? 0 : 2900),
         employment_ratio: num(r.employmentRatio, 100),
-        union_agreement: r.union?.trim() || "Efling",
+        union_agreement: r.union?.trim() || defaultUnion,
         role: roleEnum(r.role ?? "Starfsmaður"),
         status: r.active === false ? "inactive" : "active",
       }));
@@ -266,7 +295,7 @@ export async function importEmployees(rows: ImportRow[]): Promise<ImportResult> 
       action: "employee.import", entity: "employee", detail: `Flutti inn ${inserted} starfsmenn úr skrá`,
     });
     revalidatePath("/starfsfolk");
-    return { ok: true, inserted, skipped: skipped + dupSkipped };
+    return { ok: true, inserted, skipped: skipped + dupSkipped, noRate: fresh.filter((r) => !num(r.rate)).length };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
   }
