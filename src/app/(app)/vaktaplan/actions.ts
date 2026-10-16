@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
-import { notifyEmployee } from "@/lib/push";
+import { notifyEmployee, notifyEmployees } from "@/lib/push";
 import { sendSchedulePublishedEmail, sendLeaveDecisionEmail } from "@/lib/email";
 import { getEmployees } from "@/lib/employees.server";
 import { initials as empInitials } from "@/lib/employees";
@@ -44,8 +44,8 @@ export async function publishSchedule(shifts: ShiftInput[]): Promise<PublishResu
 
     const dates = [...new Set(shifts.map((s) => s.date))];
     if (dates.length) {
-      // Replace published plan for these dates.
-      await supabase.from("shifts").delete().eq("company_id", company).in("date", dates);
+      // Replace published plan for these dates. Lausar vaktir (án starfsmanns) eru ekki í gridinu og haldast.
+      await supabase.from("shifts").delete().eq("company_id", company).in("date", dates).not("employee_id", "is", null);
     }
 
     const rows = shifts.map((s) => ({
@@ -306,15 +306,117 @@ export async function getShiftsInRange(fromISO: string, toISO: string): Promise<
   }
 }
 
-/** Assign an applicant to an open shift. */
-export async function assignOpenShift(input: { employeeName: string; note?: string }): Promise<DecisionResult> {
+export type OpenShiftClaim = { id: string; employeeId: string; name: string; status: string; at: string };
+export type OpenShift = { id: string; date: string; start: string; end: string; type: string | null; note: string | null; claims: OpenShiftClaim[] };
+
+/** Lausar vaktir (án starfsmanns) á tímabili, með umsóknum. */
+export async function getOpenShifts(fromISO: string, toISO: string): Promise<{ ok: boolean; shifts: OpenShift[] }> {
+  if (!isSupabaseConfigured()) return { ok: true, shifts: [] };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, shifts: [] };
+    const { data: rows } = await supabase.from("shifts")
+      .select("id, date, start_time, end_time, note, shift_types(name)")
+      .eq("company_id", ctx.company).is("employee_id", null).gte("date", fromISO).lte("date", toISO)
+      .order("date").order("start_time");
+    const ids = (rows ?? []).map((r) => r.id as string);
+    const { data: claims } = ids.length
+      ? await supabase.from("shift_claims").select("id, shift_id, employee_id, status, created_at, employees(full_name)").in("shift_id", ids).order("created_at")
+      : { data: [] as Record<string, unknown>[] };
+    const shifts: OpenShift[] = (rows ?? []).map((r) => ({
+      id: r.id as string,
+      date: r.date as string,
+      start: ((r.start_time as string) ?? "").slice(0, 5),
+      end: ((r.end_time as string) ?? "").slice(0, 5),
+      type: ((r.shift_types as unknown as { name?: string } | null)?.name) ?? null,
+      note: (r.note as string) ?? null,
+      claims: (claims ?? []).filter((c) => c.shift_id === r.id && c.status === "pending").map((c) => ({
+        id: c.id as string, employeeId: c.employee_id as string, status: c.status as string, at: c.created_at as string,
+        name: ((c.employees as unknown as { full_name?: string } | null)?.full_name) ?? "",
+      })),
+    }));
+    return { ok: true, shifts };
+  } catch {
+    return { ok: false, shifts: [] };
+  }
+}
+
+const DAY_SHORT = ["sun", "mán", "þri", "mið", "fim", "fös", "lau"];
+const shiftLabel = (date: string, start: string, end: string) => {
+  const d = new Date(`${date}T12:00:00`);
+  return `${DAY_SHORT[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1} ${start}–${end}`;
+};
+
+/** Stofnar lausa vakt (eða nokkrar eins) og lætur starfsfólk vita. */
+export async function createOpenShift(input: { date: string; start: string; end: string; shiftTypeName?: string; note?: string; count?: number }): Promise<DecisionResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || !/^\d{2}:\d{2}$/.test(input.start) || !/^\d{2}:\d{2}$/.test(input.end)) return { ok: false, error: "Veldu dag og tíma" };
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    let typeId: string | null = null;
+    if (input.shiftTypeName) {
+      const { data: t } = await supabase.from("shift_types").select("id, name").eq("company_id", ctx.company);
+      typeId = (t?.find((x) => (x.name as string).toLowerCase() === input.shiftTypeName!.toLowerCase())?.id as string) ?? null;
+    }
+    const n = Math.min(Math.max(Math.round(input.count ?? 1), 1), 10);
+    const note = input.note?.trim().slice(0, 200) || null;
+    const rows = Array.from({ length: n }, () => ({
+      company_id: ctx.company, employee_id: null, shift_type_id: typeId, date: input.date,
+      start_time: input.start, end_time: input.end, note, status: "published" as const, published: true,
+    }));
+    const { error } = await supabase.from("shifts").insert(rows);
+    if (error) return { ok: false, error: userError(error) };
+    const label = shiftLabel(input.date, input.start, input.end);
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "shift.open", entity: "shift", detail: `Laus vakt stofnuð — ${label}${n > 1 ? ` (${n})` : ""}` });
+    void notifyEmployees(ctx.company, { title: "Laus vakt", body: `${label}${note ? ` · ${note}` : ""}. Sæktu um í appinu.`, url: "/mitt-svaedi", tag: "open-shift" });
+    revalidatePath("/vaktaplan");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
+/** Eyðir lausri vakt (umsóknir fara með). */
+export async function deleteOpenShift(id: string): Promise<DecisionResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { error } = await supabase.from("shifts").delete().eq("id", id).eq("company_id", ctx.company).is("employee_id", null);
+    if (error) return { ok: false, error: userError(error) };
+    revalidatePath("/vaktaplan");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
+/** Úthlutar lausri vakt til umsækjanda; öðrum umsóknum er hafnað (approve_shift_claim, 0082). */
+export async function assignOpenShift(claimId: string): Promise<DecisionResult> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data: claim } = await supabase.from("shift_claims")
+      .select("shift_id, employee_id, shifts(date, start_time, end_time), employees(full_name)").eq("id", claimId).maybeSingle();
+    const { error } = await supabase.rpc("approve_shift_claim", { p_claim: claimId });
+    if (error) {
+      if (/SHIFT_TAKEN/.test(error.message)) return { ok: false, error: "Búið er að úthluta þessari vakt" };
+      return { ok: false, error: userError(error) };
+    }
+    const sh = claim?.shifts as unknown as { date: string; start_time: string; end_time: string } | null;
+    const label = sh ? shiftLabel(sh.date, sh.start_time.slice(0, 5), sh.end_time.slice(0, 5)) : "";
+    const others = await supabase.from("shift_claims").select("employee_id").eq("shift_id", claim?.shift_id as string).eq("status", "rejected");
+    void notifyEmployee(claim?.employee_id as string | undefined, { title: "Þú fékkst vaktina", body: `${label} er komin á planið þitt.`, url: "/mitt-svaedi", tag: "open-shift" });
+    for (const o of others.data ?? []) void notifyEmployee(o.employee_id as string, { title: "Vaktinni var úthlutað", body: `${label} fór til annars starfsmanns.`, url: "/mitt-svaedi", tag: "open-shift" });
     await logAudit(supabase, ctx.company, ctx.userId, {
-      action: "shift.assign", entity: "shift", detail: `Opin vakt úthlutað — ${input.employeeName}${input.note ? ` (${input.note})` : ""}`,
+      action: "shift.assign", entity: "shift", entityId: claim?.shift_id as string | undefined,
+      detail: `Laus vakt úthlutuð — ${((claim?.employees as unknown as { full_name?: string } | null)?.full_name) ?? ""} (${label})`,
     });
     revalidatePath("/vaktaplan");
     return { ok: true };

@@ -274,13 +274,27 @@ export async function updateMyProfile(
   }
 }
 
-/** Employee applies for an open shift. Recorded as a pending pickup request. */
-export async function applyForShift(input: { note: string }): Promise<ActionResult> {
+/** Starfsmaður sækir um lausa vakt. Með shiftId: umsókn tengd vaktinni (shift_claims, 0082) sem stjórnandi
+ *  úthlutar í Vaktaplani. Án shiftId (eldri leið): skráð sem beiðni með texta. */
+export async function applyForShift(input: { note: string; shiftId?: string }): Promise<ActionResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
     const me = await currentEmployee(supabase);
     if ("error" in me) return { ok: false, error: me.error };
+    if (input.shiftId) {
+      const { error } = await supabase.from("shift_claims").insert({ company_id: me.company, shift_id: input.shiftId, employee_id: me.empId });
+      if (error) {
+        if (error.code === "23505") return { ok: true };
+        if (error.code === "42501") return { ok: false, error: "Vaktin er ekki lengur laus" };
+        return { ok: false, error: userError(error) };
+      }
+      void notifyManagers(me.company, { title: "Umsókn um lausa vakt", body: input.note, url: "/vaktaplan", tag: "open-shift" });
+      await logAudit(supabase, me.company, me.userId, { action: "shift.apply", entity: "shift", entityId: input.shiftId, detail: `Sótt um lausa vakt — ${input.note}` });
+      revalidatePath("/mitt-svaedi");
+      revalidatePath("/vaktaplan");
+      return { ok: true };
+    }
     const { error } = await supabase.from("shift_swaps").insert({
       company_id: me.company,
       requester_id: me.empId,

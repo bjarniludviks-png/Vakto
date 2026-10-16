@@ -16,7 +16,7 @@ export const VAKTO_KNOWLEDGE = `
 ## Grunnurinn (allt sem hin kerfin gera líka)
 - Vaktaplan með drag & drop, vikusýn, vaktategundir (dagvakt, kvöldvakt með álagi, helgarvakt), AI getur stungið upp á plani sem stjórnandi samþykkir.
 - Stimpilklukka: starfsmaður stimplar í símanum eða á sameiginlegri spjaldtölvu (kiosk) með PIN eða með því að skanna QR-kóða skírteinisins.
-- Frí- og leyfisbeiðnir, vaktaskipti, opnar vaktir sem starfsfólk sækir um.
+- Frí- og leyfisbeiðnir, vaktaskipti. Lausar vaktir: stjórnandi stofnar vakt án starfsmanns í Vaktaplani (spjaldið „Lausar vaktir“ → „+ Laus vakt“, má stofna nokkrar eins), starfsfólk fær tilkynningu og sækir um í appinu eða Mitt svæði, stjórnandi ýtir á „Úthluta“ og vaktin fer á viðkomandi (aðrir umsækjendur fá að vita).
 - Launaútreikningur og launakeyrslur; bein tenging við Payday (samþykktir tímar sendir beint inn sem tímaskrá) eða útflutningur í Payday (Excel), DK og almennt Excel.
 - Skýrslur/innsýn í Excel og PDF.
 - Starfsfólk lesið inn úr Excel: Starfsfólk → Flytja inn (Excel); sniðmát fæst undir i-tákninu við hnappinn. Deildir, staðir og starfsheiti sem vantar eru stofnuð sjálfkrafa. Innlestur sendir ekki boð; eftir hann birtist borði „X starfsmenn hafa ekki aðgang að appinu“ með hnappinum „Senda boð í appið“. Einnig má senda boð á einn starfsmann í prófílnum hans (Aðgangur → Senda boð).

@@ -25,6 +25,16 @@ export async function notifyManagers(companyId: string | null | undefined, paylo
   } catch { /* best-effort */ }
 }
 
+/** Push til alls virks starfsfólks fyrirtækis sem er með aðgang (t.d. ný laus vakt). */
+export async function notifyEmployees(companyId: string | null | undefined, payload: PushPayload): Promise<void> {
+  if (!companyId) return;
+  try {
+    const admin = createAdminClient();
+    const { data } = await admin.from("employees").select("user_id").eq("company_id", companyId).eq("active", true).not("user_id", "is", null);
+    for (const e of data ?? []) await sendPushToUser(e.user_id as string, payload);
+  } catch { /* best-effort */ }
+}
+
 /** Send a push to the auth user linked to an employee (employees.user_id). */
 export async function notifyEmployee(employeeId: string | null | undefined, payload: PushPayload): Promise<void> {
   if (!employeeId) return;
