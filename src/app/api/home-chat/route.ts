@@ -27,11 +27,12 @@ type Msg = { role: "user" | "assistant" | "owner"; body: string };
 
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "?";
-  if (limited(ip)) return NextResponse.json({ ok: false, error: "Of mörg skilaboð — reyndu eftir smástund." }, { status: 429 });
   let payload: { message?: string; lang?: string; threadId?: string; token?: string; page?: string };
   try { payload = await req.json(); } catch { return NextResponse.json({ ok: false }, { status: 400 }); }
   const text = (payload.message ?? "").toString().trim().slice(0, MAX_LEN);
-  const lang: "is" | "en" = payload.lang === "en" ? "en" : "is";
+  const lang: "is" | "en" | "pl" = payload.lang === "en" || payload.lang === "pl" ? payload.lang : "is";
+  const pick = (v: { is: string; en: string; pl: string }) => v[lang];
+  if (limited(ip)) return NextResponse.json({ ok: false, error: pick({ is: "Of mörg skilaboð — reyndu eftir smástund.", en: "Too many messages — try again in a moment.", pl: "Za dużo wiadomości — spróbuj ponownie za chwilę." }) }, { status: 429 });
   if (!text) return NextResponse.json({ ok: false }, { status: 400 });
   if (!isSupabaseConfigured()) return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
 
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
     threadId = data.id as string;
   }
   const { data: prior } = await admin.from("support_messages").select("role, body").eq("thread_id", threadId).order("created_at").limit(MAX_TURNS + 5);
-  if ((prior?.length ?? 0) >= MAX_TURNS) return NextResponse.json({ ok: false, error: "Þráðurinn er orðinn langur — sendu okkur póst á hallo@vakto.is." }, { status: 429 });
+  if ((prior?.length ?? 0) >= MAX_TURNS) return NextResponse.json({ ok: false, error: pick({ is: "Þráðurinn er orðinn langur — sendu okkur póst á hallo@vakto.is.", en: "This conversation is getting long — please email us at hallo@vakto.is.", pl: "Ta rozmowa jest już długa — napisz do nas na hallo@vakto.is." }) }, { status: 429 });
   await admin.from("support_messages").insert({ thread_id: threadId, role: "user", body: text });
   await admin.from("support_threads").update({ updated_at: new Date().toISOString() }).eq("id", threadId);
 
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
   if (status === "human") return NextResponse.json({ ok: true, threadId, token, reply: null, status });
 
   if (!process.env.ANTHROPIC_API_KEY) {
-    const reply = lang === "en" ? "The assistant is offline right now — email us at hallo@vakto.is and we'll get back to you." : "Aðstoðin er ekki virk í augnablikinu — sendu okkur póst á hallo@vakto.is og við svörum þér.";
+    const reply = pick({ is: "Aðstoðin er ekki virk í augnablikinu — sendu okkur póst á hallo@vakto.is og við svörum þér.", en: "The assistant is offline right now — email us at hallo@vakto.is and we'll get back to you.", pl: "Asystent jest teraz niedostępny — napisz do nas na hallo@vakto.is, a odpowiemy." });
     await admin.from("support_messages").insert({ thread_id: threadId, role: "assistant", body: reply });
     return NextResponse.json({ ok: true, threadId, token, reply, status });
   }
@@ -76,12 +77,12 @@ export async function POST(req: Request) {
     const client = new Anthropic();
     const res = await client.messages.create({ model: MODEL, max_tokens: 500, system: systemPrompt(lang), messages: merged });
     const reply = res.content.filter((c) => c.type === "text").map((c) => (c as { text: string }).text).join("").trim()
-      || (lang === "en" ? "I'm not sure about that — want to talk to a person?" : "Ég er ekki viss um þetta — viltu tala við manneskju?");
+      || pick({ is: "Ég er ekki viss um þetta — viltu tala við manneskju?", en: "I'm not sure about that — want to talk to a person?", pl: "Nie jestem tego pewien — chcesz porozmawiać z człowiekiem?" });
     await admin.from("support_messages").insert({ thread_id: threadId, role: "assistant", body: reply });
     return NextResponse.json({ ok: true, threadId, token, reply, status });
   } catch (e) {
     console.error("home-chat:", e instanceof Error ? e.message : e);
-    const reply = lang === "en" ? "Something went wrong on my end — try again, or email hallo@vakto.is." : "Eitthvað fór úrskeiðis hjá mér — reyndu aftur eða sendu póst á hallo@vakto.is.";
+    const reply = pick({ is: "Eitthvað fór úrskeiðis hjá mér — reyndu aftur eða sendu póst á hallo@vakto.is.", en: "Something went wrong on my end — try again, or email hallo@vakto.is.", pl: "Coś poszło nie tak po mojej stronie — spróbuj ponownie lub napisz na hallo@vakto.is." });
     return NextResponse.json({ ok: true, threadId, token, reply, status });
   }
 }

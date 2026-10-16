@@ -1515,7 +1515,12 @@ function AiPromptModal({ query, setQuery, onClose, onGen, names = [], depts = []
   }
 
   // Relevant examples built from the REAL roster (names + departments).
-  const ex = lang === "en" ? [
+  const ex = lang === "pl" ? [
+    names[0] ? `Daj ${names[0]} poranne zmiany 05:00–12:00 w każdy dzień roboczy` : "Poranne zmiany 05:00–12:00 w każdy dzień roboczy",
+    "Ogranicz nadgodziny w tym tygodniu",
+    depts.length >= 2 ? `Obsadź weekend: 2 osoby w ${depts[0]} i 2 w ${depts[1]}` : "Obsadź weekend: 2 osoby rano i 2 po południu",
+    names[1] ? `Daj ${names[1]} wolny piątek i przenieś zmianę na kogoś innego` : "Skopiuj ten tydzień na kolejne 4 tygodnie",
+  ] : lang !== "is" ? [
     names[0] ? `Put ${names[0]} on morning shifts 05:00–12:00 every weekday` : "Morning shifts 05:00–12:00 every weekday",
     "Minimise overtime this week",
     depts.length >= 2 ? `Staff the weekend with 2 in ${depts[0]} and 2 in ${depts[1]}` : "Staff the weekend with 2 on mornings and 2 in the afternoon",

@@ -1774,6 +1774,7 @@ export const DICT: Dict = {
   "virkur dagur": { is: "virkur dagur", en: "workday", vi: "ngày làm việc", pl: "dzień roboczy" },
   "virkir dagar": { is: "virkir dagar", en: "workdays", vi: "ngày làm việc", pl: "dni robocze" },
   "Beiðnin er lengri en orlofið sem þú átt eftir — vaktstjóri sér það þegar hann afgreiðir hana.": { is: "Beiðnin er lengri en orlofið sem þú átt eftir — vaktstjóri sér það þegar hann afgreiðir hana.", en: "This request is longer than your remaining vacation — your manager will see that when reviewing it.", vi: "Yêu cầu dài hơn số phép còn lại — quản lý sẽ thấy khi duyệt.", pl: "Wniosek jest dłuższy niż pozostały Ci urlop — kierownik zmiany zobaczy to przy jego rozpatrywaniu." },
+  "Hjálp": { is: "Hjálp", en: "Help", vi: "Trợ giúp", pl: "Pomoc" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

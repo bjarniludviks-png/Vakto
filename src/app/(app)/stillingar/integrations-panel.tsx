@@ -42,10 +42,141 @@ function Logo({ app, size = 40 }: { app: { logo: string; name: string }; size?: 
   return <span className="tg-logo" style={{ width: size, height: size }}><img src={app.logo} alt="" width={size - 14} height={size - 14} /></span>;
 }
 
+// Pólska: lykill = enski textinn (vi og vantandi pl falla á ensku).
+const PL: Record<string, string> = {
+  "Revenue": "Obrót",
+  "Labor % of revenue needs revenue figures. Pick what suits you, you can switch at any time.": "Udział kosztów pracy w obrocie wymaga danych o obrocie. Wybierz sposób, który Ci odpowiada — możesz go zmienić w każdej chwili.",
+  "Labor % is live": "Udział kosztów pracy jest liczony",
+  "No revenue yet": "Brak obrotu",
+  "Where does your revenue come from?": "Skąd pochodzi Twój obrót?",
+  "From the system I use": "Z systemu, którego używam",
+  "Your POS, store or accounting sends revenue automatically every day.": "System kasowy, sklep internetowy lub księgowość codziennie automatycznie przesyła obrót.",
+  "I'll type it in": "Wpisuję go ręcznie",
+  "One number at the end of the day. Takes ten seconds.": "Jedna liczba na koniec dnia. Zajmuje dziesięć sekund.",
+  "Estimate from monthly revenue": "Szacunek na podstawie obrotu miesięcznego",
+  "Enter roughly your monthly revenue once. VAKTO spreads it over the week.": "Wpisz raz przybliżony obrót miesięczny. VAKTO rozłoży go na dni tygodnia.",
+  "Connected": "Połączono",
+  "Error": "Błąd",
+  "Revenue yesterday": "Obrót wczoraj",
+  "Last fetched": "Ostatnio pobrano",
+  "fetched automatically every day": "pobierane automatycznie codziennie",
+  "Revenue fetched": "Obrót pobrany",
+  "Fetch now": "Pobierz teraz",
+  "Disconnected": "Rozłączono",
+  "Disconnect": "Rozłącz",
+  "No system connected yet": "Nie połączono jeszcze żadnego systemu",
+  "Pick your system below. Most connections take under a minute.": "Wybierz swój system poniżej. Większość połączeń zajmuje mniej niż minutę.",
+  "Choose a system": "Wybierz system",
+  "Weekly revenue pattern, learned from the last 8 weeks": "Tygodniowy rozkład obrotu, wyliczony z ostatnich 8 tygodni",
+  "Estimated weekly revenue pattern": "Szacowany tygodniowy rozkład obrotu",
+  "The pattern appears once revenue comes in": "Rozkład pojawi się, gdy wpłyną dane o obrocie",
+  "Average revenue by weekday": "Średni obrót według dnia tygodnia",
+  "Used to fill days without figures and to forecast revenue in the schedule. Real revenue always wins.": "Służy do uzupełniania dni bez danych i prognozowania obrotu w grafiku. Rzeczywisty obrót zawsze ma pierwszeństwo.",
+  "Systems that connect to VAKTO": "Systemy, które łączą się z VAKTO",
+  "Pick your system and follow the steps.": "Wybierz system i postępuj zgodnie z instrukcjami.",
+  "Search systems": "Szukaj systemu",
+  "Country": "Kraj",
+  "Iceland": "Islandia",
+  "Other countries": "Inne kraje",
+  "Not connected": "Nie połączono",
+  "With a key": "Z kluczem",
+  "Export": "Eksport",
+  "Coming soon": "Wkrótce",
+  "Add another": "Dodaj kolejny",
+  "Connect": "Połącz",
+  "Create key": "Utwórz klucz",
+  "Payday disconnected": "Payday rozłączony",
+  "We'll let you know": "Damy Ci znać",
+  "We'll let you know when it's ready": "Damy Ci znać, gdy integracja będzie gotowa",
+  "Notify me": "Powiadom mnie",
+  "No system found. See “Another system?” below.": "Nie znaleziono systemu. Zobacz „Inny system?” poniżej.",
+  "Another system?": "Inny system?",
+  "If your system isn't listed you can still bring revenue in.": "Jeśli Twojego systemu nie ma na liście, nadal możesz przesyłać obrót.",
+  "Upload a file": "Wgraj plik",
+  "CSV from your POS (date and amount). Good for importing history.": "Plik CSV z systemu kasowego (data i kwota). Dobry do wczytania historii.",
+  "Choose file": "Wybierz plik",
+  "Use Webhooks to send revenue from any app, with a key from VAKTO.": "Użyj Webhooks, aby przesyłać obrót z dowolnej aplikacji, z kluczem od VAKTO.",
+  "For developers": "Dla programistów",
+  "Send revenue straight to VAKTO with a key.": "Przesyłaj obrót bezpośrednio do VAKTO za pomocą klucza.",
+  "Keys": "Klucze",
+  "Record revenue": "Wpisz obrót",
+  "Day": "Dzień",
+  "Revenue excl. VAT": "Obrót bez VAT",
+  "Location": "Lokalizacja",
+  "Revenue saved": "Obrót zapisany",
+  "Save": "Zapisz",
+  "Estimated revenue": "Szacowany obrót",
+  "Monthly revenue excl. VAT, roughly": "Przybliżony obrót miesięczny bez VAT",
+  "Estimate saved": "Szacunek zapisany",
+  "More at weekends, less early in the week. Labor % is marked as estimated until real revenue arrives.": "Więcej w weekendy, mniej na początku tygodnia. Udział kosztów pracy jest oznaczony jako szacunkowy, dopóki nie wpłynie rzeczywisty obrót.",
+  "In Payday: Settings → Company → API. Create an application (name it VAKTO).": "W Payday: Settings → Company → API. Utwórz aplikację (nazwij ją VAKTO).",
+  "Copy the Client ID and Client Secret and paste them here.": "Skopiuj Client ID i Client Secret i wklej je tutaj.",
+  "Payroll then shows “Send to Payday”: approved hours go straight in as a timesheet.": "Na liście płac pojawi się wtedy „Wyślij do Payday”: zatwierdzone godziny trafiają bezpośrednio jako ewidencja czasu.",
+  "Payday connected": "Payday połączony",
+  "Checking keys…": "Sprawdzanie kluczy…",
+  "Connect Payday": "Połącz Payday",
+  "Keys are stored encrypted. VAKTO only sends hours; Payday still handles pay, filings and payments. Pay item names in Payday must match VAKTO exactly (Dagvinna, Yfirvinna, Álag 33% …; Payroll lists them for the period). Premium items must be the premium only, not the full rate.": "Klucze są przechowywane w postaci zaszyfrowanej. VAKTO wysyła tylko godziny; Payday nadal obsługuje wynagrodzenia, deklaracje i płatności. Nazwy składników płacowych w Payday muszą być dokładnie takie jak w VAKTO (Dagvinna, Yfirvinna, Álag 33% …; lista na dany okres jest na liście płac). Składniki dodatków mają obejmować tylko sam dodatek, a nie pełną stawkę.",
+  "In Shopify: Settings → Apps and sales channels → Develop apps → Create an app (name it VAKTO).": "W Shopify: Settings → Apps and sales channels → Develop apps → Create an app (nazwij ją VAKTO).",
+  "Configure Admin API scopes: tick read_orders and save. Then click Install app.": "Configure Admin API scopes: zaznacz read_orders i zapisz. Następnie kliknij Install app.",
+  "Copy the Admin API access token and paste it here. VAKTO only reads orders, never card details.": "Skopiuj Admin API access token i wklej go tutaj. VAKTO odczytuje tylko zamówienia, nigdy dane kart.",
+  "In WordPress: WooCommerce → Settings → Advanced → REST API → Add key.": "W WordPress: WooCommerce → Settings → Advanced → REST API → Add key.",
+  "Name the key VAKTO and choose Permissions: Read. Click Generate API key.": "Nazwij klucz VAKTO i wybierz Permissions: Read. Kliknij Generate API key.",
+  "Copy the Consumer key and Consumer secret and paste them here.": "Skopiuj Consumer key i Consumer secret i wklej je tutaj.",
+  "Store address": "Adres sklepu",
+  "Store URL": "Adres sklepu internetowego",
+  "Revenue goes to location": "Obrót trafia do lokalizacji",
+  "connected": "połączono",
+  "fetched": "pobrano",
+  "Connecting and fetching…": "Łączenie i pobieranie…",
+  "Connect and fetch revenue": "Połącz i pobierz obrót",
+  "The first fetch goes back 90 days. After that it runs automatically every day. Disconnect at any time.": "Pierwsze pobranie obejmuje 90 dni wstecz. Potem odbywa się automatycznie codziennie. Możesz rozłączyć w każdej chwili.",
+  "Upload revenue": "Wgraj obrót",
+  "A CSV with the date in the first column and revenue excl. VAT in the second, e.g. “2026-09-01;412300”. If a day already has revenue the amount is added.": "Plik CSV z datą w pierwszej kolumnie i obrotem bez VAT w drugiej, np. „2026-09-01;412300”. Jeśli dzień ma już obrót, kwota zostanie dodana.",
+  "days": "dni",
+  "No rows found. Check that the date is in the first column.": "Nie znaleziono wierszy. Sprawdź, czy data jest w pierwszej kolumnie.",
+  "days imported": "dni zaimportowano",
+  "Importing…": "Importowanie…",
+  "Import": "Importuj",
+  "Online store": "Sklep internetowy",
+  "Revenue from orders, fetched automatically every day.": "Obrót z zamówień, pobierany automatycznie codziennie.",
+  "WordPress store. Connects with a read-only key.": "Sklep na WordPressie. Łączy się kluczem tylko do odczytu.",
+  "Production and sales": "Produkcja i sprzedaż",
+  "VAKTO's sister system. Revenue sent with a key.": "Siostrzany system VAKTO. Obrót przesyłany za pomocą klucza.",
+  "POS and bookings (formerly SalesCloud)": "System kasowy i rezerwacje (dawniej SalesCloud)",
+  "POS revenue and upcoming bookings for the forecast.": "Obrót z kasy i nadchodzące rezerwacje do prognozy.",
+  "POS and bookings": "System kasowy i rezerwacje",
+  "Revenue and bookings for the schedule forecast.": "Obrót i rezerwacje do prognozy w grafiku.",
+  "Payroll and accounting": "Płace i księgowość",
+  "Timesheet export for payroll in Payday.": "Eksport ewidencji czasu do naliczania płac w Payday.",
+  "Accounting and payroll": "Księgowość i płace",
+  "Payroll file export for DK.": "Eksport pliku płacowego do DK.",
+  "Accounting": "Księgowość",
+  "Revenue from your books.": "Obrót z Twojej księgowości.",
+  "POS": "System kasowy",
+  "Common POS in the US and UK.": "Popularny system kasowy w USA i Wielkiej Brytanii.",
+  "Restaurants and retail worldwide.": "Restauracje i handel na całym świecie.",
+  "By PayPal, common in the Nordics.": "Od PayPal, popularny w krajach nordyckich.",
+  "Revenue and payroll abroad.": "Obrót i płace za granicą.",
+  "UK, Ireland and beyond.": "Wielka Brytania, Irlandia i inne kraje.",
+  "Sweden and Norway.": "Szwecja i Norwegia.",
+  "Thousands of apps": "Tysiące aplikacji",
+  "Send revenue from any app with Webhooks and a key.": "Przesyłaj obrót z dowolnej aplikacji przez Webhooks z kluczem.",
+  "All": "Wszystkie",
+  "Online": "Sklepy online",
+  "Bookings": "Rezerwacje",
+  "Payroll": "Płace",
+  "Sun": "Nd",
+  "Mon": "Pn",
+  "Tue": "Wt",
+  "Wed": "Śr",
+  "Thu": "Cz",
+  "Fri": "Pt",
+  "Sat": "Sb",
+};
+
 export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean }[]; onNewKey: () => void }) {
   const { lang, t } = useLang();
-  const en = lang === "en";
-  const L = (is: string, e: string) => (en ? e : is);
+  const L = (is: string, e: string) => (lang === "is" ? is : lang === "pl" ? PL[e] ?? e : e);
   const [v, setV] = useState<TengingarView | null>(null);
   const [mode, setMode] = useState<RevenueMode>("system");
   const [cat, setCat] = useState<Cat | "all">("all");
@@ -120,7 +251,7 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
               <div className="tg-wk" aria-label={L("Meðalvelta eftir vikudögum", "Average revenue by weekday")}>
                 {ORDER.map((d) => {
                   const val = wk ? Number(wk[String(d)] ?? 0) : 0;
-                  return <div key={d} title={wk ? `${nf(val)} kr` : ""}><i style={{ height: `${wk ? Math.max(4, (val / wkMax) * 100) : 8}%`, opacity: wk ? 0.9 : 0.25 }} /><span>{WD[d][en ? 1 : 0]}</span></div>;
+                  return <div key={d} title={wk ? `${nf(val)} kr` : ""}><i style={{ height: `${wk ? Math.max(4, (val / wkMax) * 100) : 8}%`, opacity: wk ? 0.9 : 0.25 }} /><span>{L(WD[d][0], WD[d][1])}</span></div>;
                 })}
               </div>
               <div className="tg-small" style={{ marginTop: 8 }}>{L("Notað til að fylla daga án tölu og spá fyrir um veltu í vaktaplaninu. Raunvelta gildir alltaf þegar hún er til.", "Used to fill days without figures and to forecast revenue in the schedule. Real revenue always wins.")}</div>
@@ -133,7 +264,7 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
         <div className="ch"><div><div className="ct">{L("Kerfi sem tengjast VAKTO", "Systems that connect to VAKTO")}</div><div className="cs">{L("Veldu kerfið og fylgdu skrefunum.", "Pick your system and follow the steps.")}</div></div></div>
         <div className="cb">
           <div className="tg-bar">
-            <div className="tg-chips">{CATS.map(([k, is, e]) => <button key={k} className={cat === k ? "on" : ""} onClick={() => setCat(k)}>{en ? e : is}</button>)}</div>
+            <div className="tg-chips">{CATS.map(([k, is, e]) => <button key={k} className={cat === k ? "on" : ""} onClick={() => setCat(k)}>{L(is, e)}</button>)}</div>
             <div className="tg-right">
               <input className="tg-search" placeholder={L("Leita að kerfi", "Search systems")} aria-label={L("Leita að kerfi", "Search systems")} value={q} onChange={(e) => setQ(e.target.value)} />
               <select className="tg-search" aria-label={L("Land", "Country")} value={country} onChange={(e) => setCountry(e.target.value)} style={{ width: "auto" }}>
@@ -147,8 +278,8 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
               const wanted = v?.interest.includes(a.id);
               return (
                 <div className="tg-app" key={a.id}>
-                  <div className="tg-app-h"><Logo app={a} /><span><b>{a.name}</b><small>{en ? a.sub[1] : a.sub[0]}</small></span></div>
-                  <p>{en ? a.d[1] : a.d[0]}</p>
+                  <div className="tg-app-h"><Logo app={a} /><span><b>{a.name}</b><small>{L(a.sub[0], a.sub[1])}</small></span></div>
+                  <p>{L(a.d[0], a.d[1])}</p>
                   <div className="tg-app-f">
                     {a.kind === "connect" && (c.length ? <span className="tg-pill good">{L("Tengt", "Connected")}</span> : <span className="tg-pill mut">{L("Ekki tengt", "Not connected")}</span>)}
                     {a.kind === "apikey" && <span className="tg-pill mut">{L("Með lykli", "With a key")}</span>}

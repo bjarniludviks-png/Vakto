@@ -8,7 +8,7 @@ import { checkPromo, createOwnerAccount, requestSignupCode, startCardSetup, veri
 import { passwordStrength, PASSWORD_MIN } from "@/lib/password";
 import Turnstile, { TURNSTILE_SITE_KEY } from "@/components/turnstile";
 
-export type SignupLang = "is" | "en";
+export type SignupLang = "is" | "en" | "pl";
 const L = {
   is: {
     per: "kr/mán · 5 virkir starfsmenn innifaldir",
@@ -70,6 +70,12 @@ const L = {
     agreeC: " VAKTO.",
     creating: "Stofna…",
     cont: "Halda áfram",
+    price: "9.990 kr",
+    ktErr: "Sláðu inn gilda kennitölu fyrirtækisins (10 tölustafir).",
+    ktLbl: "Kennitala fyrirtækis",
+    promoLbl: "Tilboðskóði (valfrjálst)", promoPh: "t.d. VAKTO2MAN", promoBad: "Kóðinn fannst ekki.",
+    promoNote: (d: number) => `Tilboð: ${d >= 59 ? "tveir mánuðir" : `${d} dagar`} frítt í stað 14 daga.`,
+    promoH: (d: number) => (d >= 59 ? "Tveir mánuðir frítt" : `${d} dagar frítt`),
   },
   en: {
     per: "ISK/mo · 5 active employees included",
@@ -131,9 +137,81 @@ const L = {
     agreeC: ".",
     creating: "Creating…",
     cont: "Continue",
+    price: "ISK 9,990",
+    ktErr: "Enter a valid Icelandic company ID (kennitala, 10 digits).",
+    ktLbl: "Company ID (kennitala)",
+    promoLbl: "Offer code (optional)", promoPh: "e.g. VAKTO2MAN", promoBad: "Code not found.",
+    promoNote: (d: number) => `Offer: ${d} days free instead of 14.`,
+    promoH: (d: number) => `${d} days free`,
+  },
+  pl: {
+    per: "ISK/mies. · 5 aktywnych pracowników w cenie",
+    extra: "+1 490 ISK za każdego kolejnego aktywnego pracownika · rocznie 8 490 + 1 270",
+    cur: "ISK",
+    st1: "1 · E-mail",
+    st2: "2 · Konto",
+    st3: "3 · Okres próbny",
+    botWait: "Chwileczkę — trwa weryfikacja zabezpieczenia przed botami.",
+    codeFail: "Nie udało się wysłać kodu",
+    netErr: "Nie udało się połączyć — spróbuj ponownie.",
+    code6: "Kod ma 6 cyfr",
+    badCode: "Błędny kod",
+    weak: "Hasło jest za słabe",
+    needTerms: "Musisz zaakceptować regulamin i politykę prywatności",
+    createFail: "Nie udało się utworzyć konta",
+    supa: "Nie udało się połączyć — spróbuj ponownie.",
+    fail: "Coś poszło nie tak",
+    trialH: "14 dni za darmo",
+    trialSub: "Dodaj kartę teraz — nic nie zostanie pobrane do końca okresu próbnego i możesz zrezygnować w każdej chwili.",
+    vatNote: "Ceny bez VAT · pierwsza opłata po 14 dniach · potwierdzenie e-mailem",
+    opening: "Otwieranie strony płatności…",
+    startTrial: "Dodaj kartę i rozpocznij okres próbny",
+    cardNote: "Karta jest rejestrowana w Straumur (Kvika) na bezpiecznej stronie płatności · VAKTO nigdy nie przechowuje numerów kart · zrezygnuj w każdej chwili w Ustawieniach",
+    createH: "Załóż konto",
+    createSub: "Wyślemy Ci 6-cyfrowy kod, aby potwierdzić adres e-mail. Na niego trafiają potwierdzenia płatności i resetowanie hasła.",
+    workEmail: "Służbowy e-mail",
+    emailPh: "imie@firma.pl",
+    sending: "Wysyłanie kodu…",
+    sendCode: "Wyślij kod potwierdzający",
+    trialNote: "14 dni za darmo · bez zobowiązań · kartę dodajesz w ostatnim kroku, nic nie jest pobierane do końca okresu próbnego.",
+    haveAcc: "Masz już konto?",
+    signIn: "Zaloguj się",
+    codeH: "Wpisz kod",
+    codeSubA: "Wysłaliśmy 6-cyfrowy kod na ",
+    codeSubB: ". Sprawdź folder spam, jeśli nie dotrze w ciągu minuty.",
+    codeLbl: "Kod potwierdzający",
+    resendIn: "Wyślij ponownie",
+    resend: "Wyślij kod ponownie",
+    changeEmail: "Zmień e-mail",
+    checking: "Sprawdzanie…",
+    confirm: "Potwierdź",
+    accH: "O Tobie i Twojej firmie",
+    accSubA: "Adres ",
+    accSubB: " został potwierdzony. Kwadrans i wszystko działa.",
+    fullName: "Imię i nazwisko",
+    namePh: "Jan Kowalski",
+    company: "Firma",
+    coPh: "Firma ehf.",
+    pw: "Hasło",
+    pwPh: "co najmniej {n} znaków — zdanie ze spacjami też jest dobre",
+    hidePw: "Ukryj hasło",
+    showPw: "Pokaż hasło",
+    stronger: "Dłuższe hasło lub trzy niepowiązane słowa sprawią, że będzie silniejsze.",
+    agreeA: "Akceptuję ",
+    terms: "regulamin",
+    agreeB: " VAKTO (w tym umowę powierzenia przetwarzania danych) oraz ",
+    privacy: "politykę prywatności",
+    agreeC: ".",
+    creating: "Tworzenie…",
+    cont: "Dalej",
+    price: "9 990 ISK",
+    ktErr: "Wpisz prawidłowy islandzki numer firmy (kennitala, 10 cyfr).",
+    ktLbl: "Numer firmy (kennitala)",
+    promoLbl: "Kod promocyjny (opcjonalnie)", promoPh: "np. VAKTO2MAN", promoBad: "Nie znaleziono kodu.",
+    promoNote: (d: number) => `Promocja: ${d} dni za darmo zamiast 14.`,
+    promoH: (d: number) => `${d} dni za darmo`,
   },
 };
-const PRICE: Record<SignupLang, string> = { is: "9.990", en: "9,990" };
 
 const Bars = () => (
   <div className="m"><svg viewBox="0 0 28 28" fill="none">
@@ -237,7 +315,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
     setError(null);
     if (!pw.ok) { setError(pw.reason ?? s.weak); return; }
     if (!terms) { setError(s.needTerms); return; }
-    if (!isValidKennitala(kennitala)) { setError(lang === "is" ? "Sláðu inn gilda kennitölu fyrirtækisins (10 tölustafir)." : "Enter a valid Icelandic company ID (kennitala, 10 digits)."); return; }
+    if (!isValidKennitala(kennitala)) { setError(s.ktErr); return; }
     setBusy(true);
     try {
       const res = await createOwnerAccount({ fullName, companyName, email, password, country: "IS", proof: proof ?? undefined, termsAccepted: terms, promo: promo?.code ?? (promoInput.trim() || undefined), kennitala });
@@ -271,14 +349,14 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
       <form className="form" onSubmit={finish}>
         <div className="brand"><Bars /><b>VAKTO</b></div>
         <Steps cur="card" s={s} />
-        {promo && <div className="promo-note">{lang === "is" ? `Tilboð: ${promo.days >= 59 ? "tveir mánuðir" : `${promo.days} dagar`} frítt í stað 14 daga.` : `Offer: ${promo.days} days free instead of 14.`}</div>}
-        <h1>{promo ? (lang === "is" ? "Tveir mánuðir frítt" : `${promo.days} days free`) : s.trialH}</h1>
+        {promo && <div className="promo-note">{s.promoNote(promo.days)}</div>}
+        <h1>{promo ? s.promoH(promo.days) : s.trialH}</h1>
         <div className="sub">{s.trialSub}</div>
 
         <div className="planpick" style={{ gridTemplateColumns: "1fr" }}>
           <div className="planopt on" style={{ cursor: "default" }}>
             <div className="pn">VAKTO</div>
-            <div className="pp">{lang === "en" ? `ISK ${PRICE.en}` : `${PRICE.is} kr`} <small>{s.per}</small></div>
+            <div className="pp">{s.price} <small>{s.per}</small></div>
             <div className="pb">{s.extra}</div>
             <div className="pb">{s.vatNote}</div>
           </div>
@@ -296,7 +374,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
       <form className="form" onSubmit={sendCode}>
         <div className="brand"><Bars /><b>VAKTO</b></div>
         <Steps cur="email" s={s} />
-        {promo && <div className="promo-note">{lang === "is" ? `Tilboð: ${promo.days >= 59 ? "tveir mánuðir" : `${promo.days} dagar`} frítt í stað 14 daga.` : `Offer: ${promo.days} days free instead of 14.`}</div>}
+        {promo && <div className="promo-note">{s.promoNote(promo.days)}</div>}
         <h1>{s.createH}</h1>
         <div className="sub">{s.createSub}</div>
 
@@ -316,7 +394,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
       <form className="form" onSubmit={checkCode}>
         <div className="brand"><Bars /><b>VAKTO</b></div>
         <Steps cur="code" s={s} />
-        {promo && <div className="promo-note">{lang === "is" ? `Tilboð: ${promo.days >= 59 ? "tveir mánuðir" : `${promo.days} dagar`} frítt í stað 14 daga.` : `Offer: ${promo.days} days free instead of 14.`}</div>}
+        {promo && <div className="promo-note">{s.promoNote(promo.days)}</div>}
         <h1>{s.codeH}</h1>
         <div className="sub">{s.codeSubA}<b style={{ color: "var(--ink)" }}>{email}</b>{s.codeSubB}</div>
 
@@ -339,13 +417,13 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
     <form className="form" onSubmit={submitAccount}>
       <div className="brand"><Bars /><b>VAKTO</b></div>
       <Steps cur="account" s={s} />
-        {promo && <div className="promo-note">{lang === "is" ? `Tilboð: ${promo.days >= 59 ? "tveir mánuðir" : `${promo.days} dagar`} frítt í stað 14 daga.` : `Offer: ${promo.days} days free instead of 14.`}</div>}
+        {promo && <div className="promo-note">{s.promoNote(promo.days)}</div>}
       <h1>{s.accH}</h1>
       <div className="sub">{s.accSubA}{email}{s.accSubB}</div>
 
       <div className="field"><div className="lbl"><label htmlFor="fn">{s.fullName}</label></div><input id="fn" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={s.namePh} autoComplete="name" autoFocus required /></div>
       <div className="field"><div className="lbl"><label htmlFor="co">{s.company}</label></div><input id="co" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder={s.coPh} autoComplete="organization" required /></div>
-      <div className="field"><div className="lbl"><label htmlFor="kt">{lang === "is" ? "Kennitala fyrirtækis" : "Company ID (kennitala)"}</label></div><input id="kt" value={kennitala} onChange={(e) => setKennitala(e.target.value.replace(/[^\d-]/g, "").slice(0, 11))} placeholder="000000-0000" inputMode="numeric" autoComplete="off" required /></div>
+      <div className="field"><div className="lbl"><label htmlFor="kt">{s.ktLbl}</label></div><input id="kt" value={kennitala} onChange={(e) => setKennitala(e.target.value.replace(/[^\d-]/g, "").slice(0, 11))} placeholder="000000-0000" inputMode="numeric" autoComplete="off" required /></div>
       <div className="field"><div className="lbl"><label htmlFor="pw">{s.pw}</label></div>
         <div className="pwwrap">
           <input id="pw" type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder={s.pwPh.replace("{n}", String(PASSWORD_MIN))} autoComplete="new-password" minLength={PASSWORD_MIN} required />
@@ -365,9 +443,9 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
         )}
       </div>
 
-      <div className="field"><div className="lbl"><label htmlFor="pc">{lang === "is" ? "Tilboðskóði (valfrjálst)" : "Offer code (optional)"}</label></div>
-        <input id="pc" value={promoInput} onChange={(e) => setPromoInput(e.target.value.toUpperCase())} onBlur={applyPromo} placeholder={lang === "is" ? "t.d. VAKTO2MAN" : "e.g. VAKTO2MAN"} autoComplete="off" />
-        {promoInput && !promo && promoChecked && <div className="promo-bad">{lang === "is" ? "Kóðinn fannst ekki." : "Code not found."}</div>}
+      <div className="field"><div className="lbl"><label htmlFor="pc">{s.promoLbl}</label></div>
+        <input id="pc" value={promoInput} onChange={(e) => setPromoInput(e.target.value.toUpperCase())} onBlur={applyPromo} placeholder={s.promoPh} autoComplete="off" />
+        {promoInput && !promo && promoChecked && <div className="promo-bad">{s.promoBad}</div>}
       </div>
       <label className="chk">
         <input type="checkbox" checked={terms} onChange={(e) => setTerms(e.target.checked)} required />

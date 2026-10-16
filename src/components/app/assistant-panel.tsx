@@ -34,6 +34,26 @@ const S = {
     note: "VAKTO AI can make mistakes. Changes only happen when you confirm.",
     upgrade: "Turn on VAKTO AI",
   },
+  pl: {
+    name: "VAKTO AI", open: "Otwórz VAKTO AI", close: "Zamknij", reset: "Nowa rozmowa", history: "Wcześniejsze rozmowy", noHistory: "Brak zapisanych rozmów.", del: "Usuń rozmowę", back: "Wstecz", ph: "Zapytaj o firmę lub poproś o zmianę…",
+    send: "Wyślij", thinking: "Myślę…", confirm: "Zatwierdź", cancel: "Anuluj", all: "Zatwierdź wszystko", done: "Gotowe", cancelled: "Anulowano",
+    hello: "Cześć! Odpowiem na pytania o koszty pracy, godziny i zmiany, ułożę grafik na cały tydzień i przygotuję zmiany do Twojego zatwierdzenia.",
+    err: "Nie udało się połączyć. Spróbuj ponownie.",
+    chips: ["Jaki jest w tym tygodniu udział kosztów pracy w obrocie?", "Porównaj koszty pracy i godziny w tym i poprzednim miesiącu", "Ułóż grafik na przyszły tydzień: każdy ma jeden dzień wolny", "Kto jest teraz na zmianie?"],
+    wide: "Powiększ", narrow: "Zmniejsz",
+    note: "VAKTO AI może się mylić. Zmiany są wprowadzane dopiero po Twoim zatwierdzeniu.",
+    upgrade: "Włącz VAKTO AI",
+  },
+  vi: {
+    name: "VAKTO AI", open: "Mở VAKTO AI", close: "Đóng", reset: "Cuộc trò chuyện mới", history: "Cuộc trò chuyện trước", noHistory: "Chưa có cuộc trò chuyện nào được lưu.", del: "Xóa cuộc trò chuyện", back: "Quay lại", ph: "Hỏi về hoạt động kinh doanh hoặc yêu cầu thay đổi…",
+    send: "Gửi", thinking: "Đang suy nghĩ…", confirm: "Xác nhận", cancel: "Hủy", all: "Xác nhận tất cả", done: "Xong", cancelled: "Đã hủy",
+    hello: "Xin chào! Tôi có thể trả lời câu hỏi về chi phí lương, giờ làm và ca làm, lập lịch cho cả tuần và chuẩn bị các thay đổi để bạn xác nhận.",
+    err: "Không thể kết nối. Vui lòng thử lại.",
+    chips: ["Tỷ lệ chi phí lương trên doanh thu tuần này là bao nhiêu?", "So sánh chi phí lương và giờ làm tháng này với tháng trước", "Lập lịch tuần sau: mỗi người được nghỉ một ngày", "Ai đang trong ca làm?"],
+    wide: "Mở rộng", narrow: "Thu nhỏ",
+    note: "VAKTO AI có thể mắc lỗi. Thay đổi chỉ được thực hiện khi bạn xác nhận.",
+    upgrade: "Bật VAKTO AI",
+  },
 };
 
 /** **feitletrun**, línuskil og „- “ listar. */
@@ -57,7 +77,7 @@ const Spark = () => <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1
 
 export function AssistantPanel() {
   const { lang } = useLang();
-  const s = S[lang === "en" ? "en" : "is"];
+  const s = S[lang];
   const path = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);

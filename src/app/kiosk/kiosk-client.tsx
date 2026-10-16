@@ -7,14 +7,18 @@ type Emp = { id: string; initials: string; name: string; color: string };
 
 const z = (n: number) => String(n).padStart(2, "0");
 
-type Lang = "is" | "en";
+type Lang = "is" | "en" | "pl";
+const LANGS: Lang[] = ["is", "en", "pl"];
 const WD: Record<Lang, string[]> = {
   is: ["sunnudagur", "mánudagur", "þriðjudagur", "miðvikudagur", "fimmtudagur", "föstudagur", "laugardagur"],
   en: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+  pl: ["niedziela", "poniedziałek", "wtorek", "środa", "czwartek", "piątek", "sobota"],
 };
 const MO: Record<Lang, string[]> = {
   is: ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"],
   en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+  // dopełniacz: „16 października 2026”
+  pl: ["stycznia", "lutego", "marca", "kwietnia", "maja", "czerwca", "lipca", "sierpnia", "września", "października", "listopada", "grudnia"],
 };
 const STR = {
   is: {
@@ -31,6 +35,9 @@ const STR = {
     notFound: "Kiosk fannst ekki", notFoundSub: "Þetta fyrirtæki fannst ekki. Sæktu rétta kiosk-slóð í Stillingum → Kiosk.",
     date: (d: Date) => `${WD.is[d.getDay()]} ${d.getDate()}. ${MO.is[d.getMonth()]} ${d.getFullYear()}`,
     scanBtn: "Skanna skírteini", scanTitle: "Sýndu QR-skírteinið fyrir myndavélina", scanUnsupported: "Þessi vafri styður ekki QR-skönnun — notaðu PIN.", scanNoCam: "Ekki tókst að opna myndavél.",
+    names: "Nöfn", ktTab: "Kennitala", ktPrompt: "Sláðu inn kennitöluna þína", ktPh: "ddmmáá-xxxx", notLinked: "Virkar þegar kiosk er tengdur fyrirtæki",
+    errs: {} as Record<string, string>,
+    locked: (min: string) => `Of margar rangar tilraunir — reyndu aftur eftir ${min} mínútur.`,
   },
   en: {
     title: "Time clock", tap: "Tap your name to clock in or out.",
@@ -46,8 +53,49 @@ const STR = {
     notFound: "Kiosk not found", notFoundSub: "This company wasn't found. Get the correct kiosk link in Settings → Kiosk.",
     date: (d: Date) => `${WD.en[d.getDay()]} ${d.getDate()} ${MO.en[d.getMonth()]} ${d.getFullYear()}`,
     scanBtn: "Scan ID card", scanTitle: "Show the QR ID card to the camera", scanUnsupported: "This browser doesn't support QR scanning — use a PIN.", scanNoCam: "Couldn't open the camera.",
+    names: "Names", ktTab: "ID number", ktPrompt: "Type your kennitala (ID number)", ktPh: "ddmmyy-xxxx", notLinked: "Works when the kiosk is linked to a company",
+    errs: {
+      "Kiosk-slóðin er ógild": "The kiosk link is invalid",
+      "Starfsmaður fannst ekki": "Employee not found",
+      "Engin kennitala skráð á starfsmann": "No kennitala registered for this employee",
+      "Rangur kóði — reyndu aftur": "Wrong code — try again",
+      "Stimplun tókst ekki — reyndu aftur.": "Clocking failed — try again.",
+      "Sláðu inn 10 stafa kennitölu": "Enter a 10-digit kennitala",
+      "Engin(n) starfsmaður fannst með þessa kennitölu": "No employee found with this kennitala",
+      "QR-stimplun er ekki virk": "QR clocking is not enabled",
+      "Skírteini fannst ekki": "ID card not found",
+    } as Record<string, string>,
+    locked: (min: string) => `Too many wrong attempts — try again in ${min} minutes.`,
   },
-} as const;
+  pl: {
+    title: "Rejestrator czasu", tap: "Stuknij swoje imię, aby odbić wejście lub wyjście.",
+    onShift: "Na zmianie", offShift: "Poza zmianą", err: "Błąd",
+    noStaff: "Brak pracowników — dodaj pracowników w aplikacji.",
+    enterPin: "Wpisz swój 4-cyfrowy kod", wrong: "Błędny kod — spróbuj ponownie", cancel: "Anuluj",
+    onSince: (tm: string) => `Na zmianie od ${tm} — wpisz kod, aby odbić wyjście`,
+    hintReal: "Twój kod = ostatnie 4 cyfry Twojego numeru kennitala.",
+    demoFor: (n: string) => `Kod demo dla ${n}: `,
+    foot: "VAKTO · Rejestrator czasu — otwórz tę stronę na wspólnym tablecie w miejscu pracy.",
+    stamped: (n: string, into: boolean) => `${n} — ${into ? "wejście odbite" : "wyjście odbite"}`,
+    at: (tm: string, into: boolean) => `o ${tm}${into ? " · Udanej zmiany!" : " · Dziękujemy za dziś!"}`,
+    notFound: "Nie znaleziono kiosku", notFoundSub: "Nie znaleziono tej firmy. Pobierz właściwy link do kiosku w Ustawienia → Kiosk.",
+    date: (d: Date) => `${WD.pl[d.getDay()]}, ${d.getDate()} ${MO.pl[d.getMonth()]} ${d.getFullYear()}`,
+    scanBtn: "Zeskanuj identyfikator", scanTitle: "Pokaż identyfikator z kodem QR do kamery", scanUnsupported: "Ta przeglądarka nie obsługuje skanowania QR — użyj PIN-u.", scanNoCam: "Nie udało się uruchomić kamery.",
+    names: "Imiona", ktTab: "Kennitala", ktPrompt: "Wpisz swój numer kennitala", ktPh: "ddmmrr-xxxx", notLinked: "Działa, gdy kiosk jest połączony z firmą",
+    errs: {
+      "Kiosk-slóðin er ógild": "Link do kiosku jest nieprawidłowy",
+      "Starfsmaður fannst ekki": "Nie znaleziono pracownika",
+      "Engin kennitala skráð á starfsmann": "Pracownik nie ma zapisanego numeru kennitala",
+      "Rangur kóði — reyndu aftur": "Błędny kod — spróbuj ponownie",
+      "Stimplun tókst ekki — reyndu aftur.": "Odbicie nie powiodło się — spróbuj ponownie.",
+      "Sláðu inn 10 stafa kennitölu": "Wpisz 10-cyfrowy numer kennitala",
+      "Engin(n) starfsmaður fannst með þessa kennitölu": "Nie znaleziono pracownika z tym numerem kennitala",
+      "QR-stimplun er ekki virk": "Odbijanie kodem QR nie jest włączone",
+      "Skírteini fannst ekki": "Nie znaleziono identyfikatora",
+    } as Record<string, string>,
+    locked: (min: string) => `Zbyt wiele błędnych prób — spróbuj ponownie za ${min} min.`,
+  },
+};
 
 export default function KioskClient({ kioskKey, data }: { kioskKey: string | null; data: KioskData | null }) {
   const real = !!data;
@@ -68,6 +116,12 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
   const [flash, setFlash] = useState<null | { name: string; into: boolean; tm: string }>(null);
   const [lang, setLang] = useState<Lang>("is");
   const s = STR[lang];
+  // Villur koma á íslensku frá þjóninum; þýðum þær þekktu.
+  const tErr = (m: string | undefined) => {
+    if (!m) return s.err;
+    const lock = /^Of margar rangar tilraunir — reyndu aftur eftir (\d+) mínútur\.$/.exec(m); // LOCKED í actions.ts
+    return lock ? s.locked(lock[1]) : s.errs[m] ?? m;
+  };
   const flashT = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [scan, setScan] = useState(false);
   const [mode, setMode] = useState<"cards" | "kt">("cards");
@@ -79,7 +133,7 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
 
   useEffect(() => {
     const saved = localStorage.getItem("vakto-kiosk-lang");
-    if (saved === "en" || saved === "is") setLang(saved);
+    if (LANGS.includes(saved as Lang)) setLang(saved as Lang);
     const raf = requestAnimationFrame(() => setNow(new Date()));
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => { cancelAnimationFrame(raf); clearInterval(t); };
@@ -101,11 +155,11 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
     if (nk.length === 10) setTimeout(() => ktSubmit(nk), 160);
   }
   async function ktSubmit(nk: string) {
-    if (!real) { setKtErr(lang === "is" ? "Virkar þegar kiosk er tengdur fyrirtæki" : "Works when the kiosk is linked to a company"); setKt(""); return; }
+    if (!real) { setKtErr(s.notLinked); setKt(""); return; }
     setKtBusy(true);
     const res = await kioskPunchByKennitala(kioskKey!, nk);
     setKtBusy(false);
-    if (!res.ok) { setKtErr(res.error ?? s.err); setKt(""); return; }
+    if (!res.ok) { setKtErr(tErr(res.error)); setKt(""); return; }
     setKt("");
     if (res.employeeId) {
       setOn((m) => ({ ...m, [res.employeeId!]: !!res.into }));
@@ -138,7 +192,7 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
       setBusy(true);
       const res = await kioskPunchByPin(kioskKey!, cur.id, np);
       setBusy(false);
-      if (!res.ok) { setErr(res.error ?? s.err); setShake(true); setTimeout(() => { setPin(""); setShake(false); }, 650); return; }
+      if (!res.ok) { setErr(tErr(res.error)); setShake(true); setTimeout(() => { setPin(""); setShake(false); }, 650); return; }
       finish(cur, !!res.into, res.time ?? nowHM());
     } else wrong();
   }
@@ -180,7 +234,7 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
             done = true;
             const res = await kioskPunchByToken(kioskKey!, raw);
             if (res.ok) { setScan(false); finish({ id: res.name ?? "", initials: "", name: res.name ?? "", color: "#e9700f" }, !!res.into, res.time ?? nowHM()); return; }
-            setScanErr(res.error ?? s.err); done = false;
+            setScanErr(tErr(res.error)); done = false;
           }
         } catch { /* keep scanning */ }
         raf = requestAnimationFrame(tick);
@@ -215,7 +269,7 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
 
   const LangToggle = () => (
     <div className="klang">
-      {(["is", "en"] as Lang[]).map((l) => (
+      {LANGS.map((l) => (
         <button key={l} className={lang === l ? "on" : ""} onClick={() => pickLang(l)}>{l.toUpperCase()}</button>
       ))}
     </div>
@@ -251,14 +305,14 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
           <div className="sub" style={{ marginTop: 20 }}>{s.noStaff}</div>
         )}
         <div className="klang" style={{ justifyContent: "center", display: "flex", margin: "14px auto 22px" }}>
-          <button className={mode === "cards" ? "on" : ""} onClick={() => pickMode("cards")}>{lang === "is" ? "Nöfn" : "Names"}</button>
-          <button className={mode === "kt" ? "on" : ""} onClick={() => pickMode("kt")}>{lang === "is" ? "Kennitala" : "ID number"}</button>
+          <button className={mode === "cards" ? "on" : ""} onClick={() => pickMode("cards")}>{s.names}</button>
+          <button className={mode === "kt" ? "on" : ""} onClick={() => pickMode("kt")}>{s.ktTab}</button>
         </div>
         {mode === "kt" && (
           <div className="card" style={{ maxWidth: 400, margin: "0 auto" }}>
-            <div className="cur" style={{ marginBottom: 10 }}>{lang === "is" ? "Sláðu inn kennitöluna þína" : "Type your kennitala (ID number)"}</div>
+            <div className="cur" style={{ marginBottom: 10 }}>{s.ktPrompt}</div>
             <div className="dots" style={{ fontSize: 26, fontWeight: 700, letterSpacing: 2, minHeight: 38, display: "flex", alignItems: "center", justifyContent: "center", fontVariantNumeric: "tabular-nums" }}>
-              {ktFmt || <span style={{ opacity: .3 }}>ddmmáá-xxxx</span>}
+              {ktFmt || <span style={{ opacity: .3 }}>{s.ktPh}</span>}
             </div>
             <div className="pin-err">{ktErr}</div>
             <div className="pad">
