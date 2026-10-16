@@ -1,5 +1,5 @@
 // Efni síðunnar /personuvernd — birt í AhLegal (src/components/site/ah-legal.tsx) — (/personuvernd).
-export const PRIVACY_META = { title: "Persónuverndarstefna", updated: "2. október 2026" };
+export const PRIVACY_META = { title: "Persónuverndarstefna", updated: "16. október 2026" };
 
 export function PrivacyBody() {
   return (
@@ -32,7 +32,7 @@ export function PrivacyBody() {
         <li>Tilkynnt efni: ef notandi tilkynnir skilaboð eða færslu er tilkynningin, útdráttur úr efninu og hver tilkynnti vistað og sýnt stjórnendum fyrirtækisins.</li>
       </ul>
       <ul><li>Staðsetning við stimplun: aðeins ef vinnuveitandi kveikir á staðsetningarkröfu. Þá er staðsetning símans skráð einu sinni þegar stimplað er inn og út, til að staðfesta að starfsmaður sé á vinnustaðnum. Engin rakning fer fram á milli stimplana og ekki í bakgrunni.</li></ul>
-      <p>VAKTO notar engar auglýsingavafrakökur. Á opna vefnum notum við Google Analytics aðeins ef gestur samþykkir það; inni í kerfinu er það aldrei notað. Sjá <a href="/vafrakokur">vafrakökur</a>.</p>
+      <p>Á opna vefnum notum við Google Analytics og Meta Pixel aðeins ef gestur samþykkir það; inni í kerfinu er hvorugt nokkurn tímann notað. Sjá <a href="/vafrakokur">vafrakökur</a>.</p>
 
       <h2>3. Tilgangur og lagagrundvöllur</h2>
       <ul>
@@ -42,7 +42,7 @@ export function PrivacyBody() {
         <li>Staðsetning við stimplun: lögmætir hagsmunir vinnuveitanda af því að staðfesta viðveru á vinnustað (6. gr. 1. mgr. f), samkvæmt fyrirmælum hans sem ábyrgðaraðila.</li>
         <li>VAKTO AI og aðrar gervigreindaraðgerðir (tillögur að vaktaplani, lestur kjarasamnings, drög að samningsákvæðum, skýrslur): efndir samnings; unnið aðeins þegar stjórnandi biður um það.</li>
         <li>Spjallið á heimasíðunni: lögmætir hagsmunir af því að svara fyrirspurnum. Samtöl eru send til gervigreindarþjónustu (sjá kafla 5) og geymd í allt að 12 mánuði.</li>
-        <li>Greining á notkun opna vefsins (Google Analytics): samþykki (6. gr. 1. mgr. a), sem má draga til baka hvenær sem er.</li>
+        <li>Greining á notkun opna vefsins og mæling á árangri auglýsinga (Google Analytics, Meta Pixel): samþykki (6. gr. 1. mgr. a), sem má draga til baka hvenær sem er.</li>
         <li>Tölvupóstar um þjónustuna (t.d. plan birt, samningur bíður, prufa að renna út): efndir samnings. Við sendum ekki markaðspóst nema með samþykki.</li>
       </ul>
 
@@ -59,6 +59,7 @@ export function PrivacyBody() {
           <tr><td>Straumur (Kvika banki hf.)</td><td>Greiðslusíða og kortageymsla (tokenization) fyrir áskriftargjöld. Kortanúmer fara aldrei um kerfi VAKTO; VAKTO geymir aðeins tilvísun (token), síðustu fjóra tölustafi og gildistíma.</td><td>Ísland</td></tr>
           <tr><td>Anthropic PBC</td><td>Gervigreind: svör spjallsins á heimasíðunni, VAKTO AI aðstoðarmaðurinn, tillögur að vaktaplani, lestur kjarasamninga, drög að samningsákvæðum og skýrslur (aðeins þegar stjórnandi biður um það). Gögn eru ekki notuð til að þjálfa líkön.</td><td>Bandaríkin undir SCC</td></tr>
           <tr><td>Google Ireland Ltd. / Google LLC</td><td>Google Analytics 4 á opna vefnum, aðeins með samþykki gests. Ekki notað inni í kerfinu.</td><td>ESB/Bandaríkin undir EU–US Data Privacy Framework og SCC</td></tr>
+          <tr><td>Meta Platforms Ireland Ltd.</td><td>Meta Pixel á opna vefnum, aðeins með samþykki gests: mælir hvort auglýsingar á Facebook/Instagram leiða til heimsókna og nýskráninga. Ekki notað inni í kerfinu.</td><td>ESB/Bandaríkin undir EU–US Data Privacy Framework og SCC</td></tr>
           <tr><td>Taktikal ehf.</td><td>Undirritun ráðningarsamninga með rafrænum skilríkjum, aðeins ef vinnuveitandi velur þá leið. Nafn, kennitala og símanúmer undirritara ásamt skjalinu eru send til Taktikal.</td><td>Ísland</td></tr>
           <tr><td>Expo (650 Industries Inc.), Apple Inc., Google LLC</td><td>Sending push-tilkynninga í VAKTO-appið: auðkenni tækis, fyrirsögn og texti tilkynningar.</td><td>Bandaríkin undir SCC</td></tr>
           <tr><td>Apple Inc. / Google LLC</td><td>Wallet-skírteini, eingöngu ef starfsmaður velur að bæta skírteininu í veskið sitt</td><td>Samkvæmt skilmálum Apple/Google</td></tr>
