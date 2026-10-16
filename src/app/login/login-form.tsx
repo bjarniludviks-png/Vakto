@@ -19,16 +19,12 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
   async function forgot() {
     setError(null);
     if (!email.trim()) {
-      setNotice(lang === "en" ? "Type your email above first, then tap this link again." : "Sláðu netfangið þitt inn fyrst — smelltu svo aftur á hlekkinn.");
+      setNotice(s.needEmail);
       return;
     }
-    setNotice(lang === "en" ? "Sending…" : "Sendi…");
+    setNotice(s.sendingReset);
     await requestPasswordReset(email);
-    setNotice(
-      lang === "en"
-        ? "If an account exists for that email, a reset link is on its way."
-        : "Ef aðgangur er til fyrir netfangið er póstur með hlekk á leiðinni."
-    );
+    setNotice(s.resetSent);
   }
 
   // „Muna eftir mér": síðasta netfang fyllt út og val notandans munað.
@@ -42,10 +38,8 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
     } catch {}
   }, []);
 
-  // Carry the marketing-site language choice into the app after login.
-  useEffect(() => {
-    try { localStorage.setItem("vakto-lang", lang); } catch {}
-  }, [lang]);
+  // Tungumálavalið (vakto-lang) er vistað af síðunni sjálfri (components/site/lang) og fylgir inn í appið.
+  // Ekki skrifa það hér: við hydration er lang fyrst "is" og það myndi yfirskrifa valið.
 
   // /auth/callback bounces here with ?error=link when a sign-in link is stale.
   useEffect(() => {
@@ -56,7 +50,7 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
   }, [s.errOauth]);
 
   // Preserve the language on the create-account link too.
-  const signupHref = lang === "en" ? "/nyskraning?lang=en" : "/nyskraning";
+  const signupHref = lang === "is" ? "/nyskraning" : `/nyskraning?lang=${lang}`;
 
   async function signIn(e: React.FormEvent) {
     e.preventDefault();
@@ -69,7 +63,8 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
         password,
       });
       if (error) {
-        setError(error.message);
+        // Supabase skilar enskri villu; algengasta tilvikið þýtt.
+        setError(/invalid login credentials/i.test(error.message) ? s.errCreds : error.message);
         return;
       }
       try {
@@ -147,7 +142,7 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
 
       <label className="remember">
         <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-        <span>{lang === "en" ? "Remember me" : "Muna eftir mér"}</span>
+        <span>{s.remember}</span>
       </label>
 
       {error && (
@@ -177,11 +172,11 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
         <button className="soc" type="button" disabled={busy} onClick={async () => {
           setBusy(true); setError(null);
           const r = await demoLogin();
-          if (!r.ok) { setBusy(false); setError(r.error ?? s.errConnect); return; }
+          if (!r.ok) { setBusy(false); setError(lang === "is" ? r.error ?? s.errConnect : s.errDemo); return; }
           window.location.assign(r.next ?? "/maelabord");
         }}>
           <span className="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 3l14 9-14 9z" /></svg></span>{" "}
-          {lang === "en" ? "Try the demo company" : "Prófa demo-fyrirtæki"}
+          {s.tryDemo}
         </button>
       )}
 

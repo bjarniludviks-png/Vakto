@@ -16,7 +16,7 @@ export async function POST(req: Request) {
   const name = (p.name ?? "").toString().trim().slice(0, 120);
   const email = (p.email ?? "").toString().trim().slice(0, 200);
   const message = (p.message ?? "").toString().trim().slice(0, 2000);
-  if (!p.threadId || !p.token || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return NextResponse.json({ ok: false, error: "Netfang vantar." }, { status: 400 });
+  if (!p.threadId || !p.token || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return NextResponse.json({ ok: false, error: p.lang === "pl" ? "Brak adresu e-mail." : p.lang === "en" ? "Email is missing." : "Netfang vantar." }, { status: 400 });
   const admin = createAdminClient();
   const { data: th } = await admin.from("support_threads").select("id").eq("id", p.threadId).eq("token", p.token).maybeSingle();
   if (!th) return NextResponse.json({ ok: false }, { status: 404 });

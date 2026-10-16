@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-type Lang = "is" | "en";
+type Lang = "is" | "en" | "pl";
 type Msg = { id: string; role: "user" | "assistant" | "owner"; body: string };
 const KEY = "vakto-home-chat";
 
@@ -30,6 +30,16 @@ const S: Record<Lang, Record<string, string>> = {
     humanMode: "A person at VAKTO replies here.", waiting: "Sending…", typing: "…", close: "Close",
     err: "Couldn't send — try again or email hallo@vakto.is.",
     owner: "VAKTO", bot: "Assistant", you: "You",
+  },
+  pl: {
+    open: "Zapytaj o VAKTO", title: "Asystent VAKTO", sub: "Odpowiada od razu · w razie potrzeby człowiek",
+    hello: "Cześć! Zapytaj mnie o VAKTO — grafik zmian, udział kosztów pracy w obrocie, ceny, Payday, aplikację… Odpowiadam od razu.",
+    ph: "Wpisz pytanie…", send: "Wyślij", human: "Porozmawiaj z człowiekiem",
+    hName: "Imię i nazwisko", hEmail: "E-mail", hMsg: "W czym możemy pomóc?", hSend: "Wyślij do VAKTO", hCancel: "Anuluj",
+    hDone: "Dziękujemy! Właściciel VAKTO dostanie to od razu i odpowie tutaj — oraz na Twój e-mail, jeśli wyjdziesz ze strony.",
+    humanMode: "Odpowiada tu osoba z VAKTO.", waiting: "Wysyłanie…", typing: "…", close: "Zamknij",
+    err: "Nie udało się wysłać — spróbuj ponownie lub napisz na hallo@vakto.is.",
+    owner: "VAKTO", bot: "Asystent", you: "Ty",
   },
 };
 

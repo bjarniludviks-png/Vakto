@@ -6,13 +6,17 @@ import { usePathname, useRouter } from "next/navigation";
 import { Icon, Logo } from "./icons";
 import { ToastHost, toast } from "./toast";
 import { visibleFor, type Role } from "./nav";
-import { useLang } from "./lang";
+import { useLang, type Lang } from "./lang";
 import { createClient } from "@/lib/supabase/client";
 import { getMyCompanies, switchCompany, type CompanyOption } from "@/app/(app)/company-actions";
 import { TopSearch } from "./top-search";
 import { ChatBadge } from "./chat-badge";
 import { AssistantPanel } from "./assistant-panel";
 import { ImpersonationBar } from "./impersonation-bar";
+
+// Hnappurinn í reikningsvalmyndinni flettir í gegnum málin og sýnir nafn næsta máls.
+const LANG_CYCLE: Record<Lang, Lang> = { is: "en", en: "vi", vi: "pl", pl: "is" };
+const LANG_NAME: Record<Lang, string> = { is: "Íslenska", en: "English", vi: "Tiếng Việt", pl: "Polski" };
 
 export type Account = {
   initials: string;
@@ -39,6 +43,7 @@ export default function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const { lang, setLang, t } = useLang();
+  const nextLang = LANG_CYCLE[lang];
   const [navOpen, setNavOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [menu, setMenu] = useState<null | "lang" | "new" | "acct">(null);
@@ -300,8 +305,8 @@ export default function AppShell({
                 <div className="mi" onClick={() => nav("/hjalp")}>
                   <Icon name="help" className="ei" />{t("acct:help")}
                 </div>
-                <div className="mi" onClick={() => { setLang(lang === "is" ? "en" : lang === "en" ? "vi" : lang === "vi" ? "pl" : "is"); setMenu(null); }}>
-                  <Icon name="globe" className="ei" />{lang === "is" ? "English" : "Íslenska"}
+                <div className="mi" onClick={() => { setLang(nextLang); setMenu(null); }}>
+                  <Icon name="globe" className="ei" />{LANG_NAME[nextLang]}
                 </div>
                 <div className="mi" onClick={toggleTheme}>
                   <Icon name="moon" className="ei" />{dark ? t("Ljóst útlit") : t("acct:dark")}

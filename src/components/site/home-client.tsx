@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import HomeChat from "./home-chat";
 import SiteNav from "./site-nav";
-import { useSiteLang } from "./lang";
+import { useFullLang, useSiteLang } from "./lang";
 import { HOME_TEXT } from "./home-text";
 import AhFooter from "./ah-footer";
 
@@ -546,6 +546,8 @@ function Sister() {
 
 export default function AppleHome() {
   const lang = useSiteLang();
+  const full = useFullLang();
+  const chatLang = full === "pl" ? "pl" : lang; // spjallið er líka til á pólsku
   const t = HOME_TEXT[lang];
   const [scrolled, setScrolled] = useState(false);
   const [overDark, setOverDark] = useState(false);
@@ -580,7 +582,7 @@ export default function AppleHome() {
         <Sister />
       </main>
       <AhFooter />
-      <HomeChat key={lang} lang={lang} skin="ah" />
+      <HomeChat key={chatLang} lang={chatLang} skin="ah" />
     </div>
   );
 }

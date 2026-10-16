@@ -1,8 +1,8 @@
-export type Lang = "is" | "en";
+export type Lang = "is" | "en" | "vi" | "pl";
 
 export function pickLang(v: string | string[] | undefined): Lang {
   const s = Array.isArray(v) ? v[0] : v;
-  return s === "en" ? "en" : "is";
+  return s === "en" || s === "vi" || s === "pl" ? s : "is";
 }
 
 export const LOGIN_I18N: Record<Lang, {
@@ -34,6 +34,12 @@ export const LOGIN_I18N: Record<Lang, {
   errOauth: string;
   errConnect: string;
   errAudkenni: string;
+  errCreds: string;
+  needEmail: string;
+  sendingReset: string;
+  resetSent: string;
+  tryDemo: string;
+  errDemo: string;
 }> = {
   is: {
     metaTitle: "VAKTO — Skrá inn",
@@ -49,7 +55,7 @@ export const LOGIN_I18N: Record<Lang, {
     emailPh: "netfang@fyrirtaeki.is",
     passwordLabel: "Lykilorð",
     forgot: "Gleymt lykilorð?",
-    remember: "Muna mig",
+    remember: "Muna eftir mér",
     signIn: "Skrá inn",
     signingIn: "Skrái inn…",
     or: "eða",
@@ -62,6 +68,12 @@ export const LOGIN_I18N: Record<Lang, {
     errOauth: "Innskráningin tókst ekki. Reyndu aftur eða notaðu netfangið þitt.",
     errConnect: "Tókst ekki að tengjast — reyndu aftur eftir augnablik.",
     errAudkenni: "Rafræn skilríki (Auðkenni) eru rétt handan við hornið.",
+    errCreds: "Rangt netfang eða lykilorð.",
+    needEmail: "Sláðu netfangið þitt inn fyrst — smelltu svo aftur á hlekkinn.",
+    sendingReset: "Sendi…",
+    resetSent: "Ef aðgangur er til fyrir netfangið er póstur með hlekk á leiðinni.",
+    tryDemo: "Prófa demo-fyrirtæki",
+    errDemo: "Demo-innskráning tókst ekki",
   },
   en: {
     metaTitle: "VAKTO — Sign in",
@@ -90,5 +102,79 @@ export const LOGIN_I18N: Record<Lang, {
     errOauth: "That sign-in didn't work. Try again or use your email.",
     errConnect: "Couldn't connect — please try again in a moment.",
     errAudkenni: "Electronic ID (Auðkenni) is just around the corner.",
+    errCreds: "Wrong email or password.",
+    needEmail: "Type your email above first, then tap this link again.",
+    sendingReset: "Sending…",
+    resetSent: "If an account exists for that email, a reset link is on its way.",
+    tryDemo: "Try the demo company",
+    errDemo: "Demo sign-in failed",
+  },
+  vi: {
+    metaTitle: "VAKTO — Đăng nhập",
+    tag: "Chào mừng trở lại",
+    h2: ["Hệ thống xếp ca đơn giản nhất,", "mà làm được nhiều hơn."],
+    desc: "Một lần đăng nhập cho cả quản lý và nhân viên — mỗi người thấy phần của mình.",
+    bullets: [],
+    quote: "Cần hỗ trợ? hallo@vakto.is",
+    quoteBy: "",
+    welcome: "Chào mừng trở lại",
+    welcomeSub: "Đăng nhập — công việc đang chờ bạn.",
+    emailLabel: "Email",
+    emailPh: "ban@congty.com",
+    passwordLabel: "Mật khẩu",
+    forgot: "Quên mật khẩu?",
+    remember: "Ghi nhớ tôi",
+    signIn: "Đăng nhập",
+    signingIn: "Đang đăng nhập…",
+    or: "hoặc",
+    withApple: "Tiếp tục với Apple",
+    withGoogle: "Tiếp tục với Google",
+    withMicrosoft: "Tiếp tục với Microsoft",
+    withAudkenni: "Định danh điện tử (Auðkenni)",
+    noAccount: "Chưa có tài khoản?",
+    createAccount: "Tạo tài khoản",
+    errOauth: "Đăng nhập không thành công. Hãy thử lại hoặc dùng email của bạn.",
+    errConnect: "Không thể kết nối — vui lòng thử lại sau giây lát.",
+    errAudkenni: "Định danh điện tử (Auðkenni) sắp ra mắt.",
+    errCreds: "Email hoặc mật khẩu không đúng.",
+    needEmail: "Hãy nhập email ở trên trước, rồi bấm lại vào liên kết này.",
+    sendingReset: "Đang gửi…",
+    resetSent: "Nếu email này có tài khoản, liên kết đặt lại mật khẩu đang được gửi đến.",
+    tryDemo: "Dùng thử công ty demo",
+    errDemo: "Đăng nhập demo không thành công",
+  },
+  pl: {
+    metaTitle: "VAKTO — Logowanie",
+    tag: "Witaj ponownie",
+    h2: ["Najprostszy system grafików,", "który robi więcej."],
+    desc: "Jedno logowanie dla kierowników i pracowników — każdy widzi swoje.",
+    bullets: [],
+    quote: "Potrzebujesz pomocy? hallo@vakto.is",
+    quoteBy: "",
+    welcome: "Witaj ponownie",
+    welcomeSub: "Zaloguj się — firma czeka.",
+    emailLabel: "E-mail",
+    emailPh: "ty@firma.pl",
+    passwordLabel: "Hasło",
+    forgot: "Nie pamiętasz hasła?",
+    remember: "Zapamiętaj mnie",
+    signIn: "Zaloguj się",
+    signingIn: "Logowanie…",
+    or: "lub",
+    withApple: "Kontynuuj z Apple",
+    withGoogle: "Kontynuuj z Google",
+    withMicrosoft: "Kontynuuj z Microsoft",
+    withAudkenni: "Identyfikator elektroniczny (Auðkenni)",
+    noAccount: "Nie masz konta?",
+    createAccount: "Załóż konto",
+    errOauth: "Logowanie nie powiodło się. Spróbuj ponownie lub użyj adresu e-mail.",
+    errConnect: "Nie udało się połączyć — spróbuj ponownie za chwilę.",
+    errAudkenni: "Identyfikator elektroniczny (Auðkenni) już wkrótce.",
+    errCreds: "Nieprawidłowy e-mail lub hasło.",
+    needEmail: "Najpierw wpisz swój e-mail powyżej, a potem kliknij ten link ponownie.",
+    sendingReset: "Wysyłanie…",
+    resetSent: "Jeśli istnieje konto dla tego adresu, link do zmiany hasła jest już w drodze.",
+    tryDemo: "Wypróbuj firmę demo",
+    errDemo: "Logowanie demo nie powiodło się",
   },
 };
