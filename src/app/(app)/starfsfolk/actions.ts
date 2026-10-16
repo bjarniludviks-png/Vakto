@@ -1182,3 +1182,39 @@ export async function uploadEmployeePhoto(employeeId: string, dataUrl: string): 
     return { ok: false, error: "Tókst ekki að vista myndina" };
   }
 }
+
+export type InviteEmployeesResult = { ok: boolean; sent?: number; linked?: number; failed?: { name: string; error: string }[]; error?: string };
+const ROLE_LABEL: Record<string, string> = { employee: "Starfsmaður", manager: "Vaktstjóri", owner: "Stjórnandi", contractor: "Verktaki" };
+
+/** Sendir boð í appið á starfsfólk sem hefur netfang en engan aðgang (t.d. eftir Excel-innlestur).
+ *  ids = tiltekið starfsfólk; án ids = allt virkt starfsfólk án aðgangs. Aðeins stjórnendur og vaktstjórar. */
+export async function inviteEmployees(ids?: string[]): Promise<InviteEmployeesResult> {
+  if (!isSupabaseConfigured()) return { ok: true, sent: 0 };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
+    const { data: me } = await supabase.from("users").select("company_id, role").eq("id", user.id).maybeSingle();
+    const company = me?.company_id as string | undefined;
+    if (!company || !["owner", "manager"].includes(me?.role as string)) return { ok: false, error: "Aðeins stjórnendur geta sent boð" };
+    let q = supabase.from("employees").select("id, full_name, email, role")
+      .eq("company_id", company).is("user_id", null).neq("status", "inactive").not("email", "is", null);
+    if (ids?.length) q = q.in("id", ids.slice(0, 500));
+    const { data: emps, error } = await q;
+    if (error) return { ok: false, error: userError(error) };
+    let sent = 0, linked = 0;
+    const failed: { name: string; error: string }[] = [];
+    for (const e of emps ?? []) {
+      const email = String(e.email ?? "").trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { failed.push({ name: e.full_name as string, error: "Ógilt netfang" }); continue; }
+      const inv = await inviteToCompany(company, email, ROLE_LABEL[e.role as string] ?? "Starfsmaður");
+      if (!inv.ok) failed.push({ name: e.full_name as string, error: inv.error ?? "Villa" });
+      else if (inv.sent) sent++; else linked++;
+    }
+    await logAudit(supabase, company, user.id, { action: "employee.invite", entity: "employee", detail: `Boð í appið: ${sent} send, ${linked} tengd` });
+    revalidatePath("/starfsfolk");
+    return { ok: true, sent, linked, failed };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}

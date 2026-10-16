@@ -10,6 +10,7 @@ import { colorFor } from "@/lib/avatar";
 type Row = {
   id: string;
   full_name: string;
+  user_id?: string | null;
   title: string | null;
   pay_type: "hourly" | "monthly";
   rate: number;
@@ -48,7 +49,7 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
     const { data, error } = await supabase
       .from("employees")
       .select(
-        "id, full_name, title, pay_type, rate, monthly_hours, employment_ratio, union_agreement, status, avatar_color, email, kennitala, phone, bank_account, role, departments(name), positions(name), locations(name)",
+        "id, full_name, title, pay_type, rate, monthly_hours, employment_ratio, union_agreement, status, avatar_color, email, kennitala, phone, bank_account, role, user_id, departments(name), positions(name), locations(name)",
       )
       .order("full_name");
 
@@ -100,6 +101,7 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
       phone: r.phone,
       bankAccount: r.bank_account,
       role: r.role,
+      hasAccount: !!r.user_id,
     }));
     return { employees, live: true };
   } catch {

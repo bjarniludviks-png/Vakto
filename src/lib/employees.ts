@@ -26,6 +26,7 @@ export type Employee = {
   nextOfKin?: string | null;
   hireDate?: string | null;
   role: string;
+  hasAccount?: boolean;  // tengdur innskráningaraðgangi (app / Mitt svæði)
   payRule?: CustomRules | null;
   permissions?: { clock: boolean; shifts: boolean; pay: boolean; requests: boolean; card: boolean; chat: boolean } | null;
   benefits?: { name: string; type: "fixed" | "perkm"; amount: number }[] | null;

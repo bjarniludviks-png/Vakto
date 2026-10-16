@@ -8,6 +8,25 @@ type Dict = Record<string, { is: string; en: string; vi?: string; pl?: string }>
 
 // App-shell chrome strings. Per-screen content can adopt useLang() incrementally.
 export const DICT: Dict = {
+  "boð send": { is: "boð send", en: "invites sent", vi: "lời mời đã gửi", pl: "zaproszeń wysłanych" },
+  "tengd aðgangi sem var til": { is: "tengd aðgangi sem var til", en: "linked to an existing account", vi: "đã liên kết tài khoản có sẵn", pl: "połączonych z istniejącym kontem" },
+  "tókst ekki": { is: "tókst ekki", en: "failed", vi: "không thành công", pl: "nie powiodło się" },
+  "starfsmaður hefur ekki aðgang að appinu": { is: "starfsmaður hefur ekki aðgang að appinu", en: "employee has no access to the app", vi: "nhân viên chưa có quyền truy cập ứng dụng", pl: "pracownik nie ma dostępu do aplikacji" },
+  "starfsmenn hafa ekki aðgang að appinu": { is: "starfsmenn hafa ekki aðgang að appinu", en: "employees have no access to the app", vi: "nhân viên chưa có quyền truy cập ứng dụng", pl: "pracowników nie ma dostępu do aplikacji" },
+  "Boðspóstur fer á": { is: "Boðspóstur fer á", en: "An invite email goes to", vi: "Email mời sẽ được gửi đến", pl: "Zaproszenie zostanie wysłane na" },
+  "netföng.": { is: "netföng.", en: "addresses.", vi: "địa chỉ.", pl: "adresów." },
+  "Hver og einn velur sér lykilorð og fær þá Mitt svæði og appið.": { is: "Hver og einn velur sér lykilorð og fær þá Mitt svæði og appið.", en: "Each person picks a password and then gets My area and the app.", vi: "Mỗi người tự chọn mật khẩu và sau đó dùng được Khu vực của tôi và ứng dụng.", pl: "Każdy wybiera hasło i otrzymuje dostęp do Mojej strefy i aplikacji." },
+  "Sendu boð svo starfsfólkið geti séð vaktir, stimplað sig og fengið launaseðla í símanum.": { is: "Sendu boð svo starfsfólkið geti séð vaktir, stimplað sig og fengið launaseðla í símanum.", en: "Send invites so staff can see shifts, clock in and get payslips on their phone.", vi: "Gửi lời mời để nhân viên xem ca làm, chấm công và nhận phiếu lương trên điện thoại.", pl: "Wyślij zaproszenia, aby pracownicy widzieli zmiany, odbijali czas pracy i otrzymywali paski wypłat w telefonie." },
+  "Já, senda boð": { is: "Já, senda boð", en: "Yes, send invites", vi: "Có, gửi lời mời", pl: "Tak, wyślij zaproszenia" },
+  "Senda boð í appið": { is: "Senda boð í appið", en: "Send app invites", vi: "Gửi lời mời dùng ứng dụng", pl: "Wyślij zaproszenia do aplikacji" },
+  "Innskráning": { is: "Innskráning", en: "Login", vi: "Đăng nhập", pl: "Logowanie" },
+  "Virkur aðgangur": { is: "Virkur aðgangur", en: "Active account", vi: "Tài khoản đang hoạt động", pl: "Aktywne konto" },
+  "hefur ekki fengið boð í appið": { is: "hefur ekki fengið boð í appið", en: "has not been invited to the app", vi: "chưa được mời dùng ứng dụng", pl: "nie otrzymał zaproszenia do aplikacji" },
+  "skráðu netfang til að senda boð": { is: "skráðu netfang til að senda boð", en: "add an email to send an invite", vi: "thêm email để gửi lời mời", pl: "dodaj e-mail, aby wysłać zaproszenie" },
+  "Boð sent": { is: "Boð sent", en: "Invite sent", vi: "Đã gửi lời mời", pl: "Zaproszenie wysłane" },
+  "Boð sent á": { is: "Boð sent á", en: "Invite sent to", vi: "Đã gửi lời mời đến", pl: "Zaproszenie wysłane na" },
+  "Tengt aðgangi sem var til": { is: "Tengt aðgangi sem var til", en: "Linked to an existing account", vi: "Đã liên kết tài khoản có sẵn", pl: "Połączono z istniejącym kontem" },
+  "Senda boð": { is: "Senda boð", en: "Send invite", vi: "Gửi lời mời", pl: "Wyślij zaproszenie" },
   // Mælaborð v2
   "Áætlun VAKTO. Staðgreiðsla, lífeyrir og félagsgjöld eru reiknuð með einföldum föstum hlutföllum; endanlegur launaseðill kemur úr launakerfinu.": { is: "Áætlun VAKTO. Staðgreiðsla, lífeyrir og félagsgjöld eru reiknuð með einföldum föstum hlutföllum; endanlegur launaseðill kemur úr launakerfinu.", en: "VAKTO estimate. Tax, pension and union fees use simple fixed rates; the final payslip comes from the payroll system.", pl: "Szacunek VAKTO. Zaliczka na podatek, składki emerytalne i związkowe są liczone według prostych stałych stawek; ostateczny pasek wynagrodzenia pochodzi z systemu płacowego." }, "Ekkert til að sækja á þessu tímabili": { is: "Ekkert til að sækja á þessu tímabili", en: "Nothing to download for this period", pl: "Brak plików do pobrania w tym okresie" },
   "Senda í Payday": { is: "Senda í Payday", en: "Send to Payday", pl: "Wyślij do Payday" }, "Tímaskrá send í Payday": { is: "Tímaskrá send í Payday", en: "Timesheet sent to Payday", pl: "Ewidencja czasu wysłana do Payday" }, "kennitölu vantar hjá": { is: "kennitölu vantar hjá", en: "missing ID number for", pl: "brak numeru kennitala u" }, "beintengt — samþykktir tímar tímakaupsfólks fara beint inn sem tímaskrá": { is: "beintengt — samþykktir tímar tímakaupsfólks fara beint inn sem tímaskrá", en: "connected — approved hours for hourly staff go straight in as a timesheet", pl: "połączono — zatwierdzone godziny pracowników godzinowych trafiają bezpośrednio jako ewidencja czasu" },

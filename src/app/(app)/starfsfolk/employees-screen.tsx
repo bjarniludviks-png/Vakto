@@ -10,7 +10,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "@/lib/contract-pdf";
-import { updateEmployee, uploadDocument, importEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow } from "./actions";
+import { updateEmployee, uploadDocument, importEmployees, inviteEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField, BankField } from "@/components/app/fields";
@@ -66,6 +66,21 @@ export default function EmployeesScreen({
   const { t } = useLang();
   const [importing, setImporting] = useState(false);
   const [importInfo, setImportInfo] = useState(false);
+  const [inviteAsk, setInviteAsk] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  // Starfsfólk með netfang en engan aðgang (t.d. eftir Excel-innlestur) — fær ekki appið fyrr en boð er sent.
+  const noAccess = live ? employees.filter((e) => !e.hasAccount && e.email && e.status !== "inactive") : [];
+  async function sendInvites() {
+    setInviting(true);
+    const r = await inviteEmployees();
+    setInviting(false); setInviteAsk(false);
+    if (!r.ok) { toast(r.error ?? t("Villa")); return; }
+    const parts = [`${r.sent ?? 0} ${t("boð send")}`];
+    if (r.linked) parts.push(`${r.linked} ${t("tengd aðgangi sem var til")}`);
+    if (r.failed?.length) parts.push(`${r.failed.length} ${t("tókst ekki")}: ${r.failed.slice(0, 3).map((f) => f.name).join(", ")}`);
+    toast(parts.join(" · "));
+    router.refresh();
+  }
   const [search, setSearch] = useState("");
   const [deptF, setDeptF] = useState("all");
   const importRef = useRef<HTMLInputElement>(null);
@@ -176,6 +191,22 @@ export default function EmployeesScreen({
           </button>
         </div>
       </div>
+
+      {noAccess.length > 0 && (
+        <div className="db2-card emp-invite">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2.5" /><path d="M11 18h2" /></svg>
+          <div className="emp-invite-tx">
+            <b>{noAccess.length} {noAccess.length === 1 ? t("starfsmaður hefur ekki aðgang að appinu") : t("starfsmenn hafa ekki aðgang að appinu")}</b>
+            <span>{inviteAsk ? `${t("Boðspóstur fer á")} ${noAccess.length === 1 ? noAccess[0].email : `${noAccess.length} ${t("netföng.")}`} ${t("Hver og einn velur sér lykilorð og fær þá Mitt svæði og appið.")}` : t("Sendu boð svo starfsfólkið geti séð vaktir, stimplað sig og fengið launaseðla í símanum.")}</span>
+          </div>
+          {inviteAsk ? (
+            <span className="emp-invite-b">
+              <button className="btn sm" disabled={inviting} onClick={sendInvites}>{inviting ? t("Sendi…") : t("Já, senda boð")}</button>
+              <button className="btn ghost sm" disabled={inviting} onClick={() => setInviteAsk(false)}>{t("Hætta við")}</button>
+            </span>
+          ) : <button className="btn sm" onClick={() => setInviteAsk(true)}>{t("Senda boð í appið")}</button>}
+        </div>
+      )}
 
       <div className="db2-row4">
         <section className="db2-card db2-tile">
@@ -726,6 +757,7 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
         <WorkFields e={e} />
 
         <Sec>Aðgangur að Mitt svæði</Sec>
+        <AccessLine e={e} />
         <input type="hidden" name="permform" value="1" />
         {(() => { const perms = resolvePerms(e.permissions); return PERM_FIELDS.map((f) => (
           <label className="statline" key={f.key} style={{ cursor: "pointer" }}>
@@ -1111,3 +1143,26 @@ function DocsTab({ employeeId }: { employeeId: string }) {
 
 /** Pay-type + rate pair for the new-employee form — the unit and example
  * follow the chosen type (kr/klst for hourly, kr/mán for monthly). */
+
+/** Er starfsmaðurinn með innskráningu? Ef ekki: senda boð í appið (þarf netfang). */
+function AccessLine({ e }: { e: Employee }) {
+  const { t } = useLang();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
+  if (e.hasAccount) return <div className="statline"><span className="k">{t("Innskráning")}</span><span className="db2-pill good">{t("Virkur aðgangur")}</span></div>;
+  return (
+    <div className="statline">
+      <span className="k">{t("Innskráning")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {e.email ? t("hefur ekki fengið boð í appið") : t("skráðu netfang til að senda boð")}</span></span>
+      {e.email && (done ? <span className="muted">{t("Boð sent")}</span> : (
+        <button type="button" className="btn sm" disabled={busy} onClick={async () => {
+          setBusy(true);
+          const r = await inviteEmployees([e.id]);
+          setBusy(false);
+          if (r.ok && !r.failed?.length) { setDone(true); toast(r.sent ? `${t("Boð sent á")} ${e.email}` : t("Tengt aðgangi sem var til")); router.refresh(); }
+          else toast(r.failed?.[0]?.error ?? r.error ?? t("Villa"));
+        }}>{busy ? t("Sendi…") : t("Senda boð")}</button>
+      ))}
+    </div>
+  );
+}
