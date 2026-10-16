@@ -7,6 +7,7 @@ import { isValidKennitala } from "@/lib/kennitala";
 import { checkPromo, createOwnerAccount, requestSignupCode, startCardSetup, verifySignupCode } from "./actions";
 import { passwordStrength, PASSWORD_MIN } from "@/lib/password";
 import Turnstile, { TURNSTILE_SITE_KEY } from "@/components/turnstile";
+import { trackSignup } from "@/components/site/analytics";
 
 export type SignupLang = "is" | "en" | "pl";
 const L = {
@@ -328,6 +329,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
         const supabase = createClient();
         await supabase.auth.signInWithPassword({ email, password });
       }
+      trackSignup();
       setStep("card");
     } catch {
       setError(s.supa);

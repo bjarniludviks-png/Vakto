@@ -1,10 +1,10 @@
 // Efni síðunnar /vafrakokur — birt í AhLegal (src/components/site/ah-legal.tsx) — (/vafrakokur).
-export const COOKIES_META = { title: "Vafrakökur", updated: "2. október 2026" };
+export const COOKIES_META = { title: "Vafrakökur", updated: "16. október 2026" };
 
 export function CookiesBody() {
   return (
     <>
-      <div className="lg-note">Stutta útgáfan: vakto.is notar <b>engar auglýsingavafrakökur</b>. Á opna vefnum (forsíðu og kynningarsíðum) mælum við notkun með Google Analytics <b>aðeins ef þú leyfir það</b>. Inni í kerfinu sjálfu eru engar greiningarvafrakökur, aðeins það sem þarf til að þú getir skráð þig inn og til að muna stillingarnar þínar.</div>
+      <div className="lg-note">Stutta útgáfan: á opna vefnum (forsíðu og kynningarsíðum) mælum við notkun með Google Analytics og árangur auglýsinga með Meta Pixel <b>aðeins ef þú leyfir það</b>. Inni í kerfinu sjálfu eru engar greiningarvafrakökur, aðeins það sem þarf til að þú getir skráð þig inn og til að muna stillingarnar þínar.</div>
 
       <h2>1. Nauðsynlegar vafrakökur</h2>
       <table>
@@ -31,19 +31,21 @@ export function CookiesBody() {
         </tbody>
       </table>
 
-      <h2>3. Greiningarvafrakökur (aðeins með samþykki)</h2>
-      <p>Á opna vefnum (forsíðu, Um okkur, innskráningu, nýskráningu og þessum síðum) birtist val um að leyfa eða hafna greiningu. Ef þú velur „Leyfa“ notum við Google Analytics 4 til að sjá hvaða síður eru skoðaðar, hvaðan gestir koma og hvernig vefurinn virkar, í samanteknu formi. Ef þú velur „Hafna“ eða velur ekkert eru engar greiningarvafrakökur settar. Google Analytics er aldrei notað inni í kerfinu sjálfu.</p>
+      <h2>3. Greiningar- og auglýsingavafrakökur (aðeins með samþykki)</h2>
+      <p>Á opna vefnum (forsíðu, Um okkur, innskráningu, nýskráningu og þessum síðum) birtist val um að leyfa eða hafna greiningu. Ef þú velur „Leyfa“ notum við Google Analytics 4 til að sjá hvaða síður eru skoðaðar, hvaðan gestir koma og hvernig vefurinn virkar, í samanteknu formi. Við notum einnig Meta Pixel til að mæla hvort auglýsingar okkar á Facebook og Instagram leiða til heimsókna og nýskráninga, og til að birta þær fólki sem líklegt er að hafi áhuga. Ef þú velur „Hafna“ eða velur ekkert eru engar greiningarvafrakökur settar. Hvorugt er nokkurn tímann notað inni í kerfinu sjálfu.</p>
       <table>
         <thead><tr><th>Nafn</th><th>Tilgangur</th><th>Líftími</th></tr></thead>
         <tbody>
           <tr><td>_ga</td><td>Google Analytics: greinir á milli heimsókna (handahófskennt auðkenni)</td><td>2 ár</td></tr>
           <tr><td>_ga_*</td><td>Google Analytics: heldur utan um lotu</td><td>2 ár</td></tr>
+          <tr><td>_fbp</td><td>Meta Pixel: greinir á milli heimsókna til að mæla árangur auglýsinga</td><td>3 mánuðir</td></tr>
+          <tr><td>_fbc</td><td>Meta Pixel: geymir að þú komst inn af auglýsingu (aðeins ef svo er)</td><td>3 mánuðir</td></tr>
         </tbody>
       </table>
       <p>Valið þitt er geymt í vafranum (localStorage: <code>vakto-consent</code>). Þú getur breytt því hvenær sem er með því að eyða geymslu vefsins í stillingum vafrans; þá ertu spurð(ur) aftur.</p>
 
       <h2>4. Aðrir þriðju aðilar</h2>
-      <p>Við notum ekki Meta Pixel, auglýsingarakningu eða sambærilega þjónustu. Innbyggð myndbönd frá öðrum eða ytri efnishlutar eru ekki notaðir. Sé starfsmannaskírteini bætt í Apple Wallet eða Google Wallet gilda skilmálar Apple/Google um það í símanum.</p>
+      <p>Fyrir utan það sem talið er upp í kafla 3 notum við enga auglýsingarakningu. Innbyggð myndbönd frá öðrum eða ytri efnishlutar eru ekki notaðir. Sé starfsmannaskírteini bætt í Apple Wallet eða Google Wallet gilda skilmálar Apple/Google um það í símanum.</p>
 
       <h2>5. Hvernig þú stjórnar þessu</h2>
       <p>Þú getur eytt vafrakökum og geymslu í stillingum vafrans. Sé nauðsynlegum kökum eytt þarftu að skrá þig inn aftur.</p>

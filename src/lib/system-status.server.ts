@@ -98,6 +98,7 @@ export async function getSystemStatus(): Promise<SystemStatus> {
           { name: "Google Wallet", role: "Starfsmannaskírteini", state: has("GOOGLE_WALLET_ISSUER_ID", "GOOGLE_WALLET_SA_EMAIL", "GOOGLE_WALLET_SA_KEY") ? "on" : "off", what: "Starfsmannaskírteini í Google Wallet á Android." },
           { name: "Kort (MapLibre, OpenFreeMap, Nominatim)", role: "Staðsetning við stimplun", state: "na", what: "Kortið í stillingum vinnustaðar og leit að heimilisfangi. Opnar þjónustur, engir lyklar." },
           { name: "Google Analytics", role: "Umferð á vakto.is", state: has("NEXT_PUBLIC_GA_ID") ? "on" : "off", what: "Mælir heimsóknir á markaðssíðuna — ekki inni í kerfinu sjálfu." },
+          { name: "Meta Pixel", role: "Árangur auglýsinga", state: has("NEXT_PUBLIC_META_PIXEL_ID") ? "on" : "off", what: "PageView og nýskráningar (CompleteRegistration) á opna vefnum, aðeins með samþykki gests." },
           { name: "Meta auglýsingar", role: "Auglýsingayfirlit í admin", state: has("META_ACCESS_TOKEN", "META_AD_ACCOUNT_ID") ? "on" : "off", what: "Les lykiltölur herferða fyrir síðuna Auglýsingar. Eingöngu lestur." },
         ],
       },
