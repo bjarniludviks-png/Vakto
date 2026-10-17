@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { nf } from "@/lib/format";
 import { isVaktoAdmin } from "@/lib/vakto-admin.server";
 import { getSystemStatus, type Service } from "@/lib/system-status.server";
+import { TaktikalTest } from "./taktikal-test";
 
 export const dynamic = "force-dynamic";
 
@@ -57,6 +58,7 @@ export default async function AdminSystemPage() {
                   <p>{v.what}</p>
                   {v.note && <p style={{ color: "var(--warn)" }}>{v.note}</p>}
                   {v.link && <a href={v.link.href} target="_blank" rel="noreferrer">{v.link.label}</a>}
+                  {v.name === "Taktikal" && v.state === "on" && <TaktikalTest />}
                 </div>
               ))}
             </div>
