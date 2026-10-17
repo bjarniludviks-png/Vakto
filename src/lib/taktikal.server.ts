@@ -52,6 +52,34 @@ async function flowKey(): Promise<string> {
   return key;
 }
 
+export type TaktikalPing = {
+  ok: boolean; status: number | null; ms: number; base: string;
+  flows: number | null; flowKeyFound: boolean | null; error?: string;
+};
+
+/** Prófar lyklana án kostnaðar: les flæðalistann (engin undirskrift stofnuð). Skilar aldrei lyklunum sjálfum. */
+export async function pingTaktikal(): Promise<TaktikalPing> {
+  const t0 = Date.now();
+  if (!taktikalConfigured()) return { ok: false, status: null, ms: 0, base: BASE, flows: null, flowKeyFound: null, error: "TAKTIKAL_COMPANY_KEY eða TAKTIKAL_API_KEY vantar í þessu umhverfi" };
+  try {
+    const r = await fetch(`${BASE}/api/management/flow`, { headers: { Authorization: auth(), Accept: "application/json" }, cache: "no-store", redirect: "manual" });
+    const ms = Date.now() - t0;
+    if (!r.ok) {
+      const error = r.status === 401 || r.status === 403 || (r.status >= 300 && r.status < 400) ? "Taktikal hafnaði lyklunum" : `Taktikal svaraði ${r.status}`;
+      return { ok: false, status: r.status, ms, base: BASE, flows: null, flowKeyFound: null, error };
+    }
+    const res: unknown = await r.json().catch(() => null);
+    const list = (Array.isArray(res) ? res : ((res as { flows?: unknown[] })?.flows ?? [])) as { key?: string; flowKey?: string }[];
+    const want = process.env.TAKTIKAL_FLOW_KEY;
+    return {
+      ok: true, status: r.status, ms, base: BASE, flows: list.length,
+      flowKeyFound: want ? list.some((f) => (f.flowKey ?? f.key) === want) : null,
+    };
+  } catch (e) {
+    return { ok: false, status: null, ms: Date.now() - t0, base: BASE, flows: null, flowKeyFound: null, error: e instanceof Error ? e.message : "Tenging mistókst" };
+  }
+}
+
 export type TaktikalSigner = { name: string; ssn: string; email: string; phone?: string | null; reason?: string };
 
 /** Íslensk sími: 7 stafir, annars +landsnúmer. Tómt ef ógilt (þá sendir Taktikal ekki SMS). */
