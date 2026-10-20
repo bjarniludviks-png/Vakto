@@ -5,7 +5,8 @@ import { VAKTO_KNOWLEDGE } from "@/lib/ai/vakto-knowledge";
 import { READ_TOOLS, WRITE_TOOLS, WRITE_NAMES, runReadTool, describeWrite, type PendingAction } from "@/lib/ai/assistant-tools";
 import { assistantUser, rateLimited } from "@/lib/ai/assistant-auth";
 import { aiAllowance, bumpAiUsage, demoAiCheck, recordDemoVisitorAi } from "@/lib/ai/ai-plan.server";
-import { modelFor } from "@/lib/ai/models";
+import { modelFor, PLAN_CHAT_EFFORT } from "@/lib/ai/models";
+import { ndjsonStream, NDJSON_HEADERS, completedShiftStrings, partialNumber, partialString, partialStringOpen, type AssistantEvent } from "@/lib/ai/stream";
 
 // VAKTO AI — aðstoðarmaður í horninu (stjórnendur og vaktstjórar).
 // Les gögn með verkfærum; breytingar verða að TILLÖGUM sem notandinn staðfestir með hnappi (sjá ./execute).
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
 Hlutverk þín:
 1. Svara spurningum um reksturinn með tölum úr verkfærunum (laun % af veltu, velta, kostnaður, tímar, frávik, hver er á vakt, vaktaplan, beiðnir, veikindahlutfall með sick_rate — nefndu skilgreininguna stuttlega). Notaðu ALLTAF verkfæri fyrir tölur — aldrei giska eða búa til tölur.
 2. Undirbúa breytingar: setja/breyta/eyða vakt, stofna lausar vaktir (create_open_shifts, t.d. „opnaðu vaktir alla daga næstu viku milli 17 og 23“), afgreiða frí-beiðnir og vaktaskipti, stimpla út, og senda ráðningarsamning aftur til undirritunar (employee_contracts fyrst, svo resend_contract; ef fleiri en einn starfsmaður passar, spurðu hvern; ef samningurinn er þegar undirritaður, segðu það og sendu ekkert). Skrifverkfærin framkvæma EKKERT — þau búa til tillögu sem notandinn staðfestir með „Staðfesta"-hnappi undir svarinu þínu. Segðu því aldrei að breyting sé búin; segðu að tillagan bíði staðfestingar. Skoðaðu fyrst stöðuna (t.d. shifts eða pending_requests) svo nöfn og id séu rétt.
-3. Setja upp heila viku: þegar beðið er um vaktaplan fyrir viku („settu upp næstu viku“, „allir vinni 36 tíma og fái einn frídag“), kallaðu fyrst á week_planning_context og síðan á plan_week með ÖLLUM vöktum vikunnar í einni tillögu. Virtu óframboð og samþykkt frí (settu aldrei vakt á þá daga), ein vakt per starfsmann per dag, minnst 11 klst hvíld milli vakta, notaðu tíma úr vaktategundum fyrirtækisins þegar þær passa, haltu þig við mönnunarþörf og launamarkmið ef þau eru gefin, og dreifðu helgum sanngjarnt. Fastlaunafólk fær vaktir eins og aðrir. Skilyrði notandans eru reglur, ekki óskir: „allir fá tvo frídaga“ = hver starfsmaður í planinu fær nákvæmlega 5 vaktir (7 − 2); „alltaf þrír á vakt“ = nákvæmlega 3 vaktir á hverjum degi vikunnar. Teldu áður en þú leggur til og athugaðu að talan gangi upp. Ef beðið er um eina deild („í eldhúsinu“): notaðu aðeins starfsfólk þeirrar deildar (dept í staff, sjá departments) og settu department í plan_week — þá haldast vaktir annarra deilda. Ef skilyrðin ganga ekki upp (t.d. of fáir í deildinni, óframboð eða frí), segðu nákvæmlega hvað vantar og hvað þú gerðir í staðinn. Ef ósk notandans stangast á við óframboð eða frí, segðu frá því í svarinu í stað þess að brjóta á því. Lýstu planinu í 3–6 punktum (tímar per mann, frídagar, áætlaður kostnaður og laun % ef veltuspá er til) — ekki telja upp hverja vakt.
+3. Setja upp heila viku: þegar beðið er um vaktaplan fyrir viku („settu upp næstu viku“, „allir vinni 36 tíma og fái einn frídag“), kallaðu fyrst á week_planning_context (nema það fylgi þegar spurningunni) og síðan á plan_week með ÖLLUM vöktum vikunnar í einni tillögu. Virtu óframboð og samþykkt frí (settu aldrei vakt á þá daga), ein vakt per starfsmann per dag, minnst 11 klst hvíld milli vakta, notaðu tíma úr vaktategundum fyrirtækisins þegar þær passa, haltu þig við mönnunarþörf og launamarkmið ef þau eru gefin, og dreifðu helgum sanngjarnt. Fastlaunafólk fær vaktir eins og aðrir. Skilyrði notandans eru reglur, ekki óskir: „allir fá tvo frídaga“ = hver starfsmaður í planinu fær nákvæmlega 5 vaktir (7 − 2); „alltaf þrír á vakt“ = nákvæmlega 3 vaktir á hverjum degi vikunnar. Teldu áður en þú leggur til og athugaðu að talan gangi upp. Ef beðið er um eina deild („í eldhúsinu“): notaðu aðeins starfsfólk þeirrar deildar (dept í staff, sjá departments) og settu department í plan_week — þá haldast vaktir annarra deilda. Ef skilyrðin ganga ekki upp (t.d. of fáir í deildinni, óframboð eða frí), segðu nákvæmlega hvað vantar og hvað þú gerðir í staðinn. Ef ósk notandans stangast á við óframboð eða frí, segðu frá því í svarinu í stað þess að brjóta á því. Lýstu planinu í notes-sviði plan_week (á eftir shifts) í 3–6 punktum (tímar per mann, frídagar, áætlaður kostnaður og laun % ef veltuspá er til, og hvað gekk ekki upp) — ekki telja upp hverja vakt. notes er svarið sem notandinn sér; skrifaðu ekkert meira eftir að tillagan er skráð.
 4. Bera saman og greina: notaðu compare_periods þegar spurt er um breytingu milli tímabila („miðað við síðasta mánuð“, „sama tíma í fyrra“, „hvers vegna hækkaði launakostnaðurinn“), labor_trend fyrir þróun yfir marga mánuði eða vikur, og payroll_runs fyrir raunveruleg útborguð laun úr launakeyrslum. Gerðu skýran greinarmun: launakostnaður í labor_summary/compare_periods er reiknaður út frá stimpluðum tímum (sama og mælaborðið), en payroll_runs eru keyrð laun. Þegar þú berð saman: nefndu bæði tímabilin með dagsetningum, gefðu breytinguna í kr og %, og bentu á 2–3 helstu ástæður (t.d. fleiri tímar, yfirvinna, álag, ákveðnir starfsmenn eða deildir, minni velta). Ef veltu vantar á öðru tímabilinu, segðu það í stað þess að bera saman laun %.
 Vaktarar og skýrslur: þegar notandinn vill láta vita af einhverju sjálfkrafa („láttu mig vita ef einhver fer yfir 180 tíma í mánuðinum“, „minntu mig ef laun % fer yfir 32 %“) notaðu create_alert; fyrir skýrslur á tímaáætlun („sendu mér yfirvinnuskýrslu alla mánudaga“) schedule_report; fyrir skýrslu strax í tölvupósti („sendu mér mætingarskýrslu síðasta mánaðar“) send_report_now með nákvæmum dagsetningum. Til að slökkva á eða eyða vaktara: list_alerts fyrst, svo toggle_alert eða delete_alert. Vaktarar eru metnir einu sinni á dag kl. 8 og skýrslur fara kl. 8 að morgni; ef beðið er um annan tíma, segðu að þær fari kl. 8. Tilkynningar fara á notandann sem biður um þær. Ef „einhver“ fer yfir tímamörk og ekki er tekið fram hvort planaðar vaktir eigi að teljast, settu includePlanned true og nefndu það.
 5. Svara „hvernig geri ég…“ spurningum út frá upplýsingunum hér að neðan. Ef þú veist ekki svarið, vísaðu á hallo@vakto.is.
@@ -75,18 +76,70 @@ ${VAKTO_KNOWLEDGE}`;
     { type: "text", text: context },
   ];
 
-  // Svarið getur tekið yfir mínútu (heil vika af vöktum). Til að tengingin slitni ekki sendum við
-  // bil á nokkurra sekúndna fresti og JSON-svarið í lokin — JSON.parse hunsar bilin á undan.
-  const run = async (): Promise<Record<string, unknown>> => {
-  const client = new Anthropic();
+  // Svarið er streymt sem NDJSON (lib/ai/stream.ts): stig („Les vaktaplan…“), texti orð fyrir orð,
+  // vaktir plan_week jafnóðum og þær eru skrifaðar, tillögur um leið og þær eru tilbúnar og loks
+  // „done“ með sama innihaldi og JSON-svarið var áður. Ping á 5 sek. fresti heldur tengingunni opinni.
+  const question = history[history.length - 1].content as string;
+  const planning = isPlanningRequest(question);
+  const run = async (send: (ev: AssistantEvent) => void): Promise<Record<string, unknown>> => {
+    const client = new Anthropic();
     const all = [...READ_TOOLS, ...WRITE_TOOLS];
     const tools: Anthropic.Tool[] = all.map((t, i) => (i === all.length - 1 ? { ...t, cache_control: { type: "ephemeral" } } : t));
     const actions: PendingAction[] = [];
     const msgs: Anthropic.MessageParam[] = [...history];
     let reply = "";
     try {
+      // Vaktaplansbeiðni: samhengi vikunnar sótt strax og sett með spurningunni — sparar heila umferð
+      // (líkanið kallaði alltaf fyrst á week_planning_context). Vilji það aðra viku kallar það sjálft.
+      if (planning) {
+        send({ t: "stage", stage: "read", tool: "week_planning_context" });
+        const monday = planningMonday(question, now);
+        const ctx = await runReadTool("week_planning_context", { monday });
+        msgs[msgs.length - 1] = { role: "user", content: [
+          { type: "text", text: question },
+          { type: "text", text: `[Kerfið sótti week_planning_context fyrir vikuna sem hefst ${monday} — ekki kalla á það aftur fyrir þá viku.]\n${ctx}` },
+        ] };
+      }
+      let jsonRetries = 0;
       for (let step = 0; step < MAX_STEPS; step++) {
-        const res = await client.messages.create({ model, max_tokens: 12000, system, tools, messages: msgs });
+        send({ t: "stage", stage: actions.length ? "summary" : "think" });
+        if (step > 0) send({ t: "turn" });
+        const stream = client.messages.stream({ model, max_tokens: 16000, system, tools, messages: msgs, ...(planning ? { output_config: { effort: actions.length ? "low" : PLAN_CHAT_EFFORT } } : {}) });
+        const blocks = new Map<number, { name: string; json: string; sent: number; notes: number }>();
+        let res: Anthropic.Message;
+        try {
+          for await (const ev of stream) {
+            if (ev.type === "content_block_start" && ev.content_block.type === "tool_use") {
+              const name = ev.content_block.name;
+              blocks.set(ev.index, { name, json: "", sent: 0, notes: 0 });
+              send({ t: "stage", stage: name === "plan_week" ? "plan" : WRITE_NAMES.has(name) ? "write" : "read", tool: name });
+            } else if (ev.type === "content_block_delta") {
+              if (ev.delta.type === "text_delta") send({ t: "text", d: ev.delta.text });
+              else if (ev.delta.type === "input_json_delta") {
+                const b = blocks.get(ev.index);
+                if (b?.name === "plan_week") {
+                  b.json += ev.delta.partial_json;
+                  const done = completedShiftStrings(b.json);
+                  if (done.length > b.sent) {
+                    send({ t: "plan", add: done.slice(b.sent), total: partialNumber(b.json, "shiftCount"), dept: partialString(b.json, "department") });
+                    b.sent = done.length;
+                  }
+                  // notes (svarið til notandans) kemur á eftir vöktunum — streymt sem texti.
+                  const notes = partialStringOpen(b.json, "notes");
+                  if (notes && notes.length > b.notes) { send({ t: "text", d: notes.slice(b.notes) }); b.notes = notes.length; }
+                }
+              }
+            }
+          }
+          res = await stream.finalMessage();
+        } catch (e) {
+          // plan_week streymir inntakinu óbuffrað: ef JSON-ið er ógilt reynum við umferðina einu sinni enn.
+          if (e instanceof Anthropic.APIError || jsonRetries++ >= 1) throw e;
+          console.error("[assistant] ógilt tool-inntak, reyni aftur", e instanceof Error ? e.message : e);
+          send({ t: "turn" });
+          step--;
+          continue;
+        }
         const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
         if (res.stop_reason !== "tool_use") { reply = text; break; }
         msgs.push({ role: "assistant", content: res.content });
@@ -96,7 +149,11 @@ ${VAKTO_KNOWLEDGE}`;
           const input = (b.input ?? {}) as Record<string, unknown>;
           if (WRITE_NAMES.has(b.name)) {
             const d = describeWrite(b.name, input, lang);
-            if (d.ok && actions.length < 12) actions.push({ tool: b.name, input, summary: d.summary });
+            if (d.ok && actions.length < 12) {
+              const action = { tool: b.name, input, summary: d.summary };
+              actions.push(action);
+              send({ t: "action", action });
+            }
             results.push({ type: "tool_result", tool_use_id: b.id, is_error: !d.ok, content: d.ok ? `Tillaga skráð og bíður staðfestingar notandans (EKKI framkvæmt): ${d.summary}` : d.error });
           } else {
             results.push({ type: "tool_result", tool_use_id: b.id, content: await runReadTool(b.name, input) });
@@ -104,6 +161,14 @@ ${VAKTO_KNOWLEDGE}`;
         }
         msgs.push({ role: "user", content: results });
         reply = text;
+        // plan_week skilaði svarinu sjálft (notes) og allar tillögur umferðarinnar stóðust: þá þarf ekki
+        // aðra umferð bara til að lýsa planinu (sparar 5–8 sek.).
+        const uses = res.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
+        const planNotes = uses.map((b) => (b.name === "plan_week" ? String((b.input as Record<string, unknown>)?.notes ?? "").trim() : "")).find(Boolean);
+        if (planNotes && uses.every((b) => WRITE_NAMES.has(b.name)) && !results.some((r) => r.is_error)) {
+          reply = [text, planNotes].filter(Boolean).join("\n\n");
+          break;
+        }
       }
     } catch (e) {
       console.error("[assistant]", e instanceof Error ? e.message : e);
@@ -115,7 +180,6 @@ ${VAKTO_KNOWLEDGE}`;
     let messageId: string | null = null;
     let conversationId: string | null = /^[0-9a-f-]{36}$/i.test(body.conversationId ?? "") ? body.conversationId! : null;
     try {
-      const question = history[history.length - 1].content as string;
       if (conversationId) {
         const { data } = await supabase.from("ai_conversations").update({ updated_at: new Date().toISOString() }).eq("id", conversationId).select("id").maybeSingle();
         if (!data) conversationId = null;
@@ -135,16 +199,26 @@ ${VAKTO_KNOWLEDGE}`;
     } catch (e) { console.error("[assistant] save", e instanceof Error ? e.message : e); }
     return { ok: true, reply: reply || (actions.length ? "" : "…"), actions, conversationId, messageId, ...(demo ? { demo: { left: Math.max(0, demo.remaining - 1), of: demo.perVisitor } } : {}) };
   };
-  const enc = new TextEncoder();
-  const stream = new ReadableStream<Uint8Array>({
-    async start(ctrl) {
-      const beat = setInterval(() => { try { ctrl.enqueue(enc.encode(" ")); } catch { /* lokað */ } }, 5000);
-      let out: Record<string, unknown>;
-      try { out = await run(); } catch (e) { console.error("[assistant]", e instanceof Error ? e.message : e); out = { ok: false, error: "VAKTO AI gat ekki svarað núna. Reyndu aftur." }; }
-      clearInterval(beat);
-      ctrl.enqueue(enc.encode(JSON.stringify(out)));
-      ctrl.close();
-    },
+  const stream = ndjsonStream<AssistantEvent>(async (send) => {
+    let out: Record<string, unknown>;
+    try { out = await run(send); } catch (e) { console.error("[assistant]", e instanceof Error ? e.message : e); out = { ok: false, error: "VAKTO AI gat ekki svarað núna. Reyndu aftur." }; }
+    send({ ...out, t: "done", ok: out.ok === true });
   });
-  return new Response(stream, { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Accel-Buffering": "no" } });
+  return new Response(stream, { headers: NDJSON_HEADERS });
+}
+
+/** Er þetta beiðni um vaktaplan fyrir viku? Þá er samhengi vikunnar sótt strax (sparar eina umferð). */
+function isPlanningRequest(q: string): boolean {
+  const s = q.toLowerCase();
+  const plan = /(vaktaplan|vaktir|vöktum|vakt\b|plan\b|planið|settu upp|setja upp|raðaðu|schedule|rota|shifts|grafik|zmian|lịch|ca làm)/.test(s);
+  const week = /(vik[uae]|week|tydzie|tygod|tuần)/.test(s);
+  return plan && week;
+}
+
+/** Mánudagur vikunnar sem beðið er um: „þessa viku“ → núverandi vika, annars næsta vika (algengast). */
+function planningMonday(q: string, now: Date): string {
+  const thisWeek = /(þessa viku|þessari viku|this week|ten tydzień|tym tygodniu|tuần này)/.test(q.toLowerCase());
+  const dow = (now.getDay() + 6) % 7; // 0 = mánudagur
+  const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - dow + (thisWeek ? 0 : 7));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }

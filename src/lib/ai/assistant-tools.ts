@@ -142,14 +142,18 @@ export const WRITE_TOOLS: Anthropic.Tool[] = [
         monday: { type: "string", description: "Mánudagur vikunnar, YYYY-MM-DD" },
         department: { type: "string", description: "Valfrjálst: ef aðeins ein deild er skipulögð (t.d. „Eldhús“). Þá koma shifts aðeins fyrir starfsfólk þeirrar deildar og vaktir annarra deilda vikunnar haldast óbreyttar." },
         label: { type: "string", description: "Ein setning sem lýsir planinu, t.d. „Allir 35–38 klst., einn frídagur hver, helgar mannaðar 4“" },
+        shiftCount: { type: "integer", description: "Fjöldi vakta í shifts. Skrifaðu hann Á UNDAN shifts (notað til að sýna framvindu)." },
         shifts: {
           type: "array",
           description: "Ein vakt per streng á forminu \"Fornafn|YYYY-MM-DD|HH:MM|HH:MM\" (byrjun|endir), valfrjálst fimmta svið er heiti vaktategundar. Dæmi: \"Anna|2026-10-19|09:00|17:00|Dagvakt\".",
           items: { type: "string" },
         },
+        notes: { type: "string", description: "Svarið til notandans, skrifað Á EFTIR shifts: 3–6 punktar („- …“) um planið — tímar per mann, frídagar, mönnun, áætlaður kostnaður og laun % ef veltuspá er til, og hvað gekk ekki upp og hvers vegna. Ekki telja upp hverja vakt." },
       },
-      required: ["monday", "label", "shifts"],
+      required: ["monday", "label", "shifts", "notes"],
     },
+    // Vaktirnar streymast jafnóðum (framvinda í spjallinu); inntakið er sannreynt í parseWeekPlan áður en nokkuð er gert.
+    eager_input_streaming: true,
   },
   {
     name: "create_open_shifts",
@@ -313,7 +317,7 @@ export async function runReadTool(name: string, input: In): Promise<string> {
         const { series: _s, ...rest } = d; void _s;
         return JSON.stringify(rest);
       }
-      if (name === "staff_hours") return JSON.stringify((await fetchAttendance(from, to)).rows.map(({ c: _c, av: _a, ...r }) => r));
+      if (name === "staff_hours") return JSON.stringify((await fetchAttendance(from, to)).rows.map(({ c, av, ...r }) => { void c; void av; return r; }));
       const res = await getShiftsInRange(from, to);
       return JSON.stringify(res.rows.slice(0, 400));
     }
@@ -335,21 +339,28 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       const seen = new Map<string, number>(); for (const e of staff) seen.set(first(e.fullName), (seen.get(first(e.fullName)) ?? 0) + 1);
       const unavail: Record<string, string[]> = {};
       for (const [k, days] of Object.entries((wk as { unavail?: Record<string, number[]> }).unavail ?? {})) unavail[k] = days.map((d) => dates[d]).filter(Boolean);
-      return JSON.stringify({
-        week: { monday: dates[0], sunday: dates[6], dates },
-        staff: staff.map((e) => ({ name: first(e.fullName), fullName: e.fullName, dept: e.department, pay: e.payType === "monthly" ? "föst laun" : "tímakaup", ratioPct: e.employmentRatio, ...(seen.get(first(e.fullName))! > 1 ? { warning: "Fleiri en einn með þetta fornafn — notaðu fullt nafn í employee" } : {}) })),
+      // Þjappað form (pípu-strengir, tómum sviðum sleppt): helmingi færri tákn en hlutir — styttir lestur líkansins.
+      const approvedLeave = ((leave.data ?? []) as unknown as { from_date: string; to_date: string; type: string; employees: { full_name?: string } | { full_name?: string }[] | null }[]).map((l) => `${first((Array.isArray(l.employees) ? l.employees[0] : l.employees)?.full_name ?? "")}|${l.from_date}|${l.to_date}|${l.type}`);
+      const pendingLeave = (reqs?.pendingLeave ?? []).map((l) => `${l.name}|${l.days.map((d) => dates[d]).join(",")}|${l.type}`);
+      const preferredDays = (reqs?.preferred ?? []).map((p) => `${p.name}|${p.days.map((d) => dates[d]).join(",")}`);
+      const out: Record<string, unknown> = {
+        format: "staff: nafn|deild|laun|starfshlutfall. currentShifts: nafn|dags|byrjun|endir|tegund. approvedLeave: nafn|frá|til|tegund (ALDREI vakt þá daga). pendingLeave/preferredDays: nafn|dagar(|tegund).",
+        week: dates,
+        staff: staff.map((e) => [first(e.fullName), e.department || "-", e.payType === "monthly" ? "föst laun" : "tímakaup", `${e.employmentRatio}%`].join("|") + (seen.get(first(e.fullName))! > 1 ? `|SAMA FORNAFN — notaðu fullt nafn: ${e.fullName}` : "")),
         departments: [...new Set(staff.map((e) => e.department).filter(Boolean))],
-        currentShifts: shifts.rows.filter((r) => r.name !== "?").map((r) => ({ employee: r.first, dept: r.dept || null, date: r.date, start: r.start, end: r.end, type: r.type ?? null })),
-        unavailable: unavail,
-        // Mjúkar óskir: forðast frí í bið og óframboð, virða framboð/vaktaskipti ef hægt er; nefna í svarinu hvað var virt.
-        pendingLeave: (reqs?.pendingLeave ?? []).map((l) => ({ employee: l.name, dates: l.days.map((d) => dates[d]), type: l.type })),
-        preferredDays: (reqs?.preferred ?? []).map((p) => ({ employee: p.name, dates: p.days.map((d) => dates[d]) })),
-        pendingSwaps: reqs?.pendingSwaps ?? [],
-        approvedLeave: ((leave.data ?? []) as unknown as { from_date: string; to_date: string; type: string; employees: { full_name?: string } | { full_name?: string }[] | null }[]).map((l) => ({ employee: first((Array.isArray(l.employees) ? l.employees[0] : l.employees)?.full_name ?? ""), from: l.from_date, to: l.to_date, type: l.type })),
-        shiftTypes: (types.data ?? []).map((t) => ({ name: t.name, start: String(t.start_time ?? "").slice(0, 5), end: String(t.end_time ?? "").slice(0, 5), premiumPct: t.premium_pct })),
-        staffingTargetsMonToSun: (co.data?.staffing_targets as number[] | null) ?? null,
-        budget: budget ? { revenueForecast: budget.revenue, revenueSource: budget.revenueSource, laborTargetPct: budget.target, fixedSalaryCostKr: budget.fixed, avgCostPerHourKr: Math.round(budget.avgRate) } : null,
-      });
+        currentShifts: shifts.rows.filter((r) => r.name !== "?").map((r) => [r.first, r.date, r.start, r.end, r.type ?? ""].join("|")),
+        shiftTypes: (types.data ?? []).map((t) => `${t.name} ${String(t.start_time ?? "").slice(0, 5)}–${String(t.end_time ?? "").slice(0, 5)}${t.premium_pct ? ` +${t.premium_pct}%` : ""}`),
+      };
+      if (Object.keys(unavail).length) out.unavailable = unavail;
+      if (approvedLeave.length) out.approvedLeave = approvedLeave;
+      // Mjúkar óskir: forðast frí í bið og óframboð, virða framboð/vaktaskipti ef hægt er; nefna í svarinu hvað var virt.
+      if (pendingLeave.length) out.pendingLeave = pendingLeave;
+      if (preferredDays.length) out.preferredDays = preferredDays;
+      if (reqs?.pendingSwaps?.length) out.pendingSwaps = reqs.pendingSwaps;
+      const targets = (co.data?.staffing_targets as number[] | null) ?? null;
+      if (targets) out.staffingTargetsMonToSun = targets;
+      if (budget) out.budget = { revenueForecast: budget.revenue, revenueSource: budget.revenueSource, laborTargetPct: budget.target, fixedSalaryCostKr: budget.fixed, avgCostPerHourKr: Math.round(budget.avgRate) };
+      return JSON.stringify(out);
     }
     if (name === "compare_periods" || name === "labor_trend" || name === "payroll_runs") {
       if (!okDate(input.from) || !okDate(input.to)) return JSON.stringify({ error: "from/to verða að vera YYYY-MM-DD" });

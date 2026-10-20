@@ -1279,6 +1279,18 @@ a.db2-who:hover span{color:var(--brand)}
 .vai-ok{font-size:12.5px;font-weight:600;color:var(--good)}
 .vai-muted{font-size:12.5px;color:var(--ink3)}
 .vai-act.done,.vai-act.cancelled{opacity:.75}
+/* Vaktaplans-tillaga: vikuyfirlit sem fyllist jafnóðum á meðan VAKTO AI skrifar vaktirnar */
+.vai-plan{display:flex;flex-direction:column;gap:8px;width:100%;max-width:94%;padding:10px 11px;border-radius:14px;background:var(--panel);box-shadow:0 0 0 1px var(--line);font-size:12.5px;color:var(--ink)}
+.vai-plan.live{box-shadow:0 0 0 1.5px color-mix(in srgb,var(--brand) 45%,transparent)}
+.vai-plan-h{display:flex;align-items:center;gap:8px}.vai-plan-h .vai-dots{color:var(--brand)}.vai-plan-h .vai-muted{margin-left:auto;font-size:12px}
+.vai-plan-bar{height:4px;border-radius:4px;background:var(--line2);overflow:hidden}
+.vai-plan-bar i{display:block;height:100%;background:var(--brand);border-radius:4px;transition:width .25s ease}
+.vai-plan-g{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.vai-plan-d{display:flex;flex-direction:column;gap:3px;min-width:0}
+.vai-plan-d small{display:flex;justify-content:space-between;font-size:10.5px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.02em;padding:0 2px}
+.vai-plan-d small em{font-style:normal;color:var(--brand)}
+.vai-plan-d span{font-size:11px;line-height:1.25;padding:3px 4px;border-radius:6px;background:var(--brand-soft);color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:vai-pop .25s ease}
+@keyframes vai-pop{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 .vai-all{align-self:flex-start}
 .vai-in{display:flex;gap:8px;align-items:flex-end;padding:10px 12px 8px;border-top:1px solid var(--line2)}
 .vai-in textarea{flex:1;resize:none;max-height:120px;font:inherit;font-size:14px;line-height:1.45;padding:10px 12px;border-radius:14px;border:1px solid var(--line);background:var(--bg,var(--panel));color:var(--ink);outline:none}
@@ -1632,3 +1644,12 @@ select:not([multiple]):not([size]){-webkit-appearance:none;appearance:none;backg
 .sr-bar em{font-style:normal;font-size:10.5px;font-weight:650;color:var(--ink2);font-variant-numeric:tabular-nums}
 .sr-head{flex-wrap:wrap;gap:10px}
 @media(max-width:760px){.sr-head .db2-seg{width:100%;overflow-x:auto}.sr-head .db2-seg button{flex:1;white-space:nowrap}.wo-tiles{grid-template-columns:1fr 1fr}.sr-bars{gap:3px}.sr-bar small{font-size:9.5px}}
+/* „Biðja AI“ á Vaktaplani: framvinda (les → hugsar → skrifar) á meðan tillagan er smíðuð */
+.ai-steps{display:flex;flex-direction:column;gap:8px;padding:6px 4px 2px}
+.ai-step{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--ink3)}
+.ai-step.on{color:var(--ink);font-weight:600}.ai-step.done{color:var(--ink2,var(--ink3))}
+.ai-step-ic{width:22px;height:22px;flex:none;display:grid;place-items:center;border-radius:50%;box-shadow:0 0 0 1px var(--line)}
+.ai-step.on .ai-step-ic{box-shadow:0 0 0 1.5px var(--brand);color:var(--brand)}
+.ai-step.done .ai-step-ic{background:var(--brand-soft);color:var(--brand);box-shadow:none}
+.ai-step-ic svg{width:13px;height:13px;stroke-width:2.4}
+.ai-step-ic .vai-dots i{width:3.5px;height:3.5px}
