@@ -1,4 +1,5 @@
 import "server-only";
+import { createClient as createSupabase } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { demoCompanyId } from "@/lib/demo.server";
 import { PUBLIC_DEMO, PUBLIC_DEMO_NOTE, DEMO_EMAIL_DOMAIN, ensureDemoBase, seedDemoData, seedDemoRequests } from "@/lib/demo-seed";
@@ -11,7 +12,8 @@ import { PUBLIC_DEMO, PUBLIC_DEMO_NOTE, DEMO_EMAIL_DOMAIN, ensureDemoBase, seedD
 //    sniðmát, API-lyklar, tengingar, aðgerðaskrá, spjall/fréttir, push-áskriftir, AI-notkun.
 // 4. Starfsfólk: aukafólk eytt, upprunalega fólkið virkt með sín gildi; aukastaðir/-deildir/-stöður út.
 // 5. Allar vaktir/stimplanir/velta þurrkaðar og sáð upp á nýtt (demo-seed.ts) + nokkrar beiðnir.
-// 6. Netfang + lykilorð demo-eigandans sett aftur á DEMO_LOGIN_EMAIL / DEMO_LOGIN_PASSWORD.
+// 6. Netfang + lykilorð demo-eigandans lagað EF innskráning með DEMO_LOGIN_* bregst (lykilorðsbreyting
+//    hjá Supabase ógildir allar lotur — þ.e. alla gesti sem eru inni — svo aldrei að óþörfu).
 //
 // Takmarkanir: skrár sem gestir hlóðu beint í Storage (framhjá server actions) eru ekki hreinsaðar;
 // breytingar á auth-lýsigögnum annarra demo-notenda en eigandans eru ekki endurstilltar.
@@ -45,7 +47,7 @@ export async function resetDemoCompany(): Promise<DemoResetResult> {
   warn("companies", coErr);
   // Stillingar sem gestir geta breytt (dálkar úr síðari migrations — sér uppfærsla svo ein vöntun felli ekki hinar).
   warn("companies extras", (await db.from("companies").update({
-    billing_interval: "month", ai_addon_since: null, contract_terms: null, email: null, phone: null, kennitala: null,
+    billing_interval: "month", ai_addon_since: null, contract_terms: null,
     leave_cap: null, pay_defaults: null, pay_period_start: 1, staffing_targets: null, weekday_revenue_learned: false,
   }).eq("id", C)).error);
   warn("companies esign", (await db.from("companies").update({ esign_provider: "vakto" }).eq("id", C)).error);
@@ -103,11 +105,26 @@ export async function resetDemoCompany(): Promise<DemoResetResult> {
   const email = process.env.DEMO_LOGIN_EMAIL, password = process.env.DEMO_LOGIN_PASSWORD;
   const owner = owners?.find((o) => (o.email as string | null)?.toLowerCase() === email?.toLowerCase());
   if (owner && email && password) {
-    const { error } = await db.auth.admin.updateUserById(owner.id as string, { email, password, email_confirm: true, user_metadata: { full_name: "Demo Stjórnandi", role: "owner", company_id: C } });
-    warn("owner auth", error);
+    if (!(await demoLoginWorks(email, password))) {
+      const { error } = await db.auth.admin.updateUserById(owner.id as string, { email, password, email_confirm: true, user_metadata: { full_name: "Demo Stjórnandi", role: "owner", company_id: C } });
+      warn("owner auth", error);
+    }
     warn("owner profile", (await db.from("users").update({ full_name: "Demo Stjórnandi", role: "owner", company_id: C }).eq("id", owner.id as string)).error);
   } else if (email) warnings.push("demo-eigandi með DEMO_LOGIN_EMAIL fannst ekki í fyrirtækinu");
 
   if (warnings.length) console.warn("[demo-reset]", warnings.join(" | "));
   return { ok: true, seeded, removedEmployees: extra.length, warnings };
+}
+
+/** Virkar demo-innskráningin óbreytt? (Prufulotunni er strax lokað — aðeins henni.) */
+async function demoLoginWorks(email: string, password: string): Promise<boolean> {
+  try {
+    const anon = createSupabase(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
+    const { error } = await anon.auth.signInWithPassword({ email, password });
+    if (error) return false;
+    await anon.auth.signOut({ scope: "local" });
+    return true;
+  } catch {
+    return false;
+  }
 }

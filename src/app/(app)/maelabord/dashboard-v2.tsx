@@ -31,6 +31,13 @@ function presetRange(k: string): { from: string; to: string } {
   const mon = new Date(t); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
   return { from: isoD(mon), to: isoD(t) };
 }
+/** Ein endurtilraun: kaldræsing eða tímabundin villa (t.d. útrunninn aðgangslykill endurnýjaður í
+ *  samhliða köllum) má ekki skilja mælaborðið eftir autt með „—“ þar til síðan er endurhlaðin. */
+async function retryOnce<T extends { ok: boolean }>(f: () => Promise<T>): Promise<T> {
+  try { const r = await f(); if (r.ok) return r; } catch { /* reynum aftur */ }
+  await new Promise((res) => setTimeout(res, 1500));
+  return f();
+}
 const SEGS: { k: string; label: string }[] = [{ k: "idag", label: "Í dag" }, { k: "vika", label: "Vika" }, { k: "30d", label: "30 dagar" }];
 const COLOR = { good: "var(--good)", warn: "var(--warn)", bad: "var(--bad)" } as const;
 const durSince = (iso: string, now: number, t: (s: string) => string = (x) => x) => { const m = Math.max(0, Math.floor((now - new Date(iso).getTime()) / 60000)); return m >= 60 ? `${Math.floor(m / 60)} ${t("klst")} ${m % 60} ${t("mín")}` : `${m} ${t("mín")}`; };
@@ -108,13 +115,13 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
     let from: string, to: string;
     if (period === "custom") { if (!customFrom || !customTo) return; from = customFrom; to = customTo; } else ({ from, to } = presetRange(period));
     let stop = false;
-    getDashboardPeriod(from, to).then((r) => { if (!stop && r.ok) setPd(r); });
+    retryOnce(() => getDashboardPeriod(from, to)).then((r) => { if (!stop && r.ok) setPd(r); }, () => {});
     return () => { stop = true; };
   }, [period, customFrom, customTo]);
   useEffect(() => {
     const { from, to } = presetRange("7d");
-    getDashboardPeriod(from, to).then((r) => { if (r.ok) setWeek(r.series); });
-    getLaborTrend(8).then((r) => { if (r.ok) setTrend(r); });
+    retryOnce(() => getDashboardPeriod(from, to)).then((r) => { if (r.ok) setWeek(r.series); }, () => {});
+    retryOnce(() => getLaborTrend(8)).then((r) => { if (r.ok) setTrend(r); }, () => {});
   }, []);
 
   const lp = pd?.laborPct ?? null;

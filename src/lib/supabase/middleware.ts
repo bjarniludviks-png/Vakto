@@ -46,8 +46,12 @@ export async function updateSession(request: NextRequest) {
 
   // Opið demo: nýskráning keyrir aldrei innan sameiginlegu demo-lotunnar (póstur er
   // stöðvaður fyrir demo-notandann). Aðeins þessi lota er skráð út (scope local).
+  // AÐEINS raunveruleg síðuopnun: <Link href="/nyskraning"> á innskráningar- og forsíðu er forsótt (RSC-prefetch)
+  // strax eftir „Prófa demo" — þá var nýja lotan skráð út og mælaborðið kom autt („—").
   const demoEmail = process.env.DEMO_LOGIN_EMAIL?.toLowerCase();
-  if (user && demoEmail && pathname.startsWith("/nyskraning") && user.email?.toLowerCase() === demoEmail) {
+  const isDocumentNav = request.method === "GET" && !request.headers.has("rsc") && !request.headers.has("next-router-prefetch")
+    && (request.headers.get("sec-fetch-dest") ?? "document") === "document";
+  if (user && demoEmail && isDocumentNav && pathname.startsWith("/nyskraning") && user.email?.toLowerCase() === demoEmail) {
     await supabase.auth.signOut({ scope: "local" });
   }
 

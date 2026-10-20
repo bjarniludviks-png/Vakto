@@ -37,14 +37,17 @@ export async function demoLogin(): Promise<{ ok: boolean; next?: string; error?:
     const supabase = await createClient();
     let { data, error } = await supabase.auth.signInWithPassword({ email, password });
     // Gestur gæti hafa breytt lykilorði/netfangi demo-aðgangsins beint gegnum Supabase → laga og reyna aftur.
-    if (error && (await healDemoOwner(demoCompanyId()!, email, password))) {
+    // AÐEINS við rangt lykilorð: lykilorðsbreyting ógildir lotur allra gesta sem eru inni.
+    if (error?.code === "invalid_credentials" && (await healDemoOwner(demoCompanyId()!, email, password))) {
       ({ data, error } = await supabase.auth.signInWithPassword({ email, password }));
     }
-    if (error || !data.user) return fail;
+    if (error || !data.user || !data.session) return fail;
     // Öryggisnet: aðgangurinn VERÐUR að vera í demo-fyrirtækinu (aldrei raunverulegt fyrirtæki).
-    const { data: u } = await supabase.from("users").select("company_id").eq("id", data.user.id).maybeSingle();
+    // Lesið með þjónustulykli: kökubundni biðlarinn les enn gömlu kökur beiðninnar (t.d. útrunna demo-lotu)
+    // og fékk þá enga röð → nýja lotan var skráð út strax eftir innskráningu (tómt mælaborð).
+    const { data: u } = await createAdminClient().from("users").select("company_id").eq("id", data.user.id).maybeSingle();
     if (u?.company_id !== demoCompanyId()) {
-      await supabase.auth.signOut({ scope: "local" });
+      await createAdminClient().auth.admin.signOut(data.session.access_token, "local");
       console.error("[demo] DEMO_LOGIN_EMAIL er ekki í DEMO_COMPANY_ID");
       return fail;
     }
