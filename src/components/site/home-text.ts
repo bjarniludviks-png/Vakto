@@ -51,6 +51,8 @@ const is = {
       { h: "Tölur", items: [
         { q: "af hverju var laun % hærra í september en í ágúst?", a: "Ber mánuðina saman: velta, tímar, yfirvinna og álag, og nefnir helstu ástæðurnar." },
         { q: "hver vann mesta yfirvinnu í mánuðinum?", a: "Raðar starfsfólki eftir yfirvinnutímum og hvað þeir kostuðu." },
+        { q: "láttu mig vita ef einhver fer yfir 180 tíma í mánuðinum.", a: "Setur upp vaktara: þú færð póst við 90 % og aftur ef einhver fer yfir, líka miðað við planið." },
+        { q: "sendu mér yfirvinnuskýrslu alla mánudaga.", a: "Skýrsla síðustu viku kemur í póstinn kl. 8 á mánudögum, með Excel-skjali." },
       ] },
     ],
     confirmB: "Ekkert breytist án þín.", confirm: " VAKTO AI spyr alltaf áður en hann breytir nokkru. Þú sérð tillöguna og ýtir á Staðfesta.",
@@ -127,6 +129,8 @@ const en: typeof is = {
       { h: "Numbers", items: [
         { q: "why was labor % higher in September than in August?", a: "Compares the months: revenue, hours, overtime and premiums, and names the main reasons." },
         { q: "who worked the most overtime this month?", a: "Ranks staff by overtime hours and what they cost." },
+        { q: "tell me if anyone goes over 180 hours this month.", a: "Sets up an alert: you get an email at 90% and again if someone goes over, schedule included." },
+        { q: "send me an overtime report every Monday.", a: "Last week's report lands in your inbox at 8:00 on Mondays, with an Excel file." },
       ] },
     ],
     confirmB: "Nothing changes without you.", confirm: " VAKTO AI always asks before it changes anything. You see the proposal and press Confirm.",

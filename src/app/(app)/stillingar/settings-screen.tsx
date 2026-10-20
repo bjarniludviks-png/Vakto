@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { IntegrationsPanel } from "./integrations-panel";
 import { BillingPanel } from "./billing-panel";
+import { AlertsPanel } from "./alerts-panel";
 import { DateField } from "@/components/app/fields";
 import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
@@ -67,7 +68,7 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
   const [section, setSection] = useState<string>((initialSection && (LEGACY[initialSection] ?? initialSection)) ?? (initialModal === "revenue" || initialModal === "avgrevenue" ? "tengingar" : "fyrirtaeki"));
   const SECTIONS: [string, string][] = [
     ["fyrirtaeki", "Fyrirtæki"], ["stadir", "Staðir og teymi"], ["reglur", "Reglur og laun"],
-    ["tengingar", "Tengingar"], ["notendur", "Notendur"], ["askrift", "Áskrift"],
+    ["tengingar", "Tengingar"], ["vaktarar", "Vaktarar og skýrslur"], ["notendur", "Notendur"], ["askrift", "Áskrift"],
   ];
   return (
     <>
@@ -150,6 +151,8 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
         </div>
       </div>
       </>}
+
+      {section === "vaktarar" && <AlertsPanel />}
 
       {section === "tengingar" && <IntegrationsPanel apiKeys={data.apiKeys} onNewKey={() => setKeyModal(true)} />}
 

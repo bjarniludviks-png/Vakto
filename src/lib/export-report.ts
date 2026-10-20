@@ -79,6 +79,16 @@ export async function exportTableXlsx(d: TableExport) {
   XLSX.writeFile(wb, `vakto-${slug(d.title)}-${d.from}_${d.to}.xlsx`);
 }
 
+/** Sama .xlsx og exportTableXlsx, en sem base64 á þjóni (viðhengi í sjálfvirkum skýrslum). */
+export async function tableXlsxBase64(d: TableExport): Promise<{ filename: string; content: string }> {
+  const XLSX = await import("xlsx");
+  const ws = XLSX.utils.aoa_to_sheet([[`${d.title} — ${d.company}`], [`Tímabil: ${d.from} – ${d.to}`], [], d.columns, ...d.rows]);
+  ws["!cols"] = d.columns.map((c, i) => ({ wch: Math.max(12, c.length + 2, i === 0 ? 24 : 0) }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, d.title.slice(0, 31));
+  return { filename: `vakto-${slug(d.title)}-${d.from}_${d.to}.xlsx`, content: XLSX.write(wb, { type: "base64", bookType: "xlsx" }) as string };
+}
+
 /** Generic branded table → PDF (manager report library). */
 export async function exportTablePdf(d: TableExport) {
   const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([import("jspdf"), import("jspdf-autotable")]);

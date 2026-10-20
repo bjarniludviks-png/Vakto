@@ -312,6 +312,41 @@ export async function sendStillWorkingEmail(to: string, name: string) {
   });
 }
 
+/** Vaktarar og sjálfvirkar skýrslur (0086): stutt viðvörun eða þjöppuð tafla. Gildi koma forsniðin (format.ts). */
+export async function sendVaktariEmail(to: string, o: {
+  subject: string; heading: string; body: string; headingEn: string; bodyEn: string;
+  rows?: [string, string][];
+  table?: { columns: string[]; numeric: number[]; rows: string[][]; more?: number };
+  attachment?: { filename: string; content: string };
+  ctaLabel?: string; ctaLabelEn?: string; ctaHref?: string;
+}) {
+  const th = `padding:0 8px 8px 0;font-size:12px;font-weight:600;color:${FAINT};border-bottom:1px solid ${LINE};white-space:nowrap`;
+  const td = `padding:9px 8px 9px 0;border-bottom:1px solid #f2f2f5;font-size:13px;font-variant-numeric:tabular-nums;color:${INK}`;
+  const table = o.table && o.table.rows.length ? `
+    <div style="overflow-x:auto;margin-top:26px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>${o.table.columns.map((c, i) => `<td${o.table!.numeric.includes(i) ? ' align="right"' : ""} style="${th}">${c}</td>`).join("")}</tr>
+      ${o.table.rows.map((r) => `<tr>${r.map((v, i) => `<td${o.table!.numeric.includes(i) ? ' align="right"' : ""} style="${td}${i === 0 ? ";font-weight:600" : ""}">${v}</td>`).join("")}</tr>`).join("")}
+      ${o.table.more ? `<tr><td colspan="${o.table.columns.length}" style="${td};color:${FAINT}">+ ${o.table.more} til viðbótar</td></tr>` : ""}
+    </table></div>` : "";
+  return sendEmail({
+    to,
+    subject: o.subject,
+    attachments: o.attachment ? [o.attachment] : undefined,
+    html: template({
+      preheader: o.heading,
+      heading: o.heading,
+      body: o.body,
+      rows: o.rows,
+      extraHtml: table,
+      headingEn: o.headingEn,
+      bodyEn: o.bodyEn,
+      ctaLabel: o.ctaLabel ?? "Opna VAKTO",
+      ctaLabelEn: o.ctaLabelEn ?? "Open VAKTO",
+      ctaHref: o.ctaHref ?? `${APP_URL}/maelabord`,
+    }),
+  });
+}
+
 export async function sendContractEmail(to: string, name: string, company: string) {
   const first = (name || "").split(/\s+/)[0] || "";
   return sendEmail({
