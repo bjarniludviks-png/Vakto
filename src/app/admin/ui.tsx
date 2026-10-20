@@ -30,6 +30,7 @@ export const STATUS_UI: Record<BillingStatus, { label: string; bg: string; fg: s
   trial_expired: { label: "Prufa útrunnin", bg: "var(--bad-soft)", fg: "var(--bad)", dot: "var(--bad)" },
   unpaid: { label: "Borgar ekki", bg: "var(--bad-soft)", fg: "var(--bad)", dot: "var(--warn)" },
   free: { label: "Frítt", bg: "var(--line2)", fg: "var(--ink2)", dot: "var(--teal)" },
+  canceled: { label: "Sagði upp", bg: "var(--warn-soft)", fg: "var(--warn)", dot: "var(--warn)" },
   suspended: { label: "Lokað", bg: "var(--ink)", fg: "var(--panel)", dot: "var(--ink)" },
   none: { label: "Ekkert plan", bg: "var(--line2)", fg: "var(--ink3)", dot: "var(--ink3)" },
 };

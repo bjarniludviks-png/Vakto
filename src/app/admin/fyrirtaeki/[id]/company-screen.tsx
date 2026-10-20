@@ -107,6 +107,7 @@ export default function CompanyScreen({ company: c, detail, billing }: { company
                     <option value="unpaid">Borgar ekki</option>
                     <option value="free">Frítt</option>
                     <option value="suspended">Lokað — enginn kemst inn</option>
+                    {c.manualStatus === "canceled" && <option value="canceled" disabled>Sagði upp (eigandi)</option>}
                   </select>
                   <button className="btn ghost sm" disabled={busy} onClick={() => run(() => extendTrial(c.id, 14), "Prufa framlengd um 14 daga")}>Framlengja prufu +14 d.</button>
                 </div>

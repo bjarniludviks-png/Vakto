@@ -4,14 +4,14 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees } from "@/lib/employees.server";
 import { nf } from "@/lib/format";
 import { taktikalEnabled } from "@/lib/taktikal.server";
-import { estimateMonthly, nextDueDate } from "@/lib/billing.server";
+import { estimateMonthly, nextDueDate, accessEndsAt as accessEnd } from "@/lib/billing.server";
 import { planFor, invoiceFor, type PlanId, type BillingInterval } from "@/lib/pricing";
 
 export type LocationRow = { id?: string; name: string; staff: number; timezone: string; lat?: number | null; lng?: number | null; radius?: number };
 export type GeofenceMode = "off" | "flag" | "block";
 export type PositionRow = { id?: string; name: string; staff: number; baseRate: string; rawRate?: number };
 export type UserRow = { name: string; initials: string; role: string; email: string };
-export type CompanyInfo = { name: string; kennitala: string; address: string; postalCode?: string; city?: string; phone: string; email: string; feedPostPolicy?: "everyone" | "managers"; payPeriodStart?: number; plan?: string | null; trialEndsAt?: string | null; billingStatus?: string | null; laborTarget?: number; leaveCap?: number | null; esignProvider?: "vakto" | "taktikal"; taktikalAvailable?: boolean };
+export type CompanyInfo = { name: string; kennitala: string; address: string; postalCode?: string; city?: string; phone: string; email: string; feedPostPolicy?: "everyone" | "managers"; payPeriodStart?: number; plan?: string | null; trialEndsAt?: string | null; billingStatus?: string | null; accessEndsAt?: string | null; laborTarget?: number; leaveCap?: number | null; esignProvider?: "vakto" | "taktikal"; taktikalAvailable?: boolean };
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
 export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
 export type CardView = { last4: string | null; brand: string | null; expiry: string | null };
@@ -137,7 +137,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       : compRes.data;
     const c = (comp ?? {}) as Record<string, string | null>;
     // Subscription state (0020 / 0027) — tolerant of missing columns.
-    let plan: string | null = null, trialEndsAt: string | null = null, billingStatus: string | null = null;
+    let plan: string | null = null, trialEndsAt: string | null = null, billingStatus: string | null = null, accessEndsAt: string | null = null;
     let pricing: PricingView | null = null;
     const sub = await supabase.from("companies").select("plan, trial_ends_at, billing_status, price_plan, price_v1_until, billing_interval, billing_year_start, billing_anchor, ai_addon").eq("id", company).maybeSingle();
     let ai: AiView | null = null;
@@ -164,6 +164,8 @@ export async function getSettingsData(): Promise<SettingsData> {
       } catch (e) { console.error("aiAllowance", e); }
       plan = (sub.data.plan as string | null) ?? null;
       billingStatus = (sub.data.billing_status as string | null) ?? null;
+      // Uppsögn: aðgangur helst út greitt tímabil / prufu (sýnt í glugganum og eftir uppsögn)
+      if (billingStatus !== "free" && billingStatus !== "suspended") try { accessEndsAt = await accessEnd(company, sub.data); } catch (e) { console.error("accessEndsAt", e); }
       const te = sub.data.trial_ends_at as string | null;
       if (te) { const d = new Date(te); trialEndsAt = `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`; }
     }
@@ -200,7 +202,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       apiKeys,
       companyId: company,
       kioskToken, card, invoices, pricing, ai, geofenceMode,
-      company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", postalCode, city, phone: c.phone ?? "", email: c.email ?? "", feedPostPolicy, payPeriodStart: ppd, plan, trialEndsAt, billingStatus, laborTarget, leaveCap, esignProvider, taktikalAvailable },
+      company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", postalCode, city, phone: c.phone ?? "", email: c.email ?? "", feedPostPolicy, payPeriodStart: ppd, plan, trialEndsAt, billingStatus, accessEndsAt, laborTarget, leaveCap, esignProvider, taktikalAvailable },
       live: true,
     };
   } catch {

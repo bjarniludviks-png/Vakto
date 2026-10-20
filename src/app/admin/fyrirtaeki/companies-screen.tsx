@@ -13,12 +13,12 @@ import { setBillingStatus, extendTrial } from "../actions";
 import { StatusBadge, TrialClock, niceDate, planLabel, relDate } from "../ui";
 
 type Filter = "all" | "paying" | "trial" | "problem" | "other";
-const FILTERS: [Filter, string][] = [["all", "Öll"], ["paying", "Borga"], ["trial", "Í prufu"], ["problem", "Útrunnið / ógreitt"], ["other", "Annað"]];
+const FILTERS: [Filter, string][] = [["all", "Öll"], ["paying", "Borga"], ["trial", "Í prufu"], ["problem", "Útrunnið / ógreitt / uppsögn"], ["other", "Annað"]];
 const inFilter = (c: AdminCompany, f: Filter) =>
   f === "all" ? true
     : f === "paying" ? c.billingStatus === "paying"
       : f === "trial" ? c.billingStatus === "trial"
-        : f === "problem" ? c.billingStatus === "trial_expired" || c.billingStatus === "unpaid"
+        : f === "problem" ? c.billingStatus === "trial_expired" || c.billingStatus === "unpaid" || c.billingStatus === "canceled"
           : c.billingStatus === "free" || c.billingStatus === "suspended" || c.billingStatus === "none";
 
 export default function CompaniesScreen({ data }: { data: AdminOverview }) {
@@ -127,6 +127,7 @@ export default function CompaniesScreen({ data }: { data: AdminOverview }) {
                         <option value="unpaid">Borgar ekki</option>
                         <option value="free">Frítt</option>
                         <option value="suspended">Lokað — enginn kemst inn</option>
+                        {c.manualStatus === "canceled" && <option value="canceled" disabled>Sagði upp (eigandi)</option>}
                       </select>
                       <button className="btn ghost sm" disabled={busy === c.id} onClick={() => addTrial(c)} title="Framlengja prufu um 14 daga">+14 d.</button>
                     </div>

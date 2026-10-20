@@ -469,6 +469,45 @@ export async function sendSuspendedEmail(to: string, company: string) {
   });
 }
 
+/** Staðfesting á uppsögn (eða að hætt hafi verið við hana) til eiganda. endsAt = „20.11.2026“. */
+export async function sendCancelEmail(to: string, company: string, o: { endsAt: string; resumed?: boolean }) {
+  return sendEmail({
+    to,
+    subject: o.resumed ? `Áskrift ${company} að VAKTO heldur áfram` : `Uppsögn skráð: VAKTO áskrift ${company}`,
+    html: template({
+      preheader: o.resumed ? "Hætt var við uppsögnina." : `Aðgangurinn helst opinn til ${o.endsAt}.`,
+      heading: o.resumed ? "Áskriftin heldur áfram" : "Uppsögnin er skráð",
+      body: o.resumed
+        ? `Hætt var við uppsögn á áskrift <b>${company}</b>. Áskriftin heldur áfram eins og áður og verður rukkuð á gjalddaga.`
+        : `Áskrift <b>${company}</b> að VAKTO hefur verið sagt upp. Ekkert verður rukkað framar og aðgangurinn helst opinn til <b>${o.endsAt}</b>. Þú getur hætt við uppsögnina fram að því í Stillingum → Áskrift.`,
+      rows: o.resumed ? undefined : [["Fyrirtæki", company], ["Aðgangur til", o.endsAt]],
+      headingEn: o.resumed ? "Your subscription continues" : "Cancellation confirmed",
+      bodyEn: o.resumed
+        ? `The cancellation for <b>${company}</b> was withdrawn. Your subscription continues as before.`
+        : `The VAKTO subscription for <b>${company}</b> has been cancelled. Nothing more will be charged and access stays open until <b>${o.endsAt}</b>. You can undo this until then in Settings → Subscription.`,
+      ctaLabel: "Opna Áskrift", ctaLabelEn: "Open Subscription", ctaHref: `${APP_URL}/stillingar?tab=askrift`,
+    }),
+  });
+}
+
+/** Innri tilkynning: viðskiptavinur sagði upp (eða hætti við uppsögn). */
+export const CANCEL_ALERT_EMAIL = process.env.CANCEL_ALERT_EMAIL || "bjarni@vakto.is";
+export async function sendCancelAlert(o: { company: string; companyId: string; by: string; endsAt: string; resumed?: boolean }) {
+  return sendEmail({
+    to: CANCEL_ALERT_EMAIL,
+    subject: o.resumed ? `Hætt við uppsögn: ${o.company}` : `Uppsögn: ${o.company}`,
+    html: template({
+      preheader: o.resumed ? `${o.company} hætti við uppsögn.` : `${o.company} sagði upp, aðgangur til ${o.endsAt}.`,
+      heading: o.resumed ? "Hætt við uppsögn" : "Áskrift sagt upp",
+      body: o.resumed ? `<b>${o.company}</b> hætti við uppsögnina.` : `<b>${o.company}</b> sagði upp áskriftinni í Stillingum.`,
+      rows: [["Fyrirtæki", o.company], ["Gert af", o.by], ...(o.resumed ? [] : [["Aðgangur til", o.endsAt] as [string, string]])],
+      headingEn: o.resumed ? "Cancellation withdrawn" : "Subscription cancelled",
+      bodyEn: o.resumed ? `${o.company} withdrew its cancellation.` : `${o.company} cancelled; access until ${o.endsAt}.`,
+      ctaLabel: "Opna í admin", ctaLabelEn: "Open in admin", ctaHref: `https://admin.vakto.is/admin/fyrirtaeki/${o.companyId}`,
+    }),
+  });
+}
+
 /** 6 stafa kóði til að staðfesta rafræna undirritun samnings (0058). */
 export async function sendContractCodeEmail(to: string, code: string, company: string) {
   return sendEmail({
