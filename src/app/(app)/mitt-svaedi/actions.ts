@@ -9,7 +9,7 @@ import { notifyManagers } from "@/lib/push";
 import { after } from "next/server";
 import { checkNoShows } from "@/lib/noshow.server";
 import { headers } from "next/headers";
-import { requestSignCode, signWithCode, metaFrom, taktikalEmployeeLink } from "@/lib/esign.server";
+import { requestSignCode, signWithCode, metaFrom, taktikalEmployeeLink, signedPdfPath, syncTaktikalContract } from "@/lib/esign.server";
 import { userError } from "@/lib/user-error";
 
 export type PunchResult = { ok: boolean; demo?: boolean; error?: string };
@@ -374,9 +374,10 @@ export async function toggleShiftTask(id: string, done: boolean): Promise<{ ok: 
 
 /* ---------- ráðningarsamningur: in-app signing (þrep 1) ---------- */
 
-export type MyContract = { id: string; title: string; content: string; status: string; signedVia?: string | null };
+export type MyContract = { id: string; title: string; content: string; status: string; signedVia?: string | null; signedAt?: string | null; pdf?: boolean };
 
-/** My newest contract. */
+/** My newest contract. Taktikal-samningur í ferli er samstilltur við Taktikal (mest einu sinni á mínútu)
+ *  svo starfsmaðurinn sjái rétta stöðu þótt webhook hafi misfarist. */
 export async function getMyContract(): Promise<{ ok: boolean; contract?: MyContract }> {
   if (!isSupabaseConfigured()) return { ok: false };
   try {
@@ -386,15 +387,46 @@ export async function getMyContract(): Promise<{ ok: boolean; contract?: MyContr
     // Stjórnendur sjá alla samninga fyrirtækisins gegnum RLS — síum á eigin starfsmann.
     const { data: me } = await supabase.from("employees").select("id").eq("user_id", user.id).maybeSingle();
     if (!me) return { ok: true };
-    const { data } = await supabase
-      .from("contracts").select("id, title, content, status, signed_via")
+    const read = () => supabase
+      .from("contracts").select("id, title, content, status, signed_via, signed_at")
       .eq("employee_id", me.id)
       .in("status", ["sent", "signed"])
       .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    let { data } = await read();
     if (!data) return { ok: true };
-    return { ok: true, contract: { id: data.id as string, title: data.title as string, content: data.content as string, status: data.status as string, signedVia: (data.signed_via as string | null) ?? null } };
+    if (data.status === "sent" && data.signed_via === "taktikal" && !(await demoBlocked())) {
+      const r = await syncTaktikalContract(data.id as string, { minIntervalMs: 60_000 }).catch(() => null);
+      if (r?.changes?.length) ({ data } = await read());
+      if (!data) return { ok: true };
+    }
+    const pdf = data.status === "signed" ? !!(await signedPdfPath(data.id as string)) : false;
+    return { ok: true, contract: {
+      id: data.id as string, title: data.title as string, content: data.content as string, status: data.status as string,
+      signedVia: (data.signed_via as string | null) ?? null, signedAt: (data.signed_at as string | null) ?? null, pdf,
+    } };
   } catch {
     return { ok: false };
+  }
+}
+
+/** Opnar undirritaða samninginn minn (PDF úr skjalasafninu) — aðeins eigin samningur. */
+export async function openMySignedContract(id: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: false };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
+    const { data: me } = await supabase.from("employees").select("id").eq("user_id", user.id).maybeSingle();
+    const { data: c } = me ? await supabase.from("contracts").select("id").eq("id", id).eq("employee_id", me.id).maybeSingle() : { data: null };
+    if (!c) return { ok: false, error: "Samningur fannst ekki" };
+    const path = await signedPdfPath(id);
+    if (!path) return { ok: false, error: "Undirritað eintak er ekki tilbúið enn" };
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { data, error } = await createAdminClient().storage.from("documents").createSignedUrl(path, 120);
+    if (error || !data?.signedUrl) return { ok: false, error: "Tókst ekki að opna skjalið" };
+    return { ok: true, url: data.signedUrl };
+  } catch {
+    return { ok: false, error: "Tókst ekki að opna skjalið" };
   }
 }
 

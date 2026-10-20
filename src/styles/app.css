@@ -773,6 +773,28 @@ html.dark .mblock.day{background:#23264a;color:#c7ccff} html.dark .mblock.eve{ba
 .docrow{display:flex;align-items:center;gap:9px;font-size:13px;border:1px solid var(--line);border-radius:9px;padding:8px 11px}
 .docrow svg{width:15px;height:15px;color:var(--brand);flex-shrink:0}
 .docrow .dl{margin-left:auto;font-size:11px;color:var(--ink3)}
+.emp-pills{display:inline-flex;gap:5px;flex-wrap:wrap;align-items:center}
+.emp-pills .emp-cpill{font-size:11px;padding:2px 8px;font-weight:550}
+/* Samningsstaða (undirritunarferill) í Samningur-flipa starfsmanns */
+.cst{border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-top:8px;background:var(--panel)}
+.cst-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.cst-h b{font-size:13.5px;font-weight:650}
+.cst-h .cst-m{font-size:11px;padding:2px 8px}
+.cst-steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:0}
+.cst-steps li{display:flex;gap:10px;align-items:flex-start;position:relative;padding:0 0 12px}
+.cst-steps li:last-child{padding-bottom:0}
+.cst-steps li:not(:last-child)::before{content:"";position:absolute;left:9px;top:21px;bottom:2px;width:2px;background:var(--line)}
+.cst-steps li.done:not(:last-child)::before{background:var(--good)}
+.cst-dot{width:20px;height:20px;border-radius:50%;flex:none;display:grid;place-items:center;border:2px solid var(--line);background:var(--panel);color:#fff}
+.cst-steps li.done .cst-dot{background:var(--good);border-color:var(--good)}
+.cst-steps li.now .cst-dot{border-color:var(--warn);background:var(--warn-soft)}
+.cst-dot svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:3}
+.cst-tx{display:flex;flex-direction:column;gap:1px;font-size:13px;line-height:1.35}
+.cst-tx span{font-size:12px;color:var(--ink3)}
+.cst-steps li.todo .cst-tx b{color:var(--ink3);font-weight:500}
+.cst-warn{font-size:12.5px;color:var(--warn);background:var(--warn-soft);border-radius:9px;padding:8px 10px;margin:10px 0 0}
+.cst-act{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px}
+.cst-act .muted{font-size:11.5px;margin-left:auto}
 
 /* chat */
 .chat{display:grid;grid-template-columns:260px 1fr;height:560px;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--panel);box-shadow:var(--shadow-card);margin-top:6px}

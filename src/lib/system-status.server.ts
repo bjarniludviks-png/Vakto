@@ -25,6 +25,7 @@ const CRON_WHAT: Record<string, string> = {
   "/api/cron/punch-check": "Finnur opnar stimplanir sem gleymdist að loka og lætur vita",
   "/api/cron/billing": "Áminningar fyrir lok prufu, mánaðarreikningar og greiðslur af kortum",
   "/api/cron/integrations": "Sækir veltu og gögn úr tengdum kerfum (Inventra o.fl.)",
+  "/api/cron/taktikal-sync": "Sækir stöðu opinna undirritana frá Taktikal ef webhook misfórst (skráir undirskriftir, býður starfsmanni, vistar undirritað PDF)",
 };
 
 export async function getSystemStatus(): Promise<SystemStatus> {
