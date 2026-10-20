@@ -6,6 +6,7 @@ import { Image } from "expo-image";
 import Svg, { Rect, Defs, RadialGradient, Stop, Circle } from "react-native-svg";
 import { Wallet, ChevronRight } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
+import { VaktoLogo } from "../src/components/vakto-logo";
 import { Txt, Muted, Avatar, Sheet, KV, useToast } from "../src/components/ui";
 import { colors, useTheme } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
@@ -65,12 +66,7 @@ export default function Skirteini() {
             <Circle cx={180} cy={180} r={180} fill="url(#glow)" />
           </Svg>
           <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
-            <Svg width={22} height={22} viewBox="0 0 28 28" fill="none">
-              <Rect x="3" y="15" width="5.4" height="10" rx="1.6" fill={colors.brand2} />
-              <Rect x="11.3" y="9" width="5.4" height="16" rx="1.6" fill={colors.brand} />
-              <Rect x="19.6" y="3" width="5.4" height="22" rx="1.6" fill={colors.brandDeep} />
-            </Svg>
-            <Txt weight="bold" size={13} color="#fff" style={{ letterSpacing: 2, marginTop: 3 }}>VAKTO</Txt>
+            <VaktoLogo size={22} variant="on-dark" />
             <View style={{ flex: 1 }} />
             <View style={{ backgroundColor: "#fff", borderRadius: 10, padding: 5 }}><Qr seed={token ?? me.empId} size={64} /></View>
           </View>

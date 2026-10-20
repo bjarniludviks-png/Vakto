@@ -1,6 +1,7 @@
 // Client-side PDF generation for the schedule (day / week / month views).
 // jsPDF + autotable are imported lazily so they never hit the server bundle.
 import type { jsPDF } from "jspdf";
+import { drawVaktoLogo } from "@/lib/pdf-logo";
 import { dec1 } from "@/lib/format";
 
 export type PdfShift = { first: string; full: string; dept: string; time: string; hours: number };
@@ -66,17 +67,10 @@ function drawFooter(doc: jsPDF, pageNum: number, pageCount: number) {
   const by = H - 24; // baseline
   doc.setDrawColor(228, 228, 232); doc.setLineWidth(0.7);
   doc.line(40, by - 13, W - 40, by - 13);
-  // ascending-bars logo mark
-  const bx = 40;
-  doc.setFillColor(...ORANGE);
-  [6, 9, 12].forEach((h, i) => doc.roundedRect(bx + i * 5, by - h, 3.2, h, 1, 1, "F"));
-  // wordmark + tagline
-  doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...INK);
-  const wmX = bx + 21;
-  doc.text("VAKTO", wmX, by - 1);
-  const wmW = doc.getTextWidth("VAKTO");
+  // VAKTO-merkið (súlur + orðmerki) + slagorð
+  const lw = drawVaktoLogo(doc, 40, by - 1, 12);
   doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...MUT);
-  doc.text("Vaktaskipulag & launakostnaður · vakto.is", wmX + wmW + 9, by - 1);
+  doc.text("Vaktaskipulag & launakostnaður · vakto.is", 40 + lw + 9, by - 1);
   // page counter
   if (pageCount > 1) doc.text(`${pageNum} / ${pageCount}`, W - 40, by - 1, { align: "right" });
 }

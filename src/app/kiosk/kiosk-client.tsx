@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { kioskPunchByPin, kioskPunchByToken, kioskPunchByKennitala, type KioskData } from "./actions";
+import { VaktoLogo } from "@/components/brand/vakto-logo";
 
 type Emp = { id: string; initials: string; name: string; color: string };
 
@@ -278,16 +279,7 @@ export default function KioskClient({ kioskKey, data }: { kioskKey: string | nul
   return (
     <>
       <div className="top">
-        <div className="brand">
-          <div className="m">
-            <svg viewBox="0 0 28 28" fill="none">
-              <rect x="3" y="15" width="5.4" height="10" rx="1.6" fill="var(--brand-2)" />
-              <rect x="11.3" y="9" width="5.4" height="16" rx="1.6" fill="var(--brand)" />
-              <rect x="19.6" y="3" width="5.4" height="22" rx="1.6" fill="var(--brand-deep)" />
-            </svg>
-          </div>
-          <b>VAKTO</b>
-        </div>
+        <div className="brand"><VaktoLogo size={27} /></div>
         <div className="co">{coName}</div>
         <div className="sp" />
         <LangToggle />

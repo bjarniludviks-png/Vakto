@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { LOGIN_I18N, type Lang } from "./login-i18n";
 import { requestPasswordReset, demoLogin } from "./actions";
+import { VaktoLogo } from "@/components/brand/vakto-logo";
 
 export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; demo?: boolean }) {
   const s = LOGIN_I18N[lang];
@@ -90,16 +91,7 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
 
   return (
     <form className="form" onSubmit={signIn}>
-      <div className="brand">
-        <div className="m">
-          <svg viewBox="0 0 28 28" fill="none">
-            <rect x="3" y="15" width="5.4" height="10" rx="1.6" fill="var(--brand-2)" />
-            <rect x="11.3" y="9" width="5.4" height="16" rx="1.6" fill="var(--brand)" />
-            <rect x="19.6" y="3" width="5.4" height="22" rx="1.6" fill="var(--brand-deep)" />
-          </svg>
-        </div>
-        <b>VAKTO</b>
-      </div>
+      <div className="brand"><VaktoLogo size={30} /></div>
       <h1>{s.welcome}</h1>
       <div className="sub">{s.welcomeSub}</div>
 

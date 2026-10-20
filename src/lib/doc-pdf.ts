@@ -4,11 +4,11 @@
 // t.d. vottorð um að starfsmaður vann ekkert á tímabilinu.
 // Keyrir í vafra; jsPDF og letrið hlaðin með dynamic import.
 import type { jsPDF } from "jspdf";
+import { drawVaktoLogo } from "@/lib/pdf-logo";
 import { nf, dec1 } from "@/lib/format";
 import { WO_ACTION, type WoSnapshot, type WoLogEntry } from "@/lib/work-overview";
 
 type RGB = [number, number, number];
-const ORANGE: RGB = [233, 112, 15];
 const INK: RGB = [23, 23, 28];
 const INK2: RGB = [61, 58, 54];
 const MUT: RGB = [138, 138, 148];
@@ -63,10 +63,6 @@ function kit(doc: Doc) {
   const LEFT = 128, RX = M + LEFT + 14, RW = W - M - RX;
   const font = (style: "normal" | "medium" | "bold" | "italic", size: number, color: RGB) => { doc.setFont("GS", style); doc.setFontSize(size); doc.setTextColor(...color); };
   const wrap = (text: string, width: number) => doc.splitTextToSize(text, width) as string[];
-  const mark = (x: number, baseY: number, scale = 1) => {
-    doc.setFillColor(...ORANGE);
-    [6, 9, 12].forEach((h, i) => doc.roundedRect(x + i * 5 * scale, baseY - h * scale, 3.2 * scale, h * scale, 1, 1, "F"));
-  };
   const state = { y: 0 };
 
   const richWrap = (runs: Run[], width: number): Run[][] => {
@@ -95,8 +91,7 @@ function kit(doc: Doc) {
     const headH = 34 + 38 + 15 + 20 + sIs.length * 13.5 + sEn.length * 12 + 14 + tileH + 26;
     doc.setFillColor(...WARM); doc.rect(0, 0, W, headH, "F");
     let y = 34;
-    mark(M, y + 2);
-    font("bold", 10.5, INK); doc.text("VAKTO", M + 20, y + 1.5);
+    drawVaktoLogo(doc, M, y + 1.5, 17);
     font("normal", 8, WARM_MUT); doc.text("vakto.is", W - M, y + 1.5, { align: "right" });
     y += 38;
     font("bold", 23, INK); doc.text(titleIs, M, y);
@@ -177,8 +172,7 @@ function kit(doc: Doc) {
       doc.setPage(i);
       const by = H - 26;
       doc.setDrawColor(...RULE); doc.setLineWidth(0.7); doc.line(M, by - 12, W - M, by - 12);
-      mark(M, by + 0.5, 0.8);
-      font("bold", 8.5, INK); doc.text("VAKTO", M + 16, by);
+      drawVaktoLogo(doc, M, by, 11);
       font("normal", 7.8, MUT); doc.text(label, M + 52, by);
       doc.text(`vakto.is · ${i} / ${pages}`, W - M, by, { align: "right" });
     }

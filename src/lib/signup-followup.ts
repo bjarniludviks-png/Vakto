@@ -16,12 +16,7 @@ export function followupStage(o: Pick<FollowupInput, "hasStaff" | "hasSchedule">
 const SIG = `<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-family:-apple-system,'Segoe UI',Helvetica,Arial,sans-serif;color:#1d1d1f">
   <tr>
     <td style="padding:0 14px 0 0;vertical-align:middle">
-      <table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse"><tr>
-        <td style="vertical-align:bottom;padding:0 2px 0 0"><div style="width:6px;height:10px;background:#f59331;border-radius:2px;font-size:0;line-height:0">&nbsp;</div></td>
-        <td style="vertical-align:bottom;padding:0 2px 0 0"><div style="width:6px;height:16px;background:#e9700f;border-radius:2px;font-size:0;line-height:0">&nbsp;</div></td>
-        <td style="vertical-align:bottom;padding:0 7px 0 0"><div style="width:6px;height:22px;background:#cf5f0c;border-radius:2px;font-size:0;line-height:0">&nbsp;</div></td>
-        <td style="vertical-align:bottom;padding:0;font-size:16px;line-height:16px;font-weight:700;letter-spacing:2px;color:#1d1d1f">VAKTO</td>
-      </tr></table>
+      <img src="https://www.vakto.is/brand/vakto-logo@2x.png" width="114" height="24" alt="VAKTO" style="display:block;width:114px;height:24px;border:0">
     </td>
     <td style="padding:0 0 0 14px;border-left:2px solid #f2e6da;vertical-align:middle">
       <div style="font-size:15px;font-weight:700;line-height:20px;color:#1d1d1f">Bjarni Lúðvíksson</div>

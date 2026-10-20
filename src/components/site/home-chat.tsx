@@ -5,6 +5,7 @@
 // Þráðurinn (id + token) lifir í localStorage svo samtalið haldist milli heimsókna.
 
 import { useEffect, useRef, useState } from "react";
+import { VaktoMark } from "@/components/brand/vakto-logo";
 
 type Lang = "is" | "en" | "pl";
 type Msg = { id: string; role: "user" | "assistant" | "owner"; body: string };
@@ -133,7 +134,7 @@ export default function HomeChat({ lang, skin = "ny" }: { lang: Lang; skin?: "ny
       {open && (
         <div className={`${skin}-chatbox`} role="dialog" aria-label={s.title}>
           <div className="hd">
-            <span className="av"><svg viewBox="0 0 28 28" fill="none"><rect x="3" y="15" width="5.4" height="10" rx="1.6" fill="#f59331" /><rect x="11.3" y="9" width="5.4" height="16" rx="1.6" fill="#e9700f" /><rect x="19.6" y="3" width="5.4" height="22" rx="1.6" fill="#cf5f0c" /></svg></span>
+            <span className="av"><VaktoMark /></span>
             <div><b>{s.title}</b><small>{status === "human" ? s.humanMode : s.sub}</small></div>
             <button className="x" onClick={() => setOpen(false)} aria-label={s.close}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>

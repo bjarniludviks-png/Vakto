@@ -9,9 +9,6 @@ body{font-family:"General Sans","Plus Jakarta Sans",ui-sans-serif,system-ui,-app
   -webkit-font-smoothing:antialiased;letter-spacing:-.011em;min-height:100vh}
 .top{display:flex;align-items:center;gap:13px;padding:20px 30px;background:var(--panel);border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:11px}
-.brand .m{display:flex;align-items:center;justify-content:center}
-.brand .m svg{width:27px;height:27px;display:block}
-.brand b{font-size:17px;font-weight:700;letter-spacing:.04em;color:var(--ink)}
 .top .co{font-size:13px;color:var(--ink3);font-weight:600;border-left:1px solid var(--line);padding-left:13px}
 .top .sp{flex:1}
 .klang{display:inline-flex;gap:2px;background:var(--line2);border-radius:9px;padding:3px}

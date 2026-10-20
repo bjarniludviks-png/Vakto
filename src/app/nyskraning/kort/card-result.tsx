@@ -2,14 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { hasCardOnFile, startCardSetup } from "../actions";
-
-const Bars = () => (
-  <div className="m"><svg viewBox="0 0 28 28" fill="none">
-    <rect x="3" y="15" width="5.4" height="10" rx="1.6" fill="var(--brand-2)" />
-    <rect x="11.3" y="9" width="5.4" height="16" rx="1.6" fill="var(--brand)" />
-    <rect x="19.6" y="3" width="5.4" height="22" rx="1.6" fill="var(--brand-deep)" />
-  </svg></div>
-);
+import { VaktoLogo } from "@/components/brand/vakto-logo";
 
 export default function CardResult({ cancelled, required = false }: { cancelled: boolean; required?: boolean }) {
   const [card, setCard] = useState<{ last4: string | null; brand: string | null } | null>(null);
@@ -40,7 +33,7 @@ export default function CardResult({ cancelled, required = false }: { cancelled:
   const brand = card?.brand === "VI" ? "Visa" : card?.brand === "MC" ? "Mastercard" : card?.brand ?? "Kort";
   return (
     <div className="form">
-      <div className="brand"><Bars /><b>VAKTO</b></div>
+      <div className="brand"><VaktoLogo size={30} /></div>
       {required ? (
         <>
           <h1>Skráðu kort til að opna VAKTO</h1>

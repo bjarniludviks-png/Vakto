@@ -12,6 +12,7 @@ import SiteNav from "./site-nav";
 import { useFullLang, useSiteLang } from "./lang";
 import { HOME_TEXT } from "./home-text";
 import AhFooter from "./ah-footer";
+import { VaktoLogo } from "@/components/brand/vakto-logo";
 import { HeyVakto, VisitRequest } from "./home-ai";
 import { demoLogin } from "@/app/login/actions";
 
@@ -54,15 +55,6 @@ function useScrub(cb: (p: number, el: HTMLElement) => void, mode: "sticky" | "vi
     return () => { io.disconnect(); window.removeEventListener("scroll", on); window.removeEventListener("resize", on); cancelAnimationFrame(raf); };
   }, [mode]);
   return ref;
-}
-
-function Logo() {
-  return (
-    <span className="ah-logo" translate="no">
-      <svg viewBox="0 0 28 28" aria-hidden="true"><rect className="b1" x="3" y="15" width="5.4" height="10" rx="1.6" /><rect className="b2" x="11.3" y="9" width="5.4" height="16" rx="1.6" /><rect className="b3" x="19.6" y="3" width="5.4" height="22" rx="1.6" /></svg>
-      VAKTO
-    </span>
-  );
 }
 
 /** Appelsínugulur bjarmi í bakgrunni: daufur efst, fyllir síðuna og færist til þegar skrunað er. */
@@ -494,7 +486,7 @@ function WalletCard() {
   }, []);
   return (
     <div className="ah-pass">
-      <div className="ah-pass-top"><Logo /><span className="ah-pass-co">KAFFI KRÓNAN EHF.<small>kt. 550101-2210</small></span></div>
+      <div className="ah-pass-top"><VaktoLogo size={18} variant="white" /><span className="ah-pass-co">KAFFI KRÓNAN EHF.<small>kt. 550101-2210</small></span></div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className="ah-pass-av" src={`${SHOT}/skjol/passmynd.jpg`} alt="" width={360} height={360} loading="lazy" decoding="async" />
       <div className="ah-pass-lbl">{t.passLbl}</div>

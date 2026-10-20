@@ -6,7 +6,8 @@
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Icon, Logo } from "@/components/app/icons";
+import { Icon } from "@/components/app/icons";
+import { VaktoLogo } from "@/components/brand/vakto-logo";
 
 const SERVER_ICON = (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
@@ -86,8 +87,7 @@ export default function AdminShell({ email, name, unread, children }: { email: s
         <aside className={`side${navOpen ? " open" : ""}`}>
           <div className="brand">
             <a href="/admin" className="brandlink" title="Mælaborð" aria-label="Mælaborð">
-              <div className="m"><Logo size={26} /></div>
-              <b>VAKTO</b>
+              <VaktoLogo size={26} />
             </a>
             <button className="railtog" onClick={toggleRail} title={railed ? "Sýna hliðarstiku" : "Fela hliðarstiku"} aria-label="Fela eða sýna hliðarstiku">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 6l-6 6 6 6M21 6l-6 6 6 6" /></svg>
