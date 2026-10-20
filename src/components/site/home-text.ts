@@ -39,7 +39,7 @@ const is = {
     pre: "Hey VAKTO,",
     groups: [
       { h: "Vaktaplan", items: [
-        { q: "gerðu vaktaplan fyrir næstu viku í eldhúsinu. Allir fá tvo frídaga og alltaf þrír á vakt.", a: "Setur upp vikuna fyrir eldhúsið: fimm vaktir á mann og þrír á vakt alla daga. Aðrar deildir haldast óbreyttar." },
+        { q: "gerðu vaktaplan fyrir næstu viku í eldhúsinu. Allir fá að minnsta kosti tvo frídaga og alltaf þrír á vakt.", a: "Setur upp vikuna fyrir eldhúsið: þrír á vakt alla daga og allir með minnst tvo frídaga. Aðrar deildir haldast óbreyttar." },
         { q: "opnaðu vaktir alla daga næstu viku milli 17 og 23.", a: "Stofnar sjö lausar vaktir. Starfsfólk fær tilkynningu og sækir um í appinu." },
         { q: "samþykktu fríbeiðnina hennar Önnu.", a: "Finnur beiðnina, sýnir dagana og samþykkir. Anna fær tilkynningu." },
       ] },
@@ -117,7 +117,7 @@ const en: typeof is = {
     pre: "Hey VAKTO,",
     groups: [
       { h: "Scheduling", items: [
-        { q: "make next week's schedule for the kitchen. Everyone gets two days off and there are always three on shift.", a: "Builds the kitchen's week: five shifts each and three on shift every day. Other departments stay as they are." },
+        { q: "make next week's schedule for the kitchen. Everyone gets at least two days off and there are always three on shift.", a: "Builds the kitchen's week: three on shift every day and everyone gets at least two days off. Other departments stay as they are." },
         { q: "open shifts every day next week from 17:00 to 23:00.", a: "Creates seven open shifts. Staff get a notification and apply in the app." },
         { q: "approve Anna's time-off request.", a: "Finds the request, shows the days and approves it. Anna gets notified." },
       ] },

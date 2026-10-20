@@ -94,10 +94,13 @@ await clickOn(ta, 500);
 await ta.pressSequentially(PROMPT, { delay: 38 });
 await sleep(400);
 await page.keyboard.press("Enter");
+const T = { send: Date.now() }; // raunverulegir tímar (óklipptir), prentaðir í lokin
 await sleep(1600); // „Hugsa…" sést stutta stund
 rec = false;
 // 3) Bíða eftir tillögunni (ekki tekið upp)
 await page.locator(".vai-act.pending").first().waitFor({ timeout: 240000 });
+await page.waitForFunction(() => !document.querySelector(".vai-think"), null, { timeout: 120000 }).catch(() => {});
+T.proposal = Date.now();
 await sleep(800);
 rec = true;
 await sleep(500);
@@ -113,8 +116,14 @@ if (process.env.CONFIRM !== "1") {
 } else {
 // 4) Staðfesta
 await clickOn(page.locator(".vai-act.pending button.btn:not(.ghost)").first(), 800);
+T.confirm = Date.now();
 rec = false;
-await page.locator(".vai-ok").first().waitFor({ timeout: 120000 });
+const done = await Promise.race([
+  page.locator(".vai-ok").first().waitFor({ timeout: 120000 }).then(() => true),
+  page.locator(".vai-act-tx small").first().waitFor({ timeout: 120000 }).then(() => false),
+]);
+if (!done) throw new Error("Staðfesting mistókst (demo-notandinn má líklega ekki skrifa)");
+T.done = Date.now();
 rec = true;
 await sleep(1600);
 // 5) Loka VAKTO AI og fletta á næstu viku → staðfesta planið sést í töflunni
@@ -134,12 +143,24 @@ if (sb) {
   await page.evaluate(() => window.__fcPress(true)); await sleep(110); await page.evaluate(() => window.__fcPress(false));
   await deptSel.selectOption(process.env.DEPT ?? "Eldhús").catch(() => {});
 }
-await sleep(400);
+await sleep(250);
+// Skruna svo vikutaflan fylli skjáinn (lykiltölurnar ofan við eiga við allt fyrirtækið, ekki bara eldhúsið)
+await page.evaluate(() => {
+  let el = document.querySelector(".stoolbar");
+  while (el && el !== document.body) { const s = getComputedStyle(el); if (/(auto|scroll)/.test(s.overflowY) && el.scrollHeight > el.clientHeight) break; el = el.parentElement; }
+  const box = el && el !== document.body ? el : document.scrollingElement;
+  const grid = document.querySelector(".sgrid-wrap") ?? document.querySelector(".stoolbar");
+  const top = grid.getBoundingClientRect().top - (box === document.scrollingElement ? 0 : box.getBoundingClientRect().top) + box.scrollTop - 80; // taflan beint undir efri stikunni
+  box.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+});
 await moveTo(W - 70, 330, 900); // út á hægri spássíuna (engin hover-áhrif)
-await sleep(2600);
+await sleep(3200); // síðustu ~3 s: fyllta vikan, síuð á eldhúsið
 rec = false;
 }
 clearInterval(keepAlive);
+const sec = (a, b) => (a && b ? ((b - a) / 1000).toFixed(1) + " s" : "–");
+console.log("tímar (óklipptir): beiðni→tillaga", sec(T.send, T.proposal), "· Staðfesta→Gert", sec(T.confirm, T.done));
+console.log("demo-fyrirtæki (vakto_demo_vid-kaka):", (await ctx.cookies()).some((c) => c.name === "vakto_demo_vid"));
 await cdp.send("Page.stopScreencast");
 await browser.close();
 
