@@ -103,7 +103,8 @@ export async function chargeInvoice(invoiceId: string): Promise<"paid" | "failed
     const res = await chargeToken({ token: card.token as string, amountISK: inv.total_amount as number, reference: inv.reference as string });
     if (res.resultCode === "Authorised") {
       await admin.from("invoices").update({ status: "paid", paid_at: new Date().toISOString(), payfac_reference: res.payfacReference, attempts: (inv.attempts as number) + 1, last_error: null }).eq("id", invoiceId);
-      await admin.from("companies").update({ billing_status: "paying" }).eq("id", inv.company_id);
+      // Uppsögn ('canceled') helst þótt greiðsla berist (or: .neq eitt og sér sleppir NULL-röðum)
+      await admin.from("companies").update({ billing_status: "paying" }).eq("id", inv.company_id).or("billing_status.is.null,billing_status.neq.canceled");
       return "paid";
     }
     if (res.resultCode === "RedirectShopper") {
