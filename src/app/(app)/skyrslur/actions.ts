@@ -12,7 +12,7 @@ import { getEmployees } from "@/lib/employees.server";
 import { getTimeBank } from "./timebank.server";
 import { buildManagerReport, applyReportFilters, failReport, DEMO_REPORT_ROWS, REPORT_TITLES, type ReportKind, type ReportFilters, type ManagerReport } from "@/lib/manager-report.server";
 
-export type { ReportKind, ReportFilters, ManagerReport };
+// Tegundirnar eru fluttar inn beint úr @/lib/manager-report.server — „use server“-skrá má ekki endurflytja út (export type { … } braut build: ReportKind is not defined).
 
 /** Build one manager report over [fromISO, toISO], optionally filtered. */
 export async function getManagerReport(kind: ReportKind, fromISO: string, toISO: string, filters?: ReportFilters): Promise<ManagerReport> {
