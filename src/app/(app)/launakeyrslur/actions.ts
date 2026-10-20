@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { computeFromPunches, computeUppbot, uppbotForMonth, uppbotMonths, totals as sumTotals, type PayLine } from "@/lib/payroll";
-import { resolveRuleSet, resolveUppbot, resolveOrlof } from "@/lib/payrules";
+import { periodPayLine, totals as sumTotals, type PayLine } from "@/lib/payroll";
+import { resolveOrlof } from "@/lib/payrules";
 import { getEmployees } from "@/lib/employees.server";
 import { resolvePay } from "@/lib/paysettings";
 import { initials } from "@/lib/employees";
@@ -68,8 +68,7 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
   if (!pr.error) for (const r of pr.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never) ?? null);
 
   // Desember-/orlofsuppbót: paid automatically in the June / December run,
-  // prorated by starfshlutfall (per the employee's kjarasamningur).
-  const uppKind = uppbotForMonth(Number(from.slice(5, 7)));
+  // prorated by starfshlutfall (per the employee's kjarasamningur) — sjá periodPayLine.
 
   const lines = employees
     // Allir starfsmenn í starfi fá línu — líka með 0 tíma (svo hægt sé að sækja launaseðil sem sýnir 0).
@@ -77,10 +76,7 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
     // Verktakar senda reikning — þeir fara hvorki í launakeyrslu né launaútflutning.
     .filter((e) => e.role !== "contractor")
     .filter((e) => (byEmp.get(e.id)?.length ?? 0) > 0 || e.payType === "monthly" || e.status !== "inactive")
-    .map((e) => {
-      const ub = uppKind ? computeUppbot(resolveUppbot(e.union, null, Number(from.slice(0, 4)))[uppKind], e.employmentRatio, uppbotMonths(uppKind, Number(from.slice(0, 4)), e.hireDate)) : 0;
-      return computeFromPunches(e, byEmp.get(e.id) ?? [], resolveRuleSet(e.union, ruleMap.get(e.id)), ub);
-    });
+    .map((e) => periodPayLine(e, byEmp.get(e.id) ?? [], ruleMap.get(e.id), from));
   // Raunverulega samþykktir tímar per starfsmann (fastlaunafólk fær laun óháð þeim, en taflan sýnir þá).
   const worked = new Map<string, number>();
   for (const p of punches) worked.set(p.employee_id, (worked.get(p.employee_id) ?? 0) + Math.max(0, (Date.parse(p.clock_out) - Date.parse(p.clock_in)) / 3.6e6));
