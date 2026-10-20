@@ -12,6 +12,7 @@ import SiteNav from "./site-nav";
 import { useFullLang, useSiteLang } from "./lang";
 import { HOME_TEXT } from "./home-text";
 import AhFooter from "./ah-footer";
+import { HeyVakto, VisitRequest } from "./home-ai";
 
 const useT = () => HOME_TEXT[useSiteLang()];
 
@@ -575,10 +576,12 @@ export default function AppleHome() {
         <HeroVideo />
         <Features />
         <Showcase />
+        <HeyVakto />
         <DarkCompare />
         <Contract />
         <Wallet />
         <Pricing />
+        <VisitRequest />
         <Sister />
       </main>
       <AhFooter />

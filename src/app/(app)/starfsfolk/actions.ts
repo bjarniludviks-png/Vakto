@@ -11,7 +11,7 @@ import { sendContractEmail } from "@/lib/email";
 import { inviteToCompany } from "@/lib/invite.server";
 import type { CustomRules } from "@/lib/payrules";
 import { headers } from "next/headers";
-import { employerSign, metaFrom, startTaktikalSigning } from "@/lib/esign.server";
+import { employerSign, metaFrom, resendTaktikalInvite, startTaktikalSigning } from "@/lib/esign.server";
 import { taktikalEnabled } from "@/lib/taktikal.server";
 import type { SignatureRecord } from "@/lib/contract-pdf";
 import { userError } from "@/lib/user-error";
@@ -1060,6 +1060,47 @@ export async function setContractStatus(
       if (emp?.email) void sendContractEmail(emp.email, emp.full_name ?? "", co?.name ?? "Fyrirtækið þitt");
     }
     revalidatePath("/starfsfolk");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
+/** Sendir undirritunarbeiðni samnings aftur á skráð netfang starfsmanns (VAKTO AI: resend_contract).
+ *  Nýjasti óundirritaði samningurinn: „sendur“ → boðið endursent (sama póstur / sama Taktikal-ferli, engin ný
+ *  undirskrift); „drög“ → venjuleg sending (setContractStatus: undirritun fyrirtækis + póstur). Undirritaður → villa. */
+export async function resendContract(employeeId: string): Promise<ActionResult & { signedAt?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const company = await companyId(supabase);
+    if (!company) return { ok: false, error: "Fyrirtæki fannst ekki" };
+    const { data: rows, error } = await supabase.from("contracts")
+      .select("id, title, status, signed_at, signed_via, employees(full_name, email), companies(name)")
+      .eq("employee_id", employeeId).eq("company_id", company).neq("status", "void").order("created_at", { ascending: false });
+    if (error) return { ok: false, error: userError(error) };
+    const open = (rows ?? []).find((r) => r.status === "sent") ?? (rows ?? []).find((r) => r.status === "draft");
+    if (!open) {
+      const signed = (rows ?? []).find((r) => r.status === "signed");
+      if (signed) return { ok: false, signedAt: String(signed.signed_at ?? "").slice(0, 10), error: `Samningurinn er þegar undirritaður${signed.signed_at ? ` (${String(signed.signed_at).slice(0, 10)})` : ""} — undirritað afrit er í skjalasafni starfsmannsins.` };
+      return { ok: false, error: "Enginn samningur til — búðu hann til í Starfsfólk → Samningar." };
+    }
+    const emp = (Array.isArray(open.employees) ? open.employees[0] : open.employees) as { full_name?: string; email?: string } | null;
+    if (!emp?.email) return { ok: false, error: `Ekkert netfang skráð á ${emp?.full_name ?? "starfsmanninn"} — skráðu það í flipanum Persónulegt.` };
+    if (open.status === "draft") {
+      const r = await setContractStatus(open.id as string, "sent");
+      if (r.needSigner) return { ok: false, error: "Fyrirtækið notar rafræn skilríki — opnaðu samninginn í Starfsfólk → Samningar og skrifaðu undir þar." };
+      return r;
+    }
+    if (open.signed_via === "taktikal") {
+      const r = await resendTaktikalInvite(open.id as string);
+      if (!r.ok) return r;
+    } else {
+      const co = (Array.isArray(open.companies) ? open.companies[0] : open.companies) as { name?: string } | null;
+      await sendContractEmail(emp.email, emp.full_name ?? "", co?.name ?? "Fyrirtækið þitt");
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    await logAudit(supabase, company, user?.id ?? null, { action: "contract.resend", entity: "contracts", entityId: open.id as string, detail: `Samningur sendur aftur — ${emp.full_name ?? ""} (${emp.email})` });
     return { ok: true };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };

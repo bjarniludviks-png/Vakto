@@ -350,9 +350,16 @@ const shiftLabel = (date: string, start: string, end: string) => {
 
 /** Stofnar lausa vakt (eða nokkrar eins) og lætur starfsfólk vita. */
 export async function createOpenShift(input: { date: string; start: string; end: string; shiftTypeName?: string; note?: string; count?: number }): Promise<DecisionResult> {
+  return createOpenShifts({ ...input, dates: [input.date] });
+}
+
+/** Lausar vaktir á einum eða fleiri dögum (sama tími) — ein færsla og EIN tilkynning til starfsfólks.
+ *  Notað af „Laus vakt“ í vaktaplani og VAKTO AI (create_open_shifts). */
+export async function createOpenShifts(input: { dates: string[]; start: string; end: string; shiftTypeName?: string; note?: string; count?: number }): Promise<DecisionResult> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date) || !/^\d{2}:\d{2}$/.test(input.start) || !/^\d{2}:\d{2}$/.test(input.end)) return { ok: false, error: "Veldu dag og tíma" };
+    const dates = [...new Set(input.dates)].sort();
+    if (!dates.length || dates.length > 31 || dates.some((d) => !/^\d{4}-\d{2}-\d{2}$/.test(d)) || !/^\d{2}:\d{2}$/.test(input.start) || !/^\d{2}:\d{2}$/.test(input.end)) return { ok: false, error: "Veldu dag og tíma" };
     const supabase = await createClient();
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
@@ -363,15 +370,18 @@ export async function createOpenShift(input: { date: string; start: string; end:
     }
     const n = Math.min(Math.max(Math.round(input.count ?? 1), 1), 10);
     const note = input.note?.trim().slice(0, 200) || null;
-    const rows = Array.from({ length: n }, () => ({
-      company_id: ctx.company, employee_id: null, shift_type_id: typeId, date: input.date,
+    const rows = dates.flatMap((date) => Array.from({ length: n }, () => ({
+      company_id: ctx.company, employee_id: null, shift_type_id: typeId, date,
       start_time: input.start, end_time: input.end, note, status: "published" as const, published: true,
-    }));
+    })));
     const { error } = await supabase.from("shifts").insert(rows);
     if (error) return { ok: false, error: userError(error) };
-    const label = shiftLabel(input.date, input.start, input.end);
-    await logAudit(supabase, ctx.company, ctx.userId, { action: "shift.open", entity: "shift", detail: `Laus vakt stofnuð — ${label}${n > 1 ? ` (${n})` : ""}` });
-    void notifyEmployees(ctx.company, { title: "Laus vakt", body: `${label}${note ? ` · ${note}` : ""}. Sæktu um í appinu.`, url: "/mitt-svaedi", tag: "open-shift" });
+    const label = dates.length === 1
+      ? shiftLabel(dates[0], input.start, input.end)
+      : `${shiftLabel(dates[0], input.start, input.end).split(" ").slice(0, 2).join(" ")}–${shiftLabel(dates[dates.length - 1], input.start, input.end)}`;
+    const total = rows.length;
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "shift.open", entity: "shift", detail: `Laus vakt stofnuð — ${label}${total > 1 ? ` (${total})` : ""}` });
+    void notifyEmployees(ctx.company, { title: total > 1 ? "Lausar vaktir" : "Laus vakt", body: `${label}${total > 1 ? ` · ${total} vaktir` : ""}${note ? ` · ${note}` : ""}. Sæktu um í appinu.`, url: "/mitt-svaedi", tag: "open-shift" });
     revalidatePath("/vaktaplan");
     return { ok: true };
   } catch (e) {

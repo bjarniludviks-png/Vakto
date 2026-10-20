@@ -294,6 +294,17 @@ export async function handleTaktikalEvent(p: TaktikalWebhook): Promise<boolean> 
   return true;
 }
 
+/** Sendir starfsmanni undirritunarboð Taktikal aftur (sama ferli, engin ný undirskrift → enginn nýr kostnaður).
+ *  Aðeins þegar vinnuveitandi hefur skrifað undir og ferlið er enn opið. Kallandi athugar aðgang (RLS) fyrst. */
+export async function resendTaktikalInvite(contractId: string): Promise<{ ok: boolean; error?: string }> {
+  const { data: t } = await createAdminClient().from("contract_taktikal").select("status").eq("contract_id", contractId).maybeSingle();
+  if (!t) return { ok: false, error: "Samningurinn er ekki í rafrænni undirritun" };
+  if (t.status === "created") return { ok: false, error: "Þú átt eftir að skrifa undir fyrir hönd fyrirtækisins — opnaðu samninginn í Starfsfólk → Samningar." };
+  if (t.status === "canceled" || t.status === "expired" || t.status === "failed") return { ok: false, error: "Undirritunarferlið rann út — gerðu nýjan samning í Starfsfólk → Samningar." };
+  await inviteTaktikalEmployee(contractId);
+  return { ok: true };
+}
+
 /** Vinnuveitandi hefur skrifað undir → VAKTO sendir starfsmanni boð (með nafni fyrirtækisins) á undirritunarsíðu Taktikal. */
 async function inviteTaktikalEmployee(contractId: string) {
   const admin = createAdminClient();
