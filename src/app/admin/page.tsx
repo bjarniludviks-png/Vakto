@@ -8,7 +8,7 @@ import { AuditRows, MiniBars, STATUS_UI, StatusBadge, TrialClock, relDate, short
 export const dynamic = "force-dynamic";
 
 const WEEKS = 12;
-const ORDER: BillingStatus[] = ["paying", "trial", "free", "trial_expired", "unpaid", "suspended", "none"];
+const ORDER: BillingStatus[] = ["paying", "trial", "free", "trial_expired", "unpaid", "canceled", "suspended", "none"];
 
 async function load() {
   const [data, pulse] = await Promise.all([getAdminOverview(), getAdminPulse()]);
@@ -41,11 +41,11 @@ export default async function AdminDashboardPage() {
 
   // Þarf athygli: prufur á lokametrunum, útrunnið/ógreitt, og nýskráningar sem festust.
   const ending = data.companies.filter((c) => c.billingStatus === "trial" && c.trialDaysLeft !== null && c.trialDaysLeft <= 7).sort((a, b) => (a.trialDaysLeft ?? 0) - (b.trialDaysLeft ?? 0));
-  const lapsed = data.companies.filter((c) => c.billingStatus === "trial_expired" || c.billingStatus === "unpaid");
+  const lapsed = data.companies.filter((c) => c.billingStatus === "trial_expired" || c.billingStatus === "unpaid" || c.billingStatus === "canceled");
   const stuck = data.companies.filter((c) => now - new Date(c.createdAt).getTime() < 30 * 86400000 && c.users <= 1 && !c.hasPunches30d && !c.hasRevenue30d && c.billingStatus !== "suspended");
   const attention: { c: AdminCompany; why: string; tone: "warn" | "bad" | "mut" }[] = [
     ...ending.map((c) => ({ c, why: "Prufa að renna út", tone: "warn" as const })),
-    ...lapsed.map((c) => ({ c, why: c.billingStatus === "unpaid" ? "Borgar ekki" : "Prufa útrunnin", tone: "bad" as const })),
+    ...lapsed.map((c) => ({ c, why: c.billingStatus === "unpaid" ? "Borgar ekki" : c.billingStatus === "canceled" ? "Sagði upp" : "Prufa útrunnin", tone: "bad" as const })),
     ...stuck.filter((c) => !ending.includes(c) && !lapsed.includes(c)).map((c) => ({ c, why: "Föst í uppsetningu?", tone: "mut" as const })),
   ];
 

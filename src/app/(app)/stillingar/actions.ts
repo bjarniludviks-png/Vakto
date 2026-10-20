@@ -1059,3 +1059,52 @@ export async function getPayDefaults(): Promise<(Partial<PaySettings> & { orlof?
     return null;
   }
 }
+
+/** Uppsögn áskriftar (sjálfsafgreiðsla). Ekkert rukkað framar; aðgangur helst út greitt tímabil/prufu og
+ *  runBillingDay lokar (suspended) þegar því lýkur. billing_status má aðeins breyta með service role (0066). Aðeins eigandi. */
+export async function cancelSubscription(): Promise<SettingsResult & { endsAt?: string }> {
+  return setCanceled(true);
+}
+
+/** Hætta við uppsögn: aftur á sjálfvirka stöðu (null, eins og „auto“ í /admin), eða „paying“ ef greiddur reikningur er til. */
+export async function resumeSubscription(): Promise<SettingsResult & { endsAt?: string }> {
+  return setCanceled(false);
+}
+
+async function setCanceled(cancel: boolean): Promise<SettingsResult & { endsAt?: string }> {
+  if (await demoBlocked()) return demoResult();
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
+    const { data: profile } = await supabase.from("users").select("company_id, role").eq("id", user.id).maybeSingle();
+    if (!profile?.company_id || profile.role !== "owner") return { ok: false, error: "Aðeins stjórnandi getur breytt áskriftinni" };
+    const companyId = profile.company_id as string;
+    const admin = createAdminClient();
+    const { data: co } = await admin.from("companies").select("name, billing_status, trial_ends_at, billing_anchor, billing_year_start").eq("id", companyId).maybeSingle();
+    if (!co) return { ok: false, error: "Fyrirtæki fannst ekki" };
+    const status = (co.billing_status as string | null) ?? null;
+    if (cancel ? (status === "canceled" || status === "free" || status === "suspended") : status !== "canceled")
+      return { ok: false, error: cancel ? "Ekki hægt að segja þessari áskrift upp hér — hafðu samband við okkur." : "Áskriftinni hefur ekki verið sagt upp" };
+    const { accessEndsAt, ownerEmails } = await import("@/lib/billing.server");
+    const endsAt = await accessEndsAt(companyId, co);
+    let next: string | null = "canceled";
+    if (!cancel) {
+      const { count } = await admin.from("invoices").select("id", { count: "exact", head: true }).eq("company_id", companyId).eq("status", "paid");
+      next = (count ?? 0) > 0 ? "paying" : null;
+    }
+    const { error } = await admin.from("companies").update({ billing_status: next }).eq("id", companyId);
+    if (error) return dbFail(cancel ? "cancelSubscription" : "resumeSubscription", error);
+    const d = endsAt.slice(0, 10).split("-").reverse().join(".");
+    await logAudit(supabase, companyId, user.id, { action: cancel ? "company.cancel" : "company.resume", entity: "companies", detail: cancel ? `Áskrift sagt upp, aðgangur til ${d}` : "Hætt við uppsögn áskriftar" });
+    const { sendCancelEmail, sendCancelAlert } = await import("@/lib/email");
+    const name = (co.name as string) ?? "";
+    for (const to of await ownerEmails(companyId)) await sendCancelEmail(to, name, { endsAt: d, resumed: !cancel }).catch((e) => console.error("email:", e));
+    await sendCancelAlert({ company: name, companyId, by: user.email ?? user.id, endsAt: d, resumed: !cancel }).catch((e) => console.error("email:", e));
+    revalidatePath("/stillingar");
+    return { ok: true, endsAt };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
