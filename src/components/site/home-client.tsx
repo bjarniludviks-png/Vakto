@@ -12,6 +12,7 @@ import SiteNav from "./site-nav";
 import { useFullLang, useSiteLang } from "./lang";
 import { HOME_TEXT } from "./home-text";
 import AhFooter from "./ah-footer";
+import { demoLogin } from "@/app/login/actions";
 
 const useT = () => HOME_TEXT[useSiteLang()];
 
@@ -176,7 +177,25 @@ function PlanDrag() {
 /* ---------- 1. Hetja: myndband af kerfinu í notkun. Glugginn rennur upp yfir fyrirsögnina og stækkar
    við skrun (enginn aðdráttur inn í myndina); myndbandið spilar aðeins á meðan það sést. ---------- */
 
-function HeroVideo() {
+/** „Prófa demo": skráir gestinn inn í opna demo-fyrirtækið (sama demoLogin og innskráningarsíðan). */
+function DemoButton() {
+  const t = useT();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(false);
+  return (
+    <>
+      <button type="button" className="ah-link ah-demo" disabled={busy} onClick={async () => {
+        setBusy(true); setErr(false);
+        const r = await demoLogin().catch(() => ({ ok: false as const, next: undefined }));
+        if (!r.ok) { setBusy(false); setErr(true); return; }
+        window.location.assign(r.next ?? "/maelabord");
+      }}>{busy ? t.demoBusy : t.demo}</button>
+      {err && <span className="ah-demo-err" role="alert">{t.demoErr}</span>}
+    </>
+  );
+}
+
+function HeroVideo({ demo = false }: { demo?: boolean }) {
   const base = useShot();
   const t = useT();
   const frame = useRef<HTMLDivElement>(null), head = useRef<HTMLDivElement>(null);
@@ -213,6 +232,7 @@ function HeroVideo() {
           <p className="ah-lede">{t.lede}</p>
           <div className="ah-ctas">
             <a className="ah-btn" href="/nyskraning">{t.try}</a>
+            {demo && <DemoButton />}
             <a className="ah-link" href="#kerfid">{t.see}</a>
           </div>
         </div>
@@ -544,7 +564,7 @@ function Sister() {
   );
 }
 
-export default function AppleHome() {
+export default function AppleHome({ demo = false }: { demo?: boolean }) {
   const lang = useSiteLang();
   const full = useFullLang();
   const chatLang = full === "pl" ? "pl" : lang; // spjallið er líka til á pólsku
@@ -572,7 +592,7 @@ export default function AppleHome() {
       <Glow />
       <SiteNav home scrolled={scrolled} dark={overDark} />
       <main id="efni">
-        <HeroVideo />
+        <HeroVideo demo={demo} />
         <Features />
         <Showcase />
         <DarkCompare />

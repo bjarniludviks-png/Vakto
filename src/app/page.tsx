@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import AppleHome from "@/components/site/home-client";
 import "@/components/site/home.css";
 import { SITE_URL } from "@/lib/site";
+import { demoConfigured } from "@/lib/demo.server";
 
 // Forsíða vakto.is (okt. 2026): Apple-leg síða með alvöru skjámyndum úr kerfinu og appinu.
 // Komponentar og stílar síðunnar eru í src/components/site/.
@@ -35,7 +36,7 @@ export default function Page() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(LD).replace(/</g, "\\u003c") }} />
-      <AppleHome />
+      <AppleHome demo={demoConfigured()} />
     </>
   );
 }

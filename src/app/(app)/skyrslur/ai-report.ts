@@ -13,6 +13,7 @@ import { getDashboardPeriod } from "../maelabord/actions";
 import { getPerfHistory } from "../frammistada/perf.server";
 import { dec1, nf, krCompact } from "@/lib/format";
 import { userError } from "@/lib/user-error";
+import { demoAiGate } from "@/lib/ai/ai-plan.server";
 
 export type AiChart = { labels: string[]; values: number[]; label: string };
 export type AiReportResult = {
@@ -97,7 +98,7 @@ function fallbackAnswer(question: string, ctx: Awaited<ReturnType<typeof gatherC
 export async function aiReportQuery(question: string, fromISO: string, toISO: string): Promise<AiReportResult> {
   try {
     const ctx = await gatherContext(fromISO, toISO);
-    if (!process.env.ANTHROPIC_API_KEY) return fallbackAnswer(question, ctx);
+    if (!process.env.ANTHROPIC_API_KEY || (await demoAiGate())) return fallbackAnswer(question, ctx); // demo-þak búið → innbyggð greining
 
     const compact = {
       period: { from: fromISO, to: toISO },

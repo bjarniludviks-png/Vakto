@@ -1,5 +1,6 @@
 import "server-only";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
+import { assertNotDemo } from "@/lib/demo.server";
 
 // Tengingar við kerfi sem senda veltu. Hvert kerfi skilar heildarveltu á dag (án VSK) fyrir tímabil.
 // Lyklar eru dulkóðaðir með AES-256-GCM; lykillinn er leiddur af leyndarmáli þjónsins.
@@ -36,6 +37,7 @@ export function normalizeSite(provider: Provider, raw: string): string | null {
 const dayOf = (iso: string) => iso.slice(0, 10); // UTC-dagur (Ísland er UTC)
 
 async function getJson(url: string, headers: Record<string, string>): Promise<{ data: unknown; link: string | null }> {
+  await assertNotDemo();
   const res = await fetch(url, { headers: { Accept: "application/json", ...headers }, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(20000) }).catch((e: unknown) => { throw new Error(e instanceof Error && e.name === "TimeoutError" ? "Kerfið svaraði ekki í tæka tíð." : "Náði ekki sambandi við verslunina — athugaðu slóðina (án áframsendingar, t.d. með eða án www)."); });
   if (res.status === 401 || res.status === 403) throw new Error("Lykillinn var ekki samþykktur — athugaðu að hann sé réttur og hafi lesaðgang að pöntunum.");
   if (res.status === 404) throw new Error("Verslunin fannst ekki — athugaðu slóðina.");

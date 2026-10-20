@@ -1,5 +1,6 @@
 "use server";
 
+import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -315,6 +316,7 @@ export async function applyForShift(input: { note: string; shiftId?: string }): 
 
 /** Upload a profile photo (data URL) to the avatars bucket and save photo_url. */
 export async function uploadPhoto(dataUrl: string): Promise<ActionResult & { url?: string }> {
+  if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();

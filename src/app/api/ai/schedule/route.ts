@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAiScheduleProposal } from "@/lib/ai/schedule";
 import { assistantUser, rateLimited } from "@/lib/ai/assistant-auth";
+import { demoAiGate } from "@/lib/ai/ai-plan.server";
 
 // AI-tillaga að vaktaplani — aðeins stjórnendur og vaktstjórar, með sömu takmörkun og VAKTO AI.
 export async function POST(request: Request) {
   const me = await assistantUser(await createClient());
   if ("error" in me) return NextResponse.json({ ok: false, error: me.error }, { status: me.status });
   if (rateLimited(me.userId)) return NextResponse.json({ ok: false, error: "Of margar fyrirspurnir í einu — bíddu aðeins." }, { status: 429 });
+  const demoStop = await demoAiGate();
+  if (demoStop) return NextResponse.json({ ok: false, error: demoStop }, { status: 429 });
 
   let prompt = "";
   let context = "";

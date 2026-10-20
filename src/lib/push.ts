@@ -1,6 +1,7 @@
 import "server-only";
 import webpush from "web-push";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { demoBlocked } from "@/lib/demo.server";
 
 // Server-side web push. No-op (logged) until VAPID keys are set.
 const PUB = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -17,7 +18,7 @@ export type PushPayload = { title: string; body: string; url?: string; tag?: str
 
 /** Notify all owners/managers of a company (e.g. a new employee request). */
 export async function notifyManagers(companyId: string | null | undefined, payload: PushPayload): Promise<void> {
-  if (!companyId) return;
+  if (!companyId || (await demoBlocked(companyId))) return;
   try {
     const admin = createAdminClient();
     const { data } = await admin.from("users").select("id").eq("company_id", companyId).in("role", ["owner", "manager"]);
@@ -27,7 +28,7 @@ export async function notifyManagers(companyId: string | null | undefined, paylo
 
 /** Push til alls virks starfsfólks fyrirtækis sem er með aðgang (t.d. ný laus vakt). */
 export async function notifyEmployees(companyId: string | null | undefined, payload: PushPayload): Promise<void> {
-  if (!companyId) return;
+  if (!companyId || (await demoBlocked(companyId))) return;
   try {
     const admin = createAdminClient();
     const { data } = await admin.from("employees").select("user_id").eq("company_id", companyId).eq("active", true).not("user_id", "is", null);
@@ -47,7 +48,7 @@ export async function notifyEmployee(employeeId: string | null | undefined, payl
 
 /** Send a push to all of a user's subscribed devices; prunes dead subscriptions. */
 export async function sendPushToUser(userId: string, payload: PushPayload): Promise<void> {
-  if (!userId) return;
+  if (!userId || (await demoBlocked())) return; // opið demo: engin push
   try {
     const admin = createAdminClient();
     if (!init()) {

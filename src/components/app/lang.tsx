@@ -8,6 +8,10 @@ type Dict = Record<string, { is: string; en: string; vi?: string; pl?: string }>
 
 // App-shell chrome strings. Per-screen content can adopt useLang() incrementally.
 export const DICT: Dict = {
+  // Opið demo
+  "Þú ert í demo — gögnin eru gervigögn og núllstillast á hverri nóttu.": { is: "Þú ert í demo — gögnin eru gervigögn og núllstillast á hverri nóttu.", en: "You are in the demo — the data is fictional and resets every night.", vi: "Bạn đang dùng bản demo — dữ liệu là giả và được đặt lại mỗi đêm.", pl: "Jesteś w wersji demo — dane są fikcyjne i resetują się co noc." },
+  "Stofna eigið fyrirtæki": { is: "Stofna eigið fyrirtæki", en: "Create your own company", vi: "Tạo công ty của bạn", pl: "Załóż własną firmę" },
+  "Þetta er ekki í boði í demo": { is: "Þetta er ekki í boði í demo", en: "This is not available in the demo", vi: "Tính năng này không có trong bản demo", pl: "To nie jest dostępne w wersji demo" },
   "boð send": { is: "boð send", en: "invites sent", vi: "lời mời đã gửi", pl: "zaproszeń wysłanych" },
   "tengd aðgangi sem var til": { is: "tengd aðgangi sem var til", en: "linked to an existing account", vi: "đã liên kết tài khoản có sẵn", pl: "połączonych z istniejącym kontem" },
   "tókst ekki": { is: "tókst ekki", en: "failed", vi: "không thành công", pl: "nie powiodło się" },
