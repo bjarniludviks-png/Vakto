@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { orlofBalance, orlofYearStart, type OrlofBalance } from "./orlof";
+import { allRows } from "@/lib/supabase/all-rows";
 
 /** Orlofsstaða fyrir einn eða fleiri starfsmenn (sama fyrirtæki). RLS gildir:
  *  starfsmaður fær sína, stjórnandi alla í fyrirtækinu. Þolir ef dálkar vantar. */
@@ -13,8 +14,9 @@ export async function getOrlofBalances(
   if (!ids.length) return out;
   const since = orlofYearStart();
   const [punchRes, leaveRes, empRes] = await Promise.all([
-    supabase.from("punches").select("employee_id, clock_in, clock_out")
-      .in("employee_id", ids).gte("clock_in", since).not("clock_out", "is", null),
+    // Heilt orlofsár af stimplunum (allt að 12 mán.) — síðað, PostgREST skilar mest 1.000 röðum.
+    allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
+      .in("employee_id", ids).gte("clock_in", since).not("clock_out", "is", null).order("id").range(a, b)),
     supabase.from("leave_requests").select("employee_id, from_date, to_date, status, type")
       .in("employee_id", ids).eq("type", "orlof").gte("to_date", since),
     supabase.from("employees").select("id, orlof").in("id", ids),

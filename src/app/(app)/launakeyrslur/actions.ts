@@ -3,8 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { computeFromPunches, computeUppbot, uppbotForMonth, uppbotMonths, totals as sumTotals, type PayLine } from "@/lib/payroll";
-import { resolveRuleSet, resolveUppbot, resolveOrlof } from "@/lib/payrules";
+import { periodPayLine, totals as sumTotals, type PayLine } from "@/lib/payroll";
+import { resolveOrlof } from "@/lib/payrules";
 import { getEmployees } from "@/lib/employees.server";
 import { resolvePay } from "@/lib/paysettings";
 import { initials } from "@/lib/employees";
@@ -13,6 +13,7 @@ import { logAudit } from "@/lib/audit";
 import { notifyEmployee } from "@/lib/push";
 import type { PayrollView } from "./payroll.server";
 import { userError } from "@/lib/user-error";
+import { allRows } from "@/lib/supabase/all-rows";
 
 export type RunResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
 export type ContractorBill = { id: string; name: string; av: string; c: string; hours: number; amount: number; monthly: boolean };
@@ -37,16 +38,18 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
   const { employees } = await getEmployees();
   let needsMigration = false;
   let punches: { employee_id: string; clock_in: string; clock_out: string }[] = [];
-  const approved = await supabase.from("punches")
-    .select("employee_id, clock_in, clock_out")
+  // Síðað (allRows): mánuður hjá 60 manna fyrirtæki er >1.000 stimplanir — PostgREST skilar mest 1.000
+  // röðum, svo án þessa vantaði tíma í launakeyrsluna þegjandi.
+  const approved = await allRows<{ employee_id: string; clock_in: string; clock_out: string }>((a, b) => supabase.from("punches")
+    .select("id, employee_id, clock_in, clock_out")
     .eq("company_id", company).eq("approved", true).not("clock_out", "is", null)
-    .gte("clock_in", from).lte("clock_in", to + "T23:59:59");
+    .gte("clock_in", from).lte("clock_in", to + "T23:59:59").order("id").range(a, b));
   if (approved.error) {
     needsMigration = true;
-    const all = await supabase.from("punches")
-      .select("employee_id, clock_in, clock_out")
+    const all = await allRows<{ employee_id: string; clock_in: string; clock_out: string }>((a, b) => supabase.from("punches")
+      .select("id, employee_id, clock_in, clock_out")
       .eq("company_id", company).not("clock_out", "is", null)
-      .gte("clock_in", from).lte("clock_in", to + "T23:59:59");
+      .gte("clock_in", from).lte("clock_in", to + "T23:59:59").order("id").range(a, b));
     punches = (all.data ?? []) as typeof punches;
   } else {
     punches = (approved.data ?? []) as typeof punches;
@@ -65,8 +68,7 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
   if (!pr.error) for (const r of pr.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never) ?? null);
 
   // Desember-/orlofsuppbót: paid automatically in the June / December run,
-  // prorated by starfshlutfall (per the employee's kjarasamningur).
-  const uppKind = uppbotForMonth(Number(from.slice(5, 7)));
+  // prorated by starfshlutfall (per the employee's kjarasamningur) — sjá periodPayLine.
 
   const lines = employees
     // Allir starfsmenn í starfi fá línu — líka með 0 tíma (svo hægt sé að sækja launaseðil sem sýnir 0).
@@ -74,10 +76,7 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
     // Verktakar senda reikning — þeir fara hvorki í launakeyrslu né launaútflutning.
     .filter((e) => e.role !== "contractor")
     .filter((e) => (byEmp.get(e.id)?.length ?? 0) > 0 || e.payType === "monthly" || e.status !== "inactive")
-    .map((e) => {
-      const ub = uppKind ? computeUppbot(resolveUppbot(e.union, null, Number(from.slice(0, 4)))[uppKind], e.employmentRatio, uppbotMonths(uppKind, Number(from.slice(0, 4)), e.hireDate)) : 0;
-      return computeFromPunches(e, byEmp.get(e.id) ?? [], resolveRuleSet(e.union, ruleMap.get(e.id)), ub);
-    });
+    .map((e) => periodPayLine(e, byEmp.get(e.id) ?? [], ruleMap.get(e.id), from));
   // Raunverulega samþykktir tímar per starfsmann (fastlaunafólk fær laun óháð þeim, en taflan sýnir þá).
   const worked = new Map<string, number>();
   for (const p of punches) worked.set(p.employee_id, (worked.get(p.employee_id) ?? 0) + Math.max(0, (Date.parse(p.clock_out) - Date.parse(p.clock_in)) / 3.6e6));
@@ -104,9 +103,9 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
     const cons = employees.filter((e) => e.role === "contractor" && e.status !== "inactive");
     let contractors: ContractorBill[] = [];
     if (cons.length) {
-      const { data: cp } = await supabase.from("punches").select("employee_id, clock_in, clock_out")
+      const { data: cp } = await allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
         .eq("company_id", ctx.company).eq("approved", true).not("clock_out", "is", null)
-        .in("employee_id", cons.map((e) => e.id)).gte("clock_in", from).lte("clock_in", to + "T23:59:59");
+        .in("employee_id", cons.map((e) => e.id)).gte("clock_in", from).lte("clock_in", to + "T23:59:59").order("id").range(a, b));
       const hrs = new Map<string, number>();
       for (const p of cp ?? []) hrs.set(p.employee_id as string, (hrs.get(p.employee_id as string) ?? 0) + Math.max(0, (Date.parse(p.clock_out as string) - Date.parse(p.clock_in as string)) / 3.6e6));
       contractors = cons.map((e) => {
@@ -311,9 +310,9 @@ export async function getPayrollHistory(year: number): Promise<PayrollHistory> {
       .gte("period_start", `${year}-01-01`).lte("period_start", `${year}-12-31`);
     if (!runs?.length) return { live: true, months: emptyMonths() };
     const runMonth = new Map(runs.map((r) => [r.id as string, new Date(r.period_start as string).getMonth()]));
-    const { data: lines } = await supabase.from("payroll_lines")
+    const { data: lines } = await allRows((a, b) => supabase.from("payroll_lines")
       .select("*")
-      .in("run_id", runs.map((r) => r.id as string));
+      .in("run_id", runs.map((r) => r.id as string)).order("id").range(a, b));
     const months = emptyMonths();
     for (const l of lines ?? []) {
       const m = runMonth.get(l.run_id as string);

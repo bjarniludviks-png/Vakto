@@ -4,6 +4,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees, getCompanyData } from "@/lib/employees.server";
 import { getLaborMetrics } from "@/lib/revenue.server";
 import { initials } from "@/lib/employees";
+import { allRows } from "@/lib/supabase/all-rows";
 
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 function currentWeek(): { from: string; to: string } {
@@ -50,10 +51,10 @@ export async function getWeekAttendance(fromISO?: string, toISO?: string): Promi
     if (!company) return { rows: [], live: false };
 
     const [{ data: shifts }, { data: punches }] = await Promise.all([
-      supabase.from("shifts").select("employee_id, start_time, end_time")
-        .eq("company_id", company).gte("date", from).lte("date", to),
-      supabase.from("punches").select("employee_id, clock_in, clock_out")
-        .eq("company_id", company).gte("clock_in", from).lte("clock_in", to + "T23:59:59"),
+      allRows((a, b) => supabase.from("shifts").select("id, employee_id, start_time, end_time")
+        .eq("company_id", company).gte("date", from).lte("date", to).order("id").range(a, b)),
+      allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
+        .eq("company_id", company).gte("clock_in", from).lte("clock_in", to + "T23:59:59").order("id").range(a, b)),
     ]);
 
     const planned = new Map<string, number>();

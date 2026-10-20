@@ -11,6 +11,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees } from "@/lib/employees.server";
 import { initials } from "@/lib/employees";
 import { leaveWorkdays } from "@/lib/orlof";
+import { allRows } from "@/lib/supabase/all-rows";
 
 const LATE_MIN = 5;
 
@@ -40,12 +41,12 @@ export async function getAbsence(days = 30): Promise<Absence> {
     if (!company) return empty;
 
     const [shiftRes, punchRes, leaveRes] = await Promise.all([
-      supabase.from("shifts").select("employee_id, date, start_time")
-        .eq("company_id", company).eq("published", true).gte("date", from).lte("date", to),
-      supabase.from("punches").select("employee_id, clock_in")
-        .eq("company_id", company).gte("clock_in", `${from}T00:00:00Z`).lte("clock_in", `${to}T23:59:59Z`),
-      supabase.from("leave_requests").select("employee_id, type, from_date, to_date")
-        .eq("company_id", company).eq("status", "approved").lte("from_date", to).gte("to_date", from),
+      allRows((a, b) => supabase.from("shifts").select("id, employee_id, date, start_time")
+        .eq("company_id", company).eq("published", true).gte("date", from).lte("date", to).order("id").range(a, b)),
+      allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in")
+        .eq("company_id", company).gte("clock_in", `${from}T00:00:00Z`).lte("clock_in", `${to}T23:59:59Z`).order("id").range(a, b)),
+      allRows((a, b) => supabase.from("leave_requests").select("id, employee_id, type, from_date, to_date")
+        .eq("company_id", company).eq("status", "approved").lte("from_date", to).gte("to_date", from).order("id").range(a, b)),
     ]);
 
     // Fyrsta innstimplun per starfsmann/dag (mínútur frá miðnætti).

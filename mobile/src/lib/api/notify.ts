@@ -5,7 +5,7 @@ import { supabase } from "../supabase";
 
 const API = (process.env.EXPO_PUBLIC_API_URL ?? "https://www.vakto.is").replace(/\/$/, "");
 
-export type NotifyKind = "shift_claim" | "leave_request" | "leave_decided" | "swap_request" | "punch" | "content_report";
+export type NotifyKind = "shift_claim" | "leave_request" | "leave_decided" | "swap_request" | "punch" | "content_report" | "work_overview";
 
 /** Fire-and-forget: a failed notification never blocks the action itself. */
 export async function notifyServer(kind: NotifyKind, id?: string): Promise<void> {

@@ -11,6 +11,7 @@ import { getEmployees } from "@/lib/employees.server";
 import { resolveRuleSet } from "@/lib/payrules";
 import { classifyPay, computeFromPunches, BURDEN } from "@/lib/payroll";
 import { getTimeBank } from "./timebank.server";
+import { allRows } from "@/lib/supabase/all-rows";
 
 export type ReportKind = "hours" | "overtime" | "attendance" | "timebank" | "cost" | "costDept" | "absence";
 
@@ -158,10 +159,10 @@ export async function getManagerReport(kind: ReportKind, fromISO: string, toISO:
 
     if (kind === "attendance") {
       const [{ data: shifts }, { data: punches }] = await Promise.all([
-        supabase.from("shifts").select("employee_id, start_time, end_time")
-          .eq("company_id", company).gte("date", fromISO).lte("date", toISO),
-        supabase.from("punches").select("employee_id, clock_in, clock_out")
-          .eq("company_id", company).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59"),
+        allRows((a, b) => supabase.from("shifts").select("id, employee_id, start_time, end_time")
+          .eq("company_id", company).gte("date", fromISO).lte("date", toISO).order("id").range(a, b)),
+        allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
+          .eq("company_id", company).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59").order("id").range(a, b)),
       ]);
       const planned = new Map<string, number>();
       for (const s of shifts ?? []) {
@@ -186,10 +187,10 @@ export async function getManagerReport(kind: ReportKind, fromISO: string, toISO:
     }
 
     if (kind === "absence") {
-      const { data: leaves } = await supabase.from("leave_requests")
-        .select("employee_id, type, from_date, to_date, status")
+      const { data: leaves } = await allRows((a, b) => supabase.from("leave_requests")
+        .select("id, employee_id, type, from_date, to_date, status")
         .eq("company_id", company).eq("status", "approved")
-        .lte("from_date", toISO).gte("to_date", fromISO);
+        .lte("from_date", toISO).gte("to_date", fromISO).order("id").range(a, b));
       const days = (a: string, b: string) => Math.max(1, Math.round((Math.min(Date.parse(b), Date.parse(toISO)) - Math.max(Date.parse(a), Date.parse(fromISO))) / 86400000) + 1);
       const acc = new Map<string, { sick: number; vac: number; other: number }>();
       for (const l of leaves ?? []) {
@@ -211,8 +212,8 @@ export async function getManagerReport(kind: ReportKind, fromISO: string, toISO:
 
     // hours + overtime + cost need punch groups + rules per employee.
     const [{ data: punches }, prRes] = await Promise.all([
-      supabase.from("punches").select("employee_id, clock_in, clock_out")
-        .eq("company_id", company).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59"),
+      allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
+        .eq("company_id", company).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59").order("id").range(a, b)),
       supabase.from("employees").select("id, pay_rule").eq("company_id", company),
     ]);
     const ruleMap = new Map<string, unknown>();
@@ -276,8 +277,8 @@ async function workedHours(
   fromISO: string,
   toISO: string,
 ): Promise<{ rows: Map<string, number> }> {
-  const { data: punches } = await supabase.from("punches").select("employee_id, clock_in, clock_out")
-    .eq("company_id", company).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59");
+  const { data: punches } = await allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
+    .eq("company_id", company).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59").order("id").range(a, b));
   const rows = new Map<string, number>();
   for (const p of punches ?? []) {
     if (!p.clock_out) continue;

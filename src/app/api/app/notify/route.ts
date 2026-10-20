@@ -9,7 +9,7 @@ import { checkNoShows } from "@/lib/noshow.server";
 // Auth: the caller's Supabase access token (Bearer). We verify the caller is a
 // party to the row before notifying anyone — this endpoint never writes data.
 
-type Kind = "leave_request" | "leave_decided" | "swap_request" | "shift_claim" | "punch" | "content_report";
+type Kind = "leave_request" | "leave_decided" | "swap_request" | "shift_claim" | "punch" | "content_report" | "work_overview";
 
 export async function POST(req: Request) {
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -43,6 +43,17 @@ export async function POST(req: Request) {
     const { data: c } = await admin.from("shift_claims").select("company_id, employee_id, status").eq("id", id).maybeSingle();
     if (!c || !me || c.employee_id !== me.id || c.status !== "pending") return NextResponse.json({ ok: false }, { status: 403 });
     after(() => notifyManagers(c.company_id as string, { title: "Umsókn um lausa vakt", body: "Starfsmaður sótti um lausa vakt — úthlutaðu í Vaktaplani.", url: "/vaktaplan", tag: "open-shift" }));
+    return NextResponse.json({ ok: true });
+  }
+
+  // Svar starfsmanns við vinnuyfirliti (0084, respond_work_overview) → stjórnendur fá tilkynningu.
+  if (kind === "work_overview") {
+    const { data: w } = await admin.from("work_overviews").select("company_id, employee_id, status").eq("id", id).maybeSingle();
+    if (!w || !me || w.employee_id !== me.id || (w.status !== "employee_approved" && w.status !== "employee_flagged")) return NextResponse.json({ ok: false }, { status: 403 });
+    const approved = w.status === "employee_approved";
+    after(() => notifyManagers(w.company_id as string, approved
+      ? { title: "Vinnuyfirlit staðfest af starfsmanni", body: "Starfsmaður staðfesti vinnuyfirlitið sitt — lokastaðfesting bíður þín.", url: "/timaskraning/vinnuyfirlit", tag: "work-overview" }
+      : { title: "Athugasemd við vinnuyfirlit", body: "Starfsmaður gerði athugasemd við vinnuyfirlitið sitt.", url: "/timaskraning/vinnuyfirlit", tag: "work-overview" }));
     return NextResponse.json({ ok: true });
   }
 
