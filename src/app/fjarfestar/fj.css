@@ -1,7 +1,7 @@
 /* Fjárfestasíða VAKTO — sama útlit og vakto.is (home.css tokens, appelsínugult). */
 .fj{background:#fbfbfd;min-height:100vh;color:#1d1d1f;font-variant-numeric:tabular-nums}
 .fj main{position:relative;z-index:1}
-.fj-gate{max-width:420px;margin:0 auto;padding:160px 20px 140px}
+.fj-gate{max-width:420px;margin:0 auto;padding:160px var(--sx) 140px}
 .fj-gate h1{font-size:34px;font-weight:600;letter-spacing:-.03em;margin:0}
 .fj-gate p{font-size:15px;color:#6e6e73;margin:8px 0 24px;line-height:1.5}
 .fj-gate form{display:flex;flex-direction:column;gap:12px}
@@ -11,7 +11,7 @@
 .fj-gate button:active{transform:scale(.98)}
 .fj-err{font-size:14px;color:#c0392b}
 
-.fj-main{max-width:1080px;margin:0 auto;padding:140px 20px 110px}
+.fj-main{max-width:1080px;margin:0 auto;padding:140px var(--sx) 110px}
 .fj-hero{text-align:center}
 .fj-eye{font-size:13px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#e9700f}
 .fj-hero h1{font-size:clamp(40px,6.4vw,68px);font-weight:600;letter-spacing:-.045em;line-height:1.04;margin:16px 0 0}
