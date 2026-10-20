@@ -41,6 +41,8 @@ export type LaborStaffRow = {
   id: string; name: string; av: string; c: string; dept: string;
   planned: number; actual: number; deviation: number; over: boolean;
   cost: number; // this employee's share of `cost` (kr)
+  ot: number;   // yfirvinnutímar (classifyPay) — mánaðarskýrsla raðar eftir þessu
+  otPay: number; // kr yfirvinnuálag
 };
 export type LaborDayPoint = { date: string; label: string; planned: number; actual: number };
 
@@ -220,6 +222,7 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
       if (pl > 0 || ac > 0 || mine > 0) staff.push({
         id: e.id, name: e.fullName.split(/\s+/)[0], av: initials(e.fullName), c: e.avatarColor, dept: e.department ?? "—",
         planned: r1(pl), actual: r1(ac), deviation: r1(ac - pl), over: ac > pl + 0.05, cost: Math.round(mine),
+        ot: r1(cls.overtime), otPay: Math.round(cls.overtimePay),
       });
     }
     staff.sort((a, b) => b.deviation - a.deviation);

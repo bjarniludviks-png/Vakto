@@ -17,12 +17,7 @@ export function periodsFor(now: Date): Period[] {
     const to = new Date(now); to.setDate(to.getDate() - 1);
     out.push({ kind: "weekly", from: iso(from), to: iso(to), label: `Vikuskýrsla ${from.getDate()}.${from.getMonth() + 1}.–${to.getDate()}.${to.getMonth() + 1}.` });
   }
-  if (now.getDate() === 1) { // 1st → last month
-    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const to = new Date(now.getFullYear(), now.getMonth(), 0);
-    const MO = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
-    out.push({ kind: "monthly", from: iso(from), to: iso(to), label: `Mánaðarskýrsla ${MO[from.getMonth()]} ${from.getFullYear()}` });
-  }
+  // Mánaðarskýrslan fer nú sér (monthly-report.server.ts, /api/cron/monthly-report) — reiknuð úr labor.ts.
   return out;
 }
 
