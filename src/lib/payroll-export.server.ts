@@ -5,6 +5,7 @@ import { computeLine, computeFromPunches, hourBuckets, computeUppbot, uppbotForM
 import { resolveRuleSet, resolveUppbot } from "@/lib/payrules";
 import { DEMO_EMPLOYEES, type Employee } from "@/lib/employees";
 import { getEmployees } from "@/lib/employees.server";
+import { allRows } from "@/lib/supabase/all-rows";
 
 // Launalínur + tímar flokkaðir fyrir launakerfi (Payday/DK/Excel). Notað af útflutnings-
 // endapunktinum og beinni sendingu í Payday, svo báðar leiðir skili nákvæmlega sömu tölum.
@@ -48,13 +49,14 @@ export async function getExportLines(from?: string, to?: string): Promise<{ line
     // With a period: export approved worked hours. Without: contracted baseline.
     if (from && to && company) {
       let punches: { employee_id: string; clock_in: string; clock_out: string }[] = [];
-      const approved = await supabase.from("punches").select("employee_id, clock_in, clock_out")
+      // Síðað (allRows) — sama ástæða og í launakeyrslunni: >1.000 stimplanir á tímabili duttu út.
+      const approved = await allRows<{ employee_id: string; clock_in: string; clock_out: string }>((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
         .eq("company_id", company).eq("approved", true).not("clock_out", "is", null)
-        .gte("clock_in", from).lte("clock_in", to + "T23:59:59");
+        .gte("clock_in", from).lte("clock_in", to + "T23:59:59").order("id").range(a, b));
       if (approved.error) {
-        const all = await supabase.from("punches").select("employee_id, clock_in, clock_out")
+        const all = await allRows<{ employee_id: string; clock_in: string; clock_out: string }>((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
           .eq("company_id", company).not("clock_out", "is", null)
-          .gte("clock_in", from).lte("clock_in", to + "T23:59:59");
+          .gte("clock_in", from).lte("clock_in", to + "T23:59:59").order("id").range(a, b));
         punches = (all.data ?? []) as typeof punches;
       } else punches = (approved.data ?? []) as typeof punches;
       const byEmp = new Map<string, { clockIn: string; clockOut: string }[]>();

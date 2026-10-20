@@ -4,6 +4,7 @@ import { chargeToken, straumurConfigured } from "@/lib/straumur";
 import { invoiceFor, planFor, baseModeFor, type PlanId, type BillingInterval } from "@/lib/pricing";
 import { issuePaydayInvoice, issueMissingPaydayInvoices } from "@/lib/billing-payday.server";
 import { sendTrialReminderEmail, sendCardMissingEmail, sendPaymentFailedEmail, sendReceiptEmail, sendSuspendedEmail } from "@/lib/email";
+import { allRows } from "@/lib/supabase/all-rows";
 
 // Áskriftarvélin: prufu-áminningar, mánaðarreikningar, gjaldtaka af skráðu korti, lokun.
 // Keyrt daglega af /api/cron/billing. Allt idempotent per dag/tímabil.
@@ -27,9 +28,14 @@ async function usersCount(companyId: string): Promise<number> {
 /** Virkir starfsmenn á [from, to): átti vakt eða stimplaði sig (billing_usage, óháð síðari eyðingu). */
 export async function activeEmployees(companyId: string, from: string, to: string): Promise<number> {
   const admin = createAdminClient();
-  const { data } = await admin.from("billing_usage").select("ref").eq("company_id", companyId)
-    .in("kind", ["shift", "punch"]).gte("day", from).lt("day", to).limit(20000);
-  return new Set((data ?? []).map((r) => r.ref as string)).size;
+  // Ein röð per starfsmann × dag × tegund → 60 manna fyrirtæki á ~2.500 raðir á mánuði. `.limit(20000)`
+  // hjálpar ekki: PostgREST skilar mest 1.000 → of fáir virkir taldir. Síðað á lykli töflunnar.
+  // Villa → kasta (aldrei reikningsfæra á hálfum gögnum).
+  const { data, error } = await allRows<{ ref: string }>((a, b) => admin.from("billing_usage").select("ref").eq("company_id", companyId)
+    .in("kind", ["shift", "punch"]).gte("day", from).lt("day", to)
+    .order("kind").order("ref").order("day").range(a, b));
+  if (error) throw new Error(`activeEmployees: ${error.message}`);
+  return new Set((data ?? []).map((r) => r.ref)).size;
 }
 
 /** Fullgildar undirskriftir (Taktikal) á [from, to). */
@@ -192,7 +198,9 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
         const hasUsage = prevStart.getTime() >= anchor.getTime();
         const uFrom = iso(prevStart), uTo = iso(periodStart);
         const esigns = hasUsage ? await esignCount(id, uFrom, uTo) : 0;
-        const active = hasUsage ? await activeEmployees(id, uFrom, uTo) : 0;
+        let active = 0;
+        try { active = hasUsage ? await activeEmployees(id, uFrom, uTo) : 0; }
+        catch (e) { console.error("[billing] notkun ólesanleg — reikningur bíður til morguns:", id, e); continue; } // idempotent: reynt aftur næsta dag
         const users = await usersCount(id);
         const units = plan === "v1" ? users : active;   // v1: notendur fyrirfram eins og áður
         const interval = ((co.billing_interval as string) === "year" ? "year" : "month") as BillingInterval;

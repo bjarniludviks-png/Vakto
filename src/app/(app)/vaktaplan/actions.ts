@@ -11,6 +11,7 @@ import { initials as empInitials } from "@/lib/employees";
 import { getWeekUnavail } from "./schedule.server";
 import { getWeekBudget as laborWeekBudget, type WeekBudget } from "@/lib/labor";
 import { userError } from "@/lib/user-error";
+import { allRows } from "@/lib/supabase/all-rows";
 
 export type ShiftInput = {
   employeeName: string; // first name as shown in the grid
@@ -123,9 +124,9 @@ export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; gri
       const dt = new Date(y, m - 1, d + i);
       return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
     });
-    const { data: shifts } = await supabase
-      .from("shifts").select("employee_id, date, start_time, end_time, shift_types(name)")
-      .eq("company_id", ctx.company).in("date", dates);
+    const { data: shifts } = await allRows((a, b) => supabase
+      .from("shifts").select("id, employee_id, date, start_time, end_time, shift_types(name)")
+      .eq("company_id", ctx.company).in("date", dates).order("id").range(a, b));
 
     const idIndex = new Map(employees.map((e, i) => [e.id, i]));
     const grid: string[][] = employees.map(() => Array(7).fill("off"));
@@ -286,10 +287,10 @@ export async function getShiftsInRange(fromISO: string, toISO: string): Promise<
     const { employees, live } = await getEmployees();
     if (!live) return { ok: false, rows: [] };
     const meta = new Map(employees.map((e) => [e.id, { full: e.fullName, first: e.fullName.split(/\s+/)[0], dept: e.department ?? "" }]));
-    const { data: shifts } = await supabase
-      .from("shifts").select("employee_id, date, start_time, end_time, shift_types(name)")
+    const { data: shifts } = await allRows((a, b) => supabase
+      .from("shifts").select("id, employee_id, date, start_time, end_time, shift_types(name)")
       .eq("company_id", ctx.company).gte("date", fromISO).lte("date", toISO)
-      .order("date").order("start_time");
+      .order("date").order("start_time").order("id").range(a, b));
     const rows: ExportRow[] = (shifts ?? []).map((s) => {
       const m = meta.get(s.employee_id as string);
       return {

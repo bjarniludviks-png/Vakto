@@ -2,6 +2,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { getCompanyId, getLaborPeriods, type LaborPeriod, type Db } from "@/lib/labor";
 import { BURDEN } from "@/lib/payroll";
+import { allRows } from "@/lib/supabase/all-rows";
 
 // VAKTO AI — samanburður og saga (sama hugmynd og sales_report í INVENTRA AI).
 // Allar tölur koma úr sama útreikningi og mælaborðið (lib/labor) eða úr vistuðum launakeyrslum.
@@ -144,7 +145,7 @@ export async function payrollRuns(from: string, to: string, employee?: string) {
   const { data: runs } = await supabase.from("payroll_runs").select("id, period_start, period_end, status, created_at")
     .eq("company_id", company).lte("period_start", to).gte("period_end", from).order("period_start");
   if (!runs?.length) return { runs: [], note: "Engar launakeyrslur á þessu bili. labor_summary/compare_periods sýna áætlaðan launakostnað út frá tímum." };
-  const { data: lines } = await supabase.from("payroll_lines").select("*, employees(full_name)").in("run_id", runs.map((r) => r.id as string));
+  const { data: lines } = await allRows((a, b) => supabase.from("payroll_lines").select("*, employees(full_name)").in("run_id", runs.map((r) => r.id as string)).order("id").range(a, b));
   const want = employee ? norm(employee) : "";
   const who = (l: Record<string, unknown>) => {
     const e = l.employees as { full_name?: string } | { full_name?: string }[] | null;

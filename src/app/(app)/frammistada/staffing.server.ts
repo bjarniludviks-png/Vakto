@@ -1,6 +1,7 @@
 import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { allRows } from "@/lib/supabase/all-rows";
 
 export type WeekdayStat = { wd: number; label: string; planned: number; actual: number; deviation: number; rec: "more" | "fewer" | "ok" };
 export type StaffingPattern = { live: boolean; rows: WeekdayStat[]; weeks: number };
@@ -41,8 +42,8 @@ export async function getStaffingPattern(fromISO: string, toISO: string): Promis
     if (!company) return { live: false, rows: DEMO, weeks: 4 };
 
     const [{ data: shifts }, { data: punches }] = await Promise.all([
-      supabase.from("shifts").select("date, start_time, end_time").eq("company_id", company).gte("date", fromISO).lte("date", toISO),
-      supabase.from("punches").select("clock_in, clock_out").eq("company_id", company).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59"),
+      allRows((a, b) => supabase.from("shifts").select("id, date, start_time, end_time").eq("company_id", company).gte("date", fromISO).lte("date", toISO).order("id").range(a, b)),
+      allRows((a, b) => supabase.from("punches").select("id, clock_in, clock_out").eq("company_id", company).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59").order("id").range(a, b)),
     ]);
 
     const planned = new Array(7).fill(0), actual = new Array(7).fill(0);

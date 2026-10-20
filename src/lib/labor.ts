@@ -25,6 +25,7 @@ import { computeLine, classifyPay, BURDEN } from "@/lib/payroll";
 import { resolveRuleSet, type CustomRules } from "@/lib/payrules";
 import { initials } from "@/lib/employees";
 import { colorFor } from "@/lib/avatar";
+import { allRows } from "@/lib/supabase/all-rows"; // PostgREST max 1.000 raðir per beiðni
 
 export type Db = Awaited<ReturnType<typeof createClient>>;
 
@@ -114,20 +115,6 @@ type EmpRow = {
   /** Verktaki: þóknun án launatengdra gjalda, álaga og yfirvinnu. */
   contractor?: boolean;
 };
-
-/** Allar raðir fyrirspurnar, síða fyrir síðu. PostgREST skilar mest 1.000 röðum (max_rows) —
- * án þessa duttu stimplanir/vaktir út þegjandi yfir löng tímabil (t.d. 12 mánaða saga í Innsýn). */
-const PAGE = 1000;
-async function allRows(page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>): Promise<{ data: Record<string, unknown>[] }> {
-  const out: Record<string, unknown>[] = [];
-  for (let i = 0; i < 100; i++) {
-    const { data, error } = await page(i * PAGE, i * PAGE + PAGE - 1);
-    if (error || !data) break;
-    out.push(...(data as Record<string, unknown>[]));
-    if (data.length < PAGE) break;
-  }
-  return { data: out };
-}
 
 /** Resolve the signed-in user's company (users.company_id). */
 export async function getCompanyId(supabase: Db): Promise<string | null> {
