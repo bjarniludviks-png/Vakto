@@ -10,6 +10,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getPendingRequests } from "@/app/(app)/vaktaplan/requests.server";
 import { comparePeriods, laborTrend, payrollRuns } from "./assistant-insights";
 import { getPlanRequestsForMe, guardLeaveShifts } from "./plan-requests.server";
+import { listAlerts, createAlert, setAlertActive, deleteAlert, sendReportNow } from "@/app/(app)/stillingar/alert-actions";
+import { normalizeAlert, describeAlert, REPORTS, SCHEDULABLE_REPORTS, REPORT_TITLE, RANGES } from "@/lib/alerts";
 
 // VAKTO AI — verkfæri. LESverkfæri keyra strax (sömu aðgerðir og skjáirnir nota, sama aðgangsstýring).
 // SKRIFverkfæri keyra ALDREI í líkaninu sjálfu: þau verða „tillaga" sem notandinn staðfestir með hnappi,
@@ -17,6 +19,8 @@ import { getPlanRequestsForMe, guardLeaveShifts } from "./plan-requests.server";
 
 const DATE = { type: "string", description: "YYYY-MM-DD" } as const;
 const TIME = { type: "string", description: "HH:MM (24 klst.)" } as const;
+const PERIOD = { type: "string", enum: ["week", "month", "payroll"], description: "week = mán–sun, month = almanaksmánuður, payroll = launatímabil fyrirtækisins" };
+const CHANNEL = { type: "string", enum: ["email", "push", "both"], description: "Tölvupóstur (sjálfgefið), push-tilkynning eða bæði" };
 
 export const READ_TOOLS: Anthropic.Tool[] = [
   {
@@ -80,6 +84,11 @@ export const READ_TOOLS: Anthropic.Tool[] = [
     name: "employee_contracts",
     description: "Samningar starfsmanns (leit eftir nafni): netfang á skrá og samningar með stöðu (draft = drög, sent = bíður undirritunar starfsmanns, signed = undirritaður, void = ógildur) og dagsetningum. Ef fleiri en einn starfsmaður passar við nafnið koma allir — spurðu þá hvern er átt við. Kallaðu á þetta ÁÐUR en þú notar resend_contract.",
     input_schema: { type: "object", properties: { employee: { type: "string", description: "Nafn starfsmanns (fullt nafn eða fornafn)" } }, required: ["employee"] },
+  },
+  {
+    name: "list_alerts",
+    description: "Vaktarar og sjálfvirkar skýrslur fyrirtækisins (id, lýsing, virkur eða ekki, rás, hvort VAKTO AI bjó hann til, hvenær hann fór síðast). Kallaðu á þetta áður en þú notar toggle_alert eða delete_alert.",
+    input_schema: { type: "object", properties: {} },
   },
 ];
 
@@ -157,6 +166,54 @@ export const WRITE_TOOLS: Anthropic.Tool[] = [
       required: ["employee", "label"],
     },
   },
+  {
+    name: "create_alert",
+    description: "LEGGJA TIL nýjan vaktara sem lætur notandann vita sjálfkrafa (metinn daglega kl. 8, hver viðvörun einu sinni per starfsmann per tímabil). hours_threshold: starfsmaður fer yfir hours klst. á tímabili („láttu mig vita ef einhver fer yfir 180 tíma í mánuðinum“ → hours 180, period month); warnPct = snemmviðvörun (sjálfgefið 90, 0 = engin); includePlanned = líka þegar vaktir sem eru eftir á tímabilinu munu fara yfir. overtime_threshold: starfsmaður fer yfir hours yfirvinnutíma á tímabili. labor_pct_above: laun % af veltu fer yfir pct (period week eða month).",
+    input_schema: {
+      type: "object",
+      properties: {
+        kind: { type: "string", enum: ["hours_threshold", "overtime_threshold", "labor_pct_above"] },
+        hours: { type: "number", description: "Klst. (hours_threshold, overtime_threshold)" },
+        pct: { type: "number", description: "Laun % af veltu (labor_pct_above)" },
+        period: PERIOD,
+        warnPct: { type: "number", description: "Snemmviðvörun í % af mörkunum (hours_threshold), t.d. 90; 0 = engin" },
+        includePlanned: { type: "boolean", description: "hours_threshold: telja með vaktir sem eru eftir á tímabilinu" },
+        channel: CHANNEL,
+      },
+      required: ["kind"],
+    },
+  },
+  {
+    name: "schedule_report",
+    description: "LEGGJA TIL skýrslu úr Skýrslusafninu sem er send sjálfkrafa í tölvupósti (tafla + Excel) á tímaáætlun, alltaf kl. 8 að morgni. „Sendu mér yfirvinnuskýrslu alla mánudaga kl. 8“ → report overtime, freq weekly, weekday 1. Skýrslur: hours (launatímar), overtime (yfirvinna & álög), attendance (mæting & frávik), cost (launakostnaður), costDept (kostnaður per deild), absence (fjarvistir & veikindi). range: tímabil skýrslunnar (sjálfgefið: daily → yesterday, weekly → last_week, monthly → last_month).",
+    input_schema: {
+      type: "object",
+      properties: {
+        report: { type: "string", enum: SCHEDULABLE_REPORTS },
+        freq: { type: "string", enum: ["daily", "weekly", "monthly"] },
+        weekday: { type: "integer", minimum: 1, maximum: 7, description: "weekly: 1 = mánudagur … 7 = sunnudagur" },
+        day: { type: "integer", minimum: 1, maximum: 28, description: "monthly: dagur mánaðar" },
+        range: { type: "string", enum: RANGES },
+        channel: CHANNEL,
+      },
+      required: ["report", "freq"],
+    },
+  },
+  {
+    name: "toggle_alert",
+    description: "LEGGJA TIL að kveikja eða slökkva á vaktara eða sjálfvirkri skýrslu (id úr list_alerts).",
+    input_schema: { type: "object", properties: { id: { type: "string" }, active: { type: "boolean" }, label: { type: "string", description: "Lýsing vaktarans úr list_alerts" } }, required: ["id", "active", "label"] },
+  },
+  {
+    name: "delete_alert",
+    description: "LEGGJA TIL að eyða vaktara eða sjálfvirkri skýrslu (id úr list_alerts).",
+    input_schema: { type: "object", properties: { id: { type: "string" }, label: { type: "string", description: "Lýsing vaktarans úr list_alerts" } }, required: ["id", "label"] },
+  },
+  {
+    name: "send_report_now",
+    description: "LEGGJA TIL að senda skýrslu úr Skýrslusafninu strax í tölvupósti á netfang notandans sem biður um hana (tafla + Excel). „Sendu mér mætingarskýrslu síðasta mánaðar“ → report attendance, from/to = fyrsti og síðasti dagur síðasta mánaðar. Skýrslur eins og í schedule_report, auk timebank (orlof & tímabanki).",
+    input_schema: { type: "object", properties: { report: { type: "string", enum: REPORTS }, from: DATE, to: DATE }, required: ["report", "from", "to"] },
+  },
 ];
 
 export const WRITE_NAMES = new Set(WRITE_TOOLS.map((t) => t.name));
@@ -226,6 +283,13 @@ function openShiftDates(input: In): { ok: true; dates: string[] } | { ok: false;
 }
 const openCount = (input: In) => Math.min(Math.max(Math.round(Number(input.count) || 1), 1), 10);
 const openNote = (input: In) => [str(input.department), str(input.note)].filter(Boolean).join(" · ").slice(0, 200);
+
+/** Inntak create_alert / schedule_report → regla (sama sannprófun og Stillingar). */
+function alertInput(name: string, input: In) {
+  return name === "schedule_report"
+    ? normalizeAlert({ kind: "report", params: { report: input.report, range: input.range }, schedule: { freq: input.freq, weekday: input.weekday, day: input.day }, channel: input.channel })
+    : normalizeAlert({ kind: input.kind, params: { hours: input.hours, pct: input.pct, period: input.period, warnPct: input.warnPct, includePlanned: input.includePlanned }, channel: input.channel });
+}
 
 /** Keyrir lesverkfæri og skilar JSON-streng fyrir líkanið. */
 export async function runReadTool(name: string, input: In): Promise<string> {
@@ -305,6 +369,12 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       })));
       return JSON.stringify(out.length > 1 ? { ambiguous: true, matches: out } : out[0]);
     }
+    if (name === "list_alerts") {
+      const a = await listAlerts();
+      if (a.missing) return JSON.stringify({ error: "Vaktarar eru ekki komnir í gagnagrunninn enn" });
+      if (!a.ok) return JSON.stringify({ error: a.error ?? "Tókst ekki að sækja vaktarana" });
+      return JSON.stringify(a.rules.map((r) => ({ id: r.id, description: r.description || describeAlert(r, "is"), active: r.active, channel: r.channel, byVaktoAi: r.createdVia === "ai", lastFiredAt: r.lastFiredAt })));
+    }
     if (name === "pending_requests") {
       const r = await getPendingRequests();
       return JSON.stringify(r.items.filter((i) => i.id).map((i) => ({ id: i.id, kind: i.kind, title: i.title, detail: i.detail, hints: i.hints?.map((h) => h.text) })));
@@ -357,6 +427,26 @@ export function describeWrite(name: string, input: In, lang: string): { ok: true
       return { ok: true, summary: en
         ? `Create ${total} open shift${total > 1 ? "s" : ""} ${span}, ${input.start}–${input.end}${n > 1 ? `, ${n} per day` : ""}${str(input.shiftType) ? ` (${input.shiftType})` : ""}${note ? ` · ${note}` : ""}. Staff are notified and can apply in the app.`
         : `Stofna ${total} ${total > 1 ? "lausar vaktir" : "lausa vakt"} ${span}, kl. ${input.start}–${input.end}${n > 1 ? `, ${n} á dag` : ""}${str(input.shiftType) ? ` (${input.shiftType})` : ""}${note ? ` · ${note}` : ""}. Starfsfólk fær tilkynningu og getur sótt um í appinu.` };
+    }
+    case "create_alert":
+    case "schedule_report": {
+      const n = alertInput(name, input);
+      if (!n.ok) return n;
+      const ch = n.rule.channel === "push" ? (en ? "push notification" : "push-tilkynning") : n.rule.channel === "both" ? (en ? "email and push" : "tölvupóstur og push") : (en ? "email" : "tölvupóstur");
+      return { ok: true, summary: `${name === "schedule_report" ? (en ? "Schedule report" : "Sjálfvirk skýrsla") : (en ? "New alert" : "Nýr vaktari")}: ${describeAlert(n.rule, en ? "en" : "is")} · ${ch}` };
+    }
+    case "toggle_alert":
+      if (!str(input.id) || typeof input.active !== "boolean") return { ok: false, error: "Vantar id eða stöðu" };
+      return { ok: true, summary: `${input.active ? (en ? "Turn on alert" : "Kveikja á vaktara") : (en ? "Turn off alert" : "Slökkva á vaktara")}: ${str(input.label) || str(input.id)}` };
+    case "delete_alert":
+      if (!str(input.id)) return { ok: false, error: "Vantar id" };
+      return { ok: true, summary: `${en ? "Delete alert" : "Eyða vaktara"}: ${str(input.label) || str(input.id)}` };
+    case "send_report_now": {
+      const rep = REPORTS.find((r) => r === input.report);
+      if (!rep || !okDate(input.from) || !okDate(input.to) || str(input.to) < str(input.from)) return { ok: false, error: "Vantar skýrslu eða tímabil (YYYY-MM-DD)" };
+      return { ok: true, summary: en
+        ? `Email me the report "${REPORT_TITLE.en[rep]}" for ${shortDate(str(input.from))}–${shortDate(str(input.to))} (table + Excel)`
+        : `Senda mér skýrsluna „${REPORT_TITLE.is[rep]}“ fyrir ${shortDate(str(input.from))}–${shortDate(str(input.to))} í tölvupósti (tafla + Excel)` };
     }
     case "resend_contract":
       if (!who) return { ok: false, error: "Vantar starfsmann" };
@@ -419,6 +509,18 @@ export async function executeWrite(name: string, input: In): Promise<{ ok: boole
       if (!p.ok) return p;
       return createOpenShifts({ dates: p.dates, start: str(input.start).padStart(5, "0"), end: str(input.end).padStart(5, "0"), shiftTypeName: str(input.shiftType) || undefined, note: openNote(input) || undefined, count: openCount(input) });
     }
+    case "create_alert":
+    case "schedule_report": {
+      const n = alertInput(name, input);
+      if (!n.ok) return n;
+      return createAlert(n.rule, "ai");
+    }
+    case "toggle_alert":
+      return setAlertActive(str(input.id), input.active === true);
+    case "delete_alert":
+      return deleteAlert(str(input.id));
+    case "send_report_now":
+      return sendReportNow({ report: str(input.report), from: str(input.from), to: str(input.to) });
     case "resend_contract": {
       const { employees } = await getEmployees();
       const hits = matchStaff(employees.filter((e) => e.status !== "inactive"), str(input.employee));
