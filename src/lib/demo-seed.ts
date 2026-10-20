@@ -29,6 +29,8 @@ export const DEMO_EMAIL_DOMAIN = "demo.vakto.is";
 export const PUBLIC_DEMO = {
   company: {
     name: "Kaffi Sól", location: "Reykjavík", country: "IS", address: "Laugavegur 12", postal_code: "101", city: "Reykjavík",
+    // Gervikennitala (ekki til í fyrirtækjaskrá) — svo „Fyrstu skrefin“ séu kláruð í demóinu.
+    kennitala: "650000-0000", phone: "555 0000", email: `kaffisol@demo.vakto.is`,
     plan: "vakto", billing_status: "free", card_required: false, ai_addon: false,
     geofence_mode: "off", labor_target: 30, feed_post_policy: "everyone", revenue_mode: "manual",
   },
@@ -106,7 +108,7 @@ export async function ensureDemoBase(db: Db, companyId: string, ownerId: string 
 export type SeedOptions = { now?: Date; emailDomain?: string; log?: Log };
 export type SeedSummary = { shifts: number; punches: number; revenueDays: number; staff: number; messages: number };
 
-type Emp = { id: string; full_name: string; location_id: string | null };
+type Emp = { id: string; full_name: string; location_id: string | null; rate: number | null };
 type ShiftRow = { company_id: string; location_id: string; employee_id: string; shift_type_id: string | null; date: string; start_time: string; end_time: string; status: string; published: boolean };
 
 export async function seedDemoData(db: Db, companyId: string, opts: SeedOptions = {}): Promise<SeedSummary> {
@@ -121,7 +123,7 @@ export async function seedDemoData(db: Db, companyId: string, opts: SeedOptions 
 
   const { data: company } = await db.from("companies").select("id, name").eq("id", COMPANY).maybeSingle();
   if (!company) throw new Error(`Fyrirtæki fannst ekki: ${COMPANY}`);
-  const { data: empRows } = await db.from("employees").select("id, full_name, location_id, status")
+  const { data: empRows } = await db.from("employees").select("id, full_name, location_id, rate, status")
     .eq("company_id", COMPANY).in("status", ["active", "over_ratio"]).order("full_name");
   const emps = (empRows ?? []) as Emp[];
   if (!emps.length) throw new Error(`Engir virkir starfsmenn í ${company.name}`);
@@ -152,7 +154,8 @@ export async function seedDemoData(db: Db, companyId: string, opts: SeedOptions 
     const dateISO = iso(d), wd = d.getDay(); // 0=sun
     const weekend = wd === 0 || wd === 6;
     for (const g of groups) {
-      const nDay = g.primary ? (weekend ? 3 : 2) : (weekend ? 2 : 1), nMid = g.primary ? 1 : (weekend ? 0 : 1), nEve = g.primary ? (weekend ? 3 : 2) : (weekend ? 2 : 1);
+      // Aukastaðir: engin miðvakt — annars fer fámennt teymi yfir 40 klst/viku (yfirvinna í hverri viku).
+      const nDay = g.primary ? (weekend ? 3 : 2) : (weekend ? 2 : 1), nMid = g.primary ? 1 : 0, nEve = g.primary ? (weekend ? 3 : 2) : (weekend ? 2 : 1);
       // róterum svo allir fái frídaga
       const offset = Math.floor((d.getTime() - from.getTime()) / 864e5) % g.staff.length;
       const rota = [...g.staff.slice(offset), ...g.staff.slice(0, offset)];
@@ -166,11 +169,20 @@ export async function seedDemoData(db: Db, companyId: string, opts: SeedOptions 
         shifts.push({ company_id: COMPANY, location_id: g.id, employee_id: e.id, shift_type_id: kind === "eve" ? (eve?.id as string) ?? null : (day?.id as string) ?? null,
           date: dateISO, start_time: st, end_time: en, status: "published", published: true, _kind: kind });
       }
-      // velta liðinna daga (og í dag hingað til): helgar sterkari
+      // Velta liðinna daga (og í dag hingað til) leidd af launum dagsins: laun % lendir á 28–34 %
+      // óháð fjölda starfsfólks/staða og taxta. 1,55 ≈ launatengd gjöld + álag (kvöld/helgar) ofan á taxta.
+      // Í dag: aðeins vaktir sem er lokið (kostnaður telur bara lokaðar stimplanir) — annars sýnir „Vika“ of lágt %.
       if (d <= today) {
-        const base = (weekend ? 640_000 : 460_000) * (g.primary ? 1 : 0.55);
-        const amount = Math.round((base * (0.88 + rnd() * 0.24)) / 1000) * 1000;
-        revenue.push({ location_id: g.id, date: dateISO, amount: d.getTime() === today.getTime() ? Math.round(amount * 0.55) : amount, source: "manual" });
+        const isToday = d.getTime() === today.getTime(), nowMin = now.getHours() * 60 + now.getMinutes();
+        let wages = 0;
+        for (const [e, kind] of plan) {
+          const [st, en] = PATTERNS[kind];
+          if (isToday && Number(en.slice(0, 2)) * 60 > nowMin) continue;
+          wages += (Number(e.rate) || 2900) * (Number(en.slice(0, 2)) - Number(st.slice(0, 2)));
+        }
+        const pct = 0.28 + rnd() * 0.06;
+        const amount = Math.round((wages * 1.55) / pct / 1000) * 1000;
+        if (amount > 0 || isToday) revenue.push({ location_id: g.id, date: dateISO, amount, source: "manual" });
       }
     }
   }
@@ -213,7 +225,17 @@ export async function seedDemoData(db: Db, companyId: string, opts: SeedOptions 
   try { await ins("punches", punchRows); } catch { await ins("punches", punchRows.map(({ approved, ...p }) => { void approved; return p; })); }
   await ins("revenue", revenue);
   // meðalvelta vikudaga svo dagar án raða áætlist skynsamlega
-  await db.from("companies").update({ weekday_revenue: { 0: 640000, 1: 440000, 2: 450000, 3: 470000, 4: 480000, 5: 560000, 6: 660000 } }).eq("id", COMPANY);
+  // Meðalvelta vikudaga (allir staðir) úr sömu tölum, svo áætlaðir dagar (t.d. framtíð) stemmi við raunina.
+  const byWd = new Map<number, { sum: number; days: Set<string> }>();
+  for (const r of revenue) {
+    if (r.date === todayISO) continue; // hálfur dagur
+    const wd = new Date(r.date + "T00:00:00").getDay();
+    const b = byWd.get(wd) ?? { sum: 0, days: new Set<string>() };
+    b.sum += r.amount; b.days.add(r.date); byWd.set(wd, b);
+  }
+  const weekday_revenue: Record<string, number> = {};
+  for (const [wd, b] of byWd) weekday_revenue[String(wd)] = Math.round(b.sum / b.days.size / 1000) * 1000;
+  await db.from("companies").update({ weekday_revenue }).eq("id", COMPANY);
   log(`${company.name}: ${shiftRows.length} vaktir, ${punchRows.length} stimplanir, ${revenue.length} veltudagar (${fromISO} → ${toISO}), ${staffCount} starfsmenn`);
 
   // ---- spjall + fréttir: nokkrir starfsmenn tengdir demo-notendum (bólur frá alvöru fólki).
