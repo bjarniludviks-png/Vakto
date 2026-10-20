@@ -10,6 +10,7 @@ type Dict = Record<string, { is: string; en: string; vi?: string; pl?: string }>
 export const DICT: Dict = {
   // Opið demo
   "Þú ert í demo — gögnin eru gervigögn og núllstillast á hverri nóttu.": { is: "Þú ert í demo — gögnin eru gervigögn og núllstillast á hverri nóttu.", en: "You are in the demo — the data is fictional and resets every night.", vi: "Bạn đang dùng bản demo — dữ liệu là giả và được đặt lại mỗi đêm.", pl: "Jesteś w wersji demo — dane są fikcyjne i resetują się co noc." },
+  "Heimasíða": { is: "Heimasíða", en: "Home", vi: "Trang chủ", pl: "Strona główna" },
   "Stofna eigið fyrirtæki": { is: "Stofna eigið fyrirtæki", en: "Create your own company", vi: "Tạo công ty của bạn", pl: "Załóż własną firmę" },
   "Þetta er ekki í boði í demo": { is: "Þetta er ekki í boði í demo", en: "This is not available in the demo", vi: "Tính năng này không có trong bản demo", pl: "To nie jest dostępne w wersji demo" },
   "boð send": { is: "boð send", en: "invites sent", vi: "lời mời đã gửi", pl: "zaproszeń wysłanych" },

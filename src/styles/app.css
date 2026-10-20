@@ -48,6 +48,33 @@ svg{stroke-width:1.8}
 .navfoot a.on svg{color:var(--brand)}
 body.emp .navfoot .f-settings{display:none}
 
+/* efstu randir (innskráning-sem + demo) — --appbars-h er mæld í AppBars (app-shell.tsx) */
+.appbars{position:relative;z-index:60}
+.app{min-height:calc(100vh - var(--appbars-h,0px))}
+@media(min-width:761px){
+  .appbars{position:sticky;top:0}
+  .app .side{top:var(--appbars-h,0px);height:calc(100vh - var(--appbars-h,0px))}
+  .app .tbar{top:var(--appbars-h,0px)}
+}
+.demobar{background:#1d1d1f;color:#fff;font-size:13px;font-weight:500;line-height:1.35;
+  display:grid;grid-template-columns:1fr auto auto 1fr;align-items:center;gap:8px 12px;
+  padding:7px max(16px,env(safe-area-inset-right,0px)) 7px max(16px,env(safe-area-inset-left,0px));
+  padding-top:calc(7px + env(safe-area-inset-top,0px))}
+.demobar-txt{min-width:0;text-align:center}
+.demobar button{font:inherit;font-size:13px;font-weight:600;border-radius:999px;padding:4px 12px;cursor:pointer;white-space:nowrap;
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background .12s,opacity .12s}
+.demobar button:disabled{opacity:.6;cursor:default}
+.demobar-home{justify-self:start;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.3)}
+.demobar-home:hover{background:rgba(255,255,255,.1)}
+.demobar-cta{background:#e9700f;color:#fff;border:1px solid #e9700f}
+.demobar-cta:hover{background:#d4650c}
+@media(max-width:760px){
+  .demobar{grid-template-columns:1fr 1fr;gap:7px 8px;font-size:12.5px;padding-bottom:9px}
+  .demobar-txt{grid-column:1/-1;grid-row:1}
+  .demobar-home{justify-self:stretch}
+  .demobar button{padding:7px 10px;min-height:34px}
+}
+
 /* main */
 .main{flex:1;min-width:0}
 /* stop the iOS rubber-band bounce; PullToRefresh provides the reload gesture */
@@ -804,10 +831,12 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 .backdrop{display:none}
 @media(max-width:1024px){.kpis{grid-template-columns:repeat(2,1fr)}.grid2,.grid2b,.grid3{grid-template-columns:1fr}.chat{grid-template-columns:1fr}.clist{display:none}}
 @media(max-width:760px){
-  .side{position:fixed;left:0;top:0;height:100dvh;transform:translateX(-100%);transition:.25s;box-shadow:0 0 40px rgba(0,0,0,.2)}
+  /* skúffan liggur YFIR efstu röndunum (z 60) svo VAKTO-merkið sjáist alltaf */
+  .side{position:fixed;left:0;top:0;height:100dvh;transform:translateX(-100%);transition:.25s;box-shadow:0 0 40px rgba(0,0,0,.2);z-index:70}
+  .side .brand{padding-top:calc(22px + env(safe-area-inset-top,0px))}
   .side.open{transform:none}
   .navfoot{padding-bottom:calc(16px + env(safe-area-inset-bottom))}
-  .backdrop.show{display:block;position:fixed;inset:0;background:rgba(20,22,28,.4);z-index:35}
+  .backdrop.show{display:block;position:fixed;inset:0;background:rgba(20,22,28,.4);z-index:65}
   .menu-btn{display:flex}.tbar{padding:0 12px;gap:8px}.tsearch{display:none}.wrap{padding-left:18px;padding-right:18px}.ph .h1{font-size:22px}.kpis{grid-template-columns:repeat(2,1fr)}.kpis .kpi.flex{grid-column:1/-1}
   /* compact header buttons on mobile */
   .tactions{gap:7px}
@@ -916,7 +945,7 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 }
 
 /* full-bleed chat — fills the content area edge to edge, fixed */
-.msgr.full{position:fixed;top:66px;left:250px;right:0;bottom:0;height:auto;min-height:0;margin:0;border:0;border-radius:0;box-shadow:none;z-index:20}
+.msgr.full{position:fixed;top:calc(66px + var(--appbars-h,0px));left:250px;right:0;bottom:0;height:auto;min-height:0;margin:0;border:0;border-radius:0;box-shadow:none;z-index:20}
 @media(max-width:760px){.msgr.full{left:0}}
 
 /* ---- collapsible sidebar (icon rail) ---- */
