@@ -16,9 +16,10 @@ export async function GET(request: Request) {
   const id = new URL(request.url).searchParams.get("id");
   if (id) {
     if (!UUID.test(id)) return NextResponse.json({ ok: false }, { status: 400 });
-    const { data, error } = await supabase.from("ai_messages").select("id, role, content, actions").eq("conversation_id", id).order("created_at").limit(200);
+    const { data, error } = await supabase.from("ai_messages").select("id, role, content, actions").eq("conversation_id", id).order("created_at", { ascending: false }).limit(200);
     if (error) return NextResponse.json({ ok: true, messages: [] });
-    return NextResponse.json({ ok: true, messages: data ?? [] }, { headers: { "Cache-Control": "no-store" } });
+    // newest 200 (not the oldest), returned oldest-first for display
+    return NextResponse.json({ ok: true, messages: (data ?? []).reverse() },{ headers: { "Cache-Control": "no-store" } });
   }
   const { data, error } = await supabase.from("ai_conversations").select("id, title, updated_at").eq("user_id", me.userId).order("updated_at", { ascending: false }).limit(40);
   if (error) return NextResponse.json({ ok: true, conversations: [], unavailable: true });

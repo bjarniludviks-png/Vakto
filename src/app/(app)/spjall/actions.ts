@@ -425,24 +425,37 @@ export async function leaveChannel(channelId: string): Promise<{ ok: boolean; er
   }
 }
 
-export async function listMessages(channelId: string): Promise<{ ok: boolean; messages: ChatMessage[]; reads: ChannelRead[] }> {
-  if (!isSupabaseConfigured() || !channelId) return { ok: false, messages: [], reads: [] };
+/** Page size of a thread fetch: the NEWEST `CHAT_PAGE` messages; older pages via a cursor. */
+const CHAT_PAGE = 100;
+/** Cursor for "Sýna eldri skilaboð": the oldest message currently loaded. */
+export type MessageCursor = { createdAt: string; id: string };
+export type MessagesPage = { ok: boolean; messages: ChatMessage[]; reads: ChannelRead[]; hasMore: boolean };
+type MsgRow = { id: string; body: string | null; kind: string | null; attachment_url: string | null; created_at: string; sender_id: string; reply_to?: string | null; users: unknown };
+
+/** A thread's newest page — or, with `before`, the page right before that
+ * cursor — returned oldest-first for display. `hasMore` = older ones exist. */
+export async function listMessages(channelId: string, before?: MessageCursor | null): Promise<MessagesPage> {
+  const empty: MessagesPage = { ok: false, messages: [], reads: [], hasMore: false };
+  if (!isSupabaseConfigured() || !channelId) return empty;
   try {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
-    if ("error" in ctx) return { ok: false, messages: [], reads: [] };
-    const readsP = channelReadsOf(supabase, ctx, channelId);
+    if ("error" in ctx) return empty;
+    const readsP = before ? Promise.resolve([] as ChannelRead[]) : channelReadsOf(supabase, ctx, channelId);
+    // Newest first + limit (one extra row says whether older ones exist), then
+    // reversed for display. Keyset cursor on (created_at, id): equal stamps never skip.
+    const page = (cols: string) => {
+      let q = supabase.from("messages").select(cols).eq("company_id", ctx.company).eq("channel_id", channelId);
+      if (before) q = q.or(`created_at.lt."${before.createdAt}",and(created_at.eq."${before.createdAt}",id.lt.${before.id})`);
+      return q.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(CHAT_PAGE + 1);
+    };
     // reply_to arrives with 0042 — fall back to the old shape before it runs
-    let res = await supabase
-      .from("messages").select("id, body, kind, attachment_url, created_at, sender_id, reply_to, users(full_name)")
-      .eq("company_id", ctx.company).eq("channel_id", channelId).order("created_at").limit(300);
-    if (res.error) {
-      res = (await supabase
-        .from("messages").select("id, body, kind, attachment_url, created_at, sender_id, users(full_name)")
-        .eq("company_id", ctx.company).eq("channel_id", channelId).order("created_at").limit(300)) as unknown as typeof res;
-    }
+    let res = await page("id, body, kind, attachment_url, created_at, sender_id, reply_to, users(full_name)");
+    if (res.error) res = await page("id, body, kind, attachment_url, created_at, sender_id, users(full_name)");
     if (res.error) console.error("listMessages:", res.error.message);
-    const data = res.data ?? [];
+    const rows = (res.data ?? []) as unknown as MsgRow[];
+    const hasMore = rows.length > CHAT_PAGE;
+    const data = rows.slice(0, CHAT_PAGE).reverse();
 
     // reactions (table arrives with 0042 — tolerate its absence)
     const reactByMsg = new Map<string, { emoji: string; count: number; mine: boolean }[]>();
@@ -470,7 +483,16 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
       const best = !u || u.includes("@") ? (emps.get(m.sender_id as string)?.name ?? u) : u;
       return (best ?? "—").split(/\s+/)[0];
     };
-    const byId = new Map(data.map((m) => [m.id as string, m]));
+    const byId = new Map<string, MsgRow>(data.map((m) => [m.id, m]));
+    // Quoted messages older than the loaded page: fetch just those rows so the
+    // quote still renders (a deleted target simply shows no quote).
+    const missing = [...new Set(data.map((m) => m.reply_to).filter((x): x is string => !!x && !byId.has(x)))];
+    if (missing.length) {
+      const { data: extra } = await supabase.from("messages")
+        .select("id, body, kind, attachment_url, created_at, sender_id, users(full_name)")
+        .eq("company_id", ctx.company).in("id", missing);
+      for (const r of (extra ?? []) as unknown as MsgRow[]) byId.set(r.id, r);
+    }
     const messages: ChatMessage[] = data.map((m) => {
       const rt = "reply_to" in m && m.reply_to ? byId.get(m.reply_to as string) : undefined;
       return {
@@ -483,10 +505,10 @@ export async function listMessages(channelId: string): Promise<{ ok: boolean; me
         photo: emps.get(m.sender_id as string)?.photo ?? null,
       };
     });
-    return { ok: true, messages, reads: await readsP };
+    return { ok: true, messages, reads: await readsP, hasMore };
   } catch (e) {
     console.error("listMessages failed:", e);
-    return { ok: false, messages: [], reads: [] };
+    return empty;
   }
 }
 

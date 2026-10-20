@@ -936,6 +936,7 @@ export const DICT: Dict = {
   "Grúppa": { is: "Grúppa", en: "Group", vi: "Nhóm", pl: "Grupa" },
   "Allir í fyrirtækinu": { is: "Allir í fyrirtækinu", en: "Everyone at the company", vi: "Tất cả mọi người trong công ty", pl: "Wszyscy w firmie" },
   "Engin skilaboð enn — byrjaðu spjallið!": { is: "Engin skilaboð enn — byrjaðu spjallið!", en: "No messages yet — start the conversation!", vi: "Chưa có tin nhắn — hãy bắt đầu trò chuyện!", pl: "Brak wiadomości — rozpocznij rozmowę!" },
+  "Sýna eldri skilaboð": { is: "Sýna eldri skilaboð", en: "Show older messages", vi: "Xem tin nhắn cũ hơn", pl: "Pokaż starsze wiadomości" },
   "Ég": { is: "Ég", en: "Me", vi: "Tôi", pl: "Ja" },
   "Mönnun & þörf": { is: "Mönnun & þörf", en: "Staffing & need", vi: "Nhân sự & nhu cầu", pl: "Obsada i zapotrzebowanie" },
   "á vakt á móti mönnunarþörf · þessi vika": { is: "á vakt á móti mönnunarþörf · þessi vika", en: "on shift vs staffing need · this week", vi: "số người làm ca so với nhu cầu nhân sự · tuần này", pl: "na zmianie wobec zapotrzebowania na obsadę · ten tydzień" },

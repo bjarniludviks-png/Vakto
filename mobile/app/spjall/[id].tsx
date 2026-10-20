@@ -116,13 +116,50 @@ export default function Thread() {
     return () => subs.forEach((x) => x.remove());
   }, []);
 
+  // „Sýna eldri skilaboð“: eru eldri skilaboð en þau sem eru hlaðin?
+  const [more, setMore] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  // fylgja nýjum skilaboðum aðeins meðan lesandinn er neðst í þræðinum
+  const atBottom = useRef(true);
+
   const load = useCallback(async () => {
     if (!me || !id) return;
     const [r, blocked] = await Promise.all([listMessages(me, id), blockedUsers()]);
-    setMsgs(r.messages.filter((m) => m.me || !blocked.has(m.senderId)));
+    const fresh = r.messages.filter((m) => m.me || !blocked.has(m.senderId));
+    // endurhleðslan sækir NÝJUSTU síðuna; eldri síður sem búið er að sækja haldast
+    const first = r.messages[0]?.createdAt;
+    setMsgs((cur) => {
+      const older = r.hasMore && first ? cur.filter((m) => !m.id.startsWith("tmp-") && m.createdAt < first) : [];
+      if (!older.length) setMore(r.hasMore);
+      return [...older, ...fresh];
+    });
     setReads(r.reads);
     markChannelRead(id).catch(() => {});
   }, [me, id]);
+
+  async function loadOlder() {
+    const oldest = msgs.find((m) => !m.id.startsWith("tmp-"));
+    if (!me || !id || !oldest || loadingOlder) return;
+    setLoadingOlder(true);
+    const [r, blocked] = await Promise.all([listMessages(me, id, { createdAt: oldest.createdAt, id: oldest.id }), blockedUsers()]);
+    setLoadingOlder(false);
+    const older = r.messages.filter((m) => m.me || !blocked.has(m.senderId));
+    setMsgs((cur) => { const seen = new Set(cur.map((m) => m.id)); return [...older.filter((m) => !seen.has(m.id)), ...cur]; });
+    setMore(r.hasMore);
+  }
+  /** Breyta einu skilaboði staðbundið (eldri síður eru ekki endursóttar í endurhleðslu). */
+  function patchMsg(mid: string, fn: (m: ChatMessage) => ChatMessage | null) {
+    setMsgs((cur) => cur.flatMap((m) => (m.id === mid ? (fn(m) ?? []) : [m])));
+  }
+  function patchReaction(mid: string, emoji: string | null) {
+    patchMsg(mid, (x) => {
+      let rs = x.reactions.map((y) => (y.mine ? { ...y, count: y.count - 1, mine: false } : y)).filter((y) => y.count > 0);
+      if (emoji) rs = rs.some((y) => y.emoji === emoji)
+        ? rs.map((y) => (y.emoji === emoji ? { ...y, count: y.count + 1, mine: true } : y))
+        : [...rs, { emoji, count: 1, mine: true }];
+      return { ...x, reactions: rs };
+    });
+  }
 
   useFocusEffect(useCallback(() => {
     load();
@@ -173,6 +210,7 @@ export default function Thread() {
     setSending(true);
     setText("");
     const rt = replyTo; setReplyTo(null);
+    atBottom.current = true; // að senda fer alltaf niður á nýjustu skilaboðin
     // optimistic
     const tmp: ChatMessage = { id: "tmp-" + Date.now(), senderId: "me", sender: me.fullName.split(/\s+/)[0], senderFull: me.fullName, color: me.avatarColor, photo: me.photoUrl, me: true, body, at: new Date().toTimeString().slice(0, 5), createdAt: new Date().toISOString(), kind: "text", url: null, reactions: [], replyTo: rt ? { sender: rt.sender, body: rt.body } : null };
     setMsgs((cur) => [...cur, tmp]);
@@ -220,9 +258,20 @@ export default function Thread() {
         data={rows}
         keyExtractor={(r) => r.key}
         contentContainerStyle={{ padding: 14, paddingBottom: 8 }}
-        onContentSizeChange={() => list.current?.scrollToEnd({ animated: false })}
-        onLayout={() => list.current?.scrollToEnd({ animated: false })}
+        onContentSizeChange={() => { if (atBottom.current) list.current?.scrollToEnd({ animated: false }); }}
+        onLayout={() => { if (atBottom.current) list.current?.scrollToEnd({ animated: false }); }}
+        onScroll={(e) => { const n = e.nativeEvent; atBottom.current = n.contentSize.height - n.contentOffset.y - n.layoutMeasurement.height < 80; }}
+        scrollEventThrottle={100}
+        // eldri skilaboð bætast ofan við → sjónarhornið helst kyrrt
+        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         keyboardDismissMode="interactive"
+        ListHeaderComponent={more && msgs.length ? (
+          <View style={{ width: W - 28, alignItems: "center", paddingVertical: 6 }}>
+            <Pressable onPress={loadOlder} disabled={loadingOlder} hitSlop={8} style={{ backgroundColor: colors.panel2, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, opacity: loadingOlder ? 0.6 : 1 }}>
+              <Txt weight="semibold" size={13} color={colors.ink2}>{loadingOlder ? tr("Sæki…") : tr("Sýna eldri skilaboð")}</Txt>
+            </Pressable>
+          </View>
+        ) : null}
         ListFooterComponent={
           <View style={{ gap: 6, width: W - 28 }}>
             {typing ? <View style={{ alignSelf: "flex-start", marginLeft: 34, backgroundColor: colors.bubbleThem, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 }}><Muted size={13}>•••</Muted></View> : null}
@@ -274,7 +323,7 @@ export default function Thread() {
           {EMOJI.map((e) => {
             const mine = sel?.reactions.find((r) => r.emoji === e)?.mine;
             return (
-              <Pressable key={e} onPress={async () => { if (!me || !sel) return; await setReaction(me, sel.id, mine ? null : e); setSel(null); load(); }} style={{ backgroundColor: mine ? colors.brandSoft : colors.panel2, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7 }}>
+              <Pressable key={e} onPress={async () => { if (!me || !sel) return; const mid = sel.id; await setReaction(me, mid, mine ? null : e); patchReaction(mid, mine ? null : e); setSel(null); load(); }} style={{ backgroundColor: mine ? colors.brandSoft : colors.panel2, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7 }}>
                 <Txt size={20}>{e}</Txt>
               </Pressable>
             );
@@ -284,7 +333,7 @@ export default function Thread() {
           <Row icon={<CornerUpLeft color={colors.ink2} size={19} />} title="Svara" onPress={() => { setReplyTo(sel); setSel(null); }} chevron={false} />
           {sel && !sel.me ? <Row icon={<Flag color={colors.ink2} size={19} />} title="Tilkynna skilaboð" sub="Stjórnendur fá tilkynningu" onPress={async () => { if (!me || !sel) return; const r = await reportContent(me, "message", sel.id, sel.senderId, sel.body || (sel.kind === "image" ? "Mynd" : "Skjal")); setSel(null); toast(r.ok ? "Tilkynning send til stjórnenda" : (r.error ?? "Tókst ekki")); }} chevron={false} /> : null}
           {sel && !sel.me ? <Row icon={<Ban color={colors.bad} size={19} />} title={trf("Fela skilaboð frá {x}", sel.sender)} danger onPress={() => { const m = sel; setSel(null); Alert.alert(trf("Fela skilaboð frá {x}", m.sender), tr("Þú sérð ekki lengur skilaboð eða færslur frá viðkomandi. Þú getur opnað aftur í Stillingum."), [{ text: tr("Hætta við"), style: "cancel" }, { text: tr("Fela"), style: "destructive", onPress: async () => { if (await blockUser(m.senderId)) load(); } }]); }} chevron={false} last /> : null}
-          {sel?.me ? <Row icon={<Trash2 color={colors.bad} size={19} />} title="Eyða skilaboðum" danger onPress={async () => { if (sel) await deleteMessage(sel.id); setSel(null); load(); }} chevron={false} last /> : null}
+          {sel?.me ? <Row icon={<Trash2 color={colors.bad} size={19} />} title="Eyða skilaboðum" danger onPress={async () => { if (sel) { await deleteMessage(sel.id); patchMsg(sel.id, () => null); } setSel(null); load(); }} chevron={false} last /> : null}
         </View>
       </Sheet>
       <Sheet open={info} onClose={() => { setInfo(false); setMedia(null); }}>

@@ -22,8 +22,9 @@ export async function POST(req: Request) {
   if (!th) return NextResponse.json({ ok: false }, { status: 404 });
   await admin.from("support_threads").update({ name, email, status: "human", updated_at: new Date().toISOString() }).eq("id", th.id);
   if (message) await admin.from("support_messages").insert({ thread_id: th.id, role: "user", body: message });
-  const { data: msgs } = await admin.from("support_messages").select("role, body").eq("thread_id", th.id).order("created_at").limit(30);
-  const transcript = (msgs ?? []).map((m) => `<p><b>${m.role === "user" ? esc(name || "Gestur") : m.role === "assistant" ? "VAKTO-aðstoð" : "Þú"}:</b> ${esc(m.body as string)}</p>`).join("");
+  const { data: msgs } = await admin.from("support_messages").select("role, body").eq("thread_id", th.id).order("created_at", { ascending: false }).limit(30);
+  // nýjustu 30 (ekki elstu), í tímaröð
+  const transcript = (msgs ?? []).reverse().map((m) => `<p><b>${m.role === "user" ? esc(name || "Gestur") : m.role === "assistant" ? "VAKTO-aðstoð" : "Þú"}:</b> ${esc(m.body as string)}</p>`).join("");
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is";
   void sendEmail({
     to: ADMIN_TO,
