@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
 import { getWeekAttendance, type AttRow } from "@/lib/analytics.server";
 import { userError } from "@/lib/user-error";
+import { allRows, allRowsIn } from "@/lib/supabase/all-rows";
 
 export type ApproveResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
 
@@ -265,16 +266,16 @@ export async function getEmployeePunches(employeeId: string, fromISO: string, to
 
     let needsMigration = false;
     let punches: Record<string, unknown>[] | null = null;
-    const withApproved = await supabase.from("punches")
+    const withApproved = await allRows((a, b) => supabase.from("punches")
       .select("id, clock_in, clock_out, source, approved")
       .eq("company_id", ctx.company).eq("employee_id", employeeId)
-      .gte("clock_in", from).lte("clock_in", to).order("clock_in", { ascending: false });
+      .gte("clock_in", from).lte("clock_in", to).order("clock_in", { ascending: false }).order("id").range(a, b));
     if (withApproved.error) {
       needsMigration = true;
-      const fallback = await supabase.from("punches")
+      const fallback = await allRows((a, b) => supabase.from("punches")
         .select("id, clock_in, clock_out, source")
         .eq("company_id", ctx.company).eq("employee_id", employeeId)
-        .gte("clock_in", from).lte("clock_in", to).order("clock_in", { ascending: false });
+        .gte("clock_in", from).lte("clock_in", to).order("clock_in", { ascending: false }).order("id").range(a, b));
       punches = fallback.data;
     } else {
       punches = withApproved.data;
@@ -301,9 +302,10 @@ export async function getEmployeePunches(employeeId: string, fromISO: string, to
     });
     // Geofence verdicts (0055) — separate, tolerant query so a missing migration changes nothing.
     if (rows.length) {
-      const geoRes = await supabase.from("punches")
+      // Í bútum: .in("id", …) með hundruðum uuid sprengir lengd slóðarinnar (GET).
+      const geoRes = await allRowsIn(rows.map((r) => r.punchId), (ids, a, b) => supabase.from("punches")
         .select("id, in_lat, in_lng, in_geo, in_dist, out_lat, out_lng, out_geo, out_dist")
-        .in("id", rows.map((r) => r.punchId));
+        .in("id", ids).order("id").range(a, b));
       if (!geoRes.error) {
         const edge = (g: Record<string, unknown>, k: "in" | "out"): PunchEdgeGeo | null => {
           const v = g[`${k}_geo`] as PunchEdgeGeo["verdict"] | null;
@@ -355,16 +357,17 @@ export async function getTimeReport(fromISO: string, toISO: string): Promise<{ o
 
     let needsMigration = false;
     let punches: Record<string, unknown>[] | null = null;
-    const withApproved = await supabase.from("punches")
-      .select("clock_in, clock_out, approved, employees(full_name)")
+    // Tímaskýrsla fyrirtækis (útflutningur) — síðuð, annars vantaði raðir umfram 1.000.
+    const withApproved = await allRows((a, b) => supabase.from("punches")
+      .select("id, clock_in, clock_out, approved, employees(full_name)")
       .eq("company_id", ctx.company).gte("clock_in", from).lte("clock_in", to)
-      .order("clock_in", { ascending: true });
+      .order("clock_in", { ascending: true }).order("id").range(a, b));
     if (withApproved.error) {
       needsMigration = true;
-      const fb = await supabase.from("punches")
-        .select("clock_in, clock_out, employees(full_name)")
+      const fb = await allRows((a, b) => supabase.from("punches")
+        .select("id, clock_in, clock_out, employees(full_name)")
         .eq("company_id", ctx.company).gte("clock_in", from).lte("clock_in", to)
-        .order("clock_in", { ascending: true });
+        .order("clock_in", { ascending: true }).order("id").range(a, b));
       punches = fb.data;
     } else punches = withApproved.data;
 
@@ -528,12 +531,17 @@ export async function approvePunchList(ids: string[]): Promise<ApproveResult> {
     const supabase = await createClient();
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    const { data, error } = await supabase.from("punches")
-      .update({ approved: true, approved_by: ctx.userId, approved_at: new Date().toISOString() })
-      .in("id", ids).eq("company_id", ctx.company)
-      .not("clock_out", "is", null).select("id");
-    if (error) return { ok: false, error: "Samþykki tókst ekki — reyndu aftur" };
-    const count = data?.length ?? 0;
+    // Í bútum: hundruð valinna uuid í einu .in() geta sprengt lengd slóðarinnar.
+    const stamp = new Date().toISOString();
+    let count = 0;
+    for (let i = 0; i < ids.length; i += 150) {
+      const { data, error } = await supabase.from("punches")
+        .update({ approved: true, approved_by: ctx.userId, approved_at: stamp })
+        .in("id", ids.slice(i, i + 150)).eq("company_id", ctx.company)
+        .not("clock_out", "is", null).select("id");
+      if (error) return { ok: false, error: count ? `Samþykki stöðvaðist eftir ${count} — reyndu aftur` : "Samþykki tókst ekki — reyndu aftur" };
+      count += data?.length ?? 0;
+    }
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "punch.approve_selected", entity: "punch", detail: `Valdar stimplanir samþykktar — ${count}`,
     });

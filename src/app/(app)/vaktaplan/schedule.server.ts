@@ -5,6 +5,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees, } from "@/lib/employees.server";
 import { initials } from "@/lib/employees";
 import { dec1 } from "@/lib/format";
+import { allRows } from "@/lib/supabase/all-rows";
 
 export type Emp4 = [string, string, string, string]; // initials, first name, dept, color
 export type ShiftTypeView = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
@@ -76,9 +77,9 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
     const times: Record<string, { start: string; end: string }> = {};
     const cellTypesMap: Record<string, string> = {};
     if (company) {
-      const { data: shifts } = await supabase
-        .from("shifts").select("employee_id, date, start_time, end_time, shift_types(name)")
-        .eq("company_id", company).in("date", WEEK_DATES);
+      const { data: shifts } = await allRows((a, b) => supabase
+        .from("shifts").select("id, employee_id, date, start_time, end_time, shift_types(name)")
+        .eq("company_id", company).in("date", WEEK_DATES).order("id").range(a, b));
       for (const s of shifts ?? []) {
         const r = idById.get(s.employee_id as string);
         const c = WEEK_DATES.indexOf(s.date as string);

@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendEmail, digestReportHtml } from "@/lib/email";
 import { nf, dec1 } from "@/lib/format";
+import { allRows } from "@/lib/supabase/all-rows";
 
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -49,13 +50,13 @@ export async function sendDigests(now = new Date()): Promise<{ sent: number }> {
 
     for (const p of periods) {
       const fromTs = `${p.from}T00:00:00Z`, toTs = `${p.to}T23:59:59Z`;
-      const { data: punches } = await admin
-        .from("punches").select("employee_id, clock_in, clock_out")
-        .eq("company_id", company).gte("clock_in", fromTs).lte("clock_in", toTs);
+      const { data: punches } = await allRows((a, b) => admin
+        .from("punches").select("id, employee_id, clock_in, clock_out")
+        .eq("company_id", company).gte("clock_in", fromTs).lte("clock_in", toTs).order("id").range(a, b));
       if (!punches?.length) continue; // no activity → no email
-      const { data: shifts } = await admin
-        .from("shifts").select("employee_id, date, start_time, end_time").eq("company_id", company)
-        .gte("date", p.from).lte("date", p.to);
+      const { data: shifts } = await allRows((a, b) => admin
+        .from("shifts").select("id, employee_id, date, start_time, end_time").eq("company_id", company)
+        .gte("date", p.from).lte("date", p.to).order("id").range(a, b));
       const scheduled = new Set((shifts ?? []).map((x) => `${x.employee_id}:${x.date}`));
 
       // planned hours per employee + total (from the published schedule)
