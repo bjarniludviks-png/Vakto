@@ -10,15 +10,19 @@ import { getCompanyId, getLaborPeriods } from "@/lib/labor";
 
 const MONTHS_IS = ["jan", "feb", "mar", "apr", "maí", "jún", "júl", "ágú", "sep", "okt", "nóv", "des"];
 
-export type PerfMonth = { label: string; ym: string; revenue: number; cost: number; laborPct: number };
+/** laborPct null = engin gögn (engin velta eða enginn kostnaður) — aldrei 0 sem staðgengill. */
+export type PerfMonth = { label: string; ym: string; revenue: number; cost: number; laborPct: number | null };
 export type PerfDept = { name: string; hours: number; cost: number; share: number };
-export type PerfHistory = { live: boolean; months: PerfMonth[]; departments: PerfDept[] };
+/** prevToDate: fyrri mánuður dag 1..sami dagur og í dag — sanngjarn samanburður við
+ * yfirstandandi mánuð (hálfur mánuður á móti heilum gefur −35 % veltu). toDay = dagur mánaðar. */
+export type PerfHistory = { live: boolean; months: PerfMonth[]; departments: PerfDept[]; prevToDate?: PerfMonth & { toDay: number } };
 
 const EMPTY: PerfHistory = { live: false, months: [], departments: [] };
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 /** Last `monthsBack` months of revenue/cost/laun% + current-month cost by department.
- * laborPct is 0 for months where it is not computable (no revenue or no cost). */
+ * laborPct is null for months where it is not computable (no revenue or no cost);
+ * months before the company's first activity are left out. */
 export async function getPerfHistory(monthsBack = 6): Promise<PerfHistory> {
   if (!isSupabaseConfigured()) return EMPTY;
   try {
@@ -39,7 +43,13 @@ export async function getPerfHistory(monthsBack = 6): Promise<PerfHistory> {
       });
     }
 
-    const periods = await getLaborPeriods(supabase, company, windows.map((w) => ({ from: w.from, to: w.to })));
+    // Auka-bil: fyrri mánuður til sama dags (fyrir samanburð við yfirstandandi mánuð).
+    const pm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const pmLast = new Date(now.getFullYear(), now.getMonth(), 0).getDate();
+    const toDay = Math.min(now.getDate(), pmLast);
+    const prevRange = { from: isoOf(pm), to: isoOf(new Date(pm.getFullYear(), pm.getMonth(), toDay)) };
+    const all = await getLaborPeriods(supabase, company, [...windows.map((w) => ({ from: w.from, to: w.to })), prevRange]);
+    const periods = all.slice(0, windows.length), prevP = all[windows.length];
 
     const months: PerfMonth[] = windows
       .map((w, i) => ({
@@ -47,8 +57,9 @@ export async function getPerfHistory(monthsBack = 6): Promise<PerfHistory> {
         ym: `${w.y}-${String(w.m + 1).padStart(2, "0")}`,
         revenue: periods[i].revenue,
         cost: periods[i].cost,
-        laborPct: periods[i].pct ?? 0,
-        active: periods[i].revenue > 0 || periods[i].hours > 0, // ignore months before the company had any activity
+        laborPct: periods[i].pct,
+        // mánuðir fyrir fyrstu virkni (eða alveg án gagna) sleppa
+        active: periods[i].activeDays > 0 && (periods[i].revenue > 0 || periods[i].hours > 0),
       }))
       .filter((m) => m.active)
       .map(({ label, ym, revenue, cost, laborPct }) => ({ label, ym, revenue, cost, laborPct }));
@@ -72,7 +83,11 @@ export async function getPerfHistory(monthsBack = 6): Promise<PerfHistory> {
       }))
       .sort((a, b) => b.cost - a.cost);
 
-    return { live: months.length > 0 || departments.length > 0, months, departments };
+    const prevToDate = prevP.activeDays > 0 && (prevP.revenue > 0 || prevP.hours > 0)
+      ? { label: `${MONTHS_IS[pm.getMonth()]} ${String(pm.getFullYear()).slice(2)}`, ym: prevRange.from.slice(0, 7), revenue: prevP.revenue, cost: prevP.cost, laborPct: prevP.pct, toDay }
+      : undefined;
+
+    return { live: months.length > 0 || departments.length > 0, months, departments, prevToDate };
   } catch {
     return EMPTY;
   }

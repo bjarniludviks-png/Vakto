@@ -91,7 +91,11 @@ export async function resetDemoCompany(): Promise<DemoResetResult> {
   const extraChans = (chans ?? []).filter((c) => !chanNames.includes(c.name as string)).map((c) => c.id as string);
   if (extraChans.length) warn("channels", (await db.from("channels").delete().in("id", extraChans)).error);
 
-  // ---- 5. gervigögn
+  // ---- 5. gervigögn. Velta: öll út — glugginn rúllar mánaðarlega og eldri raunvelta án launa
+  // myndi annars sýna mánuði með veltu en 0 kr launakostnaði.
+  const { data: seedLocs } = await db.from("locations").select("id").eq("company_id", C);
+  const seedLocIds = (seedLocs ?? []).map((l) => l.id as string);
+  if (seedLocIds.length) warn("revenue", (await db.from("revenue").delete().in("location_id", seedLocIds)).error);
   let seeded: DemoResetResult["seeded"];
   try {
     const s = await seedDemoData(db, C, { emailDomain: DEMO_EMAIL_DOMAIN, log: (m) => console.log("[demo-reset]", m) });

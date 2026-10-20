@@ -1,8 +1,8 @@
 // VAKTO — refreshes a seeded demo company (staging "Kaffi Krónan", or the public demo) with
-// a realistic rolling window of data: published shifts for the last 4 weeks and
-// the coming week, punches for past shifts (a few honest anomalies: late, left
-// early, overtime, one forgotten clock-out), and daily revenue so laun % af veltu
-// lands around 28–34 %. Idempotent: wipes and re-seeds only that window.
+// a realistic rolling window of data: published shifts for the last 6 full months,
+// the current month and the coming week, punches for past shifts (a few honest
+// anomalies: late, left early, overtime, sick days, one forgotten clock-out), and
+// daily revenue so laun % af veltu lands around 27–33 % with a summer bump. Idempotent: wipes and re-seeds only that window.
 // The logic lives in src/lib/demo-seed.ts (shared with /api/cron/demo-reset).
 //
 //   node scripts/seed-demo.mjs            # uses .env.local (service role)
