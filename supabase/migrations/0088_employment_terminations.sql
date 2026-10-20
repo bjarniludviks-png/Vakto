@@ -17,6 +17,8 @@
 -- Örugg endurkeyrsla.
 
 alter table public.employees add column if not exists end_date date;
+-- auth_offboard_state() keyrir í hverri fyrirspurn (RLS) og leitar eftir employees.user_id.
+create index if not exists employees_user_id_idx on public.employees(user_id);
 
 create table if not exists public.employment_terminations (
   id uuid primary key default gen_random_uuid(),
