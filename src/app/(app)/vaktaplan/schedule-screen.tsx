@@ -20,7 +20,8 @@ type ShiftDef = { l: string; s: string; h: number; c: "day" | "eve" | "off" };
 type ShiftType = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
 type AiItem = { kind: "good" | "info" | "warn" | "bad"; title: string; detail: string; tag: string };
 type AiShift = { employee: string; day: number; start: string; end: string };
-type AiProposal = { summary: string; items: AiItem[]; laborPct: string; shifts?: AiShift[]; live: boolean; error?: string };
+// blocked = vaktir sem þjónninn fjarlægði því starfsmaður er í samþykktu fríi.
+type AiProposal = { summary: string; items: AiItem[]; laborPct: string; shifts?: AiShift[]; blocked?: { employee: string; day: number }[]; live: boolean; error?: string };
 type MonthBlock = { name: string; time: string; hrs: number; type: string };
 
 const COST_HR = 3752, BASE_HRS = 116;
@@ -477,7 +478,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       const res = await fetch("/api/ai/schedule", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt, context, lang }),
+        // weekStart: þjónninn sækir beiðnir, frí og framboð vikunnar sjálfur.
+        body: JSON.stringify({ prompt, context, lang, weekStart: weekMonISO }),
       });
       const data = (await res.json()) as AiProposal & { ok?: boolean; error?: string };
       if (!res.ok || data.ok === false) { toast(t("Tókst ekki að ná í AI — reyndu aftur.")); setAiProposal(null); return; }
@@ -495,7 +497,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   async function approveAiProposal() {
     setModal(null);
     const shifts = (aiProposal?.shifts ?? []).filter((s) => s.day >= 0 && s.day <= 6 && /^\d{1,2}:\d{2}$/.test(s.start) && /^\d{1,2}:\d{2}$/.test(s.end));
-    if (!shifts.length) { await publish(); return; }
+    const blocked = (aiProposal?.blocked ?? []).filter((b) => b.day >= 0 && b.day <= 6);
+    if (!shifts.length && !blocked.length) { await publish(); return; }
     const rowOf = (name: string) => {
       const n = name.trim().toLowerCase();
       let r = emp.findIndex((e) => e[1].toLowerCase() === n);
@@ -507,6 +510,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     const ng = grid.map((row) => [...row]);
     const nt = { ...cellTimes };
     touched.forEach((r) => { ng[r] = ng[r].map(() => "off"); weekDays.forEach((_, c) => delete nt[ckey(r, c)]); });
+    // Dagar með samþykkt frí sem AI reyndi að manna: engin vakt þar, líka ef hún var fyrir í planinu.
+    for (const b of blocked) { const r = rowOf(b.employee); if (r >= 0) { ng[r][b.day] = "off"; delete nt[ckey(r, b.day)]; } }
     let applied = 0;
     for (const s of shifts) {
       const r = rowOf(s.employee);

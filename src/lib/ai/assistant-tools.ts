@@ -8,6 +8,7 @@ import { getEmployees } from "@/lib/employees.server";
 import { createClient } from "@/lib/supabase/server";
 import { getPendingRequests } from "@/app/(app)/vaktaplan/requests.server";
 import { comparePeriods, laborTrend, payrollRuns } from "./assistant-insights";
+import { getPlanRequestsForMe, guardLeaveShifts } from "./plan-requests.server";
 
 // VAKTO AI — verkfæri. LESverkfæri keyra strax (sömu aðgerðir og skjáirnir nota, sama aðgangsstýring).
 // SKRIFverkfæri keyra ALDREI í líkaninu sjálfu: þau verða „tillaga" sem notandinn staðfestir með hnappi,
@@ -44,7 +45,7 @@ export const READ_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "week_planning_context",
-    description: "Allt sem þarf til að setja upp vaktaplan fyrir heila viku: starfsfólk (deild, starfshlutfall, tímakaup/föst laun), núverandi vaktir vikunnar, hverjir eru ekki tiltækir hvaða daga (óframboð), samþykkt frí, vaktategundir með tímum, mönnunarþörf per dag og launaáætlun (veltuspá, launamarkmið, kostnaður per klst). Kallaðu á þetta ÁÐUR en þú notar plan_week.",
+    description: "Allt sem þarf til að setja upp vaktaplan fyrir heila viku: starfsfólk (deild, starfshlutfall, tímakaup/föst laun), núverandi vaktir vikunnar, hverjir eru ekki tiltækir hvaða daga (óframboð), samþykkt frí (aldrei vakt þá daga), frí-beiðnir í bið, framboð/óskir starfsfólks og vaktaskipti í bið, vaktategundir með tímum, mönnunarþörf per dag og launaáætlun (veltuspá, launamarkmið, kostnaður per klst). Kallaðu á þetta ÁÐUR en þú notar plan_week.",
     input_schema: { type: "object", properties: { monday: { type: "string", description: "Mánudagur vikunnar, YYYY-MM-DD" } }, required: ["monday"] },
   },
   {
@@ -182,11 +183,12 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       const mon = str(input.monday), dates = weekDates(mon);
       if (new Date(`${mon}T12:00:00`).getDay() !== 1) return JSON.stringify({ error: `${mon} er ekki mánudagur` });
       const supabase = await createClient();
-      const [{ employees }, shifts, wk, budget, types, leave, co] = await Promise.all([
+      const [{ employees }, shifts, wk, budget, types, leave, co, reqs] = await Promise.all([
         getEmployees(), getShiftsInRange(dates[0], dates[6]), getWeekShifts(mon), getWeekBudget(mon),
         supabase.from("shift_types").select("name, start_time, end_time, premium_pct"),
         supabase.from("leave_requests").select("from_date, to_date, type, employees(full_name)").eq("status", "approved").lte("from_date", dates[6]).gte("to_date", dates[0]),
         supabase.from("companies").select("staffing_targets").limit(1).maybeSingle(),
+        getPlanRequestsForMe(supabase, dates).catch(() => null),
       ]);
       const first = (n: string) => n.split(/\s+/)[0];
       const staff = employees.filter((e) => e.status !== "inactive" && (e as { role?: string }).role !== "contractor");
@@ -199,6 +201,10 @@ export async function runReadTool(name: string, input: In): Promise<string> {
         staff: staff.map((e) => ({ name: first(e.fullName), fullName: e.fullName, dept: e.department, pay: e.payType === "monthly" ? "föst laun" : "tímakaup", ratioPct: e.employmentRatio, ...(seen.get(first(e.fullName))! > 1 ? { warning: "Fleiri en einn með þetta fornafn — notaðu fullt nafn í employee" } : {}) })),
         currentShifts: shifts.rows.map((r) => ({ employee: r.first, date: r.date, start: r.start, end: r.end, type: r.type ?? null })),
         unavailable: unavail,
+        // Mjúkar óskir: forðast frí í bið og óframboð, virða framboð/vaktaskipti ef hægt er; nefna í svarinu hvað var virt.
+        pendingLeave: (reqs?.pendingLeave ?? []).map((l) => ({ employee: l.name, dates: l.days.map((d) => dates[d]), type: l.type })),
+        preferredDays: (reqs?.preferred ?? []).map((p) => ({ employee: p.name, dates: p.days.map((d) => dates[d]) })),
+        pendingSwaps: reqs?.pendingSwaps ?? [],
         approvedLeave: ((leave.data ?? []) as unknown as { from_date: string; to_date: string; type: string; employees: { full_name?: string } | { full_name?: string }[] | null }[]).map((l) => ({ employee: first((Array.isArray(l.employees) ? l.employees[0] : l.employees)?.full_name ?? ""), from: l.from_date, to: l.to_date, type: l.type })),
         shiftTypes: (types.data ?? []).map((t) => ({ name: t.name, start: String(t.start_time ?? "").slice(0, 5), end: String(t.end_time ?? "").slice(0, 5), premiumPct: t.premium_pct })),
         staffingTargetsMonToSun: (co.data?.staffing_targets as number[] | null) ?? null,
@@ -281,13 +287,24 @@ export async function executeWrite(name: string, input: In): Promise<{ ok: boole
       const names = employees.map((e) => e.fullName.toLowerCase());
       const unknown = [...new Set(p.shifts.map((x) => x.employee))].filter((n) => !names.some((f) => f.startsWith(n.toLowerCase())));
       if (unknown.length) return { ok: false, error: `Starfsmaður fannst ekki: ${unknown.join(", ")}` };
+      // Varnagli óháður líkaninu: ekkert er birt ef vakt lendir á samþykktu fríi.
+      const reqs = await getPlanRequestsForMe(await createClient(), p.dates).catch(() => null);
+      if (reqs) {
+        const { dropped } = guardLeaveShifts(p.shifts, reqs, (x) => p.dates.indexOf(x.date));
+        if (dropped.length) return { ok: false, error: `Vakt á samþykktu fríi: ${dropped.map((x) => `${x.employee} ${x.date}`).join(", ")} — taktu hana út og reyndu aftur.` };
+      }
       const cleared = await deleteWeekShifts(p.dates);
       if (!cleared.ok) return { ok: false, error: "Tókst ekki að hreinsa vikuna" };
       const res = await publishSchedule(p.shifts.map((x) => ({ employeeName: x.employee, date: x.date, startTime: x.start, endTime: x.end, shiftTypeName: x.shiftType || "Dagvakt" })));
       return res.ok ? { ok: true } : { ok: false, error: res.error ?? "Tókst ekki að birta planið" };
     }
-    case "set_shift":
-      return saveShift({ employeeName: str(input.employee), date: str(input.date), startTime: str(input.start), endTime: str(input.end), shiftTypeName: str(input.shiftType) });
+    case "set_shift": {
+      const date = str(input.date);
+      const reqs = okDate(date) ? await getPlanRequestsForMe(await createClient(), [date]).catch(() => null) : null;
+      if (reqs && guardLeaveShifts([{ employee: str(input.employee) }], reqs, () => 0).dropped.length)
+        return { ok: false, error: `${str(input.employee)} er í samþykktu fríi ${date}.` };
+      return saveShift({ employeeName: str(input.employee), date, startTime: str(input.start), endTime: str(input.end), shiftTypeName: str(input.shiftType) });
+    }
     case "remove_shift":
       return deleteShift({ employeeName: str(input.employee), dateISO: str(input.date) });
     case "decide_leave":
