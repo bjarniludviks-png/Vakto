@@ -14,6 +14,8 @@ export type Conversation = {
   id: string; name: string; kind: string; av: string; color: string; last: string; lastAt: string | null; dm: boolean; photo: string | null;
   /** Unread messages from others (server-side, `channel_reads`). */
   unread: number;
+  /** Kind of the last message ('text' | 'image' | 'audio' | 'file') and whether I sent it. */
+  lastKind: string | null; lastMine: boolean;
   /** Automatic team channel: 'dept' (department) | 'loc' (location) | null (manual). */
   autoKind: "dept" | "loc" | null;
 };
@@ -249,7 +251,7 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
     // member names per channel (to resolve DM titles) + last message + unread
     const [{ data: mems }, { data: msgs }, emps, unread] = await Promise.all([
       supabase.from("channel_members").select("channel_id, user_id, users(full_name)").in("channel_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]),
-      supabase.from("messages").select("channel_id, body, kind, created_at").in("channel_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).order("created_at", { ascending: false }).limit(400),
+      supabase.from("messages").select("channel_id, body, kind, created_at, sender_id").in("channel_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).order("created_at", { ascending: false }).limit(400),
       empNameMap(supabase, ctx.company),
       unreadMap(supabase),
     ]);
@@ -265,10 +267,13 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
     channels = channels.filter((c) => c.kind === "general" || (memByCh.get(c.id) ?? []).some((m) => m.id === ctx.userId));
     const lastByCh = new Map<string, string>();
     const lastAtByCh = new Map<string, string>();
+    const lastMeta = new Map<string, { kind: string; mine: boolean }>();
     for (const m of msgs ?? []) {
       if (lastByCh.has(m.channel_id as string)) continue;
-      lastByCh.set(m.channel_id as string, m.kind === "image" ? "📷 Mynd" : m.kind === "audio" ? "🎤 Talskilaboð" : m.kind === "file" ? `📎 ${(m.body as string) || "Skjal"}` : (m.body as string));
+      // Plain text — the list draws a line icon for media (no emoji in UI chrome).
+      lastByCh.set(m.channel_id as string, m.kind === "image" ? "Mynd" : m.kind === "audio" ? "Talskilaboð" : m.kind === "file" ? ((m.body as string) || "Skjal") : (m.body as string));
       lastAtByCh.set(m.channel_id as string, m.created_at as string);
+      lastMeta.set(m.channel_id as string, { kind: (m.kind as string) ?? "text", mine: m.sender_id === ctx.userId });
     }
 
     const items: Conversation[] = channels.map((c) => {
@@ -283,6 +288,7 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
         id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: colorOf(first),
         last: lastByCh.get(c.id) ?? "", lastAt: lastAtByCh.get(c.id) ?? null, dm, photo: dm ? (others[0]?.photo ?? null) : (c.photo_url ?? null),
         unread: unread[c.id] ?? 0, autoKind,
+        lastKind: lastMeta.get(c.id)?.kind ?? null, lastMine: lastMeta.get(c.id)?.mine ?? false,
       };
     });
     // Newest activity on top; the company-wide "Almennt" channel stays pinned first.
@@ -516,6 +522,50 @@ export async function listMessages(channelId: string, before?: MessageCursor | n
   } catch (e) {
     console.error("listMessages failed:", e);
     return empty;
+  }
+}
+
+/** Media & files in a thread (newest first) for the details panel. RLS scopes to channels I can read. */
+export type ChatMedia = { id: string; kind: string; url: string; name: string; createdAt: string };
+export async function listChatMedia(channelId: string): Promise<ChatMedia[]> {
+  if (!isSupabaseConfigured() || !channelId) return [];
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return [];
+    const { data } = await supabase.from("messages")
+      .select("id, kind, body, attachment_url, created_at")
+      .eq("company_id", ctx.company).eq("channel_id", channelId).not("attachment_url", "is", null)
+      .order("created_at", { ascending: false }).limit(36);
+    return (data ?? []).map((m) => ({ id: m.id as string, kind: (m.kind as string) ?? "file", url: m.attachment_url as string, name: (m.body as string) ?? "", createdAt: m.created_at as string }));
+  } catch {
+    return [];
+  }
+}
+
+/** Search one thread's text messages (newest first, max 30). */
+export type ChatHit = { id: string; sender: string; body: string; createdAt: string };
+export async function searchChannelMessages(channelId: string, q: string): Promise<ChatHit[]> {
+  const term = q.trim().slice(0, 80);
+  if (!isSupabaseConfigured() || !channelId || term.length < 2) return [];
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return [];
+    // ILIKE wildcards in the term are literal characters
+    const like = `%${term.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+    const [{ data }, emps] = await Promise.all([
+      supabase.from("messages").select("id, body, sender_id, created_at")
+        .eq("company_id", ctx.company).eq("channel_id", channelId).eq("kind", "text").ilike("body", like)
+        .order("created_at", { ascending: false }).limit(30),
+      empNameMap(supabase, ctx.company),
+    ]);
+    return (data ?? []).map((m) => ({
+      id: m.id as string, body: (m.body as string) ?? "", createdAt: m.created_at as string,
+      sender: m.sender_id === ctx.userId ? "Ég" : (emps.get(m.sender_id as string)?.name ?? "—").split(/\s+/)[0],
+    }));
+  } catch {
+    return [];
   }
 }
 
