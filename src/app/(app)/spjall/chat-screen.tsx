@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { useLang } from "@/components/app/lang";
@@ -113,6 +113,15 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
   // Thread cache: clicking a conversation paints its last-known messages
   // instantly, the network refresh reconciles in the background.
   const cacheRef = useRef<Map<string, ChatMessage[]>>(new Map());
+  // Per thread: are there older messages than the ones loaded ("Sýna eldri skilaboð")?
+  const moreRef = useRef<Map<string, boolean>>(new Map());
+  const [more, setMore] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const boxRef = useRef<HTMLDivElement | null>(null);
+  // Follow new messages only while the reader sits at the bottom of the thread.
+  const atBottomRef = useRef(true);
+  // Scroll anchor while older messages are prepended (keeps the view still).
+  const anchorRef = useRef<{ h: number; top: number } | null>(null);
   const activeRef = useRef<string | null>(null);
   const sbRef = useRef<SupabaseBrowser | null>(null);
   const sb = () => { if (!sbRef.current) sbRef.current = createBrowserClient(); return sbRef.current; };
@@ -162,9 +171,43 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
     if (!id) return;
     listMessages(id).then((r) => {
       if (!r.ok) return;
-      cacheRef.current.set(id, r.messages);
-      if (activeRef.current === id) { setMsgs(r.messages); setReads(r.reads); }
+      // The refresh brings the NEWEST page; keep any older pages already loaded.
+      const merged = r.hasMore && r.messages.length
+        ? [...(cacheRef.current.get(id) ?? []).filter((m) => !m.id.startsWith("tmp-") && m.createdAt < r.messages[0].createdAt), ...r.messages]
+        : r.messages;
+      if (merged.length === r.messages.length) moreRef.current.set(id, r.hasMore);
+      cacheRef.current.set(id, merged);
+      if (activeRef.current === id) { setMsgs(merged); setMore(moreRef.current.get(id) ?? false); setReads(r.reads); }
     });
+  }
+  /** "Sýna eldri skilaboð": prepend the page before the oldest loaded message. */
+  async function loadOlder() {
+    const id = activeRef.current;
+    const oldest = msgs.find((m) => !m.id.startsWith("tmp-"));
+    if (!id || !oldest || loadingOlder) return;
+    setLoadingOlder(true);
+    const r = await listMessages(id, { createdAt: oldest.createdAt, id: oldest.id });
+    setLoadingOlder(false);
+    if (!r.ok || activeRef.current !== id) return;
+    const prepend = (ms: ChatMessage[]) => {
+      const seen = new Set(ms.map((m) => m.id));
+      return [...r.messages.filter((m) => !seen.has(m.id)), ...ms];
+    };
+    moreRef.current.set(id, r.hasMore);
+    cacheRef.current.set(id, prepend(cacheRef.current.get(id) ?? []));
+    const box = boxRef.current;
+    anchorRef.current = box ? { h: box.scrollHeight, top: box.scrollTop } : null;
+    setMsgs(prepend);
+    setMore(r.hasMore);
+  }
+  /** Apply a change to one message both on screen and in the thread cache
+   * (older pages are not re-fetched by the reconcile, so they update locally). */
+  function patchMsg(id: string, fn: (m: ChatMessage) => ChatMessage | null) {
+    const apply = (ms: ChatMessage[]) => ms.flatMap((m) => (m.id === id ? (fn(m) ?? []) : [m]));
+    setMsgs(apply);
+    const cid = activeRef.current;
+    const cached = cid ? cacheRef.current.get(cid) : undefined;
+    if (cid && cached) cacheRef.current.set(cid, apply(cached));
   }
   /** Advance my read cursor (only while the tab is actually visible). */
   function read(id?: string | null) {
@@ -178,6 +221,8 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
     activeRef.current = c.id;
     setActive(c);
     setMsgs(cacheRef.current.get(c.id) ?? []);
+    setMore(moreRef.current.get(c.id) ?? false);
+    atBottomRef.current = true;
     setReads([]);
     setTypers({});
     setReplyTo(null);
@@ -196,7 +241,11 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
   }
 
   useEffect(() => {
-    if (active?.id) { setMsgs(cacheRef.current.get(active.id) ?? []); loadMsgs(active.id); read(active.id); }
+    if (active?.id) {
+      setMsgs(cacheRef.current.get(active.id) ?? []); setMore(moreRef.current.get(active.id) ?? false);
+      atBottomRef.current = true;
+      loadMsgs(active.id); read(active.id);
+    }
     // Realtime does the heavy lifting; polling is only a 10s safety net — and
     // a hidden tab does not poll at all (it catches up on visibilitychange).
     const iv = setInterval(() => {
@@ -220,7 +269,9 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
   useEffect(() => {
     for (const c of initial.items.slice(0, 3)) {
       if (cacheRef.current.has(c.id)) continue;
-      listMessages(c.id).then((r) => { if (r.ok && !cacheRef.current.has(c.id)) cacheRef.current.set(c.id, r.messages); });
+      listMessages(c.id).then((r) => {
+        if (r.ok && !cacheRef.current.has(c.id)) { cacheRef.current.set(c.id, r.messages); moreRef.current.set(c.id, r.hasMore); }
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -343,7 +394,12 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
       if (found) open(found);
     }
   }
-  useEffect(() => { endRef.current?.scrollIntoView({ block: "end" }); }, [msgs, typers]);
+  useLayoutEffect(() => {
+    const box = boxRef.current;
+    const a = anchorRef.current;
+    if (box && a) { anchorRef.current = null; box.scrollTop = box.scrollHeight - a.h + a.top; return; }
+    if (atBottomRef.current) endRef.current?.scrollIntoView({ block: "end" });
+  }, [msgs, typers]);
 
   async function send(kind: "text" | "image" | "audio" = "text", url?: string, body?: string) {
     const text = body ?? val;
@@ -354,6 +410,7 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
     sendTyping(true);
     const reply = replyTo;
     setReplyTo(null);
+    atBottomRef.current = true; // sending always jumps to the newest message
     // Optimistic: show the message instantly; the reload reconciles the real row.
     const now = new Date();
     setMsgs((ms) => [...ms, {
@@ -375,8 +432,16 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
   async function react(m: ChatMessage, emoji: string) {
     setReactFor(null);
     const mine = m.reactions.find((r) => r.mine);
-    const r = await setMessageReaction(m.id, mine?.emoji === emoji ? null : emoji);
+    const next = mine?.emoji === emoji ? null : emoji;
+    const r = await setMessageReaction(m.id, next);
     if (!r.ok) toast(r.error ?? "Tókst ekki");
+    else patchMsg(m.id, (x) => {
+      let rs = x.reactions.map((y) => (y.mine ? { ...y, count: y.count - 1, mine: false } : y)).filter((y) => y.count > 0);
+      if (next) rs = rs.some((y) => y.emoji === next)
+        ? rs.map((y) => (y.emoji === next ? { ...y, count: y.count + 1, mine: true } : y))
+        : [...rs, { emoji: next, count: 1, mine: true }];
+      return { ...x, reactions: rs.sort((a, b) => b.count - a.count) };
+    });
     loadMsgs(active?.id);
   }
 
@@ -384,6 +449,7 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
     if (!window.confirm(t("Eyða skilaboðum?"))) return;
     const r = await deleteMessage(m.id);
     if (!r.ok) toast(r.error ?? "Tókst ekki");
+    else patchMsg(m.id, () => null);
     loadMsgs(active?.id); reloadConvs();
   }
 
@@ -512,7 +578,15 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
                 </div>
                 {!active.dm && <button className="iconbtn" title={t("Upplýsingar")} onClick={() => setModal("info")}><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></svg></button>}
               </div>
-              <div className="msgr-msgs">
+              <div
+                className="msgr-msgs" ref={boxRef}
+                onScroll={(e) => { const b = e.currentTarget; atBottomRef.current = b.scrollHeight - b.scrollTop - b.clientHeight < 80; }}
+              >
+                {more && msgs.length > 0 && (
+                  <button className="btn ghost sm" style={{ alignSelf: "center", marginBottom: 6, flexShrink: 0 }} disabled={loadingOlder} onClick={loadOlder}>
+                    {loadingOlder ? t("Hleð…") : t("Sýna eldri skilaboð")}
+                  </button>
+                )}
                 {msgs.length ? msgs.map((m, mi) => {
                   const g = groupFlags(msgs, mi);
                   return (

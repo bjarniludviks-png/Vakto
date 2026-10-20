@@ -246,7 +246,8 @@ const D: Record<string, E> = {
   "Faldir notendur": ["Hidden people", "Người đã ẩn", "Ukryte osoby"], "{n} faldir — ýttu til að sýna alla aftur": ["{n} hidden — tap to show everyone again", "{n} đã ẩn — chạm để hiện lại tất cả", "ukryte: {n} — naciśnij, aby znów pokazać wszystkich"], "Sýna alla aftur?": ["Show everyone again?", "Hiện lại tất cả?", "Znów pokazać wszystkich?"],
   "Skilaboð og færslur frá þeim sem þú faldir birtast aftur.": ["Messages and posts from people you hid will show again.", "Tin nhắn và bài viết của những người bạn đã ẩn sẽ hiện lại.", "Wiadomości i wpisy od osób, które ukryłeś/aś, znów będą widoczne."], "Sýna aftur": ["Show again", "Hiện lại", "Pokaż ponownie"], "Allir sýnilegir aftur": ["Everyone is visible again", "Đã hiện lại tất cả", "Wszyscy znów są widoczni"],
   "Tilkynnt efni": ["Reported content", "Nội dung bị báo cáo", "Zgłoszone treści"], "Skilaboð í spjalli": ["Chat message", "Tin nhắn", "Wiadomość na czacie"], "Færsla í fréttaveitu": ["News post", "Bài đăng", "Wpis w aktualnościach"], "Athugasemd": ["Comment", "Bình luận", "Komentarz"], "Merkja afgreitt": ["Mark resolved", "Đánh dấu đã xử lý", "Oznacz jako rozpatrzone"],
-  "Nýtt verkefni…": ["New task…", "Việc mới…", "Nowe zadanie…"], "Bæta við verkefni": ["Add task", "Thêm việc", "Dodaj zadanie"], "Fjarlægja verkefni": ["Remove task", "Xóa việc", "Usuń zadanie"], "Tókst ekki að bæta við verkefni": ["Couldn't add the task", "Không thêm được việc", "Nie udało się dodać zadania"],
+  "Sýna eldri skilaboð": ["Show older messages", "Xem tin nhắn cũ hơn", "Pokaż starsze wiadomości"],
+  "Nýtt verkefni…": ["New task…", "Việc mới…", "Nowe zadanie…"],"Bæta við verkefni": ["Add task", "Thêm việc", "Dodaj zadanie"], "Fjarlægja verkefni": ["Remove task", "Xóa việc", "Usuń zadanie"], "Tókst ekki að bæta við verkefni": ["Couldn't add the task", "Không thêm được việc", "Nie udało się dodać zadania"],
 };
 
 const NUM = /\d[\d.,:–\-]*/g;

@@ -124,16 +124,34 @@ export async function listConversations(me: Me): Promise<Conversation[]> {
   });
 }
 
-export async function listMessages(me: Me, channelId: string): Promise<{ messages: ChatMessage[]; reads: ChannelRead[] }> {
-  const [{ data: msgs }, people, { data: auth }, { data: reads }] = await Promise.all([
-    supabase.from("messages").select("id, sender_id, body, kind, attachment_url, created_at, reply_to, message_reactions(user_id, emoji)").eq("channel_id", channelId).order("created_at").limit(300),
+/** Síðustærð spjallþráðar: NÝJUSTU skilaboðin; eldri sótt með bendli („Sýna eldri skilaboð“). */
+export const CHAT_PAGE = 100;
+export type MessageCursor = { createdAt: string; id: string };
+
+/** Nýjasta síða þráðar — eða, með `before`, síðan á undan bendlinum — í tímaröð
+ * (elst fyrst). `hasMore` = eldri skilaboð eru til. */
+export async function listMessages(me: Me, channelId: string, before?: MessageCursor | null): Promise<{ messages: ChatMessage[]; reads: ChannelRead[]; hasMore: boolean }> {
+  // nýjast fyrst + limit (ein aukaröð segir hvort eldri séu til), svo snúið við;
+  // bendill á (created_at, id) svo jafnir tímastimplar detta aldrei út
+  let q = supabase.from("messages").select("id, sender_id, body, kind, attachment_url, created_at, reply_to, message_reactions(user_id, emoji)").eq("channel_id", channelId);
+  if (before) q = q.or(`created_at.lt."${before.createdAt}",and(created_at.eq."${before.createdAt}",id.lt.${before.id})`);
+  const [{ data: rows }, people, { data: auth }, { data: reads }] = await Promise.all([
+    q.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(CHAT_PAGE + 1),
     peopleMap(me.companyId),
     supabase.auth.getUser(),
-    supabase.from("channel_reads").select("user_id, last_read_at").eq("channel_id", channelId),
+    before ? Promise.resolve({ data: [] as { user_id: string; last_read_at: string }[] }) : supabase.from("channel_reads").select("user_id, last_read_at").eq("channel_id", channelId),
   ]);
+  const hasMore = (rows ?? []).length > CHAT_PAGE;
+  const msgs = (rows ?? []).slice(0, CHAT_PAGE).reverse();
   const myId = auth.user?.id;
-  const byId = new Map((msgs ?? []).map((m) => [m.id, m]));
-  const messages: ChatMessage[] = (msgs ?? []).map((m) => {
+  const byId = new Map<string, { sender_id: string; body: string | null }>(msgs.map((m) => [m.id, m]));
+  // tilvitnuð skilaboð utan síðunnar: sækja bara þær raðir (eytt → engin tilvitnun)
+  const missing = [...new Set(msgs.map((m) => m.reply_to as string | null).filter((x): x is string => !!x && !byId.has(x)))];
+  if (missing.length) {
+    const { data: extra } = await supabase.from("messages").select("id, sender_id, body").in("id", missing);
+    for (const r of extra ?? []) byId.set(r.id, r);
+  }
+  const messages: ChatMessage[] = msgs.map((m) => {
     const p = people.get(m.sender_id);
     const full = p?.name ?? "Notandi";
     const rx = (m.message_reactions ?? []) as { user_id: string; emoji: string }[];
@@ -149,7 +167,7 @@ export async function listMessages(me: Me, channelId: string): Promise<{ message
     };
   });
   const readsOut: ChannelRead[] = (reads ?? []).filter((r) => r.user_id !== myId).map((r) => ({ userId: r.user_id, name: people.get(r.user_id)?.name ?? "", lastReadAt: r.last_read_at }));
-  return { messages, reads: readsOut };
+  return { messages, reads: readsOut, hasMore };
 }
 
 export async function sendChatMessage(me: Me, channelId: string, body: string, replyTo?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
