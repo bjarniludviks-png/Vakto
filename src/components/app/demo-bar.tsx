@@ -23,7 +23,7 @@ export function DemoBar() {
       <button className="demobar-home" onClick={() => leave("/")} disabled={busy}>
         <span aria-hidden>←</span> {t("Heimasíða")}
       </button>
-      <span className="demobar-txt">{t("Þú ert í demo — gögnin eru gervigögn og núllstillast á hverri nóttu.")}</span>
+      <span className="demobar-txt">{t("Þú ert í demo — aðeins til skoðunar. Gögnin eru gervigögn.")}</span>
       <button className="demobar-cta" onClick={() => leave("/nyskraning")} disabled={busy}>
         {t("Stofna eigið fyrirtæki")} <span aria-hidden>→</span>
       </button>

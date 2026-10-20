@@ -15,8 +15,11 @@ import { PUBLIC_DEMO, PUBLIC_DEMO_NOTE, DEMO_EMAIL_DOMAIN, ensureDemoBase, seedD
 // 6. Netfang + lykilorð demo-eigandans lagað EF innskráning með DEMO_LOGIN_* bregst (lykilorðsbreyting
 //    hjá Supabase ógildir allar lotur — þ.e. alla gesti sem eru inni — svo aldrei að óþörfu).
 //
-// Takmarkanir: skrár sem gestir hlóðu beint í Storage (framhjá server actions) eru ekki hreinsaðar;
-// breytingar á auth-lýsigögnum annarra demo-notenda en eigandans eru ekki endurstilltar.
+// Frá 0087 er demoið aðeins til skoðunar (gestir geta ekkert skrifað — RLS, gikkur, server actions,
+// þjónustulykill), svo meginhlutverk keyrslunnar er að sá gögnum með dagsetningum sem rúlla.
+// Hreinsun gestagagna (3.–4.) er látin standa sem öryggisnet (t.d. eldri gögn eða ef vörn bilar).
+// Takmörkun: breytingar á auth-lýsigögnum demo-notenda (supabase.auth.updateUser) ná ekki til RLS —
+// lykilorð/netfang eigandans er lagað í lið 6 / demoLogin.
 
 export type DemoResetResult = { ok: boolean; skipped?: string; seeded?: { shifts: number; punches: number; revenueDays: number }; removedEmployees?: number; warnings: string[] };
 

@@ -17,9 +17,11 @@ export const DICT: Dict = {
   "Senda prufu á mig": { is: "Senda prufu á mig", en: "Send me a test", vi: "Gửi thử cho tôi", pl: "Wyślij mi test" },
   "Prufa send á": { is: "Prufa send á", en: "Test sent to", vi: "Đã gửi thử đến", pl: "Test wysłany do" },
   // Opið demo
-  "Þú ert í demo — gögnin eru gervigögn og núllstillast á hverri nóttu.": { is: "Þú ert í demo — gögnin eru gervigögn og núllstillast á hverri nóttu.", en: "You are in the demo — the data is fictional and resets every night.", vi: "Bạn đang dùng bản demo — dữ liệu là giả và được đặt lại mỗi đêm.", pl: "Jesteś w wersji demo — dane są fikcyjne i resetują się co noc." },
   "Heimasíða": { is: "Heimasíða", en: "Home", vi: "Trang chủ", pl: "Strona główna" },
   "Stofna eigið fyrirtæki": { is: "Stofna eigið fyrirtæki", en: "Create your own company", vi: "Tạo công ty của bạn", pl: "Załóż własną firmę" },
+  "Þú ert í demo — aðeins til skoðunar. Gögnin eru gervigögn.": { is: "Þú ert í demo — aðeins til skoðunar. Gögnin eru gervigögn.", en: "You are in the demo — view only. The data is fictional.", vi: "Bạn đang dùng bản demo — chỉ để xem. Dữ liệu là giả.", pl: "Jesteś w wersji demo — tylko do podglądu. Dane są fikcyjne." },
+  "Aðeins til skoðunar": { is: "Aðeins til skoðunar", en: "View only", vi: "Chỉ để xem", pl: "Tylko do podglądu" },
+  "Demo er aðeins til skoðunar — stofnaðu eigið fyrirtæki til að prófa breytingar (14 daga frí prufa).": { is: "Demo er aðeins til skoðunar — stofnaðu eigið fyrirtæki til að prófa breytingar (14 daga frí prufa).", en: "The demo is view-only — create your own company to try making changes (14-day free trial).", vi: "Bản demo chỉ để xem — hãy tạo công ty của bạn để thử thay đổi (dùng thử miễn phí 14 ngày).", pl: "Demo służy tylko do podglądu — załóż własną firmę, aby wprowadzać zmiany (14 dni za darmo)." },
   "Þetta er ekki í boði í demo": { is: "Þetta er ekki í boði í demo", en: "This is not available in the demo", vi: "Tính năng này không có trong bản demo", pl: "To nie jest dostępne w wersji demo" },
   "boð send": { is: "boð send", en: "invites sent", vi: "lời mời đã gửi", pl: "zaproszeń wysłanych" },
   "tengd aðgangi sem var til": { is: "tengd aðgangi sem var til", en: "linked to an existing account", vi: "đã liên kết tài khoản có sẵn", pl: "połączonych z istniejącym kontem" },

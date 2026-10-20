@@ -60,6 +60,7 @@ export async function getMyPunches(fromISO: string, toISO: string): Promise<{ ok
 
 /** Employee requests a correction to a punch (forgot to clock in/out, wrong time). */
 export async function requestCorrection(input: { punchId?: string; date: string; requestedIn?: string; requestedOut?: string; reason: string }): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -100,6 +101,7 @@ function punchError(message: string): string {
 /** Clock the currently signed-in employee in or out (source: app). `pos` is
  *  only sent when the company has geofencing on; the DB trigger judges it. */
 export async function myPunch(into: boolean, pos?: PunchPos | null): Promise<PunchResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   after(() => checkNoShows());
   try {
@@ -152,6 +154,7 @@ export type LeaveType = "orlof" | "veikindi" | "olaunad";
 export async function submitLeaveRequest(
   input: { fromDate: string; toDate: string; type: LeaveType },
 ): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -189,6 +192,7 @@ export async function submitLeaveRequest(
 export async function requestShiftSwap(
   input: { note: string; requesteeName?: string },
 ): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -225,6 +229,7 @@ export async function requestShiftSwap(
 export async function setAvailability(
   input: { weekdays: number[]; available?: boolean; reason?: string },
 ): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -253,6 +258,7 @@ export async function setAvailability(
 export async function updateMyProfile(
   input: { phone?: string; email?: string; bankAccount?: string },
 ): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -278,6 +284,7 @@ export async function updateMyProfile(
 /** Starfsmaður sækir um lausa vakt. Með shiftId: umsókn tengd vaktinni (shift_claims, 0082) sem stjórnandi
  *  úthlutar í Vaktaplani. Án shiftId (eldri leið): skráð sem beiðni með texta. */
 export async function applyForShift(input: { note: string; shiftId?: string }): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -352,6 +359,7 @@ export async function uploadPhoto(dataUrl: string): Promise<ActionResult & { url
 
 /** Tick/untick a task on my shift (RLS limits to my own rows). */
 export async function toggleShiftTask(id: string, done: boolean): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const supabase = await createClient();
@@ -392,6 +400,7 @@ export async function getMyContract(): Promise<{ ok: boolean; contract?: MyContr
 
 /** Taktikal (0062): undirritunartengill starfsmanns — tilbúinn þegar vinnuveitandi hefur skrifað undir. */
 export async function taktikalMyLink(id: string): Promise<{ ok: boolean; url?: string; waiting?: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
   try {
     const supabase = await createClient();
@@ -406,6 +415,7 @@ export async function taktikalMyLink(id: string): Promise<{ ok: boolean; url?: s
 
 /** Rafræn undirritun (0058), skref 1: 6 stafa kóði á netfang starfsmannsins. */
 export async function requestContractCode(id: string): Promise<{ ok: boolean; sentTo?: string; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
   try {
     const supabase = await createClient();
@@ -420,6 +430,7 @@ export async function requestContractCode(id: string): Promise<{ ok: boolean; se
 
 /** Skref 2: kóðinn staðfestur → samningur undirritaður, PDF sent báðum aðilum. */
 export async function signContractWithCode(id: string, code: string): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
   try {
     const supabase = await createClient();
@@ -451,7 +462,7 @@ export async function getWelcomeSeen(): Promise<boolean> {
 }
 
 export async function markWelcomeSeen(): Promise<void> {
-  if (!isSupabaseConfigured()) return;
+  if (!isSupabaseConfigured() || (await demoBlocked())) return;
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();

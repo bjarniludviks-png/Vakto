@@ -44,6 +44,7 @@ function num(s: string | undefined, fallback = 0): number {
 export async function addRevenue(
   input: { amount: string; date?: string; locationName?: string },
 ): Promise<SyncResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const amount = num(input.amount);
   if (amount <= 0) return { ok: false, error: "Sláðu inn upphæð" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true, amount };
@@ -92,6 +93,7 @@ export async function getWeekdayRevenue(): Promise<Record<string, number> | null
 /** Save average revenue per weekday (used to estimate laun% without a POS link).
  * map keys "0".."6" (0=Sun … 6=Sat) → kr. Needs migration 0018. */
 export async function setWeekdayRevenue(map: Record<string, number>): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const clean: Record<string, number> = {};
   for (let d = 0; d < 7; d++) clean[String(d)] = Math.max(0, Math.round(Number(map[String(d)]) || 0));
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
@@ -115,6 +117,7 @@ export async function setWeekdayRevenue(map: Record<string, number>): Promise<Se
 export async function saveCompanyInfo(
   input: { name: string; kennitala?: string; address?: string; postalCode?: string; city?: string; phone?: string; email?: string },
 ): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!input.name?.trim()) return { ok: false, error: "Nafn fyrirtækis vantar" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -154,6 +157,7 @@ export async function saveCompanyInfo(
 
 /** Add a location (staður) to the company. */
 export async function addLocation(input: { name: string }): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!input.name?.trim()) return { ok: false, error: "Nafn vantar" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -176,6 +180,7 @@ export async function addLocation(input: { name: string }): Promise<SettingsResu
 
 /** Add a position (staða) with an optional base rate. */
 export async function addPosition(input: { name: string; baseRate?: string }): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!input.name?.trim()) return { ok: false, error: "Nafn vantar" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -198,13 +203,14 @@ export async function addPosition(input: { name: string; baseRate?: string }): P
 
 /** Create a department under a location (departments hang off locations in the schema). */
 export async function addDepartment(input: { name: string; locationName?: string; color?: string | null }): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!input.name?.trim()) return { ok: false, error: "Nafn vantar" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    let locQ = supabase.from("locations").select("id, name").eq("company_id", ctx.company).order("name");
+    const locQ = supabase.from("locations").select("id, name").eq("company_id", ctx.company).order("name");
     const { data: locs } = await locQ;
     if (!locs?.length) return { ok: false, error: "Búðu fyrst til stað (Staðir)" };
     const loc = input.locationName ? locs.find((l) => l.name === input.locationName) ?? locs[0] : locs[0];
@@ -230,6 +236,7 @@ export async function addDepartment(input: { name: string; locationName?: string
  *  fyrirtæki sem voru til áður en 0044 bætti honum við) svo stjórnandi lendi
  *  aldrei í því að slóðin sé „ekki tilbúin“. */
 export async function ensureKioskToken(): Promise<{ ok: boolean; token?: string; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, token: "demo" };
   try {
     const supabase = await createClient();
@@ -255,6 +262,7 @@ export async function ensureKioskToken(): Promise<{ ok: boolean; token?: string;
 
 /** Aðferð við rafræna undirritun samninga (0062): 'vakto' (kóði í tölvupósti) eða 'taktikal' (rafræn skilríki). */
 export async function setEsignProvider(provider: "vakto" | "taktikal"): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (provider !== "vakto" && provider !== "taktikal") return { ok: false, error: "Ógilt val" };
   if (provider === "taktikal" && !taktikalEnabled()) return { ok: false, error: "Rafræn skilríki eru ekki virk á þessum aðgangi" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
@@ -297,6 +305,7 @@ export async function aiContractTerms(input: { description?: string; current?: s
 }
 
 export async function saveContractTerms(terms: string): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -331,6 +340,7 @@ export async function getContractTerms(): Promise<string> {
 
 /** Edit or delete a position (starfsheiti). Employees keep working; on delete they lose the position link. */
 export async function updatePosition(id: string, input: { name: string; baseRate?: string }): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!input.name?.trim()) return { ok: false, error: "Nafn vantar" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -369,6 +379,7 @@ export async function deletePosition(id: string): Promise<SettingsResult> {
 
 /** Edit or delete a location (starfsstöð). Delete is blocked while departments/revenue reference it. */
 export async function updateLocation(id: string, input: { name: string }): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!input.name?.trim()) return { ok: false, error: "Nafn vantar" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -471,6 +482,7 @@ export async function uploadCompanyDoc(input: { fileName: string; dataUrl: strin
 }
 
 export async function deleteCompanyDoc(id: string): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -510,6 +522,7 @@ export async function openCompanyDoc(id: string): Promise<{ ok: boolean; url?: s
 
 /** Rename a department (company-scoped via its location). */
 export async function renameDepartment(id: string, name: string, color?: string | null): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!name?.trim()) return { ok: false, error: "Nafn vantar" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -562,6 +575,7 @@ export async function deleteDepartment(id: string): Promise<SettingsResult> {
 export async function savePayRule(
   input: { code: string; label: string; kind: string; pct: string; confirmed: boolean },
 ): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -648,6 +662,7 @@ export async function listRuleTemplates(): Promise<{ templates: RuleTemplate[]; 
 }
 
 export async function saveRuleTemplate(input: RuleTemplateInput): Promise<SettingsResult & { id?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -679,6 +694,7 @@ export async function saveRuleTemplate(input: RuleTemplateInput): Promise<Settin
 }
 
 export async function deleteRuleTemplate(id: string): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -805,6 +821,7 @@ export async function createApiKey(name: string): Promise<CreateKeyResult> {
 
 /** Revoke a key — external systems using it get 401 from then on. */
 export async function revokeApiKey(id: string): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -825,6 +842,7 @@ export async function revokeApiKey(id: string): Promise<SettingsResult> {
 
 /** Pay-period start day (1 = calendar month; 21 = 21st→20th …). */
 export async function savePayPeriodStart(day: number): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const d = Math.round(day);
   if (!(d >= 1 && d <= 28)) return { ok: false, error: "Veldu dag 1–28" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
@@ -869,6 +887,7 @@ export async function startCardChange(origin: string): Promise<{ ok: boolean; ur
 
 /** Fréttaveita: hverjir mega birta (0054). Aðeins stjórnendur/eigendur. */
 export async function setFeedPostPolicy(policy: "everyone" | "managers"): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -886,6 +905,7 @@ export async function setFeedPostPolicy(policy: "everyone" | "managers"): Promis
 
 /** Laun % markmið (0045) og hámark starfsmanna í fríi sama dag (0057, null = ekkert). */
 export async function saveCompanyLimits(input: { laborTarget?: number; leaveCap?: number | null }): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const patch: Record<string, number | null> = {};
   if (input.laborTarget !== undefined) {
     const n = Math.round(Number(input.laborTarget) * 10) / 10;
@@ -920,6 +940,7 @@ export async function saveCompanyLimits(input: { laborTarget?: number; leaveCap?
 
 /** Company-wide "Staðsetning við stimplun": off / flag / block. */
 export async function saveGeofenceMode(mode: "off" | "flag" | "block"): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!["off", "flag", "block"].includes(mode)) return { ok: false, error: "Ógilt val" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -941,6 +962,7 @@ export async function saveGeofenceMode(mode: "off" | "flag" | "block"): Promise<
 
 /** Pin a workplace on the map (null clears the pin) + its radius in metres. */
 export async function saveLocationFence(id: string, input: { lat: number | null; lng: number | null; radius: number }): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const { lat, lng } = input;
   const radius = Math.round(input.radius);
   if ((lat == null) !== (lng == null)) return { ok: false, error: "Ógild staðsetning" };
@@ -1031,6 +1053,7 @@ export async function setAiAddon(on: boolean): Promise<SettingsResult> {
 /** Sjálfgefnir launaliðir fyrirtækis (0081 companies.pay_defaults): lífeyrir, félagsgjald, sjóðir og orlof.
  *  Gilda fyrir alla starfsmenn sem hafa ekki eigin stillingu. */
 export async function savePayDefaults(input: Partial<PaySettings> & { orlof?: { mode: string; pct: number } }): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -1064,11 +1087,13 @@ export async function getPayDefaults(): Promise<(Partial<PaySettings> & { orlof?
 /** Uppsögn áskriftar (sjálfsafgreiðsla). Ekkert rukkað framar; aðgangur helst út greitt tímabil/prufu og
  *  runBillingDay lokar (suspended) þegar því lýkur. billing_status má aðeins breyta með service role (0066). Aðeins eigandi. */
 export async function cancelSubscription(): Promise<SettingsResult & { endsAt?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   return setCanceled(true);
 }
 
 /** Hætta við uppsögn: aftur á sjálfvirka stöðu (null, eins og „auto“ í /admin), eða „paying“ ef greiddur reikningur er til. */
 export async function resumeSubscription(): Promise<SettingsResult & { endsAt?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   return setCanceled(false);
 }
 

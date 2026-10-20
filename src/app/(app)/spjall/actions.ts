@@ -82,6 +82,7 @@ export async function getUnreadCounts(): Promise<UnreadCounts> {
 
 /** "I have seen everything in this channel up to now" — upsert my read cursor. */
 export async function markChannelRead(channelId: string): Promise<{ ok: boolean }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured() || !channelId) return { ok: false };
   try {
     const supabase = await createClient();
@@ -136,6 +137,7 @@ const teamSyncAt = new Map<string, number>();
  * + every manager/owner. Adds missing members, never removes anyone (manual
  * additions stick). Requires `channels.auto_key` — silently no-op before it. */
 export async function ensureTeamChannels(): Promise<{ ok: boolean }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false };
   try {
     const supabase = await createClient();
@@ -313,6 +315,7 @@ export async function searchPeople(q: string): Promise<Person[]> {
 
 /** Find or create a 1:1 DM with another user. */
 export async function startDM(otherUserId: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
   try {
     const supabase = await createClient();
@@ -336,6 +339,7 @@ export async function startDM(otherUserId: string): Promise<{ ok: boolean; id?: 
 }
 
 export async function createGroup(name: string, memberUserIds: string[]): Promise<{ ok: boolean; id?: string; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
   const nm = name.trim();
   if (!nm) return { ok: false, error: "Sláðu inn heiti" };
@@ -380,6 +384,7 @@ export async function listMembers(channelId: string): Promise<Members> {
 }
 
 export async function addMembers(channelId: string, userIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
   try {
     const supabase = await createClient();
@@ -394,6 +399,7 @@ export async function addMembers(channelId: string, userIds: string[]): Promise<
 }
 
 export async function removeMember(channelId: string, userId: string): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
   try {
     const supabase = await createClient();
@@ -411,6 +417,7 @@ export async function removeMember(channelId: string, userId: string): Promise<{
 }
 
 export async function leaveChannel(channelId: string): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
   try {
     const supabase = await createClient();
@@ -513,6 +520,7 @@ export async function listMessages(channelId: string, before?: MessageCursor | n
 }
 
 export async function sendChatMessage(channelId: string, body: string, kind: "text" | "image" | "audio" = "text", attachmentUrl?: string, replyTo?: string): Promise<{ ok: boolean; id?: string; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
   const text = body.trim();
   if ((!text && kind === "text") || !channelId) return { ok: false };
@@ -558,6 +566,7 @@ export async function sendChatMessage(channelId: string, body: string, kind: "te
 
 /** One emoji reaction per user per message — emoji sets/updates, null removes. */
 export async function setMessageReaction(messageId: string, emoji: string | null): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const supabase = await createClient();
@@ -577,6 +586,7 @@ export async function setMessageReaction(messageId: string, emoji: string | null
 
 /** Unsend: delete your own message (RLS-enforced). */
 export async function deleteMessage(messageId: string): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const supabase = await createClient();
@@ -603,6 +613,7 @@ async function isAutoChannel(supabase: Sb, channelId: string): Promise<boolean> 
 
 /** Rename a group (any member — RLS `channels_member_update`). */
 export async function renameChannel(channelId: string, name: string): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
   const nm = name.trim();
   if (!nm) return { ok: false, error: "Sláðu inn heiti" };
@@ -762,6 +773,7 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
 
 /** Pin/unpin an announcement (managers + owners only — checked server-side). */
 export async function setPostPinned(postId: string, pinned: boolean): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const supabase = await createClient();
@@ -777,6 +789,7 @@ export async function setPostPinned(postId: string, pinned: boolean): Promise<{ 
 }
 
 export async function createPost(body: string, media?: { imageUrl?: string; fileUrl?: string; fileName?: string }, audience?: { kind: "all" | "department" | "location"; id: string | null }): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!body.trim() && !media?.imageUrl && !media?.fileUrl) return { ok: false, error: "Skrifaðu eitthvað fyrst" };
   if (!isSupabaseConfigured()) return { ok: true };
   try {
@@ -812,6 +825,7 @@ export async function createPost(body: string, media?: { imageUrl?: string; file
 
 /** One reaction per user per post — emoji sets/updates it, null removes it. */
 export async function setPostReaction(postId: string, emoji: string | null): Promise<{ ok: boolean }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const supabase = await createClient();
@@ -826,6 +840,7 @@ export async function setPostReaction(postId: string, emoji: string | null): Pro
 }
 
 export async function addPostComment(postId: string, body: string, parentId?: string | null): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!body.trim()) return { ok: false, error: "Skrifaðu athugasemd" };
   if (!isSupabaseConfigured()) return { ok: true };
   try {

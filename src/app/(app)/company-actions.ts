@@ -1,5 +1,6 @@
 "use server";
 
+import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -61,6 +62,7 @@ export async function getMyCompanies(): Promise<CompanyOption[]> {
 /** Switch the active company (must be a member). Updates users.company_id +
  * role so all existing company-scoped queries follow along. */
 export async function switchCompany(companyId: string): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
   try {
     const supabase = await createClient();

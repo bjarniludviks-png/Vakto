@@ -14,6 +14,7 @@ import { ChatBadge } from "./chat-badge";
 import { AssistantPanel } from "./assistant-panel";
 import { ImpersonationBar } from "./impersonation-bar";
 import { DemoBar } from "./demo-bar";
+import { DemoGuard } from "./demo-guard";
 
 // Hnappurinn í reikningsvalmyndinni flettir í gegnum málin og sýnir nafn næsta máls.
 const LANG_CYCLE: Record<Lang, Lang> = { is: "en", en: "vi", vi: "pl", pl: "is" };
@@ -365,7 +366,8 @@ export default function AppShell({
       )}
 
       <ToastHost />
-      {(role === "owner" || role === "manager") && (account.role === "owner" || account.role === "manager") && <AssistantPanel />}
+      {account.demo && <DemoGuard />}
+      {(role === "owner" || role === "manager") && (account.role === "owner" || account.role === "manager") && <AssistantPanel demo={!!account.demo} />}
     </>
   );
 }

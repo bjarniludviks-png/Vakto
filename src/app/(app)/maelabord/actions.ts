@@ -1,5 +1,6 @@
 "use server";
 
+import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { resolvePrefs, type DashPrefs } from "./widgets";
@@ -104,6 +105,7 @@ export async function getLaborTrend(weeks = 8): Promise<{ ok: boolean; target: n
 // ---------- sérsniðið mælaborð (0077) ----------
 /** Vistar röð og falin spjöld innskráðs notanda. Skrifað með service-role, aðeins í eigin röð. */
 export async function saveDashboardPrefs(prefs: DashPrefs): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const supabase = await createClient();

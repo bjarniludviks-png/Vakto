@@ -39,6 +39,7 @@ export async function getMonthlyReportSetting(): Promise<MonthlyReportSetting> {
 }
 
 export async function saveMonthlyReportSetting(mode: MonthlyReportMode): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!["off", "owners", "managers"].includes(mode)) return { ok: false, error: "Ógilt val" };
   if (!isSupabaseConfigured()) return { ok: true };
   try {
@@ -60,6 +61,7 @@ export async function saveMonthlyReportSetting(mode: MonthlyReportMode): Promise
 
 /** Sendir skýrslu síðasta mánaðar á innskráðan eiganda strax. */
 export async function sendMonthlyReportTestToMe(): Promise<{ ok: boolean; to?: string; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
   try {
     const ctx = await ownerCtx();

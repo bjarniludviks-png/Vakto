@@ -109,6 +109,7 @@ async function lookupId(
 }
 
 export async function createEmployee(input: NewEmployeeInput): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!input.fullName?.trim()) return { ok: false, error: "Nafn vantar" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
 
@@ -198,6 +199,7 @@ export type ImportResult = { ok: boolean; demo?: boolean; inserted?: number; ski
 
 /** Bulk-import employees (e.g. from a Payday Excel export). Chunked for large teams. */
 export async function importEmployees(rows: ImportRow[]): Promise<ImportResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const valid = rows.filter((r) => r.fullName?.trim()).map((r) => ({ ...r, kennitala: normKennitala(r.kennitala) }));
   const skipped = rows.length - valid.length;
   if (valid.length === 0) return { ok: false, error: "Engir gildir starfsmenn í skránni" };
@@ -480,6 +482,7 @@ export async function getEmployeePayRule(id: string): Promise<CustomRules | null
 
 /** Deactivate (or reactivate) an employee — keeps all history. */
 export async function setEmployeeStatus(id: string, active: boolean): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   if (id.startsWith("e") && id.length <= 3) return { ok: true, demo: true }; // demo row id
   try {
@@ -500,6 +503,7 @@ export async function setEmployeeStatus(id: string, active: boolean): Promise<Ac
 
 /** Permanently delete an employee and all their records (cascades). */
 export async function deleteEmployee(id: string): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   if (id.startsWith("e") && id.length <= 3) return { ok: true, demo: true }; // demo row id
   try {
@@ -529,6 +533,7 @@ export async function deleteEmployee(id: string): Promise<ActionResult> {
 }
 
 export async function updateEmployee(id: string, input: UpdateEmployeeInput): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   if (id.startsWith("e") && id.length <= 3) return { ok: true, demo: true }; // demo row id
   try {
@@ -695,6 +700,7 @@ export async function getOverseenDepartments(employeeId: string): Promise<string
 
 /** Assign which departments a manager oversees. Empty array = sees everything. */
 export async function setOverseenDepartments(employeeId: string, names: string[]): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   if (employeeId.startsWith("e") && employeeId.length <= 3) return { ok: true, demo: true };
   try {
@@ -884,6 +890,7 @@ Starfsmaður: ______________________　Dags: ________
 /** Generate a contract draft from employee + company data. */
 /** `kind` velur samningsgerð; sjálfgefið eftir hlutverki (verktaki → verksamningur). */
 export async function generateContract(employeeId: string, kind?: "employment" | "contractor"): Promise<ActionResult & { content?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -939,6 +946,7 @@ export async function listContracts(employeeId: string): Promise<{ contracts: Co
 
 /** Save edited draft content — review-before-send flow. Drafts only. */
 export async function updateContractContent(id: string, content: string): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -954,6 +962,7 @@ export async function updateContractContent(id: string, content: string): Promis
 }
 
 export async function deleteContract(id: string): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -976,6 +985,7 @@ export async function setContractStatus(
   id: string, status: "draft" | "sent" | "signed" | "void",
   signer?: { ssn: string; phone?: string },
 ): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -1072,6 +1082,7 @@ export async function setContractStatus(
  *  Nýjasti óundirritaði samningurinn: „sendur“ → boðið endursent (sama póstur / sama Taktikal-ferli, engin ný
  *  undirskrift); „drög“ → venjuleg sending (setContractStatus: undirritun fyrirtækis + póstur). Undirritaður → villa. */
 export async function resendContract(employeeId: string): Promise<ActionResult & { signedAt?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   if (await demoBlocked()) return demoResult(); // opið demo: enginn póstur / Taktikal (sjá líka þröskuldana)
   try {
@@ -1183,6 +1194,7 @@ export async function getContractSignatures(id: string): Promise<SignatureRecord
 
 /** Opnar undirritunartengil vinnuveitanda aftur (Taktikal), t.d. ef glugganum var lokað. */
 export async function taktikalEmployerLink(contractId: string): Promise<{ ok: boolean; url?: string; status?: string; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false };
   try {
     const supabase = await createClient();

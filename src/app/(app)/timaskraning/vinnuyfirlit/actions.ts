@@ -1,5 +1,6 @@
 "use server";
 
+import { demoBlocked, demoResult } from "@/lib/demo.server";
 // Vinnuyfirlit (0084): stjórnandi býr til → sendir → starfsmaður staðfestir/gerir athugasemd →
 // stjórnandi staðfestir (final: PDF með fingrafari í skjalasafn starfsmanns).
 // Allt fer um innskráðan notanda (RLS); svar starfsmanns eingöngu um respond_work_overview().
@@ -66,6 +67,7 @@ export type WoResult = { ok: boolean; error?: string; count?: number; skipped?: 
 /** Býr til (eða endurreiknar) yfirlit fyrir alla — eða aðeins `onlyIds`. Snertir ekki yfirlit
  * sem starfsmaður hefur staðfest eða sem er lokið; endurreiknuð yfirlit fara aftur í drög. */
 export async function generateWorkOverviews(from: string, to: string, onlyIds?: string[]): Promise<WoResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
   if (!okDate(from) || !okDate(to) || to < from) return { ok: false, error: "Ógilt tímabil" };
   try {
@@ -108,6 +110,7 @@ export async function generateWorkOverviews(from: string, to: string, onlyIds?: 
 
 /** Sendir drög til staðfestingar (push á hvern starfsmann). */
 export async function sendWorkOverviews(ids: string[]): Promise<WoResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured() || !ids.length) return { ok: true, count: 0 };
   try {
     const supabase = await createClient();
@@ -136,6 +139,7 @@ export async function sendWorkOverviews(ids: string[]): Promise<WoResult> {
 /** Stjórnandi staðfestir: PDF með fingrafari og staðfestingarskrá → skjalasafn starfsmanns.
  * Ef starfsmaður gerði athugasemd þarf svar stjórnanda (note). */
 export async function finalizeWorkOverview(id: string, note?: string): Promise<WoResult & { documentId?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
   try {
     const supabase = await createClient();
@@ -215,6 +219,7 @@ export async function getMyWorkOverviews(): Promise<{ ok: boolean; missing?: boo
 
 /** Starfsmaður staðfestir (approve) eða gerir athugasemd (comment áskilin). */
 export async function respondToWorkOverview(id: string, approve: boolean, comment?: string): Promise<WoResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
   const note = (comment ?? "").trim();
   if (!approve && !note) return { ok: false, error: "Skrifaðu athugasemdina" };
