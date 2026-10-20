@@ -1,6 +1,7 @@
 "use client";
 
 import { PayDefaultsCard } from "./pay-defaults";
+import { MonthlyReportCard } from "./monthly-report";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { IntegrationsPanel } from "./integrations-panel";
@@ -96,6 +97,7 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
           </div>
         </div>
       </div>
+      <MonthlyReportCard />
       </>}
 
       {section === "reglur" && <>

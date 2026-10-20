@@ -48,7 +48,7 @@ export async function sendEmail(input: { to: string; subject: string; html: stri
    Aðeins inline-stílar og töflur (Apple Mail, Gmail, Outlook). Valkvætt: kóði, upplýsingalínur, auka-HTML.
    ============================================================ */
 
-type Bilingual = {
+export type Bilingual = {
   preheader: string;
   heading: string;
   body: string; // IS, may contain <b>/<a>
@@ -100,7 +100,7 @@ const rowsTable = (rows: [string, string][], small = false) =>
       <td align="right" style="padding:${small ? "8px" : "13px"} 0;border-top:1px solid ${i === 0 ? LINE : "#f2f2f5"};font-size:${small ? 13 : 15}px;font-weight:600;color:${INK};font-variant-numeric:tabular-nums">${v}</td>
     </tr>`).join("")}</table>`;
 
-function template(o: Bilingual): string {
+export function template(o: Bilingual): string {
   return `<!doctype html><html lang="is"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
 <style>

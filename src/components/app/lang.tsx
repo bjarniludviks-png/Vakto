@@ -8,6 +8,14 @@ type Dict = Record<string, { is: string; en: string; vi?: string; pl?: string }>
 
 // App-shell chrome strings. Per-screen content can adopt useLang() incrementally.
 export const DICT: Dict = {
+  // Mánaðarskýrsla í pósti (0085)
+  "Mánaðarskýrsla í pósti": { is: "Mánaðarskýrsla í pósti", en: "Monthly report by email", vi: "Báo cáo tháng qua email", pl: "Raport miesięczny e-mailem" },
+  "Laun % af veltu, yfirvinna, veikindi og opin mál síðasta mánaðar — send 1. hvers mánaðar": { is: "Laun % af veltu, yfirvinna, veikindi og opin mál síðasta mánaðar — send 1. hvers mánaðar", en: "Labour % of revenue, overtime, sickness and open items for last month — sent on the 1st of each month", vi: "Tỷ lệ lương trên doanh thu, tăng ca, nghỉ ốm và việc tồn của tháng trước — gửi ngày 1 hàng tháng", pl: "Płace jako % przychodu, nadgodziny, choroby i otwarte sprawy z ostatniego miesiąca — wysyłane 1. dnia miesiąca" },
+  "Senda á": { is: "Senda á", en: "Send to", vi: "Gửi đến", pl: "Wyślij do" },
+  "Eigendur": { is: "Eigendur", en: "Owners", vi: "Chủ sở hữu", pl: "Właściciele" },
+  "Eigendur og vaktstjóra": { is: "Eigendur og vaktstjóra", en: "Owners and managers", vi: "Chủ sở hữu và quản lý ca", pl: "Właściciele i kierownicy zmian" },
+  "Senda prufu á mig": { is: "Senda prufu á mig", en: "Send me a test", vi: "Gửi thử cho tôi", pl: "Wyślij mi test" },
+  "Prufa send á": { is: "Prufa send á", en: "Test sent to", vi: "Đã gửi thử đến", pl: "Test wysłany do" },
   // Opið demo
   "Þú ert í demo — gögnin eru gervigögn og núllstillast á hverri nóttu.": { is: "Þú ert í demo — gögnin eru gervigögn og núllstillast á hverri nóttu.", en: "You are in the demo — the data is fictional and resets every night.", vi: "Bạn đang dùng bản demo — dữ liệu là giả và được đặt lại mỗi đêm.", pl: "Jesteś w wersji demo — dane są fikcyjne i resetują się co noc." },
   "Stofna eigið fyrirtæki": { is: "Stofna eigið fyrirtæki", en: "Create your own company", vi: "Tạo công ty của bạn", pl: "Załóż własną firmę" },
