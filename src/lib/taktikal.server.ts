@@ -172,11 +172,121 @@ export function webhookRejectReason(p: TaktikalWebhook): string | null {
   const ms = (Number(ticks) - 621355968000000000) / 10000;
   if (!Number.isFinite(ms) || Math.abs(Date.now() - ms) > 24 * 3600e3) return "stale timestamp";
   if (process.env.TAKTIKAL_COMPANY_KEY && p.EventData?.CompanyKey !== process.env.TAKTIKAL_COMPANY_KEY) return "CompanyKey mismatch";
-  const want = createHmac("sha256", key).update(sig.SignedData, "utf8").digest();
-  const got = Buffer.from(sig.Signature, "base64");
-  if (got.length !== want.length || !timingSafeEqual(got, want)) return "HMAC mismatch";
+  if (!hmacMatches(key, sig.SignedData, sig.Signature)) return "HMAC mismatch";
   return null;
+}
+
+function hmacMatches(key: string, signedData: string, signature: string): boolean {
+  const want = createHmac("sha256", key).update(signedData, "utf8").digest();
+  const got = Buffer.from(signature, "base64");
+  return got.length === want.length && timingSafeEqual(got, want);
 }
 export function verifyWebhook(p: TaktikalWebhook): boolean {
   return webhookRejectReason(p) === null;
+}
+
+/* ------------------------------------------------------------------------------------------
+ * Staða ferlis sótt beint frá Taktikal (varaleið fyrir webhooks sem misfórust).
+ *
+ *   1. GET /api/signing/activity?ProcessKey=…  — virknilog fyrirtækisins (aðeins lestur, Basic Auth).
+ *      Undirskrift = færsla með status „SigneeSigned“ og signeeKey; ferlið sjálft hefur status
+ *      (Completed / Active / Canceled / Expired / Blocked).
+ *   2. Varaleið: GET /api/signing/{ProcessKey}/signee/{SigneeKey} — SigningProcess með
+ *      signees[].signed + signedAt.
+ * ---------------------------------------------------------------------------------------- */
+
+export type TaktikalSigneeState = { key: string; name: string; email: string | null; signed: boolean; signedAt: string | null };
+export type TaktikalProcessState = {
+  /** Staða ferlisins eins og Taktikal skilar henni (lágstafir), t.d. "completed", "active", "canceled". */
+  status: string | null;
+  signees: TaktikalSigneeState[];
+  source: "activity" | "signee";
+};
+
+type ActivityEntry = { signeeKey?: string; status?: string; createdAt?: string };
+type ActivitySignee = { signeeKey?: string; key?: string; name?: string; email?: string };
+type ActivityWrapper = { processKey?: string; status?: string; activityLog?: ActivityEntry[]; signees?: ActivitySignee[] };
+type ProcessSignee = { key?: string; name?: string; email?: string; signed?: boolean; signedAt?: string | null; status?: string };
+
+const iso = (d: Date) => d.toISOString().slice(0, 19);
+
+/** Les stöðu eins ferlis frá Taktikal. Kostar ekkert (engin ný undirskrift); kastar ef hvorug leiðin svarar. */
+export async function fetchProcessState(processKey: string, opts: { createdAt?: string | null; signeeKey?: string | null } = {}): Promise<TaktikalProcessState> {
+  if (!taktikalConfigured()) throw new Error("Taktikal er ekki tengt í þessu umhverfi");
+  let activityErr: unknown = null;
+  try {
+    const from = new Date((opts.createdAt ? new Date(opts.createdAt).getTime() : Date.now()) - 3 * 86400e3);
+    const to = new Date(Date.now() + 86400e3);
+    const q = new URLSearchParams({ StartDate: iso(from), EndDate: iso(to), ProcessKey: processKey, Take: "5", StatusFilter: "All" });
+    const res = await call<ActivityWrapper[] | { results?: ActivityWrapper[] }>(`/api/signing/activity?${q}`, { method: "GET" });
+    const list = Array.isArray(res) ? res : (res?.results ?? []);
+    const w = list.find((x) => x?.processKey === processKey) ?? (list.length === 1 ? list[0] : undefined);
+    if (w) {
+      const log = w.activityLog ?? [];
+      const signedAt = new Map<string, string>();
+      for (const e of log) {
+        if (!e?.signeeKey || String(e.status ?? "").toLowerCase() !== "signeesigned") continue;
+        const prev = signedAt.get(e.signeeKey);
+        if (!prev || (e.createdAt ?? "") < prev) signedAt.set(e.signeeKey, e.createdAt ?? new Date().toISOString());
+      }
+      const signees = (w.signees ?? []).map((s) => {
+        const key = s.signeeKey ?? s.key ?? "";
+        return { key, name: s.name ?? "", email: s.email ?? null, signed: signedAt.has(key), signedAt: signedAt.get(key) ?? null };
+      });
+      // Signee sem birtist aðeins í loginu (ef signees-listinn er tómur).
+      for (const [key, at] of signedAt) if (!signees.some((s) => s.key === key)) signees.push({ key, name: "", email: null, signed: true, signedAt: at });
+      return { status: w.status ? String(w.status).toLowerCase() : null, signees, source: "activity" };
+    }
+    activityErr = new Error("Taktikal: ferlið fannst ekki í virknilogginu");
+  } catch (e) { activityErr = e; }
+
+  if (opts.signeeKey) {
+    const p = await call<{ key?: string; status?: string; signees?: ProcessSignee[] }>(
+      `/api/signing/${encodeURIComponent(processKey)}/signee/${encodeURIComponent(opts.signeeKey)}?UserAgent=${encodeURIComponent("VAKTO status sync")}`,
+      { method: "GET" },
+    );
+    return {
+      status: p.status ? String(p.status).toLowerCase() : null,
+      signees: (p.signees ?? []).map((s) => ({
+        key: s.key ?? "", name: s.name ?? "", email: s.email ?? null,
+        signed: !!s.signed || String(s.status ?? "").toLowerCase() === "signed",
+        signedAt: s.signedAt ?? null,
+      })),
+      source: "signee",
+    };
+  }
+  throw activityErr instanceof Error ? activityErr : new Error("Taktikal: staða fékkst ekki");
+}
+
+export type TaktikalWebhookCheck = {
+  /** Webhook-slóðir sem Taktikal hefur skráðar á flæðið. null = tókst ekki að lesa. */
+  urls: string[] | null;
+  /** Bendir einhver þeirra á /api/taktikal/webhook? */
+  pointsHere: boolean | null;
+  keySet: boolean;
+  /** Passar TAKTIKAL_WEBHOOK_KEY við undirskrift sýnidæmisins frá Taktikal? null = ekki hægt að meta. */
+  keyMatches: boolean | null;
+  error?: string;
+};
+
+/** Sjálfsprófun webhooks: les skráð webhook flæðisins (GET /api/management/webhook/flowKey/{FlowKey})
+ *  og ber webhook-lykilinn saman við undirritað sýnidæmi ef Taktikal skilar því. Breytir engu. */
+export async function checkTaktikalWebhook(): Promise<TaktikalWebhookCheck> {
+  const keySet = !!process.env.TAKTIKAL_WEBHOOK_KEY;
+  if (!taktikalConfigured()) return { urls: null, pointsHere: null, keySet, keyMatches: null, error: "Lyklar vantar" };
+  try {
+    const fk = await flowKey();
+    const res = await call<unknown>(`/api/management/webhook/flowKey/${encodeURIComponent(fk)}`, { method: "GET" });
+    type Hook = { url?: unknown; sampleData?: { eventSignature?: { signedData?: string; signature?: string } } };
+    const list = (Array.isArray(res) ? res : []) as Hook[];
+    const urls = list.map((h) => (typeof h.url === "string" ? h.url : String((h.url as { absoluteUri?: string } | null)?.absoluteUri ?? h.url ?? ""))).filter(Boolean);
+    const pointsHere = urls.some((u) => /\/api\/taktikal\/webhook\/?$/.test(u));
+    let keyMatches: boolean | null = null;
+    const key = process.env.TAKTIKAL_WEBHOOK_KEY;
+    const sample = list.map((h) => h.sampleData?.eventSignature).find((x) => x?.signedData && x?.signature);
+    if (key && sample?.signedData && sample.signature) keyMatches = hmacMatches(key, sample.signedData, sample.signature);
+    return { urls, pointsHere, keySet, keyMatches };
+  } catch (e) {
+    return { urls: null, pointsHere: null, keySet, keyMatches: null, error: e instanceof Error ? e.message : "Tókst ekki að lesa webhook" };
+  }
 }

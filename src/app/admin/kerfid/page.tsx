@@ -4,6 +4,7 @@ import { nf } from "@/lib/format";
 import { isVaktoAdmin } from "@/lib/vakto-admin.server";
 import { getSystemStatus, type Service } from "@/lib/system-status.server";
 import { TaktikalTest } from "./taktikal-test";
+import { checkTaktikalWebhook, pingTaktikal, type TaktikalPing, type TaktikalWebhookCheck } from "@/lib/taktikal.server";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +13,39 @@ function State({ s }: { s: Service["state"] }) {
   return <span className={`adm-status ${s === "on" ? "ok" : "off"}`}><i />{s === "on" ? "Tengt" : "Ekki tengt hér"}</span>;
 }
 
+/** Taktikal: raunveruleg staða (prófað við hverja opnun síðunnar — les aðeins flæðalistann, kostar ekkert). */
+function TaktikalState({ ping }: { ping: TaktikalPing }) {
+  if (ping.ok) return <span className="adm-status ok"><i />Tenging virkar</span>;
+  const rejected = ping.status === 401 || ping.status === 403 || (ping.status !== null && ping.status >= 300 && ping.status < 400);
+  return <span className="adm-status err" title={ping.error}><i />{rejected ? "Lyklum hafnað" : "Tenging mistókst"}</span>;
+}
+
+function TaktikalWebhookLine({ w }: { w: TaktikalWebhookCheck }) {
+  const items: { ok: boolean | null; text: string }[] = [
+    { ok: w.keySet, text: w.keySet ? "TAKTIKAL_WEBHOOK_KEY er sett" : "TAKTIKAL_WEBHOOK_KEY vantar — öllum webhooks er hafnað" },
+    w.urls === null
+      ? { ok: null, text: `Gat ekki lesið skráð webhook hjá Taktikal${w.error ? ` (${w.error})` : ""}` }
+      : w.pointsHere
+        ? { ok: true, text: `Webhook skráð: ${w.urls.find((u) => /\/api\/taktikal\/webhook\/?$/.test(u))?.replace("https://", "")}` }
+        : { ok: false, text: w.urls.length ? `Webhook bendir annað: ${w.urls.join(", ")}` : "Ekkert webhook skráð á flæðið hjá Taktikal" },
+    ...(w.keyMatches === null ? [] : [{ ok: w.keyMatches, text: w.keyMatches ? "Webhook-lykillinn passar við undirskrift Taktikal" : "Webhook-lykillinn passar EKKI við undirskrift Taktikal — webhooks fá 406" }]),
+  ];
+  return (
+    <ul style={{ listStyle: "none", padding: 0, margin: "8px 0 0", fontSize: 12, display: "grid", gap: 3 }}>
+      {items.map((x) => (
+        <li key={x.text} style={{ color: x.ok === false ? "var(--bad)" : x.ok ? "var(--good)" : "var(--ink3)" }}>{x.ok === false ? "✕" : x.ok ? "✓" : "–"} {x.text}</li>
+      ))}
+      <li style={{ color: "var(--ink3)" }}>Misfarist webhook nær daglega samstillingin (taktikal-sync) og „Uppfæra stöðu frá Taktikal“ á starfsmanninum.</li>
+    </ul>
+  );
+}
+
 // Kerfið: hvað VAKTO er byggt á, hvað er tengt í þessu umhverfi og hvar hvert stjórnborð er.
 export default async function AdminSystemPage() {
   if (!(await isVaktoAdmin())) redirect("/maelabord");
   const s = await getSystemStatus();
+  const taktikalOn = s.groups.some((g) => g.services.some((v) => v.name === "Taktikal" && v.state === "on"));
+  const [tkPing, tkHook] = taktikalOn ? await Promise.all([pingTaktikal(), checkTaktikalWebhook()]) : [null, null];
   return (
     <>
       <PageHeader title="Kerfið" subtitle="Hvað VAKTO er byggt á, hvað er tengt og hvar þú finnur hvert stjórnborð" />
@@ -53,11 +83,12 @@ export default async function AdminSystemPage() {
             <div className="adm-svc">
               {g.services.map((v) => (
                 <div key={v.name}>
-                  <h4>{v.name}<State s={v.state} /></h4>
+                  <h4>{v.name}{v.name === "Taktikal" && tkPing ? <TaktikalState ping={tkPing} /> : <State s={v.state} />}</h4>
                   <p style={{ color: "var(--ink3)", fontSize: 12, fontWeight: 600 }}>{v.role}</p>
                   <p>{v.what}</p>
                   {v.note && <p style={{ color: "var(--warn)" }}>{v.note}</p>}
                   {v.link && <a href={v.link.href} target="_blank" rel="noreferrer">{v.link.label}</a>}
+                  {v.name === "Taktikal" && tkHook && <TaktikalWebhookLine w={tkHook} />}
                   {v.name === "Taktikal" && v.state === "on" && <TaktikalTest />}
                 </div>
               ))}
