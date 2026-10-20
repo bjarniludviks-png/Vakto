@@ -10,6 +10,7 @@ import { supabase, isSupabaseConfigured } from "../src/lib/supabase";
 import { Txt, Btn, Muted } from "../src/components/ui";
 import { MARK_BARS, WHITE_BAR_OPACITY, VaktoWordmark, logoGap } from "../src/components/vakto-logo";
 import { colors, radius, font, useTheme } from "../src/theme";
+import { ACCESS_CLOSED_MSG, getAccessState, takeAccessClosed } from "../src/lib/api/access";
 
 // Sama merki og alls staðar (hvíta útgáfan á appelsínugulu): súlurnar í 28-kassa, kvarðaðar í LOGO px.
 const LOGO = 52;
@@ -36,7 +37,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(() => (takeAccessClosed() ? tr(ACCESS_CLOSED_MSG) : null));
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sending, setSending] = useState(false);
@@ -70,7 +71,8 @@ export default function Login() {
     setBusy(true);
     const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
-    if (err) setError("Innskráning tókst ekki — athugaðu netfang og lykilorð.");
+    if (err) setError(/banned/i.test(err.message) ? tr(ACCESS_CLOSED_MSG) : "Innskráning tókst ekki — athugaðu netfang og lykilorð.");
+    else if ((await getAccessState()).state === "closed") { takeAccessClosed(); await supabase.auth.signOut(); setError(tr(ACCESS_CLOSED_MSG)); }
     // Gate in _layout redirects on success.
   }
 

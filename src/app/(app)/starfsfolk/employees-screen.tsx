@@ -18,6 +18,8 @@ import { useCountry } from "@/components/app/country";
 import { templateToPayRule, type RuleTemplate } from "@/lib/rules";
 import { listRuleTemplates } from "../stillingar/actions";
 import { ContractView, ContractEditor } from "@/components/app/contract-view";
+import { LeavingPill } from "./termination/banner";
+import type { LeavingInfo } from "@/lib/termination";
 import { Av } from "@/components/app/avatar";
 import { PaySettingsCard } from "./pay-settings";
 import { computeLine } from "@/lib/payroll";
@@ -57,9 +59,14 @@ export const profileTabsFor = (role?: string | null): readonly ProfileTab[] =>
 export default function EmployeesScreen({
   employees,
   live,
+  leaving = {},
+  today = "",
 }: {
   employees: Employee[];
   live: boolean;
+  /** Starfslok (0088): starfsmenn sem hætta / eru hættir. */
+  leaving?: Record<string, LeavingInfo>;
+  today?: string;
 }) {
   const router = useRouter();
   const [showInactive, setShowInactive] = useState(false);
@@ -83,6 +90,7 @@ export default function EmployeesScreen({
   }
   const [search, setSearch] = useState("");
   const [deptF, setDeptF] = useState("all");
+  const [leftF, setLeftF] = useState(false); // sía: „Hættir“ (starfslok skráð)
   const importRef = useRef<HTMLInputElement>(null);
 
   /** Payday-style: downloadable template that matches the import columns. */
@@ -154,7 +162,7 @@ export default function EmployeesScreen({
   const depts = [...new Set(employees.map((e) => e.department).filter(Boolean))] as string[];
   const q = search.trim().toLowerCase();
   const list = employees.filter((e) =>
-    (showInactive || e.status !== "inactive") &&
+    (leftF ? !!leaving[e.id] : showInactive || e.status !== "inactive") &&
     (deptF === "all" || e.department === deptF) &&
     (!q || e.fullName.toLowerCase().includes(q) || (e.title ?? "").toLowerCase().includes(q)));
   const avBg = (e: Employee) => e.avatarColor;
@@ -239,6 +247,12 @@ export default function EmployeesScreen({
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Leita að starfsmanni…")} />
             </div>
+            {employees.some((e) => leaving[e.id]) && (
+              <select className="emp-sel" aria-label={t("Staða")} value={leftF ? "left" : "all"} onChange={(e) => setLeftF(e.target.value === "left")}>
+                <option value="all">{t("Allt starfsfólk")}</option>
+                <option value="left">{t("Hættir")} ({employees.filter((e) => leaving[e.id]).length})</option>
+              </select>
+            )}
             {depts.length > 1 && (
               <select className="emp-sel" value={deptF} onChange={(e) => setDeptF(e.target.value)}>
                 <option value="all">{t("Allar deildir")}</option>
@@ -264,7 +278,7 @@ export default function EmployeesScreen({
                     <td className="r">{nf(e.rate)} <span className="db2-muted">{e.payType === "monthly" ? "kr/mán" : "kr/klst"}</span></td>
                     <td className="r" style={e.employmentRatio > 120 ? { color: "var(--bad)" } : undefined}>{contractor ? <span className="db2-muted">—</span> : `${e.employmentRatio}%`}</td>
                     <td>{contractor ? <span className="db2-muted">{t("á ekki við")}</span> : e.union}</td>
-                    <td>{e.status === "inactive" ? <span className="db2-pill mut">{t("Óvirkur")}</span> : <span className={`db2-pill ${b.cls}`}>{t(b.labelKey)}</span>}</td>
+                    <td>{leaving[e.id] ? <LeavingPill info={leaving[e.id]} today={today} /> : e.status === "inactive" ? <span className="db2-pill mut">{t("Óvirkur")}</span> : <span className={`db2-pill ${b.cls}`}>{t(b.labelKey)}</span>}</td>
                     <td className="r" onClick={(ev) => ev.stopPropagation()}>
                       <span className="emp-rowact">
                         <button className="emp-del" title={t("Eyða starfsmanni")} aria-label={t("Eyða starfsmanni")} onClick={() => delEmp(e.id, e.fullName)}>

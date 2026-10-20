@@ -27,7 +27,7 @@ async function squarePhoto(f: File): Promise<string> {
   } finally { URL.revokeObjectURL(url); }
 }
 
-export default function EmployeeProfile({ employee }: { employee: Employee }) {
+export default function EmployeeProfile({ employee, banner, action }: { employee: Employee; banner?: React.ReactNode; action?: React.ReactNode }) {
   const router = useRouter();
   const { t } = useLang();
   const [tab, setTab] = useState<ProfileTab>("Laun");
@@ -127,9 +127,11 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
           </div>
         </div>
         <div className="db2-period">
+          {action}
           <button className="btn ghost sm" type="button" disabled={saving} onClick={toggleActive}>{e.status === "inactive" ? t("Virkja") : t("Óvirkja")}</button>
         </div>
       </div>
+      {banner}
 
       <div className="ep-tabs" role="tablist">
         {tabs.map((x) => (

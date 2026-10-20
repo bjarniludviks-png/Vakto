@@ -235,8 +235,14 @@ function ContractSignCard() {
   return (
     <>
       <div className="mini" style={{ borderColor: "var(--brand)", background: "var(--brand-soft, #fdf1e7)" }}>
+        {/* Starfslokaskjal (0088) fer sömu undirritunarleið og samningar — hlutlaust orðalag fyrir það. */}
+        {/^(Ráðningarsamningur|Verksamningur)/.test(contract.title) ? <>
         <div className="mh" style={{ color: "var(--brand)" }}>{t("Ráðningarsamningur bíður undirritunar")}</div>
         <p style={{ fontSize: 13, margin: "4px 0 10px" }}>{t("Vinnuveitandinn þinn sendi þér ráðningarsamning. Lestu hann yfir og undirritaðu rafrænt.")}</p>
+        </> : <>
+        <div className="mh" style={{ color: "var(--brand)" }}>{t("Skjal bíður undirritunar")}</div>
+        <p style={{ fontSize: 13, margin: "4px 0 10px" }}>{contract.title.split(" — ")[0]}. {t("Lestu skjalið yfir og staðfestu móttöku með rafrænni undirritun.")}</p>
+        </>}
         <button className="btn sm" onClick={() => setOpen(true)}>{t("Skoða & undirrita")}</button>
       </div>
       {open && (
@@ -254,7 +260,7 @@ function ContractSignCard() {
                 <>
                   <label style={{ display: "flex", alignItems: "flex-start", gap: 9, fontSize: 13, cursor: "pointer" }}>
                     <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} style={{ marginTop: 2 }} />
-                    {t("Ég hef lesið samninginn og samþykki hann. Ég staðfesti með kóða sem sendur er á netfangið mitt.")}
+                    {/^(Ráðningarsamningur|Verksamningur)/.test(contract.title) ? t("Ég hef lesið samninginn og samþykki hann. Ég staðfesti með kóða sem sendur er á netfangið mitt.") : t("Ég hef lesið skjalið og staðfesti móttöku þess. Ég staðfesti með kóða sem sendur er á netfangið mitt.")}
                   </label>
                   <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
                     <button className="btn" disabled={!agreed || busy} onClick={sendCode}>{busy ? t("Sendi…") : t("Senda mér kóða")}</button>

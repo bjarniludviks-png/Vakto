@@ -35,6 +35,7 @@ export const LOGIN_I18N: Record<Lang, {
   errConnect: string;
   errAudkenni: string;
   errCreds: string;
+  errClosed: string;
   needEmail: string;
   sendingReset: string;
   resetSent: string;
@@ -69,6 +70,7 @@ export const LOGIN_I18N: Record<Lang, {
     errConnect: "Tókst ekki að tengjast — reyndu aftur eftir augnablik.",
     errAudkenni: "Rafræn skilríki (Auðkenni) eru rétt handan við hornið.",
     errCreds: "Rangt netfang eða lykilorð.",
+    errClosed: "Aðgangur að VAKTO er lokaður. Ráðningu þinni er lokið og lesaðgangurinn sem vinnuveitandinn veitti er runninn út. Hafðu samband við vinnuveitandann ef þig vantar gögn.",
     needEmail: "Sláðu netfangið þitt inn fyrst — smelltu svo aftur á hlekkinn.",
     sendingReset: "Sendi…",
     resetSent: "Ef aðgangur er til fyrir netfangið er póstur með hlekk á leiðinni.",
@@ -103,6 +105,7 @@ export const LOGIN_I18N: Record<Lang, {
     errConnect: "Couldn't connect — please try again in a moment.",
     errAudkenni: "Electronic ID (Auðkenni) is just around the corner.",
     errCreds: "Wrong email or password.",
+    errClosed: "Your access to VAKTO is closed. Your employment has ended and the read-only access your employer granted has expired. Contact your employer if you need your records.",
     needEmail: "Type your email above first, then tap this link again.",
     sendingReset: "Sending…",
     resetSent: "If an account exists for that email, a reset link is on its way.",
@@ -137,6 +140,7 @@ export const LOGIN_I18N: Record<Lang, {
     errConnect: "Không thể kết nối — vui lòng thử lại sau giây lát.",
     errAudkenni: "Định danh điện tử (Auðkenni) sắp ra mắt.",
     errCreds: "Email hoặc mật khẩu không đúng.",
+    errClosed: "Quyền truy cập VAKTO của bạn đã đóng. Công việc của bạn đã kết thúc và quyền chỉ xem do chủ lao động cấp đã hết hạn. Hãy liên hệ chủ lao động nếu bạn cần hồ sơ.",
     needEmail: "Hãy nhập email ở trên trước, rồi bấm lại vào liên kết này.",
     sendingReset: "Đang gửi…",
     resetSent: "Nếu email này có tài khoản, liên kết đặt lại mật khẩu đang được gửi đến.",
@@ -171,6 +175,7 @@ export const LOGIN_I18N: Record<Lang, {
     errConnect: "Nie udało się połączyć — spróbuj ponownie za chwilę.",
     errAudkenni: "Identyfikator elektroniczny (Auðkenni) już wkrótce.",
     errCreds: "Nieprawidłowy e-mail lub hasło.",
+    errClosed: "Twój dostęp do VAKTO jest zamknięty. Zatrudnienie się zakończyło, a dostęp tylko do odczytu przyznany przez pracodawcę wygasł. Skontaktuj się z pracodawcą, jeśli potrzebujesz swoich dokumentów.",
     needEmail: "Najpierw wpisz swój e-mail powyżej, a potem kliknij ten link ponownie.",
     sendingReset: "Wysyłanie…",
     resetSent: "Jeśli istnieje konto dla tego adresu, link do zmiany hasła jest już w drodze.",

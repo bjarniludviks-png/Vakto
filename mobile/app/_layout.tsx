@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
@@ -9,11 +9,28 @@ import { ToastProvider } from "../src/components/ui";
 import { colors, useTheme, loadThemeMode } from "../src/theme";
 import { loadLang } from "../src/lib/i18n";
 import { isManager } from "../src/lib/api/ops";
+import { supabase } from "../src/lib/supabase";
+import { getAccessState, markAccessClosed, READONLY_ROUTES } from "../src/lib/api/access";
 
 function Gate({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  // Starfslok (0088): eftir síðasta dag aðeins skjöl/samningar; eftir lokun er lotunni hent út.
+  // Grunnurinn framfylgir þessu sjálfur (RLS) — hér er bara réttur skjár valinn.
+  const [access, setAccess] = useState<"active" | "readonly" | "closed" | null>(null);
+  const uid = session?.user.id;
+  useEffect(() => {
+    if (!uid) { setAccess(null); return; }
+    let live = true;
+    getAccessState().then((a) => {
+      if (!live) return;
+      if (a.state === "closed") { markAccessClosed(); supabase.auth.signOut().catch(() => {}); }
+      setAccess(a.state);
+    }).catch(() => live && setAccess("active"));
+    return () => { live = false; };
+  }, [uid]);
 
   // Stjórnendur lenda á mælaborðinu þegar appið opnast; starfsfólk á Heim.
   const landed = useRef(false);
@@ -21,14 +38,19 @@ function Gate({ children }: { children: React.ReactNode }) {
     if (loading) return;
     const onLogin = segments[0] === "login";
     if (!session && !onLogin) { landed.current = false; router.replace("/login"); return; }
+    if (session && access === null) return; // bíður eftir aðgangsstöðu
+    if (session && access === "readonly") {
+      if (!READONLY_ROUTES.includes(String(segments[0] ?? ""))) router.replace("/starfslok");
+      return;
+    }
     if (session && onLogin) { router.replace("/"); return; }
     if (session && !onLogin && !landed.current && segments.length <= 1) {
       landed.current = true;
       isManager().then((m) => { if (m) router.replace("/maelabord"); }).catch(() => {});
     }
-  }, [session, loading, segments, router]);
+  }, [session, loading, segments, router, access]);
 
-  if (loading) {
+  if (loading || (session && access === null)) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg }}>
         <ActivityIndicator color={colors.brand} />

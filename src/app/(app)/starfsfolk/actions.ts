@@ -494,6 +494,8 @@ export async function setEmployeeStatus(id: string, active: boolean): Promise<Ac
     if (company) await logAudit(supabase, company, user?.id ?? null, {
       action: "employee.status", entity: "employee", entityId: id, detail: active ? "Starfsmaður virkjaður" : "Starfsmaður óvirkjaður",
     });
+    // Endurráðning: starfslok (0088) falla úr gildi og innskráning opnast aftur (RLS staðfesti aðganginn hér að ofan).
+    if (active && company) await (await import("@/lib/terminations-cron.server")).reopenAfterRehire(company, id, user?.id ?? null).catch((e) => console.error("[reopenAfterRehire]", e));
     revalidatePath("/starfsfolk");
     return { ok: true };
   } catch (e) {

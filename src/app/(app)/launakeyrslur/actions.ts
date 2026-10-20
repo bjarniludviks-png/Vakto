@@ -67,6 +67,11 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
   const ruleMap = new Map<string, { eve: number; weekend: number; overtime: number; holiday: number; night: number } | null>();
   const pr = await supabase.from("employees").select("id, pay_rule").eq("company_id", company);
   if (!pr.error) for (const r of pr.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never) ?? null);
+  // Starfslok (0088): síðasti starfsdagur. Hættur fyrir tímabilið → engin lína nema hann eigi tíma á því.
+  const endRes = await supabase.from("employees").select("id, end_date").eq("company_id", company);
+  const endOf = new Map<string, string | null>();
+  if (!endRes.error) for (const r of endRes.data ?? []) endOf.set(r.id as string, (r.end_date as string | null) ?? null);
+  const goneBefore = (id: string) => { const d = endOf.get(id); return !!d && d < from; };
 
   // Desember-/orlofsuppbót: paid automatically in the June / December run,
   // prorated by starfshlutfall (per the employee's kjarasamningur) — sjá periodPayLine.
@@ -76,7 +81,7 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
     // Óvirkir koma aðeins með ef þeir unnu á tímabilinu. Payday-útflutningur sleppir núlllínum sjálfur.
     // Verktakar senda reikning — þeir fara hvorki í launakeyrslu né launaútflutning.
     .filter((e) => e.role !== "contractor")
-    .filter((e) => (byEmp.get(e.id)?.length ?? 0) > 0 || e.payType === "monthly" || e.status !== "inactive")
+    .filter((e) => (byEmp.get(e.id)?.length ?? 0) > 0 || (!goneBefore(e.id) && (e.payType === "monthly" || e.status !== "inactive")))
     .map((e) => periodPayLine(e, byEmp.get(e.id) ?? [], ruleMap.get(e.id), from));
   // Raunverulega samþykktir tímar per starfsmann (fastlaunafólk fær laun óháð þeim, en taflan sýnir þá).
   const worked = new Map<string, number>();

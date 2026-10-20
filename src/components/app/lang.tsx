@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { TERMINATION_DICT } from "@/lib/termination-dict";
 
 export type Lang = "is" | "en" | "vi" | "pl";
 
@@ -1976,7 +1977,7 @@ export function useLang() {
   const { lang, setLang } = useContext(Ctx);
   // Fallback chain: vi/pl → en → is(key) so partial translations still work.
   const t = (key: string) => {
-    const e = DICT[key];
+    const e = DICT[key] ?? TERMINATION_DICT[key];
     if (!e) return key;
     if (lang === "vi") return e.vi ?? e.en ?? key;
     if (lang === "pl") return e.pl ?? e.en ?? key;

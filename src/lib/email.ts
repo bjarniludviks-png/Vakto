@@ -588,6 +588,42 @@ export async function sendSignedContractEmail(to: string, o: { employeeName: str
   });
 }
 
+/** Starfslok (0088): skjal til undirritunar í VAKTO (sama kóðaflæði og samningar). */
+export async function sendTerminationSignEmail(to: string, name: string, company: string, title: string) {
+  const first = (name || "").split(/\s+/)[0] || "";
+  return sendEmail({
+    to,
+    subject: `${company}: ${title.toLowerCase()} til undirritunar / document to sign`,
+    html: template({
+      preheader: `${company} sendi þér skjal vegna starfsloka.`,
+      heading: `Skjal vegna starfsloka${first ? ", " + first : ""}`,
+      body: `<b>${company}</b> sendi þér skjal vegna starfsloka (${title.toLowerCase()}). Opnaðu Mitt svæði, lestu það yfir og staðfestu móttöku með rafrænni undirritun.`,
+      headingEn: "A document about the end of your employment",
+      bodyEn: `<b>${company}</b> sent you a document about the end of your employment. Open My area, read it and confirm receipt with an electronic signature.`,
+      ctaLabel: "Lesa skjalið",
+      ctaLabelEn: "Read the document",
+      ctaHref: `${APP_URL}/mitt-svaedi`,
+    }),
+  });
+}
+
+/** Starfslok (0088): bréf sent án undirritunar — PDF fylgir og er líka í skjalasafni starfsmannsins. */
+export async function sendTerminationLetterEmail(to: string, o: { name: string; company: string; title: string; pdfBase64: string; filename: string }) {
+  const first = (o.name || "").split(/\s+/)[0] || "";
+  return sendEmail({
+    to,
+    subject: `${o.company}: ${o.title.toLowerCase()} / document about your employment`,
+    html: template({
+      preheader: "Skjalið fylgir sem PDF.",
+      heading: `${o.title}${first ? ", " + first : ""}`,
+      body: `<b>${o.company}</b> sendi þér meðfylgjandi skjal vegna starfsloka. Það er líka í skjalasafninu þínu í VAKTO.`,
+      headingEn: "A document about the end of your employment",
+      bodyEn: `<b>${o.company}</b> sent you the attached document about the end of your employment. It is also in your documents in VAKTO.`,
+    }),
+    attachments: [{ filename: o.filename, content: o.pdfBase64 }],
+  });
+}
+
 /** Innri tilkynningar til eiganda VAKTO (nýskráning, morgunyfirlit). Viðtakandi: OWNER_ALERT_EMAIL. */
 export const OWNER_ALERT_EMAIL = process.env.OWNER_ALERT_EMAIL || "bjarni@bgl.is";
 

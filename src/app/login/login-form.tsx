@@ -46,9 +46,9 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
   useEffect(() => {
     const err = new URLSearchParams(window.location.search).get("error");
     if (!err) return;
-    const id = setTimeout(() => setError(s.errOauth), 0);
+    const id = setTimeout(() => setError(err === "lokad" ? s.errClosed : s.errOauth), 0); // lokad: starfslok (0088)
     return () => clearTimeout(id);
-  }, [s.errOauth]);
+  }, [s.errOauth, s.errClosed]);
 
   // Preserve the language on the create-account link too.
   const signupHref = lang === "is" ? "/nyskraning" : `/nyskraning?lang=${lang}`;
@@ -65,7 +65,7 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
       });
       if (error) {
         // Supabase skilar enskri villu; algengasta tilvikið þýtt.
-        setError(/invalid login credentials/i.test(error.message) ? s.errCreds : error.message);
+        setError(/invalid login credentials/i.test(error.message) ? s.errCreds : /banned/i.test(error.message) ? s.errClosed : error.message);
         return;
       }
       try {
