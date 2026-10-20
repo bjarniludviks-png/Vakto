@@ -1,5 +1,6 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
+import { modelFor } from "@/lib/ai/models";
 
 export type AiItem = { kind: "good" | "info" | "warn" | "bad"; title: string; detail: string; tag: string };
 /** One proposed shift: day 0=mánudagur … 6=sunnudagur, times HH:MM. */
@@ -87,12 +88,12 @@ export function isAiConfigured() {
 }
 
 /** `requests` = beiðnir/frí/framboð vikunnar, byggt á þjóninum (formatPlanRequests) — ekki frá vafranum. */
-export async function getAiScheduleProposal(prompt: string, context: string, lang = "is", requests = ""): Promise<AiProposal> {
+export async function getAiScheduleProposal(prompt: string, context: string, lang = "is", requests = "", opts: { demo?: boolean } = {}): Promise<AiProposal> {
   if (!isAiConfigured()) return { ...DEMO, summary: prompt ? `„${prompt}" — ${DEMO.summary}` : DEMO.summary };
 
   const client = new Anthropic();
   const response = await client.messages.create({
-    model: "claude-opus-4-8",
+    model: modelFor("plan", opts),
     max_tokens: 4096,
     thinking: { type: "adaptive" },
     output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },

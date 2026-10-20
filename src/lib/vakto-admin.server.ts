@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { allRows } from "@/lib/supabase/all-rows";
 
 // Comma-separated allowlist; defaults to the founder's account.
 const ADMIN_EMAILS = (process.env.VAKTO_ADMIN_EMAILS || "bjarniludviks@icloud.com")
@@ -214,15 +215,17 @@ export async function getAdminOverview(): Promise<AdminOverview> {
     const monthDate = monthIso.slice(0, 10);
 
     const [usersRes, empRes, locRes, punchRes, auditRes, revRes, platRes] = await Promise.all([
-      db.from("users").select("company_id"),
-      db.from("employees").select("company_id"),
-      db.from("locations").select("id, company_id"),
+      // Yfir ÖLL fyrirtæki — síðað (PostgREST skilar mest 1.000 röðum, óháð .limit()).
+      allRows<{ company_id: string }>((a, b) => db.from("users").select("id, company_id").order("id").range(a, b)),
+      allRows<{ company_id: string }>((a, b) => db.from("employees").select("id, company_id").order("id").range(a, b)),
+      allRows<{ id: string; company_id: string }>((a, b) => db.from("locations").select("id, company_id").order("id").range(a, b)),
       db.from("punches").select("company_id, clock_in").order("clock_in", { ascending: false }).limit(2000),
       db.from("audit_log").select("company_id, created_at").order("created_at", { ascending: false }).limit(2000),
-      db.from("revenue").select("location_id").gte("date", monthDate).limit(5000),
+      allRows<{ location_id: string }>((a, b) => db.from("revenue").select("id, location_id").gte("date", monthDate).order("id").range(a, b)),
       db.from("platform_audit").select("id, admin_email, action, company_id, target, detail, at").order("at", { ascending: false }).limit(50),
     ]);
-    const usageRes = await db.from("billing_usage").select("company_id, kind, ref").gte("day", monthDate).limit(50000);
+    const usageRes = await allRows<{ company_id: string; kind: string; ref: string }>((a, b) => db.from("billing_usage").select("company_id, kind, ref")
+      .gte("day", monthDate).order("company_id").order("kind").order("ref").order("day").range(a, b));
     const active30 = new Map<string, Set<string>>(), esign30 = new Map<string, number>();
     for (const r of usageRes.data ?? []) {
       const k = String(r.company_id);
@@ -360,7 +363,7 @@ export async function getCompanyDetail(companyId: string): Promise<AdminCompanyD
     const locIds = (locRes.data ?? []).map((l) => l.id as string);
     let revenue30d = 0;
     if (locIds.length) {
-      const { data: rev } = await db.from("revenue").select("amount").in("location_id", locIds).gte("date", month);
+      const { data: rev } = await allRows<{ amount: number }>((a, b) => db.from("revenue").select("id, amount").in("location_id", locIds).gte("date", month).order("id").range(a, b));
       revenue30d = (rev ?? []).reduce((a, r) => a + Number(r.amount ?? 0), 0);
     }
     const emps = empRes.data ?? [];

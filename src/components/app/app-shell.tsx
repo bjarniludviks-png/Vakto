@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Icon, Logo } from "./icons";
@@ -149,8 +149,10 @@ export default function AppShell({
 
   return (
     <>
-      <ImpersonationBar />
-      {account.demo && <DemoBar />}
+      <AppBars>
+        <ImpersonationBar />
+        {account.demo && <DemoBar />}
+      </AppBars>
       <div
         className={`backdrop${navOpen ? " show" : ""}`}
         onClick={() => setNavOpen(false)}
@@ -366,6 +368,23 @@ export default function AppShell({
       {(role === "owner" || role === "manager") && (account.role === "owner" || account.role === "manager") && <AssistantPanel />}
     </>
   );
+}
+
+/** Raðar efstu röndunum (innskráning-sem + demo) og birtir samanlagða hæð þeirra sem
+ * `--appbars-h` svo hliðarstika, topbar og spjall á heilum skjá raðist fyrir neðan þær. */
+function AppBars({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const root = document.documentElement;
+    const set = () => root.style.setProperty("--appbars-h", `${el.offsetHeight}px`);
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(el);
+    return () => { ro.disconnect(); root.style.removeProperty("--appbars-h"); };
+  }, []);
+  return <div ref={ref} className="appbars">{children}</div>;
 }
 
 const ROLE_IDENTITY: Record<Role, Account> = {

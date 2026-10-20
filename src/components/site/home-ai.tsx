@@ -2,22 +2,24 @@
 
 // Forsíða: „Hey VAKTO" (dæmi um hvað VAKTO AI gerir í raun — sjá assistant-tools.ts) og
 // „Fáðu kynningu á vinnustaðinn" (beiðni í tölvupósti, /api/kynning).
-// Myndbandið (public/showcase/forsida/video/ai[-en].mp4, scripts/video-forsida-ai.mjs) birtist aðeins ef skráin er til.
+// Myndbandið (public/showcase/forsida/video/ai[-en].mp4, scripts/video-forsida-ai.mjs) birtist ef skráin er til;
+// annars skjámynd af AI-tillögu (light/ai.jpg, scripts/shots-forsida-ai.mjs).
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import Turnstile, { TURNSTILE_SITE_KEY } from "@/components/turnstile";
 import { useSiteLang } from "./lang";
 import { HOME_TEXT } from "./home-text";
 
-const VIDEO = "/showcase/forsida/video";
+const SHOT = "/showcase/forsida";
+const VIDEO = `${SHOT}/video`;
 
 function Spark() {
   // Sama neistatákn og VAKTO AI-hnappurinn í kerfinu.
   return <svg className="ah-spark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3Z" /><path d="M18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8Z" /></svg>;
 }
 
-/** Spilar aðeins þegar skráin er til og myndbandið sést; annars er kaflinn bara dæmin. */
-function AiVideo({ alt }: { alt: string }) {
+/** Spilar aðeins þegar skráin er til og myndbandið sést; annars skjámynd af tillögu VAKTO AI. */
+function AiVideo({ alt, shotAlt }: { alt: string; shotAlt: string }) {
   const lang = useSiteLang();
   const src = `${VIDEO}/ai${lang === "en" ? "-en" : ""}`;
   const [found, setFound] = useState<string | null>(null); // slóðin sem reyndist til
@@ -35,7 +37,12 @@ function AiVideo({ alt }: { alt: string }) {
     io.observe(el);
     return () => io.disconnect();
   }, [ok]);
-  if (!ok) return null;
+  if (!ok) return (
+    <div className="ah-hey-shot">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={`${SHOT}${lang === "en" ? "/en" : ""}/light/ai.jpg`} alt={shotAlt} width={1209} height={1656} loading="lazy" decoding="async" draggable={false} />
+    </div>
+  );
   return (
     <div className="ah-hey-vid">
       <div className="ah-mac">
@@ -57,7 +64,7 @@ export function HeyVakto() {
         <h2>{t.h}</h2>
         <p className="ah-lede">{t.lede}</p>
       </div>
-      <AiVideo alt={t.videoAlt} />
+      <AiVideo alt={t.videoAlt} shotAlt={t.shotAlt} />
       <div className="ah-hey-grid">
         {t.groups.map((g) => (
           <div className="ah-hey-col" key={g.h}>

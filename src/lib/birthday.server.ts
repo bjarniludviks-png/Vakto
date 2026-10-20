@@ -7,6 +7,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { notifyEmployee } from "@/lib/push";
+import { allRows } from "@/lib/supabase/all-rows";
 
 export async function checkBirthdays(): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
@@ -15,9 +16,10 @@ export async function checkBirthdays(): Promise<number> {
     const now = new Date();
     const ddmm = `${String(now.getDate()).padStart(2, "0")}${String(now.getMonth() + 1).padStart(2, "0")}`;
     const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
-    const { data: emps } = await admin
+    // Yfir ÖLL fyrirtæki — síðað (PostgREST skilar mest 1.000 röðum; annars gleymdust afmæli).
+    const { data: emps } = await allRows((a, b) => admin
       .from("employees").select("id, company_id, full_name, kennitala")
-      .eq("status", "active").not("kennitala", "is", null);
+      .eq("status", "active").not("kennitala", "is", null).order("id").range(a, b));
     let n = 0;
     for (const e of emps ?? []) {
       const kt = (e.kennitala as string).replace(/\D/g, "");

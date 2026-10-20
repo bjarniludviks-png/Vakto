@@ -8,8 +8,17 @@ type Dict = Record<string, { is: string; en: string; vi?: string; pl?: string }>
 
 // App-shell chrome strings. Per-screen content can adopt useLang() incrementally.
 export const DICT: Dict = {
+  // Mánaðarskýrsla í pósti (0085)
+  "Mánaðarskýrsla í pósti": { is: "Mánaðarskýrsla í pósti", en: "Monthly report by email", vi: "Báo cáo tháng qua email", pl: "Raport miesięczny e-mailem" },
+  "Laun % af veltu, yfirvinna, veikindi og opin mál síðasta mánaðar — send 1. hvers mánaðar": { is: "Laun % af veltu, yfirvinna, veikindi og opin mál síðasta mánaðar — send 1. hvers mánaðar", en: "Labour % of revenue, overtime, sickness and open items for last month — sent on the 1st of each month", vi: "Tỷ lệ lương trên doanh thu, tăng ca, nghỉ ốm và việc tồn của tháng trước — gửi ngày 1 hàng tháng", pl: "Płace jako % przychodu, nadgodziny, choroby i otwarte sprawy z ostatniego miesiąca — wysyłane 1. dnia miesiąca" },
+  "Senda á": { is: "Senda á", en: "Send to", vi: "Gửi đến", pl: "Wyślij do" },
+  "Eigendur": { is: "Eigendur", en: "Owners", vi: "Chủ sở hữu", pl: "Właściciele" },
+  "Eigendur og vaktstjóra": { is: "Eigendur og vaktstjóra", en: "Owners and managers", vi: "Chủ sở hữu và quản lý ca", pl: "Właściciele i kierownicy zmian" },
+  "Senda prufu á mig": { is: "Senda prufu á mig", en: "Send me a test", vi: "Gửi thử cho tôi", pl: "Wyślij mi test" },
+  "Prufa send á": { is: "Prufa send á", en: "Test sent to", vi: "Đã gửi thử đến", pl: "Test wysłany do" },
   // Opið demo
   "Þú ert í demo — gögnin eru gervigögn og núllstillast á hverri nóttu.": { is: "Þú ert í demo — gögnin eru gervigögn og núllstillast á hverri nóttu.", en: "You are in the demo — the data is fictional and resets every night.", vi: "Bạn đang dùng bản demo — dữ liệu là giả và được đặt lại mỗi đêm.", pl: "Jesteś w wersji demo — dane są fikcyjne i resetują się co noc." },
+  "Heimasíða": { is: "Heimasíða", en: "Home", vi: "Trang chủ", pl: "Strona główna" },
   "Stofna eigið fyrirtæki": { is: "Stofna eigið fyrirtæki", en: "Create your own company", vi: "Tạo công ty của bạn", pl: "Załóż własną firmę" },
   "Þetta er ekki í boði í demo": { is: "Þetta er ekki í boði í demo", en: "This is not available in the demo", vi: "Tính năng này không có trong bản demo", pl: "To nie jest dostępne w wersji demo" },
   "boð send": { is: "boð send", en: "invites sent", vi: "lời mời đã gửi", pl: "zaproszeń wysłanych" },
@@ -1247,7 +1256,7 @@ export const DICT: Dict = {
   "Júní 2025": { is: "Júní 2025", en: "June 2025", vi: "Tháng 6 2025", pl: "Czerwiec 2025" },
   "Breyting (mán)": { is: "Breyting á milli mánaða", en: "Month-over-month delta", vi: "Thay đổi theo tháng", pl: "Zmiana miesiąc do miesiąca" },
   "vs í fyrra": { is: "vs. fyrra ár (YoY)", en: "vs. previous year", vi: "so với năm trước", pl: "vs poprzedni rok (r/r)" },
-  "Velta vs launakostnaður": { is: "Samhengi veltu og launakostnaðar", en: "Revenue optimization vs. labor burden", vi: "Doanh thu vs. chi phí lương", pl: "Relacja obrotu i kosztu wynagrodzeń" },
+  "Velta vs launakostnaður": { is: "Samhengi veltu og launakostnaðar", en: "Revenue and labor cost", vi: "Doanh thu vs. chi phí lương", pl: "Relacja obrotu i kosztu wynagrodzeń" },
   "6 mánuðir": { is: "Síðustu 6 mánuðir", en: "Rolling 6-month view", vi: "6 tháng", pl: "Ostatnie 6 miesięcy" },
   "markmið 30%": { is: "markmið 30%", en: "target 30%", vi: "mục tiêu 30%", pl: "cel 30%" },
   "Launamat": { is: "Launamat", en: "Pay estimate", vi: "Ước tính lương", pl: "Szacunek wynagrodzenia" },
@@ -1850,6 +1859,9 @@ export const DICT: Dict = {
   "og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.": { is: "og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.", en: "and then closes. Your data is kept and you can undo the cancellation until then.", vi: "rồi sẽ đóng. Dữ liệu được giữ lại và bạn có thể hoàn tác việc hủy trước thời điểm đó.", pl: "i wtedy zostanie zamknięty. Dane są zachowane, a do tego czasu możesz cofnąć anulowanie." },
   "Ekkert verður rukkað framar. Aðgangurinn helst opinn út greitt tímabil og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.": { is: "Ekkert verður rukkað framar. Aðgangurinn helst opinn út greitt tímabil og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.", en: "Nothing more will be charged. Access stays open until the end of the paid period and then closes. Your data is kept and you can undo the cancellation until then.", vi: "Sẽ không bị tính phí thêm. Quyền truy cập vẫn mở đến hết kỳ đã thanh toán rồi sẽ đóng. Dữ liệu được giữ lại và bạn có thể hoàn tác việc hủy trước thời điểm đó.", pl: "Nie zostaną pobrane żadne dalsze opłaty. Dostęp pozostaje otwarty do końca opłaconego okresu, a potem zostanie zamknięty. Dane są zachowane, a do tego czasu możesz cofnąć anulowanie." },
   "Já, segja upp": { is: "Já, segja upp", en: "Yes, cancel", vi: "Có, hủy", pl: "Tak, anuluj" },
+  // Innsýn (okt. 2026)
+  "m kr": { is: "m kr", en: "m ISK", vi: "triệu ISK", pl: "mln kr" },
+  "Engin gögn fyrir tímabilið.": { is: "Engin gögn fyrir tímabilið.", en: "No data for this period.", vi: "Không có dữ liệu cho kỳ này.", pl: "Brak danych za ten okres." },
   "Augnablik…": { is: "Augnablik…", en: "One moment…", vi: "Đợi một chút…", pl: "Chwileczkę…" },
 };
 

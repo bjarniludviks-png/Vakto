@@ -8,6 +8,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { isDemoCompany } from "@/lib/demo.server";
+import { allRows } from "@/lib/supabase/all-rows";
 import { getLaborPeriods, getLaborPct, type Db } from "@/lib/labor";
 import { buildManagerReport, loadReportEmployees, type ManagerReport } from "@/lib/manager-report.server";
 import { tableXlsxBase64 } from "@/lib/export-report";
@@ -257,7 +258,7 @@ export async function evaluateRule(db: Db, co: Co, rule: AlertRule, now: Date): 
 export async function runAlerts(now = new Date()): Promise<{ ok: boolean; rules: number; sent: number; errors: number; missing?: boolean }> {
   if (!isSupabaseConfigured()) return { ok: true, rules: 0, sent: 0, errors: 0 };
   const db = createAdminClient() as unknown as Db;
-  const { data, error } = await db.from("alert_rules").select("*").eq("active", true).limit(2000);
+  const { data, error } = await allRows<Row>((x, y) => db.from("alert_rules").select("*").eq("active", true).order("id").range(x, y));
   if (error) return { ok: false, rules: 0, sent: 0, errors: 0, missing: true };
   const byCo = new Map<string, Row[]>();
   for (const r of data ?? []) {

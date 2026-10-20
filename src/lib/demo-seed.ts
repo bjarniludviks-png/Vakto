@@ -2,9 +2,10 @@
 // scripts/bootstrap-public-demo.mjs og næturkeyrsluna /api/cron/demo-reset.
 // Hreint TS (engin @/-slóð, ekkert server-only) svo Node 24 flytji það beint inn (type stripping).
 //
-//   seedDemoData()   — rúllandi gluggi: birtar vaktir síðustu 4 vikur + næstu viku, stimplanir
-//                      fyrir liðnar vaktir (nokkur heiðarleg frávik), dagleg velta (laun % ~28–34 %),
-//                      spjall + fréttir. Þurrkar og sáir aðeins gluggann (idempotent).
+//   seedDemoData()   — rúllandi gluggi: birtar vaktir 6 heila mánuði aftur + yfirstandandi mánuð + næstu
+//                      viku, stimplanir fyrir liðnar vaktir (stöku seinkun/yfirvinna, veikindalotur),
+//                      dagleg velta (laun % ~27–33 %, árstíðasveifla), spjall + fréttir.
+//                      Þurrkar og sáir aðeins gluggann (idempotent).
 //   ensureDemoBase() — grunnur OPNA demo-fyrirtækisins (staðir, deildir, stöður, vaktategundir,
 //                      starfsfólk, rásir) eftir PUBLIC_DEMO. Endurkeyranlegt; lagar breytt gildi.
 
@@ -108,6 +109,11 @@ export async function ensureDemoBase(db: Db, companyId: string, ownerId: string 
 export type SeedOptions = { now?: Date; emailDomain?: string; log?: Log };
 export type SeedSummary = { shifts: number; punches: number; revenueDays: number; staff: number; messages: number };
 
+/** Mánuðir aftur í tímann (heilir) sem demo-sagan nær yfir. */
+const HISTORY_MONTHS = 6;
+/** Markmið laun % per almanaksmánuð (0=jan): sumarið (ferðamenn) ber hærri veltu, janúar er rólegur. */
+const MONTH_PCT = [0.325, 0.315, 0.305, 0.300, 0.295, 0.282, 0.272, 0.278, 0.300, 0.305, 0.312, 0.290];
+
 type Emp = { id: string; full_name: string; location_id: string | null; rate: number | null };
 type ShiftRow = { company_id: string; location_id: string; employee_id: string; shift_type_id: string | null; date: string; start_time: string; end_time: string; status: string; published: boolean };
 
@@ -119,7 +125,8 @@ export async function seedDemoData(db: Db, companyId: string, opts: SeedOptions 
 
   const now = opts.now ?? new Date();
   const today = new Date(now); today.setHours(0, 0, 0, 0);
-  const from = addDays(today, -28), to = addDays(today, 7);
+  // Saga: 6 heilir mánuðir á undan yfirstandandi mánuði (svo Innsýn sýni raunhæfa þróun) + næsta vika.
+  const from = new Date(today.getFullYear(), today.getMonth() - HISTORY_MONTHS, 1), to = addDays(today, 7);
 
   const { data: company } = await db.from("companies").select("id, name").eq("id", COMPANY).maybeSingle();
   if (!company) throw new Error(`Fyrirtæki fannst ekki: ${COMPANY}`);
@@ -145,17 +152,29 @@ export async function seedDemoData(db: Db, companyId: string, opts: SeedOptions 
   await db.from("punches").delete().eq("company_id", COMPANY).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59");
   await db.from("shifts").delete().eq("company_id", COMPANY).gte("date", fromISO).lte("date", toISO);
   await db.from("revenue").delete().in("location_id", locs).gte("date", fromISO).lte("date", toISO);
+  await db.from("leave_requests").delete().eq("company_id", COMPANY).eq("type", "veikindi").eq("status", "approved").gte("from_date", fromISO).lte("from_date", toISO);
+
+  // ---- veikindi: stöku 1–3 daga lotur (~2 á mánuði) + ein nýleg (í gær og fyrradag). Enginn stimplar sig þá daga.
+  const todayISO = iso(today);
+  const sick: { employee_id: string; from: string; to: string }[] = [];
+  for (let d = addDays(from, 9); d < addDays(today, -4); d = addDays(d, 11 + Math.floor(rnd() * 10))) {
+    const e = emps[Math.floor(rnd() * emps.length)];
+    sick.push({ employee_id: e.id, from: iso(d), to: iso(addDays(d, Math.floor(rnd() * 3))) });
+  }
+  if (emps[3]) sick.push({ employee_id: emps[3].id, from: iso(addDays(today, -2)), to: iso(addDays(today, -1)) });
+  const isSick = (eid: string, dISO: string) => sick.some((s) => s.employee_id === eid && dISO >= s.from && dISO <= s.to);
 
   // ---- vaktir: lítið kaffihús. Virkir dagar 2 dag + 1 mið + 2 kvöld, helgar 3 + 1 + 3 (aukastaðir minna).
+  // Sumarbylgja (jún–ágú, ferðamenn): ein aukadagvakt um helgar og lægra laun % (meiri velta á hvern tíma).
   const shifts: (ShiftRow & { _kind: string })[] = [];
   const revenue: { location_id: string; date: string; amount: number; source: string }[] = [];
   const PATTERNS: Record<string, [string, string]> = { day: ["07:00", "15:00"], mid: ["10:00", "18:00"], eve: ["15:00", "23:00"] };
   for (let d = new Date(from); d <= to; d = addDays(d, 1)) {
     const dateISO = iso(d), wd = d.getDay(); // 0=sun
-    const weekend = wd === 0 || wd === 6;
+    const weekend = wd === 0 || wd === 6, summer = d.getMonth() >= 5 && d.getMonth() <= 7;
     for (const g of groups) {
       // Aukastaðir: engin miðvakt — annars fer fámennt teymi yfir 40 klst/viku (yfirvinna í hverri viku).
-      const nDay = g.primary ? (weekend ? 3 : 2) : (weekend ? 2 : 1), nMid = g.primary ? 1 : 0, nEve = g.primary ? (weekend ? 3 : 2) : (weekend ? 2 : 1);
+      const nDay = g.primary ? (weekend ? (summer ? 4 : 3) : 2) : (weekend ? 2 : 1), nMid = g.primary ? 1 : 0, nEve = g.primary ? (weekend ? 3 : 2) : (weekend ? 2 : 1);
       // róterum svo allir fái frídaga
       const offset = Math.floor((d.getTime() - from.getTime()) / 864e5) % g.staff.length;
       const rota = [...g.staff.slice(offset), ...g.staff.slice(0, offset)];
@@ -169,7 +188,7 @@ export async function seedDemoData(db: Db, companyId: string, opts: SeedOptions 
         shifts.push({ company_id: COMPANY, location_id: g.id, employee_id: e.id, shift_type_id: kind === "eve" ? (eve?.id as string) ?? null : (day?.id as string) ?? null,
           date: dateISO, start_time: st, end_time: en, status: "published", published: true, _kind: kind });
       }
-      // Velta liðinna daga (og í dag hingað til) leidd af launum dagsins: laun % lendir á 28–34 %
+      // Velta liðinna daga (og í dag hingað til) leidd af launum dagsins: laun % lendir á ~27–33 %
       // óháð fjölda starfsfólks/staða og taxta. 1,55 ≈ launatengd gjöld + álag (kvöld/helgar) ofan á taxta.
       // Í dag: aðeins vaktir sem er lokið (kostnaður telur bara lokaðar stimplanir) — annars sýnir „Vika“ of lágt %.
       if (d <= today) {
@@ -178,30 +197,32 @@ export async function seedDemoData(db: Db, companyId: string, opts: SeedOptions 
         for (const [e, kind] of plan) {
           const [st, en] = PATTERNS[kind];
           if (isToday && Number(en.slice(0, 2)) * 60 > nowMin) continue;
+          if (isSick(e.id, dateISO)) continue; // óunnin vakt — annars hrapar laun % þá daga
           wages += (Number(e.rate) || 2900) * (Number(en.slice(0, 2)) - Number(st.slice(0, 2)));
         }
-        const pct = 0.28 + rnd() * 0.06;
+        const pct = MONTH_PCT[d.getMonth()] + (rnd() - 0.5) * 0.03;
         const amount = Math.round((wages * 1.55) / pct / 1000) * 1000;
         if (amount > 0 || isToday) revenue.push({ location_id: g.id, date: dateISO, amount, source: "manual" });
       }
     }
   }
 
-  // ---- stimplanir fyrir liðnar vaktir, með nokkrum heiðarlegum frávikum
-  const todayISO = iso(today), yesterdayISO = iso(addDays(today, -1)), weekAgoISO = iso(addDays(today, -7));
+  // ---- stimplanir fyrir liðnar vaktir, með nokkrum heiðarlegum frávikum (stöku seinkun, snemma heim, yfirvinna)
+  const yesterdayISO = iso(addDays(today, -1)), weekAgoISO = iso(addDays(today, -7));
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const punchRows: Record<string, unknown>[] = [];
   let forgot = false;
   for (const s of shifts) {
     if (s.date > todayISO) continue;
+    if (isSick(s.employee_id, s.date)) continue; // veik/ur — vaktin stendur, engin stimplun
     const [sh, sm] = s.start_time.split(":").map(Number), [eh, em] = s.end_time.split(":").map(Number);
     const startMin = sh * 60 + sm, endMin = eh * 60 + em;
     const r = rnd();
     let inMin = startMin + Math.round((rnd() - 0.5) * 8);      // ±4 mín
     let outMin = endMin + Math.round((rnd() - 0.5) * 8);
-    if (r < 0.08) inMin = startMin + 18 + Math.round(rnd() * 25);          // seint
-    else if (r < 0.14) outMin = endMin - 25 - Math.round(rnd() * 30);      // fór snemma
-    else if (r < 0.24) outMin = endMin + 70 + Math.round(rnd() * 80);      // yfirvinna
+    if (r < 0.035) inMin = startMin + 12 + Math.round(rnd() * 25);         // seint
+    else if (r < 0.07) outMin = endMin - 25 - Math.round(rnd() * 30);      // fór snemma
+    else if (r < 0.14) outMin = endMin + 60 + Math.round(rnd() * 90);      // yfirvinna
     const ts = (min: number) => { const d0 = new Date(`${s.date}T00:00:00Z`); d0.setUTCMinutes(min); return d0.toISOString(); };
     let clockOut: string | null = ts(outMin);
     if (s.date === todayISO) {
@@ -214,21 +235,27 @@ export async function seedDemoData(db: Db, companyId: string, opts: SeedOptions 
   }
 
   const shiftRows: ShiftRow[] = shifts.map(({ _kind, ...rest }) => { void _kind; return rest; });
+  // Stórar lotur samhliða (~2.000 vaktir/stimplanir) — næturkeyrslan þarf að vera fljót.
   const ins = async (table: string, rows: Record<string, unknown>[]) => {
-    for (let i = 0; i < rows.length; i += 500) {
-      const { error } = await db.from(table).insert(rows.slice(i, i + 500));
-      if (error) throw new Error(`${table}: ${error.message}`);
-    }
+    const chunks: Record<string, unknown>[][] = [];
+    for (let i = 0; i < rows.length; i += 1000) chunks.push(rows.slice(i, i + 1000));
+    for (const { error } of await Promise.all(chunks.map((c) => db.from(table).insert(c)))) if (error) throw new Error(`${table}: ${error.message}`);
   };
-  await ins("shifts", shiftRows);
-  // punches.approved þarf 0008; án hennar sleppt
-  try { await ins("punches", punchRows); } catch { await ins("punches", punchRows.map(({ approved, ...p }) => { void approved; return p; })); }
-  await ins("revenue", revenue);
-  // meðalvelta vikudaga svo dagar án raða áætlist skynsamlega
-  // Meðalvelta vikudaga (allir staðir) úr sömu tölum, svo áætlaðir dagar (t.d. framtíð) stemmi við raunina.
+  await Promise.all([
+    ins("shifts", shiftRows),
+    // punches.approved þarf 0008; án hennar sleppt
+    ins("punches", punchRows).catch(async () => {
+      await db.from("punches").delete().eq("company_id", COMPANY).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59");
+      await ins("punches", punchRows.map(({ approved, ...p }) => { void approved; return p; }));
+    }),
+    ins("revenue", revenue),
+    ins("leave_requests", sick.map((s) => ({ company_id: COMPANY, employee_id: s.employee_id, type: "veikindi", from_date: s.from, to_date: s.to, status: "approved" }))),
+  ]);
+  // Meðalvelta vikudaga (allir staðir) úr síðustu 8 vikum, svo áætlaðir dagar (t.d. framtíð) stemmi við árstíðina.
+  const recentISO = iso(addDays(today, -56));
   const byWd = new Map<number, { sum: number; days: Set<string> }>();
   for (const r of revenue) {
-    if (r.date === todayISO) continue; // hálfur dagur
+    if (r.date === todayISO || r.date < recentISO) continue; // hálfur dagur / gömul árstíð
     const wd = new Date(r.date + "T00:00:00").getDay();
     const b = byWd.get(wd) ?? { sum: 0, days: new Set<string>() };
     b.sum += r.amount; b.days.add(r.date); byWd.set(wd, b);
@@ -236,7 +263,7 @@ export async function seedDemoData(db: Db, companyId: string, opts: SeedOptions 
   const weekday_revenue: Record<string, number> = {};
   for (const [wd, b] of byWd) weekday_revenue[String(wd)] = Math.round(b.sum / b.days.size / 1000) * 1000;
   await db.from("companies").update({ weekday_revenue }).eq("id", COMPANY);
-  log(`${company.name}: ${shiftRows.length} vaktir, ${punchRows.length} stimplanir, ${revenue.length} veltudagar (${fromISO} → ${toISO}), ${staffCount} starfsmenn`);
+  log(`${company.name}: ${shiftRows.length} vaktir, ${punchRows.length} stimplanir, ${revenue.length} veltudagar, ${sick.length} veikindalotur (${fromISO} → ${toISO}), ${staffCount} starfsmenn`);
 
   // ---- spjall + fréttir: nokkrir starfsmenn tengdir demo-notendum (bólur frá alvöru fólki).
   const staff = groups[0].staff;
@@ -301,7 +328,7 @@ export async function seedDemoRequests(db: Db, companyId: string, now = new Date
   const d = (n: number) => iso(addDays(now, n));
   const { error } = await db.from("leave_requests").insert([
     { company_id: companyId, employee_id: e[1], type: "orlof", from_date: d(12), to_date: d(16), status: "pending" },
-    { company_id: companyId, employee_id: e[3], type: "veikindi", from_date: d(-2), to_date: d(-1), status: "approved" },
+    // (samþykkt veikindi — þ.m.t. nýleg lota — sáir seedDemoData svo stimplanir stemmi)
   ]);
   if (error) log(`leave_requests: ${error.message}`);
   const { error: se } = await db.from("shift_swaps").insert({ company_id: companyId, requester_id: e[2], requestee_id: e[4], note: "laugardagur 15–23", status: "pending" });

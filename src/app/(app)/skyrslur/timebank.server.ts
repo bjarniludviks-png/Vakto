@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees } from "@/lib/employees.server";
 import { initials } from "@/lib/employees";
+import { allRows } from "@/lib/supabase/all-rows";
 
 const MONTHLY_HOURS = 173.33;
 const MONTHS_IS = ["jan", "feb", "mar", "apr", "maí", "jún", "júl", "ágú", "sep", "okt", "nóv", "des"];
@@ -43,9 +44,10 @@ export async function getTimeBank(months = 6): Promise<TimeBank> {
       windows.push({ y, m, from: iso(new Date(y, m, 1)), to: iso(new Date(y, m + 1, 0)), label: `${MONTHS_IS[m]} ${String(y).slice(2)}` });
     }
     const from0 = windows[0].from, to0 = windows[windows.length - 1].to;
-    const { data: punches } = await supabase.from("punches")
-      .select("employee_id, clock_in, clock_out").eq("company_id", company)
-      .gte("clock_in", from0).lte("clock_in", to0 + "T23:59:59");
+    // 6 mánuðir af stimplunum — síðað (PostgREST skilar mest 1.000 röðum).
+    const { data: punches } = await allRows((a, b) => supabase.from("punches")
+      .select("id, employee_id, clock_in, clock_out").eq("company_id", company)
+      .gte("clock_in", from0).lte("clock_in", to0 + "T23:59:59").order("id").range(a, b));
 
     // actual hours per employee per month index.
     const actual = new Map<string, number[]>();
@@ -62,9 +64,9 @@ export async function getTimeBank(months = 6): Promise<TimeBank> {
 
     // Hours already settled in payroll runs come back OFF the debt.
     const settled = new Map<string, number>();
-    const setRes = await supabase
-      .from("payroll_lines").select("employee_id, timebank_hours, payroll_runs!inner(company_id)")
-      .eq("payroll_runs.company_id", company).gt("timebank_hours", 0);
+    const setRes = await allRows((a, b) => supabase
+      .from("payroll_lines").select("id, employee_id, timebank_hours, payroll_runs!inner(company_id)")
+      .eq("payroll_runs.company_id", company).gt("timebank_hours", 0).order("id").range(a, b));
     if (!setRes.error) for (const r of setRes.data ?? []) {
       settled.set(r.employee_id as string, (settled.get(r.employee_id as string) ?? 0) + Number(r.timebank_hours));
     }

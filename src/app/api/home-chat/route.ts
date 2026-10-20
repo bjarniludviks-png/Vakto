@@ -3,12 +3,13 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { systemPrompt } from "@/lib/ai/vakto-knowledge";
+import { HOME_CHAT_MODEL } from "@/lib/ai/models";
 
 // Spjallgaurinn á heimasíðunni. Gestir eru ekki innskráðir — hver þráður er
 // auðkenndur með handahófs-token sem vafrinn geymir. Skrifað með service-role.
 
 export const runtime = "nodejs";
-const MODEL = "claude-sonnet-5";
+const MODEL = HOME_CHAT_MODEL; // nafnlaus markaðsumferð → ódýrasta líkanið
 const MAX_LEN = 1200;
 const MAX_TURNS = 40;         // skilaboð per þráð
 const MAX_PER_MIN = 12;       // per IP

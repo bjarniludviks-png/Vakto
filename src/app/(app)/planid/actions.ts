@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { initials } from "@/lib/employees";
 import { colorFor } from "@/lib/avatar";
+import { allRows } from "@/lib/supabase/all-rows";
 
 export type PlanShift = {
   id: string;
@@ -71,12 +72,12 @@ export async function getPlan(weekStartISO: string): Promise<{ live: boolean; sh
     endD.setDate(endD.getDate() + 6);
     const to = endD.toISOString().slice(0, 10);
 
-    const { data } = await supabase
+    const { data } = await allRows((a, b) => supabase
       .from("shifts")
       .select("id, date, start_time, end_time, employee_id, employees:coworkers(full_name, avatar_color, departments(name, color)), shift_types(name, color)")
       .eq("company_id", ctx.company)
       .gte("date", from).lte("date", to)
-      .order("date").order("start_time");
+      .order("date").order("start_time").order("id").range(a, b));
 
     const shifts: PlanShift[] = (data ?? []).map((s) => {
       const emp = (Array.isArray(s.employees) ? s.employees[0] : s.employees) as
@@ -84,8 +85,8 @@ export async function getPlan(weekStartISO: string): Promise<{ live: boolean; sh
         | null;
       const dep = emp?.departments ? (Array.isArray(emp.departments) ? emp.departments[0] : emp.departments) : null;
       const st = (Array.isArray(s.shift_types) ? s.shift_types[0] : s.shift_types) as { name?: string; color?: string } | null;
-      const start = hm(s.start_time);
-      const end = hm(s.end_time);
+      const start = hm(s.start_time as string | null);
+      const end = hm(s.end_time as string | null);
       return {
         id: s.id as string,
         date: s.date as string,
