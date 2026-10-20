@@ -2,7 +2,7 @@
 // annarri, merkið færist upp og innskráningarblaðið rennur inn að neðan. Virðir „Minnka hreyfingu“.
 import React, { useEffect, useRef, useState } from "react";
 import { tr } from "../src/lib/i18n";
-import { View, TextInput, KeyboardAvoidingView, Platform, ScrollView, Animated, Easing, AccessibilityInfo, Pressable, useWindowDimensions } from "react-native";
+import { View, TextInput, Keyboard, Platform, ScrollView, Animated, Easing, AccessibilityInfo, Pressable, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Eye, EyeOff } from "lucide-react-native";
@@ -41,6 +41,25 @@ export default function Login() {
   const [note, setNote] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sending, setSending] = useState(false);
+  const pwRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  // Lyklaborð: blaðið rennur upp yfir hausinn og fær bil neðst svo „Skrá inn“ hverfi ekki undir lyklaborðið.
+  const [kb, setKb] = useState(0);
+  const kbUp = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const ios = Platform.OS === "ios";
+    const show = Keyboard.addListener(ios ? "keyboardWillShow" : "keyboardDidShow", (e) => {
+      setKb(e.endCoordinates.height);
+      Animated.timing(kbUp, { toValue: 1, duration: ios ? e.duration || 250 : 200, easing: OUT, useNativeDriver: true }).start();
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), ios ? (e.duration || 250) : 50);
+    });
+    const hide = Keyboard.addListener(ios ? "keyboardWillHide" : "keyboardDidHide", (e) => {
+      setKb(0);
+      Animated.timing(kbUp, { toValue: 0, duration: ios ? e.duration || 250 : 200, easing: OUT, useNativeDriver: true }).start();
+    });
+    return () => { show.remove(); hide.remove(); };
+  }, [kbUp]);
 
   // hreyfigildi: súlur (0→1 hver), orðmerki, færsla merkis upp, blað, innihald blaðs
   const bars = useRef(BARS.map(() => new Animated.Value(0))).current;
@@ -89,6 +108,7 @@ export default function Login() {
 
   const logoStart = H / 2 - 70;             // miðja skjásins
   const logoEnd = insets.top + 54;          // efst í hausnum
+  const sheetLift = HERO - 12;              // hve langt blaðið rennur upp þegar lyklaborðið er opið
   const rise = (v: Animated.Value) => ({ opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }] });
 
   return (
@@ -99,7 +119,7 @@ export default function Login() {
       <View pointerEvents="none" style={{ position: "absolute", top: 110, left: -60, width: 170, height: 170, borderRadius: 85, backgroundColor: "rgba(0,0,0,.05)" }} />
 
       {/* merkið: byrjar á miðjum skjá, færist upp í hausinn */}
-      <Animated.View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: logoStart, alignItems: "center", transform: [{ translateY: lift.interpolate({ inputRange: [0, 1], outputRange: [0, logoEnd - logoStart] }) }] }}>
+      <Animated.View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: logoStart, alignItems: "center", opacity: kbUp.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }), transform: [{ translateY: lift.interpolate({ inputRange: [0, 1], outputRange: [0, logoEnd - logoStart] }) }] }}>
         <View accessible accessibilityRole="image" accessibilityLabel="VAKTO" style={{ flexDirection: "row", alignItems: "center" }}>
           <View style={{ width: LOGO, height: LOGO }}>
             {BARS.map((b, i) => (
@@ -116,9 +136,8 @@ export default function Login() {
       </Animated.View>
 
       {/* innskráningarblaðið rennur inn að neðan */}
-      <Animated.View style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: HERO + insets.top, backgroundColor: colors.panel, borderTopLeftRadius: 30, borderTopRightRadius: 30, transform: [{ translateY: sheet.interpolate({ inputRange: [0, 1], outputRange: [H, 0] }) }] }}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-          <ScrollView contentContainerStyle={{ padding: 24, paddingTop: 28, paddingBottom: insets.bottom + 24, gap: 14 }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <Animated.View style={{ position: "absolute", left: 0, right: 0, bottom: 0, top: HERO + insets.top, backgroundColor: colors.panel, borderTopLeftRadius: 30, borderTopRightRadius: 30, transform: [{ translateY: Animated.add(sheet.interpolate({ inputRange: [0, 1], outputRange: [H, 0] }), kbUp.interpolate({ inputRange: [0, 1], outputRange: [0, -sheetLift] })) }] }}>
+          <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 24, paddingTop: 28, paddingBottom: (kb ? Math.max(kb - sheetLift, 0) : insets.bottom) + 24, gap: 14 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive" showsVerticalScrollIndicator={false}>
             <Animated.View style={rise(rows[0])}>
               <Txt weight="bold" size={26} style={{ letterSpacing: -0.6 }}>Velkomin aftur</Txt>
               <Muted style={{ marginTop: 2 }}>Skráðu þig inn til að sjá vaktirnar þínar.</Muted>
@@ -126,13 +145,13 @@ export default function Login() {
 
             <Animated.View style={[{ gap: 6 }, rise(rows[1])]}>
               <Txt weight="medium" size={13} color={colors.ink2}>Netfang</Txt>
-              <TextInput style={inputStyle()} autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="username" keyboardType="email-address" value={email} onChangeText={setEmail} placeholder={tr("netfang@fyrirtaeki.is")} placeholderTextColor={colors.ink3} returnKeyType="next" />
+              <TextInput style={inputStyle()} autoCapitalize="none" autoCorrect={false} autoComplete="email" textContentType="username" keyboardType="email-address" value={email} onChangeText={setEmail} placeholder={tr("netfang@fyrirtaeki.is")} placeholderTextColor={colors.ink3} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => pwRef.current?.focus()} />
             </Animated.View>
 
             <Animated.View style={[{ gap: 6 }, rise(rows[2])]}>
               <Txt weight="medium" size={13} color={colors.ink2}>Lykilorð</Txt>
               <View>
-                <TextInput style={[inputStyle(), { paddingRight: 48 }]} secureTextEntry={!show} autoComplete="password" textContentType="password" value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor={colors.ink3} onSubmitEditing={signIn} returnKeyType="go" />
+                <TextInput ref={pwRef} style={[inputStyle(), { paddingRight: 48 }]} secureTextEntry={!show} autoComplete="password" textContentType="password" value={password} onChangeText={setPassword} placeholder="••••••••" placeholderTextColor={colors.ink3} onSubmitEditing={signIn} returnKeyType="go" />
                 <Pressable onPress={() => setShow((v) => !v)} hitSlop={10} accessibilityLabel={tr(show ? "Fela lykilorð" : "Sýna lykilorð")} style={{ position: "absolute", right: 6, top: 0, bottom: 0, width: 40, alignItems: "center", justifyContent: "center" }}>
                   {show ? <EyeOff color={colors.ink3} size={19} /> : <Eye color={colors.ink3} size={19} />}
                 </Pressable>
@@ -151,7 +170,6 @@ export default function Login() {
               </Muted>
             </Animated.View>
           </ScrollView>
-        </KeyboardAvoidingView>
       </Animated.View>
     </View>
   );
