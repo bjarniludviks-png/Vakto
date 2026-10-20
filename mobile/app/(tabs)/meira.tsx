@@ -3,7 +3,7 @@ import React, { useCallback, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
 import { View, Pressable, Alert, Platform } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { IdCard, FolderOpen, Newspaper, FileText, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight } from "lucide-react-native";
+import { IdCard, FolderOpen, Newspaper, FileText, FileCheck, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight } from "lucide-react-native";
 import { Screen, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, List, Row, IconBox, Eyebrow, Bar, Pill, iconColor } from "../../src/components/ui";
 import { colors, useTheme } from "../../src/theme";
@@ -68,6 +68,7 @@ export default function Eg() {
         {manager ? <Row icon={<IconBox tone="brand"><Newspaper color={iconColor("brand")} size={19} /></IconBox>} title="Fréttaveita" sub="Færslur og tilkynningar vinnustaðarins" onPress={() => router.push("/frettaveita")} /> : null}
         <Row icon={<IconBox tone="brand"><IdCard color={iconColor("brand")} size={19} /></IconBox>} title="Starfsmannaskírteini" sub="Sýna eða bæta í Wallet" onPress={() => router.push("/skirteini")} />
         <Row icon={<IconBox tone="info"><FolderOpen color={iconColor("info")} size={19} /></IconBox>} title="Skjöl" sub="Ráðningarsamningur, HACCP, handbækur" onPress={() => router.push("/skjol")} />
+        <Row icon={<IconBox tone="brand"><FileCheck color={iconColor("brand")} size={19} /></IconBox>} title="Vinnuyfirlit" sub="Staðfestu tímana þína fyrir tímabilið" onPress={() => router.push("/vinnuyfirlit")} />
         <Row icon={<IconBox tone="good"><CheckCircle2 color={iconColor("good")} size={19} /></IconBox>} title="Beiðnir" sub={reqCount ? `${pending} í bið · ${reqCount} alls` : "Frí, vaktaskipti, leiðréttingar"} onPress={() => router.push("/beidnir")} />
         <Row icon={<IconBox><Clock color={colors.ink2} size={19} /></IconBox>} title="Tímar og stimplanir" sub={pay ? trf("{n} klst í {x}", dec1(pay.earnedH), pay.monthLabel.split(" ")[0]) : "Stimplanirnar þínar"} onPress={() => router.push("/timar")} />
         <Row icon={<IconBox><Users color={colors.ink2} size={19} /></IconBox>} title="Samstarfsfólk" sub="Hverjir vinna með þér" onPress={() => router.push("/samstarfsfolk")} last />

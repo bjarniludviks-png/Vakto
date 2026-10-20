@@ -5,6 +5,7 @@
 // Keyrir í vafra; jsPDF og letrið hlaðin með dynamic import.
 import type { jsPDF } from "jspdf";
 import { nf, dec1 } from "@/lib/format";
+import { WO_ACTION, type WoSnapshot, type WoLogEntry } from "@/lib/work-overview";
 
 type RGB = [number, number, number];
 const ORANGE: RGB = [233, 112, 15];
@@ -331,3 +332,122 @@ export async function downloadTimesheetPdf(o: { rows: TimesheetRow[]; from: stri
   const doc = await buildTimesheetPdf(o);
   doc.save(`${o.employee ? `Timaskraning_${ascii(o.employee)}` : `Timaskyrsla_${ascii(o.company ?? "VAKTO")}`}_${o.from}_${o.to}.pdf`);
 }
+
+const LEAVE_IS: Record<string, string> = { orlof: "Orlof", veikindi: "Veikindi", olaunad: "Launalaust" };
+const hrs = (n: number) => `${dec1(n)} klst.`;
+const stamp = (s: string) => { const d = new Date(s); return `${d.getUTCDate()}.${d.getUTCMonth() + 1}.${d.getUTCFullYear()} kl. ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}`; };
+
+/** Vinnuyfirlit (0084) — tímar per dag, launaliðir og staðfestingarskrá með fingrafari.
+ * Tölurnar koma úr snapshot (sami útreikningur og launakeyrslan). Keyrir í vafra og á þjóni. */
+export async function buildWorkOverviewPdf(s: WoSnapshot, log: WoLogEntry[], fingerprint: string | null): Promise<Doc> {
+  const doc = await newDoc();
+  const k = kit(doc);
+  const per = `${isoNice(s.from)} – ${isoNice(s.to)}`;
+  const ktE = kt(s.employee.kennitala), ktC = kt(s.company.kennitala);
+  const t = s.totals, p = s.pay;
+
+  k.header("Vinnuyfirlit", "Work overview",
+    [{ t: "Unnar vinnustundir ", b: false }, { t: s.employee.name, b: true }, { t: `${ktE ? ` (kt. ${ktE})` : ""} hjá `, b: false }, { t: s.company.name || "vinnuveitanda", b: true }, { t: `${ktC ? ` (kt. ${ktC})` : ""} á tímabilinu ${per}.`, b: false }],
+    `Hours worked by ${s.employee.name} in the period ${per}.`,
+    [
+      { label: "Á plani · Scheduled", value: hrs(t.planned) },
+      { label: "Unnið · Worked", value: hrs(t.worked) },
+      { label: "Frávik · Difference", value: `${t.diff > 0 ? "+" : t.diff < 0 ? "−" : ""}${hrs(Math.abs(t.diff))}`, tone: Math.abs(t.diff) >= 0.05 ? "warn" : undefined },
+      { label: "Brúttólaun · Gross", value: kr(p.gross), tone: "good" },
+    ]);
+
+  k.section(1, "Starfsmaður", "Employee", 70, (x, y, w) => k.fields(x, y, w, [
+    ["Nafn · Name", s.employee.name], ["Kennitala · ID No.", ktE],
+    ["Starf · Role", s.employee.title ?? ""], ["Deild · Department", s.employee.dept ?? ""],
+    ["Kjarasamningur · Agreement", s.employee.union ?? ""], ["Tímabil · Period", per],
+  ]));
+
+  // Dagatafla í fullri breidd.
+  k.ensure(60);
+  const x0 = k.M, w = k.CW;
+  doc.setDrawColor(...RULE); doc.setLineWidth(0.8); doc.line(x0, k.state.y - 9, x0 + w, k.state.y - 9);
+  k.font("bold", 10, INK); doc.text("2. Dagar", x0, k.state.y + 8);
+  k.font("italic", 8.3, MUT); doc.text("Days — vaktir á plani og samþykktar stimplanir", x0, k.state.y + 19);
+  k.state.y += 38;
+  const cols = [{ h: "Dagur · Day", w: 0.17 }, { h: "Á plani · Scheduled", w: 0.22 }, { h: "Stimplanir · Punches", w: 0.27 }, { h: "Hlé", w: 0.08, r: true }, { h: "Plan", w: 0.09, r: true }, { h: "Unnið", w: 0.09, r: true }, { h: "", w: 0.08, r: true }];
+  const xs: number[] = []; let acc = x0; for (const c of cols) { xs.push(acc); acc += c.w * w; }
+  const head = () => {
+    k.font("medium", 7.3, MUT);
+    cols.forEach((c, i) => doc.text(c.h, c.r ? xs[i] + c.w * w - 4 : xs[i], k.state.y, c.r ? { align: "right" } : undefined));
+    doc.setDrawColor(...RULE); doc.setLineWidth(0.8); doc.line(x0, k.state.y + 7, x0 + w, k.state.y + 7);
+    k.state.y += 20;
+  };
+  head();
+  if (!s.days.length) k.state.y += k.note(x0, k.state.y, w, "Engar vaktir eða vinnustundir á tímabilinu.", "No shifts or working hours in the period.") + 14;
+  for (const d of s.days) {
+    if (k.ensure(18)) head();
+    const dt = new Date(`${d.date}T12:00:00Z`);
+    const diff = d.worked - d.planned;
+    const cells = [
+      `${DOW[dt.getUTCDay()]} ${isoNice(d.date)}`,
+      d.leave ? `${d.plannedText ? d.plannedText + " · " : ""}${LEAVE_IS[d.leave] ?? d.leave}` : (d.plannedText ?? "—"),
+      d.punches.length ? d.punches.map((x) => `${x.in}–${x.out}`).join(", ") : "—",
+      d.breakMin ? `${d.breakMin} mín` : "",
+      dec1(d.planned), dec1(d.worked),
+      Math.abs(diff) >= 0.05 ? `${diff > 0 ? "+" : "−"}${dec1(Math.abs(diff))}` : "",
+    ];
+    cells.forEach((v, i) => {
+      const c = cols[i];
+      k.font(i === 6 ? "medium" : "normal", 8.8, i === 6 || (d.leave && i === 1) ? WARN : INK);
+      doc.text(k.wrap(String(v), c.w * w - 6)[0] ?? "", c.r ? xs[i] + c.w * w - 4 : xs[i], k.state.y, c.r ? { align: "right" } : undefined);
+    });
+    doc.setDrawColor(...RULE); doc.setLineWidth(0.5); doc.line(x0, k.state.y + 6, x0 + w, k.state.y + 6);
+    k.state.y += 17;
+  }
+  k.ensure(30);
+  k.state.y += 6;
+  k.font("bold", 10, INK); doc.text("Samtals · Total", x0, k.state.y);
+  doc.text(dec1(t.planned), xs[4] + cols[4].w * w - 4, k.state.y, { align: "right" });
+  doc.text(dec1(t.worked), xs[5] + cols[5].w * w - 4, k.state.y, { align: "right" });
+  k.state.y += 14;
+  k.font("normal", 8.3, MUT);
+  doc.text(`${t.shifts} vaktir · hlé ${t.breakMin} mín · ${t.sickDays} veikindadagar · ${t.leaveDays} aðrir frídagar`, x0, k.state.y);
+  k.state.y += 28;
+
+  k.section(3, "Launaliðir", "Pay items", 90, (x, y, ww) => {
+    const rows: { label: string; hint?: string; amount: string; strong?: boolean; tone?: "good" | "neg" }[] = [];
+    if (p.monthly) rows.push({ label: "Mánaðarlaun", hint: "Monthly salary", amount: kr(p.dayPay) });
+    else {
+      rows.push({ label: `Tímakaup — ${hrs(p.hours)} × ${kr(p.rate)}`, hint: `Dagvinna ${hrs(p.dagvinnaH)}${p.yfirvinnaH ? ` · yfirvinna ${hrs(p.yfirvinnaH)}` : ""}`, amount: kr(p.dayPay) });
+      if (p.premiums || p.alag.length) rows.push({ label: "Álag (kvöld, nætur, helgar, stórhátíðir)", hint: p.alag.map((a) => `${String(Math.round(a.pct * 10) / 10).replace(".", ",")}%: ${hrs(a.h)}`).join(" · ") || "Shift premiums", amount: kr(p.premiums) });
+      if (p.overtime || p.yfirvinnaH) rows.push({ label: "Yfirvinnuálag", hint: `${hrs(p.yfirvinnaH)} · overtime premium`, amount: kr(p.overtime) });
+    }
+    if (p.uppbot) rows.push({ label: "Desember-/orlofsuppbót", hint: "Holiday bonus", amount: kr(p.uppbot) });
+    if (p.orlof) rows.push({ label: "Orlof", hint: "Holiday pay", amount: kr(p.orlof) });
+    if (p.benefits) rows.push({ label: "Hlunnindi og styrkir", hint: "Benefits & allowances", amount: kr(p.benefits) });
+    rows.push({ label: "Brúttólaun · Gross pay", amount: kr(p.gross), strong: true, tone: "good" });
+    return k.amountRows(x, y, ww, rows);
+  });
+
+  k.section(4, "Staðfestingarskrá", "Approval log", 60, (x, y, ww) => {
+    let yy = y;
+    for (const l of log) {
+      k.font("medium", 9.2, INK); doc.text(WO_ACTION[l.action] ?? l.action, x, yy + 9);
+      k.font("normal", 8.6, INK2); doc.text(`${l.name ?? "—"} · ${stamp(l.at)}`, x + ww, yy + 9, { align: "right" });
+      yy += 14;
+      if (l.note) { k.font("italic", 8.3, MUT); for (const ln of k.wrap(`„${l.note}“`, ww)) { doc.text(ln, x, yy + 5); yy += 10.5; } yy += 2; }
+      yy += 5;
+    }
+    if (fingerprint) {
+      yy += 4;
+      k.font("medium", 7.3, MUT); doc.text("Fingrafar skjals · Document fingerprint (SHA-256)", x, yy + 7);
+      k.font("normal", 7.6, INK2); k.wrap(fingerprint, ww).forEach((ln, i) => doc.text(ln, x, yy + 19 + i * 10));
+      yy += 32;
+    }
+    return yy - y;
+  });
+
+  if (s.pendingPunches) k.state.y += k.note(k.M, k.state.y, k.CW, `${s.pendingPunches} stimplanir biðu samþykktar þegar yfirlitið var búið til og eru ekki með.`, "Punches awaiting approval are not included.") + 10;
+  k.ensure(30);
+  k.font("italic", 7.8, MUT);
+  k.wrap("Reiknað í VAKTO með sama útreikningi og launakeyrslan: samþykktar stimplanir, birtar vaktir og launareglur starfsmanns. Frádráttur og útborgun koma á launaseðli. Fingrafarið nær yfir allt efni yfirlitsins og staðfestingarskrána. · Calculated in VAKTO with the payroll engine.", k.CW).forEach((l, i) => doc.text(l, k.M, k.state.y + i * 10));
+  k.footer(`Vinnuyfirlit · ${s.employee.name} · ${per}`);
+  return doc;
+}
+
+export const workOverviewFileName = (s: WoSnapshot) => `Vinnuyfirlit_${ascii(s.employee.name)}_${s.from}_${s.to}.pdf`;
