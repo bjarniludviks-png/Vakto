@@ -14,14 +14,14 @@ export function emailConfigured(): boolean {
   return !!KEY;
 }
 
-export async function sendEmail(input: { to: string; subject: string; html: string; text?: string; from?: string; replyTo?: string; attachments?: { filename: string; content: string }[] }): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+export async function sendEmail(input: { to: string; subject: string; html: string; text?: string; from?: string; replyTo?: string; attachments?: { filename: string; content: string }[]; /** Póstur til VAKTO sjálfs (t.d. beiðni um kynningu) — má fara þótt sendandinn sé innskráður í demo. */ internal?: boolean }): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   if (process.env.EMAIL_PREVIEW === "1") {
     ((globalThis as { __emailPreview?: unknown[] }).__emailPreview ??= []).push(input);
     return { ok: true, skipped: true };
   }
   // Opið demo: enginn póstur fer úr demo-fyrirtækinu (þröskuldur fyrir öll boð, kóða, kvittanir o.fl.)
   // né á gervinetföng demo-fólks (@demo.vakto.is — t.d. úr cron-keyrslum).
-  if (/@demo\.vakto\.is$/i.test(input.to.trim()) || (process.env.DEMO_COMPANY_ID && (await (await import("@/lib/demo.server")).currentUserIsDemo()))) {
+  if (/@demo\.vakto\.is$/i.test(input.to.trim()) || (!input.internal && process.env.DEMO_COMPANY_ID && (await (await import("@/lib/demo.server")).currentUserIsDemo()))) {
     console.log(`[email] skipped (demo): "${input.subject}" → ${input.to}`);
     return { ok: true, skipped: true };
   }

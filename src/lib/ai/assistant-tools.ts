@@ -3,7 +3,8 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { getDashboardPeriod } from "@/app/(app)/maelabord/actions";
 import { getWhoIsOn } from "@/app/(app)/timaskraning/attendance.server";
 import { fetchAttendance, setClockOut } from "@/app/(app)/timaskraning/actions";
-import { getShiftsInRange, saveShift, deleteShift, updateLeaveRequest, approveShiftSwap, getWeekBudget, getWeekShifts, deleteWeekShifts, publishSchedule } from "@/app/(app)/vaktaplan/actions";
+import { getShiftsInRange, saveShift, deleteShift, updateLeaveRequest, approveShiftSwap, getWeekBudget, getWeekShifts, deleteWeekShifts, publishSchedule, createOpenShifts } from "@/app/(app)/vaktaplan/actions";
+import { listContracts, resendContract } from "@/app/(app)/starfsfolk/actions";
 import { getEmployees } from "@/lib/employees.server";
 import { createClient } from "@/lib/supabase/server";
 import { getPendingRequests } from "@/app/(app)/vaktaplan/requests.server";
@@ -75,6 +76,11 @@ export const READ_TOOLS: Anthropic.Tool[] = [
       required: ["from", "to"],
     },
   },
+  {
+    name: "employee_contracts",
+    description: "Samningar starfsmanns (leit eftir nafni): netfang á skrá og samningar með stöðu (draft = drög, sent = bíður undirritunar starfsmanns, signed = undirritaður, void = ógildur) og dagsetningum. Ef fleiri en einn starfsmaður passar við nafnið koma allir — spurðu þá hvern er átt við. Kallaðu á þetta ÁÐUR en þú notar resend_contract.",
+    input_schema: { type: "object", properties: { employee: { type: "string", description: "Nafn starfsmanns (fullt nafn eða fornafn)" } }, required: ["employee"] },
+  },
 ];
 
 export const WRITE_TOOLS: Anthropic.Tool[] = [
@@ -109,11 +115,12 @@ export const WRITE_TOOLS: Anthropic.Tool[] = [
   },
   {
     name: "plan_week",
-    description: "LEGGJA TIL heilt vaktaplan fyrir eina viku (mánudag–sunnudag) í einni tillögu. KEMUR Í STAÐ allra vakta vikunnar: taktu því með ALLAR vaktir sem eiga að vera, líka þær sem breytast ekki. Þegar notandinn staðfestir er planið birt og starfsfólk fær tilkynningu. Notaðu þetta fyrir beiðnir eins og „settu upp næstu viku“, „allir vinni 35 tíma og fái einn frídag“. Fyrir stakar breytingar notaðu set_shift.",
+    description: "LEGGJA TIL heilt vaktaplan fyrir eina viku (mánudag–sunnudag) í einni tillögu. KEMUR Í STAÐ allra vakta vikunnar: taktu því með ALLAR vaktir sem eiga að vera, líka þær sem breytast ekki. Þegar notandinn staðfestir er planið birt og starfsfólk fær tilkynningu. Notaðu þetta fyrir beiðnir eins og „settu upp næstu viku“, „allir vinni 35 tíma og fái einn frídag“, „vaktaplan fyrir eldhúsið, allir tvo frídaga, alltaf þrír á vakt“ (þá department). Fyrir stakar breytingar notaðu set_shift.",
     input_schema: {
       type: "object",
       properties: {
         monday: { type: "string", description: "Mánudagur vikunnar, YYYY-MM-DD" },
+        department: { type: "string", description: "Valfrjálst: ef aðeins ein deild er skipulögð (t.d. „Eldhús“). Þá koma shifts aðeins fyrir starfsfólk þeirrar deildar og vaktir annarra deilda vikunnar haldast óbreyttar." },
         label: { type: "string", description: "Ein setning sem lýsir planinu, t.d. „Allir 35–38 klst., einn frídagur hver, helgar mannaðar 4“" },
         shifts: {
           type: "array",
@@ -122,6 +129,32 @@ export const WRITE_TOOLS: Anthropic.Tool[] = [
         },
       },
       required: ["monday", "label", "shifts"],
+    },
+  },
+  {
+    name: "create_open_shifts",
+    description: "LEGGJA TIL lausar (opnar) vaktir sem starfsfólk getur sótt um í appinu — t.d. „opnaðu vaktir alla daga næstu viku milli 17 og 23“. Sami tími alla valda daga; count = fjöldi lausra vakta per dag. Dagar: from–to, valfrjálst takmarkað við weekdays (1 = mánudagur … 7 = sunnudagur). Mest 31 dagur. Starfsfólk fær eina tilkynningu þegar staðfest er.",
+    input_schema: {
+      type: "object",
+      properties: {
+        from: DATE, to: DATE,
+        weekdays: { type: "array", items: { type: "integer", minimum: 1, maximum: 7 }, description: "Valfrjálst: aðeins þessir vikudagar (1 = mán … 7 = sun)" },
+        start: TIME, end: TIME,
+        count: { type: "integer", minimum: 1, maximum: 10, description: "Lausar vaktir per dag (sjálfgefið 1)" },
+        shiftType: { type: "string", description: "Heiti vaktategundar (valfrjálst)" },
+        department: { type: "string", description: "Deild (valfrjálst) — birtist í athugasemd vaktarinnar" },
+        note: { type: "string", description: "Stutt athugasemd til starfsfólks (valfrjálst)" },
+      },
+      required: ["from", "to", "start", "end"],
+    },
+  },
+  {
+    name: "resend_contract",
+    description: "LEGGJA TIL að senda undirritunarbeiðni ráðningarsamnings aftur á netfang starfsmanns á skrá. Notar nýjasta óundirritaða samninginn: ef hann er sendur er boðið endursent; ef hann er drög er hann undirritaður fyrir hönd fyrirtækisins og sendur (eins og „Undirrita & senda“). Ekki nota ef samningurinn er þegar undirritaður — segðu frá því. Notaðu employee_contracts fyrst og fullt nafn hér.",
+    input_schema: {
+      type: "object",
+      properties: { employee: { type: "string", description: "FULLT nafn starfsmanns eins og employee_contracts skilaði því" }, label: { type: "string", description: "Stutt lýsing, t.d. „Ráðningarsamningur Péturs Karlssonar → petur@dæmi.is“" } },
+      required: ["employee", "label"],
     },
   },
 ];
@@ -163,6 +196,37 @@ function parseWeekPlan(input: In): { ok: true; mon: string; dates: string[]; shi
 }
 const shortDate = (iso: string) => `${Number(iso.slice(8))}.${Number(iso.slice(5, 7))}.`;
 
+/** Starfsfólk sem passar við nafn: nákvæmt fullt nafn vinnur, annars öll nöfn þar sem hvert orð byrjar eins. */
+function matchStaff<T extends { fullName: string }>(list: T[], name: string): T[] {
+  const q = name.toLowerCase().trim();
+  const exact = list.filter((e) => e.fullName.toLowerCase() === q);
+  if (exact.length) return exact;
+  const words = q.split(/\s+/).filter(Boolean);
+  return list.filter((e) => { const parts = e.fullName.toLowerCase().split(/\s+/); return words.every((w) => parts.some((p) => p.startsWith(w))); });
+}
+
+/** Dagsetningar lausra vakta: from–to (mest 31 dagur), valfrjálst aðeins ákveðnir vikudagar (1 = mán … 7 = sun). */
+function openShiftDates(input: In): { ok: true; dates: string[] } | { ok: false; error: string } {
+  if (!okDate(input.from) || !okDate(input.to)) return { ok: false, error: "from/to verða að vera YYYY-MM-DD" };
+  if (!okTime(input.start) || !okTime(input.end)) return { ok: false, error: "Vantar tíma (HH:MM)" };
+  const from = str(input.from), to = str(input.to);
+  if (to < from) return { ok: false, error: "to er á undan from" };
+  const wd = Array.isArray(input.weekdays) ? (input.weekdays as unknown[]).map(Number).filter((n) => n >= 1 && n <= 7) : [];
+  const [y, m, d] = from.split("-").map(Number);
+  const out: string[] = [];
+  for (let i = 0; i < 400; i++) {
+    const dt = new Date(y, m - 1, d + i);
+    const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+    if (iso > to) break;
+    if (!wd.length || wd.includes(dt.getDay() === 0 ? 7 : dt.getDay())) out.push(iso);
+  }
+  if (!out.length) return { ok: false, error: "Engir dagar passa við bilið og vikudagana" };
+  if (out.length > 31) return { ok: false, error: "Mest 31 dagur í einu" };
+  return { ok: true, dates: out };
+}
+const openCount = (input: In) => Math.min(Math.max(Math.round(Number(input.count) || 1), 1), 10);
+const openNote = (input: In) => [str(input.department), str(input.note)].filter(Boolean).join(" · ").slice(0, 200);
+
 /** Keyrir lesverkfæri og skilar JSON-streng fyrir líkanið. */
 export async function runReadTool(name: string, input: In): Promise<string> {
   try {
@@ -199,7 +263,8 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       return JSON.stringify({
         week: { monday: dates[0], sunday: dates[6], dates },
         staff: staff.map((e) => ({ name: first(e.fullName), fullName: e.fullName, dept: e.department, pay: e.payType === "monthly" ? "föst laun" : "tímakaup", ratioPct: e.employmentRatio, ...(seen.get(first(e.fullName))! > 1 ? { warning: "Fleiri en einn með þetta fornafn — notaðu fullt nafn í employee" } : {}) })),
-        currentShifts: shifts.rows.map((r) => ({ employee: r.first, date: r.date, start: r.start, end: r.end, type: r.type ?? null })),
+        departments: [...new Set(staff.map((e) => e.department).filter(Boolean))],
+        currentShifts: shifts.rows.filter((r) => r.name !== "?").map((r) => ({ employee: r.first, dept: r.dept || null, date: r.date, start: r.start, end: r.end, type: r.type ?? null })),
         unavailable: unavail,
         // Mjúkar óskir: forðast frí í bið og óframboð, virða framboð/vaktaskipti ef hægt er; nefna í svarinu hvað var virt.
         pendingLeave: (reqs?.pendingLeave ?? []).map((l) => ({ employee: l.name, dates: l.days.map((d) => dates[d]), type: l.type })),
@@ -228,6 +293,18 @@ export async function runReadTool(name: string, input: In): Promise<string> {
         notArrived: w.missing.map((m) => ({ name: m.name, dept: m.dept, plannedStart: m.start, late: m.late, minutes: m.mins })),
       });
     }
+    if (name === "employee_contracts") {
+      const q = str(input.employee);
+      if (!q) return JSON.stringify({ error: "Vantar nafn" });
+      const { employees } = await getEmployees();
+      const hits = matchStaff(employees.filter((e) => e.status !== "inactive"), q).slice(0, 5);
+      if (!hits.length) return JSON.stringify({ error: `Enginn starfsmaður fannst sem heitir „${q}“` });
+      const out = await Promise.all(hits.map(async (e) => ({
+        fullName: e.fullName, dept: e.department, email: e.email ?? null,
+        contracts: (await listContracts(e.id)).contracts.map((c) => ({ title: c.title, status: c.status, created: c.created, signedAt: c.signed_at, via: c.signed_via })),
+      })));
+      return JSON.stringify(out.length > 1 ? { ambiguous: true, matches: out } : out[0]);
+    }
     if (name === "pending_requests") {
       const r = await getPendingRequests();
       return JSON.stringify(r.items.filter((i) => i.id).map((i) => ({ id: i.id, kind: i.kind, title: i.title, detail: i.detail, hints: i.hints?.map((h) => h.text) })));
@@ -252,7 +329,7 @@ export function describeWrite(name: string, input: In, lang: string): { ok: true
       if (!p.ok) return p;
       const people = new Set(p.shifts.map((x) => x.employee.toLowerCase())).size;
       const hours = p.shifts.reduce((a, x) => { let h = (Number(x.end.slice(0, 2)) * 60 + Number(x.end.slice(3))) - (Number(x.start.slice(0, 2)) * 60 + Number(x.start.slice(3))); if (h <= 0) h += 1440; return a + h / 60; }, 0);
-      const lbl = str(input.label);
+      const lbl = [str(input.department) && (en ? `Department: ${str(input.department)} (other departments unchanged).` : `Deild: ${str(input.department)} (aðrar deildir óbreyttar).`), str(input.label)].filter(Boolean).join(" ");
       return { ok: true, summary: en
         ? `Publish week plan ${shortDate(p.dates[0])}–${shortDate(p.dates[6])}: ${p.shifts.length} shifts for ${people} people, ${Math.round(hours)} hrs. Replaces all shifts that week and notifies staff.${lbl ? ` ${lbl}` : ""}`
         : `Birta vaktaplan ${shortDate(p.dates[0])}–${shortDate(p.dates[6])}: ${p.shifts.length} vaktir hjá ${people} starfsmönnum, ${Math.round(hours)} klst. Kemur í stað allra vakta vikunnar og starfsfólk fær tilkynningu.${lbl ? ` ${lbl}` : ""}` };
@@ -272,6 +349,18 @@ export function describeWrite(name: string, input: In, lang: string): { ok: true
     case "clock_out":
       if (!who || !okTime(input.time)) return { ok: false, error: "Vantar starfsmann eða tíma" };
       return { ok: true, summary: en ? `Clock out ${who} at ${input.time}` : `Stimpla ${who} út kl. ${input.time}` };
+    case "create_open_shifts": {
+      const p = openShiftDates(input);
+      if (!p.ok) return p;
+      const n = openCount(input), note = openNote(input), total = n * p.dates.length;
+      const span = p.dates.length === 1 ? shortDate(p.dates[0]) : `${shortDate(p.dates[0])}–${shortDate(p.dates[p.dates.length - 1])} (${p.dates.length} ${en ? "days" : "dagar"})`;
+      return { ok: true, summary: en
+        ? `Create ${total} open shift${total > 1 ? "s" : ""} ${span}, ${input.start}–${input.end}${n > 1 ? `, ${n} per day` : ""}${str(input.shiftType) ? ` (${input.shiftType})` : ""}${note ? ` · ${note}` : ""}. Staff are notified and can apply in the app.`
+        : `Stofna ${total} ${total > 1 ? "lausar vaktir" : "lausa vakt"} ${span}, kl. ${input.start}–${input.end}${n > 1 ? `, ${n} á dag` : ""}${str(input.shiftType) ? ` (${input.shiftType})` : ""}${note ? ` · ${note}` : ""}. Starfsfólk fær tilkynningu og getur sótt um í appinu.` };
+    }
+    case "resend_contract":
+      if (!who) return { ok: false, error: "Vantar starfsmann" };
+      return { ok: true, summary: `${en ? "Resend contract for signature" : "Senda samning aftur til undirritunar"}: ${str(input.label) || who}` };
   }
   return { ok: false, error: "Óþekkt aðgerð" };
 }
@@ -293,6 +382,18 @@ export async function executeWrite(name: string, input: In): Promise<{ ok: boole
         const { dropped } = guardLeaveShifts(p.shifts, reqs, (x) => p.dates.indexOf(x.date));
         if (dropped.length) return { ok: false, error: `Vakt á samþykktu fríi: ${dropped.map((x) => `${x.employee} ${x.date}`).join(", ")} — taktu hana út og reyndu aftur.` };
       }
+      // Ein deild: vaktir annarra deilda vikunnar haldast (bætt aftan við planið áður en vikan er hreinsuð).
+      const dept = str(input.department).toLowerCase();
+      if (dept) {
+        const inPlan = new Set(p.shifts.map((x) => `${x.employee.toLowerCase()}|${x.date}`));
+        const cur = await getShiftsInRange(p.dates[0], p.dates[6]);
+        if (!cur.ok) return { ok: false, error: "Tókst ekki að lesa núverandi vaktir vikunnar" };
+        for (const r of cur.rows) {
+          if (r.name === "?" || r.dept.toLowerCase() === dept) continue;
+          if (inPlan.has(`${r.first.toLowerCase()}|${r.date}`) || inPlan.has(`${r.name.toLowerCase()}|${r.date}`)) continue;
+          p.shifts.push({ employee: r.name, date: r.date, start: r.start, end: r.end, shiftType: r.type ?? "" });
+        }
+      }
       const cleared = await deleteWeekShifts(p.dates);
       if (!cleared.ok) return { ok: false, error: "Tókst ekki að hreinsa vikuna" };
       const res = await publishSchedule(p.shifts.map((x) => ({ employeeName: x.employee, date: x.date, startTime: x.start, endTime: x.end, shiftTypeName: x.shiftType || "Dagvakt" })));
@@ -313,6 +414,18 @@ export async function executeWrite(name: string, input: In): Promise<{ ok: boole
       return approveShiftSwap(str(input.id));
     case "clock_out":
       return setClockOut({ employeeName: str(input.employee), time: str(input.time) });
+    case "create_open_shifts": {
+      const p = openShiftDates(input);
+      if (!p.ok) return p;
+      return createOpenShifts({ dates: p.dates, start: str(input.start).padStart(5, "0"), end: str(input.end).padStart(5, "0"), shiftTypeName: str(input.shiftType) || undefined, note: openNote(input) || undefined, count: openCount(input) });
+    }
+    case "resend_contract": {
+      const { employees } = await getEmployees();
+      const hits = matchStaff(employees.filter((e) => e.status !== "inactive"), str(input.employee));
+      if (!hits.length) return { ok: false, error: `Starfsmaður fannst ekki: ${str(input.employee)}` };
+      if (hits.length > 1) return { ok: false, error: `Fleiri en einn passar: ${hits.map((e) => e.fullName).join(", ")} — tilgreindu fullt nafn.` };
+      return resendContract(hits[0].id);
+    }
   }
   return { ok: false, error: "Óþekkt aðgerð" };
 }

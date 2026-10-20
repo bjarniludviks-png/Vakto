@@ -33,6 +33,37 @@ const is = {
     { t: "Fréttaveita fyrir vinnustaðinn.", d: "Nýr matseðill, breyttur opnunartími, mynd úr eldhúsinu. Festu það mikilvæga efst svo það týnist ekki.", alt: "Fréttaveitan í appinu" },
     { t: "Launaseðill sem stenst.", d: "Dagvinna, álag og yfirvinna sundurliðuð. Líka þegar mánuðurinn var 0 tímar og starfsmaðurinn þarf staðfestingu.", alt: "Launaseðill úr VAKTO" },
   ],
+  // „Hey VAKTO“ — aðeins það sem VAKTO AI getur í raun gert (verkfærin í src/lib/ai/assistant-tools.ts).
+  hey: {
+    eyebrow: "VAKTO AI", h: "Hey VAKTO, …", lede: "Segðu hvað þarf að gera, eins og við vaktstjóra. VAKTO AI les þín gögn, svarar með þínum tölum og undirbýr breytinguna.",
+    pre: "Hey VAKTO,",
+    groups: [
+      { h: "Vaktaplan", items: [
+        { q: "gerðu vaktaplan fyrir næstu viku í eldhúsinu. Allir fá tvo frídaga og alltaf þrír á vakt.", a: "Setur upp vikuna fyrir eldhúsið: fimm vaktir á mann og þrír á vakt alla daga. Aðrar deildir haldast óbreyttar." },
+        { q: "opnaðu vaktir alla daga næstu viku milli 17 og 23.", a: "Stofnar sjö lausar vaktir. Starfsfólk fær tilkynningu og sækir um í appinu." },
+        { q: "samþykktu fríbeiðnina hennar Önnu.", a: "Finnur beiðnina, sýnir dagana og samþykkir. Anna fær tilkynningu." },
+      ] },
+      { h: "Starfsfólk", items: [
+        { q: "hver er ekki mættur í dag?", a: "Sýnir hverjir á plani dagsins hafa ekki stimplað sig inn, og hve seint þeir eru." },
+        { q: "Jón gleymdi að stimpla sig út. Settu útstimplun kl. 23:00.", a: "Setur útstimplun hjá Jóni kl. 23:00 og tímaskráningin lagast." },
+        { q: "sendu ráðningarsamninginn aftur á Pétur Karlsson.", a: "Sendir undirritunarbeiðnina aftur á netfangið hans Péturs." },
+      ] },
+      { h: "Tölur", items: [
+        { q: "af hverju var laun % hærra í september en í ágúst?", a: "Ber mánuðina saman: velta, tímar, yfirvinna og álag, og nefnir helstu ástæðurnar." },
+        { q: "hver vann mesta yfirvinnu í mánuðinum?", a: "Raðar starfsfólki eftir yfirvinnutímum og hvað þeir kostuðu." },
+      ] },
+    ],
+    confirmB: "Ekkert breytist án þín.", confirm: " VAKTO AI spyr alltaf áður en hann breytir nokkru. Þú sérð tillöguna og ýtir á Staðfesta.",
+    who: "Fyrir stjórnendur og vaktstjóra. 25 spurningar á mánuði innifaldar.",
+    videoAlt: "Myndband: VAKTO AI setur upp vaktaplan fyrir eldhúsið og stjórnandinn staðfestir tillöguna.",
+  },
+  // „Fáðu kynningu á vinnustaðinn“ — beiðni fer í tölvupósti (/api/kynning).
+  visit: {
+    h: "Fáðu kynningu á vinnustaðinn.", p: "Við komum til ykkar og kynnum VAKTO fyrir stjórnendum og starfsfólki. Frítt og án skuldbindingar.",
+    name: "Nafn", company: "Fyrirtæki", contact: "Sími eða netfang", message: "Skilaboð (valfrjálst)", messagePh: "T.d. hvenær hentar, fjöldi starfsfólks eða staðir",
+    send: "Biðja um kynningu", sending: "Sendi…", okH: "Takk, beiðnin er komin.", ok: "Við höfum samband fljótlega til að finna tíma.",
+    err: "Tókst ekki að senda — sendu póst á hallo@vakto.is.", bot: "Augnablik, bot-vörnin er að hlaðast.",
+  },
   conH: "Samningur á mínútu, undirritaður á annarri.",
   conP: "VAKTO fyllir út ráðningarsamning úr gögnum starfsmannsins, eftir formi Vinnumálastofnunar. Báðir skrifa undir í símanum og fá undirritað eintak í pósti.",
   conTicks: ["Fylgir formi Vinnumálastofnunar, á íslensku og ensku", "Undirritun með kóða í pósti eða rafrænum skilríkjum", "Fingrafar skjals og undirritunarskrá fylgja", "Launaseðlar og tímaskrár í sama stíl"],
@@ -43,7 +74,7 @@ const is = {
   sisH: "Frá sömu smiðju.", sisP: "BGL Ventures, fyrirtækið á bak við VAKTO, smíðar líka INVENTRA: rekstrarkerfi og gervigreind sem minnkar rýrnun hjá framleiðendum ferskvöru.", sisGo: "inventra.is",
   priceH: "Eitt verð. Allt kerfið.", amt: "9.990 kr", per: "/mán",
   price1: "5 virkir starfsmenn innifaldir.", price2: "1.490 kr á hvern virkan starfsmann umfram.",
-  fine: "Án VSK. Þú borgar aðeins fyrir þá sem unnu í mánuðinum. Undirskrift með rafrænum skilríkjum 490 kr. VAKTO AI: 25 spurningar á mánuði innifaldar, ótakmarkaðra með viðbót á 1.990 kr/mán. 15% afsláttur ef greitt er árlega. 14 daga frí prufa · ekkert kort · greitt með korti eða kröfu í heimabanka · engin binding.",
+  fine: "Án VSK. Þú borgar aðeins fyrir þá sem unnu í mánuðinum. Undirskrift með rafrænum skilríkjum 490 kr. VAKTO AI: 25 spurningar á mánuði innifaldar, allt að 500 með viðbót á 1.990 kr/mán. 15% afsláttur ef greitt er árlega. 14 daga frí prufa · ekkert kort · greitt með korti eða kröfu í heimabanka · engin binding.",
 };
 
 const en: typeof is = {
@@ -78,6 +109,35 @@ const en: typeof is = {
     { t: "A news feed for the workplace.", d: "A new menu, changed opening hours, a photo from the kitchen. Pin what matters so it doesn't get lost.", alt: "The news feed in the app" },
     { t: "A payslip that holds up.", d: "Day rate, premiums and overtime itemised. Even when the month was zero hours and the employee needs proof.", alt: "Payslip from VAKTO" },
   ],
+  hey: {
+    eyebrow: "VAKTO AI", h: "Hey VAKTO, …", lede: "Say what needs doing, the way you would to a shift manager. VAKTO AI reads your data, answers with your numbers and prepares the change.",
+    pre: "Hey VAKTO,",
+    groups: [
+      { h: "Scheduling", items: [
+        { q: "make next week's schedule for the kitchen. Everyone gets two days off and there are always three on shift.", a: "Builds the kitchen's week: five shifts each and three on shift every day. Other departments stay as they are." },
+        { q: "open shifts every day next week from 17:00 to 23:00.", a: "Creates seven open shifts. Staff get a notification and apply in the app." },
+        { q: "approve Anna's time-off request.", a: "Finds the request, shows the days and approves it. Anna gets notified." },
+      ] },
+      { h: "Staff", items: [
+        { q: "who hasn't shown up today?", a: "Shows who on today's schedule hasn't clocked in, and how late they are." },
+        { q: "Jón forgot to clock out. Set his clock-out to 23:00.", a: "Sets Jón's clock-out at 23:00 and the timesheet is fixed." },
+        { q: "resend the employment contract to Pétur Karlsson.", a: "Sends the signing request to Pétur's email again." },
+      ] },
+      { h: "Numbers", items: [
+        { q: "why was labor % higher in September than in August?", a: "Compares the months: revenue, hours, overtime and premiums, and names the main reasons." },
+        { q: "who worked the most overtime this month?", a: "Ranks staff by overtime hours and what they cost." },
+      ] },
+    ],
+    confirmB: "Nothing changes without you.", confirm: " VAKTO AI always asks before it changes anything. You see the proposal and press Confirm.",
+    who: "For owners and shift managers. 25 questions a month included.",
+    videoAlt: "Video: VAKTO AI builds a schedule for the kitchen and the manager confirms the proposal.",
+  },
+  visit: {
+    h: "Get a presentation at your workplace.", p: "We come to you and present VAKTO to your managers and staff. Free, no commitment.",
+    name: "Name", company: "Company", contact: "Phone or email", message: "Message (optional)", messagePh: "E.g. when suits you, number of staff or locations",
+    send: "Request a presentation", sending: "Sending…", okH: "Thanks, we got your request.", ok: "We'll be in touch shortly to find a time.",
+    err: "Could not send — email hallo@vakto.is.", bot: "One moment, the bot check is loading.",
+  },
   conH: "A contract in a minute, signed in the next.",
   conP: "VAKTO fills out the employment contract from the employee's details, following the Directorate of Labour's form. Both parties sign on their phone and get a signed copy by email.",
   conTicks: ["Follows the Directorate of Labour's form, in Icelandic and English", "Signed with an emailed code or electronic ID", "Document fingerprint and signing log included", "Payslips and timesheets in the same style"],
@@ -88,7 +148,7 @@ const en: typeof is = {
   sisH: "From the same makers.", sisP: "BGL Ventures, the company behind VAKTO, also builds INVENTRA: an operations system with AI that cuts waste for fresh-food producers.", sisGo: "inventra.is",
   priceH: "One price. The whole system.", amt: "ISK 9,990", per: "/mo",
   price1: "5 active employees included.", price2: "ISK 1,490 per additional active employee.",
-  fine: "Excl. VAT. You only pay for those who worked that month. Signing with electronic ID ISK 490. VAKTO AI: 25 questions a month included, more with the ISK 1,990/mo add-on. 15% off when paid annually. 14-day free trial · no card · pay by card or bank claim · no commitment.",
+  fine: "Excl. VAT. You only pay for those who worked that month. Signing with electronic ID ISK 490. VAKTO AI: 25 questions a month included, up to 500 with the ISK 1,990/mo add-on. 15% off when paid annually. 14-day free trial · no card · pay by card or bank claim · no commitment.",
 };
 
 export const HOME_TEXT: Record<SiteLang, typeof is> = { is, en };

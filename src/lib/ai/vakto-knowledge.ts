@@ -30,7 +30,7 @@ export const VAKTO_KNOWLEDGE = `
 - Ráðningarsamningar búnir til úr starfsmannagögnum, starfsmaður les og samþykkir rafrænt í appinu (rafrænt samþykki skráð með nafni og tímastimpli).
 - Spjall (eins og Messenger): rásir sjálfkrafa per deild og stað, bein skilaboð, hópar, myndir, talskilaboð, viðbrögð, svör, „séð“, ólesið-teljari, push-tilkynningar.
 - Fréttaveita: tilkynningar með myndum og skjölum, viðbrögð, athugasemdir og svör við athugasemdum, fest tilkynning.
-- VAKTO AI (fyrir stjórnendur og vaktstjóra, neistatáknið neðst í horninu á vefnum eða ⌘J): svarar spurningum um reksturinn með raunverulegum tölum (laun % af veltu, tímar, frávik, hver er á vakt, beiðnir), setur upp vaktaplan fyrir heila viku eftir lýsingu („allir vinni 35 tíma og fái einn frídag“) ber saman tímabil (t.d. „október miðað við september“ eða „sama vika í fyrra“: velta, launakostnaður, laun %, tímar, yfirvinna, per deild og starfsmann), sýnir þróun per mánuð eða viku, les keyrð laun úr launakeyrslum og undirbýr stakar breytingar (vaktir, frí-beiðnir, vaktaskipti, útstimplun). Allar breytingar eru tillögur sem stjórnandinn staðfestir með hnappi; ekkert er framkvæmt án staðfestingar. Samtöl vistast og má opna aftur undir klukkutákninu.
+- VAKTO AI (fyrir stjórnendur og vaktstjóra, neistatáknið neðst í horninu á vefnum eða ⌘J — „Hey VAKTO“): svarar spurningum um reksturinn með raunverulegum tölum (laun % af veltu, tímar, frávik, hver er á vakt og hver hefur ekki mætt, beiðnir, hver vann mesta yfirvinnu), setur upp vaktaplan fyrir heila viku eftir lýsingu, líka fyrir eina deild með skilyrðum („vaktaplan fyrir eldhúsið næstu viku, allir fá tvo frídaga og alltaf þrír á vakt“ — vaktir annarra deilda haldast), stofnar lausar vaktir („opnaðu vaktir alla daga næstu viku milli 17 og 23“), sendir ráðningarsamning aftur til undirritunar á netfang starfsmanns, ber saman tímabil (t.d. „af hverju var laun % hærra í september en í ágúst“ eða „sama vika í fyrra“: velta, launakostnaður, laun %, tímar, yfirvinna, per deild og starfsmann), sýnir þróun per mánuð eða viku, les keyrð laun úr launakeyrslum og undirbýr stakar breytingar (vaktir, samþykkja/hafna frí-beiðnum, vaktaskipti, setja útstimplun ef einhver gleymdi að stimpla sig út). Allar breytingar eru tillögur sem stjórnandinn staðfestir með hnappi; ekkert er framkvæmt án staðfestingar. Samtöl vistast og má opna aftur undir klukkutákninu.
 - Handbækur/skjöl: hægt að hlaða upp skjölum fyrirtækisins og starfsmanna (t.d. handbók) sem starfsfólk sér í appinu.
 
 ## Verð (án VSK)
@@ -57,6 +57,7 @@ export const VAKTO_KNOWLEDGE = `
 
 ## Samband
 - Netfang: hallo@vakto.is. BGL Ventures ehf., kt. 490806-0400, Ísland.
+- Kynning á vinnustaðnum: VAKTO kemur á staðinn og kynnir kerfið fyrir stjórnendum og starfsfólki, frítt. Beðið um kynningu í forminu „Fáðu kynningu á vinnustaðinn“ neðst á forsíðunni (vakto.is).
 - Ef spurningin snýst um tilboð fyrir keðjur, sérþarfir, tengingar við sölukerfi eða eitthvað sem er ekki hér að ofan: bjóða að tengja við manneskju (eigandi VAKTO svarar).
 `;
 
