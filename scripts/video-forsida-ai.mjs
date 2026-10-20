@@ -116,6 +116,8 @@ while (Date.now() - T.send < 240000) {
 }
 await pendingLoc.waitFor({ timeout: 60000 });
 T.proposal = Date.now();
+const aiText = await page.locator(".vai-list").innerText().catch(() => "");
+if (/prufa|\btest\b/i.test(aiText)) console.log("VIÐVÖRUN: svarið nefnir prufu-/testgögn — taka aftur upp");
 speed = 1; rec = true;
 await sleep(500);
 const list = page.locator(".vai-list");
