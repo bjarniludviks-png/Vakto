@@ -5,7 +5,8 @@
 // Atburðarás: Vaktaplan → VAKTO AI opnað → beiðnin slegin inn → tillagan birtist (endar þar; ekkert skrifað).
 //   CONFIRM=1 → „Staðfesta" → „Gert" → næsta vika síuð á eldhúsið (planið í töflunni). ATH: birtir planið í alvöru í
 //   demo-fyrirtækinu og virkar aðeins meðan demo-notandinn má skrifa (demo-ið á að vera les-eingöngu).
-// Biðin eftir svari líkansins er klippt út (aðeins stuttur „Hugsa…"-bútur sést).
+// Biðin er tekin upp hraðspóluð: hrein „Hugsa…"-bið ×SPEED_THINK (klippt eftir SKIP_THINK_S), framvindan og
+// vikutaflan sem fyllist í spjallinu ×SPEED_GRID — svo áhorfandinn sér vaktirnar raðast inn.
 import { chromium } from "playwright";
 import { createClient } from "@supabase/supabase-js";
 import { spawnSync } from "child_process";
@@ -68,11 +69,11 @@ async function clickOn(loc, ms = 650) {
 
 // Upptaka: CDP-screencast; rammar aðeins vistaðir á meðan `rec` er satt (hleðsla og bið eftir líkaninu klippt út)
 const cdp = await ctx.newCDPSession(page);
-const frames = []; let rec = false; let lastTs = 0; let tAcc = 0;
+const frames = []; let rec = false; let lastTs = 0; let tAcc = 0; let speed = 1; // speed > 1 = hraðspólað
 cdp.on("Page.screencastFrame", async (f) => {
   cdp.send("Page.screencastFrameAck", { sessionId: f.sessionId }).catch(() => {});
   const ts = f.metadata.timestamp;
-  if (rec) { const dt = lastTs ? Math.min(ts - lastTs, 0.1) : 0; tAcc += dt; frames.push({ t: tAcc, data: f.data }); }
+  if (rec) { const dt = lastTs ? Math.min(ts - lastTs, 0.1) : 0; tAcc += dt / speed; frames.push({ t: tAcc, data: f.data }); }
   lastTs = ts;
 });
 const keepAlive = setInterval(() => { page.evaluate(() => { const c = document.getElementById("__fc"); if (c) c.style.opacity = c.style.opacity === "0.999" ? "1" : "0.999"; }).catch(() => {}); }, 33);
@@ -95,14 +96,29 @@ await ta.pressSequentially(PROMPT, { delay: 38 });
 await sleep(400);
 await page.keyboard.press("Enter");
 const T = { send: Date.now() }; // raunverulegir tímar (óklipptir), prentaðir í lokin
-await sleep(1600); // „Hugsa…" sést stutta stund
-rec = false;
-// 3) Bíða eftir tillögunni (ekki tekið upp)
-await page.locator(".vai-act.pending").first().waitFor({ timeout: 240000 });
-await page.waitForFunction(() => !document.querySelector(".vai-think"), null, { timeout: 120000 }).catch(() => {});
+await sleep(1200); // „Hugsa…" sést á eðlilegum hraða stutta stund
+// 3) Biðin: tekin upp hraðspóluð svo framvindan („Raða vöktum… N af M") og vikutaflan sem fyllist sjáist.
+//    Hrein „Hugsa…"-bið (engin tafla enn) er spóluð hraðar og klippt alveg eftir SKIP_THINK_S sek.
+const SPEED_THINK = Number(process.env.SPEED_THINK ?? 5), SPEED_GRID = Number(process.env.SPEED_GRID ?? 2.5);
+const SKIP_THINK_S = Number(process.env.SKIP_THINK_S ?? 2.5);
+let thinkRec = 0, lastPoll = Date.now();
+const pendingLoc = page.locator(".vai-act.pending").first();
+while (Date.now() - T.send < 240000) {
+  const st = await page.evaluate(() => ({ plan: !!document.querySelector(".vai-plan-h, .vai-plan-g"), pending: !!document.querySelector(".vai-act.pending"), think: !!document.querySelector(".vai-think") }));
+  if (st.pending && !st.think) break;
+  const now = Date.now();
+  if (st.plan) { if (!T.grid) T.grid = now; speed = SPEED_GRID; rec = true; }
+  else { speed = SPEED_THINK; if (rec) thinkRec += (now - lastPoll) / 1000 / SPEED_THINK; rec = thinkRec < SKIP_THINK_S; }
+  lastPoll = now;
+  // halda spjallinu skrunuðu niður svo nýjustu vaktirnar sjáist
+  await page.locator(".vai-list").evaluate((el) => { el.scrollTop = el.scrollHeight; }).catch(() => {});
+  await sleep(100);
+}
+await pendingLoc.waitFor({ timeout: 60000 });
 T.proposal = Date.now();
-await sleep(800);
-rec = true;
+const aiText = await page.locator(".vai-list").innerText().catch(() => "");
+if (/prufa|\btest\b/i.test(aiText)) console.log("VIÐVÖRUN: svarið nefnir prufu-/testgögn — taka aftur upp");
+speed = 1; rec = true;
 await sleep(500);
 const list = page.locator(".vai-list");
 await list.evaluate((el) => el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }));
@@ -159,7 +175,7 @@ rec = false;
 }
 clearInterval(keepAlive);
 const sec = (a, b) => (a && b ? ((b - a) / 1000).toFixed(1) + " s" : "–");
-console.log("tímar (óklipptir): beiðni→tillaga", sec(T.send, T.proposal), "· Staðfesta→Gert", sec(T.confirm, T.done));
+console.log("tímar (óklipptir): beiðni→fyrsta vakt í töflu", sec(T.send, T.grid), "· beiðni→tillaga", sec(T.send, T.proposal), "· Staðfesta→Gert", sec(T.confirm, T.done));
 console.log("demo-fyrirtæki (vakto_demo_vid-kaka):", (await ctx.cookies()).some((c) => c.name === "vakto_demo_vid"));
 await cdp.send("Page.stopScreencast");
 await browser.close();

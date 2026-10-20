@@ -970,7 +970,7 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 @media(min-width:761px){
   .app.railed .side{width:64px}
   .app.railed .brand{flex-direction:column;padding:16px 0 10px;gap:8px}
-  .app.railed .brand .vakto-logo-word{display:none}
+  .app.railed .brand .vakto-logo-word{display:none!important} /* SVG-ið er með inline display:block */
   .app.railed .railtog{margin:0}
   .app.railed .railtog svg{transform:rotate(180deg)}
   .app.railed .nav{padding:6px 8px}
