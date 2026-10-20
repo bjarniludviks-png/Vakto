@@ -92,7 +92,14 @@ export default function AppShell({
       }
     } catch { /* einkagluggi o.fl. */ }
   }, [account.demo]);
+  // Spjallrásir þurfa plássið: á /spjall er hliðarstikan felld saman sjálfkrafa. Það er sérstakt
+  // ástand — vistaða stillingin (vakto-rail) er óbreytt og gildir aftur um leið og farið er af /spjall.
+  const onChat = pathname.startsWith("/spjall");
+  const [chatRail, setChatRail] = useState(true);
+  useEffect(() => { if (onChat) setChatRail(true); }, [onChat]); // eslint-disable-line react-hooks/set-state-in-effect -- ný heimsókn á /spjall byrjar samanfelld
+  const isRailed = onChat ? chatRail : railed;
   function toggleRail() {
+    if (onChat) { setChatRail((r) => !r); return; }
     setRailed((r) => { try { localStorage.setItem("vakto-rail", r ? "0" : "1"); } catch {} return !r; });
   }
   function toggleTheme() {
@@ -159,14 +166,14 @@ export default function AppShell({
         className={`backdrop${navOpen ? " show" : ""}`}
         onClick={() => setNavOpen(false)}
       />
-      <div className={`app${railed ? " railed" : ""}`}>
+      <div className={`app${isRailed ? " railed" : ""}`}>
         {/* ---------- sidebar ---------- */}
         <aside className={`side${navOpen ? " open" : ""}`}>
           <div className="brand">
             <Link href="/" className="brandlink" title={t("Fara á forsíðu")} aria-label={t("Fara á forsíðu")}>
               <VaktoLogo size={26} />
             </Link>
-            <button className="railtog" onClick={toggleRail} title={railed ? "Sýna hliðarstiku" : "Fela hliðarstiku"} aria-label="toggle sidebar">
+            <button className="railtog" onClick={toggleRail} title={isRailed ? "Sýna hliðarstiku" : "Fela hliðarstiku"} aria-label="toggle sidebar">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 6l-6 6 6 6M21 6l-6 6 6 6" /></svg>
             </button>
           </div>
@@ -181,7 +188,7 @@ export default function AppShell({
                 >
                   {t("grp:" + g.title)}
                 </div>
-                {(railed || !collapsed[g.title]) &&
+                {(isRailed || !collapsed[g.title]) &&
                   g.items.map((it) => (
                     <Link
                       key={it.slug}

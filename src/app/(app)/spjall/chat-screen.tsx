@@ -1,17 +1,21 @@
 "use client";
 
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/app/page-header";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { useLang } from "@/components/app/lang";
 import { toast } from "@/components/app/toast";
 import { CHAT_READ_EVENT } from "@/components/app/chat-badge";
 import {
+  AssistantComposer, AssistantHistoryList, AssistantMessages, Spark, useAssistantChat, type AssistantChat,
+} from "@/components/app/assistant-chat";
+import {
   listConversations, listMessages, sendChatMessage, createGroup, startDM, searchPeople,
   listMembers, addMembers, removeMember, leaveChannel, uploadChatMedia,
   renameChannel, setChannelPhoto, setMessageReaction, deleteMessage,
-  markChannelRead, listChannelReads,
-  type Conversation, type ChatMessage, type Person, type Members, type ChannelRead,
+  markChannelRead, listChannelReads, listChatMedia, searchChannelMessages,
+  type Conversation, type ChatMessage, type Person, type Members, type ChannelRead, type ChatMedia, type ChatHit,
 } from "./actions";
 
 import { REACTIONS } from "@/lib/reactions";
@@ -19,32 +23,32 @@ const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "🔥", "👏", "😅"
 
 type ChatInitial = { ok: boolean; items: Conversation[]; meId: string; meName?: string };
 type SupabaseBrowser = ReturnType<typeof createBrowserClient>;
+/** VAKTO AI í samtalalistanum: aðeins stjórnendur og vaktstjórar (sjá page.tsx). */
+type AiAccess = { enabled: boolean; demo: boolean };
 
-/** "Í dag" / "Í gær" / "24. ágúst" day separators between messages. */
 /** Mynd? Líka skjal með myndarendingu (sent úr appinu sem skrá). */
 const IMG_RE = /\.(jpe?g|png|gif|webp|heic|heif)(\?|$)/i;
+const isImage = (kind: string, url: string | null, body: string) => !!url && (kind === "image" || (kind === "file" && (IMG_RE.test(url) || IMG_RE.test(body))));
+/** Tímaskil í þræðinum: nýr dagur eða hlé ≥ 30 mín (eins og í Messenger). */
+const SEP_GAP = 30 * 60e3;
 
-function dayLabel(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const today = now.toDateString();
-  const yest = new Date(now.getTime() - 864e5).toDateString();
-  if (d.toDateString() === today) return "Í dag";
-  if (d.toDateString() === yest) return "Í gær";
-  const MO = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
-  return `${d.getDate()}. ${MO[d.getMonth()]}${d.getFullYear() !== now.getFullYear() ? " " + d.getFullYear() : ""}`;
-}
+const MO = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
+const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+const firstName = (s: string) => s.split(/\s+/)[0] || s;
+const visible = () => typeof document === "undefined" || document.visibilityState === "visible";
 
 /** Messenger-style grouping: consecutive messages from the same sender within
  * 5 minutes merge — avatar/name only once, tighter radii inside the group. */
-function groupFlags(msgs: ChatMessage[], i: number): { first: boolean; last: boolean; newDay: boolean } {
+function groupFlags(msgs: ChatMessage[], i: number): { first: boolean; last: boolean; sep: boolean } {
   const m = msgs[i], prev = msgs[i - 1], next = msgs[i + 1];
   const near = (a?: ChatMessage, b?: ChatMessage) =>
     !!a && !!b && a.senderId === b.senderId &&
     Math.abs(new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()) < 5 * 60e3 &&
     new Date(a.createdAt).toDateString() === new Date(b.createdAt).toDateString();
-  const newDay = !prev || new Date(prev.createdAt).toDateString() !== new Date(m.createdAt).toDateString();
-  return { first: newDay || !near(prev, m), last: !near(m, next) || (!!next && new Date(next.createdAt).toDateString() !== new Date(m.createdAt).toDateString()), newDay };
+  const gap = (a?: ChatMessage, b?: ChatMessage) => !a || !b ||
+    new Date(a.createdAt).toDateString() !== new Date(b.createdAt).toDateString() ||
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime() >= SEP_GAP;
+  return { first: gap(prev, m) || !near(prev, m), last: !near(m, next) || gap(m, next), sep: gap(prev, m) };
 }
 
 /** Person avatar — profile photo when set, else colored initials. */
@@ -65,24 +69,32 @@ function ConvAvatar({ c, size = 40 }: { c: Conversation; size?: number }) {
   return <span className="avt" style={{ background: c.color, width: size, height: size, fontSize: c.kind === "general" ? size * 0.45 : size * 0.33 }}>{c.av}</span>;
 }
 
-/** `embedded`: rendered inside another page (Laun & spjall tabs) — inline
- * instead of the fixed full-bleed panel, so the page's own chrome stays visible. */
-export default function ChatScreen({ initial, embedded = false }: { initial?: ChatInitial; embedded?: boolean }) {
-  if (!initial?.ok) return <DemoChat />;
-  return <Messenger initial={initial} embedded={embedded} />;
+/** VAKTO AI avatar — orange spark badge. */
+function AiAvatar({ size = 44 }: { size?: number }) {
+  return <span className="ai-ava" style={{ width: size, height: size }}><Spark /></span>;
 }
 
-/** "13:45" today, else "24.6." */
-function convTime(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const now = new Date();
-  if (d.toDateString() === now.toDateString()) return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  return `${d.getDate()}.${d.getMonth() + 1}.`;
+/* line icons (lucide style) */
+const I = {
+  back: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6" /></svg>,
+  info: <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></svg>,
+  compose: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>,
+  search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.4-3.4" /></svg>,
+  plus: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" /></svg>,
+  close: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 6l12 12M18 6 6 18" /></svg>,
+  image: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>,
+  mic: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>,
+  file: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg>,
+  settings: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg>,
+  chat: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12Z" /></svg>,
+};
+
+/** `embedded`: rendered inside another page (Laun & spjall tabs) — inline
+ * instead of the fixed full-bleed panel, so the page's own chrome stays visible. */
+export default function ChatScreen({ initial, embedded = false, ai = { enabled: false, demo: false } }: { initial?: ChatInitial; embedded?: boolean; ai?: AiAccess }) {
+  if (!initial?.ok) return <DemoChat />;
+  return <Messenger initial={initial} embedded={embedded} ai={ai} />;
 }
-const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
-const firstName = (s: string) => s.split(/\s+/)[0] || s;
-const visible = () => typeof document === "undefined" || document.visibilityState === "visible";
 
 const TYPING_SEND_EVERY = 2000; // throttle: at most one "typing" broadcast per 2 s
 const TYPING_IDLE_STOP = 3000;  // "stop" after 3 s without a keystroke
@@ -90,21 +102,35 @@ const TYPING_EXPIRE = 4500;     // drop a typer we have not heard from in 4.5 s
 
 type Typer = { name: string; at: number };
 
-function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedded?: boolean }) {
+function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; embedded?: boolean; ai: AiAccess }) {
   const { t } = useLang();
+  const router = useRouter();
   const [convs, setConvs] = useState<Conversation[]>(initial.items);
   const [active, setActive] = useState<Conversation | null>(initial.items[0] ?? null);
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [reads, setReads] = useState<ChannelRead[]>([]);
   const [typers, setTypers] = useState<Record<string, Typer>>({});
   const [val, setVal] = useState("");
   const [search, setSearch] = useState("");
   const [emoji, setEmoji] = useState(false);
   const [rec, setRec] = useState(false);
-  const [modal, setModal] = useState<null | "group" | "info">(null);
+  const [modal, setModal] = useState<null | "new" | "info">(null);
   const [people, setPeople] = useState<Person[]>([]);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [reactFor, setReactFor] = useState<string | null>(null);
+  // VAKTO AI as a pinned conversation (thread column uses the shared assistant UI).
+  const [aiOpen, setAiOpen] = useState(false);
+  const aiChat = useAssistantChat({ demo: ai.demo });
+  // Details panel: docked as a 3rd column at ≥1100px (remembered per user), a slide-over below.
+  const sideKey = `vakto-chat-details:${initial.meId}`;
+  const [wide, setWide] = useState(true);
+  const [sideDocked, setSideDocked] = useState(true);
+  const [sideOver, setSideOver] = useState(false);
+  const [infoVer, setInfoVer] = useState(0);
+  const [flash, setFlash] = useState<string | null>(null);
+  // Relative times ("5 mín") render only after mount — server and browser clocks/time zones differ.
+  const [now, setNow] = useState<number | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -129,9 +155,30 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
 
   // Phone: land on the conversation LIST, not inside the first thread.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- needs the viewport, only known in the browser
     if (window.matchMedia("(max-width: 760px)").matches) setActive(null);
+  }, []);
+
+  // Layout mode, remembered details-panel preference and the relative-time clock.
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1100px)");
+    const onMq = () => { setWide(mq.matches); if (mq.matches) setSideOver(false); };
+    onMq();
+    mq.addEventListener("change", onMq);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- viewport/localStorage/clock exist only after mount (hydration-safe)
+    try { if (localStorage.getItem(sideKey) === "0") setSideDocked(false); } catch { /* private mode */ }
+    setNow(Date.now());
+    const iv = setInterval(() => setNow(Date.now()), 60_000);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSideOver(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { mq.removeEventListener("change", onMq); clearInterval(iv); window.removeEventListener("keydown", onKey); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  function toggleSide() {
+    if (wide) setSideDocked((d) => { try { localStorage.setItem(sideKey, d ? "0" : "1"); } catch { /* private mode */ } return !d; });
+    else setSideOver((o) => !o);
+  }
+  const sideShown = wide ? sideDocked : sideOver;
 
   // Messenger-style keyboard handling: when the iOS keyboard opens it shrinks
   // the visual viewport — raise the fixed panel's bottom by the keyboard height
@@ -177,7 +224,7 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
         : r.messages;
       if (merged.length === r.messages.length) moreRef.current.set(id, r.hasMore);
       cacheRef.current.set(id, merged);
-      if (activeRef.current === id) { setMsgs(merged); setMore(moreRef.current.get(id) ?? false); setReads(r.reads); }
+      if (activeRef.current === id) { setMsgs(merged); setMore(moreRef.current.get(id) ?? false); setReads(r.reads); setLoadedFor(id); }
     });
   }
   /** "Sýna eldri skilaboð": prepend the page before the oldest loaded message. */
@@ -200,6 +247,29 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
     setMsgs(prepend);
     setMore(r.hasMore);
   }
+  /** Search hit → show that message: page back (same cursor as "Sýna eldri") until it is loaded. */
+  async function jumpTo(msgId: string) {
+    const cid = activeRef.current;
+    if (!cid) return;
+    let list = cacheRef.current.get(cid) ?? msgs;
+    let hasMore = moreRef.current.get(cid) ?? more;
+    for (let guard = 0; !list.some((m) => m.id === msgId) && hasMore && guard < 10; guard++) {
+      const oldest = list.find((m) => !m.id.startsWith("tmp-"));
+      if (!oldest) break;
+      const r = await listMessages(cid, { createdAt: oldest.createdAt, id: oldest.id });
+      if (!r.ok || activeRef.current !== cid) return;
+      const seen = new Set(list.map((m) => m.id));
+      list = [...r.messages.filter((m) => !seen.has(m.id)), ...list];
+      hasMore = r.hasMore;
+    }
+    cacheRef.current.set(cid, list); moreRef.current.set(cid, hasMore);
+    atBottomRef.current = false;
+    setMsgs(list); setMore(hasMore);
+    if (!wide) setSideOver(false);
+    setFlash(msgId);
+    setTimeout(() => boxRef.current?.querySelector(`[data-mid="${msgId}"]`)?.scrollIntoView({ block: "center", behavior: "smooth" }), 80);
+    setTimeout(() => setFlash((f) => (f === msgId ? null : f)), 2400);
+  }
   /** Apply a change to one message both on screen and in the thread cache
    * (older pages are not re-fetched by the reconcile, so they update locally). */
   function patchMsg(id: string, fn: (m: ChatMessage) => ChatMessage | null) {
@@ -219,6 +289,7 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
    * `active?.id` effect below does the network refresh + read cursor. */
   function open(c: Conversation) {
     activeRef.current = c.id;
+    setAiOpen(false);
     setActive(c);
     setMsgs(cacheRef.current.get(c.id) ?? []);
     setMore(moreRef.current.get(c.id) ?? false);
@@ -229,6 +300,15 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
     setReactFor(null);
     requestAnimationFrame(() => inputRef.current?.focus());
   }
+  function openAi() {
+    activeRef.current = null;
+    setActive(null);
+    setAiOpen(true);
+    setReplyTo(null);
+    setReactFor(null);
+    aiChat.focus();
+  }
+  function closeThread() { setActive(null); setAiOpen(false); setSideOver(false); }
 
   useEffect(() => { activeRef.current = active?.id ?? null; activeConvRef.current = active; }, [active]);
   const activeConvRef = useRef<Conversation | null>(null);
@@ -378,6 +458,7 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
   // People search — suggestions from the FIRST character (Messenger-style).
   useEffect(() => {
     const q = search.trim();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing the suggestions with the query
     if (!q) { setPeople([]); return; }
     const id = setTimeout(() => searchPeople(q).then(setPeople), 150);
     return () => clearTimeout(id);
@@ -387,10 +468,13 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
     setSearch("");
     const r = await startDM(p.userId);
     if (!r.ok) { toast(r.error ?? "Villa"); return; }
+    await openById(r.id);
+  }
+  async function openById(id?: string) {
     const c = await listConversations();
     if (c.ok) {
       setConvs(c.items);
-      const found = c.items.find((x) => x.id === r.id);
+      const found = c.items.find((x) => x.id === id);
       if (found) open(found);
     }
   }
@@ -487,8 +571,37 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
     } catch { toast("Fékk ekki aðgang að hljóðnema"); }
   }
 
-  const shown = convs.filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()));
+  /** "núna" · "5 mín" · "2 klst" · "3 d" · "2 v" — Messenger-style relative age. */
+  function relTime(iso: string | null): string {
+    if (!iso || now === null) return "";
+    const d = new Date(iso);
+    const mins = Math.max(0, Math.floor((now - d.getTime()) / 60e3));
+    if (mins < 1) return t("chat:now");
+    if (mins < 60) return `${mins} ${t("rt:min")}`;
+    const h = Math.floor(mins / 60);
+    if (h < 24) return `${h} ${t("rt:h")}`;
+    const days = Math.floor(h / 24);
+    if (days < 7) return `${days} ${t("rt:d")}`;
+    if (days < 365) return `${Math.floor(days / 7)} ${t("rt:w")}`;
+    return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`;
+  }
+  function dayLabel(iso: string): string {
+    const d = new Date(iso);
+    const n = new Date();
+    if (d.toDateString() === n.toDateString()) return t("Í dag");
+    if (d.toDateString() === new Date(n.getTime() - 864e5).toDateString()) return t("Í gær");
+    return `${d.getDate()}. ${MO[d.getMonth()]}${d.getFullYear() !== n.getFullYear() ? " " + d.getFullYear() : ""}`;
+  }
+
+  const q = search.trim().toLowerCase();
+  const shown = convs.filter((c) => !q || c.name.toLowerCase().includes(q));
+  const aiShown = ai.enabled && (!q || "vakto ai".includes(q) || q.includes("ai"));
+  const pinned = shown.filter((c) => c.kind === "general");
+  const rest = shown.filter((c) => c.kind !== "general");
   const teamLabel = (c: Conversation) => (c.autoKind === "dept" ? t("Deild") : c.autoKind === "loc" ? t("Staður") : null);
+  const subtitleOf = (c: Conversation) => c.dm ? t("Bein skilaboð") : c.kind === "general" ? t("Allt starfsfólkið") : c.autoKind === "dept" ? t("Deildarrás") : c.autoKind === "loc" ? t("Staðarrás") : t("Grúppa");
+  const nameOf = (c: Conversation) => (c.kind === "general" ? "# " + c.name : c.name);
+  const aiLast = [...aiChat.msgs].reverse().find((m) => m.content.trim());
 
   // Read receipt goes under the LAST message I sent (a real row, not the optimistic one).
   let lastMineIdx = -1;
@@ -501,59 +614,75 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
   const typerNames = Object.values(typers).map((x) => x.name);
   const typingText = typerNames.length === 0 ? "" : typerNames.length === 1 ? `${typerNames[0]} ${t("er að skrifa…")}` : `${typerNames.length} ${t("eru að skrifa…")}`;
 
+  function convRow(c: Conversation) {
+    const un = c.id !== active?.id && c.unread > 0;
+    const label = teamLabel(c);
+    const kindIcon = c.lastKind === "image" ? I.image : c.lastKind === "audio" ? I.mic : c.lastKind === "file" ? I.file : null;
+    const preview = c.last ? (c.lastKind === "image" || c.lastKind === "audio" ? t(c.last) : c.last) : (label ? "" : c.dm ? t("Bein skilaboð") : t("Grúppa"));
+    return (
+      <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}${un ? " un" : ""}`} onClick={() => open(c)} role="button" tabIndex={0}
+        onKeyDown={(e) => { if (e.key === "Enter") open(c); }} title={un ? `${c.unread} ${t("ólesin")}` : undefined}>
+        <ConvAvatar c={c} size={44} />
+        <div className="tx">
+          <b>{nameOf(c)}</b>
+          <span className="pv">
+            <span className="pv-t">
+              {label && <span className="pv-k">{label}{c.last ? " · " : ""}</span>}
+              {c.last && c.lastMine && <>{t("Þú")}: </>}
+              {kindIcon && <span className="pv-i">{kindIcon}</span>}
+              {preview}
+            </span>
+            {c.lastAt && now !== null && <span className="pv-d">· {relTime(c.lastAt)}</span>}
+          </span>
+        </div>
+        {un && <span className="udot" aria-label={`${c.unread} ${t("ólesin")}`} />}
+      </div>
+    );
+  }
+
+  const threadOpen = !!active || aiOpen;
   return (
     <>
-      <div ref={wrapRef} className={`msgr${embedded ? "" : " full"}${active ? " thread-open" : ""}`} style={embedded ? { height: "calc(100dvh - 215px)" } : undefined}>
-        {/* conversation list */}
+      <div ref={wrapRef} className={`msgr${embedded ? "" : " full"}${threadOpen ? " thread-open" : ""}${sideDocked ? " side-docked" : ""}${sideOver ? " side-over" : ""}`} style={embedded ? { height: "calc(100dvh - 215px)" } : undefined}>
+        {/* (a) conversation list */}
         <div className="msgr-list">
-          <div className="msgr-head" style={{ gap: 8 }}>
-            <div className="srchbox" style={{ flex: 1 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.4-3.4" /></svg><input placeholder={t("Leitaðu að spjalli eða manneskju…")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-            <button className="iconbtn" title={t("Ný grúppa")} onClick={() => setModal("group")}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M19 8v6M22 11h-6" /></svg></button>
+          <div className="msgr-lhead">
+            <h2>{t("Spjall")}</h2>
+            <button className="iconbtn soft" title={t("Nýtt spjall")} aria-label={t("Nýtt spjall")} onClick={() => setModal("new")}>{I.compose}</button>
           </div>
-          <div style={{ flex: 1, overflowY: "auto" }}>
-            {search.trim() && (
-              <div className="chat-sec">{t("Samtöl")}</div>
-            )}
-            {search.trim() && shown.length === 0 && (
-              <div className="muted" style={{ fontSize: 12.5, padding: "4px 14px 10px" }}>{t("Ekkert samtal fannst")}</div>
-            )}
-            {shown.map((c) => {
-              const un = c.id !== active?.id && c.unread > 0;
-              const label = teamLabel(c);
-              return (
-                <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}`} onClick={() => open(c)}>
-                  <ConvAvatar c={c} />
-                  <div className="tx">
-                    <b style={un ? { fontWeight: 800 } : undefined}>{c.kind === "general" ? "# " + c.name : c.name}</b>
-                    <span style={un ? { color: "var(--ink)", fontWeight: 600 } : undefined}>
-                      {label && <span style={{ color: "var(--ink3)", fontWeight: 600, fontSize: 11, letterSpacing: ".03em", textTransform: "uppercase" }}>{label}{c.last ? " · " : ""}</span>}
-                      {c.last || (label ? "" : c.dm ? t("Bein skilaboð") : t("Grúppa"))}
-                    </span>
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, marginLeft: "auto", flexShrink: 0 }}>
-                    <span className="muted" style={{ fontSize: 11, fontVariantNumeric: "tabular-nums" }}>{convTime(c.lastAt)}</span>
-                    {un && (
-                      <span style={{ minWidth: 18, height: 18, padding: "0 5px", borderRadius: 999, background: "var(--brand)", color: "#fff", fontSize: 11, fontWeight: 700, lineHeight: "18px", textAlign: "center", fontVariantNumeric: "tabular-nums" }}>
-                        {c.unread > 99 ? "99+" : c.unread}
-                      </span>
-                    )}
-                  </div>
+          <div className="msgr-lsearch">
+            <div className="srchbox">{I.search}<input placeholder={t("Leitaðu að spjalli eða manneskju…")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+          </div>
+          <div className="msgr-convs">
+            {(aiShown || pinned.length > 0) && <div className="chat-sec">{t("Fest")}</div>}
+            {aiShown && (
+              <div className={`conv conv-ai${aiOpen ? " on" : ""}`} onClick={openAi} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") openAi(); }}>
+                <AiAvatar size={44} />
+                <div className="tx">
+                  <b>VAKTO AI</b>
+                  <span className="pv"><span className="pv-t">{aiLast ? (aiLast.role === "user" ? `${t("Þú")}: ` : "") + aiLast.content.replace(/[*#]/g, "").slice(0, 90) : t("Spyrðu um laun, vaktir og tíma")}</span></span>
                 </div>
-              );
-            })}
-            {search.trim() && people.length > 0 && (
+              </div>
+            )}
+            {pinned.map(convRow)}
+            {rest.length > 0 && (aiShown || pinned.length > 0) && <div className="chat-sec">{t("Samtöl")}</div>}
+            {rest.map(convRow)}
+            {q && shown.length === 0 && !aiShown && (
+              <div className="muted" style={{ fontSize: 12.5, padding: "4px 16px 10px" }}>{t("Ekkert samtal fannst")}</div>
+            )}
+            {q && people.length > 0 && (
               <>
                 <div className="chat-sec">{t("Byrja nýtt spjall")}</div>
                 {people
                   .filter((p) => !convs.some((c) => c.dm && c.name === p.name))
                   .map((p) => (
-                    <div key={p.userId} className="conv" onClick={() => openDM(p)}>
-                      <PersonAvatar p={p} size={40} />
+                    <div key={p.userId} className="conv" onClick={() => openDM(p)} role="button" tabIndex={0}>
+                      <PersonAvatar p={p} size={44} />
                       <div className="tx">
                         <b>{p.name}</b>
-                        <span>{t("Senda skilaboð")}</span>
+                        <span className="pv"><span className="pv-t">{t("Senda skilaboð")}</span></span>
                       </div>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ink3)" strokeWidth="2" style={{ marginLeft: "auto", flexShrink: 0 }}><path d="M12 5v14M5 12h14" /></svg>
+                      <span style={{ marginLeft: "auto", color: "var(--ink3)", display: "flex" }}>{I.plus}</span>
                     </div>
                   ))}
               </>
@@ -561,22 +690,33 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
           </div>
         </div>
 
-        {/* thread */}
+        {/* (b) thread */}
         <div className="msgr-thread">
-          {active ? (
+          {aiOpen ? (
             <>
               <div className="msgr-head">
-                <button className="iconbtn mob-back" onClick={() => setActive(null)}><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M15 18l-6-6 6-6" /></svg></button>
-                <ConvAvatar c={active} size={34} />
-                <div
-                  style={{ flex: 1, minWidth: 0, cursor: active.dm ? undefined : "pointer", display: "flex", flexDirection: "column", lineHeight: 1.2 }}
-                  onClick={() => !active.dm && setModal("info")}
-                  title={active.dm ? undefined : t("Upplýsingar")}
-                >
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{active.kind === "general" ? "# " + active.name : active.name}</span>
-                  {teamLabel(active) && <span className="muted" style={{ fontSize: 11, fontWeight: 500 }}>{active.autoKind === "dept" ? t("Deildarrás") : t("Staðarrás")}</span>}
+                <button className="iconbtn mob-back" onClick={closeThread} aria-label={t("Til baka")}>{I.back}</button>
+                <AiAvatar size={40} />
+                <div className="msgr-title" onClick={toggleSide}>
+                  <b>VAKTO AI</b>
+                  <span>{t("Aðstoðarmaður fyrir reksturinn")}</span>
                 </div>
-                {!active.dm && <button className="iconbtn" title={t("Upplýsingar")} onClick={() => setModal("info")}><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></svg></button>}
+                {aiChat.msgs.length > 0 && <button className="iconbtn" title={aiChat.s.reset} aria-label={aiChat.s.reset} onClick={() => { aiChat.fresh(); aiChat.focus(); }}>{I.plus}</button>}
+                <button className={`iconbtn msgr-info${sideShown ? " on" : ""}`} aria-pressed={sideShown} title={t("Upplýsingar")} aria-label={t("Upplýsingar")} onClick={toggleSide}>{I.info}</button>
+              </div>
+              <AssistantMessages chat={aiChat} className="vai-list msgr-ai-list" onUpgrade={() => router.push("/stillingar?tab=askrift#vakto-ai")} />
+              <div className="msgr-ai-foot"><AssistantComposer chat={aiChat} /></div>
+            </>
+          ) : active ? (
+            <>
+              <div className="msgr-head">
+                <button className="iconbtn mob-back" onClick={closeThread} aria-label={t("Til baka")}>{I.back}</button>
+                <ConvAvatar c={active} size={40} />
+                <div className="msgr-title" onClick={toggleSide} title={t("Upplýsingar")}>
+                  <b>{nameOf(active)}</b>
+                  <span>{subtitleOf(active)}</span>
+                </div>
+                <button className={`iconbtn msgr-info${sideShown ? " on" : ""}`} aria-pressed={sideShown} title={t("Upplýsingar")} aria-label={t("Upplýsingar")} onClick={toggleSide}>{I.info}</button>
               </div>
               <div
                 className="msgr-msgs" ref={boxRef}
@@ -589,34 +729,34 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
                 )}
                 {msgs.length ? msgs.map((m, mi) => {
                   const g = groupFlags(msgs, mi);
+                  const img = isImage(m.kind, m.url, m.body);
                   return (
                   <React.Fragment key={m.id}>
-                  {g.newDay && <div className="day-sep"><span>{dayLabel(m.createdAt)}</span></div>}
-                  <div className={`mrow ${m.me ? "me" : "them"}${m.reactions.length ? " hasre" : ""}${g.first ? " g-first" : ""}${g.last ? " g-last" : " g-mid"}`}>
+                  {g.sep && <div className="day-sep"><span>{dayLabel(m.createdAt)} {hhmm(m.createdAt)}</span></div>}
+                  {!m.me && !active.dm && g.first && <div className="m-who">{m.sender}</div>}
+                  <div data-mid={m.id} className={`mrow ${m.me ? "me" : "them"}${m.reactions.length ? " hasre" : ""}${g.first ? " g-first" : ""}${g.last ? " g-last" : " g-mid"}${flash === m.id ? " flash" : ""}`}>
                     {!m.me && (
                       <span className="m-ava" style={{ visibility: g.last ? "visible" : "hidden" }}>
                         {m.photo ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img className="avt-img" src={m.photo} alt="" style={{ width: 28, height: 28 }} />
+                          <img className="avt-img" src={m.photo} alt="" style={{ width: 30, height: 30 }} />
                         ) : (
-                          <span className="avt" style={{ background: "var(--brand-soft)", color: "var(--brand)", width: 28, height: 28, fontSize: 10.5, fontWeight: 700 }}>
+                          <span className="avt" style={{ background: "var(--brand-soft)", color: "var(--brand)", width: 30, height: 30, fontSize: 11, fontWeight: 700 }}>
                             {m.sender.slice(0, 2).toUpperCase()}
                           </span>
                         )}
                       </span>
                     )}
-                    <div className={`mbub ${m.me ? "me" : "them"}`}>
-                      {!m.me && !active.dm && g.first && <span className="who" style={{ color: "var(--brand)" }}>{m.sender}</span>}
+                    <div className={`mbub ${m.me ? "me" : "them"}${img ? " media" : ""}`} title={`${dayLabel(m.createdAt)} ${hhmm(m.createdAt)}`}>
                       {m.replyTo && (
                         <span className="mreply"><b>{m.replyTo.sender}</b><span>{m.replyTo.body}</span></span>
                       )}
-                      {m.url && (m.kind === "image" || (m.kind === "file" && (IMG_RE.test(m.url) || IMG_RE.test(m.body))))
+                      {img
                         // eslint-disable-next-line @next/next/no-img-element
-                        ? <a href={m.url} target="_blank" rel="noreferrer"><img src={m.url} alt="" /></a>
+                        ? <a href={m.url!} target="_blank" rel="noreferrer"><img src={m.url!} alt="" /></a>
                         : m.kind === "audio" && m.url ? <audio controls src={m.url} style={{ height: 36 }} />
-                          : m.kind === "file" && m.url ? <a className="mfile" href={m.url} target="_blank" rel="noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg><span>{m.body || t("Skjal")}</span></a>
+                          : m.kind === "file" && m.url ? <a className="mfile" href={m.url} target="_blank" rel="noreferrer">{I.file}<span>{m.body || t("Skjal")}</span></a>
                             : m.body}
-                      {g.last && <span className="tm">{m.at}</span>}
                       {m.reactions.length > 0 && (
                         <span className="mreacts" onClick={() => react(m, m.reactions[0].emoji)}>
                           {m.reactions.map((r) => <span key={r.emoji}>{r.emoji}{r.count > 1 ? <b>{r.count}</b> : null}</span>)}
@@ -643,24 +783,33 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
                     </div>
                   </div>
                   {mi === lastMineIdx && seenText && (
-                    <div className="muted" style={{ alignSelf: "flex-end", fontSize: 11, marginTop: m.reactions.length ? 6 : -2, paddingRight: 4 }}>{seenText}</div>
+                    <div className="m-seen" style={{ marginTop: m.reactions.length ? 6 : 0 }}>{seenText}</div>
                   )}
                   </React.Fragment>
                   );
-                }) : <div className="muted" style={{ textAlign: "center", margin: "auto", fontSize: 13 }}>{t("Engin skilaboð enn — byrjaðu spjallið!")}</div>}
+                }) : loadedFor === active.id ? (
+                  <div className="msgr-empty">
+                    <ConvAvatar c={active} size={76} />
+                    <b>{nameOf(active)}</b>
+                    <span className="side-sub">{subtitleOf(active)}</span>
+                    <p>{t("Engin skilaboð enn — byrjaðu spjallið!")}</p>
+                  </div>
+                ) : (
+                  <div className="msgr-skel" aria-hidden="true">
+                    <i className="sk-line" style={{ width: "42%" }} /><i className="sk-line me" style={{ width: "34%" }} /><i className="sk-line" style={{ width: "55%" }} />
+                  </div>
+                )}
                 <div ref={endRef} />
               </div>
               {/* typing indicator — fixed height so the composer never jumps */}
-              <div className="muted" aria-live="polite" style={{ height: 18, lineHeight: "18px", fontSize: 12, padding: "0 16px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", background: "var(--bg)" }}>
-                {typingText}
-              </div>
+              <div className="msgr-typing" aria-live="polite">{typingText}</div>
               {replyTo && (
                 <div className="replybar">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 17l-5-5 5-5" /><path d="M4 12h11a5 5 0 0 1 5 5v2" /></svg>
                   <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                    <b>{t("Svarar")} {replyTo.sender}:</b> {replyTo.kind === "image" ? "📷" : replyTo.kind === "audio" ? "🎤" : replyTo.body}
+                    <b>{t("Svarar")} {replyTo.sender}:</b> {replyTo.kind === "image" ? t("Mynd") : replyTo.kind === "audio" ? t("Talskilaboð") : replyTo.body}
                   </span>
-                  <button className="iconbtn" onClick={() => setReplyTo(null)} style={{ width: 24, height: 24 }}>✕</button>
+                  <button className="iconbtn" onClick={() => setReplyTo(null)} style={{ width: 24, height: 24 }} aria-label={t("Loka")}>{I.close}</button>
                 </div>
               )}
               {emoji && <div className="emojibar">{EMOJIS.map((e) => <button key={e} onClick={() => { setVal((v) => v + e); sendTyping(); }}>{e}</button>)}</div>}
@@ -683,13 +832,156 @@ function Messenger({ initial, embedded = false }: { initial: ChatInitial; embedd
                 <input ref={fileRef} type="file" accept="image/*,image/gif" hidden onChange={onFile} />
               </div>
             </>
-          ) : <div className="muted" style={{ margin: "auto", fontSize: 14 }}>{t("Veldu spjall")}</div>}
+          ) : (
+            <div className="msgr-empty">
+              <span className="msgr-empty-ic">{I.chat}</span>
+              <p>{t("Veldu spjall")}</p>
+            </div>
+          )}
         </div>
+
+        {/* (c) details panel */}
+        {threadOpen && (
+          <>
+            <div className="msgr-scrim" onClick={() => setSideOver(false)} />
+            <aside className="msgr-side" aria-label={t("Upplýsingar")}>
+              <button className="iconbtn msgr-side-x" onClick={() => (wide ? toggleSide() : setSideOver(false))} aria-label={t("Loka")}>{I.close}</button>
+              {aiOpen
+                ? <AiDetails chat={aiChat} show={sideShown} />
+                : active && <ConvDetails key={active.id} conv={active} subtitle={subtitleOf(active)} name={nameOf(active)} version={infoVer} show={sideShown}
+                  onManage={() => setModal("info")} onJump={jumpTo} dayLabel={dayLabel} />}
+            </aside>
+          </>
+        )}
       </div>
 
-      {modal === "group" && <NewGroupModal onClose={() => setModal(null)} onDone={(id) => { setModal(null); listConversations().then((c) => { if (c.ok) { setConvs(c.items); const f = c.items.find((x) => x.id === id); if (f) open(f); } }); }} />}
-      {modal === "info" && active && <InfoModal conv={active} onClose={() => setModal(null)} onLeft={() => { setModal(null); setActive(null); reloadConvs(); }} onChanged={reloadConvs} />}
+      {modal === "new" && <NewChatModal onClose={() => setModal(null)} onDone={(id) => { setModal(null); void openById(id); }} />}
+      {modal === "info" && active && <InfoModal conv={active} onClose={() => setModal(null)} onLeft={() => { setModal(null); setActive(null); reloadConvs(); }} onChanged={() => { reloadConvs(); setInfoVer((v) => v + 1); }} />}
     </>
+  );
+}
+
+/** Details for a channel: big avatar, search in the thread, members, media & files. */
+function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, dayLabel }: {
+  conv: Conversation; name: string; subtitle: string; version: number; show: boolean;
+  onManage: () => void; onJump: (id: string) => void; dayLabel: (iso: string) => string;
+}) {
+  const { t } = useLang();
+  const [members, setMembers] = useState<Members | null>(null);
+  const [media, setMedia] = useState<ChatMedia[] | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<ChatHit[] | null>(null);
+  const group = !conv.dm && conv.kind !== "general";
+  const manageable = conv.kind === "group";
+
+  // Loaded only while the panel is visible — closed panels cost no queries.
+  useEffect(() => {
+    if (!show) return;
+    if (group) listMembers(conv.id).then(setMembers);
+    listChatMedia(conv.id).then(setMedia);
+  }, [show, conv.id, group, version]);
+  useEffect(() => {
+    const term = q.trim();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing the hits with the query
+    if (term.length < 2) { setHits(null); return; }
+    const id = setTimeout(() => searchChannelMessages(conv.id, term).then(setHits), 250);
+    return () => clearTimeout(id);
+  }, [q, conv.id]);
+
+  const pics = (media ?? []).filter((m) => isImage(m.kind, m.url, m.name));
+  const files = (media ?? []).filter((m) => !isImage(m.kind, m.url, m.name));
+  return (
+    <div className="side-in">
+      <div className="side-hero">
+        <ConvAvatar c={conv} size={80} />
+        <b>{name}</b>
+        <span className="side-sub">{subtitle}{members ? ` · ${members.members.length} ${t("meðlimir")}` : ""}</span>
+      </div>
+      <div className="side-acts">
+        <button className={searching ? "on" : ""} onClick={() => { setSearching((s) => !s); setQ(""); }}>
+          <span>{I.search}</span>{t("Leita")}
+        </button>
+        {manageable && <button onClick={onManage}><span>{I.settings}</span>{t("Stjórna grúppu")}</button>}
+      </div>
+      {searching && (
+        <div className="side-sec">
+          <div className="srchbox">{I.search}<input autoFocus placeholder={t("Leita í samtali")} value={q} onChange={(e) => setQ(e.target.value)} /></div>
+          {hits && (hits.length ? (
+            <div className="side-hits">
+              {hits.map((h) => (
+                <button key={h.id} className="side-hit" onClick={() => onJump(h.id)}>
+                  <small>{h.sender === "Ég" ? t("Þú") : h.sender} · {dayLabel(h.createdAt)}</small>
+                  <span>{h.body}</span>
+                </button>
+              ))}
+            </div>
+          ) : <p className="side-muted">{t("Engar niðurstöður")}</p>)}
+        </div>
+      )}
+      {group && (
+        <div className="side-sec">
+          <div className="side-h">{t("Meðlimir")}{members ? ` · ${members.members.length}` : ""}</div>
+          {members === null ? <i className="sk-line" style={{ height: 34, display: "block" }} /> : (
+            <div className="side-people">
+              {members.members.map((p) => (
+                <div key={p.userId} className="side-person">
+                  <PersonAvatar p={p} size={34} />
+                  <span>{p.name}{p.userId === members.adminId ? <small> · {t("stofnandi")}</small> : null}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      <div className="side-sec">
+        <div className="side-h">{t("Myndir og skrár")}</div>
+        {media === null ? <i className="sk-line" style={{ height: 70, display: "block" }} />
+          : media.length === 0 ? <p className="side-muted">{t("Engar myndir eða skrár enn")}</p> : (
+            <>
+              {pics.length > 0 && (
+                <div className="side-grid">
+                  {pics.map((m) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <a key={m.id} href={m.url} target="_blank" rel="noreferrer"><img src={m.url} alt="" loading="lazy" /></a>
+                  ))}
+                </div>
+              )}
+              {files.map((m) => (
+                <a key={m.id} className="side-file" href={m.url} target="_blank" rel="noreferrer">
+                  <span>{m.kind === "audio" ? I.mic : I.file}</span>
+                  <b>{m.kind === "audio" ? t("Talskilaboð") : (m.name || t("Skjal"))}</b>
+                  <small>{dayLabel(m.createdAt)}</small>
+                </a>
+              ))}
+            </>
+          )}
+      </div>
+    </div>
+  );
+}
+
+/** Details for VAKTO AI: new conversation + earlier conversations (history). */
+function AiDetails({ chat, show }: { chat: AssistantChat; show: boolean }) {
+  const { t } = useLang();
+  const { s } = chat;
+  useEffect(() => { if (show) void chat.loadHistory(); }, [show]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="side-in">
+      <div className="side-hero">
+        <AiAvatar size={80} />
+        <b>VAKTO AI</b>
+        <span className="side-sub">{t("Aðstoðarmaður fyrir reksturinn")}</span>
+      </div>
+      <div className="side-acts">
+        <button onClick={() => { chat.fresh(); chat.focus(); }}><span>{I.plus}</span>{s.reset}</button>
+      </div>
+      <div className="side-sec">
+        <div className="side-h">{s.history}</div>
+        <div className="vai-hist side-ai-hist"><AssistantHistoryList chat={chat} /></div>
+      </div>
+      <p className="side-muted" style={{ padding: "0 18px" }}>{s.note}</p>
+    </div>
   );
 }
 
@@ -700,7 +992,7 @@ function PeoplePicker({ selected, onToggle }: { selected: Set<string>; onToggle:
   useEffect(() => { const id = setTimeout(() => searchPeople(q).then(setPeople), 200); return () => clearTimeout(id); }, [q]);
   return (
     <>
-      <div className="srchbox" style={{ marginBottom: 10 }}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.4-3.4" /></svg><input autoFocus placeholder={t("Leita að starfsmanni")} value={q} onChange={(e) => setQ(e.target.value)} /></div>
+      <div className="srchbox" style={{ marginBottom: 10 }}>{I.search}<input autoFocus placeholder={t("Leita að starfsmanni")} value={q} onChange={(e) => setQ(e.target.value)} /></div>
       <div className="att" style={{ maxHeight: "44vh", overflowY: "auto" }}>
         {people.length ? people.map((p) => (
           <div className="it rowlink" key={p.userId} onClick={() => onToggle(p)}>
@@ -714,17 +1006,20 @@ function PeoplePicker({ selected, onToggle }: { selected: Set<string>; onToggle:
   );
 }
 
-function NewGroupModal({ onClose, onDone }: { onClose: () => void; onDone: (id: string) => void }) {
+/** New chat: one person → direct message; several → a named group. */
+function NewChatModal({ onClose, onDone }: { onClose: () => void; onDone: (id: string) => void }) {
   const { t } = useLang();
   const [name, setName] = useState("");
   const [sel, setSel] = useState<Person[]>([]);
   const [busy, setBusy] = useState(false);
   const ids = new Set(sel.map((p) => p.userId));
+  const isGroup = sel.length > 1;
   function toggle(p: Person) { setSel((s) => ids.has(p.userId) ? s.filter((x) => x.userId !== p.userId) : [...s, p]); }
   async function create() {
-    if (!name.trim()) { toast("Sláðu inn heiti"); return; }
+    if (!sel.length) { toast(t("Veldu meðlimi")); return; }
+    if (isGroup && !name.trim()) { toast("Sláðu inn heiti"); return; }
     setBusy(true);
-    const r = await createGroup(name, sel.map((p) => p.userId));
+    const r = isGroup ? await createGroup(name, sel.map((p) => p.userId)) : await startDM(sel[0].userId);
     setBusy(false);
     if (r.ok && r.id) onDone(r.id); else toast(r.error ?? "Villa");
   }
@@ -732,14 +1027,14 @@ function NewGroupModal({ onClose, onDone }: { onClose: () => void; onDone: (id: 
     <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="mbg" onClick={onClose} />
       <div className="modal">
-        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Ný grúppa")}</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Nýtt spjall")}</div><button className="x" onClick={onClose}>✕</button></div>
         <div className="mb">
-          <div className="field"><label>{t("Heiti grúppu")}</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("t.d. Eldhús, Kvöldvakt…")} /></div>
-          {sel.length > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>{sel.map((p) => <span key={p.userId} className="tag" style={{ background: "var(--brand-soft)", color: "var(--brand)" }}>{p.name} ✕</span>)}</div>}
+          {sel.length > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>{sel.map((p) => <span key={p.userId} className="tag" style={{ background: "var(--brand-soft)", color: "var(--brand)", cursor: "pointer" }} onClick={() => toggle(p)}>{p.name} ✕</span>)}</div>}
+          {isGroup && <div className="field"><label>{t("Heiti grúppu")}</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("t.d. Eldhús, Kvöldvakt…")} /></div>}
           <label className="muted" style={{ fontSize: 12, display: "block", marginBottom: 6 }}>{t("Veldu meðlimi")}</label>
           <PeoplePicker selected={ids} onToggle={toggle} />
           <div style={{ display: "flex", gap: 9, marginTop: 12 }}>
-            <button className="btn" disabled={busy} onClick={create}>{t("Búa til grúppu")}</button>
+            <button className="btn" disabled={busy || !sel.length} onClick={create}>{isGroup ? t("Búa til grúppu") : t("Senda skilaboð")}</button>
             <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
           </div>
         </div>
@@ -762,9 +1057,9 @@ function InfoModal({ conv, onClose, onLeft, onChanged }: { conv: Conversation; o
   // Department/location channels mirror settings: no rename, no leaving.
   const team = !!conv.autoKind;
   const kindLabel = conv.autoKind === "dept" ? t("Deildarrás") : conv.autoKind === "loc" ? t("Staðarrás") : t("Grúppa");
-  async function remove(p: Person) { const r = await removeMember(conv.id, p.userId); if (r.ok) reload(); else toast(r.error ?? "Villa"); }
+  async function remove(p: Person) { const r = await removeMember(conv.id, p.userId); if (r.ok) { reload(); onChanged(); } else toast(r.error ?? "Villa"); }
   async function leave() { if (!window.confirm(`Hætta í „${conv.name}"?`)) return; const r = await leaveChannel(conv.id); if (r.ok) onLeft(); else toast(r.error ?? "Villa"); }
-  async function add(p: Person) { const r = await addMembers(conv.id, [p.userId]); if (r.ok) { reload(); setAdding(false); } else toast(r.error ?? "Villa"); }
+  async function add(p: Person) { const r = await addMembers(conv.id, [p.userId]); if (r.ok) { reload(); setAdding(false); onChanged(); } else toast(r.error ?? "Villa"); }
   async function saveName() {
     const r = await renameChannel(conv.id, nameVal);
     if (r.ok) { setEditingName(false); onChanged(); toast(t("Heiti breytt")); } else toast(r.error ?? "Villa");

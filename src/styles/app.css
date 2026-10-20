@@ -889,19 +889,19 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 @keyframes sk{0%{background-position:100% 0}100%{background-position:-100% 0}}
 
 /* ---- Messenger-style chat ---- */
-.msgr{display:flex;height:calc(100dvh - 150px);min-height:460px;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--panel);box-shadow:var(--shadow-card);margin-top:8px}
-.msgr-list{width:308px;border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
+.msgr{--msg-them:#eff0f3;position:relative;display:flex;height:calc(100dvh - 150px);min-height:460px;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--panel);box-shadow:var(--shadow-card);margin-top:8px}
+.msgr-list{width:340px;flex-shrink:0;border-right:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
 .msgr-thread{flex:1;display:flex;flex-direction:column;min-width:0}
-.msgr-head{padding:11px 14px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;font-weight:650;font-size:14.5px}
-.msgr-msgs{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:16px;display:flex;flex-direction:column;gap:7px;background:var(--bg)}
+.msgr-head{padding:10px 14px;min-height:62px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;font-weight:650;font-size:14.5px}
+.msgr-msgs{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:16px 18px 10px;display:flex;flex-direction:column;gap:2px;background:var(--panel)}
 .msgr-input{border-top:1px solid var(--line);padding:9px 11px;display:flex;align-items:center;gap:6px}
 .msgr-input .txt{flex:1;border:1px solid var(--line);border-radius:999px;padding:9px 15px;font-size:14px;outline:none;background:var(--panel)}
-.conv{display:flex;gap:11px;padding:10px 13px;cursor:pointer;align-items:center}
+.conv{display:flex;gap:12px;padding:8px 10px;margin:0 8px;border-radius:12px;cursor:pointer;align-items:center}
 .conv:hover{background:var(--line2)} .conv.on{background:var(--brand-soft)}
-.conv .tx{min-width:0;flex:1} .conv .tx b{font-size:13.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .conv .tx span{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
-.mbub{max-width:74%;padding:8px 12px;border-radius:15px;font-size:13.5px;line-height:1.42;word-break:break-word}
-.mbub.them{background:var(--panel);border:1px solid var(--line);align-self:flex-start;border-bottom-left-radius:4px}
-.mbub.me{background:var(--brand);color:#fff;align-self:flex-end;border-bottom-right-radius:4px}
+.conv .tx{min-width:0;flex:1} .conv .tx b{font-size:14.5px;font-weight:600;color:var(--ink);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .conv .tx span{font-size:12px;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.mbub{max-width:74%;padding:8px 13px;border-radius:18px;font-size:14.5px;line-height:1.42;word-break:break-word}
+.mbub.them{background:var(--msg-them);color:var(--ink);align-self:flex-start}
+.mbub.me{background:var(--brand);color:#fff;align-self:flex-end}
 .mbub img{max-width:240px;border-radius:11px;display:block}
 .mbub .who{font-size:11px;font-weight:700;display:block;margin-bottom:2px;color:var(--brand)}
 .mbub .tm{font-size:10px;opacity:.65;display:block;text-align:right;margin-top:3px}
@@ -918,12 +918,12 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 .acp-item.on{background:var(--brand-soft);color:var(--brand-deep)}
 
 /* ---- Messenger-style extras: rows w/ hover actions, reactions, replies ---- */
-.chat-sec{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:12px 14px 5px}
-.day-sep{display:flex;justify-content:center;margin:10px 0 4px}
-.day-sep span{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--ink3);background:var(--line2);border-radius:999px;padding:4px 13px}
+.chat-sec{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding:12px 18px 6px}
+.day-sep{display:flex;justify-content:center;margin:14px 0 6px}
+.day-sep span{font-size:11.5px;font-weight:600;color:var(--ink3)}
 .m-ava{align-self:flex-end;margin-bottom:2px;flex-shrink:0}
 /* grouped bubbles: tighter spacing + squared inner corners like Messenger */
-.mrow.g-mid,.mrow.g-last:not(.g-first){margin-top:-3px}
+.mrow.g-first{margin-top:6px}
 .mrow.them.g-first:not(.g-last) .mbub{border-bottom-left-radius:6px}
 .mrow.them.g-mid .mbub{border-top-left-radius:6px;border-bottom-left-radius:6px}
 .mrow.them.g-last:not(.g-first) .mbub{border-top-left-radius:6px}
@@ -944,7 +944,7 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 .msgr-send:hover{transform:scale(1.06)}
 .msgr-send:disabled{background:var(--line);color:var(--ink3);cursor:default;transform:none}
 .avt-img{border-radius:50%;object-fit:cover;flex-shrink:0;display:block}
-.mrow{display:flex;align-items:flex-end;gap:4px;max-width:74%}
+.mrow{display:flex;align-items:flex-end;gap:8px;max-width:74%}
 .mrow.me{flex-direction:row-reverse;align-self:flex-end}
 .mrow.them{align-self:flex-start}
 .mrow .mbub{max-width:100%;position:relative}
@@ -974,7 +974,7 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 .mob-back{display:none}
 @media(max-width:900px){
   .msgr{height:calc(100dvh - 130px)}
-  .msgr-list{width:100%}
+  .msgr-list{width:100%;border-right:0}
   .msgr.thread-open .msgr-list{display:none}
   .msgr:not(.thread-open) .msgr-thread{display:none}
   .mob-back{display:flex}
@@ -983,6 +983,118 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 /* full-bleed chat — fills the content area edge to edge, fixed */
 .msgr.full{position:fixed;top:calc(66px + var(--appbars-h,0px));left:250px;right:0;bottom:0;height:auto;min-height:0;margin:0;border:0;border-radius:0;box-shadow:none;z-index:20}
 @media(max-width:760px){.msgr.full{left:0}}
+
+/* ---- Spjallrásir v2: Messenger-útlit á tölvu (okt. 2026) ----
+   ≥1100px: listi · þráður · upplýsingar (dálkur). 901–1099px: listi · þráður, upplýsingar renna inn.
+   ≤900px: listi → þráður eins og áður. */
+html.dark .msgr{--msg-them:#262833}
+.msgr-lhead{display:flex;align-items:center;gap:8px;padding:16px 16px 4px}
+.msgr-lhead h2{flex:1;margin:0;font-size:22px;font-weight:700;letter-spacing:-.01em;color:var(--ink)}
+.iconbtn.soft{background:var(--line2);color:var(--ink)}
+.iconbtn.soft:hover{background:var(--line)}
+.msgr-lsearch{padding:8px 16px 8px}
+.msgr-lsearch .srchbox,.side-sec .srchbox{display:flex;width:100%;border-radius:999px;height:38px;border-color:transparent}
+.msgr-lsearch .srchbox input,.side-sec .srchbox input{width:100%;font-size:13.5px}
+.msgr-lsearch .srchbox:focus-within,.side-sec .srchbox:focus-within{border-color:var(--brand)}
+.msgr-convs{flex:1;overflow-y:auto;padding-bottom:12px}
+.conv .tx .pv{display:flex;gap:4px;font-size:12.5px;color:var(--ink3);min-width:0;margin-top:2px}
+.conv .tx .pv span{display:inline;font-size:inherit;color:inherit}
+.conv .tx .pv .pv-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.conv .tx .pv .pv-d{flex-shrink:0;white-space:nowrap}
+.conv .tx .pv .pv-k{font-weight:650;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase}
+.conv .tx .pv .pv-i{display:inline-flex;vertical-align:-2px;margin-right:4px}
+.conv.un .tx b{font-weight:750}
+.conv.un .tx .pv,.conv.un .tx .pv .pv-t{color:var(--ink);font-weight:600}
+.udot{width:11px;height:11px;border-radius:50%;background:var(--brand);flex-shrink:0;margin-left:auto}
+.ai-ava{border-radius:50%;background:linear-gradient(135deg,var(--brand-2),var(--brand));color:#fff;display:inline-grid;place-items:center;flex-shrink:0}
+.ai-ava svg{width:46%;height:46%;fill:currentColor}
+.msgr-title{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25;cursor:pointer}
+.msgr-title b{font-size:15px;font-weight:650;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msgr-title span{font-size:12px;color:var(--ink3);font-weight:500}
+.msgr-head .iconbtn{color:var(--brand)}
+.msgr-head .iconbtn:hover,.msgr-head .iconbtn.on{background:var(--brand-soft)}
+.m-who{font-size:11.5px;color:var(--ink3);margin:8px 0 2px 51px;align-self:flex-start}
+.m-seen{align-self:flex-end;font-size:11px;color:var(--ink3);padding-right:4px;margin-top:2px}
+.mbub.media{background:none;padding:0}
+.mbub.media img{max-width:280px;border-radius:16px}
+.mrow.flash .mbub{animation:mflash 2.2s ease}
+@keyframes mflash{0%,45%{box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 55%,transparent)}100%{box-shadow:0 0 0 0 transparent}}
+.msgr-typing{height:20px;line-height:20px;font-size:12px;padding:0 18px;color:var(--ink3);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;background:var(--panel);flex-shrink:0}
+.msgr-thread .msgr-input{border-top:0;padding-bottom:12px}
+.msgr-empty{margin:auto;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;padding:24px;color:var(--ink3)}
+.msgr-empty b{font-size:17px;color:var(--ink);margin-top:10px}
+.msgr-empty .side-sub{font-size:13px}
+.msgr-empty p{font-size:13.5px;margin:12px 0 0}
+.msgr-empty-ic{width:64px;height:64px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center}
+.msgr-skel{display:flex;flex-direction:column;gap:12px;margin-top:auto;padding-bottom:8px}
+.msgr-skel i{height:34px;border-radius:18px;display:block}
+.msgr-skel i.me{align-self:flex-end}
+/* VAKTO AI í þræðinum — miðjaður dálkur (eins og Grok/ChatGPT) */
+.msgr-ai-list{flex:1;background:var(--panel);padding:24px max(18px,calc((100% - 760px) / 2)) 16px}
+.msgr-ai-list .vai-msg.assistant .vai-bub{background:var(--msg-them)}
+.msgr-ai-list .vai-bub{font-size:14.5px;max-width:84%}
+.msgr-ai-list .vai-msg.assistant{align-items:flex-start}
+.msgr-ai-list .vai-hello{margin:auto 0;padding:8px 0}
+.msgr-ai-list .vai-hello p{font-size:15px}
+.msgr-ai-list .vai-chips{flex-direction:row;flex-wrap:wrap}
+.msgr-ai-list .vai-chips button{background:var(--msg-them);border-radius:999px;padding:9px 14px}
+.msgr-ai-foot{padding:0 max(12px,calc((100% - 784px) / 2));background:var(--panel)}
+.msgr-ai-foot .vai-in{border-top:0;padding:6px 0}
+.msgr-ai-foot .vai-in textarea{border-radius:22px;background:var(--line2);border-color:transparent;padding:11px 16px}
+.msgr-ai-foot .vai-in textarea:focus{background:var(--panel);border-color:var(--brand)}
+.msgr-ai-foot .vai-in button{border-radius:50%}
+.msgr-ai-foot .vai-note{padding-bottom:12px}
+/* upplýsingadálkur */
+.msgr-side{display:none;width:320px;flex-shrink:0;border-left:1px solid var(--line);background:var(--panel);overflow-y:auto;position:relative;flex-direction:column}
+.msgr-scrim{display:none}
+.msgr-side-x{position:absolute;top:10px;right:10px;z-index:1}
+@media(min-width:1100px){
+  .msgr.side-docked .msgr-side{display:flex}
+  .msgr-side-x{display:none}
+}
+@media(min-width:1100px) and (max-width:1279px){
+  .msgr-thread .mrow{max-width:84%}
+  .msgr-list{width:310px}
+  .msgr-side{width:290px}
+}
+@media(min-width:901px) and (max-width:1099px){
+  .msgr-list{width:300px}
+}
+@media(max-width:1099px){
+  .msgr.side-over .msgr-side{display:flex;position:absolute;top:0;right:0;bottom:0;width:min(360px,100%);z-index:8;box-shadow:-18px 0 40px -20px rgba(0,0,0,.35);animation:side-in .18s ease}
+  .msgr.side-over .msgr-scrim{display:block;position:absolute;inset:0;background:rgba(15,16,20,.28);z-index:7}
+}
+@media(max-width:760px){.msgr.side-over .msgr-side{width:100%}}
+@keyframes side-in{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+.side-in{display:flex;flex-direction:column;padding-bottom:20px}
+.side-hero{display:flex;flex-direction:column;align-items:center;text-align:center;gap:4px;padding:28px 18px 12px}
+.side-hero b{font-size:17px;font-weight:700;margin-top:10px;color:var(--ink)}
+.side-hero .side-sub{font-size:12.5px;color:var(--ink3)}
+.side-acts{display:flex;justify-content:center;gap:22px;padding:6px 18px 16px}
+.side-acts button{display:flex;flex-direction:column;align-items:center;gap:6px;font:inherit;font-size:12px;color:var(--ink2);background:none;border:0;cursor:pointer}
+.side-acts button>span{width:38px;height:38px;border-radius:50%;background:var(--line2);display:grid;place-items:center;color:var(--ink)}
+.side-acts button>span svg{width:17px;height:17px}
+.side-acts button.on>span,.side-acts button:hover>span{background:var(--brand-soft);color:var(--brand)}
+.side-sec{padding:14px 18px 6px;border-top:1px solid var(--line2);display:flex;flex-direction:column;gap:8px}
+.side-h{font-size:13px;font-weight:650;color:var(--ink)}
+.side-muted{font-size:12.5px;color:var(--ink3);margin:0;line-height:1.5}
+.side-hits{display:flex;flex-direction:column;gap:2px;max-height:280px;overflow:auto}
+.side-hit{text-align:left;font:inherit;background:none;border:0;border-radius:10px;padding:7px 9px;cursor:pointer;display:flex;flex-direction:column;gap:2px;color:var(--ink)}
+.side-hit:hover{background:var(--line2)}
+.side-hit small{font-size:11px;color:var(--ink3)}
+.side-hit span{font-size:13px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.side-people{display:flex;flex-direction:column;gap:2px;max-height:320px;overflow:auto}
+.side-person{display:flex;align-items:center;gap:10px;padding:5px 2px;font-size:13.5px;color:var(--ink)}
+.side-person small{color:var(--ink3)}
+.side-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+.side-grid a{aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--line2);display:block}
+.side-grid img{width:100%;height:100%;object-fit:cover;display:block}
+.side-file{display:flex;align-items:center;gap:10px;padding:7px 4px;border-radius:9px;color:var(--ink);text-decoration:none;font-size:13px}
+.side-file:hover{background:var(--line2)}
+.side-file>span{width:32px;height:32px;border-radius:8px;background:var(--line2);display:grid;place-items:center;flex-shrink:0;color:var(--ink2)}
+.side-file b{flex:1;min-width:0;font-weight:550;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side-file small{color:var(--ink3);font-size:11px;flex-shrink:0}
+.side-ai-hist{padding:0;flex:none}
 
 /* ---- collapsible sidebar (icon rail) ---- */
 .railtog{margin-left:auto;width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--ink3);flex-shrink:0}
@@ -1510,7 +1622,6 @@ a.db2-who:hover span{color:var(--brand)}
 .rowlink:hover .rep-dl{color:var(--brand);border-color:var(--brand-2)}
 
 /* Í spjallinu situr hnappurinn ofan við sendingarreitinn */
-.vai-fab.up{bottom:96px}
 
 /* ── Launakeyrslur: söguleg súlurit + merki ── */
 .phc{display:flex;gap:10px;height:250px;margin-top:6px}
