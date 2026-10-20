@@ -51,6 +51,9 @@
 .ah-btn-lg{font-size:17px;padding:15px 30px}
 .ah-link{color:#b85309!important;font-weight:600;font-size:16px}
 .ah-link:hover{text-decoration:underline}
+.ah-demo{background:none;border:0;padding:0;cursor:pointer;font-family:inherit}
+.ah-demo:disabled{opacity:.6;cursor:default}
+.ah-demo-err{flex-basis:100%;text-align:center;font-size:14px;color:#b42318}
 
 /* ---------- letur ---------- */
 .ah-eyebrow{color:var(--brand);font-weight:600;font-size:15px;letter-spacing:.01em;margin:0 0 14px}

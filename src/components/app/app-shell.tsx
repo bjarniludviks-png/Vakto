@@ -13,6 +13,7 @@ import { TopSearch } from "./top-search";
 import { ChatBadge } from "./chat-badge";
 import { AssistantPanel } from "./assistant-panel";
 import { ImpersonationBar } from "./impersonation-bar";
+import { DemoBar } from "./demo-bar";
 
 // Hnappurinn í reikningsvalmyndinni flettir í gegnum málin og sýnir nafn næsta máls.
 const LANG_CYCLE: Record<Lang, Lang> = { is: "en", en: "vi", vi: "pl", pl: "is" };
@@ -29,6 +30,8 @@ export type Account = {
   role: Role;
   /** SaaS-owner super-admin (email allowlist) — shows the VAKTO Admin menu entry. */
   vaktoAdmin?: boolean;
+  /** Opna demo-fyrirtækið (DEMO_COMPANY_ID) — demo-rönd, útskráning aðeins þessarar lotu. */
+  demo?: boolean;
 };
 
 type MenuPos = { top: number; right: number } | null;
@@ -83,10 +86,10 @@ export default function AppShell({
     try {
       if (localStorage.getItem("vakto-ephemeral") === "1" && !document.cookie.split("; ").includes("vakto-alive=1")) {
         localStorage.removeItem("vakto-ephemeral");
-        createClient().auth.signOut().finally(() => window.location.assign("/login"));
+        createClient().auth.signOut({ scope: account.demo ? "local" : "global" }).finally(() => window.location.assign("/login"));
       }
     } catch { /* einkagluggi o.fl. */ }
-  }, []);
+  }, [account.demo]);
   function toggleRail() {
     setRailed((r) => { try { localStorage.setItem("vakto-rail", r ? "0" : "1"); } catch {} return !r; });
   }
@@ -132,7 +135,8 @@ export default function AppShell({
   async function signOut() {
     setMenu(null);
     try {
-      await createClient().auth.signOut();
+      // Demo: margir gestir deila einum aðgangi — „global" myndi skrá alla hina út.
+      await createClient().auth.signOut({ scope: account.demo ? "local" : "global" });
     } catch {
       /* ignore when not configured */
     }
@@ -146,6 +150,7 @@ export default function AppShell({
   return (
     <>
       <ImpersonationBar />
+      {account.demo && <DemoBar />}
       <div
         className={`backdrop${navOpen ? " show" : ""}`}
         onClick={() => setNavOpen(false)}

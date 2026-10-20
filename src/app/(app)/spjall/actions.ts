@@ -1,5 +1,6 @@
 "use server";
 
+import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { after } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
@@ -599,6 +600,7 @@ export async function renameChannel(channelId: string, name: string): Promise<{ 
 
 /** Set a group photo: upload (base64 data URL) to the chat bucket + save on the channel. */
 export async function setChannelPhoto(channelId: string, dataUrl: string, ext: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
   try {
     const supabase = await createClient();
@@ -622,6 +624,7 @@ export async function setChannelPhoto(channelId: string, dataUrl: string, ext: s
 
 /** Upload an image/voice clip (base64 data URL) to the chat bucket; returns public URL. */
 export async function uploadChatMedia(dataUrl: string, ext: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
   try {
     const supabase = await createClient();

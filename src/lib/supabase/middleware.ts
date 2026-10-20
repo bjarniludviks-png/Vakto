@@ -44,6 +44,13 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Opið demo: nýskráning keyrir aldrei innan sameiginlegu demo-lotunnar (póstur er
+  // stöðvaður fyrir demo-notandann). Aðeins þessi lota er skráð út (scope local).
+  const demoEmail = process.env.DEMO_LOGIN_EMAIL?.toLowerCase();
+  if (user && demoEmail && pathname.startsWith("/nyskraning") && user.email?.toLowerCase() === demoEmail) {
+    await supabase.auth.signOut({ scope: "local" });
+  }
+
   // ---------- VAKTO Platform host (admin.vakto.is) ----------
   // Its own surface with its own session (cookies are host-scoped, so a
   // BM-Veitingar login on vakto.is never leaks over here — and vice versa).

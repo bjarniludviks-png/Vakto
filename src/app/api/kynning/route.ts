@@ -35,6 +35,7 @@ export async function POST(req: Request) {
   if (!(await verifyTurnstile(p.token))) return NextResponse.json({ ok: false, error: en ? "The bot check failed — reload the page and try again." : "Bot-vörnin samþykkti ekki beiðnina — endurhladdu síðuna og reyndu aftur." }, { status: 400 });
   const r = await sendEmail({
     to: TO,
+    internal: true, // fer til VAKTO, ekki gestsins — líka þegar gesturinn er innskráður í opna demóið
     replyTo: isEmail ? contact : undefined,
     subject: `Beiðni um kynningu: ${company}`,
     html: `<div style="font-family:-apple-system,Segoe UI,sans-serif;font-size:14px;line-height:1.55">

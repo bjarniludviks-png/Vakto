@@ -1,5 +1,6 @@
 "use server";
 
+import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -307,6 +308,7 @@ export type UploadDocResult = { ok: boolean; demo?: boolean; path?: string; erro
 export async function uploadDocument(
   input: { employeeId: string; fileName: string; dataUrl: string; type?: string },
 ): Promise<UploadDocResult> {
+  if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   if (input.employeeId.startsWith("e") && input.employeeId.length <= 3) return { ok: true, demo: true };
   try {
@@ -1071,6 +1073,7 @@ export async function setContractStatus(
  *  undirskrift); „drög“ → venjuleg sending (setContractStatus: undirritun fyrirtækis + póstur). Undirritaður → villa. */
 export async function resendContract(employeeId: string): Promise<ActionResult & { signedAt?: string }> {
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  if (await demoBlocked()) return demoResult(); // opið demo: enginn póstur / Taktikal (sjá líka þröskuldana)
   try {
     const supabase = await createClient();
     const company = await companyId(supabase);
@@ -1196,6 +1199,7 @@ export async function taktikalEmployerLink(contractId: string): Promise<{ ok: bo
 
 /** Stjórnandi setur prófílmynd á starfsmann (avatars-fötu fyrirtækisins; RLS leyfir stjórnendum). */
 export async function uploadEmployeePhoto(employeeId: string, dataUrl: string): Promise<ActionResult & { url?: string }> {
+  if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -1230,6 +1234,7 @@ const ROLE_LABEL: Record<string, string> = { employee: "Starfsmaður", manager: 
 /** Sendir boð í appið á starfsfólk sem hefur netfang en engan aðgang (t.d. eftir Excel-innlestur).
  *  ids = tiltekið starfsfólk; án ids = allt virkt starfsfólk án aðgangs. Aðeins stjórnendur og vaktstjórar. */
 export async function inviteEmployees(ids?: string[]): Promise<InviteEmployeesResult> {
+  if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: true, sent: 0 };
   try {
     const supabase = await createClient();

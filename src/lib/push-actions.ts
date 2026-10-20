@@ -1,9 +1,11 @@
 "use server";
 
+import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 export async function savePushSubscription(sub: { endpoint: string; keys: { p256dh: string; auth: string } }): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const supabase = await createClient();
