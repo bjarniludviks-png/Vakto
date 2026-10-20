@@ -4,12 +4,12 @@ import { createClient } from "@/lib/supabase/server";
 import { VAKTO_KNOWLEDGE } from "@/lib/ai/vakto-knowledge";
 import { READ_TOOLS, WRITE_TOOLS, WRITE_NAMES, runReadTool, describeWrite, type PendingAction } from "@/lib/ai/assistant-tools";
 import { assistantUser, rateLimited } from "@/lib/ai/assistant-auth";
-import { aiAllowance, bumpAiUsage, demoAiGate } from "@/lib/ai/ai-plan.server";
+import { aiAllowance, bumpAiUsage, demoAiCheck, recordDemoVisitorAi } from "@/lib/ai/ai-plan.server";
+import { modelFor } from "@/lib/ai/models";
 
 // VAKTO AI — aðstoðarmaður í horninu (stjórnendur og vaktstjórar).
 // Les gögn með verkfærum; breytingar verða að TILLÖGUM sem notandinn staðfestir með hnappi (sjá ./execute).
 export const maxDuration = 180;
-const MODEL = "claude-sonnet-5";
 const MAX_STEPS = 10;
 const DAYS_IS = ["sunnudagur", "mánudagur", "þriðjudagur", "miðvikudagur", "fimmtudagur", "föstudagur", "laugardagur"];
 
@@ -24,8 +24,9 @@ export async function POST(request: Request) {
 
   // Mánaðarheimild (0075): 25 frítt, 500 með viðbót eða í prufu. Þegar hún er búin svarar
   // aðstoðarmaðurinn ekki; spjallið sýnir þá hnapp á Stillingar → Áskrift.
-  const demoStop = await demoAiGate(false); // opið demo: dagsþak (talið hér að neðan eins og annað)
-  if (demoStop) return NextResponse.json({ ok: false, error: demoStop }, { status: 429 });
+  const demo = await demoAiCheck(); // opið demo: dagsþök alls + per gest (talið hér að neðan eins og annað)
+  if (demo?.stop) return NextResponse.json({ ok: false, error: demo.stop, signup: demo.signup }, { status: 429 });
+  const model = modelFor("chat", { demo: !!demo }); // demo → Haiku
   const allowance = await aiAllowance(me.companyId).catch(() => null);
   if (allowance && allowance.used >= allowance.limit) {
     const free = allowance.mode === "free";
@@ -84,7 +85,7 @@ ${VAKTO_KNOWLEDGE}`;
     let reply = "";
     try {
       for (let step = 0; step < MAX_STEPS; step++) {
-        const res = await client.messages.create({ model: MODEL, max_tokens: 12000, system, tools, messages: msgs });
+        const res = await client.messages.create({ model, max_tokens: 12000, system, tools, messages: msgs });
         const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
         if (res.stop_reason !== "tool_use") { reply = text; break; }
         msgs.push({ role: "assistant", content: res.content });
@@ -108,6 +109,7 @@ ${VAKTO_KNOWLEDGE}`;
       return { ok: false, error: lang === "en" ? "VAKTO AI could not answer right now. Try again." : "VAKTO AI gat ekki svarað núna. Reyndu aftur." };
     }
     await bumpAiUsage(me.companyId);
+    if (demo) await recordDemoVisitorAi(demo.companyId, demo.key);
     // Vista samtalið (þolir að töflurnar vanti — þá er sagan aðeins í vafranum).
     let messageId: string | null = null;
     let conversationId: string | null = /^[0-9a-f-]{36}$/i.test(body.conversationId ?? "") ? body.conversationId! : null;
@@ -130,7 +132,7 @@ ${VAKTO_KNOWLEDGE}`;
         messageId = (saved ?? []).find((r) => r.role === "assistant")?.id as string ?? null;
       }
     } catch (e) { console.error("[assistant] save", e instanceof Error ? e.message : e); }
-    return { ok: true, reply: reply || (actions.length ? "" : "…"), actions, conversationId, messageId };
+    return { ok: true, reply: reply || (actions.length ? "" : "…"), actions, conversationId, messageId, ...(demo ? { demo: { left: Math.max(0, demo.remaining - 1), of: demo.perVisitor } } : {}) };
   };
   const enc = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({

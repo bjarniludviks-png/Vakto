@@ -65,9 +65,9 @@
   Tímaskráning, Launakeyrslur, Starfsfólk, Skýrslur, Frammistaða, Mitt svæði, Spjall, Stillingar.
   Shared chart primitives in `src/components/app/charts.tsx` (Bars/Stacked/Paired).
 - **Fasi 2 in progress:** ✅ role-switch preview (owner can view as manager/employee via account menu),
-  ✅ real AI scheduling — `Biðja AI` posts to `/api/ai/schedule`, which calls **Claude Opus 4.8**
-  (`@anthropic-ai/sdk`, structured outputs via `output_config.format` json_schema, model id
-  `claude-opus-4-8`) and returns a proposal the user confirms; falls back to a demo proposal when
+  ✅ real AI scheduling — `Biðja AI` posts to `/api/ai/schedule`, which calls **Claude Opus 5.5**
+  (`@anthropic-ai/sdk`, structured outputs via `output_config.format` json_schema, model ids centralized in
+  `src/lib/ai/models.ts`) and returns a proposal the user confirms; falls back to a demo proposal when
   `ANTHROPIC_API_KEY` is unset (`src/lib/ai/schedule.ts` — server-only).
 - ✅ **Starfsfólk persistence:** `Nýr starfsmaður` and the profile-modal `Vista` call Server Actions
   in `src/app/(app)/starfsfolk/actions.ts` (`createEmployee`/`updateEmployee`) that insert/update

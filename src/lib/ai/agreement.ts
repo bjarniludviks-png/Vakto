@@ -5,11 +5,12 @@ import "server-only";
 // stjórnandi geti borið hvert gildi saman við samninginn áður en hann vistar.
 // Ekkert er vistað hér: UI sýnir tillöguna og aðeins „Vista sniðmát“ gildir.
 //
-// Líkan: claude-opus-4-8 eins og restin af VAKTO (sjá src/lib/ai/schedule.ts).
+// Líkan: modelFor("analysis") (src/lib/ai/models.ts).
 // Citations-fídus API-sins er ósamrýmanlegur structured outputs, svo tilvitnanir
 // koma í `sources` í skemanu og UI merkir þær sem „til yfirferðar“.
 
 import Anthropic from "@anthropic-ai/sdk";
+import { modelFor } from "@/lib/ai/models";
 import type { RuleSet } from "@/lib/rules";
 import { strictSchema, stripUnset } from "./schema";
 
@@ -75,7 +76,7 @@ Reglur:
 - Laun (wage): lestu mánaðarlaun, dagvinnukaup og yfirvinnukaup úr launatöflu samningsins fyrir hlutverkið og starfsaldurinn, og launaflokk/þrep. Ef launatafla fylgir ekki eða hlutverkið er óljóst, slepptu wage og nefndu það í "missing". Hvert launagildi þarf tilvitnun í sources eins og önnur gildi. Taktu fram í explanation frá hvaða dagsetningu launataflan gildir.
 - Skrifaðu explanation og notes á íslensku. Þetta er tillaga sem stjórnandi yfirfer — ekki lögfræðiráðgjöf.`;
 
-export async function readAgreement(input: { pdfBase64?: string; text?: string; hint?: string }): Promise<AgreementResult> {
+export async function readAgreement(input: { pdfBase64?: string; text?: string; hint?: string }, opts: { demo?: boolean } = {}): Promise<AgreementResult> {
   const empty: AgreementResult = { ok: false, live: false, name: "", explanation: "", rules: {}, sources: [], missing: [] };
   if (!process.env.ANTHROPIC_API_KEY) {
     return { ...empty, error: "AI er ekki virkt — ANTHROPIC_API_KEY vantar. Settu reglurnar inn handvirkt eða notaðu sniðmát." };
@@ -89,7 +90,7 @@ export async function readAgreement(input: { pdfBase64?: string; text?: string; 
   try {
     const client = new Anthropic();
     const stream = client.messages.stream({
-      model: "claude-opus-4-8",
+      model: modelFor("analysis", opts),
       max_tokens: 32000,
       thinking: { type: "adaptive" },
       output_config: { effort: "high", format: { type: "json_schema", schema: strictSchema(SCHEMA) } },

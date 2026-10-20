@@ -28,7 +28,7 @@ export async function requestPasswordReset(email: string): Promise<{ ok: boolean
  * when DEMO_COMPANY_ID + DEMO_LOGIN_EMAIL + DEMO_LOGIN_PASSWORD are set — without
  * DEMO_COMPANY_ID none of the demo guards apply, so no anonymous login then. */
 export async function demoLogin(): Promise<{ ok: boolean; next?: string; error?: string }> {
-  const { demoConfigured, demoCompanyId } = await import("@/lib/demo.server");
+  const { demoConfigured, demoCompanyId, demoVisitorId } = await import("@/lib/demo.server");
   const email = process.env.DEMO_LOGIN_EMAIL!, password = process.env.DEMO_LOGIN_PASSWORD!;
   if (!demoConfigured()) return { ok: false, error: "Demo er ekki í boði" };
   const fail = { ok: false, error: "Demo-innskráning tókst ekki" };
@@ -51,6 +51,7 @@ export async function demoLogin(): Promise<{ ok: boolean; next?: string; error?:
       console.error("[demo] DEMO_LOGIN_EMAIL er ekki í DEMO_COMPANY_ID");
       return fail;
     }
+    await demoVisitorId(); // gestakaka fyrir AI-þak per gest
     return { ok: true, next: "/maelabord" };
   } catch {
     return fail;

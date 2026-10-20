@@ -10,7 +10,8 @@ import { inviteToCompany, roleFromLabel } from "@/lib/invite.server";
 import { draftContractTerms, type TermsDraft } from "@/lib/ai/terms";
 import { strictSchema, stripUnset } from "@/lib/ai/schema";
 import { taktikalEnabled } from "@/lib/taktikal.server";
-import { demoBlocked, demoResult } from "@/lib/demo.server";
+import { currentUserIsDemo, demoBlocked, demoResult } from "@/lib/demo.server";
+import { modelFor } from "@/lib/ai/models";
 import { demoAiGate } from "@/lib/ai/ai-plan.server";
 
 export type SyncResult = { ok: boolean; demo?: boolean; amount?: number; error?: string };
@@ -288,7 +289,7 @@ export async function aiContractTerms(input: { description?: string; current?: s
       description: input.description?.slice(0, 3000),
       current: input.current?.slice(0, 8000),
       companyName: (c?.name as string | undefined) ?? undefined,
-    });
+    }, { demo: await currentUserIsDemo() });
   } catch (e) {
     console.error("aiContractTerms", e);
     return fail("Tókst ekki að semja ákvæðin.");
@@ -711,7 +712,7 @@ export async function aiSuggestRules(input: { country?: string; region?: string;
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
     const client = new Anthropic();
     const msg = await client.messages.create({
-      model: "claude-opus-4-8",
+      model: modelFor("analysis", { demo: await currentUserIsDemo() }),
       max_tokens: 2000,
       thinking: { type: "adaptive" },
       output_config: {
