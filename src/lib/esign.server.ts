@@ -15,6 +15,7 @@ import "server-only";
 
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { sendContractCodeEmail, sendSignedContractEmail, sendTaktikalSignEmail } from "@/lib/email";
 import { buildContractPdf, type SignatureRecord } from "@/lib/contract-pdf";
 import { createSigningProcess, fetchSignedPdf, TAKTIKAL_EVENT, type TaktikalWebhook } from "@/lib/taktikal.server";
@@ -72,6 +73,7 @@ async function ownContract(caller: Caller, contractId: string) {
 export async function requestSignCode(caller: Caller, contractId: string): Promise<{ ok: boolean; sentTo?: string; error?: string }> {
   const r = await ownContract(caller, contractId);
   if ("error" in r) return { ok: false, error: r.error };
+  if (await demoBlocked(r.c.company_id as string)) return demoResult();
   const to = caller.email ?? (r.emp.email as string | null);
   if (!to) return { ok: false, error: "Ekkert netfang skráð — talaðu við vinnuveitandann" };
   // Hóf: nýr kóði í fyrsta lagi á 45 sek. fresti.
@@ -193,6 +195,7 @@ export async function startTaktikalSigning(
   const { data: c } = await admin.from("contracts")
     .select("id, company_id, title, content, status, employees(full_name, kennitala, email, phone), companies(name)")
     .eq("id", contractId).maybeSingle();
+  if (await demoBlocked(c?.company_id as string | undefined)) return demoResult();
   if (!c || c.status !== "sent") return { ok: false, error: "Samningurinn er ekki í undirritunarferli" };
   const company = ((Array.isArray(c.companies) ? c.companies[0] : c.companies) as { name?: string } | null)?.name?.trim() || "vinnuveitanda";
   const emp = (Array.isArray(c.employees) ? c.employees[0] : c.employees) as { full_name?: string; kennitala?: string; email?: string; phone?: string } | null;

@@ -4,6 +4,10 @@
   ],
   "crons": [
     {
+      "path": "/api/cron/demo-reset",
+      "schedule": "30 2 * * *"
+    },
+    {
       "path": "/api/cron/punch-check",
       "schedule": "0 3 * * *"
     },

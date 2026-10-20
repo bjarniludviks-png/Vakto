@@ -7,6 +7,7 @@ import type { Role } from "@/components/app/nav";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { isVaktoAdmin } from "@/lib/vakto-admin.server";
+import { isDemoCompany } from "@/lib/demo.server";
 import { PhotoProvider } from "@/components/app/avatar";
 
 function initials(name: string) {
@@ -63,6 +64,7 @@ async function getAccount(): Promise<Account & { country: string }> {
       companyId,
       kioskToken,
       role: (profile?.role as Role) ?? "owner",
+      demo: isDemoCompany(companyId),
       country: comp?.country ?? "IS",
     };
   } catch {

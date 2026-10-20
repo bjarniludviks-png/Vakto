@@ -1,4 +1,5 @@
 import "server-only";
+import { assertNotDemo } from "@/lib/demo.server";
 
 // Payday API (apidoc.payday.is): tímaskrá send beint í launakeyrslu.
 //   POST /auth/token               { clientId, clientSecret } → accessToken (gildir í 24 klst)
@@ -11,6 +12,7 @@ export type PaydayCreds = { key?: string; secret?: string };
 export type PaydayRow = { ssn: string; name: string; items: { name: string; quantity: number }[] };
 
 async function call(path: string, init: RequestInit): Promise<Response> {
+  await assertNotDemo();
   return fetch(BASE + path, { ...init, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(25000) }).catch(() => { throw new Error("Náði ekki sambandi við Payday — reyndu aftur."); });
 }
 /** Stutt, læsileg skilaboð úr villusvari Payday (aldrei hrár HTML eða langur texti). */

@@ -2,6 +2,7 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { emailConfigured, sendInviteEmail } from "@/lib/email";
 import { userError } from "@/lib/user-error";
+import { demoBlocked, DEMO_BLOCKED } from "@/lib/demo.server";
 
 /** Íslensk hlutverkaheiti (eins og í formunum) → users.role. */
 export const INVITE_ROLE: Record<string, string> = {
@@ -26,6 +27,7 @@ export type InviteResult = {
 export async function inviteToCompany(companyId: string, emailRaw: string, roleLabel: string): Promise<InviteResult> {
   const emailAddr = emailRaw.trim();
   if (!emailAddr) return { ok: false, sent: false, error: "Netfang vantar" };
+  if (await demoBlocked(companyId)) return { ok: false, sent: false, error: DEMO_BLOCKED };
   try {
     const admin = createAdminClient();
     const role = roleFromLabel(roleLabel);

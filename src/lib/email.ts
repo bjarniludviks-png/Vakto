@@ -19,6 +19,12 @@ export async function sendEmail(input: { to: string; subject: string; html: stri
     ((globalThis as { __emailPreview?: unknown[] }).__emailPreview ??= []).push(input);
     return { ok: true, skipped: true };
   }
+  // Opið demo: enginn póstur fer úr demo-fyrirtækinu (þröskuldur fyrir öll boð, kóða, kvittanir o.fl.)
+  // né á gervinetföng demo-fólks (@demo.vakto.is — t.d. úr cron-keyrslum).
+  if (/@demo\.vakto\.is$/i.test(input.to.trim()) || (process.env.DEMO_COMPANY_ID && (await (await import("@/lib/demo.server")).currentUserIsDemo()))) {
+    console.log(`[email] skipped (demo): "${input.subject}" → ${input.to}`);
+    return { ok: true, skipped: true };
+  }
   if (!KEY) {
     console.log(`[email] skipped (no RESEND_API_KEY): "${input.subject}" → ${input.to}`);
     return { ok: true, skipped: true };

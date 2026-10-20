@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 let emit: ((msg: string, kind: "ok" | "error") => void) | null = null;
 
 /** Villuskilaboð sem kallandinn merkti ekki sem villu (margir senda `res.error` beint) fá samt viðvörunarmerki. */
-const LOOKS_LIKE_ERROR = /^(villa|error|tókst ekki|ekki tókst|gat ekki|fylltu|vantar)|tókst ekki|failed|could not/i;
+const LOOKS_LIKE_ERROR = /^(villa|error|tókst ekki|ekki tókst|gat ekki|fylltu|vantar)|tókst ekki|ekki í boði í demo|failed|could not|not available in the demo/i;
 
 /** kind "error": viðvörunarmerki í stað haks og stendur lengur (villur þarf að ná að lesa).
  *  Án kind er giskað út frá textanum. */

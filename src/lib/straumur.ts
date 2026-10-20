@@ -1,5 +1,6 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "crypto";
+import { assertNotDemo } from "@/lib/demo.server";
 
 // Straumur (Kvika) greiðslugátt — sjá docs.straumur.is.
 // Kort er skráð með 0 kr greiðslusíðu (tokenization) og mánaðargjaldið síðan
@@ -36,6 +37,7 @@ async function call<T>(path: string, method: "GET" | "POST", body?: unknown): Pr
 
 /** 0 kr greiðslusíða sem geymir kortið. merchantReference = card:<companyId>:<ts>. */
 export async function createCardSetupCheckout(companyId: string, opts: { returnUrl: string; culture?: "is" | "en"; email?: string }): Promise<{ url: string; checkoutReference: string; reference: string }> {
+  await assertNotDemo(companyId);
   const reference = `card:${companyId}:${Date.now()}`;
   const res = await call<{ url: string; checkoutReference: string }>("/hostedcheckout", "POST", {
     amount: 0,
@@ -60,6 +62,7 @@ export type ChargeResult = { resultCode: string; payfacReference: string | null;
 
 /** Mánaðargjald tekið af skráðu korti (merchant-initiated). amount í heilum krónum. */
 export async function chargeToken(opts: { token: string; amountISK: number; reference: string }): Promise<ChargeResult> {
+  await assertNotDemo();
   const res = await call<{ resultCode: string; payfacReference: string | null; checkoutReference: string | null; action?: { method: string; url: string } | null }>("/payment", "POST", {
     terminalIdentifier: TERMINAL_GATEWAY,
     amount: Math.round(opts.amountISK) * 100,   // minor units — ISK verður að enda á 00

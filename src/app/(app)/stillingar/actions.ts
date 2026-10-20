@@ -10,6 +10,8 @@ import { inviteToCompany, roleFromLabel } from "@/lib/invite.server";
 import { draftContractTerms, type TermsDraft } from "@/lib/ai/terms";
 import { strictSchema, stripUnset } from "@/lib/ai/schema";
 import { taktikalEnabled } from "@/lib/taktikal.server";
+import { demoBlocked, demoResult } from "@/lib/demo.server";
+import { demoAiGate } from "@/lib/ai/ai-plan.server";
 
 export type SyncResult = { ok: boolean; demo?: boolean; amount?: number; error?: string };
 export type SettingsResult = { ok: boolean; demo?: boolean; error?: string };
@@ -279,6 +281,8 @@ export async function aiContractTerms(input: { description?: string; current?: s
     if ("error" in ctx) return fail(ctx.error ?? "Villa");
     const { data: u } = await supabase.from("users").select("role").eq("id", ctx.userId).maybeSingle();
     if (u?.role !== "owner" && u?.role !== "manager") return fail("Aðeins stjórnendur");
+    const demoStop = await demoAiGate();
+    if (demoStop) return fail(demoStop);
     const { data: c } = await supabase.from("companies").select("name").eq("id", ctx.company).maybeSingle();
     return await draftContractTerms({
       description: input.description?.slice(0, 3000),
@@ -345,6 +349,7 @@ export async function updatePosition(id: string, input: { name: string; baseRate
 }
 
 export async function deletePosition(id: string): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -380,6 +385,7 @@ export async function updateLocation(id: string, input: { name: string }): Promi
 }
 
 export async function deleteLocation(id: string): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -437,6 +443,7 @@ export async function listCompanyDocs(): Promise<{ docs: CompanyDoc[]; live: boo
 }
 
 export async function uploadCompanyDoc(input: { fileName: string; dataUrl: string }): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -528,6 +535,7 @@ export async function renameDepartment(id: string, name: string, color?: string 
 
 /** Delete a department — employees in it are left without a department (not deleted). */
 export async function deleteDepartment(id: string): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -580,6 +588,7 @@ export async function savePayRule(
 
 /** Invite a teammate by email (admin auth invite) and link them to the company. */
 export async function inviteUser(input: { email: string; role: string }): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult();
   if (!input.email?.trim()) return { ok: false, error: "Netfang vantar" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -697,7 +706,7 @@ export async function aiSuggestRules(input: { country?: string; region?: string;
     explanation: "Tillaga byggð á innbyggðu sniðmáti — settu ANTHROPIC_API_KEY til að fá AI-greiningu á þínu landi/svæði/stéttarfélagi. Yfirfarðu allar tölur áður en þú vistar.",
     live: false,
   };
-  if (!process.env.ANTHROPIC_API_KEY) return fallback;
+  if (!process.env.ANTHROPIC_API_KEY || (await demoAiGate())) return fallback;
   try {
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
     const client = new Anthropic();
@@ -768,6 +777,7 @@ export type CreateKeyResult = { ok: boolean; demo?: boolean; key?: string; error
 /** Create a named API connection. The full key is returned ONCE — only its
  * sha256 hash is stored. Key format: vk_live_<48 hex chars>. */
 export async function createApiKey(name: string): Promise<CreateKeyResult> {
+  if (await demoBlocked()) return demoResult();
   const nm = name.trim();
   if (!nm) return { ok: false, error: "Gefðu tengingunni nafn" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true, key: "vk_live_demo0000000000000000000000000000000000000000" };
@@ -837,6 +847,7 @@ export async function savePayPeriodStart(day: number): Promise<SettingsResult> {
 
 /** Áskrift: skrá nýtt kort (0 kr greiðslusíða hjá Straumi). Skilar slóð. */
 export async function startCardChange(origin: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  if (await demoBlocked()) return demoResult();
   try {
     const { createClient } = await import("@/lib/supabase/server");
     const { straumurConfigured, createCardSetupCheckout } = await import("@/lib/straumur");
@@ -974,6 +985,7 @@ export async function geocodeAddress(q: string): Promise<{ ok: boolean; hits: Ge
 /** Mánaðarlegt ⇄ árlegt. Árlegt tekur gildi á næsta gjalddaga (árgjald fyrirfram); mánaðarlegt
  *  tekur gildi þegar greitt ár rennur út (fyrirframgreitt ár er ekki endurgreitt). Aðeins eigandi. */
 export async function setBillingInterval(interval: "month" | "year"): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult();
   if (interval !== "month" && interval !== "year") return { ok: false, error: "Ógilt val" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -995,6 +1007,7 @@ export async function setBillingInterval(interval: "month" | "year"): Promise<Se
 
 /** VAKTO AI-viðbótin (0075) á/af. Gildir strax; rukkuð á hverjum mánaðarreikningi sem myndast á meðan hún er á. */
 export async function setAiAddon(on: boolean): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -1059,6 +1072,7 @@ export async function resumeSubscription(): Promise<SettingsResult & { endsAt?: 
 }
 
 async function setCanceled(cancel: boolean): Promise<SettingsResult & { endsAt?: string }> {
+  if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();

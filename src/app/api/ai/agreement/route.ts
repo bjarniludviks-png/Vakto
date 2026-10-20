@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { readAgreement } from "@/lib/ai/agreement";
+import { demoAiGate } from "@/lib/ai/ai-plan.server";
 
 // POST multipart: file (PDF eða .txt), hint (hlutverk/starfsaldur). Aðeins eigandi/
 // vaktstjóri. Route handler (ekki server action) því kjarasamningar eru oft stærri
@@ -15,6 +16,8 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ ok: false, error: "Ekki innskráð(ur)" }, { status: 401 });
   const { data: u } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
   if (u?.role !== "owner" && u?.role !== "manager") return NextResponse.json({ ok: false, error: "Aðeins stjórnendur" }, { status: 403 });
+  const demoStop = await demoAiGate();
+  if (demoStop) return NextResponse.json({ ok: false, error: demoStop }, { status: 429 });
 
   let form: FormData;
   try { form = await request.formData(); } catch { return NextResponse.json({ ok: false, error: "Ógild beiðni" }, { status: 400 }); }

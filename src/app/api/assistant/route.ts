@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { VAKTO_KNOWLEDGE } from "@/lib/ai/vakto-knowledge";
 import { READ_TOOLS, WRITE_TOOLS, WRITE_NAMES, runReadTool, describeWrite, type PendingAction } from "@/lib/ai/assistant-tools";
 import { assistantUser, rateLimited } from "@/lib/ai/assistant-auth";
-import { aiAllowance, bumpAiUsage } from "@/lib/ai/ai-plan.server";
+import { aiAllowance, bumpAiUsage, demoAiGate } from "@/lib/ai/ai-plan.server";
 
 // VAKTO AI — aðstoðarmaður í horninu (stjórnendur og vaktstjórar).
 // Les gögn með verkfærum; breytingar verða að TILLÖGUM sem notandinn staðfestir með hnappi (sjá ./execute).
@@ -24,6 +24,8 @@ export async function POST(request: Request) {
 
   // Mánaðarheimild (0075): 25 frítt, 500 með viðbót eða í prufu. Þegar hún er búin svarar
   // aðstoðarmaðurinn ekki; spjallið sýnir þá hnapp á Stillingar → Áskrift.
+  const demoStop = await demoAiGate(false); // opið demo: dagsþak (talið hér að neðan eins og annað)
+  if (demoStop) return NextResponse.json({ ok: false, error: demoStop }, { status: 429 });
   const allowance = await aiAllowance(me.companyId).catch(() => null);
   if (allowance && allowance.used >= allowance.limit) {
     const free = allowance.mode === "free";

@@ -12,6 +12,7 @@ import "server-only";
 //   TAKTIKAL_ENABLED=1                      — sýnir valkostinn í Stillingum (öryggisrofi)
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { assertNotDemo } from "@/lib/demo.server";
 
 const BASE = (process.env.TAKTIKAL_BASE_URL || "https://onboarding.taktikal.is").replace(/\/$/, "");
 
@@ -99,6 +100,7 @@ export async function createSigningProcess(input: {
   pdfBase64: string; fileName: string; ownerEmail: string; contractId: string;
   employer: TaktikalSigner; employee: TaktikalSigner;
 }): Promise<TaktikalProcess> {
+  await assertNotDemo();
   const signee = (s: TaktikalSigner, notify: boolean) => ({
     name: s.name,
     ssn: s.ssn.replace(/\D/g, ""),
