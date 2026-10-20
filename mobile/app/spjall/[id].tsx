@@ -5,7 +5,7 @@ import { tr, trf } from "../../src/lib/i18n";
 import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions, Modal } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronLeft, Send, X, Hash, CornerUpLeft, Trash2, Flag, Ban, ImagePlus, MoreHorizontal, BellOff, Bell, Paperclip, FileText, Images, LogOut } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, Send, X, Hash, CornerUpLeft, Trash2, Flag, Ban, Image as ImageIcon, Camera, CirclePlus, Info, BellOff, Bell, FileText, Images, LogOut } from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { Linking, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
@@ -94,6 +94,23 @@ export default function Thread() {
   })).current;
   const toast = useToast();
   const [uploading, setUploading] = useState(false);
+  // Messenger-innsláttur: táknin falla saman í ör meðan skrifað er
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const compact = !!text.trim() && !toolsOpen;
+  async function takePhoto() {
+    if (!me || !id) return;
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) { toast(tr("Leyfðu aðgang að myndavél í stillingum símans")); return; }
+    const r = await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 0.7 });
+    if (r.canceled || !r.assets[0]) return;
+    setUploading(true);
+    const up = await uploadImage(me, r.assets[0].uri, r.assets[0].uri.toLowerCase().endsWith(".png") ? "png" : "jpg");
+    if (!up.ok || !up.url) { setUploading(false); toast(up.error ?? "Mynd hlóðst ekki upp"); return; }
+    const res = await sendChatImage(me, id, up.url);
+    setUploading(false);
+    if (!res.ok) toast(res.error ?? "Tókst ekki að senda mynd");
+    else load();
+  }
   async function pickAndSend() {
     if (!me || !id) return;
     const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7 });
@@ -241,15 +258,17 @@ export default function Thread() {
   const seenBy = lastMine ? reads.filter((r) => r.lastReadAt >= lastMine.createdAt) : [];
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.panel }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 8, paddingTop: insets.top + 4, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.line2, backgroundColor: colors.panel }}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}><ChevronLeft color={colors.ink} size={26} /></Pressable>
-        {isGroup ? <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={18} /></View> : <Avatar name={name ?? "?"} size={36} />}
+        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel={tr("Til baka")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }}><ChevronLeft color={colors.brand} size={28} /></Pressable>
+        <Pressable onPress={openInfo} style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+        {kind === "general" ? <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={18} /></View> : <Avatar name={name ?? "?"} size={36} color={isGroup ? colors.info : undefined} />}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt weight="bold" size={15} numberOfLines={1}>{name ?? "Spjall"}</Txt>
           <Muted size={12}>{typing ? trf("{x} skrifar…", typing) : isGroup ? (muted ? trf("{n} meðlimir · þaggað", members || "—") : trf("{n} meðlimir", members || "—")) : muted ? "Einkaspjall · þaggað" : "Einkaspjall"}</Muted>
         </View>
-        <Pressable onPress={openInfo} hitSlop={10} style={{ width: 40, height: 40, alignItems: "center", justifyContent: "center" }}><MoreHorizontal color={colors.ink} size={24} /></Pressable>
+        </Pressable>
+        <Pressable onPress={openInfo} hitSlop={10} accessibilityLabel={tr("Upplýsingar")} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}><Info color={colors.brand} size={24} /></Pressable>
       </View>
 
       <Animated.View {...pan.panHandlers} style={{ flex: 1, width: W + TIME_W, transform: [{ translateX: pull }] }}>
@@ -281,7 +300,7 @@ export default function Thread() {
         renderItem={({ item }) =>
           item.kind === "sep" ? (
             <View style={{ width: W - 28, alignItems: "center" }}>
-              <Txt weight="bold" size={11} color={colors.ink3} style={{ marginVertical: 12, letterSpacing: 0.6, textTransform: "uppercase" }}>{item.label}</Txt>
+              <Txt weight="semibold" size={12} color={colors.ink3} style={{ marginTop: 16, marginBottom: 8 }}>{item.label}</Txt>
             </View>
           ) : (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -302,18 +321,29 @@ export default function Thread() {
           <Pressable onPress={() => setReplyTo(null)} hitSlop={8}><X color={colors.ink3} size={18} /></Pressable>
         </View>
       ) : null}
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8, paddingHorizontal: 10, paddingTop: 8, paddingBottom: Math.max(10, insets.bottom), backgroundColor: colors.panel, borderTopWidth: replyTo ? 0 : 1, borderTopColor: colors.line2 }}>
-        <Pressable onPress={pickAndSend} disabled={uploading} hitSlop={6} style={{ width: 36, height: 40, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.5 : 1 }}>
-          <ImagePlus color={colors.ink2} size={22} />
-        </Pressable>
-        <Pressable onPress={pickFile} disabled={uploading} hitSlop={6} style={{ width: 32, height: 40, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.5 : 1 }}>
-          <Paperclip color={colors.ink2} size={20} />
-        </Pressable>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2, paddingHorizontal: 8, paddingTop: 6, paddingBottom: Math.max(8, insets.bottom), backgroundColor: colors.panel }}>
+        {compact ? (
+          <Pressable onPress={() => setToolsOpen(true)} hitSlop={6} accessibilityLabel={tr("Fleiri valkostir")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }}>
+            <ChevronRight color={colors.brand} size={24} />
+          </Pressable>
+        ) : (
+          <>
+            <Pressable onPress={pickFile} disabled={uploading} hitSlop={4} accessibilityLabel={tr("Senda skjal")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.5 : 1 }}>
+              <CirclePlus color={colors.brand} size={24} />
+            </Pressable>
+            <Pressable onPress={takePhoto} disabled={uploading} hitSlop={4} accessibilityLabel={tr("Myndavél")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.5 : 1 }}>
+              <Camera color={colors.brand} size={24} />
+            </Pressable>
+            <Pressable onPress={pickAndSend} disabled={uploading} hitSlop={4} accessibilityLabel={tr("Mynd")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center", opacity: uploading ? 0.5 : 1 }}>
+              <ImageIcon color={colors.brand} size={24} />
+            </Pressable>
+          </>
+        )}
         <TextInput
-          style={{ flex: 1, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.panel2, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: font.regular, color: colors.ink, maxHeight: 110 }}
-          multiline value={text} onChangeText={onType} placeholder={tr("Skrifaðu skilaboð…")} placeholderTextColor={colors.ink3} blurOnSubmit={false}
+          style={{ flex: 1, backgroundColor: colors.panel2, borderRadius: 22, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, minHeight: 40, marginHorizontal: 4, marginBottom: 2, fontSize: 16, fontFamily: font.regular, color: colors.ink, maxHeight: 120 }}
+          multiline value={text} onChangeText={(v) => { onType(v); if (!v) setToolsOpen(false); }} onFocus={() => setToolsOpen(false)} placeholder="Aa" placeholderTextColor={colors.ink3} blurOnSubmit={false}
         />
-        <Pressable onPress={send} disabled={!text.trim() || sending} style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: text.trim() ? colors.brand : colors.line2, alignItems: "center", justifyContent: "center" }}>
+        <Pressable onPress={send} disabled={!text.trim() || sending} accessibilityLabel={tr("Senda")} style={{ width: 40, height: 40, marginBottom: 2, borderRadius: 20, backgroundColor: text.trim() ? colors.brand : colors.line2, alignItems: "center", justifyContent: "center" }}>
           <Send color={text.trim() ? "#fff" : colors.ink3} size={18} />
         </Pressable>
       </View>
@@ -411,9 +441,9 @@ function Bubble({ item, onLong, onImage }: { item: Extract<RowItem, { kind: "msg
     : { borderTopRightRadius: r, borderBottomRightRadius: r, borderTopLeftRadius: first ? r : s, borderBottomLeftRadius: last ? r : s };
   return (
     <View style={{ marginBottom: m.reactions.length ? 14 : last ? 8 : 2 }}>
-      {showSender ? <Txt size={11} weight="semibold" color={colors.ink3} style={{ marginLeft: 42, marginBottom: 2 }}>{m.senderFull}</Txt> : null}
-      <View style={{ flexDirection: m.me ? "row-reverse" : "row", alignItems: "flex-end", gap: 8, maxWidth: "86%", alignSelf: m.me ? "flex-end" : "flex-start" }}>
-        {!m.me ? <View style={{ width: 26, opacity: last ? 1 : 0 }}><Avatar name={m.senderFull} size={26} color={m.color} photo={m.photo} /></View> : null}
+      {showSender ? <Txt size={12} color={colors.ink3} style={{ marginLeft: 48, marginBottom: 3 }}>{m.senderFull}</Txt> : null}
+      <View style={{ flexDirection: m.me ? "row-reverse" : "row", alignItems: "flex-end", gap: 8, maxWidth: "82%", alignSelf: m.me ? "flex-end" : "flex-start" }}>
+        {!m.me ? <View style={{ width: 28, opacity: last ? 1 : 0 }}><Avatar name={m.senderFull} size={28} color={m.color} photo={m.photo} /></View> : null}
         <Pressable onLongPress={onLong} delayLongPress={250} style={{ backgroundColor: m.me ? colors.brand : colors.bubbleThem, paddingHorizontal: img ? 4 : 13, paddingVertical: img ? 4 : 9, ...radius, position: "relative", flexShrink: 1 }}>
           {m.replyTo ? (
             <View style={{ borderLeftWidth: 2, borderLeftColor: m.me ? "rgba(255,255,255,.6)" : colors.brand, paddingLeft: 8, marginBottom: 6 }}>
@@ -427,7 +457,7 @@ function Bubble({ item, onLong, onImage }: { item: Extract<RowItem, { kind: "msg
               <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: m.me ? "rgba(255,255,255,.2)" : colors.panel, alignItems: "center", justifyContent: "center" }}><FileText color={m.me ? "#fff" : colors.ink2} size={18} /></View>
               <View style={{ flexShrink: 1 }}><Txt weight="bold" size={14} color={m.me ? "#fff" : colors.ink} numberOfLines={2}>{m.body || "Skjal"}</Txt><Txt size={11.5} color={m.me ? "rgba(255,255,255,.8)" : colors.ink3}>Ýttu til að opna</Txt></View>
             </Pressable>
-          ) : m.body ? <Txt size={15} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 20 }}>{m.body}</Txt> : null}
+          ) : m.body ? <Txt size={16} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 21 }}>{m.body}</Txt> : null}
           {m.reactions.length ? (
             <View style={{ position: "absolute", bottom: -12, [m.me ? "left" : "right"]: 8, flexDirection: "row", backgroundColor: colors.panel, borderRadius: 999, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 6, paddingVertical: 1, gap: 3 }}>
               {m.reactions.map((x) => <Txt key={x.emoji} size={12}>{x.emoji}{x.count > 1 ? ` ${x.count}` : ""}</Txt>)}

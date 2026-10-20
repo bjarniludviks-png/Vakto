@@ -5,7 +5,7 @@ import { toast } from "@/components/app/toast";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
-import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, getMyContract, requestContractCode, signContractWithCode, taktikalMyLink, type LeaveType, type MyPunchRow, type MyContract } from "./actions";
+import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, getMyContract, openMySignedContract, requestContractCode, signContractWithCode, taktikalMyLink, type LeaveType, type MyPunchRow, type MyContract } from "./actions";
 import { listCompanyDocs, openCompanyDoc, type CompanyDoc } from "../stillingar/actions";
 import { dec1, nf, krCompact } from "@/lib/format";
 import { leaveWorkdays } from "@/lib/orlof";
@@ -200,6 +200,30 @@ function TaktikalSignBox({ contractId }: { contractId: string }) {
   );
 }
 
+/** Undirritaði samningurinn minn — opnar PDF-ið úr skjalasafninu (sama skjal og í appinu). */
+function SignedContractRow({ contract }: { contract: MyContract }) {
+  const { t } = useLang();
+  const [busy, setBusy] = useState(false);
+  const d = contract.signedAt ? new Date(contract.signedAt) : null;
+  const date = d && !Number.isNaN(d.getTime()) ? `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}` : "";
+  return (
+    <div className="mini" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <div style={{ flex: "1 1 200px" }}>
+        <div className="mh">{t("Ráðningarsamningurinn þinn")}</div>
+        <p style={{ fontSize: 12.5, margin: "2px 0 0", color: "var(--ink3)" }}>
+          {t("Undirritaður")}{date ? ` ${date}` : ""}{contract.signedVia === "taktikal" ? ` · ${t("rafræn skilríki (Taktikal)")}` : ""}
+        </p>
+      </div>
+      <button className="btn ghost sm" type="button" disabled={busy} onClick={async () => {
+        setBusy(true);
+        const r = await openMySignedContract(contract.id);
+        setBusy(false);
+        if (r.ok && r.url) window.open(r.url, "_blank", "noopener"); else toast(r.error ?? t("Tókst ekki að opna skjalið"));
+      }}>{busy ? t("Opna…") : t("Opna undirritað PDF")}</button>
+    </div>
+  );
+}
+
 /** Rafræn undirritun (0058): starfsmaður les, hakar við samþykki, fær 6 stafa kóða
  * á netfangið sitt og slær hann inn. Þjónninn skráir tíma, IP, tæki og fingrafar
  * skjalsins og sendir báðum aðilum undirritað PDF. */
@@ -211,8 +235,9 @@ function ContractSignCard() {
   const [busy, setBusy] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
   const [code, setCode] = useState("");
-  useEffect(() => { getMyContract().then((r) => { if (r.ok && r.contract?.status === "sent") setContract(r.contract); }); }, []);
+  useEffect(() => { getMyContract().then((r) => { if (r.ok && r.contract && (r.contract.status === "sent" || r.contract.pdf)) setContract(r.contract); }); }, []);
   if (!contract) return null;
+  if (contract.status === "signed") return <SignedContractRow contract={contract} />;
   async function sendCode() {
     if (!contract) return;
     setBusy(true);

@@ -12,7 +12,7 @@ import { sendContractEmail } from "@/lib/email";
 import { inviteToCompany } from "@/lib/invite.server";
 import type { CustomRules } from "@/lib/payrules";
 import { headers } from "next/headers";
-import { employerSign, metaFrom, resendTaktikalInvite, startTaktikalSigning } from "@/lib/esign.server";
+import { employerSign, metaFrom, resendTaktikalInvite, signedPdfPath, startTaktikalSigning, syncTaktikalContract, type TaktikalSyncResult } from "@/lib/esign.server";
 import { taktikalEnabled } from "@/lib/taktikal.server";
 import type { SignatureRecord } from "@/lib/contract-pdf";
 import { userError } from "@/lib/user-error";
@@ -1109,6 +1109,10 @@ export async function resendContract(employeeId: string): Promise<ActionResult &
       return r;
     }
     if (open.signed_via === "taktikal") {
+      // Webhook gæti hafa misfarist: uppfæra stöðuna frá Taktikal fyrst (býður starfsmanni ef fyrirtækið hefur undirritað).
+      const synced = await syncTaktikalContract(open.id as string).catch(() => null);
+      if (synced?.changes?.includes("employee_invited")) return { ok: true };
+      if (synced?.changes?.includes("contract_signed")) return { ok: false, error: "Samningurinn reyndist þegar undirritaður — staðan hefur verið uppfærð." };
       const r = await resendTaktikalInvite(open.id as string);
       if (!r.ok) return r;
     } else {
@@ -1123,26 +1127,136 @@ export async function resendContract(employeeId: string): Promise<ActionResult &
   }
 }
 
-/** Employee ids that have NO signed contract (for the missing-contracts chip). */
-export async function getContractStatusMap(): Promise<Record<string, string>> {
+/** Samningsstaða starfsmanns fyrir lista Starfsfólks (smá merki á hverri röð).
+ *  signed = undirritað · employee = bíður starfsmanns · company = bíður fyrirtækis (drög eða fyrirtækið á eftir að undirrita). */
+export type EmployeeContractState = "signed" | "employee" | "company";
+export async function getContractStatusMap(): Promise<Record<string, EmployeeContractState>> {
   if (!isSupabaseConfigured()) return {};
   try {
     const supabase = await createClient();
     const company = await companyId(supabase);
     if (!company) return {};
     const { data, error } = await supabase.from("contracts")
-      .select("employee_id, status").eq("company_id", company);
+      .select("employee_id, status, employer_signed_at").eq("company_id", company).neq("status", "void");
     if (error) return {};
-    const map: Record<string, string> = {};
+    const rank: Record<EmployeeContractState, number> = { signed: 3, employee: 2, company: 1 };
+    const map: Record<string, EmployeeContractState> = {};
     for (const r of data ?? []) {
+      const st: EmployeeContractState = r.status === "signed" ? "signed" : r.status === "sent" && r.employer_signed_at ? "employee" : "company";
       const cur = map[r.employee_id as string];
-      // signed wins over sent wins over draft
-      const rank: Record<string, number> = { signed: 3, sent: 2, draft: 1, void: 0 };
-      if (!cur || (rank[r.status as string] ?? 0) > (rank[cur] ?? 0)) map[r.employee_id as string] = r.status as string;
+      if (!cur || rank[st] > rank[cur]) map[r.employee_id as string] = st;
     }
     return map;
   } catch {
     return {};
+  }
+}
+
+/** Samningur í fyrirtæki kallandans — aðeins stjórnendur/vaktstjórar (RLS + hlutverk). */
+async function managedContract(contractId: string) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: me } = await supabase.from("users").select("company_id, role").eq("id", user.id).maybeSingle();
+  if (!me?.company_id || !["owner", "manager"].includes(me.role as string)) return null;
+  const { data: c } = await supabase.from("contracts").select("id, employee_id, company_id").eq("id", contractId).eq("company_id", me.company_id as string).maybeSingle();
+  return c ? { supabase, user, company: me.company_id as string, contract: c } : null;
+}
+
+export type ContractProgress = {
+  id: string;
+  /** Aðferð: Taktikal (rafræn skilríki) eða kóði í tölvupósti / handvirkt. */
+  method: "taktikal" | "email_otp" | "manual" | null;
+  sentAt: string | null;
+  employer: { name: string | null; at: string } | null;
+  employee: { name: string | null; at: string } | null;
+  pdfStored: boolean;
+  /** contract_taktikal.status (created/employer_signed/…/canceled/expired) */
+  taktikalStatus: string | null;
+  /** Síðast athugað hjá Taktikal / síðasta webhook. */
+  checkedAt: string | null;
+};
+
+/** Undirritunarferill hvers samnings starfsmanns: sent → fyrirtæki → starfsmaður → PDF vistað. */
+export async function getContractProgress(employeeId: string): Promise<Record<string, ContractProgress>> {
+  if (!isSupabaseConfigured()) return {};
+  try {
+    const supabase = await createClient();
+    const company = await companyId(supabase);
+    if (!company) return {};
+    const { data: rows } = await supabase.from("contracts")
+      .select("id, status, signed_via, sent_at, created_at, signed_at, signed_by_name, employer_signed_at, employer_signed_by")
+      .eq("company_id", company).eq("employee_id", employeeId);
+    if (!rows?.length) return {};
+    const ids = rows.map((r) => r.id as string);
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const admin = createAdminClient();
+    const [{ data: sigs }, { data: tk }, { data: docs }] = await Promise.all([
+      supabase.from("contract_signatures").select("contract_id, signer_role, signer_name, method, signed_at").in("contract_id", ids),
+      admin.from("contract_taktikal").select("contract_id, status, updated_at").in("contract_id", ids),
+      admin.from("documents").select("url, name, type, created_at").eq("company_id", company).eq("employee_id", employeeId),
+    ]);
+    const out: Record<string, ContractProgress> = {};
+    for (const r of rows) {
+      const id = r.id as string;
+      const mine = (sigs ?? []).filter((s) => s.contract_id === id);
+      const emr = mine.find((s) => s.signer_role === "employer");
+      const eme = mine.find((s) => s.signer_role === "employee");
+      const t = (tk ?? []).find((x) => x.contract_id === id);
+      const via = (r.signed_via as string | null) ?? (eme?.method as string | undefined) ?? null;
+      const method = via === "taktikal" || eme?.method === "taktikal_qes" ? "taktikal" : via === "email_otp" ? "email_otp" : r.status === "signed" ? "manual" : via ? "email_otp" : null;
+      const employerAt = (emr?.signed_at as string | undefined) ?? (r.employer_signed_at as string | null) ?? null;
+      const employeeAt = (eme?.signed_at as string | undefined) ?? (r.status === "signed" ? (r.signed_at as string | null) : null) ?? null;
+      out[id] = {
+        id, method,
+        sentAt: (r.sent_at as string | null) ?? null,
+        employer: employerAt ? { name: (emr?.signer_name as string | undefined) ?? (r.employer_signed_by as string | null) ?? null, at: employerAt } : null,
+        employee: employeeAt ? { name: (eme?.signer_name as string | undefined) ?? (r.signed_by_name as string | null) ?? null, at: employeeAt } : null,
+        pdfStored: (docs ?? []).some((d) => String(d.url ?? "").startsWith(`${company}/${employeeId}/${id}-`))
+          || (r.status === "signed" && (docs ?? []).some((d) => d.type === "Samningur" && /undirrit/i.test(String(d.name ?? "")) && String(d.created_at ?? "") >= String(r.created_at ?? ""))),
+        taktikalStatus: (t?.status as string | undefined) ?? null,
+        checkedAt: (t?.updated_at as string | undefined) ?? null,
+      };
+    }
+    return out;
+  } catch (e) {
+    console.error("[getContractProgress]", e);
+    return {};
+  }
+}
+
+/** „Uppfæra stöðu frá Taktikal“ — sækir stöðu ferlisins og keyrir sömu stöðuvél og webhookið.
+ *  auto=true (við opnun samningsspjalds): hægt á — í mesta lagi einu sinni á mínútu per samning. */
+export async function syncContractStatus(contractId: string, auto = false): Promise<TaktikalSyncResult> {
+  if (await demoBlocked()) return { ok: false, error: "Þetta er ekki í boði í demo" };
+  if (!isSupabaseConfigured()) return { ok: false };
+  try {
+    const m = await managedContract(contractId);
+    if (!m) return { ok: false, error: "Samningur fannst ekki" };
+    const r = await syncTaktikalContract(contractId, { minIntervalMs: auto ? 60_000 : 0 });
+    if (r.changes?.length) {
+      await logAudit(m.supabase, m.company, m.user.id, { action: "contract.sync", entity: "contracts", entityId: contractId, detail: `Staða samnings uppfærð frá Taktikal: ${r.changes.join(", ")}` });
+    }
+    return r;
+  } catch (e) {
+    console.error("[syncContractStatus]", e);
+    return { ok: false, error: "Tókst ekki að uppfæra stöðuna" };
+  }
+}
+
+/** Opnar undirritaða PDF-ið (úr skjalasafni starfsmannsins) — stuttur signed URL. */
+export async function openSignedContractPdf(contractId: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: false };
+  try {
+    const m = await managedContract(contractId);
+    if (!m) return { ok: false, error: "Samningur fannst ekki" };
+    const path = await signedPdfPath(contractId);
+    if (!path) return { ok: false, error: "Undirritað PDF hefur ekki verið vistað enn" };
+    const { data, error } = await m.supabase.storage.from("documents").createSignedUrl(path, 120);
+    if (error || !data?.signedUrl) return { ok: false, error: "Tókst ekki að opna skjalið" };
+    return { ok: true, url: data.signedUrl };
+  } catch {
+    return { ok: false, error: "Tókst ekki að opna skjalið" };
   }
 }
 

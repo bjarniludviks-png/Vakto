@@ -3,7 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
 import { View, Pressable, ScrollView, RefreshControl, TextInput } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { Plus, MessageCircle, Hash, BellOff, Search, X, Users, UserRound, Check, ChevronLeft } from "lucide-react-native";
+import { SquarePen, MessageCircle, Hash, BellOff, Search, X, Users, UserRound, Check, ChevronLeft } from "lucide-react-native";
 import { Header, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, Sheet, Empty, Row, Btn, Seg, useToast } from "../../src/components/ui";
 import { colors, font, useTheme } from "../../src/theme";
@@ -20,6 +20,14 @@ function when(ts: string | null): string {
   const diff = (now.getTime() - d.getTime()) / 86400000;
   if (diff < 7) return ["Sun", "Mán", "Þri", "Mið", "Fim", "Fös", "Lau"][d.getDay()];
   return `${d.getDate()}.${d.getMonth() + 1}`;
+}
+
+/** Mynd samtals: einkaspjall = manneskjan, # Almennt = brand-hringur, hópur = hópmynd eða upphafsstafir. */
+function ConvAvatar({ c, size }: { c: Conversation; size: number }) {
+  if (c.kind === "general") {
+    return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={Math.round(size * 0.44)} /></View>;
+  }
+  return <Avatar name={c.name} size={size} color={c.kind === "dm" ? c.color : colors.info} photo={c.photo} />;
 }
 
 export default function Spjall() {
@@ -62,6 +70,11 @@ export default function Spjall() {
     return list;
   }, [convs, onlyUnread, search, muted]);
   const unreadTotal = (convs ?? []).filter((c) => c.unread > 0 && !muted.has(c.id)).length;
+  // # Almennt fyrst, svo nýjustu samtölin (listinn kemur raðaður eftir virkni)
+  const pins = useMemo(() => {
+    const list = convs ?? [];
+    return [...list.filter((c) => c.kind === "general"), ...list.filter((c) => c.kind !== "general").slice(0, 8)];
+  }, [convs]);
 
   async function openNew(mode: "dm" | "group") {
     if (!me) return;
@@ -88,59 +101,70 @@ export default function Spjall() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Header title="Spjall" right={
-        <View style={{ flexDirection: "row" }}>
-          <IconBtn label="Leita" onPress={() => setSearch((s) => (s === null ? "" : null))}><Search color={search !== null ? colors.brand : colors.ink} size={22} /></IconBtn>
-          <IconBtn label="Nýtt spjall" onPress={() => setNewMode("pick")}><Plus color={colors.ink} size={24} /></IconBtn>
-        </View>
+        <IconBtn label="Nýtt spjall" onPress={() => setNewMode("pick")}><SquarePen color={colors.ink} size={22} /></IconBtn>
       } />
-      <View style={{ backgroundColor: colors.panel, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: colors.line2 }}>
-        {search !== null ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.panel2, borderRadius: 14, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 14, marginTop: 4 }}>
-            <Search color={colors.ink3} size={18} />
-            <TextInput autoFocus value={search} onChangeText={setSearch} placeholder={tr("Leita í spjalli…")} placeholderTextColor={colors.ink3} style={{ flex: 1, paddingVertical: 13, fontSize: 15.5, fontFamily: font.regular, color: colors.ink }} />
-            {search ? <Pressable onPress={() => setSearch("")} hitSlop={8}><X color={colors.ink3} size={18} /></Pressable> : null}
-          </View>
+      <View style={{ backgroundColor: colors.panel, paddingTop: 8, paddingBottom: 10, gap: 12 }}>
+        {/* leit alltaf sýnileg (Messenger-pilla) */}
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: colors.panel2, borderRadius: 999, paddingHorizontal: 14, marginHorizontal: 16 }}>
+          <Search color={colors.ink3} size={18} />
+          <TextInput value={search ?? ""} onChangeText={(v) => setSearch(v)} placeholder={tr("Leita í spjalli…")} placeholderTextColor={colors.ink3} returnKeyType="search" style={{ flex: 1, paddingVertical: 11, fontSize: 16, fontFamily: font.regular, color: colors.ink }} />
+          {search ? <Pressable onPress={() => setSearch(null)} hitSlop={8} accessibilityLabel={tr("Hreinsa")}><X color={colors.ink3} size={18} /></Pressable> : null}
+        </View>
+        {/* fastir hringir: # Almennt + nýjustu samtölin (eins og efsta röðin í Messenger) */}
+        {pins.length && !search ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}>
+            {pins.map((c) => {
+              const un = c.unread > 0 && !muted.has(c.id);
+              return (
+                <Pressable key={c.id} onPress={() => router.push(`/spjall/${c.id}?name=${encodeURIComponent(c.name)}`)} accessibilityLabel={c.name} style={({ pressed }) => ({ width: 66, alignItems: "center", gap: 6, opacity: pressed ? 0.7 : 1 })}>
+                  <View>
+                    <ConvAvatar c={c} size={60} />
+                    {un ? <View style={{ position: "absolute", right: 0, bottom: 2, width: 16, height: 16, borderRadius: 8, backgroundColor: colors.brand, borderWidth: 3, borderColor: colors.panel }} /> : null}
+                  </View>
+                  <Txt size={12.5} weight={un ? "semibold" : "regular"} color={un ? colors.ink : colors.ink2} numberOfLines={1} style={{ maxWidth: 66, textAlign: "center" }}>{c.kind === "dm" ? c.name.split(/\s+/)[0] : c.name}</Txt>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         ) : null}
-        <Seg value={onlyUnread ? "unread" : "all"} onChange={(v) => setOnlyUnread(v === "unread")} items={[{ id: "all", label: "Allt" }, { id: "unread", label: `Ólesið${unreadTotal ? ` · ${unreadTotal}` : ""}` }]} />
+        <View style={{ paddingHorizontal: 16 }}>
+          <Seg value={onlyUnread ? "unread" : "all"} onChange={(v) => setOnlyUnread(v === "unread")} items={[{ id: "all", label: "Allt" }, { id: "unread", label: `Ólesið${unreadTotal ? ` · ${unreadTotal}` : ""}` }]} />
+        </View>
         {dnd ? (
-          <Pressable onPress={() => router.push("/stillingar")} style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.warnSoft, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 }}>
+          <Pressable onPress={() => router.push("/stillingar")} style={{ flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.warnSoft, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, marginHorizontal: 16 }}>
             <BellOff color={colors.warn} size={16} />
             <Txt weight="semibold" size={12.5} color={colors.warn} style={{ flex: 1 }}>{trf("Tilkynningar þaggaðar {x}", dndLabel(dnd))}</Txt>
             <Txt weight="bold" size={12.5} color={colors.warn}>Breyta</Txt>
           </Pressable>
         ) : null}
       </View>
-      <ScrollView contentInsetAdjustmentBehavior="automatic" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.brand} />}>
+      <ScrollView style={{ backgroundColor: colors.panel }} contentInsetAdjustmentBehavior="automatic" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.brand} />}>
         {convs && visible.length === 0 ? <Empty icon={<MessageCircle color={colors.brandDeep} size={26} />} title={onlyUnread ? "Allt lesið" : search ? "Ekkert fannst" : "Engin samtöl enn"} sub={onlyUnread ? "Engin ólesin skilaboð." : search ? "Prófaðu annað leitarorð." : "Ýttu á + til að byrja spjall."} /> : null}
-        {visible.map((c, i, arr) => (
-          <Pressable
-            key={c.id}
-            onPress={() => router.push(`/spjall/${c.id}?name=${encodeURIComponent(c.name)}`)}
-            style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 12, backgroundColor: pressed ? colors.panel2 : colors.panel, borderBottomWidth: i === arr.length - 1 ? 0 : 1, borderBottomColor: colors.line2 })}
-          >
-            {c.kind === "dm" ? (
-              <Avatar name={c.name} size={50} color={c.color} photo={c.photo} />
-            ) : c.kind === "general" ? (
-              <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={24} /></View>
-            ) : (
-              <Avatar name={c.name} size={50} color={colors.info} photo={c.photo} />
-            )}
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                <Txt weight="bold" size={15} numberOfLines={1} style={{ flexShrink: 1 }}>{c.name}</Txt>
-                <Txt size={11.5} color={colors.ink3} style={{ fontVariant: ["tabular-nums"] }}>{when(c.lastAt)}</Txt>
+        {visible.map((c) => {
+          // Messenger-röð: 56px mynd, nafn + tími til hægri, síðustu skilaboð; ólesið = feitletrað + punktur
+          const un = c.unread > 0 && !muted.has(c.id);
+          return (
+            <Pressable
+              key={c.id}
+              onPress={() => router.push(`/spjall/${c.id}?name=${encodeURIComponent(c.name)}`)}
+              style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 8, minHeight: 72, backgroundColor: pressed ? colors.panel2 : colors.panel })}
+            >
+              <ConvAvatar c={c} size={56} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                  <Txt weight={un ? "bold" : "semibold"} size={16} numberOfLines={1} style={{ flexShrink: 1 }}>{c.name}</Txt>
+                  <Txt size={12.5} weight={un ? "bold" : "regular"} color={un ? colors.brandDeep : colors.ink3} style={{ fontVariant: ["tabular-nums"] }}>{when(c.lastAt)}</Txt>
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 3 }}>
+                  <Txt size={14} color={un ? colors.ink : colors.ink3} weight={un ? "semibold" : "regular"} numberOfLines={1} style={{ flex: 1 }}>
+                    {c.last ? `${c.lastFrom && c.kind !== "dm" ? c.lastFrom + ": " : c.lastFrom === "Þú" ? "Þú: " : ""}${c.last}` : "Engin skilaboð enn"}
+                  </Txt>
+                  {muted.has(c.id) ? <BellOff color={colors.ink3} size={15} /> : un ? <View accessibilityLabel={trf("{n} ólesin", c.unread)} style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.brand }} /> : null}
+                </View>
               </View>
-              <Txt size={13} color={c.unread && !muted.has(c.id) ? colors.ink : colors.ink2} weight={c.unread && !muted.has(c.id) ? "semibold" : "regular"} numberOfLines={1} style={{ marginTop: 2 }}>
-                {c.last ? `${c.lastFrom && c.kind !== "dm" ? c.lastFrom + ": " : c.lastFrom === "Þú" ? "Þú: " : ""}${c.last}` : "Engin skilaboð enn"}
-              </Txt>
-            </View>
-            {muted.has(c.id) ? <BellOff color={colors.ink3} size={16} /> : c.unread ? (
-              <View style={{ minWidth: 20, height: 20, borderRadius: 10, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center", paddingHorizontal: 6 }}>
-                <Txt weight="bold" size={11.5} color="#fff">{c.unread}</Txt>
-              </View>
-            ) : null}
-          </Pressable>
-        ))}
+            </Pressable>
+          );
+        })}
       </ScrollView>
 
       <Sheet open={newMode !== null} onClose={() => setNewMode(null)}>

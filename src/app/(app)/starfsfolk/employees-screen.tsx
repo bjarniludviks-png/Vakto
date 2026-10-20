@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/app/page-header";
 import { Autocomplete } from "@/components/app/autocomplete";
 import { UNIONS, PENSION_FUNDS } from "@/lib/is-lists";
 import { toast } from "@/components/app/toast";
@@ -10,7 +9,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "@/lib/contract-pdf";
-import { updateEmployee, uploadDocument, importEmployees, inviteEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow } from "./actions";
+import { updateEmployee, uploadDocument, importEmployees, inviteEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow, getContractProgress, syncContractStatus, openSignedContractPdf, resendContract, type ContractProgress, type EmployeeContractState } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField, BankField } from "@/components/app/fields";
@@ -61,12 +60,15 @@ export default function EmployeesScreen({
   live,
   leaving = {},
   today = "",
+  contractStates = {},
 }: {
   employees: Employee[];
   live: boolean;
   /** Starfslok (0088): starfsmenn sem hætta / eru hættir. */
   leaving?: Record<string, LeavingInfo>;
   today?: string;
+  /** Samningsstaða per starfsmann (getContractStatusMap) — smá merki á hverri röð. */
+  contractStates?: Record<string, EmployeeContractState>;
 }) {
   const router = useRouter();
   const [showInactive, setShowInactive] = useState(false);
@@ -278,7 +280,12 @@ export default function EmployeesScreen({
                     <td className="r">{nf(e.rate)} <span className="db2-muted">{e.payType === "monthly" ? "kr/mán" : "kr/klst"}</span></td>
                     <td className="r" style={e.employmentRatio > 120 ? { color: "var(--bad)" } : undefined}>{contractor ? <span className="db2-muted">—</span> : `${e.employmentRatio}%`}</td>
                     <td>{contractor ? <span className="db2-muted">{t("á ekki við")}</span> : e.union}</td>
-                    <td>{leaving[e.id] ? <LeavingPill info={leaving[e.id]} today={today} /> : e.status === "inactive" ? <span className="db2-pill mut">{t("Óvirkur")}</span> : <span className={`db2-pill ${b.cls}`}>{t(b.labelKey)}</span>}</td>
+                    <td>
+                      <span className="emp-pills">
+                        {leaving[e.id] ? <LeavingPill info={leaving[e.id]} today={today} /> : e.status === "inactive" ? <span className="db2-pill mut">{t("Óvirkur")}</span> : <span className={`db2-pill ${b.cls}`}>{t(b.labelKey)}</span>}
+                        {live && e.status !== "inactive" && <ContractPill s={contractStates[e.id]} />}
+                      </span>
+                    </td>
                     <td className="r" onClick={(ev) => ev.stopPropagation()}>
                       <span className="emp-rowact">
                         <button className="emp-del" title={t("Eyða starfsmanni")} aria-label={t("Eyða starfsmanni")} onClick={() => delEmp(e.id, e.fullName)}>
@@ -302,6 +309,13 @@ export default function EmployeesScreen({
       </section>
     </div>
   );
+}
+
+/** Smá samningsmerki á röð í Starfsfólk-listanum. */
+function ContractPill({ s }: { s?: EmployeeContractState }) {
+  const { t } = useLang();
+  const [cls, label] = s === "signed" ? ["good", "Undirritað"] : s === "employee" ? ["warn", "Bíður starfsmanns"] : s === "company" ? ["info", "Bíður fyrirtækis"] : ["mut", "Enginn samningur"];
+  return <span className={`db2-pill ${cls} emp-cpill`} title={t("Ráðningarsamningur")}>{t(label)}</span>;
 }
 
 function Sec({ children, first }: { children: React.ReactNode; first?: boolean }) {
@@ -911,6 +925,28 @@ const CONTRACT_STATUS: Record<string, { label: string; tag: string }> = {
   void: { label: "ógilt", tag: "mut" },
 };
 
+/** „⋯“-hnappur með lítilli valmynd (t.d. eyðing) — lokast við smell utan hennar eða Escape. */
+function RowMenu({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  return (
+    <div className="rmenu" ref={ref}>
+      <button type="button" className="rmenu-b" aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+      </button>
+      {open && <div className="rmenu-p" role="menu" onClick={() => setOpen(false)}>{children}</div>}
+    </div>
+  );
+}
+
 /** Employment contracts: generate from employee data, send for e-signature
  * (0058: employer signs on send, employee confirms with an emailed code). */
 function ContractTab({ employeeId, contractor = false }: { employeeId: string; contractor?: boolean }) {
@@ -920,8 +956,32 @@ function ContractTab({ employeeId, contractor = false }: { employeeId: string; c
   const [view, setView] = useState<ContractRow | null>(null);
   const [busy, setBusy] = useState(false);
   const [signerFor, setSignerFor] = useState<{ id: string; ssn: string; phone: string } | null>(null);
-  const load = () => listContracts(employeeId).then((r) => { setContracts(r.contracts); setLive(r.live); }).catch(() => {});
-  useEffect(() => { load(); }, [employeeId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [progress, setProgress] = useState<Record<string, ContractProgress>>({});
+  const load = () => Promise.all([listContracts(employeeId), getContractProgress(employeeId)])
+    .then(([r, p]) => { setContracts(r.contracts); setLive(r.live); setProgress(p); return { contracts: r.contracts, progress: p }; })
+    .catch(() => null);
+  useEffect(() => {
+    let alive = true;
+    load().then(async (res) => {
+      if (!res || !alive) return;
+      // Sjálfvirk samstilling við Taktikal þegar staðan er ekki endanleg (þjónninn hægir á: mest 1×/mín per samning).
+      const open = res.contracts.filter((c) => {
+        const p = res.progress[c.id];
+        const tk = c.signed_via === "taktikal" || p?.method === "taktikal";
+        const ended = ["canceled", "expired", "failed"].includes(p?.taktikalStatus ?? "");
+        return tk && !ended && p?.taktikalStatus && (c.status === "sent" || (c.status === "signed" && !p.pdfStored));
+      });
+      let changed = false;
+      for (const c of open) {
+        const r = await syncContractStatus(c.id, true).catch(() => null);
+        if (r?.ok && !r.skipped) changed = true;
+      }
+      if (changed && alive) load();
+    });
+    return () => { alive = false; };
+  }, [employeeId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const newestOpenId = contracts.find((c) => c.status === "sent")?.id ?? null;
+  const tracked = contracts.filter((c) => c.status === "sent" || c.status === "signed");
 
   async function create(kind?: "employment" | "contractor") {
     setBusy(true);
@@ -956,25 +1016,36 @@ function ContractTab({ employeeId, contractor = false }: { employeeId: string; c
       )}
       <div className="docs">
         {contracts.map((c) => (
-          <div className="docrow" key={c.id}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /></svg>
-            <span style={{ cursor: "pointer" }} onClick={() => setView(c)}>{c.title}</span>
-            <span className={`tag ${CONTRACT_STATUS[c.status]?.tag ?? "mut"}`}>{t(CONTRACT_STATUS[c.status]?.label ?? c.status)}</span>
-            <span className="dl">{c.signed_at ?? c.created}</span>
-            <button className="btn ghost sm" type="button" onClick={async () => downloadContractPdf(c.title, c.content, c.status === "draft" ? [] : await getContractSignatures(c.id))}>PDF</button>
-            {c.status === "draft" && <button className="btn sm" type="button" onClick={() => mark(c, "sent")}>{t("Undirrita & senda")}</button>}
-            {c.status === "sent" && c.signed_via === "taktikal" && (
-              <button className="btn ghost sm" type="button" onClick={async () => {
-                const r = await taktikalEmployerLink(c.id);
-                if (r.url && r.status === "created") window.location.href = r.url;
-                else toast(r.status === "employer_signed" ? t("Þú hefur skrifað undir — beðið eftir starfsmanni") : t("Undirritun er ekki opin"));
-              }}>{t("Opna undirritun")}</button>
+          // Spjald: titill + staða efst, dagsetning smá, aðgerðir í röð (brotna á síma), eyðing í „⋯“-valmynd.
+          <div className="ctr" key={c.id}>
+            <svg className="ctr-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /></svg>
+            <div className="ctr-main">
+              <button type="button" className="ctr-title" onClick={() => setView(c)}>{c.title}</button>
+              <div className="ctr-meta">
+                <span className={`tag ${CONTRACT_STATUS[c.status]?.tag ?? "mut"}`}>{t(CONTRACT_STATUS[c.status]?.label ?? c.status)}</span>
+                <span className="dl">{docDate(c.signed_at ?? c.created) || (c.signed_at ?? c.created)}</span>
+              </div>
+            </div>
+            <div className="ctr-act">
+              <button className="btn ghost sm" type="button" onClick={async () => downloadContractPdf(c.title, c.content, c.status === "draft" ? [] : await getContractSignatures(c.id))}>PDF</button>
+              {c.status === "draft" && <button className="btn sm" type="button" onClick={() => mark(c, "sent")}>{t("Undirrita & senda")}</button>}
+              {c.status !== "signed" && c.status !== "void" && <button className="btn ghost sm" type="button" title={t("Ef samningurinn var undirritaður á pappír")} onClick={() => mark(c, "signed")}>{t("Merkja undirritað")}</button>}
+            </div>
+            {c.status !== "signed" && (
+              <RowMenu label={t("Fleiri aðgerðir")}>
+                <button type="button" className="danger" onClick={() => remove(c)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
+                  {t("Eyða samningi")}
+                </button>
+              </RowMenu>
             )}
-            {c.status !== "signed" && c.status !== "void" && <button className="btn ghost sm" type="button" title={t("Ef samningurinn var undirritaður á pappír")} onClick={() => mark(c, "signed")}>{t("Merkja undirritað")}</button>}
-            {c.status !== "signed" && <button className="x" type="button" title={t("Eyða samningi")} onClick={() => remove(c)} style={{ color: "var(--bad)" }}>✕</button>}
           </div>
         ))}
       </div>
+      {tracked.length > 0 && <Sec>{t("Staða undirritunar")}</Sec>}
+      {tracked.map((c) => (
+        <ContractProgressCard key={c.id} c={c} p={progress[c.id]} employeeId={employeeId} newestOpen={c.id === newestOpenId} onChanged={() => { load(); }} />
+      ))}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
         <button className="btn sm" type="button" disabled={busy} onClick={() => create(contractor ? "contractor" : "employment")}>
           {busy ? t("Bý til…") : contractor ? t("+ Verksamningur úr gögnum") : t("+ Ráðningarsamningur úr gögnum")}
@@ -987,6 +1058,121 @@ function ContractTab({ employeeId, contractor = false }: { employeeId: string; c
       {view && <ContractViewModal view={view} onClose={() => setView(null)} onChanged={load} onNeedSigner={(x) => setSignerFor(x)} />}
       {signerFor && <SignerModal init={signerFor} onClose={() => setSignerFor(null)} onDone={load} />}
     </>
+  );
+}
+
+const CHECK = <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>;
+function fmtDT(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()} kl. ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+/** Undirritunarferill eins samnings: sent → fyrirtæki → starfsmaður → undirritað PDF vistað. */
+function ContractProgressCard({ c, p, employeeId, newestOpen, onChanged }: {
+  c: ContractRow; p: ContractProgress | undefined; employeeId: string; newestOpen: boolean; onChanged: () => void;
+}) {
+  const { t } = useLang();
+  const [busy, setBusy] = useState<"" | "sync" | "resend" | "pdf" | "sign">("");
+  const taktikal = p?.method === "taktikal" || c.signed_via === "taktikal";
+  const ended = p?.taktikalStatus === "canceled" || p?.taktikalStatus === "expired" || p?.taktikalStatus === "failed";
+  const sent = c.status === "sent" || c.status === "signed";
+  const employerDone = !!p?.employer || (c.status === "signed" && !taktikal);
+  const employeeDone = !!p?.employee || c.status === "signed";
+  const pdfDone = !!p?.pdfStored;
+  const steps: { key: string; done: boolean; title: string; sub: string }[] = [
+    { key: "sent", done: sent, title: t("Sent til undirritunar"), sub: fmtDT(p?.sentAt) },
+    {
+      key: "employer", done: employerDone,
+      title: employerDone ? t("Fyrirtækið hefur undirritað") : t("Bíður undirskriftar fyrirtækisins"),
+      sub: employerDone ? [p?.employer?.name, fmtDT(p?.employer?.at)].filter(Boolean).join(" · ") : taktikal ? t("Opnaðu undirritunina og skrifaðu undir með rafrænum skilríkjum") : "",
+    },
+    {
+      key: "employee", done: employeeDone,
+      title: employeeDone ? t("Starfsmaður hefur undirritað") : t("Bíður undirskriftar starfsmanns"),
+      sub: employeeDone ? [p?.employee?.name, fmtDT(p?.employee?.at ?? c.signed_at)].filter(Boolean).join(" · ") : employerDone ? t("Boð um undirritun var sent á netfang starfsmannsins") : "",
+    },
+    {
+      key: "pdf", done: pdfDone,
+      title: pdfDone ? t("Undirritað PDF vistað") : t("Undirritað PDF ekki vistað enn"),
+      sub: pdfDone ? t("í Skjöl starfsmannsins — starfsmaðurinn sér það líka í appinu og Mitt svæði") : employeeDone && taktikal ? t("Sótt frá Taktikal — smelltu á „Uppfæra stöðu frá Taktikal“ ef það skilar sér ekki") : "",
+    },
+  ];
+  const firstTodo = steps.findIndex((s) => !s.done);
+  const methodLabel = taktikal ? t("Rafræn skilríki (Taktikal)") : p?.method === "manual" ? t("Merkt undirritað handvirkt") : t("Kóði í tölvupósti");
+
+  async function sync(silentNoop = false) {
+    setBusy("sync");
+    const r = await syncContractStatus(c.id);
+    setBusy("");
+    if (!r.ok) { toast(r.error ?? t("Tókst ekki að uppfæra stöðuna"), "error"); return; }
+    const ch = r.changes ?? [];
+    if (ch.length) {
+      const parts = [
+        ch.includes("employer_signed") && t("undirskrift fyrirtækisins skráð"),
+        ch.includes("employee_invited") && t("starfsmanni sent boð"),
+        ch.includes("employee_signed") && t("undirskrift starfsmanns skráð"),
+        ch.includes("pdf_stored") && t("undirritað PDF vistað"),
+        (ch.includes("canceled") || ch.includes("expired")) && t("ferlið er ekki lengur opið hjá Taktikal"),
+      ].filter(Boolean);
+      toast(`${t("Staða uppfærð")}: ${parts.join(", ")}`, "ok");
+    } else if (!silentNoop) toast(t("Staðan er óbreytt hjá Taktikal"));
+    onChanged();
+  }
+
+  return (
+    <div className="cst">
+      <div className="cst-h">
+        <b>{c.title}</b>
+        <span className="db2-pill mut cst-m">{methodLabel}</span>
+      </div>
+      <ol className="cst-steps">
+        {steps.map((s, i) => (
+          <li key={s.key} className={s.done ? "done" : i === firstTodo && !ended ? "now" : "todo"}>
+            <span className="cst-dot">{s.done ? CHECK : null}</span>
+            <span className="cst-tx"><b>{s.title}</b>{s.sub && <span>{s.sub}</span>}</span>
+          </li>
+        ))}
+      </ol>
+      {ended && c.status !== "signed" && (
+        <p className="cst-warn">{p?.taktikalStatus === "canceled" ? t("Undirritunarferlið var afturkallað hjá Taktikal. Búðu til nýjan samning til að senda aftur.") : t("Undirritunarferlið rann út hjá Taktikal. Búðu til nýjan samning til að senda aftur.")}</p>
+      )}
+      <div className="cst-act">
+        {taktikal && c.status === "sent" && !employerDone && !ended && (
+          <button className="btn sm" type="button" disabled={!!busy} onClick={async () => {
+            setBusy("sign");
+            const r = await taktikalEmployerLink(c.id);
+            setBusy("");
+            if (r.url && r.status === "created") window.open(r.url, "_blank", "noopener");
+            else { toast(r.status === "employer_signed" ? t("Þú hefur skrifað undir — beðið eftir starfsmanni") : t("Undirritun er ekki opin")); onChanged(); }
+          }}>{t("Opna undirritun")}</button>
+        )}
+        {c.status === "sent" && newestOpen && employerDone && !ended && (
+          <button className="btn ghost sm" type="button" disabled={!!busy} onClick={async () => {
+            setBusy("resend");
+            const r = await resendContract(employeeId);
+            setBusy("");
+            toast(r.ok ? t("Boð sent aftur á starfsmanninn") : (r.error ?? "Villa"), r.ok ? "ok" : "error");
+            onChanged();
+          }}>{busy === "resend" ? t("Sendi…") : t("Senda boð aftur")}</button>
+        )}
+        {taktikal && (c.status === "sent" || !pdfDone) && !ended && (
+          <button className="btn ghost sm" type="button" disabled={!!busy} onClick={() => sync()}>
+            {busy === "sync" ? t("Uppfæri…") : t("Uppfæra stöðu frá Taktikal")}
+          </button>
+        )}
+        {pdfDone && (
+          <button className="btn sm" type="button" disabled={!!busy} onClick={async () => {
+            setBusy("pdf");
+            const r = await openSignedContractPdf(c.id);
+            setBusy("");
+            if (r.ok && r.url) window.open(r.url, "_blank", "noopener"); else toast(r.error ?? "Villa", "error");
+          }}>{busy === "pdf" ? t("Opna…") : t("Opna undirritað PDF")}</button>
+        )}
+        {taktikal && p?.checkedAt && c.status === "sent" && <span className="muted">{t("Síðast athugað")} {fmtDT(p.checkedAt)}</span>}
+      </div>
+    </div>
   );
 }
 
@@ -1092,10 +1278,9 @@ function DocsTab({ employeeId }: { employeeId: string }) {
   const [docs, setDocs] = useState<{ name: string; meta: string; path?: string }[]>(DEMO_DOCS);
   const [live, setLive] = useState(false);
   const [opening, setOpening] = useState(false);
-  async function load() {
-    const r = await getDocuments(employeeId);
+  const load = () => getDocuments(employeeId).then((r) => {
     if (r.live) { setLive(true); setDocs(r.rows.map((d) => ({ name: d.name, meta: docDate(d.created), path: d.path }))); }
-  }
+  });
   useEffect(() => { load(); }, [employeeId]); // eslint-disable-line react-hooks/exhaustive-deps
   function readAsDataUrl(f: File): Promise<string> {
     return new Promise((resolve, reject) => {
