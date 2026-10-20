@@ -126,12 +126,3 @@ export function Icon({
   );
 }
 
-export function Logo({ size = 26 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 28 28" fill="none">
-      <rect x="3" y="15" width="5.4" height="10" rx="1.6" fill="var(--brand-2)" />
-      <rect x="11.3" y="9" width="5.4" height="16" rx="1.6" fill="var(--brand)" />
-      <rect x="19.6" y="3" width="5.4" height="22" rx="1.6" fill="var(--brand-deep)" />
-    </svg>
-  );
-}

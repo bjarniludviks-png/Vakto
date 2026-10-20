@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { passwordStrength, PASSWORD_MIN } from "@/lib/password";
 import { checkNewPassword } from "./actions";
+import { VaktoLogo } from "@/components/brand/vakto-logo";
 
 const C = {
   ink: "#1a1a1f", ink2: "#5f6470", ink3: "#9296a6", line: "#e6e6e9",
@@ -152,14 +153,7 @@ export default function NyttLykilord() {
   return (
     <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: C.bg, padding: 20, fontFamily: "'General Sans', system-ui, -apple-system, sans-serif" }}>
       <form onSubmit={save} style={{ width: "min(420px, 100%)", background: "#fff", borderRadius: 16, padding: "34px 30px", boxShadow: "0 1px 2px rgba(18,18,40,.04), 0 12px 30px -16px rgba(18,18,40,.14)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 18 }}>
-          <svg viewBox="0 0 28 28" fill="none" width="26" height="26">
-            <rect x="3" y="15" width="5.4" height="10" rx="1.6" fill="#f59331" />
-            <rect x="11.3" y="9" width="5.4" height="16" rx="1.6" fill="#e9700f" />
-            <rect x="19.6" y="3" width="5.4" height="22" rx="1.6" fill="#cf5f0c" />
-          </svg>
-          <b style={{ fontSize: 17, letterSpacing: 1, color: C.ink }}>VAKTO</b>
-        </div>
+        <VaktoLogo size={26} style={{ marginBottom: 18, color: C.ink }} />
         <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-.02em", color: C.ink, margin: "0 0 6px" }}>{t.h1}</h1>
         <p style={{ fontSize: 14.5, color: C.ink2, margin: "0 0 22px", lineHeight: 1.5 }}>
           {t.sub}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "../ny.css";
 import "../og.css";
 import { Starfield } from "../starfield";
+import { VaktoMark } from "@/components/brand/vakto-logo";
 
 // Facebook-prófílmynd (1080×1080): VAKTO-súlurnar á dökka bakgrunninum með ljóma.
 export const metadata: Metadata = { title: "VAKTO — profile image", robots: { index: false, follow: false } };
@@ -17,11 +18,7 @@ export default function FbProfilePage() {
         <span className="ny-underglow" />
       </div>
       <div className="mark">
-        <svg width="460" height="460" viewBox="0 0 28 28" fill="none">
-          <rect x="3" y="15" width="5.4" height="10" rx="1.6" fill="#f59331" />
-          <rect x="11.3" y="9" width="5.4" height="16" rx="1.6" fill="#e9700f" />
-          <rect x="19.6" y="3" width="5.4" height="22" rx="1.6" fill="#cf5f0c" />
-        </svg>
+        <VaktoMark size={460} />
       </div>
     </div>
   );

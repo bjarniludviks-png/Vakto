@@ -74,11 +74,12 @@ const FAINT = "#86868b";
 const LINE = "#ececf0";
 const FONT = "-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
+// VAKTO-merkið sem hýst PNG (sama merki og í kerfinu; búið til af scripts/brand/generate-logo.mts).
+// Póstforrit sýna ekki SVG né vefletur, svo orðmerkið er mynd — 114×24 í @1x, @2x-skráin fyrir skjái.
+const LOGO_PNG = "https://www.vakto.is/brand/vakto-logo@2x.png";
 const logo = (size = 1) => {
-  const w = Math.round(5 * size), g = Math.round(3 * size);
-  const bar = (h: number, pad: number) => `<td valign="bottom" style="padding-right:${pad}px"><div style="width:${w}px;height:${Math.round(h * size)}px;border-radius:2px;background:${BRAND}"></div></td>`;
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="display:inline-table;vertical-align:middle"><tr>${bar(9, g)}${bar(14, g)}${bar(19, 0)}</tr></table>` +
-    `<span style="font-size:${Math.round(16 * size)}px;font-weight:700;letter-spacing:${(1.6 * size).toFixed(1)}px;color:${INK};vertical-align:middle;padding-left:${Math.round(8 * size)}px">VAKTO</span>`;
+  const w = Math.round(114 * size), h = Math.round(24 * size);
+  return `<img src="${LOGO_PNG}" width="${w}" height="${h}" alt="VAKTO" style="display:inline-block;width:${w}px;height:${h}px;border:0;outline:none;text-decoration:none;vertical-align:middle">`;
 };
 
 const pill = (label: string, href: string) =>

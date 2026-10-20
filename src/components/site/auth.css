@@ -37,7 +37,6 @@
   .ah-auth-l{min-height:100dvh;padding:88px max(22px, env(safe-area-inset-right,0px)) 40px max(22px, env(safe-area-inset-left,0px))}
   .ah-auth-r{padding:64px max(22px, env(safe-area-inset-right,0px)) calc(72px + env(safe-area-inset-bottom,0px)) max(22px, env(safe-area-inset-left,0px));border-left:0;border-top:1px solid rgba(233,112,15,.12)}
 }
-.ah-auth-top .ah-logo{color:var(--ink)}
 .ah-auth-mac{width:min(560px,100%)}
 .ah-auth-mac .ah-mac{border-radius:12px}
 .ah-auth-mac .ah-mac-bar{height:30px}

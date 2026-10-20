@@ -2,6 +2,7 @@
 
 // Shown when a company's access has been suspended by the VAKTO admin.
 import { useEffect, useState } from "react";
+import { VaktoLogo } from "@/components/brand/vakto-logo";
 
 const T = {
   is: { h: "Aðgangur fyrirtækisins er lokaður", p: "Aðgangi fyrirtækisins þíns að VAKTO hefur verið lokað tímabundið. Hafðu samband við okkur til að opna hann aftur." },
@@ -20,6 +21,7 @@ export default function AdgangurLokadur() {
   return (
     <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f4f4f6", fontFamily: "'General Sans', system-ui, sans-serif", padding: 20 }}>
       <div style={{ maxWidth: 420, background: "#fff", borderRadius: 16, padding: "36px 34px", boxShadow: "0 1px 2px rgba(18,18,40,.04), 0 12px 30px -16px rgba(18,18,40,.14)", textAlign: "center" }}>
+        <VaktoLogo size={26} style={{ marginBottom: 22 }} />
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d8483a" strokeWidth="1.8" style={{ margin: "0 auto 14px", display: "block" }}>
           <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>

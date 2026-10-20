@@ -3,7 +3,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Icon, Logo } from "./icons";
+import { Icon } from "./icons";
+import { VaktoLogo } from "@/components/brand/vakto-logo";
 import { ToastHost, toast } from "./toast";
 import { visibleFor, type Role } from "./nav";
 import { useLang, type Lang } from "./lang";
@@ -162,10 +163,7 @@ export default function AppShell({
         <aside className={`side${navOpen ? " open" : ""}`}>
           <div className="brand">
             <Link href="/" className="brandlink" title={t("Fara á forsíðu")} aria-label={t("Fara á forsíðu")}>
-              <div className="m">
-                <Logo size={26} />
-              </div>
-              <b>VAKTO</b>
+              <VaktoLogo size={26} />
             </Link>
             <button className="railtog" onClick={toggleRail} title={railed ? "Sýna hliðarstiku" : "Fela hliðarstiku"} aria-label="toggle sidebar">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 6l-6 6 6 6M21 6l-6 6 6 6" /></svg>

@@ -5,7 +5,7 @@ import { nf } from "@/lib/format";
 import { ESIGN_PRICE } from "@/lib/pricing";
 import { brandName } from "@/app/(app)/stillingar/card-brand";
 import { PrintButton } from "./print-button";
-import { Logo } from "@/components/app/icons";
+import { VaktoLogo } from "@/components/brand/vakto-logo";
 import "./kvittun.css";
 
 export const dynamic = "force-dynamic";
@@ -55,7 +55,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
       <div className="kv-actions">{inv.payday_invoice_id && <a className="kv-btn primary" href={`/kvittun/${inv.id}/reikningur`}>Sækja reikning nr. {inv.payday_invoice_number ?? ""} (PDF)</a>}<PrintButton /></div>
       <article className="kv-paper">
         <header className="kv-head">
-          <div className="kv-logo"><Logo size={30} /><b>VAKTO</b></div>
+          <div className="kv-logo"><VaktoLogo size={30} /></div>
           <div className="kv-title"><h1>Greiðslukvittun</h1><span>Tilvísun {String(inv.reference).replace(/^inv:/, "").slice(0, 8).toUpperCase()}</span>{inv.payday_invoice_number && <span>Reikningur nr. {inv.payday_invoice_number}</span>}</div>
         </header>
 

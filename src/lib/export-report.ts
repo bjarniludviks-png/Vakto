@@ -1,6 +1,7 @@
 // Client-side Excel (.xlsx) + PDF export for the time report. Heavy deps are
 // dynamically imported so they don't bloat the initial bundle.
 import { dec1, nf } from "@/lib/format";
+import { drawVaktoLogo } from "@/lib/pdf-logo";
 import type { TimeReportRow } from "@/app/(app)/timaskraning/actions";
 
 const statusIs = (a: boolean) => (a ? "Samþykkt" : "Bíður");
@@ -47,12 +48,7 @@ function logoFooter(doc: any) {
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i);
     const by = ph - 10;
-    // Three ascending bars in the brand shades (matches the app logo).
-    doc.setFillColor(245, 147, 49); doc.rect(14, by - 3.5, 2, 3.5, "F");   // --brand-2
-    doc.setFillColor(233, 112, 15); doc.rect(16.6, by - 5.5, 2, 5.5, "F"); // --brand
-    doc.setFillColor(207, 95, 12); doc.rect(19.2, by - 7.5, 2, 7.5, "F");  // --brand-deep
-    doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(233, 112, 15);
-    doc.text("VAKTO", 23, by);
+    drawVaktoLogo(doc, 14, by, 7); // sama merki og í kerfinu (súlur + orðmerki)
     doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(150, 150, 150);
     doc.text("vakto.is", pw - 14, by, { align: "right" });
   }

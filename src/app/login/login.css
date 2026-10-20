@@ -18,9 +18,6 @@ body{font-family:"General Sans","Plus Jakarta Sans",ui-sans-serif,system-ui,-app
 .left{display:flex;align-items:center;justify-content:center;padding:40px 28px;background:#060607}
 .form{width:100%;max-width:380px}
 .brand{display:flex;align-items:center;gap:11px;margin-bottom:42px}
-.brand .m{display:flex;align-items:center;justify-content:center}
-.brand .m svg{width:30px;height:30px;display:block}
-.brand b{font-size:19px;font-weight:700;letter-spacing:.04em;color:var(--ink)}
 .form h1{font-size:30px;font-weight:700;letter-spacing:-.03em;color:#fff}
 .form .sub{font-size:14.5px;color:var(--ink2);margin-top:8px;margin-bottom:30px}
 .field{margin-bottom:18px}

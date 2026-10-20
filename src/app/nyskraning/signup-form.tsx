@@ -8,6 +8,7 @@ import { checkPromo, createOwnerAccount, requestSignupCode, startCardSetup, veri
 import { passwordStrength, PASSWORD_MIN } from "@/lib/password";
 import Turnstile, { TURNSTILE_SITE_KEY } from "@/components/turnstile";
 import { trackSignup } from "@/components/site/analytics";
+import { VaktoLogo } from "@/components/brand/vakto-logo";
 
 export type SignupLang = "is" | "en" | "pl";
 const L = {
@@ -214,14 +215,6 @@ const L = {
   },
 };
 
-const Bars = () => (
-  <div className="m"><svg viewBox="0 0 28 28" fill="none">
-    <rect x="3" y="15" width="5.4" height="10" rx="1.6" fill="var(--brand-2)" />
-    <rect x="11.3" y="9" width="5.4" height="16" rx="1.6" fill="var(--brand)" />
-    <rect x="19.6" y="3" width="5.4" height="22" rx="1.6" fill="var(--brand-deep)" />
-  </svg></div>
-);
-
 type Step = "email" | "code" | "account" | "card";
 const STEP_IDS: Step[] = ["email", "account", "card"];
 
@@ -349,7 +342,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
   if (step === "card") {
     return (
       <form className="form" onSubmit={finish}>
-        <div className="brand"><Bars /><b>VAKTO</b></div>
+        <div className="brand"><VaktoLogo size={30} /></div>
         <Steps cur="card" s={s} />
         {promo && <div className="promo-note">{s.promoNote(promo.days)}</div>}
         <h1>{promo ? s.promoH(promo.days) : s.trialH}</h1>
@@ -374,7 +367,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
   if (step === "email") {
     return (
       <form className="form" onSubmit={sendCode}>
-        <div className="brand"><Bars /><b>VAKTO</b></div>
+        <div className="brand"><VaktoLogo size={30} /></div>
         <Steps cur="email" s={s} />
         {promo && <div className="promo-note">{s.promoNote(promo.days)}</div>}
         <h1>{s.createH}</h1>
@@ -394,7 +387,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
   if (step === "code") {
     return (
       <form className="form" onSubmit={checkCode}>
-        <div className="brand"><Bars /><b>VAKTO</b></div>
+        <div className="brand"><VaktoLogo size={30} /></div>
         <Steps cur="code" s={s} />
         {promo && <div className="promo-note">{s.promoNote(promo.days)}</div>}
         <h1>{s.codeH}</h1>
@@ -417,7 +410,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
 
   return (
     <form className="form" onSubmit={submitAccount}>
-      <div className="brand"><Bars /><b>VAKTO</b></div>
+      <div className="brand"><VaktoLogo size={30} /></div>
       <Steps cur="account" s={s} />
         {promo && <div className="promo-note">{s.promoNote(promo.days)}</div>}
       <h1>{s.accH}</h1>

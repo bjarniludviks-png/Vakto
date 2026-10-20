@@ -8,9 +8,12 @@ import { StatusBar } from "expo-status-bar";
 import { Eye, EyeOff } from "lucide-react-native";
 import { supabase, isSupabaseConfigured } from "../src/lib/supabase";
 import { Txt, Btn, Muted } from "../src/components/ui";
+import { MARK_BARS, WHITE_BAR_OPACITY, VaktoWordmark, logoGap } from "../src/components/vakto-logo";
 import { colors, radius, font, useTheme } from "../src/theme";
 
-const BARS = [{ h: 22, o: 0.7 }, { h: 35, o: 0.85 }, { h: 48, o: 1 }];
+// Sama merki og alls staðar (hvíta útgáfan á appelsínugulu): súlurnar í 28-kassa, kvarðaðar í LOGO px.
+const LOGO = 52;
+const BARS = MARK_BARS.map((b, i) => ({ left: (b.x * LOGO) / 28, top: (b.y * LOGO) / 28, w: (b.w * LOGO) / 28, h: (b.h * LOGO) / 28, r: (b.rx * LOGO) / 28, o: WHITE_BAR_OPACITY[i] }));
 const OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const HERO = 250; // sýnileg hæð appelsínugula haussins þegar blaðið er komið upp
 
@@ -95,14 +98,18 @@ export default function Login() {
 
       {/* merkið: byrjar á miðjum skjá, færist upp í hausinn */}
       <Animated.View pointerEvents="none" style={{ position: "absolute", left: 0, right: 0, top: logoStart, alignItems: "center", transform: [{ translateY: lift.interpolate({ inputRange: [0, 1], outputRange: [0, logoEnd - logoStart] }) }] }}>
-        <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 7, height: 48 }}>
-          {BARS.map((b, i) => (
-            <Animated.View key={i} style={{ width: 13, height: b.h, borderRadius: 4, backgroundColor: "#fff", opacity: bars[i].interpolate({ inputRange: [0, 1], outputRange: [0, b.o] }), transformOrigin: "bottom", transform: [{ scaleY: bars[i].interpolate({ inputRange: [0, 1], outputRange: [0.12, 1] }) }] }} />
-          ))}
+        <View accessible accessibilityRole="image" accessibilityLabel="VAKTO" style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={{ width: LOGO, height: LOGO }}>
+            {BARS.map((b, i) => (
+              <Animated.View key={i} style={{ position: "absolute", left: b.left, top: b.top, width: b.w, height: b.h, borderRadius: b.r, backgroundColor: "#fff", opacity: bars[i].interpolate({ inputRange: [0, 1], outputRange: [0, b.o] }), transformOrigin: "bottom", transform: [{ scaleY: bars[i].interpolate({ inputRange: [0, 1], outputRange: [0.12, 1] }) }] }} />
+            ))}
+          </View>
+          <Animated.View style={[{ marginLeft: logoGap(LOGO) }, rise(word)]}>
+            <VaktoWordmark size={LOGO} color="#fff" />
+          </Animated.View>
         </View>
-        <Animated.View style={[{ alignItems: "center", marginTop: 14 }, rise(word)]}>
-          <Txt weight="bold" size={30} color="#fff" style={{ letterSpacing: -0.6 }}>VAKTO</Txt>
-          <Txt size={14} color="rgba(255,255,255,.88)" style={{ marginTop: 2 }}>Vaktir, tímar og laun á einum stað</Txt>
+        <Animated.View style={[{ alignItems: "center", marginTop: 10 }, rise(word)]}>
+          <Txt size={14} color="rgba(255,255,255,.88)">Vaktir, tímar og laun á einum stað</Txt>
         </Animated.View>
       </Animated.View>
 

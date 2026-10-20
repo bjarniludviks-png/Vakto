@@ -5,6 +5,7 @@
 // málsgreinar). Keyrir í vafra (niðurhal) OG á þjóni (undirritað eintak, esign.server.ts).
 // jsPDF og letrið eru hlaðin inn með dynamic import.
 import type { jsPDF } from "jspdf";
+import { drawVaktoLogo } from "@/lib/pdf-logo";
 
 type RGB = [number, number, number];
 const ORANGE: RGB = [233, 112, 15];
@@ -215,10 +216,6 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
     doc.setFont("GS", style); doc.setFontSize(size); doc.setTextColor(...color);
   };
   const wrap = (text: string, width: number) => doc.splitTextToSize(text, width) as string[];
-  const mark = (x: number, baseY: number, scale = 1) => {
-    doc.setFillColor(...ORANGE);
-    [6, 9, 12].forEach((h, i) => doc.roundedRect(x + i * 5 * scale, baseY - h * scale, 3.2 * scale, h * scale, 1, 1, "F"));
-  };
 
   const parsed = parseContract(content);
   const VERK = parsed.sections.some((x) => splitLang(x.title)[0].startsWith("Verkkaupi"));
@@ -275,8 +272,7 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
     const headH = 34 + 20 + 30 + 14 + (sIs.length ? sIs.length * 13.5 + sEn.length * 12 + 14 : 0) + tileH + 4 + 24;
     doc.setFillColor(...WARM); doc.rect(0, 0, W, headH, "F");
     y = 34;
-    mark(M, y + 2);
-    font("bold", 10.5, INK); doc.text("VAKTO", M + 20, y + 1.5);
+    drawVaktoLogo(doc, M, y + 1.5, 17);
     font("normal", 8, WARM_MUT); doc.text("vakto.is", W - M, y + 1.5, { align: "right" });
     y += 38;
     font("bold", 23, INK); doc.text(tIs || "Ráðningarsamningur", M, y);
@@ -456,8 +452,7 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
     doc.setPage(i);
     const by = opts.stampStrip && i === pages ? H - 62 : H - 26;
     doc.setDrawColor(...RULE); doc.setLineWidth(0.7); doc.line(M, by - 12, W - M, by - 12);
-    mark(M, by + 0.5, 0.8);
-    font("bold", 8.5, INK); doc.text("VAKTO", M + 16, by);
+    drawVaktoLogo(doc, M, by, 11);
     font("normal", 7.8, MUT);
     doc.text(`${tIs || "Ráðningarsamningur"}${empName ? ` · ${empName}` : ""}`, M + 52, by);
     doc.text(`vakto.is · ${i} / ${pages}`, W - M, by, { align: "right" });

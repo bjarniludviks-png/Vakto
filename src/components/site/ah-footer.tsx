@@ -3,13 +3,12 @@
 // Fótur vefsins (forsíða, Um okkur, innskráning/lögfræði). IS/EN eftir vali notandans.
 import Link from "next/link";
 import { useSiteLang } from "./lang";
+import { VaktoLogo } from "@/components/brand/vakto-logo";
 
+/** Merki vefsins = sama merki og í kerfinu (components/brand/vakto-logo.tsx). */
 export function AhLogo() {
   return (
-    <span className="ah-logo" translate="no">
-      <svg viewBox="0 0 28 28" aria-hidden="true"><rect className="b1" x="3" y="15" width="5.4" height="10" rx="1.6" /><rect className="b2" x="11.3" y="9" width="5.4" height="16" rx="1.6" /><rect className="b3" x="19.6" y="3" width="5.4" height="22" rx="1.6" /></svg>
-      VAKTO
-    </span>
+    <VaktoLogo size={26} className="ah-logo" />
   );
 }
 
