@@ -7,7 +7,7 @@ import { useSiteLang } from "./lang";
 export function AhLogo() {
   return (
     <span className="ah-logo" translate="no">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="12" width="4" height="8" rx="1.3" /><rect x="10" y="8" width="4" height="12" rx="1.3" /><rect x="17" y="4" width="4" height="16" rx="1.3" /></svg>
+      <svg viewBox="0 0 28 28" aria-hidden="true"><rect className="b1" x="3" y="15" width="5.4" height="10" rx="1.6" /><rect className="b2" x="11.3" y="9" width="5.4" height="16" rx="1.6" /><rect className="b3" x="19.6" y="3" width="5.4" height="22" rx="1.6" /></svg>
       VAKTO
     </span>
   );
