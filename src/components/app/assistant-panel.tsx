@@ -6,6 +6,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useLang } from "./lang";
+import { showDemoReadOnly } from "./demo-guard";
 
 type Action = { tool: string; input: Record<string, unknown>; summary: string; state?: "pending" | "busy" | "done" | "error" | "cancelled"; error?: string };
 type Msg = { id?: string; role: "user" | "assistant"; content: string; actions?: Action[]; upgrade?: boolean; signup?: boolean };
@@ -16,7 +17,7 @@ const KEY_ID = "vakto-assistant-id";
 const S = {
   is: {
     name: "VAKTO AI", open: "Opna VAKTO AI", close: "Loka", reset: "Nýtt samtal", history: "Fyrri samtöl", noHistory: "Engin vistuð samtöl enn.", del: "Eyða samtali", back: "Til baka", ph: "Spurðu um reksturinn eða biddu um breytingu…",
-    send: "Senda", thinking: "Hugsa…", confirm: "Staðfesta", cancel: "Hætta við", all: "Staðfesta allt", done: "Gert", cancelled: "Hætt við",
+    send: "Senda", thinking: "Hugsa…", confirm: "Staðfesta", viewOnly: "Aðeins til skoðunar í demo — tillagan er ekki framkvæmd.", cancel: "Hætta við", all: "Staðfesta allt", done: "Gert", cancelled: "Hætt við",
     hello: "Hæ! Ég get svarað spurningum um laun, tíma og vaktir, sett upp vaktaplan fyrir heila viku og undirbúið breytingar sem þú staðfestir.",
     err: "Tókst ekki að ná sambandi. Reyndu aftur.",
     chips: ["Hvernig er laun % af veltu þessa vikuna?", "Berðu saman launakostnað og tíma í þessum mánuði og síðasta", "Settu upp næstu viku: allir með einn frídag", "Hver er á vakt núna?", "Láttu mig vita ef einhver fer yfir 180 tíma í mánuðinum"],
@@ -27,7 +28,7 @@ const S = {
   },
   en: {
     name: "VAKTO AI", open: "Open VAKTO AI", close: "Close", reset: "New conversation", history: "Earlier conversations", noHistory: "No saved conversations yet.", del: "Delete conversation", back: "Back", ph: "Ask about the business or request a change…",
-    send: "Send", thinking: "Thinking…", confirm: "Confirm", cancel: "Cancel", all: "Confirm all", done: "Done", cancelled: "Cancelled",
+    send: "Send", thinking: "Thinking…", confirm: "Confirm", viewOnly: "View only in the demo — the proposal is not carried out.", cancel: "Cancel", all: "Confirm all", done: "Done", cancelled: "Cancelled",
     hello: "Hi! I can answer questions about labor cost, hours and shifts, plan a whole week, and prepare changes for you to confirm.",
     err: "Could not connect. Try again.",
     chips: ["What's labor % of revenue this week?", "Compare labor cost and hours this month vs last month", "Plan next week: everyone gets one day off", "Who is on shift now?", "Tell me if anyone goes over 180 hours this month"],
@@ -38,7 +39,7 @@ const S = {
   },
   pl: {
     name: "VAKTO AI", open: "Otwórz VAKTO AI", close: "Zamknij", reset: "Nowa rozmowa", history: "Wcześniejsze rozmowy", noHistory: "Brak zapisanych rozmów.", del: "Usuń rozmowę", back: "Wstecz", ph: "Zapytaj o firmę lub poproś o zmianę…",
-    send: "Wyślij", thinking: "Myślę…", confirm: "Zatwierdź", cancel: "Anuluj", all: "Zatwierdź wszystko", done: "Gotowe", cancelled: "Anulowano",
+    send: "Wyślij", thinking: "Myślę…", confirm: "Zatwierdź", viewOnly: "Demo tylko do podglądu — propozycja nie zostanie wykonana.", cancel: "Anuluj", all: "Zatwierdź wszystko", done: "Gotowe", cancelled: "Anulowano",
     hello: "Cześć! Odpowiem na pytania o koszty pracy, godziny i zmiany, ułożę grafik na cały tydzień i przygotuję zmiany do Twojego zatwierdzenia.",
     err: "Nie udało się połączyć. Spróbuj ponownie.",
     chips: ["Jaki jest w tym tygodniu udział kosztów pracy w obrocie?", "Porównaj koszty pracy i godziny w tym i poprzednim miesiącu", "Ułóż grafik na przyszły tydzień: każdy ma jeden dzień wolny", "Kto jest teraz na zmianie?", "Powiadom mnie, jeśli ktoś przekroczy 180 godzin w miesiącu"],
@@ -49,7 +50,7 @@ const S = {
   },
   vi: {
     name: "VAKTO AI", open: "Mở VAKTO AI", close: "Đóng", reset: "Cuộc trò chuyện mới", history: "Cuộc trò chuyện trước", noHistory: "Chưa có cuộc trò chuyện nào được lưu.", del: "Xóa cuộc trò chuyện", back: "Quay lại", ph: "Hỏi về hoạt động kinh doanh hoặc yêu cầu thay đổi…",
-    send: "Gửi", thinking: "Đang suy nghĩ…", confirm: "Xác nhận", cancel: "Hủy", all: "Xác nhận tất cả", done: "Xong", cancelled: "Đã hủy",
+    send: "Gửi", thinking: "Đang suy nghĩ…", confirm: "Xác nhận", viewOnly: "Bản demo chỉ để xem — đề xuất sẽ không được thực hiện.", cancel: "Hủy", all: "Xác nhận tất cả", done: "Xong", cancelled: "Đã hủy",
     hello: "Xin chào! Tôi có thể trả lời câu hỏi về chi phí lương, giờ làm và ca làm, lập lịch cho cả tuần và chuẩn bị các thay đổi để bạn xác nhận.",
     err: "Không thể kết nối. Vui lòng thử lại.",
     chips: ["Tỷ lệ chi phí lương trên doanh thu tuần này là bao nhiêu?", "So sánh chi phí lương và giờ làm tháng này với tháng trước", "Lập lịch tuần sau: mỗi người được nghỉ một ngày", "Ai đang trong ca làm?", "Báo cho tôi nếu ai đó vượt quá 180 giờ trong tháng"],
@@ -79,7 +80,8 @@ function Rich({ text }: { text: string }) {
 
 const Spark = () => <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3Z" /><path d="M18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8Z" /></svg>;
 
-export function AssistantPanel() {
+/** demo: opna demoið er aðeins til skoðunar — spurningum er svarað, tillögur eru sýndar en ekki framkvæmdar. */
+export function AssistantPanel({ demo = false }: { demo?: boolean }) {
   const { lang } = useLang();
   const s = S[lang];
   const path = usePathname();
@@ -126,7 +128,7 @@ export function AssistantPanel() {
   }
   /** Vistar stöðu tillögu (staðfest / hætt við) svo hún sé rétt þegar samtalið er opnað aftur. */
   function saveState(mi: number, ai: number, state: "done" | "cancelled" | "error") {
-    const id = msgs[mi]?.id; if (!id) return;
+    const id = msgs[mi]?.id; if (!id || demo) return;
     void fetch("/api/assistant/conversations", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messageId: id, index: ai, state }) }).catch(() => {});
   }
   useEffect(() => { list.current?.scrollTo({ top: list.current.scrollHeight, behavior: "smooth" }); }, [msgs, busy, open]);
@@ -165,6 +167,7 @@ export function AssistantPanel() {
   }
   async function confirm(mi: number, ai: number) {
     const a = msgs[mi]?.actions?.[ai]; if (!a || a.state !== "pending") return;
+    if (demo) { showDemoReadOnly(); return; } // þjónninn lokar líka /api/assistant/execute í demo
     patchAction(mi, ai, { state: "busy" });
     try {
       const res = await fetch("/api/assistant/execute", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tool: a.tool, input: a.input, lang }) });
@@ -174,6 +177,7 @@ export function AssistantPanel() {
     } catch { patchAction(mi, ai, { state: "error", error: s.err }); }
   }
   async function confirmAll(mi: number) {
+    if (demo) { showDemoReadOnly(); return; }
     const acts = msgs[mi]?.actions ?? [];
     for (let i = 0; i < acts.length; i++) if (acts[i].state === "pending") await confirm(mi, i);
   }
@@ -198,7 +202,7 @@ export function AssistantPanel() {
               {hist.length === 0 ? <p className="vai-muted">{s.noHistory}</p> : hist.map((c) => (
                 <div key={c.id} className={`vai-conv${c.id === convId ? " on" : ""}`}>
                   <button className="vai-conv-t" onClick={() => openConv(c.id)}><b>{c.title || s.name}</b><small>{(() => { const d = new Date(c.updated_at); return `${d.getDate()}.${d.getMonth() + 1}.`; })()}</small></button>
-                  <button className="vai-ico" onClick={() => delConv(c.id)} title={s.del} aria-label={s.del}><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg></button>
+                  {!demo && <button className="vai-ico" onClick={() => delConv(c.id)} title={s.del} aria-label={s.del}><svg viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg></button>}
                 </div>
               ))}
             </div>
@@ -219,7 +223,7 @@ export function AssistantPanel() {
                   <div className="vai-acts">
                     {m.actions.map((a, j) => (
                       <div key={j} className={`vai-act ${a.state}`}>
-                        <span className="vai-act-tx">{a.summary}{a.state === "error" && <small>{a.error}</small>}</span>
+                        <span className="vai-act-tx">{a.summary}{a.state === "error" && <small>{a.error}</small>}{demo && a.state === "pending" && <small>{s.viewOnly}</small>}</span>
                         {a.state === "pending" && (<span className="vai-act-b">
                           <button className="btn sm" onClick={() => confirm(i, j)}>{s.confirm}</button>
                           <button className="btn ghost sm" onClick={() => { patchAction(i, j, { state: "cancelled" }); saveState(i, j, "cancelled"); }}>{s.cancel}</button>

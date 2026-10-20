@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { canAccess, homeFor } from "@/lib/access";
 import type { Role } from "@/components/app/nav";
+import { DEMO_READONLY_HEADER, DEMO_READONLY_MSG, demoApiAllowed } from "@/lib/demo-readonly";
 
 /**
  * Refreshes the Supabase auth session on every request and guards the
@@ -53,6 +54,24 @@ export async function updateSession(request: NextRequest) {
     && (request.headers.get("sec-fetch-dest") ?? "document") === "document";
   if (user && demoEmail && isDocumentNav && pathname.startsWith("/nyskraning") && user.email?.toLowerCase() === demoEmail) {
     await supabase.auth.signOut({ scope: "local" });
+  }
+
+  // Opið demo er AÐEINS til skoðunar: skrifandi /api/**-köll demo-lotu eru stöðvuð hér (nema
+  // DEMO_API_ALLOW — AI-spurningar, forsíðuspjall o.fl.). Server actions eru varðar í hverri
+  // aðgerð + þjónustulyklinum + RLS (migration 0087) — sjá lib/demo-readonly.ts.
+  const demoCompany = process.env.DEMO_COMPANY_ID?.trim();
+  if (user && demoCompany && pathname.startsWith("/api/") && !demoApiAllowed(pathname, request.method)) {
+    let isDemo = !!demoEmail && user.email?.toLowerCase() === demoEmail;
+    if (!isDemo) {
+      const { data: me } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
+      isDemo = me?.company_id === demoCompany;
+    }
+    if (isDemo) {
+      return NextResponse.json(
+        { ok: false, error: DEMO_READONLY_MSG, demoReadOnly: true },
+        { status: 403, headers: { [DEMO_READONLY_HEADER]: "1" } },
+      );
+    }
   }
 
   // ---------- VAKTO Platform host (admin.vakto.is) ----------

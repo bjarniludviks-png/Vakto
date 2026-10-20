@@ -1,5 +1,6 @@
 "use server";
 
+import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { logAudit } from "@/lib/audit";
@@ -65,6 +66,7 @@ export async function getTengingar(): Promise<TengingarView> {
 }
 
 export async function connectIntegration(input: { provider: Provider; site: string; token?: string; key?: string; secret?: string; locationId?: string }): Promise<R & { total?: number }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctxOf(); if ("error" in c) return { ok: false, error: c.error };
   if (input.provider !== "shopify" && input.provider !== "woocommerce") return { ok: false, error: "Óþekkt kerfi" };
   const site = normalizeSite(input.provider, input.site);
@@ -86,6 +88,7 @@ export async function connectIntegration(input: { provider: Provider; site: stri
 
 /** Tengir Payday: lyklarnir eru prófaðir (sóttur aðgangslykill) og geymdir dulkóðaðir. */
 export async function connectPayday(input: { clientId: string; clientSecret: string }): Promise<R> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctxOf(); if ("error" in c) return { ok: false, error: c.error };
   const creds = { key: input.clientId.trim(), secret: input.clientSecret.trim() };
   if (!creds.key || !creds.secret) return { ok: false, error: "Vantar Client ID og Client Secret" };
@@ -100,6 +103,7 @@ export async function connectPayday(input: { clientId: string; clientSecret: str
 }
 
 export async function syncNow(id: string): Promise<R> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctxOf(); if ("error" in c) return { ok: false, error: c.error };
   const { data } = await c.supabase.from("company_integrations").select("id, company_id, provider, site, location_id, secret_enc").eq("id", id).eq("company_id", c.company).maybeSingle();
   if (!data) return { ok: false, error: "Tenging fannst ekki" };
@@ -109,6 +113,7 @@ export async function syncNow(id: string): Promise<R> {
 }
 
 export async function disconnectIntegration(id: string): Promise<R> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctxOf(); if ("error" in c) return { ok: false, error: c.error };
   const { data } = await c.supabase.from("company_integrations").delete().eq("id", id).eq("company_id", c.company).select("provider, site").maybeSingle();
   if (data) await logAudit(c.supabase, c.company, c.userId, { action: "integration.disconnect", entity: "company_integrations", entityId: id, detail: `${data.provider} aftengt — ${data.site}` });
@@ -117,6 +122,7 @@ export async function disconnectIntegration(id: string): Promise<R> {
 }
 
 export async function setRevenueMode(mode: RevenueMode): Promise<R> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctxOf(); if ("error" in c) return { ok: false, error: c.error };
   const { error } = await c.supabase.from("companies").update({ revenue_mode: mode }).eq("id", c.company);
   return error ? { ok: false, error: "Tókst ekki að vista" } : { ok: true };
@@ -127,6 +133,7 @@ const WEIGHTS = [0.14, 0.11, 0.11, 0.12, 0.14, 0.18, 0.20];
 
 /** Áætlun út frá mánaðarveltu: skiptist á vikudaga eftir dæmigerðu mynstri. Raunvelta vinnur alltaf þegar hún kemur. */
 export async function saveMonthlyEstimate(monthly: number): Promise<R> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctxOf(); if ("error" in c) return { ok: false, error: c.error };
   if (!(monthly > 0) || monthly > 5e10) return { ok: false, error: "Sláðu inn mánaðarveltu" };
   const weekly = (monthly * 12) / 52;
@@ -141,12 +148,14 @@ export async function saveMonthlyEstimate(monthly: number): Promise<R> {
 
 /** Eftir handvirka skráningu: læra mynstrið ef nóg er komið af tölum. */
 export async function relearnPattern(): Promise<R> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctxOf(); if ("error" in c) return { ok: false, error: c.error };
   await refreshWeekdayPattern(c.company);
   return { ok: true };
 }
 
 export async function notifyInterest(provider: string): Promise<R> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctxOf(); if ("error" in c) return { ok: false, error: c.error };
   const { error } = await c.supabase.from("integration_interest").upsert({ company_id: c.company, provider: provider.slice(0, 40), user_id: c.userId }, { onConflict: "company_id,provider" });
   return error ? { ok: false, error: "Tókst ekki að vista" } : { ok: true };

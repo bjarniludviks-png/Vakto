@@ -5,6 +5,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { after } from "next/server";
 import { checkNoShows } from "@/lib/noshow.server";
 import { colorFor } from "@/lib/avatar";
+import { demoResult, isDemoCompany } from "@/lib/demo.server";
 
 
 export type PunchResult = { ok: boolean; demo?: boolean; error?: string };
@@ -85,6 +86,7 @@ export async function kioskPunchByPin(
     const admin = createAdminClient();
     const co = await companyByKey(admin, kioskKey);
     if (!co) return { ok: false, error: "Kiosk-slóðin er ógild" };
+    if (isDemoCompany(co.id)) return demoResult(); // opið demo: aðeins til skoðunar
     const companyId = co.id;
     const { data: emp } = await admin
       .from("employees").select("id, kennitala").eq("id", employeeId).eq("company_id", companyId).maybeSingle();
@@ -125,6 +127,7 @@ export async function kioskPunchByKennitala(
     const admin = createAdminClient();
     const co = await companyByKey(admin, kioskKey);
     if (!co) return { ok: false, error: "Kiosk-slóðin er ógild" };
+    if (isDemoCompany(co.id)) return demoResult(); // opið demo: aðeins til skoðunar
     const companyId = co.id;
     if (await tooManyFails(admin, companyId, null, 10)) return { ok: false, error: LOCKED };
     const { data: emps } = await admin
@@ -160,6 +163,7 @@ export async function kioskPunchByToken(
     const admin = createAdminClient();
     const co = await companyByKey(admin, kioskKey);
     if (!co) return { ok: false, error: "Kiosk-slóðin er ógild" };
+    if (isDemoCompany(co.id)) return demoResult(); // opið demo: aðeins til skoðunar
     const companyId = co.id;
     const { data: emp, error: e0 } = await admin
       .from("employees").select("id, full_name").eq("clock_token", token.trim()).eq("company_id", companyId).maybeSingle();

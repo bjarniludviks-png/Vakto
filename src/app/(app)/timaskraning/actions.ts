@@ -1,5 +1,6 @@
 "use server";
 
+import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -28,6 +29,7 @@ async function companyOf(supabase: Awaited<ReturnType<typeof createClient>>) {
 
 /** Manager approves a single timesheet. */
 export async function approveTimesheet(id: string): Promise<ApproveResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured() || !id) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -48,6 +50,7 @@ export async function approveTimesheet(id: string): Promise<ApproveResult> {
 
 /** Fill a missing clock-out for an employee's latest open punch (today). */
 export async function setClockOut(input: { employeeName: string; time: string }): Promise<ApproveResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -77,6 +80,7 @@ export async function setClockOut(input: { employeeName: string; time: string })
 
 /** Manager manually clocks an employee in (forgot to punch). */
 export async function managerClockIn(employeeId: string, timeHHMM?: string): Promise<ApproveResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -107,6 +111,7 @@ export async function managerClockIn(employeeId: string, timeHHMM?: string): Pro
 
 /** Manager deletes a punch entirely. */
 export async function deletePunch(punchId: string): Promise<ApproveResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured() || !punchId) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -132,6 +137,7 @@ export async function adjustPunch(
   punchId: string, clockInHHMM?: string, clockOutHHMM?: string,
   dates?: { inDate?: string; outDate?: string },
 ): Promise<ApproveResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured() || !punchId) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -386,6 +392,7 @@ export async function getTimeReport(fromISO: string, toISO: string): Promise<{ o
 
 /** Approve / unapprove a single punch. */
 export async function setPunchApproved(punchId: string, approved: boolean): Promise<ApproveResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured() || !punchId) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -408,6 +415,7 @@ export async function setPunchApproved(punchId: string, approved: boolean): Prom
 
 /** Approve all closed punches for an employee in a range. */
 export async function approveEmployeePunches(employeeId: string, fromISO: string, toISO: string): Promise<ApproveResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -462,6 +470,7 @@ export async function getCorrections(): Promise<{ ok: boolean; rows: CorrectionR
 
 /** Manager approves (applies) or rejects an employee correction request. */
 export async function decideCorrection(id: string, approve: boolean): Promise<ApproveResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured() || !id) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -503,6 +512,7 @@ export async function decideCorrection(id: string, approve: boolean): Promise<Ap
 
 /** Manager approves all pending timesheets for the company. */
 export async function approveAllTimesheets(): Promise<ApproveResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -525,6 +535,7 @@ export async function approveAllTimesheets(): Promise<ApproveResult> {
 
 /** Approve a specific set of punches in one update (checkbox selection). */
 export async function approvePunchList(ids: string[]): Promise<ApproveResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!ids.length) return { ok: true, count: 0 };
   if (!isSupabaseConfigured()) return { ok: true, demo: true, count: ids.length };
   try {

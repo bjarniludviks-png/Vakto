@@ -1,5 +1,6 @@
 "use server";
 
+import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -23,6 +24,7 @@ export type ShiftInput = {
 export type PublishResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
 
 export async function publishSchedule(shifts: ShiftInput[]): Promise<PublishResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true, count: shifts.length };
   try {
     const supabase = await createClient();
@@ -160,6 +162,7 @@ export type ShiftTypeInput = { nm: string; t: string; prem: string; fg: string; 
 /** Persist the company's shift types (upsert by name; delete removed ones
  * when no shift references them). */
 export async function saveShiftTypes(list: ShiftTypeInput[]): Promise<DecisionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -193,6 +196,7 @@ export async function saveShiftTypes(list: ShiftTypeInput[]): Promise<DecisionRe
 }
 
 export async function saveShift(input: Omit<ShiftInput, "date"> & { date?: string }): Promise<DecisionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -232,6 +236,7 @@ export async function saveShift(input: Omit<ShiftInput, "date"> & { date?: strin
 
 /** Set the weekly staffing need (7 numbers, Mon..Sun). */
 export async function setStaffingTargets(targets: number[]): Promise<DecisionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -252,6 +257,7 @@ export async function setStaffingTargets(targets: number[]): Promise<DecisionRes
 
 /** Delete a single set shift (one employee, one day). */
 export async function deleteShift(input: { employeeName: string; dateISO: string }): Promise<DecisionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -351,12 +357,14 @@ const shiftLabel = (date: string, start: string, end: string) => {
 
 /** Stofnar lausa vakt (eða nokkrar eins) og lætur starfsfólk vita. */
 export async function createOpenShift(input: { date: string; start: string; end: string; shiftTypeName?: string; note?: string; count?: number }): Promise<DecisionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   return createOpenShifts({ ...input, dates: [input.date] });
 }
 
 /** Lausar vaktir á einum eða fleiri dögum (sama tími) — ein færsla og EIN tilkynning til starfsfólks.
  *  Notað af „Laus vakt“ í vaktaplani og VAKTO AI (create_open_shifts). */
 export async function createOpenShifts(input: { dates: string[]; start: string; end: string; shiftTypeName?: string; note?: string; count?: number }): Promise<DecisionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const dates = [...new Set(input.dates)].sort();
@@ -392,6 +400,7 @@ export async function createOpenShifts(input: { dates: string[]; start: string; 
 
 /** Eyðir lausri vakt (umsóknir fara með). */
 export async function deleteOpenShift(id: string): Promise<DecisionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -408,6 +417,7 @@ export async function deleteOpenShift(id: string): Promise<DecisionResult> {
 
 /** Úthlutar lausri vakt til umsækjanda; öðrum umsóknum er hafnað (approve_shift_claim, 0082). */
 export async function assignOpenShift(claimId: string): Promise<DecisionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -448,6 +458,7 @@ async function companyOf(supabase: Awaited<ReturnType<typeof createClient>>) {
 
 /** Manager approves or rejects a leave request. */
 export async function updateLeaveRequest(id: string, approved: boolean): Promise<DecisionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -479,6 +490,7 @@ export async function updateLeaveRequest(id: string, approved: boolean): Promise
 
 /** Manager approves a shift swap. */
 export async function approveShiftSwap(id: string): Promise<DecisionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -502,6 +514,7 @@ export async function approveShiftSwap(id: string): Promise<DecisionResult> {
 /** Wipe ALL shifts for the given dates — the "Eyða öllu / byrja upp á nýtt"
  * button in the schedule. Confirmed in the UI before calling. */
 export async function deleteWeekShifts(dates: string[]): Promise<{ ok: boolean; demo?: boolean; count?: number; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   if (!dates.length) return { ok: false, error: "Engar dagsetningar" };
   try {
@@ -553,6 +566,7 @@ export async function getShiftTasks(employeeName: string, dateISO: string): Prom
 /** Replace the checklist for employee+day. Existing rows with an unchanged
  * title survive (keeping their done state); removed ones are deleted. */
 export async function saveShiftTasks(employeeName: string, dateISO: string, titles: string[]): Promise<DecisionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();

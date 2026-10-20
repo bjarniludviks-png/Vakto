@@ -2,14 +2,15 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { DEMO_READONLY_MSG } from "@/lib/demo-readonly";
 
-// Opið demo (DEMO_COMPANY_ID): gestir skrá sig inn í EITT sameiginlegt gervifyrirtæki.
-// Allt sem snertir umheiminn (póstur, push, rafræn undirritun, kort/greiðslur, boð,
-// tengingar, API-lyklar) er stöðvað á þröskuldum (email.ts, push.ts, straumur.ts,
-// taktikal.server.ts, invite.server.ts, integrations) — ekki í hverri aðgerð.
-// Gögnin sjálf eru endurstillt á hverri nóttu (/api/cron/demo-reset).
+// Opið demo (DEMO_COMPANY_ID): gestir skrá sig inn í EITT sameiginlegt gervifyrirtæki sem er
+// AÐEINS til skoðunar — engin skrif (sjá lögin í demo-readonly.ts og migration 0087).
+// Allt sem snertir umheiminn (póstur, push, rafræn undirritun, kort/greiðslur, boð) er auk þess
+// stöðvað á þröskuldum (email.ts, push.ts, straumur.ts, taktikal.server.ts, invite.server.ts).
+// Næturkeyrslan (/api/cron/demo-reset) sáir gögnunum upp á nýtt með dagsetningum sem rúlla.
 
-export const DEMO_BLOCKED = "Þetta er ekki í boði í demo";
+export const DEMO_BLOCKED = DEMO_READONLY_MSG;
 /** AI-spurningar á sólarhring fyrir allt demo-fyrirtækið (ai_usage núllstillt í næturkeyrslu). */
 export const DEMO_AI_DAILY = 50;
 /** AI-spurningar á sólarhring per gest (vafra) í demo — talið í audit_log, sjá ai-plan.server.ts. */

@@ -24,6 +24,7 @@ export async function savePushSubscription(sub: { endpoint: string; keys: { p256
 }
 
 export async function removePushSubscription(endpoint: string): Promise<{ ok: boolean }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true };
   try {
     const supabase = await createClient();

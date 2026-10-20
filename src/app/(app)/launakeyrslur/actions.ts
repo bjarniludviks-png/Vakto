@@ -1,5 +1,6 @@
 "use server";
 
+import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -151,6 +152,7 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
 /** Run + persist payroll for a period using approved worked hours. */
 /** onlyIds: keyra aðeins fyrir valda starfsmenn (hakað í töflunni). Tómt/undefined = allir. */
 export async function runPayroll(from?: string, to?: string, settleIds: string[] = [], onlyIds?: string[]): Promise<RunResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true, count: 0 };
   try {
     const supabase = await createClient();
@@ -368,6 +370,7 @@ export async function getPaydayItemNames(from: string, to: string): Promise<stri
 }
 
 export async function sendToPayday(from: string, to: string, onlyIds?: string[]): Promise<{ ok: boolean; error?: string; count?: number; skipped?: string[] }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
   try {
     const supabase = await createClient();

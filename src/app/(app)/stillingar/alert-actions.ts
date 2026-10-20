@@ -1,5 +1,6 @@
 "use server";
 
+import { demoBlocked, demoResult } from "@/lib/demo.server";
 // Vaktarar og skýrslur (0086) — Stillingar og VAKTO AI nota sömu aðgerðir. Aðeins eigendur og vaktstjórar;
 // RLS á alert_rules tryggir það líka. Þolir að taflan vanti (missing: true → viðmótið segir frá því).
 
@@ -43,6 +44,7 @@ export async function listAlerts(): Promise<AlertsData> {
 
 /** Nýr vaktari eða skýrsla á tímaáætlun. `via` merkir reglur sem VAKTO AI bjó til. */
 export async function createAlert(input: unknown, via: "ui" | "ai" = "ui"): Promise<Res & { id?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctx();
   if ("error" in c) return { ok: false, error: c.error };
   const n = normalizeAlert(input);
@@ -70,6 +72,7 @@ export async function createAlert(input: unknown, via: "ui" | "ai" = "ui"): Prom
 }
 
 export async function setAlertActive(id: string, active: boolean): Promise<Res> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctx();
   if ("error" in c) return { ok: false, error: c.error };
   const { data, error } = await c.supabase.from("alert_rules").update({ active: !!active, updated_at: new Date().toISOString() })
@@ -80,6 +83,7 @@ export async function setAlertActive(id: string, active: boolean): Promise<Res> 
 }
 
 export async function deleteAlert(id: string): Promise<Res> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctx();
   if ("error" in c) return { ok: false, error: c.error };
   const { data, error } = await c.supabase.from("alert_rules").delete().eq("id", id).eq("company_id", c.companyId).select("id, description");
@@ -91,6 +95,7 @@ export async function deleteAlert(id: string): Promise<Res> {
 
 /** Sendir skýrslu úr Skýrslusafninu strax á netfang notandans sem biður um hana. */
 export async function sendReportNow(input: { report: string; from: string; to: string }): Promise<Res> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctx();
   if ("error" in c) return { ok: false, error: c.error };
   const report = REPORTS.find((r) => r === input.report) as AlertReport | undefined;
@@ -105,6 +110,7 @@ export async function sendReportNow(input: { report: string; from: string; to: s
 
 /** „Senda núna“ á sjálfvirkri skýrslu: sama skýrsla og tímabil og næsta sending, á netfang notandans. */
 export async function sendAlertReportNow(id: string): Promise<Res> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctx();
   if ("error" in c) return { ok: false, error: c.error };
   const { data, error } = await c.supabase.from("alert_rules").select("*").eq("id", id).eq("company_id", c.companyId).maybeSingle();
