@@ -18,6 +18,7 @@ import { AsyncButton } from "@/components/app/async-button";
 import { WalletButtons } from "@/components/app/wallet-buttons";
 import { ContractView } from "@/components/app/contract-view";
 import { WelcomeTour } from "./welcome";
+import { WorkOverviewCard } from "./work-overview-card";
 
 type ReqKind = "leave" | "avail" | "swap" | "pickup";
 const IC = (d: string) => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">{d.split("|").map((p, i) => <path key={i} d={p} />)}</svg>;
@@ -427,6 +428,7 @@ function Overview({ onReq, perms, my }: { onReq: (k: ReqKind) => void; perms: Pe
         </div>
       )}
       {live && <ContractSignCard />}
+      {live && <WorkOverviewCard />}
       {live && my!.tasks.length > 0 && <TasksCard initial={my!.tasks} />}
       <CompanyDocsCardMy />
     </div>

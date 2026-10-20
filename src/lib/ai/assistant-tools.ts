@@ -12,6 +12,8 @@ import { comparePeriods, laborTrend, payrollRuns } from "./assistant-insights";
 import { getPlanRequestsForMe, guardLeaveShifts } from "./plan-requests.server";
 import { listAlerts, createAlert, setAlertActive, deleteAlert, sendReportNow } from "@/app/(app)/stillingar/alert-actions";
 import { normalizeAlert, describeAlert, REPORTS, SCHEDULABLE_REPORTS, REPORT_TITLE, RANGES } from "@/lib/alerts";
+import { getSickRate } from "@/lib/sickrate.server";
+import { byDept, pctOf, SICK_DEFINITION } from "@/lib/sickrate";
 
 // VAKTO AI — verkfæri. LESverkfæri keyra strax (sömu aðgerðir og skjáirnir nota, sama aðgangsstýring).
 // SKRIFverkfæri keyra ALDREI í líkaninu sjálfu: þau verða „tillaga" sem notandinn staðfestir með hnappi,
@@ -78,6 +80,15 @@ export const READ_TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: { from: DATE, to: DATE, employee: { type: "string", description: "Nafn starfsmanns (valfrjálst)" } },
       required: ["from", "to"],
+    },
+  },
+  {
+    name: "sick_rate",
+    description: "Veikindahlutfall = veikindatímar ÷ áætlaðir vinnutímar (samþykktar veikindabeiðnir; tímar birtra vakta á veikindadögum, annars 8 klst. × starfshlutfall á virkum degi). Skilar hlutfalli, veikindatímum, áætluðum tímum, veikindadögum og tilvikum per tímabil (þróun), og skiptingu per deild og per starfsmann (aðeins þeir sem voru veikir). by: 'period' (launatímabil), 'month', 'quarter', 'year'; count = fjöldi tímabila aftur í tímann (sjálfgefið 12/12/8/4). Notaðu fyrir „hvert er veikindahlutfallið“, „hvaða deild er með mest veikindi“, „hver hefur oftast verið veikur“.",
+    input_schema: {
+      type: "object",
+      properties: { by: { type: "string", enum: ["period", "month", "quarter", "year"] }, count: { type: "number", description: "Fjöldi tímabila (1–24)" } },
+      required: ["by"],
     },
   },
   {
@@ -374,6 +385,20 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       if (a.missing) return JSON.stringify({ error: "Vaktarar eru ekki komnir í gagnagrunninn enn" });
       if (!a.ok) return JSON.stringify({ error: a.error ?? "Tókst ekki að sækja vaktarana" });
       return JSON.stringify(a.rules.map((r) => ({ id: r.id, description: r.description || describeAlert(r, "is"), active: r.active, channel: r.channel, byVaktoAi: r.createdVia === "ai", lastFiredAt: r.lastFiredAt })));
+    }
+    if (name === "sick_rate") {
+      const by = (["period", "month", "quarter", "year"] as const).find((g) => g === input.by) ?? "month";
+      const n = Number(input.count);
+      const d = await getSickRate(by, Number.isFinite(n) && n > 0 ? Math.min(24, Math.round(n)) : undefined);
+      if (!d.live) return JSON.stringify({ error: "Engin gögn (eða ekki aðgangur)" });
+      return JSON.stringify({
+        definition: SICK_DEFINITION,
+        periods: d.buckets.map((b) => ({
+          label: b.label, from: b.from, to: b.to, ratePct: b.rate, sickHours: b.sick, plannedHours: b.planned, sickDays: b.sickDays, occurrences: b.occurrences,
+          byDepartment: byDept(b.rows).map((x) => ({ dept: x.dept, ratePct: x.rate, sickDays: x.sickDays, occurrences: x.occurrences, people: x.people })),
+          sickEmployees: b.rows.filter((r) => r.sick > 0).map((r) => ({ name: r.name, dept: r.dept, sickDays: r.sickDays, occurrences: r.occurrences, sickHours: r.sick, ratePct: pctOf(r.sick, r.planned) })),
+        })),
+      });
     }
     if (name === "pending_requests") {
       const r = await getPendingRequests();

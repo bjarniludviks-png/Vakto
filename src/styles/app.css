@@ -1596,3 +1596,25 @@ a.db2-who:hover span{color:var(--brand)}
 
 /* Fellilistar: eigin ör með bili frá brúninni (sjálfgefna ör vafrans lendir alveg úti við rúnnaða brún). */
 select:not([multiple]):not([size]){-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%238b8a93' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;background-size:12px;padding-right:34px!important}
+
+/* Vinnuyfirlit (0084) + veikindahlutfall */
+.db2-pill.pr{background:#eeecfd;color:#5b50e6}
+.wo-back{display:inline-block;font-size:12.5px;color:var(--ink3);margin-bottom:4px}
+.wo-back:hover{color:var(--brand)}
+.wo-per{font-size:13.5px;font-weight:600;color:var(--ink2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.wo-modal{max-width:760px}
+.wo-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.wo-tiles>div{background:var(--bg);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:3px}
+.wo-tiles span{font-size:11.5px;color:var(--ink3)}
+.wo-tiles b{font-size:15px;font-weight:650;font-variant-numeric:tabular-nums}
+.wo-note{background:var(--warn-soft);border-radius:12px;padding:10px 13px;margin-bottom:12px;font-size:13px}
+.wo-note p{margin:3px 0 0;color:var(--ink2)}
+.wo-def{font-size:12px;color:var(--ink3);line-height:1.5;margin-top:10px}
+.sr-bars{display:flex;align-items:flex-end;gap:6px;height:120px;padding:6px 0 0}
+.sr-bar{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;cursor:pointer;background:none;border:0;padding:0;font:inherit}
+.sr-bar i{display:block;width:100%;max-width:38px;border-radius:6px 6px 3px 3px;background:var(--brand-soft);min-height:3px}
+.sr-bar.on i{background:var(--brand)}
+.sr-bar small{font-size:10.5px;color:var(--ink3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.sr-bar em{font-style:normal;font-size:10.5px;font-weight:650;color:var(--ink2);font-variant-numeric:tabular-nums}
+.sr-head{flex-wrap:wrap;gap:10px}
+@media(max-width:760px){.sr-head .db2-seg{width:100%;overflow-x:auto}.sr-head .db2-seg button{flex:1;white-space:nowrap}.wo-tiles{grid-template-columns:1fr 1fr}.sr-bars{gap:3px}.sr-bar small{font-size:9.5px}}

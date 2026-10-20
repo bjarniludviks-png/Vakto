@@ -2,7 +2,7 @@
 // run (persistence), the Payday/Excel export, and the labor% metric.
 import type { Employee } from "@/lib/employees";
 import type { RuleSet, CustomRules, Band, OrlofSet } from "@/lib/payrules";
-import { resolveOrlof } from "@/lib/payrules";
+import { resolveOrlof, resolveRuleSet, resolveUppbot } from "@/lib/payrules";
 import { resolvePay, taxBeforeAllowance, taxYear, type PaySettings } from "@/lib/paysettings";
 
 export const PERSONAL_ALLOWANCE = taxYear(new Date().getFullYear()).allowance; // persónuafsláttur kr/mán
@@ -345,4 +345,18 @@ export function totals(lines: PayLine[]): PayrollTotals {
 export function applyGrossAdjustment(l: PayLine, adj: number, e: EmpPick, year = new Date().getFullYear()): PayLine {
   const gross = Math.max(0, l.gross - Math.round(adj));
   return deductions(e, { ...l, gross }, year);
+}
+
+/** Launalína tímabils eins og launakeyrslan reiknar hana: reglur starfsmanns (kjarasamningur eða
+ * eigin reglur) + desember-/orlofsuppbót í júní/desember. Launakeyrsla og vinnuyfirlit nota bæði þetta. */
+export function periodPayLine(
+  e: EmpPick & { union: string | null; hireDate?: string | null },
+  punches: { clockIn: string; clockOut: string }[],
+  payRule: Partial<CustomRules> | null | undefined,
+  from: string,
+): PayLine {
+  const year = Number(from.slice(0, 4));
+  const kind = uppbotForMonth(Number(from.slice(5, 7)));
+  const ub = kind ? computeUppbot(resolveUppbot(e.union, null, year)[kind], e.employmentRatio, uppbotMonths(kind, year, e.hireDate)) : 0;
+  return computeFromPunches(e, punches, resolveRuleSet(e.union, payRule), ub);
 }
