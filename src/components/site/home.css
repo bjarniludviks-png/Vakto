@@ -532,8 +532,9 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
   .ah-slide-v{margin-top:24px}
   .ah-sl-phones .ah-phone{width:min(200px,52vw)}
   .ah-sl-shot img,.ah-sl-paper img{width:min(320px,80%)}
-  .ah-sl-wide{justify-content:flex-start;overflow:hidden;border-radius:14px 14px 0 0}
-  .ah-sl-wide img{width:175%;max-width:none;border-radius:0;box-shadow:none}
+  /* Öll myndin sýnileg: laun%-talan OG mánaðarsúlurnar eiga að sjást saman */
+  .ah-slide-v:has(>.ah-sl-wide){align-items:flex-end}
+  .ah-sl-wide img{width:100%;border-radius:12px 12px 0 0;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 18px 40px -16px rgba(40,25,10,.3)}
   .ah-dark-row>div:last-child{display:none}
 }
 
