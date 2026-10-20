@@ -306,6 +306,8 @@
 .ah-slide-v{flex:1;min-height:0;display:flex;justify-content:center;align-items:flex-start;margin-top:40px}
 .ah-sl-shot img,.ah-sl-paper img{width:min(430px,86%);margin:0 auto;border-radius:16px 16px 0 0;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 30px 70px -20px rgba(40,25,10,.35)}
 .ah-sl-paper img{border-radius:6px 6px 0 0;width:min(460px,88%)}
+.ah-sl-wide{width:100%;display:flex;justify-content:center}
+.ah-sl-wide img{width:min(880px,94%);border-radius:16px 16px 0 0;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 30px 70px -20px rgba(40,25,10,.35)}
 .ah-sl-phones{display:flex;gap:32px;justify-content:center;align-items:flex-start}
 .ah-sl-phones .ah-phone{width:min(250px,60vw);margin:0}
 .ah-sl-phones .ah-sl-lo{margin-top:70px}
@@ -520,6 +522,8 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
   .ah-slide-v{margin-top:24px}
   .ah-sl-phones .ah-phone{width:min(200px,52vw)}
   .ah-sl-shot img,.ah-sl-paper img{width:min(320px,80%)}
+  .ah-sl-wide{justify-content:flex-start;overflow:hidden;border-radius:14px 14px 0 0}
+  .ah-sl-wide img{width:175%;max-width:none;border-radius:0;box-shadow:none}
   .ah-dark-row>div:last-child{display:none}
 }
 
@@ -539,6 +543,9 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 .ah-spark{width:18px;height:18px;fill:var(--brand);flex:none}
 .ah-hey-vid{max-width:920px;margin:0 auto 56px}
 .ah-hey-vid video{display:block;width:100%;height:100%;object-fit:cover;object-position:top left}
+/* Engin myndbandsskrá: skjámynd af AI-tillögunni í sama ramma og glærurnar */
+.ah-hey-shot{max-width:560px;margin:0 auto 56px}
+.ah-hey-shot img{display:block;width:100%;height:auto;max-height:820px;object-fit:cover;object-position:top;border-radius:16px;box-shadow:0 0 0 1px rgba(0,0,0,.06),0 30px 70px -20px rgba(40,25,10,.35)}
 .ah-hey-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:start}
 .ah-hey-col{background:rgba(255,255,255,.82);backdrop-filter:blur(4px);border-radius:28px;padding:28px 24px;box-shadow:0 0 0 1px var(--line),0 20px 50px -30px rgba(40,25,10,.25)}
 .ah-hey-col h3{font-size:14px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin:0 0 18px}

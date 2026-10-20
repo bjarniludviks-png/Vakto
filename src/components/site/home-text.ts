@@ -28,7 +28,7 @@ const is = {
   feedAlt: "Fréttaveita í appinu",
   showH: "Kynntu þér VAKTO.", showRole: "glærusýning", slideRole: "glæra", of: "af", slideN: "Glæra", pause: "Gera hlé", play: "Spila",
   slides: [
-    { t: "VAKTO AI.", d: "Spurðu eins og þú talar: „Hvernig er laun % þessa vikuna?“ eða „Settu upp næstu viku, allir með einn frídag.“ VAKTO AI svarar með þínum tölum og setur upp heilt vaktaplan sem þú ferð yfir og samþykkir. Ekkert breytist fyrr en þú staðfestir. Hann les líka kjarasamninginn með tilvísun í hverja grein.", alt: "Tillaga VAKTO AI: Moon færður á kvöldvakt á laugardag, launakostnaður óbreyttur 27,4%" },
+    { t: "Skýrslur sem skipta máli.", d: "Laun % af veltu per mánuð, kostnaður per deild, yfirvinna, veikindi og mæting. Sæktu í Excel eða PDF, eða biddu VAKTO AI um skýrsluna.", alt: "Innsýn í VAKTO: laun 31,1 % af veltu í október, velta 19,3 m.kr. og launakostnaður 6,0 m.kr." },
     { t: "Vaktirnar í vasanum.", d: "Starfsfólk sér planið sitt, sækir um lausar vaktir og býður vaktir í skiptum. Spjallið er á sama stað.", alt: "Vaktir vikunnar í appinu", alt2: "Spjallrásir í appinu" },
     { t: "Fréttaveita fyrir vinnustaðinn.", d: "Nýr matseðill, breyttur opnunartími, mynd úr eldhúsinu. Festu það mikilvæga efst svo það týnist ekki.", alt: "Fréttaveitan í appinu" },
     { t: "Launaseðill sem stenst.", d: "Dagvinna, álag og yfirvinna sundurliðuð. Líka þegar mánuðurinn var 0 tímar og starfsmaðurinn þarf staðfestingu.", alt: "Launaseðill úr VAKTO" },
@@ -56,6 +56,7 @@ const is = {
     confirmB: "Ekkert breytist án þín.", confirm: " VAKTO AI spyr alltaf áður en hann breytir nokkru. Þú sérð tillöguna og ýtir á Staðfesta.",
     who: "Fyrir stjórnendur og vaktstjóra. 25 spurningar á mánuði innifaldar.",
     videoAlt: "Myndband: VAKTO AI setur upp vaktaplan fyrir eldhúsið og stjórnandinn staðfestir tillöguna.",
+    shotAlt: "Tillaga VAKTO AI: Moon færður á kvöldvakt á laugardag, launakostnaður óbreyttur 27,4%",
   },
   // „Fáðu kynningu á vinnustaðinn“ — beiðni fer í tölvupósti (/api/kynning).
   visit: {
@@ -104,7 +105,7 @@ const en: typeof is = {
   feedAlt: "News feed in the app",
   showH: "Get to know VAKTO.", showRole: "slideshow", slideRole: "slide", of: "of", slideN: "Slide", pause: "Pause", play: "Play",
   slides: [
-    { t: "VAKTO AI.", d: "Ask the way you talk: “What's labor % this week?” or “Plan next week, everyone gets one day off.” VAKTO AI answers with your own numbers and builds a full schedule for you to review and approve. Nothing changes until you confirm. It also reads the union agreement with a reference to every clause.", alt: "VAKTO AI suggestion: Moon moved to Saturday's evening shift, labor cost unchanged at 27.4%" },
+    { t: "Reports that matter.", d: "Labor % of revenue per month, cost per department, overtime, sick leave and attendance. Download as Excel or PDF, or ask VAKTO AI for the report.", alt: "Insights in VAKTO: labor at 31.1% of revenue in October, revenue ISK 19.3m and labor cost ISK 6.0m" },
     { t: "Shifts in your pocket.", d: "Staff see their schedule, apply for open shifts and offer shifts to swap. The chat is right there too.", alt: "This week's shifts in the app", alt2: "Chat channels in the app" },
     { t: "A news feed for the workplace.", d: "A new menu, changed opening hours, a photo from the kitchen. Pin what matters so it doesn't get lost.", alt: "The news feed in the app" },
     { t: "A payslip that holds up.", d: "Day rate, premiums and overtime itemised. Even when the month was zero hours and the employee needs proof.", alt: "Payslip from VAKTO" },
@@ -131,6 +132,7 @@ const en: typeof is = {
     confirmB: "Nothing changes without you.", confirm: " VAKTO AI always asks before it changes anything. You see the proposal and press Confirm.",
     who: "For owners and shift managers. 25 questions a month included.",
     videoAlt: "Video: VAKTO AI builds a schedule for the kitchen and the manager confirms the proposal.",
+    shotAlt: "VAKTO AI suggestion: Moon moved to Saturday's evening shift, labor cost unchanged at 27.4%",
   },
   visit: {
     h: "Get a presentation at your workplace.", p: "We come to you and present VAKTO to your managers and staff. Free, no commitment.",

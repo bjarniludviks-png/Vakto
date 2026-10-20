@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { readAgreement } from "@/lib/ai/agreement";
 import { demoAiGate } from "@/lib/ai/ai-plan.server";
+import { currentUserIsDemo } from "@/lib/demo.server";
 
 // POST multipart: file (PDF eða .txt), hint (hlutverk/starfsaldur). Aðeins eigandi/
 // vaktstjóri. Route handler (ekki server action) því kjarasamningar eru oft stærri
@@ -31,6 +32,6 @@ export async function POST(request: Request) {
   const isText = !isPdf && (file.type.startsWith("text/") || /\.(txt|md)$/i.test(file.name));
   if (!isPdf && !isText) return NextResponse.json({ ok: false, error: "Aðeins PDF eða textaskrá" }, { status: 415 });
 
-  const res = await readAgreement(isPdf ? { pdfBase64: buf.toString("base64"), hint } : { text: buf.toString("utf8"), hint });
+  const res = await readAgreement(isPdf ? { pdfBase64: buf.toString("base64"), hint } : { text: buf.toString("utf8"), hint }, { demo: await currentUserIsDemo() });
   return NextResponse.json(res, { status: res.ok ? 200 : 502 });
 }

@@ -5,9 +5,10 @@ import "server-only";
 // kjarasamningi, ógreiddar prufuvaktir, frádráttur af launum). Vistar ekkert:
 // stjórnandi velur ákvæðin, les og vistar sjálfur.
 //
-// Líkan: claude-opus-4-8 eins og annars staðar í VAKTO (lib/ai/schedule.ts, agreement.ts).
+// Líkan: modelFor("analysis") (src/lib/ai/models.ts).
 
 import Anthropic from "@anthropic-ai/sdk";
+import { modelFor } from "@/lib/ai/models";
 
 export type TermClause = { titleIs: string; titleEn: string; textIs: string; textEn: string };
 export type TermFlag = { clause: string; severity: "high" | "medium"; issueIs: string; issueEn: string };
@@ -53,7 +54,7 @@ Reglur:
 
 const clean = (s: string) => s.replace(/\s+\/\s+/g, "/").replace(/\s+/g, " ").trim();
 
-export async function draftContractTerms(input: { description?: string; current?: string; companyName?: string }): Promise<TermsDraft> {
+export async function draftContractTerms(input: { description?: string; current?: string; companyName?: string }, opts: { demo?: boolean } = {}): Promise<TermsDraft> {
   const empty: TermsDraft = { ok: false, clauses: [], flags: [], summary: "" };
   if (!process.env.ANTHROPIC_API_KEY) return { ...empty, error: "AI er ekki virkt á þessum aðgangi." };
   const description = input.description?.trim() ?? "";
@@ -69,7 +70,7 @@ export async function draftContractTerms(input: { description?: string; current?
   try {
     const client = new Anthropic();
     const msg = await client.messages.stream({
-      model: "claude-opus-4-8",
+      model: modelFor("analysis", opts),
       max_tokens: 16000,
       thinking: { type: "adaptive" },
       output_config: { effort: "high", format: { type: "json_schema", schema: SCHEMA } },
