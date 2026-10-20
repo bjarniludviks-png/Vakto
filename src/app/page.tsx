@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { siteViewport } from "@/components/site/viewport";
 import AppleHome from "@/components/site/home-client";
 import "@/components/site/home.css";
 import { SITE_URL } from "@/lib/site";
@@ -8,6 +9,8 @@ import { demoConfigured } from "@/lib/demo.server";
 // Komponentar og stílar síðunnar eru í src/components/site/.
 const DESC = "Vaktakerfi fyrir íslenska vinnustaði: vaktaplan, stimpilklukka, launakeyrsla eftir kjarasamningi og rafrænir ráðningarsamningar. Laun sem hlutfall af veltu í rauntíma. 14 daga frí prufa.";
 
+// viewport-fit=cover + ljós theme-color fyrir opna vefinn (iOS 26 Safari, sjá components/site/viewport.ts).
+export const viewport = siteViewport;
 export const metadata: Metadata = {
   title: "VAKTO: vaktakerfi, vaktaplan, stimpilklukka og laun",
   description: DESC,

@@ -3,10 +3,17 @@
   --bg:#fbfbfd; --bg2:#f5f5f7; --ink:#1d1d1f; --ink2:#6e6e73; --ink3:#86868b; --line:rgba(0,0,0,.08);
   --brand:#e9700f; --brand2:#f59331; --brandSoft:rgba(233,112,15,.10);
   --ease:cubic-bezier(.23,1,.32,1);
+  /* Hliðarspássíur sem víkja fyrir hak/hornum í landslagi (viewport-fit=cover, sjá src/components/site/viewport.ts). */
+  --sx:max(20px, env(safe-area-inset-left,0px), env(safe-area-inset-right,0px));
+  --gl:max(20px, env(safe-area-inset-left,0px), calc((100vw - 1100px)/2));
+  --gr:max(20px, env(safe-area-inset-right,0px), calc((100vw - 1100px)/2));
   position:relative; background:var(--bg); color:var(--ink);
   font-family:'General Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
   -webkit-font-smoothing:antialiased; overflow-x:clip;
 }
+/* Sami litur á html/body og síðunni: iOS 26 Safari litar svæðið bak við fljótandi slána út frá síðunni,
+   og annars sést hvít rönd (body var #fff) í stað síðunnar. */
+html:has(.ah),html:has(.ah) body,html:has(.ah-auth),html:has(.ah-auth) body{background:#fbfbfd}
 .ah *{box-sizing:border-box}
 .ah a{color:inherit;text-decoration:none}
 .ah img{display:block;max-width:100%;height:auto}
@@ -20,7 +27,10 @@
 .ah-top-sentinel{position:absolute;top:0;left:0;width:1px;height:8px;pointer-events:none}
 
 /* ---------- appelsínugulur bjarmi ---------- */
-.ah-glow{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+/* Ekki position:fixed á heilskjá: iOS 26 Safari les fixed-einingar við jaðrana og málar þá heilan lit undir slána.
+   Í staðinn absolute yfir alla síðuna með sticky innra lagi (100lvh) sem nær líka bak við slána. */
+.ah-glow{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:clip}
+.ah-glow-in{position:sticky;top:0;height:100vh;height:100lvh;overflow:hidden}
 .ah-blob{position:absolute;border-radius:50%;filter:blur(90px);will-change:transform,opacity}
 .ah-b1{width:62vw;height:62vw;right:-18vw;top:-22vw;background:radial-gradient(circle at 40% 40%,rgba(245,147,49,.55),rgba(233,112,15,.18) 55%,transparent 70%);opacity:.35}
 .ah-b2{width:55vw;height:55vw;left:-20vw;top:30vh;background:radial-gradient(circle,rgba(233,112,15,.42),rgba(245,147,49,.12) 60%,transparent 72%);opacity:0}
@@ -28,7 +38,7 @@
 
 /* ---------- valmynd ---------- */
 .ah-nav{position:fixed;left:0;right:0;top:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:16px;
-  padding:calc(env(safe-area-inset-top,0px) + 12px) max(20px, calc((100vw - 1100px)/2)) 12px;
+  padding:calc(env(safe-area-inset-top,0px) + 12px) var(--gr) 12px var(--gl);
   transition:background .3s var(--ease),box-shadow .3s var(--ease),backdrop-filter .3s}
 .ah-nav.sc{background:rgba(251,251,253,.72);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);box-shadow:0 1px 0 var(--line)}
 .ah-logo{display:inline-flex;align-items:center;gap:8px;font-weight:700;letter-spacing:.06em;font-size:15px}
@@ -84,8 +94,8 @@
 
 /* ---------- 1. hetja / aðdráttur ---------- */
 .ah-hero{position:relative;height:290vh}
-.ah-sticky{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 20px}
-.ah-hero-head{position:absolute;top:calc(env(safe-area-inset-top,0px) + 11vh);left:0;right:0;text-align:center;padding:0 20px;will-change:transform,opacity}
+.ah-sticky{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 var(--sx)}
+.ah-hero-head{position:absolute;top:calc(env(safe-area-inset-top,0px) + 11vh);left:0;right:0;text-align:center;padding:0 var(--sx);will-change:transform,opacity}
 .ah-ctas{display:flex;gap:26px;justify-content:center;align-items:center;margin-top:32px;flex-wrap:wrap}
 .ah-hero-frame{position:relative;width:min(1080px,92vw);will-change:transform}
 .ah-hero .ah-mac-view img{transform-origin:23.6% 58.5%}
@@ -96,7 +106,7 @@
 .ah-zcap{margin-left:calc(min(620px,90vw) / -2);left:50%;transform:none}
 
 /* ---------- kaflar ---------- */
-.ah-sec{position:relative;padding:150px max(20px, calc((100vw - 1100px)/2))}
+.ah-sec{position:relative;padding:150px var(--gr) 150px var(--gl)}
 .ah-head{text-align:center;margin-bottom:70px}
 
 /* ---------- 2. bento ---------- */
@@ -119,7 +129,7 @@
 @media (max-width:900px){.ah-bento{grid-template-columns:1fr}.ah-wide,.ah-tall{grid-column:auto;grid-row:auto}}
 
 /* ---------- 3. dökkt ---------- */
-.ah-dark{position:relative;background:#000;color:#f5f5f7;padding:150px max(20px, calc((100vw - 1100px)/2));overflow:hidden}
+.ah-dark{position:relative;background:#000;color:#f5f5f7;padding:150px var(--gr) 150px var(--gl);overflow:hidden}
 .ah-dark::before{content:"";position:absolute;inset:auto -20% -40% -20%;height:80%;background:radial-gradient(closest-side,rgba(233,112,15,.32),transparent);pointer-events:none}
 .ah-dark h2 span,.ah-dark .ah-lede{color:#a1a1a6}
 .ah-compare{position:relative;max-width:1080px;margin:0 auto;touch-action:pan-y;cursor:ew-resize;user-select:none;outline:none}
@@ -194,7 +204,7 @@
 .ah-price-card .ah-fine{font-size:14px;color:var(--ink3);margin:10px 0 30px}
 
 /* ---------- fótur ---------- */
-.ah-foot{position:relative;z-index:1;padding:64px max(20px, calc((100vw - 1100px)/2)) calc(28px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line);font-size:14px;color:var(--ink3)}
+.ah-foot{position:relative;z-index:1;padding:64px var(--gr) calc(28px + env(safe-area-inset-bottom,0px)) var(--gl);border-top:1px solid var(--line);font-size:14px;color:var(--ink3)}
 .ah-foot-grid{display:grid;grid-template-columns:1.6fr repeat(4,1fr);gap:32px}
 .ah-foot-brand p{margin:14px 0 0;max-width:300px;line-height:1.55;color:#6e6e73}
 .ah-foot nav{display:flex;flex-direction:column}
@@ -293,7 +303,7 @@
 .ah-compare img{pointer-events:none;-webkit-user-drag:none;user-select:none}
 
 /* ---------- Kynntu þér VAKTO (glærur) ---------- */
-.ah-show{--gut:max(20px, calc((100vw - 1100px)/2));padding-left:0;padding-right:0}
+.ah-show{--gut:max(20px, env(safe-area-inset-left,0px), env(safe-area-inset-right,0px), calc((100vw - 1100px)/2));padding-left:0;padding-right:0}
 .ah-head-l{text-align:left;padding:0 var(--gut);margin-bottom:44px}
 .ah-track{display:flex;gap:20px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;padding:0 var(--gut) 12px;scroll-padding-inline:var(--gut);overscroll-behavior-x:contain}
 .ah-track::-webkit-scrollbar{display:none}
@@ -339,13 +349,13 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 }
 
 /* ---------- spjallgluggi í horninu (HomeChat skin="ah") ---------- */
-.ah-chatfab{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:25;display:inline-flex;align-items:center;gap:9px;font:inherit;font-size:14.5px;font-weight:600;
+.ah-chatfab{position:fixed;right:max(20px, env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:25;display:inline-flex;align-items:center;gap:9px;font:inherit;font-size:14.5px;font-weight:600;
   color:var(--ink);background:rgba(255,255,255,.82);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border:0;border-radius:999px;padding:12px 18px 12px 13px;cursor:pointer;
   box-shadow:0 0 0 1px rgba(0,0,0,.07),0 12px 34px -10px rgba(233,112,15,.45);transition:transform .16s var(--ease),opacity .2s}
 .ah-chatfab svg{width:20px;height:20px;color:var(--brand)}
 .ah-chatfab:active{transform:scale(.97)}
 .ah-chatfab.hide{opacity:0;pointer-events:none;transform:translateY(8px)}
-.ah-chatbox{position:fixed;right:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:26;width:min(390px,calc(100vw - 24px));height:min(620px,calc(100dvh - 40px));display:flex;flex-direction:column;
+.ah-chatbox{position:fixed;right:max(20px, env(safe-area-inset-right,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:26;width:min(390px,calc(100vw - 24px));height:min(620px,calc(100dvh - 40px));display:flex;flex-direction:column;
   background:rgba(251,251,253,.92);backdrop-filter:saturate(180%) blur(24px);-webkit-backdrop-filter:saturate(180%) blur(24px);border-radius:24px;overflow:hidden;color:var(--ink);
   box-shadow:0 0 0 1px rgba(0,0,0,.07),0 30px 80px -20px rgba(40,25,10,.4);transform-origin:bottom right;animation:ah-chat-in .32s var(--ease)}
 @keyframes ah-chat-in{from{opacity:0;transform:scale(.96) translateY(10px)}to{opacity:1;transform:none}}
@@ -477,7 +487,7 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 /* ---------- Sími: hetjan rúllar eðlilega (engin sticky-skrunlengd = ekkert autt bil) ---------- */
 @media (max-width:700px){
   .ah-hero-v{height:auto}
-  .ah-hero-v .ah-sticky{position:relative;height:auto;overflow:visible;padding:calc(env(safe-area-inset-top,0px) + 104px) 20px 8px}
+  .ah-hero-v .ah-sticky{position:relative;height:auto;overflow:visible;padding:calc(env(safe-area-inset-top,0px) + 104px) var(--sx) 8px}
   .ah-hero-v .ah-hero-head{position:relative;top:auto;padding:0;opacity:1!important;transform:none!important}
   .ah-hero-v .ah-hero-frame{width:100%;margin-top:36px;transform:none!important}
   .ah-hero-v + .ah-sec{padding-top:56px}
@@ -486,7 +496,7 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 @media (pointer:coarse){.ah-foot nav{gap:0}.ah-foot nav a{min-height:32px}.ah-foot h2{margin-bottom:6px}.ah-foot-grid{gap:28px 24px}}
 
 /* ---------- Samþykki fyrir greiningarvafrakökum ---------- */
-.ah-consent{position:fixed;left:20px;bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:45;width:min(400px,calc(100vw - 40px));
+.ah-consent{position:fixed;left:max(20px, env(safe-area-inset-left,0px));bottom:calc(20px + env(safe-area-inset-bottom,0px));z-index:45;width:min(400px,calc(100vw - 40px));
   background:rgba(255,255,255,.96);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-radius:18px;padding:16px 18px;
   box-shadow:0 0 0 1px rgba(0,0,0,.07),0 20px 50px -18px rgba(40,25,10,.35);font-family:'General Sans',-apple-system,BlinkMacSystemFont,sans-serif;color:#1d1d1f}
 .ah-consent p{margin:0;font-size:14px;line-height:1.5;color:#424245}
@@ -503,7 +513,7 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 .ah-dg-en .ah-dg-chip{background-position:56.39% 53.38%}
 
 /* Systurkerfið INVENTRA — lítið og hógvært neðst */
-.ah-sister{padding:0 20px 72px}
+.ah-sister{padding:0 var(--sx) 72px}
 .ah-sister-in{max-width:880px;margin:0 auto;display:flex;align-items:center;gap:22px;padding:20px 26px;border-radius:20px;background:#fff;box-shadow:0 0 0 1px var(--line),0 16px 40px -30px rgba(0,0,0,.25);color:var(--ink);text-decoration:none;transition:transform .2s var(--ease)}
 .ah-sister-in:hover{transform:translateY(-2px)}
 .ah-sister-logo{display:flex;align-items:flex-end;gap:3px;flex:none}

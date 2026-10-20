@@ -5,8 +5,8 @@
   --brand:#e9700f; --brand-2:#b85309; --brand-deep:#cf5f0c; --brand-soft:rgba(233,112,15,.22); --bad:#c8321e;
   position:relative;min-height:100vh;min-height:100dvh;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);
   background:#fbfbfd;color:var(--ink);font-family:'General Sans',-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:-.011em;overflow:hidden}
-.ah-auth-l{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:96px 28px 40px}
-.ah-auth-top{position:absolute;top:calc(env(safe-area-inset-top,0px) + 18px);left:28px;right:28px;display:flex;justify-content:space-between;align-items:center;font-size:14px}
+.ah-auth-l{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:96px max(28px, env(safe-area-inset-right,0px)) calc(40px + env(safe-area-inset-bottom,0px)) max(28px, env(safe-area-inset-left,0px))}
+.ah-auth-top{position:absolute;top:calc(env(safe-area-inset-top,0px) + 18px);left:max(28px, env(safe-area-inset-left,0px));right:max(28px, env(safe-area-inset-right,0px));display:flex;justify-content:space-between;align-items:center;font-size:14px}
 .ah-auth-top a{color:var(--ink2);text-decoration:none}
 .ah-auth-top a:hover{color:var(--ink)}
 .ah-auth .form{max-width:400px}
@@ -34,8 +34,8 @@
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e9700f' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E");background-size:13px;background-repeat:no-repeat;background-position:center}
 @media (max-width:900px){
   .ah-auth{grid-template-columns:1fr;overflow:visible}
-  .ah-auth-l{min-height:100dvh;padding:88px 22px 40px}
-  .ah-auth-r{padding:64px 22px 72px;border-left:0;border-top:1px solid rgba(233,112,15,.12)}
+  .ah-auth-l{min-height:100dvh;padding:88px max(22px, env(safe-area-inset-right,0px)) 40px max(22px, env(safe-area-inset-left,0px))}
+  .ah-auth-r{padding:64px max(22px, env(safe-area-inset-right,0px)) calc(72px + env(safe-area-inset-bottom,0px)) max(22px, env(safe-area-inset-left,0px));border-left:0;border-top:1px solid rgba(233,112,15,.12)}
 }
 .ah-auth-top .ah-logo{color:var(--ink)}
 .ah-auth-mac{width:min(560px,100%)}

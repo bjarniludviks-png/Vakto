@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { siteViewport } from "@/components/site/viewport";
 import { cookies } from "next/headers";
 import SiteNav from "@/components/site/site-nav";
 import AhFooter from "@/components/site/ah-footer";
@@ -12,6 +13,8 @@ import { PLANS } from "@/lib/pricing";
 import { nf } from "@/lib/format";
 
 // Fjárfestasíða (lykilorðsvarin, noindex). Áætlanir byggja á raunverulegu verðskránni í src/lib/pricing.ts.
+// viewport-fit=cover + ljós theme-color fyrir opna vefinn (iOS 26 Safari, sjá components/site/viewport.ts).
+export const viewport = siteViewport;
 export const metadata: Metadata = { title: "VAKTO: Fjárfestar", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 

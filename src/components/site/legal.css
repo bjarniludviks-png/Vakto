@@ -1,6 +1,6 @@
 /* Lögfræðisíður í útliti nýju forsíðunnar */
 .ah-legal{min-height:100dvh}
-.ah-legal-main{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:140px 20px 100px}
+.ah-legal-main{position:relative;z-index:1;max-width:760px;margin:0 auto;padding:140px var(--sx) 100px}
 .ah-legal-main h1{font-size:clamp(38px,5vw,60px);letter-spacing:-.04em}
 .ah-legal-upd{margin:16px 0 48px;color:#6e6e73;font-size:15px}
 .ah-legal-body{font-size:17px;line-height:1.65;color:#3a3a3f}

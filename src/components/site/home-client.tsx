@@ -87,9 +87,11 @@ export function Glow() {
   }, []);
   return (
     <div className="ah-glow" aria-hidden="true">
-      <div ref={a} className="ah-blob ah-b1" />
-      <div ref={b} className="ah-blob ah-b2" />
-      <div ref={c} className="ah-blob ah-b3" />
+      <div className="ah-glow-in">
+        <div ref={a} className="ah-blob ah-b1" />
+        <div ref={b} className="ah-blob ah-b2" />
+        <div ref={c} className="ah-blob ah-b3" />
+      </div>
     </div>
   );
 }
