@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "@/components/app/toast";
@@ -37,6 +37,14 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const openTab = (x: ProfileTab) => { setTab(x); setVisited((v) => (v.has(x) ? v : new Set(v).add(x))); };
+  // Sími: flipastikan skrunar lárétt — virki flipinn rúllar í miðjuna (aðeins lárétt, síðan hoppar ekki).
+  const tabsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const bar = tabsRef.current;
+    const on = bar?.querySelector<HTMLElement>("button.on");
+    if (!bar || !on || bar.scrollWidth <= bar.clientWidth) return;
+    bar.scrollTo({ left: on.offsetLeft - (bar.clientWidth - on.offsetWidth) / 2, behavior: "smooth" });
+  }, [tab]);
   useEffect(() => {
     if (!dirty) return;
     const warn = (ev: BeforeUnloadEvent) => { ev.preventDefault(); };
@@ -131,7 +139,7 @@ export default function EmployeeProfile({ employee }: { employee: Employee }) {
         </div>
       </div>
 
-      <div className="ep-tabs" role="tablist">
+      <div className="ep-tabs" role="tablist" ref={tabsRef}>
         {tabs.map((x) => (
           <button key={x} type="button" role="tab" aria-selected={x === tab} className={x === tab ? "on" : ""} onClick={() => openTab(x)}>{t(`ep:tab:${x}`)}</button>
         ))}

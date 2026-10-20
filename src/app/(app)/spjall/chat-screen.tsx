@@ -87,6 +87,17 @@ const I = {
   file: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><path d="M14 3v5h5" /></svg>,
   settings: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" /></svg>,
   chat: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12Z" /></svg>,
+  // sími (Messenger-útlit)
+  plusC: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9.5" /><path d="M12 8v8M8 12h8" /></svg>,
+  camera: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" /><circle cx="12" cy="13" r="3.5" /></svg>,
+  imageL: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>,
+  micL: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>,
+  chevR: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="m9 6 6 6-6 6" /></svg>,
+  backL: <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M15 19l-7-7 7-7" /></svg>,
+  leave: <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M15 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11" /></svg>,
+  reply: <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M9 17l-5-5 5-5" /><path d="M4 12h11a5 5 0 0 1 5 5v2" /></svg>,
+  trash: <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" /></svg>,
+  copy: <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>,
 };
 
 /** `embedded`: rendered inside another page (Laun & spjall tabs) — inline
@@ -129,6 +140,13 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const [sideOver, setSideOver] = useState(false);
   const [infoVer, setInfoVer] = useState(0);
   const [flash, setFlash] = useState<string | null>(null);
+  // Sími (≤900px): Messenger-útlit — fastir hringir efst, þráður á heilum skjá, aðgerðir með löngu ýti.
+  const [phone, setPhone] = useState(false);
+  const [memberCount, setMemberCount] = useState<number | null>(null);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [sheetFor, setSheetFor] = useState<ChatMessage | null>(null);
+  const pressRef = useRef<{ t: ReturnType<typeof setTimeout> | null; x: number; y: number }>({ t: null, x: 0, y: 0 });
+  const camRef = useRef<HTMLInputElement | null>(null);
   // Relative times ("5 mín") render only after mount — server and browser clocks/time zones differ.
   const [now, setNow] = useState<number | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
@@ -165,13 +183,17 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     const onMq = () => { setWide(mq.matches); if (mq.matches) setSideOver(false); };
     onMq();
     mq.addEventListener("change", onMq);
+    const pq = window.matchMedia("(max-width: 900px)");
+    const onPq = () => setPhone(pq.matches);
+    onPq();
+    pq.addEventListener("change", onPq);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- viewport/localStorage/clock exist only after mount (hydration-safe)
     try { if (localStorage.getItem(sideKey) === "0") setSideDocked(false); } catch { /* private mode */ }
     setNow(Date.now());
     const iv = setInterval(() => setNow(Date.now()), 60_000);
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSideOver(false); };
     window.addEventListener("keydown", onKey);
-    return () => { mq.removeEventListener("change", onMq); clearInterval(iv); window.removeEventListener("keydown", onKey); };
+    return () => { mq.removeEventListener("change", onMq); pq.removeEventListener("change", onPq); clearInterval(iv); window.removeEventListener("keydown", onKey); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   function toggleSide() {
@@ -335,6 +357,15 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     return () => clearInterval(iv);
   }, [active?.id]);
 
+  // Sími: „Grúppa · 6“ í haus þráðarins (fjöldi meðlima sóttur aðeins þar).
+  const countFor = phone && active && !active.dm && active.kind !== "general" ? active.id : null;
+  useEffect(() => {
+    if (!countFor) return;
+    let alive = true;
+    listMembers(countFor).then((m) => { if (alive) setMemberCount(m.members.length || null); });
+    return () => { alive = false; setMemberCount(null); };
+  }, [countFor, infoVer]);
+
   // Coming back to the tab: refresh + mark the open thread read.
   useEffect(() => {
     const onVis = () => {
@@ -488,7 +519,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   async function send(kind: "text" | "image" | "audio" = "text", url?: string, body?: string) {
     const text = body ?? val;
     if (kind === "text" && !text.trim()) return;
-    if (kind === "text") setVal("");
+    if (kind === "text") { setVal(""); setToolsOpen(false); }
     setEmoji(false);
     if (!active) return;
     sendTyping(true);
@@ -539,7 +570,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0]; if (!f || !active) return;
-    if (fileRef.current) fileRef.current.value = "";
+    e.target.value = ""; // myndasafn eða myndavél (sími)
     const r = new FileReader();
     r.onload = async () => {
       const ext = (f.name.split(".").pop() || "png").toLowerCase();
@@ -622,9 +653,12 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     return (
       <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}${un ? " un" : ""}`} onClick={() => open(c)} role="button" tabIndex={0}
         onKeyDown={(e) => { if (e.key === "Enter") open(c); }} title={un ? `${c.unread} ${t("ólesin")}` : undefined}>
-        <ConvAvatar c={c} size={44} />
+        <ConvAvatar c={c} size={phone ? 56 : 44} />
         <div className="tx">
-          <b>{nameOf(c)}</b>
+          <div className="tl">
+            <b>{nameOf(c)}</b>
+            {c.lastAt && now !== null && <time className="tm-r">{relTime(c.lastAt)}</time>}
+          </div>
           <span className="pv">
             <span className="pv-t">
               {label && <span className="pv-k">{label}{c.last ? " · " : ""}</span>}
@@ -640,6 +674,30 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     );
   }
 
+  /** Sími: langt ýti á bólu opnar aðgerðablað (viðbrögð, svara, afrita, eyða) í stað hover-hnappa. */
+  function pressStart(m: ChatMessage, e: React.PointerEvent) {
+    if (!phone || e.pointerType === "mouse") return;
+    const p = pressRef.current;
+    if (p.t) clearTimeout(p.t);
+    p.x = e.clientX; p.y = e.clientY;
+    p.t = setTimeout(() => { p.t = null; navigator.vibrate?.(8); setSheetFor(m); }, 420);
+  }
+  function pressMove(e: React.PointerEvent) {
+    const p = pressRef.current;
+    if (p.t && Math.hypot(e.clientX - p.x, e.clientY - p.y) > 8) { clearTimeout(p.t); p.t = null; }
+  }
+  function pressEnd() { const p = pressRef.current; if (p.t) { clearTimeout(p.t); p.t = null; } }
+
+  // Fastir hringir efst (sími): VAKTO AI, # Almennt, svo nýjustu samtölin.
+  const pins: ({ ai: true } | Conversation)[] = q ? [] : [
+    ...(aiShown ? [{ ai: true as const }] : []),
+    ...pinned,
+    ...rest.slice(0, 8),
+  ];
+  const pinLabel = (c: Conversation) => (c.kind === "general" ? c.name : c.dm ? firstName(c.name) : c.name);
+  // Sími + texti í innslætti: táknin falla saman í ör (eins og Messenger) þar til ýtt er á hana.
+  const toolsCompact = phone && !!val.trim() && !toolsOpen;
+
   const threadOpen = !!active || aiOpen;
   return (
     <>
@@ -654,10 +712,25 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
             <div className="srchbox">{I.search}<input placeholder={t("Leitaðu að spjalli eða manneskju…")} value={search} onChange={(e) => setSearch(e.target.value)} /></div>
           </div>
           <div className="msgr-convs">
+            {pins.length > 0 && (
+              <div className="msgr-pins" role="list" aria-label={t("Fest")}>
+                {pins.map((c) => "ai" in c ? (
+                  <button key="ai" role="listitem" className="mpin" onClick={openAi}>
+                    <AiAvatar size={60} />
+                    <span>VAKTO AI</span>
+                  </button>
+                ) : (
+                  <button key={c.id} role="listitem" className={`mpin${c.unread > 0 ? " un" : ""}`} onClick={() => open(c)}>
+                    <span className="mpin-a"><ConvAvatar c={c} size={60} />{c.unread > 0 && <i className="mpin-dot" aria-label={`${c.unread} ${t("ólesin")}`} />}</span>
+                    <span>{pinLabel(c)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {(aiShown || pinned.length > 0) && <div className="chat-sec">{t("Fest")}</div>}
             {aiShown && (
               <div className={`conv conv-ai${aiOpen ? " on" : ""}`} onClick={openAi} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") openAi(); }}>
-                <AiAvatar size={44} />
+                <AiAvatar size={phone ? 56 : 44} />
                 <div className="tx">
                   <b>VAKTO AI</b>
                   <span className="pv"><span className="pv-t">{aiLast ? (aiLast.role === "user" ? `${t("Þú")}: ` : "") + aiLast.content.replace(/[*#]/g, "").slice(0, 90) : t("Spyrðu um laun, vaktir og tíma")}</span></span>
@@ -677,7 +750,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                   .filter((p) => !convs.some((c) => c.dm && c.name === p.name))
                   .map((p) => (
                     <div key={p.userId} className="conv" onClick={() => openDM(p)} role="button" tabIndex={0}>
-                      <PersonAvatar p={p} size={44} />
+                      <PersonAvatar p={p} size={phone ? 56 : 44} />
                       <div className="tx">
                         <b>{p.name}</b>
                         <span className="pv"><span className="pv-t">{t("Senda skilaboð")}</span></span>
@@ -695,8 +768,8 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
           {aiOpen ? (
             <>
               <div className="msgr-head">
-                <button className="iconbtn mob-back" onClick={closeThread} aria-label={t("Til baka")}>{I.back}</button>
-                <AiAvatar size={40} />
+                <button className="iconbtn mob-back" onClick={closeThread} aria-label={t("Til baka")}>{phone ? I.backL : I.back}</button>
+                <AiAvatar size={phone ? 36 : 40} />
                 <div className="msgr-title" onClick={toggleSide}>
                   <b>VAKTO AI</b>
                   <span>{t("Aðstoðarmaður fyrir reksturinn")}</span>
@@ -705,16 +778,16 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                 <button className={`iconbtn msgr-info${sideShown ? " on" : ""}`} aria-pressed={sideShown} title={t("Upplýsingar")} aria-label={t("Upplýsingar")} onClick={toggleSide}>{I.info}</button>
               </div>
               <AssistantMessages chat={aiChat} className="vai-list msgr-ai-list" onUpgrade={() => router.push("/stillingar?tab=askrift#vakto-ai")} />
-              <div className="msgr-ai-foot"><AssistantComposer chat={aiChat} /></div>
+              <div className="msgr-ai-foot"><AssistantComposer chat={aiChat} placeholder={phone ? t("Spyrðu VAKTO AI…") : undefined} /></div>
             </>
           ) : active ? (
             <>
               <div className="msgr-head">
-                <button className="iconbtn mob-back" onClick={closeThread} aria-label={t("Til baka")}>{I.back}</button>
-                <ConvAvatar c={active} size={40} />
+                <button className="iconbtn mob-back" onClick={closeThread} aria-label={t("Til baka")}>{phone ? I.backL : I.back}</button>
+                <ConvAvatar c={active} size={phone ? 36 : 40} />
                 <div className="msgr-title" onClick={toggleSide} title={t("Upplýsingar")}>
                   <b>{nameOf(active)}</b>
-                  <span>{subtitleOf(active)}</span>
+                  <span>{typingText && phone ? typingText : `${subtitleOf(active)}${phone && memberCount ? ` · ${memberCount}` : ""}`}</span>
                 </div>
                 <button className={`iconbtn msgr-info${sideShown ? " on" : ""}`} aria-pressed={sideShown} title={t("Upplýsingar")} aria-label={t("Upplýsingar")} onClick={toggleSide}>{I.info}</button>
               </div>
@@ -739,15 +812,17 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                       <span className="m-ava" style={{ visibility: g.last ? "visible" : "hidden" }}>
                         {m.photo ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img className="avt-img" src={m.photo} alt="" style={{ width: 30, height: 30 }} />
+                          <img className="avt-img" src={m.photo} alt="" style={{ width: phone ? 28 : 30, height: phone ? 28 : 30 }} />
                         ) : (
-                          <span className="avt" style={{ background: "var(--brand-soft)", color: "var(--brand)", width: 30, height: 30, fontSize: 11, fontWeight: 700 }}>
+                          <span className="avt" style={{ background: "var(--brand-soft)", color: "var(--brand)", width: phone ? 28 : 30, height: phone ? 28 : 30, fontSize: phone ? 10.5 : 11, fontWeight: 700 }}>
                             {m.sender.slice(0, 2).toUpperCase()}
                           </span>
                         )}
                       </span>
                     )}
-                    <div className={`mbub ${m.me ? "me" : "them"}${img ? " media" : ""}`} title={`${dayLabel(m.createdAt)} ${hhmm(m.createdAt)}`}>
+                    <div className={`mbub ${m.me ? "me" : "them"}${img ? " media" : ""}`} title={phone ? undefined : `${dayLabel(m.createdAt)} ${hhmm(m.createdAt)}`}
+                      onPointerDown={(e) => pressStart(m, e)} onPointerMove={pressMove} onPointerUp={pressEnd} onPointerCancel={pressEnd}
+                      onContextMenu={(e) => { if (phone) { e.preventDefault(); pressEnd(); setSheetFor(m); } }}>
                       {m.replyTo && (
                         <span className="mreply"><b>{m.replyTo.sender}</b><span>{m.replyTo.body}</span></span>
                       )}
@@ -813,16 +888,35 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                 </div>
               )}
               {emoji && <div className="emojibar">{EMOJIS.map((e) => <button key={e} onClick={() => { setVal((v) => v + e); sendTyping(); }}>{e}</button>)}</div>}
-              <div className="msgr-input">
-                <button className="iconbtn" title={t("Tákn")} onClick={() => setEmoji((v) => !v)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" /></svg></button>
-                <button className="iconbtn" title={t("Mynd")} onClick={() => fileRef.current?.click()}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg></button>
-                <button className="iconbtn" title={t("Talskilaboð")} style={rec ? { color: "var(--bad)" } : undefined} onClick={toggleRec}>
-                  {rec ? <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
-                    : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>}
-                </button>
+              <div className={`msgr-input${phone ? " mob" : ""}`}>
+                {phone ? (
+                  // Sími: + (tákn) · myndavél · myndasafn · hljóðnemi — falla saman í ör meðan skrifað er.
+                  toolsCompact ? (
+                    <button className="iconbtn mi-ic" aria-label={t("Fleiri valkostir")} onPointerDown={(e) => e.preventDefault()} onClick={() => setToolsOpen(true)}>{I.chevR}</button>
+                  ) : (
+                    <>
+                      <button className={`iconbtn mi-ic${emoji ? " on" : ""}`} aria-label={t("Tákn")} aria-pressed={emoji} onClick={() => setEmoji((v) => !v)}>{I.plusC}</button>
+                      <button className="iconbtn mi-ic" aria-label={t("Myndavél")} onClick={() => camRef.current?.click()}>{I.camera}</button>
+                      <button className="iconbtn mi-ic" aria-label={t("Mynd")} onClick={() => fileRef.current?.click()}>{I.imageL}</button>
+                      <button className={`iconbtn mi-ic${rec ? " rec" : ""}`} aria-label={t("Talskilaboð")} onClick={toggleRec}>
+                        {rec ? <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg> : I.micL}
+                      </button>
+                    </>
+                  )
+                ) : (
+                  <>
+                    <button className="iconbtn" title={t("Tákn")} onClick={() => setEmoji((v) => !v)}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01" /></svg></button>
+                    <button className="iconbtn" title={t("Mynd")} onClick={() => fileRef.current?.click()}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg></button>
+                    <button className="iconbtn" title={t("Talskilaboð")} style={rec ? { color: "var(--bad)" } : undefined} onClick={toggleRec}>
+                      {rec ? <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
+                        : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>}
+                    </button>
+                  </>
+                )}
                 <input
-                  ref={inputRef} className="txt" placeholder={rec ? t("Tek upp… smelltu til að stöðva") : t("chat:ph")} value={val}
-                  onChange={(e) => { setVal(e.target.value); if (e.target.value) sendTyping(); else sendTyping(true); }}
+                  ref={inputRef} className="txt" placeholder={rec ? t("Tek upp… smelltu til að stöðva") : phone ? "Aa" : t("chat:ph")} value={val}
+                  onFocus={() => setToolsOpen(false)}
+                  onChange={(e) => { setVal(e.target.value); if (e.target.value) sendTyping(); else { sendTyping(true); setToolsOpen(false); } }}
                   onBlur={() => sendTyping(true)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); send(); inputRef.current?.focus(); } }}
                 />
@@ -830,6 +924,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
                 </button>
                 <input ref={fileRef} type="file" accept="image/*,image/gif" hidden onChange={onFile} />
+                <input ref={camRef} type="file" accept="image/*" capture="environment" hidden onChange={onFile} />
               </div>
             </>
           ) : (
@@ -846,12 +941,46 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
             <div className="msgr-scrim" onClick={() => setSideOver(false)} />
             <aside className="msgr-side" aria-label={t("Upplýsingar")}>
               <button className="iconbtn msgr-side-x" onClick={() => (wide ? toggleSide() : setSideOver(false))} aria-label={t("Loka")}>{I.close}</button>
+              {/* sími: upplýsingaskjár á heilum skjá með til-baka-ör (eins og Messenger) */}
+              <div className="msgr-side-top">
+                <button className="iconbtn mob-back" onClick={() => setSideOver(false)} aria-label={t("Til baka")}>{I.backL}</button>
+                <b>{aiOpen ? "VAKTO AI" : active ? nameOf(active) : ""}</b>
+              </div>
               {aiOpen
-                ? <AiDetails chat={aiChat} show={sideShown} />
+                ? <AiDetails chat={aiChat} show={sideShown} onOpened={() => setSideOver(false)} />
                 : active && <ConvDetails key={active.id} conv={active} subtitle={subtitleOf(active)} name={nameOf(active)} version={infoVer} show={sideShown}
-                  onManage={() => setModal("info")} onJump={jumpTo} dayLabel={dayLabel} />}
+                  onManage={() => setModal("info")} onJump={jumpTo} dayLabel={dayLabel}
+                  onLeave={async () => {
+                    if (!window.confirm(`${t("Hætta í grúppu")}: „${active.name}“?`)) return;
+                    const r = await leaveChannel(active.id);
+                    if (!r.ok) { toast(r.error ?? "Villa"); return; }
+                    closeThread(); reloadConvs();
+                  }} />}
             </aside>
           </>
+        )}
+
+        {/* sími: aðgerðablað eftir langt ýti á skilaboð */}
+        {sheetFor && (
+          <div className="msheet-wrap" onClick={() => setSheetFor(null)}>
+            <div className="msheet" role="dialog" aria-label={t("Fleiri aðgerðir")} onClick={(e) => e.stopPropagation()}>
+              <div className="msheet-re">
+                {REACTIONS.map((e) => (
+                  <button key={e} className={sheetFor.reactions.find((r) => r.emoji === e)?.mine ? "on" : ""} onClick={() => { const m = sheetFor; setSheetFor(null); void react(m, e); }}>{e}</button>
+                ))}
+              </div>
+              <div className="msheet-list">
+                <button onClick={() => { setReplyTo(sheetFor); setSheetFor(null); inputRef.current?.focus(); }}>{I.reply}{t("Svara")}</button>
+                {sheetFor.kind === "text" && sheetFor.body && (
+                  <button onClick={() => { void navigator.clipboard?.writeText(sheetFor.body).then(() => toast(t("Afritað"))).catch(() => {}); setSheetFor(null); }}>{I.copy}{t("Afrita")}</button>
+                )}
+                {sheetFor.me && !sheetFor.id.startsWith("tmp-") && (
+                  <button className="danger" onClick={() => { const m = sheetFor; setSheetFor(null); void unsend(m); }}>{I.trash}{t("Eyða")}</button>
+                )}
+              </div>
+              <button className="msheet-x" onClick={() => setSheetFor(null)}>{t("Hætta við")}</button>
+            </div>
+          </div>
         )}
       </div>
 
@@ -862,9 +991,9 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
 }
 
 /** Details for a channel: big avatar, search in the thread, members, media & files. */
-function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, dayLabel }: {
+function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, dayLabel, onLeave }: {
   conv: Conversation; name: string; subtitle: string; version: number; show: boolean;
-  onManage: () => void; onJump: (id: string) => void; dayLabel: (iso: string) => string;
+  onManage: () => void; onJump: (id: string) => void; dayLabel: (iso: string) => string; onLeave: () => void;
 }) {
   const { t } = useLang();
   const [members, setMembers] = useState<Members | null>(null);
@@ -905,7 +1034,7 @@ function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, da
         {manageable && <button onClick={onManage}><span>{I.settings}</span>{t("Stjórna grúppu")}</button>}
       </div>
       {searching && (
-        <div className="side-sec">
+        <div className="side-sec side-search">
           <div className="srchbox">{I.search}<input autoFocus placeholder={t("Leita í samtali")} value={q} onChange={(e) => setQ(e.target.value)} /></div>
           {hits && (hits.length ? (
             <div className="side-hits">
@@ -920,7 +1049,7 @@ function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, da
         </div>
       )}
       {group && (
-        <div className="side-sec">
+        <div className="side-sec side-members">
           <div className="side-h">{t("Meðlimir")}{members ? ` · ${members.members.length}` : ""}</div>
           {members === null ? <i className="sk-line" style={{ height: 34, display: "block" }} /> : (
             <div className="side-people">
@@ -934,7 +1063,7 @@ function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, da
           )}
         </div>
       )}
-      <div className="side-sec">
+      <div className="side-sec side-media">
         <div className="side-h">{t("Myndir og skrár")}</div>
         {media === null ? <i className="sk-line" style={{ height: 70, display: "block" }} />
           : media.length === 0 ? <p className="side-muted">{t("Engar myndir eða skrár enn")}</p> : (
@@ -957,12 +1086,18 @@ function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, da
             </>
           )}
       </div>
+      {/* sími: aðgerðalisti neðst (aðeins það sem virkar) — falinn á tölvu */}
+      <div className="side-sec side-list">
+        <button onClick={() => { setSearching(true); setQ(""); document.querySelector(".msgr-side")?.scrollTo({ top: 0, behavior: "smooth" }); }}>{I.search}<span>{t("Leita í samtali")}</span></button>
+        {manageable && <button onClick={onManage}>{I.settings}<span>{t("Stjórna grúppu")}</span></button>}
+        {manageable && !conv.autoKind && <button className="danger" onClick={onLeave}>{I.leave}<span>{t("Hætta í grúppu")}</span></button>}
+      </div>
     </div>
   );
 }
 
 /** Details for VAKTO AI: new conversation + earlier conversations (history). */
-function AiDetails({ chat, show }: { chat: AssistantChat; show: boolean }) {
+function AiDetails({ chat, show, onOpened }: { chat: AssistantChat; show: boolean; onOpened?: () => void }) {
   const { t } = useLang();
   const { s } = chat;
   useEffect(() => { if (show) void chat.loadHistory(); }, [show]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -974,11 +1109,11 @@ function AiDetails({ chat, show }: { chat: AssistantChat; show: boolean }) {
         <span className="side-sub">{t("Aðstoðarmaður fyrir reksturinn")}</span>
       </div>
       <div className="side-acts">
-        <button onClick={() => { chat.fresh(); chat.focus(); }}><span>{I.plus}</span>{s.reset}</button>
+        <button onClick={() => { chat.fresh(); chat.focus(); onOpened?.(); }}><span>{I.plus}</span>{s.reset}</button>
       </div>
       <div className="side-sec">
         <div className="side-h">{s.history}</div>
-        <div className="vai-hist side-ai-hist"><AssistantHistoryList chat={chat} /></div>
+        <div className="vai-hist side-ai-hist"><AssistantHistoryList chat={chat} onOpened={onOpened} /></div>
       </div>
       <p className="side-muted" style={{ padding: "0 18px" }}>{s.note}</p>
     </div>

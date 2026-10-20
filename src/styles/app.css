@@ -1786,3 +1786,173 @@ select:not([multiple]):not([size]){-webkit-appearance:none;appearance:none;backg
 .ai-step.done .ai-step-ic{background:var(--brand-soft);color:var(--brand);box-shadow:none}
 .ai-step-ic svg{width:13px;height:13px;stroke-width:2.4}
 .ai-step-ic .vai-dots i{width:3.5px;height:3.5px}
+
+/* ============ Starfsmannaspjald → Samningar: samningar sem spjöld (sími 360–430px) ============ */
+.ctr{display:flex;align-items:center;gap:10px;font-size:13px;border:1px solid var(--line);border-radius:12px;padding:10px 8px 10px 12px;background:var(--panel)}
+.ctr-ic{width:16px;height:16px;color:var(--brand);flex:none}
+.ctr-main{flex:1;min-width:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ctr-title{font:inherit;font-size:13.5px;font-weight:600;color:var(--ink);background:none;border:0;padding:0;text-align:left;cursor:pointer;min-width:0;overflow-wrap:anywhere}
+.ctr-title:hover{color:var(--brand)}
+.ctr-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ctr-meta .dl{font-size:11.5px;color:var(--ink3);white-space:nowrap;font-variant-numeric:tabular-nums}
+.ctr-act{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.rmenu{position:relative;flex:none}
+.rmenu-b{width:32px;height:32px;border-radius:9px;border:0;background:none;color:var(--ink3);display:grid;place-items:center;cursor:pointer}
+.rmenu-b:hover,.rmenu-b[aria-expanded="true"]{background:var(--line2);color:var(--ink)}
+.rmenu-b svg{width:18px;height:18px;fill:currentColor}
+.rmenu-p{position:absolute;right:0;top:calc(100% + 6px);z-index:40;min-width:190px;background:var(--panel);border-radius:12px;box-shadow:0 0 0 1px var(--line),0 16px 40px -12px rgba(20,22,28,.28);padding:5px}
+.rmenu-p button{display:flex;align-items:center;gap:9px;width:100%;font:inherit;font-size:13.5px;font-weight:550;color:var(--ink);background:none;border:0;border-radius:8px;padding:10px 11px;cursor:pointer;text-align:left}
+.rmenu-p button:hover{background:var(--line2)}
+.rmenu-p button.danger{color:var(--bad)}
+.rmenu-p button.danger:hover{background:var(--bad-soft)}
+.rmenu-p svg{width:16px;height:16px;flex:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* flipastika: sléttur lárétt skrun, virki flipinn rúllar í sjónmál (employee-profile.tsx) */
+.ep-tabs{position:relative;scrollbar-width:none;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.ep-tabs::-webkit-scrollbar{display:none}
+@media(max-width:640px){
+  .ctr{display:grid;grid-template-columns:auto minmax(0,1fr) auto;grid-template-areas:"ic main menu" "act act act";align-items:start;row-gap:12px;column-gap:10px;padding:14px 8px 14px 14px;border-radius:14px}
+  .ctr-ic{grid-area:ic;margin-top:2px}
+  .ctr-main{grid-area:main;flex-direction:column;align-items:flex-start;gap:6px}
+  .ctr-title{font-size:15px;line-height:1.3}
+  .ctr .rmenu{grid-area:menu;margin-top:-10px}
+  .ctr .rmenu-b{width:44px;height:44px;border-radius:12px}
+  .ctr-act{grid-area:act;gap:8px;padding-right:6px}
+  .ctr-act .btn{flex:1 1 calc(50% - 4px);justify-content:center;min-height:44px;font-size:13.5px;border-radius:11px}
+  .rmenu-p button{padding:13px 12px;font-size:15px}
+  .cst{padding:14px}
+  .cst-h b{font-size:15px}
+  .cst-act{gap:8px}
+  .cst-act .btn{flex:1 1 100%;justify-content:center;min-height:44px;font-size:13.5px;border-radius:11px}
+  .cst-act .muted{margin-left:0;width:100%;text-align:center}
+  .ep-tabs{padding:4px}
+  .ep-tabs button{min-height:44px;padding:0 16px;font-size:14px}
+  .ep-tabs button:hover:not(.on){background:none;color:var(--ink2)} /* snerting: engin „föst“ hover-litun */
+  .ep-avwrap .ep-cam{width:22px;height:22px;right:-6px;bottom:-6px}
+  .db2.ep{padding-bottom:72px} /* VAKTO AI-hnappurinn hylur ekki síðustu línuna/Vista */
+}
+
+/* ============ Spjallrásir á síma (≤900px): Messenger / Grok-útlit ============
+   Tölvan (#54) er óbreytt: allt hér er annaðhvort falið ≥901px eða innan media-fyrirspurnarinnar. */
+.msgr-pins,.msgr-side-top,.side-list{display:none}
+.conv .tx .tl{display:flex;align-items:baseline;gap:8px;min-width:0}
+.conv .tx .tl b{flex:1;min-width:0}
+.conv .tx .tm-r{display:none}
+.msheet-wrap{position:fixed;inset:0;z-index:90;background:rgba(15,16,20,.34);display:flex;align-items:flex-end;animation:msheet-fade .15s ease}
+.msheet{width:100%;background:var(--bg);border-radius:22px 22px 0 0;padding:14px 12px calc(12px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:10px;animation:msheet-up .22s cubic-bezier(.23,1,.32,1)}
+.msheet-re{display:flex;justify-content:space-around;background:var(--panel);border-radius:999px;padding:6px}
+.msheet-re button{font-size:26px;width:48px;height:48px;border-radius:50%;border:0;background:none;cursor:pointer;line-height:1}
+.msheet-re button.on{background:var(--brand-soft)}
+.msheet-list{background:var(--panel);border-radius:14px;overflow:hidden}
+.msheet-list button{display:flex;align-items:center;gap:14px;width:100%;min-height:52px;padding:0 16px;font:inherit;font-size:16px;color:var(--ink);background:none;border:0;text-align:left;cursor:pointer}
+.msheet-list button+button{border-top:1px solid var(--line2)}
+.msheet-list button svg{color:var(--ink2);flex:none}
+.msheet-list button.danger,.msheet-list button.danger svg{color:var(--bad)}
+.msheet-x{min-height:52px;border-radius:14px;background:var(--panel);border:0;font:inherit;font-size:16px;font-weight:650;color:var(--brand);cursor:pointer}
+@keyframes msheet-up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+@keyframes msheet-fade{from{opacity:0}to{opacity:1}}
+@media(max-width:900px){
+  /* listi */
+  .msgr.full{left:0}
+  .msgr-lhead{padding:14px 16px 2px}
+  .msgr-lhead h2{font-size:30px;font-weight:750;letter-spacing:-.025em}
+  .msgr-lhead .iconbtn{width:40px;height:40px}
+  .msgr-lsearch{padding:8px 16px 2px}
+  .msgr-lsearch .srchbox{height:42px;background:var(--line2)}
+  .msgr-lsearch .srchbox input{font-size:16px;background:transparent}
+  .side-sec .srchbox input{background:transparent}
+  .msgr-convs{padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+  .msgr-pins{display:flex;gap:12px;overflow-x:auto;padding:14px 16px 8px;scrollbar-width:none;overscroll-behavior-x:contain}
+  .msgr-pins::-webkit-scrollbar{display:none}
+  .mpin{flex:none;width:68px;display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;padding:0;font:inherit;cursor:pointer;color:var(--ink2);-webkit-tap-highlight-color:transparent}
+  .mpin>span:last-child{font-size:12.5px;line-height:1.25;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+  .mpin.un>span:last-child{color:var(--ink);font-weight:650}
+  .mpin-a{position:relative;display:block}
+  .mpin-dot{position:absolute;right:1px;bottom:2px;width:15px;height:15px;border-radius:50%;background:var(--brand);box-shadow:0 0 0 3px var(--panel)}
+  .mpin:active .mpin-a,.mpin:active .ai-ava{transform:scale(.96)}
+  .chat-sec{display:none}
+  .conv{gap:12px;padding:8px 16px;margin:0;border-radius:0;min-height:72px;-webkit-tap-highlight-color:transparent}
+  .conv:hover{background:none}
+  .conv:active{background:var(--line2)}
+  .conv.on{background:none}
+  .conv .tx b{font-size:16px;font-weight:560}
+  .conv .tx .tm-r{display:block;flex:none;font-size:13px;color:var(--ink3);font-variant-numeric:tabular-nums}
+  .conv.un .tx .tm-r{color:var(--brand);font-weight:650}
+  .conv .tx .pv{font-size:14.5px;margin-top:3px}
+  .conv .tx .pv .pv-d{display:none}
+  .conv .tx .pv .pv-k{font-size:11px}
+  .conv.un .tx b{font-weight:750}
+  .udot{width:12px;height:12px}
+  /* þráður + VAKTO AI: heill skjár yfir topstikunni (eins og app) */
+  .msgr.full.thread-open{top:0;left:0;z-index:64;padding-top:env(safe-area-inset-top,0px)}
+  .msgr-head{min-height:58px;padding:6px 6px 6px 2px;gap:8px;border-bottom:1px solid var(--line2);background:var(--panel)}
+  .msgr-head .iconbtn{width:44px;height:44px}
+  .msgr-head .mob-back{width:40px;margin-right:-4px}
+  .msgr-title b{font-size:16px}
+  .msgr-title span{font-size:12.5px}
+  .msgr-msgs{padding:10px 12px 8px}
+  .mrow{max-width:82%;gap:6px}
+  .mbub{font-size:16px;line-height:1.36;padding:8px 13px;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+  .mbub.media img{max-width:min(260px,62vw)}
+  .m-who{font-size:12px;margin-left:47px}
+  .day-sep{margin:18px 0 8px}
+  .day-sep span{font-size:12px;font-weight:550}
+  .msgr-typing{display:none}
+  .msgr-input.mob{gap:0;padding:6px 8px calc(8px + env(safe-area-inset-bottom,0px));border-top:0}
+  .msgr-input.mob .mi-ic{width:40px;height:44px;color:var(--brand);border-radius:12px}
+  .msgr-input.mob .mi-ic.on{background:var(--brand-soft)}
+  .msgr-input.mob .mi-ic.rec{color:var(--bad)}
+  .msgr-input.mob .txt{min-width:0;height:40px;padding:0 16px;font-size:16px;border-radius:999px;margin:0 6px 0 4px}
+  .msgr-input.mob .msgr-send{width:40px;height:40px}
+  .msgr.kb-open .msgr-input.mob{padding-bottom:8px}
+  .emojibar{padding:8px 12px;justify-content:space-between}
+  .emojibar button{font-size:24px;width:40px;height:40px}
+  .replybar{padding:8px 14px}
+  /* VAKTO AI (Grok-líkt): hreint, svör án bólu, stór innsláttur */
+  .msgr-ai-list{padding:18px 18px 12px}
+  .msgr-ai-list .vai-hello p{font-size:17px;line-height:1.5;color:var(--ink)}
+  .msgr-ai-list .vai-chips button{font-size:14.5px;padding:11px 15px;text-align:left}
+  .msgr-ai-list .vai-bub{font-size:16px;line-height:1.55;max-width:88%}
+  .msgr-ai-list .vai-msg.assistant .vai-bub{background:none;padding:2px 0;max-width:100%}
+  .msgr-ai-list .vai-msg.assistant .vai-think{background:var(--msg-them);padding:9px 13px}
+  .msgr-ai-list .vai-plan,.msgr-ai-list .vai-acts{max-width:100%}
+  .msgr-ai-list .vai-act-b .btn{min-height:40px;padding:0 16px;font-size:13.5px}
+  .msgr-ai-foot{padding:6px 12px calc(4px + env(safe-area-inset-bottom,0px))}
+  .msgr-ai-foot .vai-in{align-items:center;gap:8px}
+  .msgr-ai-foot .vai-in textarea{min-height:52px;padding:14px 18px;font-size:16px;border-radius:26px;border:1px solid var(--line);background:var(--panel);box-shadow:0 6px 24px -14px rgba(20,22,28,.35)}
+  .msgr-ai-foot .vai-in button{width:48px;height:48px}
+  .msgr-ai-foot .vai-note{font-size:11px;padding:2px 12px 6px}
+  .msgr.kb-open .msgr-ai-foot{padding-bottom:4px}
+  .msgr.kb-open .msgr-ai-foot .vai-note{display:none}
+  /* upplýsingaskjár: heill skjár, spjöld á gráum grunni (eins og Messenger) */
+  .msgr.side-over .msgr-side{position:absolute;inset:0;width:100%;z-index:8;background:var(--bg);box-shadow:none;padding-top:env(safe-area-inset-top,0px)}
+  .msgr.side-over .msgr-scrim{display:none}
+  .msgr-side-x{display:none}
+  .msgr-side-top{display:flex;align-items:center;gap:4px;position:sticky;top:0;z-index:2;min-height:56px;padding:6px 8px 6px 2px;background:var(--bg)}
+  .msgr-side-top b{flex:1;text-align:center;font-size:16px;font-weight:650;color:var(--ink);margin-right:44px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .msgr-side-top .iconbtn{color:var(--brand);width:44px;height:44px}
+  .side-in{padding-bottom:calc(28px + env(safe-area-inset-bottom,0px))}
+  .side-hero{padding:6px 18px 4px}
+  .side-hero b{font-size:22px;letter-spacing:-.01em}
+  .side-hero .side-sub{font-size:13.5px}
+  .side-acts{gap:30px;padding:14px 18px 20px}
+  .side-acts button{font-size:13px;color:var(--ink)}
+  .side-acts button>span{width:48px;height:48px;background:var(--panel)}
+  .side-acts button>span svg{width:20px;height:20px}
+  .side-sec{margin:0 16px 16px;padding:14px 16px;border-top:0;background:var(--panel);border-radius:14px}
+  .side-search{order:1}.side-media{order:2}.side-members{order:3}.side-list{order:4}
+  .side-in>.side-muted{order:5}
+  .side-h{font-size:14px}
+  .side-person{min-height:46px;font-size:15px;gap:12px}
+  .side-grid{gap:3px}
+  .side-grid a{border-radius:10px}
+  .side-file{min-height:48px;font-size:14.5px}
+  .side-list{display:flex;flex-direction:column;gap:0;padding:2px 0}
+  .side-list button{display:flex;align-items:center;gap:14px;min-height:52px;padding:0 16px;font:inherit;font-size:16px;color:var(--ink);background:none;border:0;text-align:left;cursor:pointer}
+  .side-list button+button{border-top:1px solid var(--line2)}
+  .side-list button svg{width:20px;height:20px;color:var(--ink2);flex:none}
+  .side-list button.danger,.side-list button.danger svg{color:var(--bad)}
+  .side-ai-hist .vai-conv-t{min-height:48px}
+}
+@media(max-width:900px) and (hover:none){
+  .mact{display:none}
+}

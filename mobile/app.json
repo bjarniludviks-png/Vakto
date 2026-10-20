@@ -14,8 +14,8 @@
       "bundleIdentifier": "is.vakto.app",
       "buildNumber": "1",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "VAKTO notar myndasafnið til að velja prófílmynd.",
-        "NSCameraUsageDescription": "VAKTO notar myndavélina til að taka prófílmynd.",
+        "NSPhotoLibraryUsageDescription": "VAKTO notar myndasafnið til að velja prófílmynd og senda myndir í spjalli.",
+        "NSCameraUsageDescription": "VAKTO notar myndavélina til að taka prófílmynd og senda myndir í spjalli.",
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "VAKTO skráir staðsetningu einu sinni þegar þú stimplar þig inn og út, ef vinnustaðurinn hefur kveikt á því. Engin rakning þess á milli."
       }
@@ -63,7 +63,7 @@
         "expo-image-picker",
         {
           "photosPermission": "VAKTO notar myndasafnið til að velja prófílmynd og senda myndir í spjalli.",
-          "cameraPermission": "VAKTO notar myndavélina til að taka prófílmynd."
+          "cameraPermission": "VAKTO notar myndavélina til að taka prófílmynd og senda myndir í spjalli."
         }
       ],
       [

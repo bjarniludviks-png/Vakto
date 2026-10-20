@@ -1992,6 +1992,11 @@ export const DICT: Dict = {
   // Spjallrásir v2 (Messenger-útlit, okt. 2026)
   "Fest": { is: "Fest", en: "Pinned", vi: "Đã ghim", pl: "Przypięte" },
   "Leita í samtali": { is: "Leita í samtali", en: "Search in conversation", vi: "Tìm trong cuộc trò chuyện", pl: "Szukaj w rozmowie" },
+  // Spjall á síma (Messenger-útlit)
+  "Fleiri valkostir": { is: "Fleiri valkostir", en: "More options", vi: "Tùy chọn khác", pl: "Więcej opcji" },
+  "Myndavél": { is: "Myndavél", en: "Camera", vi: "Máy ảnh", pl: "Aparat" },
+  "Spyrðu VAKTO AI…": { is: "Spyrðu VAKTO AI…", en: "Ask VAKTO AI…", vi: "Hỏi VAKTO AI…", pl: "Zapytaj VAKTO AI…" },
+  "Afritað": { is: "Afritað", en: "Copied", vi: "Đã sao chép", pl: "Skopiowano" },
   "Myndir og skrár": { is: "Myndir og skrár", en: "Media and files", vi: "Ảnh và tệp", pl: "Multimedia i pliki" },
   "Engar myndir eða skrár enn": { is: "Engar myndir eða skrár enn", en: "No media or files yet", vi: "Chưa có ảnh hoặc tệp", pl: "Brak multimediów i plików" },
   "Stjórna grúppu": { is: "Stjórna grúppu", en: "Manage group", vi: "Quản lý nhóm", pl: "Zarządzaj grupą" },

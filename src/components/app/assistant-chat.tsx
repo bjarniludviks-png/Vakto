@@ -311,14 +311,14 @@ export function AssistantMessages({ chat, onUpgrade, className = "vai-list", hid
 }
 
 /** Innsláttur + fyrirvari (og spurningar eftir í demo). */
-export function AssistantComposer({ chat }: { chat: AssistantChat }) {
+export function AssistantComposer({ chat, placeholder }: { chat: AssistantChat; placeholder?: string }) {
   const { s, text, busy, demoLeft, focusKey } = chat;
   const input = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { if (focusKey) input.current?.focus(); }, [focusKey]);
   return (
     <>
       <form className="vai-in" onSubmit={(e) => { e.preventDefault(); chat.send(text); }}>
-        <textarea ref={input} rows={1} value={text} placeholder={s.ph} onChange={(e) => chat.setText(e.target.value)}
+        <textarea ref={input} rows={1} value={text} placeholder={placeholder ?? s.ph} enterKeyHint="send" onChange={(e) => chat.setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); chat.send(text); } }} />
         <button type="submit" disabled={busy || !text.trim()} aria-label={s.send}><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></button>
       </form>
