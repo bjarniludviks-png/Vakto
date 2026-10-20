@@ -4,6 +4,7 @@ import { getLaborPeriods, getLaborTarget, laborColor, type Db } from "@/lib/labo
 import { leaveWorkdays } from "@/lib/orlof";
 import { isDemoCompany } from "@/lib/demo.server";
 import { sendEmail } from "@/lib/email";
+import { modelFor } from "@/lib/ai/models";
 import { monthlyReportHtml, monthlyReportText, monthlyReportSubject, type MonthlyReportData, type MonthlyDeviation } from "@/lib/monthly-report-email";
 
 // Mánaðarskýrsla til eiganda (og vaktstjóra ef valið) 1. hvers mánaðar — fyrri mánuður.
@@ -104,7 +105,7 @@ export async function aiCommentary(d: MonthlyReportData): Promise<{ is: string; 
       sickDays: d.sickDays, sickRatePct: d.sickRate, deviations: d.deviations, openItems: d.open,
     };
     const msg = await client.messages.create({
-      model: "claude-opus-4-8",
+      model: modelFor("chat"), // stutt samantekt → Sonnet-stig
       max_tokens: 800,
       output_config: {
         format: {
