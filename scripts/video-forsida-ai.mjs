@@ -2,9 +2,10 @@
 //   node scripts/video-forsida-ai.mjs [preview-url]          → public/showcase/forsida/video/ai.mp4 + ai.jpg (plakat)
 //   LANG_SITE=en node scripts/video-forsida-ai.mjs [url]     → ai-en.mp4 + ai-en.jpg
 // Krefst: .env.local á staging (DEMO_LOGIN_EMAIL + service role), preview með ANTHROPIC_API_KEY, ffmpeg (FFMPEG=…).
-// Atburðarás: Vaktaplan → VAKTO AI opnað → beiðnin slegin inn → tillagan birtist → „Staðfesta" → „Gert" → næsta vika (planið í töflunni).
-// Biðin eftir svari líkansins er klippt út (aðeins stuttur „Hugsa…"-bútur sést). ATH: staðfestingin birtir
-// planið í alvöru í demo-fyrirtækinu á staging (næsta vika, aðeins eldhúsið).
+// Atburðarás: Vaktaplan → VAKTO AI opnað → beiðnin slegin inn → tillagan birtist (endar þar; ekkert skrifað).
+//   CONFIRM=1 → „Staðfesta" → „Gert" → næsta vika síuð á eldhúsið (planið í töflunni). ATH: birtir planið í alvöru í
+//   demo-fyrirtækinu og virkar aðeins meðan demo-notandinn má skrifa (demo-ið á að vera les-eingöngu).
+// Biðin eftir svari líkansins er klippt út (aðeins stuttur „Hugsa…"-bútur sést).
 import { chromium } from "playwright";
 import { createClient } from "@supabase/supabase-js";
 import { spawnSync } from "child_process";
@@ -103,6 +104,13 @@ await sleep(500);
 const list = page.locator(".vai-list");
 await list.evaluate((el) => el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }));
 await sleep(2600); // tillagan lesin
+// Sjálfgefið endar myndbandið á tillögunni (demo-ið er les-eingöngu). CONFIRM=1 → „Staðfesta" + planið í töflunni.
+if (process.env.CONFIRM !== "1") {
+  const btn = await page.locator(".vai-act.pending button.btn:not(.ghost)").first().boundingBox();
+  if (btn) await moveTo(btn.x + btn.width / 2 + 60, btn.y + btn.height + 34, 900); // bendir á tillöguna, smellir ekki
+  await sleep(3200);
+  rec = false;
+} else {
 // 4) Staðfesta
 await clickOn(page.locator(".vai-act.pending button.btn:not(.ghost)").first(), 800);
 rec = false;
@@ -130,6 +138,7 @@ await sleep(400);
 await moveTo(W - 70, 330, 900); // út á hægri spássíuna (engin hover-áhrif)
 await sleep(2600);
 rec = false;
+}
 clearInterval(keepAlive);
 await cdp.send("Page.stopScreencast");
 await browser.close();
@@ -147,7 +156,7 @@ fs.writeFileSync(path.join(TMP, "list.txt"), lines.join("\n"));
 const run = (args) => { const r = spawnSync(FFMPEG, args, { stdio: ["ignore", "ignore", "pipe"] }); if (r.status !== 0) { console.log(r.stderr.toString().slice(-1500)); throw new Error("ffmpeg"); } };
 const mp4 = `${OUT}/ai${SUFFIX}.mp4`;
 run(["-y", "-f", "concat", "-safe", "0", "-i", path.join(TMP, "list.txt"), "-vf", "fps=30,scale=1920:-2:flags=lanczos,format=yuv420p", "-c:v", "libx264", "-preset", "slow", "-crf", "24", "-profile:v", "high", "-movflags", "+faststart", "-an", mp4]);
-// Plakat: síðasti ramminn (staðfesta planið í töflunni)
+// Plakat: síðasti ramminn (tillagan; með CONFIRM=1 planið í töflunni)
 run(["-y", "-sseof", "-0.3", "-i", mp4, "-frames:v", "1", "-q:v", "3", `${OUT}/ai${SUFFIX}.jpg`]);
 console.log("komið:", mp4, (fs.statSync(mp4).size / 1e6).toFixed(2), "MB");
 fs.rmSync(TMP, { recursive: true, force: true });
