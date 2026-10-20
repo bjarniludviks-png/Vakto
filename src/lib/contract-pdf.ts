@@ -119,6 +119,24 @@ export function contractSummary(sections: Section[]): ContractSummary {
     return "";
   };
   const is = (v: string) => splitLang(v)[0];
+  // Starfslok (0088, lib/termination.ts): aðilar + dagsetningar í hausnum.
+  if (sections.some((s) => splitLang(s.title)[0].startsWith("Starfslok"))) {
+    const strip = (v: string) => v.replace(/\s*\(kt\.[^)]*\)\s*$/, "");
+    const employer = strip(find("Aðilar", "Vinnuveitandi")), employee = strip(find("Aðilar", "Starfsmaður"));
+    const last = find("Starfslok", "Síðasti starfsdagur");
+    const sentence: [string, string] | null = employer && employee && last
+      ? [`Ráðningarsambandi ${employer} og ${employee} lýkur ${last}.`, `The employment between ${employer} and ${employee} ends on ${last}.`]
+      : null;
+    return {
+      sentence, names: sentence ? { employer, employee } : null,
+      tiles: [
+        { label: "Ástæða · Reason", value: is(find("Starfslok", "Ástæða")) || "—" },
+        { label: "Tilkynnt · Notice date", value: find("Starfslok", "Dagsetning tilkynningar") || "—" },
+        { label: "Frestur · Notice", value: is(find("Starfslok", "Uppsagnarfrestur")) || "—" },
+        { label: "Síðasti dagur · Last day", value: last || "—" },
+      ],
+    };
+  }
   // Verksamningur (verktaki): annað sett af köflum og lykiltölum.
   if (sections.some((s) => splitLang(s.title)[0].startsWith("Verkkaupi"))) {
     const kt0 = (v: string) => { const d = v.replace(/\D/g, ""); return d.length === 10 ? `${d.slice(0, 6)}-${d.slice(6)}` : ""; };
@@ -198,7 +216,7 @@ export async function downloadContractPdf(title: string, content: string, signat
 
 /** `stampStrip`: Taktikal setur undirskriftarstimpla sína neðst á síðustu síðu (BottomLastPage) —
  *  þá er beltið haldið auðu, fóturinn færður upp og undirskriftarlínum skipt út fyrir tilvísun. */
-export async function buildContractPdf(content: string, signatures: SignatureRecord[] = [], opts: { stampStrip?: boolean; primary?: "is" | "en" } = {}): Promise<jsPDF> {
+export async function buildContractPdf(content: string, signatures: SignatureRecord[] = [], opts: { stampStrip?: boolean; primary?: "is" | "en"; noSignatures?: boolean } = {}): Promise<jsPDF> {
   const { jsPDF } = await import("jspdf");
   const fonts = await import("./fonts/general-sans");
   const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -383,8 +401,8 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
     drawSection(sec.title ? n : null, sec.title, visibleRows(sec.rows), sec.paras);
   }
 
-  // ---- Undirritun (kafli í sama stíl) ----
-  {
+  // ---- Undirritun (kafli í sama stíl) — sleppt fyrir skjal sem er aðeins sent (t.d. starfslokabréf án undirritunar) ----
+  if (!opts.noSignatures) {
     const emp = signatures.find((s) => s.role === "employer");
     const ee = signatures.find((s) => s.role === "employee");
     ensure(92);

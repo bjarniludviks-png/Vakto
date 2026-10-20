@@ -55,7 +55,7 @@ export default function Samningur() {
   }, [load]);
 
   return (
-    <Screen title="Ráðningarsamningur" back>
+    <Screen title={contract && !/^(Ráðningarsamningur|Verksamningur)/.test(contract.title) ? "Starfslok" : "Ráðningarsamningur"} back>
       {loaded && !contract ? (
         <Card>
           <Muted>Enginn samningur hefur verið sendur á þig ennþá.</Muted>
@@ -92,7 +92,7 @@ export default function Samningur() {
                 <View style={{ width: 22, height: 22, borderRadius: 6, borderWidth: 1.5, borderColor: agreed ? colors.brand : colors.line, backgroundColor: agreed ? colors.brand : "transparent", alignItems: "center", justifyContent: "center", marginTop: 1 }}>
                   {agreed ? <Check color="#fff" size={15} strokeWidth={3} /> : null}
                 </View>
-                <Txt size={13} style={{ flex: 1, lineHeight: 19 }}>{tr("Ég hef lesið samninginn og samþykki hann. Ég staðfesti með kóða sem sendur er á netfangið mitt.")}</Txt>
+                <Txt size={13} style={{ flex: 1, lineHeight: 19 }}>{tr(contract && !/^(Ráðningarsamningur|Verksamningur)/.test(contract.title) ? "Ég hef lesið skjalið og staðfesti móttöku þess. Ég staðfesti með kóða sem sendur er á netfangið mitt." : "Ég hef lesið samninginn og samþykki hann. Ég staðfesti með kóða sem sendur er á netfangið mitt.")}</Txt>
               </Pressable>
               <Btn title="Senda mér kóða" disabled={!agreed || busy} loading={busy} onPress={sendCode} />
             </View>

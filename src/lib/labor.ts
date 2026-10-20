@@ -114,6 +114,8 @@ type EmpRow = {
   union: string | null; status: string; avatarColor: string; department: string | null; rules: CustomRules;
   /** Verktaki: þóknun án launatengdra gjalda, álaga og yfirvinnu. */
   contractor?: boolean;
+  /** Síðasti starfsdagur (starfslok, 0088) — mánaðarlaun teljast aðeins til og með honum. */
+  endDate?: string | null;
 };
 
 /** Resolve the signed-in user's company (users.company_id). */
@@ -134,7 +136,7 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
   const spanFrom = ranges.reduce((a, r) => (r.from < a ? r.from : a), ranges[0].from);
   const spanTo = ranges.reduce((a, r) => (r.to > a ? r.to : a), ranges[0].to);
 
-  const [empRes, ruleRes, shiftRes, punchRes, locRes, compRes] = await Promise.all([
+  const [empRes, ruleRes, shiftRes, punchRes, locRes, compRes, endRes] = await Promise.all([
     supabase.from("employees")
       .select("id, full_name, pay_type, rate, employment_ratio, union_agreement, status, avatar_color, role, departments(name)")
       .eq("company_id", companyId),
@@ -145,10 +147,13 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
       .eq("company_id", companyId).gte("clock_in", spanFrom).lte("clock_in", spanTo + "T23:59:59").order("id").range(a, b)),
     supabase.from("locations").select("id").eq("company_id", companyId),
     supabase.from("companies").select("weekday_revenue, created_at").eq("id", companyId).maybeSingle(),
+    supabase.from("employees").select("id, end_date").eq("company_id", companyId), // tolerant: villa fyrir migration 0088
   ]);
 
   const ruleMap = new Map<string, unknown>();
   if (!ruleRes.error) for (const r of ruleRes.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never) ?? null);
+  const endMap = new Map<string, string | null>();
+  if (!endRes.error) for (const r of endRes.data ?? []) endMap.set(r.id as string, (r.end_date as string | null) ?? null);
 
   const employees: EmpRow[] = (empRes.data ?? []).map((r) => {
     const dep = (Array.isArray(r.departments) ? r.departments[0] : r.departments) as { name?: string } | null;
@@ -161,6 +166,7 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
       avatarColor: (r.avatar_color as string) ?? colorFor(r.id as string), department: dep?.name ?? null,
       rules: resolveRuleSet(union, ruleMap.get(r.id as string) as never),
       contractor: r.role === "contractor",
+      endDate: endMap.get(r.id as string) ?? null,
     };
   });
 
@@ -217,8 +223,11 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
     let planned = 0, actual = 0, overtime = 0, premium = 0, cost = 0, plannedCost = 0, overtimePay = 0, premiumPay = 0;
     const staff: LaborStaffRow[] = [];
     for (const e of employees) {
-      if (e.status === "inactive") continue;
       const pl = plannedMap.get(e.id) ?? 0, ac = actualMap.get(e.id) ?? 0;
+      // Starfslok (0088): mánaðarlaun teljast til og með síðasta starfsdegi; óvirkur/hættur starfsmaður
+      // telst áfram með fyrir tímana sem hann vann á tímabilinu (sagan dettur ekki út).
+      const share = e.endDate ? monthShareOf(liveDays.filter((d) => d <= e.endDate!)) : e.status === "inactive" ? 0 : monthShare;
+      if (e.status === "inactive" && pl === 0 && ac === 0 && share === 0) continue;
       const cls = e.contractor
         ? { overtime: 0, premium: 0, overtimePay: 0, premiumPay: 0 }
         : classifyPay(e.rate, e.payType === "hourly", byEmp.get(e.id) ?? [], e.rules);
@@ -226,7 +235,7 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
       overtimePay += cls.overtimePay; premiumPay += cls.premiumPay;
       let mine = 0, minePlanned = 0;
       if (e.payType === "monthly") {
-        mine = (monthlyCost.get(e.id) ?? 0) * monthShare; minePlanned = mine;
+        mine = (monthlyCost.get(e.id) ?? 0) * share; minePlanned = mine;
       } else {
         mine = ac * (eff.get(e.id) ?? 0); minePlanned = pl * (eff.get(e.id) ?? 0);
       }
@@ -338,12 +347,15 @@ export type WeekBudget = {
 export async function getWeekBudget(supabase: Db, companyId: string, monISO: string): Promise<WeekBudget> {
   const [y, m, d] = monISO.split("-").map(Number);
   const sun = isoOf(new Date(y, m - 1, d + 6));
-  const [period, target, empRes, ruleRes] = await Promise.all([
+  const [period, target, empRes, ruleRes, endRes] = await Promise.all([
     getLaborPeriod(supabase, companyId, monISO, sun),
     getLaborTarget(supabase, companyId),
     supabase.from("employees").select("id, full_name, pay_type, rate, employment_ratio, union_agreement, status").eq("company_id", companyId),
     supabase.from("employees").select("id, pay_rule").eq("company_id", companyId),
+    supabase.from("employees").select("id, end_date").eq("company_id", companyId), // tolerant: 0088
   ]);
+  const endOf = new Map<string, string | null>();
+  if (!endRes.error) for (const r of endRes.data ?? []) endOf.set(r.id as string, (r.end_date as string | null) ?? null);
   const ruleMap = new Map<string, unknown>();
   if (!ruleRes.error) for (const r of ruleRes.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never) ?? null);
   const share = monthShareOf(dateRange(monISO, sun));
@@ -351,6 +363,8 @@ export async function getWeekBudget(supabase: Db, companyId: string, monISO: str
   let fixed = 0, sum = 0, n = 0;
   for (const r of empRes.data ?? []) {
     if ((r.status as string) === "inactive") continue;
+    const end = endOf.get(r.id as string);
+    if (end && end < monISO) continue; // hættur fyrir vikuna (starfslok, 0088)
     const union = (r.union_agreement as string | null) ?? null;
     const e = {
       id: r.id as string, fullName: r.full_name as string,
@@ -359,7 +373,7 @@ export async function getWeekBudget(supabase: Db, companyId: string, monISO: str
       union, rules: resolveRuleSet(union, ruleMap.get(r.id as string) as never),
     };
     const l = computeLine(e as never);
-    if (e.payType === "monthly") { fixed += l.cost * share; continue; }
+    if (e.payType === "monthly") { fixed += l.cost * (end && end < sun ? monthShareOf(dateRange(monISO, end)) : share); continue; }
     const per = l.hours > 0 ? l.cost / l.hours : 0;
     if (per > 0) {
       rates[`${initials(e.fullName)}|${e.fullName.split(/\s+/)[0]}`] = Math.round(per);

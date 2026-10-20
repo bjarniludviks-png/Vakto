@@ -78,7 +78,7 @@ function payRange(k: string, cf: string, ct: string, startDay = 1): { from: stri
   return { from: isoD(from), to: isoD(to) };
 }
 
-export default function PayrollScreen({ view, empty = false, periodStart = 1 }: { view: PayrollView; empty?: boolean; periodStart?: number }) {
+export default function PayrollScreen({ view, empty = false, periodStart = 1, notice }: { view: PayrollView; empty?: boolean; periodStart?: number; notice?: React.ReactNode }) {
   const { t } = useLang();
   const [slip, setSlip] = useState<PayslipData | null>(null);
   const [showZero, setShowZero] = useState(false);
@@ -197,6 +197,8 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1 }: 
           />
         </div>
       </div>
+
+      {notice}
 
       {usePp && pp.needsMigration && (
         <div className="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9" /><path d="M12 8h.01M11 12h1v4h1" /></svg><div className="x">{t("Aðgerðin tókst ekki — reyndu aftur eða hafðu samband við VAKTO.")}</div></div>

@@ -56,6 +56,16 @@ export async function employerSign(contractId: string, signer: { userId: string;
 
 type Caller = { userId: string; email: string | null };
 
+/** Heiti skjals út frá titli samnings: ráðningar-/verksamningur, eða t.d. „Uppsagnarbréf“ (starfslok, 0088). */
+function docNames(title: string | null | undefined): { label: string; ascii: string; type: string } {
+  const t = String(title ?? "").trim();
+  const label = t.startsWith("Verksamningur") ? "Verksamningur" : !t || t.startsWith("Ráðningarsamningur") ? "Ráðningarsamningur" : t.split(" — ")[0].trim();
+  const ascii = label.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ð/g, "d").replace(/Ð/g, "D").replace(/þ/g, "th").replace(/Þ/g, "Th")
+    .replace(/æ/g, "ae").replace(/Æ/g, "Ae").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "Samningur";
+  const type = label === "Verksamningur" || label === "Ráðningarsamningur" ? "Samningur" : "Starfslok";
+  return { label, ascii, type };
+}
+
 /** Finnur samning sem kallandinn (starfsmaður) á og er í undirritunarferli. */
 async function ownContract(caller: Caller, contractId: string) {
   const admin = createAdminClient();
@@ -156,14 +166,14 @@ async function deliverSignedCopy(contractId: string) {
   const doc = await buildContractPdf(c.content as string, sigs);
   const bytes = Buffer.from(doc.output("arraybuffer"));
   const safeName = (emp?.full_name ?? "starfsmadur").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "_");
-  const verk = String(c.title ?? "").startsWith("Verksamningur");
-  const filename = `${verk ? "Verksamningur" : "Radningarsamningur"}_${safeName}_undirritadur.pdf`;
+  const dn = docNames(c.title as string);
+  const filename = `${dn.ascii}_${safeName}_undirritadur.pdf`;
 
   const path = `${c.company_id}/${c.employee_id}/${signedPdfPrefix(contractId)}${filename}`;
   const { error: upErr } = await admin.storage.from("documents").upload(path, bytes, { contentType: "application/pdf", upsert: false });
   if (!upErr) {
     await admin.from("documents").insert({
-      company_id: c.company_id, employee_id: c.employee_id, name: `${verk ? "Verksamningur" : "Ráðningarsamningur"} — undirritaður (kóði í tölvupósti).pdf`, type: "Samningur", url: path,
+      company_id: c.company_id, employee_id: c.employee_id, name: `${dn.label} — undirritaður (kóði í tölvupósti).pdf`, type: dn.type, url: path,
     });
   } else console.error("signed pdf upload", upErr);
 
@@ -212,7 +222,7 @@ export async function startTaktikalSigning(
   const pdfBase64 = Buffer.from(doc.output("arraybuffer")).toString("base64");
   const safe = (emp.full_name ?? "starfsmadur").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "_");
   const proc = await createSigningProcess({
-    pdfBase64, fileName: `Radningarsamningur_${safe}.pdf`, ownerEmail: employer.email, contractId,
+    pdfBase64, fileName: `${docNames(c.title as string).ascii}_${safe}.pdf`, ownerEmail: employer.email, contractId,
     employer: { name: employer.name, ssn: employer.ssn, email: employer.email, phone: employer.phone, reason: `Fyrir hönd: ${company}` },
     employee: { name: emp.full_name ?? "Starfsmaður", ssn: emp.kennitala, email: emp.email, phone: emp.phone },
   });
@@ -511,16 +521,16 @@ async function deliverTaktikalCopy(contractId: string, pdf: Buffer): Promise<boo
   const emp = (Array.isArray(c.employees) ? c.employees[0] : c.employees) as { full_name?: string; email?: string } | null;
   const co = (Array.isArray(c.companies) ? c.companies[0] : c.companies) as { name?: string } | null;
   const safe = (emp?.full_name ?? "starfsmadur").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "_");
-  const verk = String(c.title ?? "").startsWith("Verksamningur");
-  const filename = `${verk ? "Verksamningur" : "Radningarsamningur"}_${safe}_undirritadur.pdf`;
+  const dn = docNames(c.title as string);
+  const filename = `${dn.ascii}_${safe}_undirritadur.pdf`;
   const path = `${c.company_id}/${c.employee_id}/${signedPdfPrefix(contractId)}${filename}`;
   const { error: upErr } = await admin.storage.from("documents").upload(path, pdf, { contentType: "application/pdf", upsert: false });
   // „Already exists“ = önnur keyrsla vistaði skrána; documents-röðin er þá skráð hér ef hana vantar.
   if (upErr && !/exist|duplicate/i.test(upErr.message)) throw new Error(`taktikal pdf upload: ${upErr.message}`);
   if (await signedPdfPath(contractId)) return false;
   const { error: docErr } = await admin.from("documents").insert({
-    company_id: c.company_id, employee_id: c.employee_id, type: "Samningur", url: path,
-    name: `${verk ? "Verksamningur" : "Ráðningarsamningur"} — undirritaður (Taktikal).pdf`,
+    company_id: c.company_id, employee_id: c.employee_id, type: dn.type, url: path,
+    name: `${dn.label} — undirritaður (Taktikal).pdf`,
   });
   if (docErr) throw new Error(`taktikal pdf document row: ${docErr.message}`);
   const b64 = pdf.toString("base64");

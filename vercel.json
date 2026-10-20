@@ -32,6 +32,10 @@
       "schedule": "0 7 1-3 * *"
     },
     {
+      "path": "/api/cron/starfslok",
+      "schedule": "30 0 * * *"
+    },
+    {
       "path": "/api/cron/taktikal-sync",
       "schedule": "15 6 * * *"
     },

@@ -199,6 +199,25 @@ export async function updateSession(request: NextRequest) {
       }
     }
 
+    // Starfslok (0088): eftir síðasta dag aðeins lesaðgangur að eigin skjölum (/starfslok), síðan lokað.
+    // Framfylgt líka í grunninum (RLS) — þetta beinir bara notandanum á réttan stað.
+    if (profile?.role !== "owner") {
+      const { data: st } = await supabase.rpc("auth_offboard_state");
+      if (st === "closed") {
+        await supabase.auth.signOut({ scope: "local" });
+        const dest = request.nextUrl.clone();
+        dest.pathname = "/login"; dest.search = "?error=lokad";
+        const res = NextResponse.redirect(dest);
+        supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c));
+        return res;
+      }
+      if (st === "readonly" && !pathname.startsWith("/starfslok")) {
+        const dest = request.nextUrl.clone();
+        dest.pathname = "/starfslok"; dest.search = "";
+        return NextResponse.redirect(dest);
+      }
+    }
+
     // SAFE default: unknown role = employee (least privilege), never owner.
     const role = (profile?.role as Role) ?? "employee";
     if (!canAccess(role, pathname)) {

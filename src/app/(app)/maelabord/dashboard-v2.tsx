@@ -78,7 +78,7 @@ function Spark({ points, target, t }: { points: TrendPoint[]; target: number; t:
   );
 }
 
-export default function DashboardV2({ onboarding, onNow, missing, pending, firstName, prefs: initialPrefs }: { onboarding?: Onboarding; onNow: OnNow[]; missing: Missing[]; pending: number; firstName?: string; prefs?: DashPrefs | null }) {
+export default function DashboardV2({ onboarding, onNow, missing, pending, firstName, prefs: initialPrefs, settlements = 0 }: { onboarding?: Onboarding; onNow: OnNow[]; missing: Missing[]; pending: number; firstName?: string; prefs?: DashPrefs | null; settlements?: number }) {
   const { t } = useLang();
   const [prefs, setPrefs] = useState<DashPrefs>(() => resolvePrefs(initialPrefs));
   const [customize, setCustomize] = useState(false);
@@ -153,14 +153,15 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
   const onPlanToday = onNow.filter((r) => !r.unscheduled).length + missing.length;
 
   const attention = useMemo(() => {
-    const items: { icon: "clock" | "up" | "cal" | "rev" | "ok"; tone: string; title: string; sub: string; href: string; cta: string }[] = [];
+    const items: { icon: "clock" | "up" | "cal" | "rev" | "ok" | "out"; tone: string; title: string; sub: string; href: string; cta: string }[] = [];
     for (const m of late.slice(0, 3)) items.push({ icon: "clock", tone: "warn", title: `${m.name} ${t("er ekki mætt/ur")}`, sub: `${t("Á plani")} ${m.start} · ${mins(m.mins, t)} ${t("of seint")}`, href: "/timaskraning", cta: t("Skoða") });
     for (const s of (pd?.staff ?? []).filter((s) => s.deviation >= 1).sort((a, b) => b.deviation - a.deviation).slice(0, 3))
       items.push({ icon: "up", tone: "bad", title: `${s.name} ${t("er")} ${dec1(s.deviation)} ${t("klst yfir plani")}`, sub: `${dec1(s.actual)} ${t("unnið")} · ${dec1(s.planned)} ${t("á plani")}`, href: "/timaskraning", cta: t("Skoða") });
     if (pending > 0) items.push({ icon: "cal", tone: "info", title: `${pending} ${pending === 1 ? t("beiðni bíður") : t("beiðnir bíða")}`, sub: t("Frí, vaktaskipti eða lausar vaktir"), href: "/vaktaplan", cta: t("Afgreiða") });
+    if (settlements > 0) items.push({ icon: "out", tone: "warn", title: `${settlements} ${settlements === 1 ? t("lokauppgjör bíður") : t("lokauppgjör bíða")}`, sub: t("Laun og orlof vegna starfsloka"), href: "/launakeyrslur", cta: t("Skoða") });
     if (pd && !pd.hasRevenue) items.push({ icon: "rev", tone: "info", title: t("Engin velta skráð á tímabilinu"), sub: t("Skráðu veltu til að sjá laun sem % af veltu"), href: "/stillingar?new=revenue", cta: t("Skrá veltu") });
     return items;
-  }, [late, pd, pending, t]);
+  }, [late, pd, pending, settlements, t]);
 
   const weekMax = Math.max(1, ...week.map((s) => Math.max(s.planned, s.actual))) * 1.08;
   const greet = (() => { const h = new Date().getHours(); return h < 11 ? t("Góðan daginn") : h < 18 ? t("Góðan dag") : t("Gott kvöld"); })();
@@ -286,6 +287,7 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
                 {a.icon === "clock" && <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>}
                 {a.icon === "up" && <svg viewBox="0 0 24 24"><path d="M3 17l5-5 4 3 6-7M16 8h4v4" /></svg>}
                 {a.icon === "cal" && <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16" /></svg>}
+                {a.icon === "out" && <svg viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" /></svg>}
                 {a.icon === "rev" && <svg viewBox="0 0 24 24"><path d="M12 3v18M17 7.5c0-1.9-2.2-3-5-3s-5 1.1-5 3 2 2.6 5 3.2 5 1.4 5 3.3-2.2 3-5 3-5-1.2-5-3" /></svg>}
               </span>
               <span className="db2-tx"><b>{a.title}</b><span>{a.sub}</span></span>

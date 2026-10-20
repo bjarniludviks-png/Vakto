@@ -14,6 +14,8 @@ import { listAlerts, createAlert, setAlertActive, deleteAlert, sendReportNow } f
 import { normalizeAlert, describeAlert, REPORTS, SCHEDULABLE_REPORTS, REPORT_TITLE, RANGES } from "@/lib/alerts";
 import { getSickRate } from "@/lib/sickrate.server";
 import { byDept, pctOf, SICK_DEFINITION } from "@/lib/sickrate";
+import { getUpcomingLeavers } from "@/lib/terminations.server";
+import { REASON_LABEL } from "@/lib/termination";
 
 // VAKTO AI — verkfæri. LESverkfæri keyra strax (sömu aðgerðir og skjáirnir nota, sama aðgangsstýring).
 // SKRIFverkfæri keyra ALDREI í líkaninu sjálfu: þau verða „tillaga" sem notandinn staðfestir með hnappi,
@@ -95,6 +97,11 @@ export const READ_TOOLS: Anthropic.Tool[] = [
     name: "employee_contracts",
     description: "Samningar starfsmanns (leit eftir nafni): netfang á skrá og samningar með stöðu (draft = drög, sent = bíður undirritunar starfsmanns, signed = undirritaður, void = ógildur) og dagsetningum. Ef fleiri en einn starfsmaður passar við nafnið koma allir — spurðu þá hvern er átt við. Kallaðu á þetta ÁÐUR en þú notar resend_contract.",
     input_schema: { type: "object", properties: { employee: { type: "string", description: "Nafn starfsmanns (fullt nafn eða fornafn)" } }, required: ["employee"] },
+  },
+  {
+    name: "employment_endings",
+    description: "Starfsfólk sem hættir á næstunni eða hætti nýlega (starfslok skráð í VAKTO): nafn, ástæðuflokkur, tilkynningardagur, síðasti starfsdagur, hvort viðkomandi er laus undan vinnuskyldu, hvort lokauppgjör launa og orlofs er afgreitt og hvenær lesaðgangur að appinu lokast. Aðeins lestur — starfslok eru skráð í Starfsfólk → prófíll → „Ljúka ráðningu“.",
+    input_schema: { type: "object", properties: { days: { type: "number", description: "Hversu marga daga fram í tímann (sjálfgefið 90, mest 365). Síðustu 30 dagar fylgja alltaf." } } },
   },
   {
     name: "list_alerts",
@@ -390,6 +397,11 @@ export async function runReadTool(name: string, input: In): Promise<string> {
         contracts: (await listContracts(e.id)).contracts.map((c) => ({ title: c.title, status: c.status, created: c.created, signedAt: c.signed_at, via: c.signed_via })),
       })));
       return JSON.stringify(out.length > 1 ? { ambiguous: true, matches: out } : out[0]);
+    }
+    if (name === "employment_endings") {
+      const n = Number(input.days);
+      const rows = await getUpcomingLeavers(Number.isFinite(n) && n > 0 ? Math.round(n) : 90);
+      return JSON.stringify(rows.map((r) => ({ ...r, reason: REASON_LABEL[r.reason] })));
     }
     if (name === "list_alerts") {
       const a = await listAlerts();

@@ -30,6 +30,16 @@ export function useLang(): Lang {
 
 type E = [string, string, string]; // [en, vi, pl]
 const D: Record<string, E> = {
+  // Starfslok (0088)
+  "Starfslok": ["End of employment", "Kết thúc công việc", "Zakończenie zatrudnienia"],
+  "Takk fyrir samstarfið": ["Thank you for working with us", "Cảm ơn bạn đã làm việc cùng chúng tôi", "Dziękujemy za współpracę"],
+  "Ráðningu þinni lauk": ["Your employment ended on", "Công việc của bạn kết thúc vào", "Twoje zatrudnienie zakończyło się"],
+  "Þú getur áfram skoðað og sótt launaseðla, samninga og skjöl til og með": ["You can still view and download payslips, contracts and documents until", "Bạn vẫn có thể xem và tải phiếu lương, hợp đồng và tài liệu đến hết", "Nadal możesz przeglądać i pobierać paski wynagrodzeń, umowy i dokumenty do"],
+  "Eftir það lokast aðgangurinn — sæktu það sem þú vilt eiga.": ["After that your access closes — download what you want to keep.", "Sau đó quyền truy cập sẽ đóng — hãy tải về những gì bạn muốn giữ.", "Potem dostęp zostanie zamknięty — pobierz to, co chcesz zachować."],
+  "Samningar": ["Contracts", "Hợp đồng", "Umowy"],
+  "Ég hef lesið skjalið og staðfesti móttöku þess. Ég staðfesti með kóða sem sendur er á netfangið mitt.": ["I have read the document and confirm receipt. I confirm with a code sent to my email.", "Tôi đã đọc tài liệu và xác nhận đã nhận. Tôi xác nhận bằng mã gửi đến email của tôi.", "Przeczytałem/am dokument i potwierdzam jego otrzymanie. Potwierdzam kodem wysłanym na mój e-mail."],
+  "Aðeins til skoðunar. Spurningar um laun eða starfslok fara til vinnuveitandans.": ["View only. Questions about pay or the end of employment go to your employer.", "Chỉ để xem. Câu hỏi về lương hoặc việc nghỉ việc xin gửi cho chủ lao động.", "Tylko do podglądu. Pytania o wynagrodzenie lub zakończenie zatrudnienia kieruj do pracodawcy."],
+  "Aðgangur að VAKTO er lokaður. Ráðningu þinni er lokið og lesaðgangurinn sem vinnuveitandinn veitti er runninn út. Hafðu samband við vinnuveitandann ef þig vantar gögn.": ["Your access to VAKTO is closed. Your employment has ended and the read-only access your employer granted has expired. Contact your employer if you need your records.", "Quyền truy cập VAKTO của bạn đã đóng. Công việc của bạn đã kết thúc và quyền chỉ xem do chủ lao động cấp đã hết hạn. Hãy liên hệ chủ lao động nếu bạn cần hồ sơ.", "Twój dostęp do VAKTO jest zamknięty. Zatrudnienie się zakończyło, a dostęp tylko do odczytu przyznany przez pracodawcę wygasł. Skontaktuj się z pracodawcą, jeśli potrzebujesz swoich dokumentów."],
   "greitt út með launum": ["paid out with wages", "trả cùng lương", "wypłacane z pensją"],
   "lagt inn á orlofsreikning": ["paid into holiday account", "chuyển vào tài khoản nghỉ phép", "wpłacane na konto urlopowe"],
   "safnast upp": ["accrues", "tích lũy", "narasta"],
