@@ -14,6 +14,8 @@ import { getPerfHistory } from "../frammistada/perf.server";
 import { dec1, nf, krCompact } from "@/lib/format";
 import { userError } from "@/lib/user-error";
 import { demoAiGate } from "@/lib/ai/ai-plan.server";
+import { currentUserIsDemo } from "@/lib/demo.server";
+import { modelFor } from "@/lib/ai/models";
 
 export type AiChart = { labels: string[]; values: number[]; label: string };
 export type AiReportResult = {
@@ -117,7 +119,7 @@ export async function aiReportQuery(question: string, fromISO: string, toISO: st
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
     const client = new Anthropic();
     const msg = await client.messages.create({
-      model: "claude-opus-4-8",
+      model: modelFor("analysis", { demo: await currentUserIsDemo() }),
       max_tokens: 3000,
       thinking: { type: "adaptive" },
       output_config: {

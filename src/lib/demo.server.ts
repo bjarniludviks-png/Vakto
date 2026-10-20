@@ -1,5 +1,6 @@
 import "server-only";
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 
 // Opið demo (DEMO_COMPANY_ID): gestir skrá sig inn í EITT sameiginlegt gervifyrirtæki.
@@ -10,7 +11,26 @@ import { createClient } from "@/lib/supabase/server";
 
 export const DEMO_BLOCKED = "Þetta er ekki í boði í demo";
 /** AI-spurningar á sólarhring fyrir allt demo-fyrirtækið (ai_usage núllstillt í næturkeyrslu). */
-export const DEMO_AI_DAILY = 20;
+export const DEMO_AI_DAILY = 50;
+/** AI-spurningar á sólarhring per gest (vafra) í demo — talið í audit_log, sjá ai-plan.server.ts. */
+export const DEMO_AI_PER_VISITOR = 5;
+
+// Allir gestir deila EINUM demo-notanda, svo gestur = handahófs-auðkenni í httpOnly-köku.
+export const DEMO_VISITOR_COOKIE = "vakto_demo_vid";
+const VID = /^[0-9a-f-]{36}$/;
+
+/** Setur gestaköku ef hana vantar og skilar auðkenninu. Kökur má aðeins setja í server action /
+ *  route handler — annars (t.d. server component) er nýtt auðkenni notað aðeins í þessari beiðni. */
+export async function demoVisitorId(): Promise<string> {
+  const jar = await cookies();
+  const cur = jar.get(DEMO_VISITOR_COOKIE)?.value;
+  if (cur && VID.test(cur)) return cur;
+  const id = crypto.randomUUID();
+  try {
+    jar.set(DEMO_VISITOR_COOKIE, id, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 30 * 86400 });
+  } catch { /* ekki hægt að setja köku hér */ }
+  return id;
+}
 
 export function demoCompanyId(): string | null {
   return process.env.DEMO_COMPANY_ID?.trim() || null;

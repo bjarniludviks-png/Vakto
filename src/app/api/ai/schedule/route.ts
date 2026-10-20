@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAiScheduleProposal, type AiItem } from "@/lib/ai/schedule";
 import { assistantUser, rateLimited } from "@/lib/ai/assistant-auth";
 import { demoAiGate } from "@/lib/ai/ai-plan.server";
+import { isDemoCompany } from "@/lib/demo.server";
 import { getPlanRequests, formatPlanRequests, guardLeaveShifts, weekDatesFrom, dayShortIS, type PlanRequests } from "@/lib/ai/plan-requests.server";
 
 // AI-tillaga að vaktaplani — aðeins stjórnendur og vaktstjórar, með sömu takmörkun og VAKTO AI.
@@ -39,7 +40,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const proposal = await getAiScheduleProposal(prompt, context, lang, reqs ? formatPlanRequests(reqs) : "");
+    const proposal = await getAiScheduleProposal(prompt, context, lang, reqs ? formatPlanRequests(reqs) : "", { demo: isDemoCompany(me.companyId) });
     // Varnagli óháður líkaninu: vaktir á samþykktu fríi fara aldrei í planið.
     let blocked: { employee: string; day: number }[] = [];
     if (reqs && proposal.shifts?.length) {
