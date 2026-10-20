@@ -488,7 +488,7 @@ function WalletCard() {
   const t = useT();
   const [qr, setQr] = useState("");
   useEffect(() => {
-    import("qrcode").then((Q) => Q.toString("VAKTO-4132-KK", { type: "svg", margin: 0, color: { dark: "#16161a", light: "#ffffff" } })).then(setQr).catch(() => {});
+    import("qrcode").then((Q) => Q.toString("https://vakto.is/k/4132-KK-7Q2M9X4T8BVJ", { type: "svg", margin: 0, errorCorrectionLevel: "Q", color: { dark: "#16161a", light: "#ffffff" } })).then(setQr).catch(() => {});
   }, []);
   return (
     <div className="ah-pass">
