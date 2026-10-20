@@ -74,7 +74,7 @@ const is = {
   sisH: "Frá sömu smiðju.", sisP: "BGL Ventures, fyrirtækið á bak við VAKTO, smíðar líka INVENTRA: rekstrarkerfi og gervigreind sem minnkar rýrnun hjá framleiðendum ferskvöru.", sisGo: "inventra.is",
   priceH: "Eitt verð. Allt kerfið.", amt: "9.990 kr", per: "/mán",
   price1: "5 virkir starfsmenn innifaldir.", price2: "1.490 kr á hvern virkan starfsmann umfram.",
-  fine: "Án VSK. Þú borgar aðeins fyrir þá sem unnu í mánuðinum. Undirskrift með rafrænum skilríkjum 490 kr. VAKTO AI: 25 spurningar á mánuði innifaldar, allt að 500 með viðbót á 1.990 kr/mán. 15% afsláttur ef greitt er árlega. 14 daga frí prufa, engin binding.",
+  fine: "Án VSK. Þú borgar aðeins fyrir þá sem unnu í mánuðinum. Undirskrift með rafrænum skilríkjum 490 kr. VAKTO AI: 25 spurningar á mánuði innifaldar, allt að 500 með viðbót á 1.990 kr/mán. 15% afsláttur ef greitt er árlega. 14 daga frí prufa · ekkert kort · greitt með korti eða kröfu í heimabanka · engin binding.",
 };
 
 const en: typeof is = {
@@ -148,7 +148,7 @@ const en: typeof is = {
   sisH: "From the same makers.", sisP: "BGL Ventures, the company behind VAKTO, also builds INVENTRA: an operations system with AI that cuts waste for fresh-food producers.", sisGo: "inventra.is",
   priceH: "One price. The whole system.", amt: "ISK 9,990", per: "/mo",
   price1: "5 active employees included.", price2: "ISK 1,490 per additional active employee.",
-  fine: "Excl. VAT. You only pay for those who worked that month. Signing with electronic ID ISK 490. VAKTO AI: 25 questions a month included, up to 500 with the ISK 1,990/mo add-on. 15% off when paid annually. 14-day free trial, no commitment.",
+  fine: "Excl. VAT. You only pay for those who worked that month. Signing with electronic ID ISK 490. VAKTO AI: 25 questions a month included, up to 500 with the ISK 1,990/mo add-on. 15% off when paid annually. 14-day free trial · no card · pay by card or bank claim · no commitment.",
 };
 
 export const HOME_TEXT: Record<SiteLang, typeof is> = { is, en };

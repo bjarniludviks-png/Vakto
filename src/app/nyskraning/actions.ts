@@ -10,7 +10,7 @@ import { validatePassword } from "@/lib/password.server";
 import { verifyTurnstile } from "@/lib/turnstile.server";
 
 /** Útgáfa skilmálanna sem nýskráning samþykkir (dagsetning síðustu breytingar á /skilmalar). */
-const TERMS_VERSION = "2026-09-30";
+const TERMS_VERSION = "2026-10-20";
 
 export type SignupResult = { ok: boolean; demo?: boolean; error?: string };
 
@@ -75,8 +75,8 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
   const companyName = input.companyName?.trim();
   const email = input.email?.trim().toLowerCase();
   if (!fullName || !companyName || !email || !input.password) return { ok: false, error: "Fylltu út alla reiti" };
-  // Íslensk fyrirtæki: kennitala þarf fyrir reikninga (Payday) og samninga.
-  if ((input.country ?? "IS") === "IS" && !isValidKennitala(input.kennitala ?? "")) return { ok: false, error: "Sláðu inn gilda kennitölu fyrirtækisins (10 tölustafir)." };
+  // Kennitala fyrirtækis er skylda: reikningar og krafa í heimabanka (Payday) fara á hana.
+  if (!isValidKennitala(input.kennitala ?? "")) return { ok: false, error: "Sláðu inn gilda kennitölu fyrirtækisins (10 tölustafir)." };
   if (!input.termsAccepted) return { ok: false, error: "Þú þarft að samþykkja skilmála og persónuverndarstefnu" };
   const pwErr = await validatePassword(input.password);
   if (pwErr) return { ok: false, error: pwErr };
@@ -96,13 +96,14 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
     const userId = created.user.id;
     const prov = await provisionCompanyForUser(userId, email, fullName, companyName, input.country);
     if (!prov.ok) return { ok: false, error: prov.error };
-    // Prufan hefst núna; aðgangur opnast ekki fyrr en kort er skráð (middleware + card_required).
+    // Prufan hefst núna, ekkert kort. Greiðsluleið (kort eða krafa) er valin í Stillingum → Áskrift;
+    // card_required helst í gagnagrunni svo VAKTO Admin geti krafist korts af einstöku fyrirtæki.
     if (prov.companyId) {
       const trialEnds = new Date(Date.now() + (promoDays(input.promo) ?? 14) * 86400000).toISOString();
-      await admin.from("companies").update({ plan: "vakto", trial_ends_at: trialEnds, card_required: true, ...(isValidKennitala(input.kennitala ?? "") ? { kennitala: formatKennitala(input.kennitala!) } : {}), terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }).eq("id", prov.companyId);
+      await admin.from("companies").update({ plan: "vakto", trial_ends_at: trialEnds, card_required: false, kennitala: formatKennitala(input.kennitala!), terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }).eq("id", prov.companyId);
     }
     await sendWelcomeEmail(email, fullName, companyName); // no-op until Resend is configured
-    await sendSignupAlert({ company: companyName, name: fullName, email, country: input.country, companyId: prov.companyId, kennitala: isValidKennitala(input.kennitala ?? "") ? formatKennitala(input.kennitala!) : null, promo: promoDays(input.promo) ? input.promo!.trim().toUpperCase() : null }).catch((e) => console.error("[signup-alert]", e));
+    await sendSignupAlert({ company: companyName, name: fullName, email, country: input.country, companyId: prov.companyId, kennitala: formatKennitala(input.kennitala!), promo: promoDays(input.promo) ? input.promo!.trim().toUpperCase() : null }).catch((e) => console.error("[signup-alert]", e));
     return { ok: true };
   } catch (e) {
     { console.error("[signup]", e); return { ok: false, error: "Nýskráning tókst ekki — reyndu aftur eða hafðu samband við hallo@vakto.is." }; }
@@ -110,8 +111,8 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
 }
 
 
-/** Skref 2 í nýskráningu: prufan hefst og kúnninn fer á greiðslusíðu Straums til að skrá kort (0 kr).
- * Skilar slóð á greiðslusíðuna, eða `skip: true` ef Straumur er ekki stilltur (þá beint inn). */
+/** Kortaskráning á /nyskraning/kort (fyrirtæki sem VAKTO Admin hefur sett card_required á): greiðslusíða
+ * Straums (0 kr). Skilar slóð, eða `skip: true` ef Straumur er ekki stilltur (þá beint inn). */
 export async function startCardSetup(origin: string): Promise<{ ok: boolean; url?: string; skip?: boolean; error?: string }> {
   if (!isSupabaseConfigured()) return { ok: true, skip: true };
   try {

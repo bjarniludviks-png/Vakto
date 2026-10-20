@@ -106,6 +106,7 @@ export default function CompaniesScreen({ data }: { data: AdminOverview }) {
                     <div style={{ display: "flex", gap: 6, alignItems: "center", whiteSpace: "nowrap" }}>
                       <span className="muted" style={{ fontSize: 11.5 }}>{planLabel(c.plan)}</span>
                       <StatusBadge s={c.billingStatus} />
+                      <span className="muted" style={{ fontSize: 11.5 }} title="Greiðsluleið">{c.paymentMethod === "krafa" ? "Krafa" : c.paymentMethod === "card" ? "Kort" : "Óvalið"}</span>
                     </div>
                     <TrialClock c={c} />
                   </td>

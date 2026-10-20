@@ -1812,6 +1812,24 @@ export const DICT: Dict = {
   "Ekkert verður rukkað framar. Aðgangurinn helst opinn út greitt tímabil og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.": { is: "Ekkert verður rukkað framar. Aðgangurinn helst opinn út greitt tímabil og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.", en: "Nothing more will be charged. Access stays open until the end of the paid period and then closes. Your data is kept and you can undo the cancellation until then.", vi: "Sẽ không bị tính phí thêm. Quyền truy cập vẫn mở đến hết kỳ đã thanh toán rồi sẽ đóng. Dữ liệu được giữ lại và bạn có thể hoàn tác việc hủy trước thời điểm đó.", pl: "Nie zostaną pobrane żadne dalsze opłaty. Dostęp pozostaje otwarty do końca opłaconego okresu, a potem zostanie zamknięty. Dane są zachowane, a do tego czasu możesz cofnąć anulowanie." },
   "Já, segja upp": { is: "Já, segja upp", en: "Yes, cancel", vi: "Có, hủy", pl: "Tak, anuluj" },
   "Augnablik…": { is: "Augnablik…", en: "One moment…", vi: "Đợi một chút…", pl: "Chwileczkę…" },
+  // Greiðsluleið: kort eða krafa í heimabanka (0083)
+  "Greiðsluleið": { is: "Greiðsluleið", en: "Payment method", vi: "Phương thức thanh toán", pl: "Metoda płatności" },
+  "Greiða með korti": { is: "Greiða með korti", en: "Pay by card", vi: "Thanh toán bằng thẻ", pl: "Płać kartą" },
+  "Greiða með kröfu í heimabanka": { is: "Greiða með kröfu í heimabanka", en: "Pay by bank claim", vi: "Thanh toán qua ngân hàng trực tuyến", pl: "Płać przez bank (krafa)" },
+  "Greitt verður með korti": { is: "Greitt verður með korti", en: "You will pay by card", vi: "Sẽ thanh toán bằng thẻ", pl: "Płatność kartą" },
+  "Greitt verður með kröfu í heimabanka": { is: "Greitt verður með kröfu í heimabanka", en: "You will pay by bank claim", vi: "Sẽ thanh toán qua ngân hàng trực tuyến", pl: "Płatność przez bank (krafa)" },
+  "Krafa í heimabanka á kennitölu": { is: "Krafa í heimabanka á kennitölu", en: "Bank claim to company ID", vi: "Yêu cầu thanh toán gửi tới mã số công ty", pl: "Polecenie zapłaty na numer firmy" },
+  "Krafa í heimabanka": { is: "Krafa í heimabanka", en: "Bank claim", vi: "Yêu cầu thanh toán ngân hàng", pl: "Polecenie zapłaty (krafa)" },
+  "Reikningur kemur í tölvupósti og krafa í heimabanka fyrirtækisins, eindagi 14 dögum síðar.": { is: "Reikningur kemur í tölvupósti og krafa í heimabanka fyrirtækisins, eindagi 14 dögum síðar.", en: "The invoice arrives by email and a claim appears in the company's online bank, due 14 days later.", vi: "Hóa đơn được gửi qua email và yêu cầu thanh toán xuất hiện trong ngân hàng trực tuyến của công ty, hạn 14 ngày sau.", pl: "Faktura przychodzi e-mailem, a polecenie zapłaty pojawia się w bankowości firmy z terminem 14 dni." },
+  "Ekkert valið: eftir prufuna kemur mánaðargjaldið sem krafa í heimabanka á kennitölu": { is: "Ekkert valið: eftir prufuna kemur mánaðargjaldið sem krafa í heimabanka á kennitölu", en: "Nothing chosen: after the trial the monthly fee arrives as a bank claim to company ID", vi: "Chưa chọn: sau thời gian dùng thử, phí hàng tháng sẽ là yêu cầu thanh toán ngân hàng gửi tới mã số", pl: "Nic nie wybrano: po okresie próbnym opłata przyjdzie jako polecenie zapłaty na numer firmy" },
+  "fyrirtækisins": { is: "fyrirtækisins", en: "of the company", vi: "của công ty", pl: "firmy" },
+  "Eindagi": { is: "Eindagi", en: "Due", vi: "Hạn", pl: "Termin" },
+  "Prufan rennur út": { is: "Prufan rennur út", en: "Your trial ends", vi: "Bản dùng thử kết thúc", pl: "Okres próbny kończy się" },
+  "skráðu kort eða veldu kröfu í heimabanka.": { is: "skráðu kort eða veldu kröfu í heimabanka.", en: "add a card or choose a bank claim.", vi: "thêm thẻ hoặc chọn thanh toán qua ngân hàng.", pl: "dodaj kartę lub wybierz polecenie zapłaty." },
+  "Velja greiðsluleið": { is: "Velja greiðsluleið", en: "Choose payment method", vi: "Chọn phương thức thanh toán", pl: "Wybierz metodę płatności" },
+  "Kennitala fyrirtækisins": { is: "Kennitala fyrirtækisins", en: "Company ID (kennitala)", vi: "Mã số công ty (kennitala)", pl: "Numer firmy (kennitala)" },
+  "Reikningar fyrir áskriftina fara á kennitölu fyrirtækisins. Skráðu hana til að halda áfram.": { is: "Reikningar fyrir áskriftina fara á kennitölu fyrirtækisins. Skráðu hana til að halda áfram.", en: "Subscription invoices are issued to the company ID. Enter it to continue.", vi: "Hóa đơn thuê bao được xuất theo mã số công ty. Nhập mã số để tiếp tục.", pl: "Faktury za subskrypcję wystawiane są na numer firmy. Wpisz go, aby kontynuować." },
+  "Kennitala vistuð": { is: "Kennitala vistuð", en: "Company ID saved", vi: "Đã lưu mã số công ty", pl: "Numer firmy zapisany" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

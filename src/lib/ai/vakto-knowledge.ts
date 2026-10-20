@@ -39,10 +39,10 @@ export const VAKTO_KNOWLEDGE = `
 - Valkvætt: undirritun ráðningarsamninga með rafrænum skilríkjum (Taktikal) kostar 490 kr á undirskrift (980 kr á samning, báðir aðilar). Ókeypis undirritun með kóða í tölvupósti er innifalin.
 - VAKTO AI (aðstoðarmaðurinn): 25 spurningar á mánuði innifaldar fyrir fyrirtækið. Valkvæð viðbót, 1.990 kr/mán, gefur allt að 500 spurningar á mánuði; kveikt og slökkt í Stillingum → Áskrift, engin binding. Í 14 daga prufunni er allt að 500 spurningar opið.
 - Dæmi: staður með 12 virka starfsmenn = 9.990 + 7 × 1.490 = 20.420 kr/mán (án VSK).
-- 14 daga frí prufa með öllu. Kort er skráð við nýskráningu á greiðslusíðu Straums (Kvika) en ekkert dregið fyrr en prufan er búin; þá er mánaðargjaldið tekið sjálfkrafa af kortinu og kvittun send. Engin binding, hægt að segja upp hvenær sem er í Stillingum → Áskrift. VAKTO geymir aldrei kortanúmer. Keðjur með marga staði: hafa samband um tilboð.
+- 14 daga frí prufa með öllu, ekkert kort. Greitt með korti (Straumur, Kvika) eða kröfu í heimabanka á kennitölu fyrirtækisins; valið í Stillingum → Áskrift. Ef ekkert er valið kemur mánaðargjaldið sem krafa í heimabanka (eindagi 14 dögum síðar). Kvittun send í pósti. Engin binding, hægt að segja upp hvenær sem er í Stillingum → Áskrift. VAKTO geymir aldrei kortanúmer. Keðjur með marga staði: hafa samband um tilboð.
 
 ## Að byrja
-- Skráning á vakto.is/nyskraning: nafn, fyrirtæki, netfang, lykilorð → kort skráð hjá Straumi (0 kr) → 14 daga prufan byrjar → inn í kerfið. Tekur um korter að setja upp fyrirtækið, staðina, deildirnar og starfsfólkið (Excel-innlestur).
+- Skráning á vakto.is/nyskraning: netfang (staðfest með kóða), nafn, fyrirtæki, kennitala fyrirtækis, lykilorð → 14 daga prufan byrjar → beint inn í kerfið. Ekkert kort. Tekur um korter að setja upp fyrirtækið, staðina, deildirnar og starfsfólkið (Excel-innlestur).
 - Innskráning: vakto.is/login. Gleymt lykilorð: hlekkur á innskráningarsíðu.
 - Stimpilklukka á spjaldtölvu: Stillingar → Staðir og teymi → Tæki á staðnum → afrita kiosk-slóð.
 - Mælaborðið má sérsníða: táknið við hliðina á dagsetningunni felur, sýnir og raðar spjöldum.

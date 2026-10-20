@@ -28,7 +28,7 @@ const LD = [
     "@context": "https://schema.org", "@type": "SoftwareApplication", name: "VAKTO", url: SITE_URL,
     applicationCategory: "BusinessApplication", operatingSystem: "Web, iOS, Android", inLanguage: ["is", "en"],
     description: DESC, publisher: { "@id": `${SITE_URL}/#org` },
-    offers: { "@type": "Offer", price: "9990", priceCurrency: "ISK", description: "Á mánuði án VSK, 5 virkir starfsmenn innifaldir, 1.490 kr á hvern virkan starfsmann umfram. 14 daga frí prufa." },
+    offers: { "@type": "Offer", price: "9990", priceCurrency: "ISK", description: "Á mánuði án VSK, 5 virkir starfsmenn innifaldir, 1.490 kr á hvern virkan starfsmann umfram. 14 daga frí prufa · ekkert kort · greitt með korti eða kröfu í heimabanka · engin binding." },
   },
 ];
 

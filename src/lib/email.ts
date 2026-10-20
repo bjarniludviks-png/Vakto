@@ -392,23 +392,33 @@ export async function sendLeaveDecisionEmail(to: string, name: string, approved:
 /* ---------- áskrift & greiðslur (Straumur) ---------- */
 const kr = (n: number) => `${Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".")} kr.`;
 
-export async function sendTrialReminderEmail(to: string, company: string, o: { daysLeft: number; hasCard: boolean; total: number; note: string; noteEn: string }) {
+/** DD.MM úr ISO-tíma (Reykjavík = UTC). */
+const ddmm = (iso: string) => { const d = new Date(iso); return `${String(d.getUTCDate()).padStart(2, "0")}.${String(d.getUTCMonth() + 1).padStart(2, "0")}`; };
+
+/** Áminning á degi 10 af 14 (einn póstur). Ekkert kort og engin leið valin → „skráðu kort eða veldu kröfu“. */
+export async function sendTrialReminderEmail(to: string, company: string, o: { daysLeft: number; endsOn: string; hasCard: boolean; krafa?: boolean; total: number; note: string; noteEn: string }) {
   const when = o.daysLeft <= 0 ? "í dag" : o.daysLeft === 1 ? "á morgun" : `eftir ${o.daysLeft} daga`;
+  const date = ddmm(o.endsOn);
+  const choose = !o.hasCard && !o.krafa;
   return sendEmail({
     to,
-    subject: `Prufan hjá ${company} rennur út ${when}`,
+    subject: choose ? `Prufan rennur út ${date}: skráðu kort eða veldu kröfu í heimabanka` : `Prufan hjá ${company} rennur út ${date}`,
     html: template({
-      preheader: "Áskriftin heldur áfram sjálfkrafa ef kort er skráð.",
-      heading: `Prufan rennur út ${when}`,
+      preheader: choose ? "Skráðu kort eða veldu kröfu í heimabanka. Engin binding." : "Áskriftin heldur áfram sjálfkrafa.",
+      heading: `Prufan rennur út ${date}`,
       body: o.hasCard
-        ? `14 daga prufan fyrir <b>${company}</b> er að ljúka. Áskriftin heldur áfram sjálfkrafa: fyrsta mánaðargjaldið, <b>${kr(o.total)}</b> með VSK (${o.note}), verður tekið af skráða kortinu á gjalddaga. Þú getur sagt upp hvenær sem er í Stillingum → Áskrift.`
-        : `14 daga prufan fyrir <b>${company}</b> er að ljúka og ekkert kort er skráð. Skráðu kort í Stillingum → Áskrift til að halda áfram; annars lokast aðgangurinn 14 dögum eftir lok prufu. Mánaðargjaldið yrði <b>${kr(o.total)}</b> með VSK (${o.note}).`,
-      headingEn: `Your trial ends ${o.daysLeft <= 0 ? "today" : o.daysLeft === 1 ? "tomorrow" : `in ${o.daysLeft} days`}`,
+        ? `14 daga prufan fyrir <b>${company}</b> er að ljúka (${when}). Áskriftin heldur áfram sjálfkrafa: fyrsta mánaðargjaldið, <b>${kr(o.total)}</b> með VSK (${o.note}), verður tekið af skráða kortinu á gjalddaga. Þú getur sagt upp hvenær sem er í Stillingum → Áskrift.`
+        : o.krafa
+          ? `14 daga prufan fyrir <b>${company}</b> er að ljúka (${when}). Áskriftin heldur áfram: fyrsta mánaðargjaldið, <b>${kr(o.total)}</b> með VSK (${o.note}), kemur sem krafa í heimabanka fyrirtækisins. Þú getur sagt upp hvenær sem er í Stillingum → Áskrift.`
+          : `14 daga prufan fyrir <b>${company}</b> rennur út <b>${date}</b>. Skráðu kort eða veldu kröfu í heimabanka í Stillingum → Áskrift. Ef ekkert er valið kemur mánaðargjaldið, <b>${kr(o.total)}</b> með VSK (${o.note}), sem krafa í heimabanka á kennitölu fyrirtækisins. Engin binding.`,
+      headingEn: `Your trial ends on ${date}`,
       bodyEn: o.hasCard
         ? `The 14-day trial for <b>${company}</b> is ending. Your subscription continues automatically: the first monthly charge, <b>${kr(o.total)}</b> incl. VAT (${o.noteEn}), will be taken from the card on file. Cancel any time in Settings → Subscription.`
-        : `The 14-day trial for <b>${company}</b> is ending and no card is on file. Add a card in Settings → Subscription to continue; otherwise access closes 14 days after the trial ends.`,
-      rows: [["Fyrirtæki", company], ["Prufan rennur út", when.charAt(0).toUpperCase() + when.slice(1)], ["Mánaðargjald með VSK", kr(o.total)], ["Kort skráð", o.hasCard ? "Já" : "Nei"]],
-      ctaLabel: "Opna Áskrift", ctaLabelEn: "Open Subscription", ctaHref: `${APP_URL}/stillingar?tab=askrift`,
+        : o.krafa
+          ? `The 14-day trial for <b>${company}</b> is ending. The first monthly fee, <b>${kr(o.total)}</b> incl. VAT, will arrive as a bank claim in your online bank. Cancel any time in Settings → Subscription.`
+          : `The 14-day trial for <b>${company}</b> ends on ${date}. Add a card or choose a bank claim (krafa) in Settings → Subscription. If nothing is chosen, the monthly fee arrives as a bank claim to the company ID. No commitment.`,
+      rows: [["Fyrirtæki", company], ["Prufan rennur út", date], ["Mánaðargjald með VSK", kr(o.total)], ["Greiðsluleið", o.hasCard ? "Kort" : o.krafa ? "Krafa í heimabanka" : "Ekki valin (krafa)"]],
+      ctaLabel: choose ? "Velja greiðsluleið" : "Opna Áskrift", ctaLabelEn: choose ? "Choose payment method" : "Open Subscription", ctaHref: `${APP_URL}/stillingar?tab=askrift`,
     }),
   });
 }
@@ -418,33 +428,72 @@ export async function sendCardMissingEmail(to: string, company: string, why: "ex
     to,
     subject: why === "disabled" ? `Kortið hjá ${company} er ekki lengur virkt` : `Prufan hjá ${company} er búin. Skráðu kort`,
     html: template({
-      preheader: "Skráðu kort til að halda VAKTO opnu.",
+      preheader: why === "disabled" ? "Skráðu nýtt kort eða veldu kröfu í heimabanka." : "Skráðu kort til að halda VAKTO opnu.",
       heading: why === "disabled" ? "Kortið er ekki lengur virkt" : "Prufan er búin",
-      body: `${why === "disabled" ? "Skráða kortið fyrir" : "14 daga prufan fyrir"} <b>${company}</b> ${why === "disabled" ? "er ekki lengur gilt" : "er lokið og ekkert kort er skráð"}. Skráðu kort í Stillingum → Áskrift svo áskriftin haldi áfram. Aðgangurinn lokast 14 dögum síðar ef ekkert kort er skráð, en gögnin þín eru geymd.`,
+      body: why === "disabled"
+        ? `Skráða kortið fyrir <b>${company}</b> er ekki lengur gilt. Skráðu nýtt kort eða veldu kröfu í heimabanka í Stillingum → Áskrift. Annars kemur næsti reikningur sem krafa í heimabanka á kennitölu fyrirtækisins.`
+        : `14 daga prufan fyrir <b>${company}</b> er lokið og ekkert kort er skráð. Skráðu kort í Stillingum → Áskrift svo áskriftin haldi áfram. Aðgangurinn lokast 14 dögum síðar ef ekkert kort er skráð, en gögnin þín eru geymd.`,
       headingEn: why === "disabled" ? "Your card is no longer valid" : "Your trial has ended",
-      bodyEn: `Add a card in Settings → Subscription to keep <b>${company}</b> running. Access closes 14 days later if no card is on file; your data is kept.`,
-      ctaLabel: "Skrá kort", ctaLabelEn: "Add a card", ctaHref: `${APP_URL}/stillingar?tab=askrift`,
+      bodyEn: why === "disabled"
+        ? `Add a new card or choose a bank claim (krafa) in Settings → Subscription. Otherwise the next invoice for <b>${company}</b> arrives as a bank claim to the company ID.`
+        : `Add a card in Settings → Subscription to keep <b>${company}</b> running. Access closes 14 days later if no card is on file; your data is kept.`,
+      ctaLabel: why === "disabled" ? "Opna Áskrift" : "Skrá kort", ctaLabelEn: why === "disabled" ? "Open Subscription" : "Add a card", ctaHref: `${APP_URL}/stillingar?tab=askrift`,
     }),
   });
 }
 
-export async function sendReceiptEmail(to: string, company: string, o: { total: number; periodStart: string; periodEnd: string }) {
+export async function sendReceiptEmail(to: string, company: string, o: { total: number; periodStart: string; periodEnd: string; krafa?: boolean }) {
+  const how = o.krafa ? "var greitt með kröfu í heimabanka" : "var tekið af skráða kortinu";
   return sendEmail({
     to,
     subject: `Kvittun: VAKTO áskrift ${company}, ${kr(o.total)}`,
     html: template({
-      preheader: "Mánaðargjaldið var tekið af skráða kortinu.",
+      preheader: o.krafa ? "Krafan hefur verið greidd." : "Mánaðargjaldið var tekið af skráða kortinu.",
       heading: "Takk fyrir greiðsluna",
-      body: `Mánaðargjald VAKTO fyrir <b>${company}</b> var tekið af skráða kortinu. Reikninginn finnurðu í Stillingum → Áskrift.`,
+      body: `Mánaðargjald VAKTO fyrir <b>${company}</b> ${how}. Reikninginn finnurðu í Stillingum → Áskrift.`,
       rows: [["Upphæð með VSK", kr(o.total)], ["Tímabil", `${o.periodStart} – ${o.periodEnd}`], ["Seljandi", "BGL Ventures ehf., kt. 490806-0400"]],
       headingEn: "Thank you",
-      bodyEn: `The VAKTO monthly fee for <b>${company}</b>, ${o.periodStart} – ${o.periodEnd}, <b>${kr(o.total)}</b> incl. VAT, was charged to the card on file. Invoices are in Settings → Subscription.`,
+      bodyEn: `The VAKTO monthly fee for <b>${company}</b>, ${o.periodStart} – ${o.periodEnd}, <b>${kr(o.total)}</b> incl. VAT, ${o.krafa ? "was paid by bank claim" : "was charged to the card on file"}. Invoices are in Settings → Subscription.`,
       ctaLabel: "Sjá reikninga", ctaLabelEn: "View invoices", ctaHref: `${APP_URL}/stillingar?tab=askrift`,
     }),
   });
 }
 
-export async function sendPaymentFailedEmail(to: string, company: string, total: number) {
+/** Krafa stofnuð í heimabanka (Payday BGL). dueDate = eindagi (YYYY-MM-DD). */
+export async function sendKrafaIssuedEmail(to: string, company: string, o: { total: number; periodStart: string; periodEnd: string; dueDate: string }) {
+  const due = o.dueDate.slice(0, 10).split("-").reverse().map((v) => String(Number(v))).join(".");
+  return sendEmail({
+    to,
+    subject: `Krafa í heimabanka: VAKTO áskrift ${company}, ${kr(o.total)}`,
+    html: template({
+      preheader: `Krafa með eindaga ${due} er komin í heimabanka.`,
+      heading: "Krafan er komin í heimabanka",
+      body: `Mánaðargjald VAKTO fyrir <b>${company}</b> hefur verið stofnað sem krafa í heimabanka á kennitölu fyrirtækisins. Reikningurinn kemur líka í tölvupósti. Viltu frekar greiða með korti? Skráðu kort í Stillingum → Áskrift.`,
+      rows: [["Upphæð með VSK", kr(o.total)], ["Tímabil", `${o.periodStart} – ${o.periodEnd}`], ["Eindagi", due], ["Seljandi", "BGL Ventures ehf., kt. 490806-0400"]],
+      headingEn: "A bank claim is in your online bank",
+      bodyEn: `The VAKTO monthly fee for <b>${company}</b>, <b>${kr(o.total)}</b> incl. VAT, has been issued as a bank claim (krafa) to the company ID, due ${due}.`,
+      ctaLabel: "Opna Áskrift", ctaLabelEn: "Open Subscription", ctaHref: `${APP_URL}/stillingar?tab=askrift`,
+    }),
+  });
+}
+
+export async function sendPaymentFailedEmail(to: string, company: string, total: number, o?: { krafa?: boolean; dueDate?: string }) {
+  if (o?.krafa) {
+    const due = (o.dueDate ?? "").slice(0, 10).split("-").reverse().map((v) => String(Number(v))).join(".");
+    return sendEmail({
+      to,
+      subject: `Ógreidd krafa: VAKTO áskrift ${company}`,
+      html: template({
+        preheader: "Krafan í heimabanka er ógreidd.",
+        heading: "Krafan er ógreidd",
+        body: `Krafa að upphæð <b>${kr(total)}</b> fyrir <b>${company}</b>${due ? ` (eindagi ${due})` : ""} hefur ekki verið greidd. Greiddu hana í heimabanka eða skráðu kort í Stillingum → Áskrift. Aðganginum verður lokað eftir 14 daga ef greiðsla berst ekki.`,
+        headingEn: "Your bank claim is unpaid",
+        bodyEn: `The bank claim of <b>${kr(total)}</b> for <b>${company}</b> has not been paid. Pay it in your online bank or add a card in Settings → Subscription. Access closes in 14 days if payment is not received.`,
+        rows: [["Upphæð með VSK", kr(total)], ...(due ? [["Eindagi", due] as [string, string]] : []), ["Lokað ef ekki greitt", "Eftir 14 daga"]],
+        ctaLabel: "Opna Áskrift", ctaLabelEn: "Open Subscription", ctaHref: `${APP_URL}/stillingar?tab=askrift`,
+      }),
+    });
+  }
   return sendEmail({
     to,
     subject: `Greiðsla tókst ekki: VAKTO áskrift ${company}`,
@@ -563,7 +612,7 @@ export async function sendSignupAlert(o: { company: string; name: string; email:
     html: template({
       preheader: `${o.name} skráði ${o.company} í VAKTO.`,
       heading: "Ný skráning",
-      body: `<b>${o.name}</b> var að stofna aðgang fyrir <b>${o.company}</b>. Prufan er 14 dagar og aðgangurinn opnast þegar kort hefur verið skráð.`,
+      body: `<b>${o.name}</b> var að stofna aðgang fyrir <b>${o.company}</b>. Prufan er 14 dagar, ekkert kort. Greitt með korti eða kröfu í heimabanka eftir prufuna.`,
       rows: [["Fyrirtæki", o.company], ["Kennitala", o.kennitala || "—"], ["Nafn", o.name], ["Netfang", o.email], ["Land", o.country || "IS"], ["Tilboðskóði", o.promo || "enginn (14 daga prufa)"], ["Tími", when]],
       headingEn: "New signup",
       bodyEn: `${o.name} just created an account for ${o.company}.`,

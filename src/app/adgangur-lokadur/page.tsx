@@ -2,11 +2,13 @@
 
 // Shown when a company's access has been suspended by the VAKTO admin.
 import { useEffect, useState } from "react";
+import { SignOutLink } from "@/components/sign-out-link";
+import { ImpersonationBar } from "@/components/app/impersonation-bar";
 
 const T = {
-  is: { h: "Aðgangur fyrirtækisins er lokaður", p: "Aðgangi fyrirtækisins þíns að VAKTO hefur verið lokað tímabundið. Hafðu samband við okkur til að opna hann aftur." },
-  en: { h: "Your company's access is closed", p: "Your company's access to VAKTO has been temporarily suspended. Contact us to reopen it." },
-  pl: { h: "Dostęp firmy jest zablokowany", p: "Dostęp Twojej firmy do VAKTO został tymczasowo zablokowany. Skontaktuj się z nami, aby go przywrócić." },
+  is: { h: "Aðgangur fyrirtækisins er lokaður", p: "Aðgangi fyrirtækisins þíns að VAKTO hefur verið lokað tímabundið. Hafðu samband við okkur til að opna hann aftur.", out: "Skrá út" },
+  en: { h: "Your company's access is closed", p: "Your company's access to VAKTO has been temporarily suspended. Contact us to reopen it.", out: "Sign out" },
+  pl: { h: "Dostęp firmy jest zablokowany", p: "Dostęp Twojej firmy do VAKTO został tymczasowo zablokowany. Skontaktuj się z nami, aby go przywrócić.", out: "Wyloguj się" },
 };
 
 export default function AdgangurLokadur() {
@@ -18,6 +20,8 @@ export default function AdgangurLokadur() {
   }, []);
   const t = T[lang];
   return (
+    <>
+    <ImpersonationBar />
     <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f4f4f6", fontFamily: "'General Sans', system-ui, sans-serif", padding: 20 }}>
       <div style={{ maxWidth: 420, background: "#fff", borderRadius: 16, padding: "36px 34px", boxShadow: "0 1px 2px rgba(18,18,40,.04), 0 12px 30px -16px rgba(18,18,40,.14)", textAlign: "center" }}>
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#d8483a" strokeWidth="1.8" style={{ margin: "0 auto 14px", display: "block" }}>
@@ -30,8 +34,10 @@ export default function AdgangurLokadur() {
         <a href="mailto:help@vakto.is" style={{ display: "inline-block", background: "#e9700f", color: "#fff", textDecoration: "none", fontWeight: 700, fontSize: 14.5, padding: "11px 22px", borderRadius: 10 }}>
           help@vakto.is
         </a>
-        <p style={{ fontSize: 12, color: "#9296a6", marginTop: 16 }}>VAKTO · vakto.is</p>
+        <p style={{ fontSize: 13, color: "#5f6470", marginTop: 16 }}><SignOutLink label={t.out} /></p>
+        <p style={{ fontSize: 12, color: "#9296a6", marginTop: 10 }}>VAKTO · vakto.is</p>
       </div>
     </div>
+    </>
   );
 }

@@ -2,10 +2,11 @@ import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { chargeToken, straumurConfigured } from "@/lib/straumur";
 import { invoiceFor, planFor, baseModeFor, type PlanId, type BillingInterval } from "@/lib/pricing";
-import { issuePaydayInvoice, issueMissingPaydayInvoices } from "@/lib/billing-payday.server";
-import { sendTrialReminderEmail, sendCardMissingEmail, sendPaymentFailedEmail, sendReceiptEmail, sendSuspendedEmail } from "@/lib/email";
+import { issuePaydayInvoice, issueMissingPaydayInvoices, issuePaydayClaimInvoice, paydayInvoiceState, paydayInvoicingConfigured } from "@/lib/billing-payday.server";
+import { sendTrialReminderEmail, sendCardMissingEmail, sendPaymentFailedEmail, sendReceiptEmail, sendSuspendedEmail, sendKrafaIssuedEmail } from "@/lib/email";
 
-// Áskriftarvélin: prufu-áminningar, mánaðarreikningar, gjaldtaka af skráðu korti, lokun.
+// Áskriftarvélin: prufu-áminningar, mánaðarreikningar, gjaldtaka af skráðu korti eða krafa í heimabanka
+// (Payday BGL), greiðslustaða krafna, lokun.
 // Keyrt daglega af /api/cron/billing. Allt idempotent per dag/tímabil.
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -119,14 +120,22 @@ export async function chargeInvoice(invoiceId: string): Promise<"paid" | "failed
   }
 }
 
-export type BillingRunResult = { reminders: number; expired: number; invoices: number; paid: number; failed: number; suspended: number; retried: number; paydayInvoices: number };
+/** Áminning um lok prufu: send þegar þetta margir dagar (eða færri) eru eftir, þ.e. á degi 10 af 14. */
+export const TRIAL_REMINDER_DAYS = 4;
+/** Krafa ógreidd svo mörgum dögum eftir eindaga → 'unpaid' + póstur; tvöfalt það → 'suspended'. */
+export const KRAFA_GRACE_DAYS = 14;
+
+export type PaymentMethod = "card" | "krafa";
+
+export type BillingRunResult = { reminders: number; expired: number; invoices: number; paid: number; failed: number; suspended: number; retried: number; paydayInvoices: number; krafa: number; krafaPaid: number };
 
 export async function runBillingDay(now = new Date()): Promise<BillingRunResult> {
   const admin = createAdminClient();
-  const out: BillingRunResult = { reminders: 0, expired: 0, invoices: 0, paid: 0, failed: 0, suspended: 0, retried: 0, paydayInvoices: 0 };
-  const { data: companies } = await admin.from("companies")
-    .select("id, name, plan, price_plan, price_v1_until, billing_interval, billing_year_start, trial_ends_at, billing_status, billing_anchor, trial_reminder_sent_at, trial_expired_sent_at, ai_addon")
+  const out: BillingRunResult = { reminders: 0, expired: 0, invoices: 0, paid: 0, failed: 0, suspended: 0, retried: 0, paydayInvoices: 0, krafa: 0, krafaPaid: 0 };
+  const { data: companies, error: coErr } = await admin.from("companies")
+    .select("id, name, plan, price_plan, price_v1_until, billing_interval, billing_year_start, trial_ends_at, billing_status, billing_anchor, trial_reminder_sent_at, trial_expired_sent_at, ai_addon, payment_method, country")
     .not("plan", "is", null);
+  if (coErr) throw new Error(`runBillingDay: ${coErr.message} (migration 0083 keyrð?)`);
   for (const co of companies ?? []) {
     const id = co.id as string, name = (co.name as string) ?? "";
     const status = (co.billing_status as string | null) ?? null;
@@ -141,10 +150,12 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
     }
     const trialEnds = co.trial_ends_at ? new Date(co.trial_ends_at as string) : null;
 
-    // 1) Áminning 3 dögum fyrir lok prufu
+    const method = (co.payment_method as PaymentMethod | null) ?? null;
+
+    // 1) Áminning 4 dögum fyrir lok prufu (dagur 10): einn póstur. Kort skráð, krafa valin, eða „veldu leið“.
     if (trialEnds && !co.trial_reminder_sent_at) {
       const d = daysBetween(now, trialEnds);
-      if (d >= 0 && d <= 3) {
+      if (d >= 0 && d <= TRIAL_REMINDER_DAYS) {
         const card = await activeCard(id);
         // Fyrsti reikningur eftir prufu = grunngjald (v2: notkun í prufunni er ekki rukkuð; v1: notendur fyrirfram).
         const plan = planFor(co, now);
@@ -152,7 +163,7 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
         const first = invoiceFor(plan, plan === "v1" ? users : 0, 0, { ai: !!co.ai_addon });
         const note = plan === "v1" ? `${users} notendur` : `grunngjald með 5 virkum starfsmönnum`;
         const noteEn = plan === "v1" ? `${users} users` : `base fee incl. 5 active employees`;
-        for (const to of await ownerEmails(id)) await sendTrialReminderEmail(to, name, { daysLeft: d, hasCard: !!card, total: first.total, note, noteEn }).catch((e) => console.error("email:", e));
+        for (const to of await ownerEmails(id)) await sendTrialReminderEmail(to, name, { daysLeft: d, endsOn: trialEnds.toISOString(), hasCard: !!card && method !== "krafa", krafa: method === "krafa", total: first.total, note, noteEn }).catch((e) => console.error("email:", e));
         await admin.from("companies").update({ trial_reminder_sent_at: now.toISOString() }).eq("id", id);
         out.reminders++;
       }
@@ -164,7 +175,12 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
     if (!co.billing_anchor) await admin.from("companies").update({ billing_anchor: iso(anchor) }).eq("id", id);
 
     const card = await activeCard(id);
-    if (!card) {
+    // Ekkert kort (eða krafa valin): innheimt með kröfu í heimabanka á kennitöluna. Aldrei lokað fyrir það eitt
+    // að kort vanti. Krafa er aðeins í boði á Íslandi; erlend fyrirtæki án korts fara gömlu leiðina.
+    const iceland = !co.country || co.country === "IS";
+    const viaKrafa = iceland && (method === "krafa" || !card);
+    if (viaKrafa && !card && method !== "card" && method !== "krafa") await admin.from("companies").update({ payment_method: "krafa" }).eq("id", id);
+    if (!card && !viaKrafa) {
       if (!co.trial_expired_sent_at) {
         for (const to of await ownerEmails(id)) await sendCardMissingEmail(to, name, "expired").catch((e) => console.error("email:", e));
         await admin.from("companies").update({ trial_expired_sent_at: now.toISOString(), billing_status: "unpaid" }).eq("id", id);
@@ -209,18 +225,28 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
           usage_start: hasUsage ? uFrom : null, usage_end: hasUsage ? uTo : null, billing_interval: yearlyRates ? "year" : "month",
           base_amount: p.base, extra_amount: p.extra, ai_amount: p.ai, vat_amount: p.vat, total_amount: p.total, reference: `inv:${crypto.randomUUID()}`,
           ...(settled ? { status: "paid", paid_at: new Date().toISOString() } : {}),
+          payment_method: viaKrafa ? "krafa" : "card",
         }).select("id").single();
         if (inv && settled) { await admin.from("invoices").update({ reference: `inv:${inv.id}` }).eq("id", inv.id); continue; }
         if (inv) {
           // reference verður að vísa í id-ið svo webhook finni reikninginn
           await admin.from("invoices").update({ reference: `inv:${inv.id}` }).eq("id", inv.id);
           out.invoices++;
+          if (viaKrafa) {
+            // Krafa í heimabanka gegnum Payday BGL. Mistekst → reikningurinn helst 'pending' og syncKrafaInvoices reynir aftur.
+            const due = await issuePaydayClaimInvoice(inv.id as string, (await ownerEmails(id))[0] ?? null, now);
+            if (due) {
+              out.krafa++;
+              for (const to of await ownerEmails(id)) await sendKrafaIssuedEmail(to, name, { total: p.total, periodStart: iso(periodStart), periodEnd: iso(periodEnd), dueDate: due }).catch((e) => console.error("email:", e));
+            }
+            continue;
+          }
           if (!straumurConfigured()) continue;
           const r = await chargeInvoice(inv.id as string);
           if (r === "paid") { out.paid++; await issuePaydayInvoice(inv.id as string, (await ownerEmails(id))[0]); for (const to of await ownerEmails(id)) await sendReceiptEmail(to, name, { total: p.total, periodStart: iso(periodStart), periodEnd: iso(periodEnd) }).catch((e) => console.error("email:", e)); }
           else { out.failed++; await admin.from("companies").update({ billing_status: "unpaid" }).eq("id", id); for (const to of await ownerEmails(id)) await sendPaymentFailedEmail(to, name, p.total).catch((e) => console.error("email:", e)); }
         }
-      } else if (existing.status === "failed" && (existing.attempts as number) < 4 && straumurConfigured()) {
+      } else if (!viaKrafa && existing.status === "failed" && (existing.attempts as number) < 4 && straumurConfigured()) {
         // endurreyna daglega í 3 daga
         const r = await chargeInvoice(existing.id as string);
         out.retried++;
@@ -233,8 +259,66 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
       }
     }
   }
+  const k = await syncKrafaInvoices(now);
+  out.krafaPaid = k.paid; out.suspended += k.suspended;
   // Reikningar í Payday BGL fyrir allar greiddar færslur sem vantar enn reikning
   // (greitt í dag, endurreynt, greitt gegnum webhook, eða Payday var niðri).
   out.paydayInvoices = await issueMissingPaydayInvoices(async (cid) => (await ownerEmails(cid))[0] ?? null);
   return out;
+}
+
+/** Kröfur í heimabanka: stofna þær sem mistókust, merkja greiddar (Payday BGL) og ítreka/loka ef ógreitt.
+ *  Eindagi + 14 d. ógreitt → 'unpaid' + póstur; eindagi + 28 d. → 'suspended' + póstur. Uppsögn ('canceled') er aldrei yfirskrifuð. */
+export async function syncKrafaInvoices(now = new Date()): Promise<{ paid: number; unpaid: number; suspended: number }> {
+  const res = { paid: 0, unpaid: 0, suspended: 0 };
+  if (!paydayInvoicingConfigured()) return res;
+  const admin = createAdminClient();
+  const { data: rows, error } = await admin.from("invoices")
+    .select("id, company_id, total_amount, period_start, period_end, payday_invoice_id, payday_attempts, due_date, overdue_sent_at")
+    .eq("payment_method", "krafa").eq("status", "pending").order("created_at").limit(200);
+  if (error) { console.error("[krafa-sync]", error.message); return res; }
+  const keep = "billing_status.is.null,billing_status.neq.canceled";
+  for (const r of rows ?? []) {
+    const cid = r.company_id as string;
+    try {
+      const { data: co } = await admin.from("companies").select("name, billing_status").eq("id", cid).maybeSingle();
+      const name = (co?.name as string) ?? "";
+      if (!r.payday_invoice_id) {
+        if (((r.payday_attempts as number) ?? 0) < 5) {
+          const due = await issuePaydayClaimInvoice(r.id as string, (await ownerEmails(cid))[0] ?? null, now);
+          if (due) for (const to of await ownerEmails(cid)) await sendKrafaIssuedEmail(to, name, { total: r.total_amount as number, periodStart: r.period_start as string, periodEnd: r.period_end as string, dueDate: due }).catch((e) => console.error("email:", e));
+        }
+        continue;
+      }
+      const st = await paydayInvoiceState(r.payday_invoice_id as string);
+      if (st.status === "PAID") {
+        await admin.from("invoices").update({ status: "paid", paid_at: st.paidDate ? new Date(st.paidDate).toISOString() : now.toISOString(), last_error: null }).eq("id", r.id);
+        await admin.from("companies").update({ billing_status: "paying" }).eq("id", cid).or(keep);
+        for (const to of await ownerEmails(cid)) await sendReceiptEmail(to, name, { total: r.total_amount as number, periodStart: r.period_start as string, periodEnd: r.period_end as string, krafa: true }).catch((e) => console.error("email:", e));
+        res.paid++;
+        continue;
+      }
+      if (st.status === "CANCELLED" || st.status === "DELETED" || st.status === "CREDIT") {
+        // Felld niður í Payday (handvirkt): reikningurinn ógildur hér líka, engin ítrekun.
+        await admin.from("invoices").update({ status: "void", last_error: `payday:${st.status.toLowerCase()}` }).eq("id", r.id);
+        continue;
+      }
+      const status = (co?.billing_status as string | null) ?? null;
+      if (!r.due_date || status === "free" || status === "canceled" || status === "suspended") continue;
+      const late = daysBetween(new Date(r.due_date as string), now);
+      if (late >= 2 * KRAFA_GRACE_DAYS) {
+        await admin.from("companies").update({ billing_status: "suspended" }).eq("id", cid).or(keep);
+        for (const to of await ownerEmails(cid)) await sendSuspendedEmail(to, name).catch((e) => console.error("email:", e));
+        res.suspended++;
+      } else if (late >= KRAFA_GRACE_DAYS && !r.overdue_sent_at) {
+        await admin.from("companies").update({ billing_status: "unpaid" }).eq("id", cid).or(keep);
+        await admin.from("invoices").update({ overdue_sent_at: now.toISOString() }).eq("id", r.id);
+        for (const to of await ownerEmails(cid)) await sendPaymentFailedEmail(to, name, r.total_amount as number, { krafa: true, dueDate: r.due_date as string }).catch((e) => console.error("email:", e));
+        res.unpaid++;
+      }
+    } catch (e) {
+      console.error("[krafa-sync]", r.id, e instanceof Error ? e.message : e);
+    }
+  }
+  return res;
 }

@@ -54,6 +54,8 @@ export async function POST(req: Request) {
       }, { onConflict: "provider,token" });
       // Kort komið: ógreidd staða (t.d. eftir kortavandræði) fer aftur í prufu/virka.
       await admin.from("companies").update({ card_required: false }).eq("id", companyIdFromRef);
+      // Kort skráð = greitt með korti héðan í frá (0083). Ógreiddar kröfur standa áfram í heimabanka.
+      await admin.from("companies").update({ payment_method: "card" }).eq("id", companyIdFromRef);
       const { data: co } = await admin.from("companies").select("billing_status, trial_ends_at").eq("id", companyIdFromRef).maybeSingle();
       if (co?.billing_status === "unpaid") {
         const trialActive = co.trial_ends_at && new Date(co.trial_ends_at as string).getTime() > Date.now();

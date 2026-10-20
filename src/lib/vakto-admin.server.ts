@@ -42,6 +42,7 @@ export type AdminCompany = {
   trialDaysLeft: number | null; // negative = expired N days ago; null = no trial date
   billingStatus: BillingStatus;
   manualStatus: string | null; // raw billing_status column (admin override)
+  paymentMethod: "card" | "krafa" | null; // companies.payment_method (0083); null = ekki valið
   mrr: number;                 // kr/mán án VSK this company contributes (0 unless paying) — síðustu 30 dagar
   pricePlan: PlanId;
   activeEmployees30d: number;   // virkir (vakt eða stimplun) síðustu 30 daga — grunnur v2-verðs
@@ -209,6 +210,9 @@ export async function getAdminOverview(): Promise<AdminOverview> {
         .order("created_at", { ascending: true }) as typeof comps;
     }
     const rows = (comps.data ?? []) as Record<string, unknown>[];
+    // Greiðsluleið (0083) — sér fyrirspurn svo yfirlitið virki þótt migration vanti.
+    const pmRes = await db.from("companies").select("id, payment_method");
+    const payMethod = new Map(((pmRes.error ? [] : pmRes.data) ?? []).map((r) => [r.id as string, (r.payment_method as "card" | "krafa" | null) ?? null]));
     const month = new Date(Date.now() - 30 * 86400000);
     const monthIso = month.toISOString();
     const monthDate = monthIso.slice(0, 10);
@@ -284,6 +288,7 @@ export async function getAdminOverview(): Promise<AdminOverview> {
         trialDaysLeft: daysLeft(trialEndsAt),
         billingStatus: status,
         manualStatus: manual,
+        paymentMethod: payMethod.get(id) ?? null,
         mrr: mrrOf(status, plan, u, active30.get(id)?.size ?? 0, esign30.get(id) ?? 0),
         pricePlan: plan,
         activeEmployees30d: active30.get(id)?.size ?? 0,
@@ -404,6 +409,7 @@ export type AdminCard = { id: string; brand: string | null; last4: string | null
 export type AdminInvoice = {
   id: string; periodStart: string; periodEnd: string; total: number; base: number; extra: number; vat: number;
   status: string; attempts: number; lastError: string | null; paidAt: string | null; createdAt: string;
+  method: string | null; dueDate: string | null; paydayNumber: number | null; paydayError: string | null;
 };
 export type AdminCompanyBilling = {
   ok: boolean;
@@ -411,6 +417,8 @@ export type AdminCompanyBilling = {
   interval: string | null;          // companies.billing_interval (month/year)
   anchor: string | null;            // companies.billing_anchor — fyrsti gjalddagi
   cardRequired: boolean;
+  paymentMethod: "card" | "krafa" | null; // 0083
+  kennitala: string | null;
   termsAcceptedAt: string | null;
   esignProvider: string | null;
   cards: AdminCard[];
@@ -423,7 +431,7 @@ export type AdminCompanyBilling = {
 export async function getCompanyBilling(companyId: string): Promise<AdminCompanyBilling> {
   const empty: AdminCompanyBilling = {
     ok: false, contact: { address: null, phone: null, email: null }, interval: null, anchor: null,
-    cardRequired: false, termsAcceptedAt: null, esignProvider: null, cards: [], invoices: [], paidTotal: 0,
+    cardRequired: false, paymentMethod: null, kennitala: null, termsAcceptedAt: null, esignProvider: null, cards: [], invoices: [], paidTotal: 0,
   };
   if (!(await isVaktoAdmin()) || !companyId) return empty;
   try {
@@ -432,7 +440,7 @@ export async function getCompanyBilling(companyId: string): Promise<AdminCompany
       db.from("companies").select("*").eq("id", companyId).maybeSingle(),
       db.from("payment_methods").select("id, provider, card_summary, card_brand, card_expiry, status, created_at")
         .eq("company_id", companyId).order("created_at", { ascending: false }).limit(10),
-      db.from("invoices").select("id, period_start, period_end, total_amount, base_amount, extra_amount, vat_amount, status, attempts, last_error, paid_at, created_at")
+      db.from("invoices").select("*")
         .eq("company_id", companyId).order("period_start", { ascending: false }).limit(24),
     ]);
     const co = (coRes.data ?? {}) as Record<string, unknown>;
@@ -441,12 +449,15 @@ export async function getCompanyBilling(companyId: string): Promise<AdminCompany
       id: String(i.id), periodStart: String(i.period_start), periodEnd: String(i.period_end),
       total: Number(i.total_amount ?? 0), base: Number(i.base_amount ?? 0), extra: Number(i.extra_amount ?? 0), vat: Number(i.vat_amount ?? 0),
       status: String(i.status), attempts: Number(i.attempts ?? 0), lastError: str(i.last_error), paidAt: str(i.paid_at), createdAt: String(i.created_at),
+      method: str(i.payment_method), dueDate: str(i.due_date), paydayNumber: typeof i.payday_invoice_number === "number" ? i.payday_invoice_number : null, paydayError: str(i.payday_error),
     }));
     return {
       ok: true,
       contact: { address: str(co.address), phone: str(co.phone), email: str(co.email) },
       interval: str(co.billing_interval), anchor: str(co.billing_anchor),
       cardRequired: co.card_required === true,
+      paymentMethod: co.payment_method === "card" || co.payment_method === "krafa" ? co.payment_method : null,
+      kennitala: str(co.kennitala),
       termsAcceptedAt: str(co.terms_accepted_at), esignProvider: str(co.esign_provider),
       cards: (pmRes.data ?? []).map((p) => ({
         id: String(p.id), brand: str(p.card_brand), last4: str(p.card_summary), expiry: str(p.card_expiry),

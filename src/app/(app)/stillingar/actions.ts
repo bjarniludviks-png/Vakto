@@ -115,6 +115,12 @@ export async function saveCompanyInfo(
   input: { name: string; kennitala?: string; address?: string; postalCode?: string; city?: string; phone?: string; email?: string },
 ): Promise<SettingsResult> {
   if (!input.name?.trim()) return { ok: false, error: "Nafn fyrirtækis vantar" };
+  // Kennitala fer á reikninga og kröfur í heimabanka (Payday): gild eða ekkert, vistuð sem 000000-0000.
+  if (input.kennitala?.trim()) {
+    const { isValidKennitala, formatKennitala } = await import("@/lib/kennitala");
+    if (!isValidKennitala(input.kennitala)) return { ok: false, error: "Kennitalan er ekki gild (10 tölustafir)." };
+    input = { ...input, kennitala: formatKennitala(input.kennitala) };
+  }
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
     const supabase = await createClient();
@@ -127,7 +133,10 @@ export async function saveCompanyInfo(
       phone: input.phone?.trim() || null,
       email: input.email?.trim() || null,
     };
+    const { data: before } = await supabase.from("companies").select("kennitala").eq("id", ctx.company).maybeSingle();
     let { error } = await supabase.from("companies").update(patch).eq("id", ctx.company);
+    // Ný kennitala → nýr viðskiptamaður í Payday BGL (reikningar og kröfur fara á kennitöluna).
+    if (!error && (before?.kennitala ?? null) !== patch.kennitala) await createAdminClient().from("companies").update({ payday_customer_id: null }).eq("id", ctx.company);
     if (error && /address|phone|email/.test(error.message)) {
       // 0026 not run yet — save what the schema has.
       ({ error } = await supabase.from("companies")

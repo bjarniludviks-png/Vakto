@@ -152,7 +152,8 @@ export async function updateSession(request: NextRequest) {
       .from("users").select("role, company_id").eq("id", user.id).maybeSingle();
 
     // Suspended company → everyone locked out (except the VAKTO admin allowlist).
-    if (profile?.company_id && pathname !== "/adgangur-lokadur") {
+    // /admin (t.d. /admin/return eftir stuðningsinnskráningu á sama host) má aldrei festast á korta-/lokunarhliði.
+    if (profile?.company_id && pathname !== "/adgangur-lokadur" && !pathname.startsWith("/admin")) {
       const { data: co } = await supabase
         .from("companies").select("billing_status, card_required").eq("id", profile.company_id).maybeSingle();
       // Nýskráð fyrirtæki án korts: allt lokað nema kortasíðan — þegar greiðslusíða Straums er tengd.

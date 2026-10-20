@@ -117,6 +117,7 @@ export default function CompanyScreen({ company: c, detail, billing }: { company
             <div className="card">
               <div className="ch"><div><div className="ct">Kort og tengiliður</div><div className="cs">Kort er geymt hjá Straumi — hér sést aðeins tegund og síðustu fjórir stafir</div></div></div>
               <div className="cb">
+                <p style={{ fontSize: 13, margin: "0 0 10px" }}>Greiðsluleið: <b>{billing.paymentMethod === "krafa" ? `Krafa í heimabanka (kt. ${billing.kennitala ?? "vantar"})` : billing.paymentMethod === "card" ? "Kort" : "Ekki valin (krafa eftir prufu)"}</b></p>
                 {card ? (
                   <div className="adm-card-chip">
                     <div className="logo">{(card.brand ?? "KORT").slice(0, 4).toUpperCase()}</div>
@@ -184,7 +185,7 @@ export default function CompanyScreen({ company: c, detail, billing }: { company
 
           <div className="adm-grid c2">
             <div className="card">
-              <div className="ch"><div><div className="ct">Reikningar</div><div className="cs">Það sem hefur verið tekið af kortinu</div></div><span className="badge">{billing.invoices.length}</span></div>
+              <div className="ch"><div><div className="ct">Reikningar</div><div className="cs">Tekið af korti eða innheimt með kröfu í heimabanka</div></div><span className="badge">{billing.invoices.length}</span></div>
               <div className="cb tbl" style={{ paddingTop: 8 }}>
                 <table>
                   <thead><tr><th>Tímabil</th><th className="r">Án VSK</th><th className="r">Samtals</th><th>Staða</th><th>Greitt</th></tr></thead>
@@ -194,8 +195,8 @@ export default function CompanyScreen({ company: c, detail, billing }: { company
                         <td style={{ whiteSpace: "nowrap" }}>{niceDate(i.periodStart)} – {niceDate(i.periodEnd)}</td>
                         <td className="r">{nf(i.total - i.vat)}</td>
                         <td className="r"><b>{nf(i.total)}</b></td>
-                        <td><span className={`tag ${INVOICE_IS[i.status]?.cls ?? "mut"}`} title={i.lastError ?? undefined}>{INVOICE_IS[i.status]?.label ?? i.status}</span>{i.status === "failed" && <span className="muted" style={{ fontSize: 11, marginLeft: 6 }}>{i.attempts} tilraunir</span>}</td>
-                        <td className="muted" style={{ whiteSpace: "nowrap" }}>{i.paidAt ? niceDate(i.paidAt) : "—"}</td>
+                        <td><span className={`tag ${INVOICE_IS[i.status]?.cls ?? "mut"}`} title={i.lastError ?? undefined}>{INVOICE_IS[i.status]?.label ?? i.status}</span>{i.status === "failed" && <span className="muted" style={{ fontSize: 11, marginLeft: 6 }}>{i.attempts} tilraunir</span>}{i.method === "krafa" && <span className="muted" style={{ fontSize: 11, marginLeft: 6 }} title={i.paydayError ?? undefined}>krafa{i.paydayNumber ? ` #${i.paydayNumber}` : ""}{i.paydayError ? " · villa" : ""}</span>}</td>
+                        <td className="muted" style={{ whiteSpace: "nowrap" }}>{i.paidAt ? niceDate(i.paidAt) : i.dueDate ? `eindagi ${niceDate(i.dueDate)}` : "—"}</td>
                       </tr>
                     ))}
                     {!billing.invoices.length && <tr><td colSpan={5} className="muted" style={{ textAlign: "center", padding: 20 }}>Engir reikningar enn.</td></tr>}

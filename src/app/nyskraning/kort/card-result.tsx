@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { hasCardOnFile, startCardSetup } from "../actions";
+import { SignOutLink } from "@/components/sign-out-link";
+import { ImpersonationBar } from "@/components/app/impersonation-bar";
 
 const Bars = () => (
   <div className="m"><svg viewBox="0 0 28 28" fill="none">
@@ -40,25 +42,26 @@ export default function CardResult({ cancelled, required = false }: { cancelled:
   const brand = card?.brand === "VI" ? "Visa" : card?.brand === "MC" ? "Mastercard" : card?.brand ?? "Kort";
   return (
     <div className="form">
+      <ImpersonationBar />
       <div className="brand"><Bars /><b>VAKTO</b></div>
       {required ? (
         <>
           <h1>Skráðu kort til að opna VAKTO</h1>
-          <div className="sub">Prufan er frí í 14 daga og ekkert er dregið fyrr en hún er búin — en kortið þarf að vera skráð áður en kerfið opnast. Það er geymt hjá Straumi (Kvika), VAKTO geymir aldrei kortanúmer.</div>
+          <div className="sub">Kort þarf að vera skráð fyrir þetta fyrirtæki áður en kerfið opnast. Það er geymt hjá Straumi (Kvika), VAKTO geymir aldrei kortanúmer. Viltu frekar greiða með kröfu í heimabanka? Hafðu samband á hallo@vakto.is.</div>
           <button className="btn" onClick={retry} disabled={busy}>{busy ? "Opna greiðslusíðu…" : "Skrá kort"}</button>
-          <div className="foot"><a href="mailto:hallo@vakto.is">Spurningar? hallo@vakto.is</a></div>
+          <div className="foot"><a href="mailto:hallo@vakto.is">Spurningar? hallo@vakto.is</a> · <SignOutLink /></div>
         </>
       ) : cancelled ? (
         <>
           <h1>Hætt við kortaskráningu</h1>
-          <div className="sub">Aðgangurinn opnast þegar kortið er skráð. Ekkert er dregið fyrr en 14 daga prufan er búin.</div>
+          <div className="sub">Ekkert kort var skráð. Þú getur reynt aftur eða haldið áfram án korts; greiðsluleiðina velurðu í Stillingum → Áskrift.</div>
           <button className="btn" onClick={retry} disabled={busy}>{busy ? "Opna…" : "Skrá kort núna"}</button>
-          <div className="foot"><a href="mailto:hallo@vakto.is">Spurningar? hallo@vakto.is</a></div>
+          <div className="foot"><a href="/stillingar?tab=askrift">Halda áfram án korts</a> · <SignOutLink /></div>
         </>
       ) : card ? (
         <>
           <h1>Kortið er skráð</h1>
-          <div className="sub">{brand} sem endar á {card.last4 ?? "····"}. Ekkert er dregið fyrr en prufan er búin, þá færðu kvittun í pósti.</div>
+          <div className="sub">{brand} sem endar á {card.last4 ?? "····"}. Ekkert er dregið fyrr en prufan er búin (eða á næsta gjalddaga), þá færðu kvittun í pósti.</div>
           <a className="btn" href="/maelabord" style={{ display: "block", textAlign: "center" }}>Opna VAKTO</a>
         </>
       ) : waited < 12 ? (

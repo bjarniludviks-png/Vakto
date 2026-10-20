@@ -7,6 +7,7 @@ import { useLang } from "@/components/app/lang";
 import { nf } from "@/lib/format";
 import { PLANS, ESIGN_PRICE, AI_ADDON_PRICE, AI_ADDON_QUESTIONS, AI_FREE_QUESTIONS } from "@/lib/pricing";
 import { setBillingInterval, startCardChange, setAiAddon, cancelSubscription, resumeSubscription } from "./actions";
+import { choosePaymentCard, choosePaymentKrafa } from "./payment-actions";
 import type { SettingsData } from "./settings.server";
 import { CardBrandLogo, brandName, brandOf } from "./card-brand";
 import "./billing.css";
@@ -26,6 +27,7 @@ const INV_STATUS: Record<string, { label: string; tone: "good" | "warn" | "bad" 
   refunded: { label: "Endurgreitt", tone: "mut" },
   void: { label: "Ógilt", tone: "mut" },
   pending: { label: "Í bið", tone: "warn" },
+  krafa: { label: "Krafa í heimabanka", tone: "warn" },
 };
 
 const isoToIs = (iso: string | null | undefined) => {
@@ -48,10 +50,29 @@ export function BillingPanel({ data }: { data: SettingsData }) {
   const [ask, setAsk] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  // Greiðsluleið (0083): kort eða krafa í heimabanka. Ekkert valið + ekkert kort → krafa eftir prufuna.
+  const method = data.paymentMethod ?? (card ? "card" : null);
+  const kt = data.company?.kennitala || "";
   async function changeCard() {
     const r = await startCardChange(window.location.origin);
     if (r.ok && r.url) window.location.assign(r.url);
     else toast(r.error ?? t("Tókst ekki"));
+  }
+  async function pickCard() {
+    if (!card) return changeCard();
+    setBusy(true);
+    const r = await choosePaymentCard();
+    setBusy(false);
+    if (r.needCard) return changeCard();
+    toast(r.ok ? t("Greitt verður með korti") : (r.error ?? t("Tókst ekki")));
+    if (r.ok) router.refresh();
+  }
+  async function pickKrafa() {
+    setBusy(true);
+    const r = await choosePaymentKrafa();
+    setBusy(false);
+    toast(r.ok ? t("Greitt verður með kröfu í heimabanka") : (r.error ?? t("Tókst ekki")));
+    if (r.ok) router.refresh();
   }
   async function toggleAi(on: boolean) {
     const r = await setAiAddon(on);
@@ -122,8 +143,14 @@ export function BillingPanel({ data }: { data: SettingsData }) {
         </section>
 
         <section className="card bill-pay">
-          <div className="bill-eyebrow">{t("Greiðslukort")}</div>
-          {card ? (
+          <div className="bill-eyebrow">{t("Greiðsluleið")}</div>
+          <div className="seg bill-method" role="group" aria-label={t("Greiðsluleið")}>
+            <button type="button" className={method === "card" ? "on" : ""} disabled={busy} onClick={pickCard}>{t("Greiða með korti")}</button>
+            <button type="button" className={method === "krafa" ? "on" : ""} disabled={busy || method === "krafa"} onClick={pickKrafa}>{t("Greiða með kröfu í heimabanka")}</button>
+          </div>
+          {method === "krafa" ? (
+            <div className="bill-krafa"><span>{t("Krafa í heimabanka á kennitölu")}</span><b>{kt || "—"}</b></div>
+          ) : card ? (
             <div className={`bill-cc ${brand}`}>
               <div className="bill-cc-top"><span className="bill-cc-chip" aria-hidden /><CardBrandLogo code={card.brand} height={brand === "visa" ? 18 : 26} onDark /></div>
               <div className="bill-cc-num">•••• •••• •••• {card.last4 ?? "····"}</div>
@@ -132,8 +159,14 @@ export function BillingPanel({ data }: { data: SettingsData }) {
           ) : (
             <div className="bill-cc empty"><span>{t("Ekkert kort skráð")}</span></div>
           )}
-          <button className="btn" onClick={changeCard}>{card ? t("Skipta um kort") : t("Skrá kort")}</button>
-          <p className="bill-fine">{t("Kortið er geymt hjá Straumi (Kvika). VAKTO geymir aldrei kortanúmer.")}</p>
+          {method === "card" && <button className="btn ghost" onClick={changeCard}>{card ? t("Skipta um kort") : t("Skrá kort")}</button>}
+          <p className="bill-fine">
+            {method === "krafa"
+              ? t("Reikningur kemur í tölvupósti og krafa í heimabanka fyrirtækisins, eindagi 14 dögum síðar.")
+              : !method
+                ? `${t("Ekkert valið: eftir prufuna kemur mánaðargjaldið sem krafa í heimabanka á kennitölu")} ${kt || t("fyrirtækisins")}.`
+                : t("Kortið er geymt hjá Straumi (Kvika). VAKTO geymir aldrei kortanúmer.")}
+          </p>
         </section>
       </div>
 
@@ -183,11 +216,11 @@ export function BillingPanel({ data }: { data: SettingsData }) {
               <thead><tr><th>{t("Tímabil")}</th><th>{t("Greitt")}</th><th className="num">{t("Upphæð m. VSK")}</th><th>{t("Staða")}</th><th aria-label={t("Kvittun")} /></tr></thead>
               <tbody>
                 {data.invoices!.map((inv) => {
-                  const s = INV_STATUS[inv.status] ?? INV_STATUS.pending;
+                  const s = (inv.status === "pending" && inv.method === "krafa" ? INV_STATUS.krafa : INV_STATUS[inv.status]) ?? INV_STATUS.pending;
                   return (
                     <tr key={inv.id}>
                       <td>{isoToIs(inv.periodStart)} – {isoToIs(inv.periodEnd)}</td>
-                      <td>{inv.paidAt ? isoToIs(inv.paidAt) : "—"}</td>
+                      <td>{inv.paidAt ? isoToIs(inv.paidAt) : inv.method === "krafa" && inv.dueDate ? `${t("Eindagi")} ${isoToIs(inv.dueDate)}` : "—"}</td>
                       <td className="num">{nf(inv.total)} kr</td>
                       <td><span className={`bill-pill ${s.tone}`}>{t(s.label)}</span></td>
                       <td className="num">{inv.status === "paid" && <a className="bill-link" href={`/kvittun/${inv.id}`} target="_blank" rel="noopener">{t("Kvittun")}</a>}</td>
