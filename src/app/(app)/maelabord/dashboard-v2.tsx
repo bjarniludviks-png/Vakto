@@ -114,6 +114,10 @@ export default function DashboardV2({ onboarding, onNow, missing, pending, first
     try { localStorage.setItem("vakto-dash-period", period); localStorage.setItem("vakto-dash-from", customFrom); localStorage.setItem("vakto-dash-to", customTo); } catch { /* ignore */ }
     let from: string, to: string;
     if (period === "custom") { if (!customFrom || !customTo) return; from = customFrom; to = customTo; } else ({ from, to } = presetRange(period));
+    // Framtíðardagar telja ekki: áætluð velta án launa myndi lækka laun % ranglega.
+    const today = presetRange("idag").to;
+    if (to > today) to = today;
+    if (from > to) from = to;
     let stop = false;
     retryOnce(() => getDashboardPeriod(from, to)).then((r) => { if (!stop && r.ok) setPd(r); }, () => {});
     return () => { stop = true; };

@@ -61,7 +61,7 @@ export async function getInsights(): Promise<{ insights: Insight[]; live: boolea
     }
 
     // Labor% trend across the last months.
-    const m = history.months.filter((x) => x.laborPct > 0);
+    const m = history.months.filter((x): x is typeof x & { laborPct: number } => x.laborPct != null && x.laborPct > 0);
     if (m.length >= 2) {
       const prev = m[m.length - 2], cur = m[m.length - 1];
       const d = cur.laborPct - prev.laborPct;

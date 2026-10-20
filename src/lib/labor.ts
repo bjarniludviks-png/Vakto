@@ -13,6 +13,10 @@ import "server-only";
 //   revenue  = revenue rows for the company's locations in the range; days
 //              WITHOUT a real row are gap-filled from companies.weekday_revenue
 //              and flagged "estimated" (real rows always win per day).
+//   upphaf   = fyrsta virkni fyrirtækisins: fyrsta birta vakt / stimplun / raunvelta
+//              (companies.created_at ef engin virkni er til). Dagar FYRIR upphaf fá
+//              hvorki áætlaða veltu né mánaðarlaun — annars sýna mánuðir áður en
+//              fyrirtækið byrjaði í VAKTO áætlaða veltu á móti 0 kr launum (0 %).
 //   pct      = cost / revenue × 100 — or NULL when either side is 0. Never a
 //              placeholder number.
 
@@ -59,6 +63,7 @@ export type LaborPeriod = LaborPct & {
   levies: number;         // launatengd gjöld share of cost
   coveredDays: number;    // days with a REAL revenue row
   days: number;           // calendar days in the range
+  activeDays: number;     // days on/after the company's first activity (0 = engin gögn)
   staff: LaborStaffRow[];
   series: LaborDayPoint[];
 };
@@ -110,6 +115,20 @@ type EmpRow = {
   contractor?: boolean;
 };
 
+/** Allar raðir fyrirspurnar, síða fyrir síðu. PostgREST skilar mest 1.000 röðum (max_rows) —
+ * án þessa duttu stimplanir/vaktir út þegjandi yfir löng tímabil (t.d. 12 mánaða saga í Innsýn). */
+const PAGE = 1000;
+async function allRows(page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>): Promise<{ data: Record<string, unknown>[] }> {
+  const out: Record<string, unknown>[] = [];
+  for (let i = 0; i < 100; i++) {
+    const { data, error } = await page(i * PAGE, i * PAGE + PAGE - 1);
+    if (error || !data) break;
+    out.push(...(data as Record<string, unknown>[]));
+    if (data.length < PAGE) break;
+  }
+  return { data: out };
+}
+
 /** Resolve the signed-in user's company (users.company_id). */
 export async function getCompanyId(supabase: Db): Promise<string | null> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -133,12 +152,12 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
       .select("id, full_name, pay_type, rate, employment_ratio, union_agreement, status, avatar_color, role, departments(name)")
       .eq("company_id", companyId),
     supabase.from("employees").select("id, pay_rule").eq("company_id", companyId), // tolerant: null before migration 0013
-    supabase.from("shifts").select("employee_id, date, start_time, end_time")
-      .eq("company_id", companyId).gte("date", spanFrom).lte("date", spanTo),
-    supabase.from("punches").select("employee_id, clock_in, clock_out")
-      .eq("company_id", companyId).gte("clock_in", spanFrom).lte("clock_in", spanTo + "T23:59:59"),
+    allRows((a, b) => supabase.from("shifts").select("id, employee_id, date, start_time, end_time")
+      .eq("company_id", companyId).gte("date", spanFrom).lte("date", spanTo).order("id").range(a, b)),
+    allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
+      .eq("company_id", companyId).gte("clock_in", spanFrom).lte("clock_in", spanTo + "T23:59:59").order("id").range(a, b)),
     supabase.from("locations").select("id").eq("company_id", companyId),
-    supabase.from("companies").select("weekday_revenue").eq("id", companyId).maybeSingle(),
+    supabase.from("companies").select("weekday_revenue, created_at").eq("id", companyId).maybeSingle(),
   ]);
 
   const ruleMap = new Map<string, unknown>();
@@ -159,9 +178,13 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
   });
 
   const locIds = (locRes.data ?? []).map((l) => l.id as string);
-  const revRows = locIds.length
-    ? (await supabase.from("revenue").select("amount, source, date").in("location_id", locIds).gte("date", spanFrom).lte("date", spanTo)).data ?? []
-    : [];
+  const [revRes, startISO] = await Promise.all([
+    locIds.length
+      ? allRows((a, b) => supabase.from("revenue").select("id, amount, source, date").in("location_id", locIds).gte("date", spanFrom).lte("date", spanTo).order("id").range(a, b))
+      : Promise.resolve({ data: [] as Record<string, unknown>[] }),
+    activityStart(supabase, companyId, locIds, compRes.data?.created_at as string | null | undefined),
+  ]);
+  const revRows = revRes.data ?? [];
   const weekdayRev = (compRes.data?.weekday_revenue as Record<string, number> | null | undefined) ?? null;
 
   // Effective hourly employer cost + full monthly employer cost per employee.
@@ -184,7 +207,9 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
   return ranges.map(({ from, to }) => {
     const days = dateRange(from, to);
     const daySet = new Set(days);
-    const monthShare = monthShareOf(days);
+    // Dagar fyrir upphaf: engin áætluð velta né mánaðarlaun (rauntölur telja samt alltaf).
+    const liveDays = startISO ? days.filter((d) => d >= startISO) : [];
+    const monthShare = monthShareOf(liveDays);
 
     const plannedMap = new Map<string, number>(), dayPlanned = new Map<string, number>();
     for (const s of shifts) {
@@ -238,7 +263,7 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
     let revenueSource: RevenueSource = srcs.size === 0 ? "none" : srcs.size > 1 ? "mixed" : [...srcs][0];
     if (weekdayRev && covered.size < days.length) {
       let est = 0;
-      for (const d of days) if (!covered.has(d)) est += Number(weekdayRev[String(new Date(d + "T00:00:00").getDay())] ?? 0);
+      for (const d of liveDays) if (!covered.has(d)) est += Number(weekdayRev[String(new Date(d + "T00:00:00").getDay())] ?? 0);
       if (est > 0) { revenue += est; revenueSource = revenueSource === "none" ? "estimated" : "mixed"; }
     }
 
@@ -254,9 +279,28 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
       planned: r1(planned), actual: r1(actual), overtime: r1(overtime), premium: r1(premium),
       plannedCost: Math.round(plannedCost), overtimePay: Math.round(overtimePay), premiumPay: Math.round(premiumPay),
       levies: Math.round(cost * (BURDEN / (1 + BURDEN))),
-      coveredDays: covered.size, days: days.length, staff, series,
+      coveredDays: covered.size, days: days.length, activeDays: liveDays.length, staff, series,
     };
   });
+}
+
+/** Fyrsti dagur virkni: elsta birta vakt, stimplun eða raunvelta. Án virkni → stofndagur
+ * fyrirtækisins (svo fyrirtæki með aðeins meðalveltu + mánaðarlaun fái samt tölu). */
+async function activityStart(supabase: Db, companyId: string, locIds: string[], createdAt: string | null | undefined): Promise<string | null> {
+  const [s, p, r] = await Promise.all([
+    supabase.from("shifts").select("date").eq("company_id", companyId).eq("published", true).order("date").limit(1),
+    supabase.from("punches").select("clock_in").eq("company_id", companyId).order("clock_in").limit(1),
+    locIds.length
+      ? supabase.from("revenue").select("date").in("location_id", locIds).order("date").limit(1)
+      : Promise.resolve({ data: [] as { date: string }[] }),
+  ]);
+  const firsts = [
+    s.data?.[0]?.date as string | undefined,
+    p.data?.[0]?.clock_in ? isoOf(new Date(p.data[0].clock_in as string)) : undefined,
+    r.data?.[0]?.date as string | undefined,
+  ].filter((x): x is string => !!x).map((x) => x.slice(0, 10)).sort();
+  if (firsts.length) return firsts[0];
+  return createdAt ? isoOf(new Date(createdAt)) : null;
 }
 
 /** Full breakdown for one inclusive date range. */

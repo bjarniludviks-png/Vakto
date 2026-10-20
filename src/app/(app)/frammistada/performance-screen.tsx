@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/app/empty-state";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { PeriodPicker } from "@/components/app/period-picker";
 import { CustomSections, CustomizeButton } from "@/components/app/section-prefs";
-import { dec1, krCompact } from "@/lib/format";
+import { dec1, krCompact, monthShort } from "@/lib/format";
 import type { PerfView } from "@/lib/analytics.server";
 import { StaffingCard } from "./staffing-card";
 import type { StaffingPattern } from "./staffing.server";
@@ -73,8 +73,11 @@ export function InsightsCard({ insights }: { insights: Insight[] }) {
   );
 }
 
+const pad2 = (n: number) => String(n).padStart(2, "0");
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; };
+
 export default function PerformanceScreen({ empty = false, live = false, embedded = false, perf, staffing, history, insights = [] }: { empty?: boolean; live?: boolean; embedded?: boolean; perf?: PerfView; staffing?: StaffingPattern; history?: PerfHistory; insights?: Insight[] }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   // Inside the Innsyn tabs the shared header renders above us — show only actions.
   const head = (actions?: React.ReactNode) => embedded
     ? (actions ? <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>{actions}</div> : null)
@@ -105,31 +108,39 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
   // Live company: real headline KPIs + monthly history + department breakdown.
   if (live && perf) {
     const all = history?.months ?? [];
-    // Period filter (month granularity) — defaults to the last 6 months.
+    // Tímabil (mánaðarnákvæmni) — sjálfgefið síðustu 6 mánuðir TIL DAGSINS Í DAG (aldrei inn í framtíðina).
+    const today = todayISO();
     const defFrom = all.length ? `${all[Math.max(0, all.length - 6)].ym}-01` : "";
-    const defTo = all.length ? `${all[all.length - 1].ym}-28` : "";
+    const defTo = all.length ? today : "";
     const pFrom = liveFrom || defFrom, pTo = liveTo || defTo;
     const months = all.filter((x) => x.ym >= pFrom.slice(0, 7) && x.ym <= pTo.slice(0, 7));
-    const withRev = months.filter((m) => m.revenue > 0);
+    const withPct = months.filter((x): x is typeof x & { laborPct: number } => x.laborPct != null);
     const cur = months[months.length - 1];
-    const prev = months.length >= 2 ? months[months.length - 2] : undefined;
+    const prevFull = months.length >= 2 ? months[months.length - 2] : undefined;
+    // Yfirstandandi mánuður nær aðeins til dagsins í dag → borinn saman við sömu daga fyrri mánaðar.
+    const running = !!cur && cur.ym === today.slice(0, 7);
+    const ptd = history?.prevToDate;
+    const prev = running && prevFull && ptd && ptd.ym === prevFull.ym ? ptd : prevFull;
+    const span = running && ptd ? (lang === "en" ? ` (1–${ptd.toDay})` : ` (1.–${ptd.toDay}.)`) : "";
+    const L = (x: { ym: string }) => monthShort(x.ym, lang);
+    const curLabel = cur ? L(cur) + span : "";
+    const prevLabel = prev ? L(prev) + (prev === ptd ? span : "") : "";
+    const K = (n: number) => krCompact(n, lang);
+    const D = (n: number) => dec1(n, lang);
     const m = (n: number) => Math.round(n / 100000) / 10; // kr → m kr (1 decimal)
-    // Headline KPIs follow the current month's real figures when history exists.
-    const lp = cur && cur.laborPct > 0 ? cur.laborPct : perf.laborPct;
-    const lpColor = lp === 0 ? "var(--ink3)" : lp <= 30 ? "var(--good)" : lp <= 33 ? "var(--warn)" : "var(--bad)";
-    const kRevenue = cur ? dec1(m(cur.revenue)) : perf.revenueM;
-    const kCost = cur ? dec1(m(cur.cost)) : perf.laborCostM;
-    const kMargin = cur ? dec1(m(Math.max(0, cur.revenue - cur.cost))) : perf.marginM;
+    // Engin gögn (null) birtist sem „—“, aldrei 0 %.
+    const lp: number | null = cur ? cur.laborPct : perf.laborPct > 0 ? perf.laborPct : null;
+    const lpColor = lp == null ? "var(--ink3)" : lp <= 30 ? "var(--good)" : lp <= 33 ? "var(--warn)" : "var(--bad)";
     const chg = (a: number, b: number) => (b > 0 ? Math.round(((a - b) / b) * 1000) / 10 : 0);
     async function exportHistory(kind: "xlsx" | "pdf") {
       const { exportTableXlsx, exportTablePdf } = await import("@/lib/export-report");
       const d = {
         title: t("Rekstur & framlegð"),
         company: "VAKTO",
-        from: months[0]?.label ?? "", to: months[months.length - 1]?.label ?? "",
+        from: months[0] ? L(months[0]) : "", to: cur ? L(cur) : "",
         columns: [t("Mánuður"), t("Velta (m.kr.)"), t("Launakostnaður (m.kr.)"), t("Laun af tekjum %"), t("Framlegð (m.kr.)")],
         numeric: [1, 2, 3, 4],
-        rows: months.map((x) => [x.label, m(x.revenue), m(x.cost), x.laborPct > 0 ? Math.round(x.laborPct * 10) / 10 : 0, m(Math.max(0, x.revenue - x.cost))]),
+        rows: months.map((x) => [L(x), m(x.revenue), m(x.cost), x.laborPct != null ? Math.round(x.laborPct * 10) / 10 : "—", m(Math.max(0, x.revenue - x.cost))]),
       };
       if (kind === "xlsx") await exportTableXlsx(d); else await exportTablePdf(d);
       toast(kind === "xlsx" ? t("Excel-skýrsla sótt") : t("PDF-skýrsla sótt"));
@@ -137,13 +148,13 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
     const chgCell = (a: number, b: number, goodUp: boolean) => {
       const c = chg(a, b);
       const good = c === 0 ? undefined : (c > 0) === goodUp ? "var(--good)" : "var(--bad)";
-      return <td className="r" style={good ? { color: good } : undefined}>{c > 0 ? "+" : ""}{dec1(c)}%</td>;
+      return <td className="r" style={good ? { color: good } : undefined}>{b > 0 ? `${c > 0 ? "+" : ""}${D(c)}%` : "—"}</td>;
     };
     return (
       <>
         {!embedded && head()}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, margin: "0 0 14px", flexWrap: "wrap" }}>
-          <PeriodPicker from={pFrom} to={pTo} onApply={(a, b) => { setLiveFrom(a); setLiveTo(b); }} />
+          <PeriodPicker from={pFrom} to={pTo} onApply={(a, b) => { setLiveFrom(a > today ? today : a); setLiveTo(b > today ? today : b); }} />
           <span style={{ display: "inline-flex", gap: 8 }}>
             <button className="btn ghost sm" onClick={() => exportHistory("xlsx")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>Excel</button>
             <button className="btn ghost sm" onClick={() => exportHistory("pdf")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>PDF</button>
@@ -154,21 +165,22 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
           { id: "kpis", title: "Lykiltölur mánaðar", node: (
         <section className="db2-card db2-hero">
           <div className="db2-hero-l">
-            <div className="db2-k">{t("Laun sem hlutfall af veltu")} · {cur ? cur.label : t("Nýjasti mánuður")}</div>
-            <div className="db2-big" style={{ color: lpColor }}>{lp > 0 ? <>{dec1(lp)}<small>%</small></> : "—"}</div>
-            {cur && prev && cur.laborPct > 0 && prev.laborPct > 0 && (
-              <p className="db2-verdict"><b>{cur.laborPct <= prev.laborPct ? t("Betra en mánuðinn á undan.") : t("Hærra en mánuðinn á undan.")}</b> {dec1(Math.abs(cur.laborPct - prev.laborPct))} {t("stig")} {cur.laborPct <= prev.laborPct ? t("lægra") : t("hærra")} {t("en í")} {prev.label} ({dec1(prev.laborPct)} %).</p>
+            <div className="db2-k">{t("Laun sem hlutfall af veltu")} · {cur ? curLabel : t("Nýjasti mánuður")}</div>
+            <div className="db2-big" style={{ color: lpColor }}>{lp != null ? <>{D(lp)}<small>%</small></> : "—"}</div>
+            {lp == null && <p className="db2-verdict">{t("Engin gögn fyrir tímabilið.")}</p>}
+            {cur && prev && cur.laborPct != null && prev.laborPct != null && (
+              <p className="db2-verdict"><b>{cur.laborPct <= prev.laborPct ? t("Betra en mánuðinn á undan.") : t("Hærra en mánuðinn á undan.")}</b> {D(Math.abs(cur.laborPct - prev.laborPct))} {t("stig")} {cur.laborPct <= prev.laborPct ? t("lægra") : t("hærra")} {t("en í")} {prevLabel}: {D(prev.laborPct)} %.</p>
             )}
             <div className="db2-hstats">
-              <div><span>{t("Velta")}</span><b>{cur ? krCompact(cur.revenue) : `${kRevenue} m.kr.`}</b>{cur && prev && prev.revenue > 0 && <em className={cur.revenue >= prev.revenue ? "up" : "down"}>{chg(cur.revenue, prev.revenue) > 0 ? "+" : ""}{dec1(chg(cur.revenue, prev.revenue))} %</em>}</div>
-              <div><span>{t("Launakostnaður (byrði)")}</span><b>{cur ? krCompact(cur.cost) : `${kCost} m.kr.`}</b>{cur && prev && prev.cost > 0 && <em className={cur.cost <= prev.cost ? "up" : "down"}>{chg(cur.cost, prev.cost) > 0 ? "+" : ""}{dec1(chg(cur.cost, prev.cost))} %</em>}</div>
-              <div><span>{t("Framlegð")}</span><b>{cur ? krCompact(Math.max(0, cur.revenue - cur.cost)) : `${kMargin} m.kr.`}</b></div>
+              <div><span>{t("Velta")}</span><b>{cur ? K(cur.revenue) : "—"}</b>{cur && prev && prev.revenue > 0 && <em className={cur.revenue >= prev.revenue ? "up" : "down"}>{chg(cur.revenue, prev.revenue) > 0 ? "+" : ""}{D(chg(cur.revenue, prev.revenue))} %</em>}</div>
+              <div><span>{t("Launakostnaður (byrði)")}</span><b>{cur ? K(cur.cost) : "—"}</b>{cur && prev && prev.cost > 0 && <em className={cur.cost <= prev.cost ? "up" : "down"}>{chg(cur.cost, prev.cost) > 0 ? "+" : ""}{D(chg(cur.cost, prev.cost))} %</em>}</div>
+              <div><span>{t("Framlegð")}</span><b>{cur ? K(Math.max(0, cur.revenue - cur.cost)) : "—"}</b></div>
             </div>
           </div>
           <div className="db2-hero-r">
             <div className="db2-k">{t("Laun% per mánuð")}</div>
-            {withRev.length
-              ? <><Bars vals={withRev.map((x) => x.laborPct)} t={30} labels={withRev.map((x) => x.label)} /><div className="db2-legend"><span><i style={{ background: "var(--good)" }} />{t("Undir markmiði")}</span><span><i style={{ background: "var(--bad)" }} />{t("Yfir markmiði")}</span></div></>
+            {withPct.length
+              ? <><Bars vals={withPct.map((x) => x.laborPct)} t={30} labels={withPct.map(L)} tips={withPct.map((x) => `${L(x)} · ${D(x.laborPct)}% (${t("markmið")} 30%)`)} fmt={lang === "en" ? String : undefined} /><div className="db2-legend"><span><i style={{ background: "var(--good)" }} />{t("Undir markmiði")}</span><span><i style={{ background: "var(--bad)" }} />{t("Yfir markmiði")}</span></div></>
               : <p className="db2-muted db2-empty">{t("Skráðu veltu til að sjá laun% per mánuð.")}</p>}
           </div>
         </section>
@@ -181,9 +193,11 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
                   a={months.map((x) => m(x.revenue))}
                   b={months.map((x) => m(x.cost))}
                   height={220}
-                  labels={months.map((x) => x.label)}
+                  labels={months.map(L)}
                   aName={t("Velta")}
                   bName={t("Launakostnaður")}
+                  unit={t("m kr")}
+                  fmt={lang === "en" ? String : undefined}
                 />
                 <div className="legend"><span><i style={{ background: "var(--teal)" }} />{t("Velta")}</span><span><i style={{ background: "var(--brand)" }} />{t("Launakostnaður")}</span></div>
               </div>
@@ -191,22 +205,22 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
           ) },
           { id: "compare", title: "Samanburður tímabila", node: cur && prev && (
           <div className="card" style={{ marginTop: 20 }}>
-            <div className="ch"><div><div className="ct">{t("Samanburður tímabila")}</div><div className="cs">{cur.label} {t("vs")} {prev.label}</div></div></div>
+            <div className="ch"><div><div className="ct">{t("Samanburður tímabila")}</div><div className="cs">{curLabel} {t("vs")} {prevLabel}</div></div></div>
             <div className="cb tbl" style={{ paddingTop: 8 }}>
               <div className="tbl"><table>
-                <thead><tr><th>{t("Mælikvarði")}</th><th className="r">{cur.label}</th><th className="r">{prev.label}</th><th className="r">{t("Breyting")}</th></tr></thead>
+                <thead><tr><th>{t("Mælikvarði")}</th><th className="r">{curLabel}</th><th className="r">{prevLabel}</th><th className="r">{t("Breyting")}</th></tr></thead>
                 <tbody>
-                  <tr><td>{t("Velta")}</td><td className="r">{krCompact(cur.revenue)}</td><td className="r">{krCompact(prev.revenue)}</td>{chgCell(cur.revenue, prev.revenue, true)}</tr>
-                  <tr><td>{t("Launakostnaður (byrði)")}</td><td className="r">{krCompact(cur.cost)}</td><td className="r">{krCompact(prev.cost)}</td>{chgCell(cur.cost, prev.cost, false)}</tr>
+                  <tr><td>{t("Velta")}</td><td className="r">{K(cur.revenue)}</td><td className="r">{K(prev.revenue)}</td>{chgCell(cur.revenue, prev.revenue, true)}</tr>
+                  <tr><td>{t("Launakostnaður (byrði)")}</td><td className="r">{K(cur.cost)}</td><td className="r">{K(prev.cost)}</td>{chgCell(cur.cost, prev.cost, false)}</tr>
                   <tr>
                     <td><b>{t("Laun af tekjum")}</b></td>
-                    <td className="r"><b>{cur.laborPct > 0 ? dec1(cur.laborPct) + "%" : "—"}</b></td>
-                    <td className="r">{prev.laborPct > 0 ? dec1(prev.laborPct) + "%" : "—"}</td>
-                    <td className="r" style={cur.laborPct && prev.laborPct ? { color: cur.laborPct <= prev.laborPct ? "var(--good)" : "var(--bad)" } : undefined}>
-                      {cur.laborPct && prev.laborPct ? `${cur.laborPct <= prev.laborPct ? "−" : "+"}${dec1(Math.abs(cur.laborPct - prev.laborPct))} ${t("stig")}` : "—"}
+                    <td className="r"><b>{cur.laborPct != null ? D(cur.laborPct) + "%" : "—"}</b></td>
+                    <td className="r">{prev.laborPct != null ? D(prev.laborPct) + "%" : "—"}</td>
+                    <td className="r" style={cur.laborPct != null && prev.laborPct != null ? { color: cur.laborPct <= prev.laborPct ? "var(--good)" : "var(--bad)" } : undefined}>
+                      {cur.laborPct != null && prev.laborPct != null ? `${cur.laborPct <= prev.laborPct ? "−" : "+"}${D(Math.abs(cur.laborPct - prev.laborPct))} ${t("stig")}` : "—"}
                     </td>
                   </tr>
-                  <tr><td>{t("Framlegð")}</td><td className="r">{krCompact(Math.max(0, cur.revenue - cur.cost))}</td><td className="r">{krCompact(Math.max(0, prev.revenue - prev.cost))}</td>{chgCell(Math.max(0, cur.revenue - cur.cost), Math.max(0, prev.revenue - prev.cost), true)}</tr>
+                  <tr><td>{t("Framlegð")}</td><td className="r">{K(Math.max(0, cur.revenue - cur.cost))}</td><td className="r">{K(Math.max(0, prev.revenue - prev.cost))}</td>{chgCell(Math.max(0, cur.revenue - cur.cost), Math.max(0, prev.revenue - prev.cost), true)}</tr>
                 </tbody>
               </table></div>
             </div>
@@ -220,7 +234,7 @@ export default function PerformanceScreen({ empty = false, live = false, embedde
                 <div key={d.name} style={{ marginBottom: 15 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 6 }}>
                     <b>{t(d.name)}</b>
-                    <span className="muted">{dec1(d.hours)} {t("klst")} · {krCompact(d.cost)} · {d.share}%</span>
+                    <span className="muted">{D(d.hours)} {t("klst")} · {K(d.cost)} · {d.share}%</span>
                   </div>
                   <div className="prog"><i style={{ width: `${Math.max(3, d.share)}%`, background: "var(--brand)" }} /></div>
                 </div>

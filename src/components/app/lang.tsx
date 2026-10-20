@@ -1217,7 +1217,7 @@ export const DICT: Dict = {
   "Júní 2025": { is: "Júní 2025", en: "June 2025", vi: "Tháng 6 2025", pl: "Czerwiec 2025" },
   "Breyting (mán)": { is: "Breyting á milli mánaða", en: "Month-over-month delta", vi: "Thay đổi theo tháng", pl: "Zmiana miesiąc do miesiąca" },
   "vs í fyrra": { is: "vs. fyrra ár (YoY)", en: "vs. previous year", vi: "so với năm trước", pl: "vs poprzedni rok (r/r)" },
-  "Velta vs launakostnaður": { is: "Samhengi veltu og launakostnaðar", en: "Revenue optimization vs. labor burden", vi: "Doanh thu vs. chi phí lương", pl: "Relacja obrotu i kosztu wynagrodzeń" },
+  "Velta vs launakostnaður": { is: "Samhengi veltu og launakostnaðar", en: "Revenue and labor cost", vi: "Doanh thu vs. chi phí lương", pl: "Relacja obrotu i kosztu wynagrodzeń" },
   "6 mánuðir": { is: "Síðustu 6 mánuðir", en: "Rolling 6-month view", vi: "6 tháng", pl: "Ostatnie 6 miesięcy" },
   "markmið 30%": { is: "markmið 30%", en: "target 30%", vi: "mục tiêu 30%", pl: "cel 30%" },
   "Launamat": { is: "Launamat", en: "Pay estimate", vi: "Ước tính lương", pl: "Szacunek wynagrodzenia" },
@@ -1820,6 +1820,9 @@ export const DICT: Dict = {
   "og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.": { is: "og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.", en: "and then closes. Your data is kept and you can undo the cancellation until then.", vi: "rồi sẽ đóng. Dữ liệu được giữ lại và bạn có thể hoàn tác việc hủy trước thời điểm đó.", pl: "i wtedy zostanie zamknięty. Dane są zachowane, a do tego czasu możesz cofnąć anulowanie." },
   "Ekkert verður rukkað framar. Aðgangurinn helst opinn út greitt tímabil og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.": { is: "Ekkert verður rukkað framar. Aðgangurinn helst opinn út greitt tímabil og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.", en: "Nothing more will be charged. Access stays open until the end of the paid period and then closes. Your data is kept and you can undo the cancellation until then.", vi: "Sẽ không bị tính phí thêm. Quyền truy cập vẫn mở đến hết kỳ đã thanh toán rồi sẽ đóng. Dữ liệu được giữ lại và bạn có thể hoàn tác việc hủy trước thời điểm đó.", pl: "Nie zostaną pobrane żadne dalsze opłaty. Dostęp pozostaje otwarty do końca opłaconego okresu, a potem zostanie zamknięty. Dane są zachowane, a do tego czasu możesz cofnąć anulowanie." },
   "Já, segja upp": { is: "Já, segja upp", en: "Yes, cancel", vi: "Có, hủy", pl: "Tak, anuluj" },
+  // Innsýn (okt. 2026)
+  "m kr": { is: "m kr", en: "m ISK", vi: "triệu ISK", pl: "mln kr" },
+  "Engin gögn fyrir tímabilið.": { is: "Engin gögn fyrir tímabilið.", en: "No data for this period.", vi: "Không có dữ liệu cho kỳ này.", pl: "Brak danych za ten okres." },
   "Augnablik…": { is: "Augnablik…", en: "One moment…", vi: "Đợi một chút…", pl: "Chwileczkę…" },
 };
 
