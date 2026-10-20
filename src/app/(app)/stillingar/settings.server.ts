@@ -15,12 +15,12 @@ export type CompanyInfo = { name: string; kennitala: string; address: string; po
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
 export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
 export type CardView = { last4: string | null; brand: string | null; expiry: string | null };
-export type InvoiceView = { id: string; periodStart: string; periodEnd: string; users: number; active: number | null; esigns: number; total: number; status: string; paidAt: string | null };
+export type InvoiceView = { id: string; periodStart: string; periodEnd: string; users: number; active: number | null; esigns: number; total: number; status: string; paidAt: string | null; method?: "card" | "krafa" | null; dueDate?: string | null };
 /** Verðskrá og áætlun (síðustu 30 dagar) fyrir Áskrift-spjaldið. */
 /** VAKTO AI-viðbótin (0075): kveikt/slökkt og notkun í mánuðinum. */
 export type AiView = { on: boolean; mode: "addon" | "trial" | "free"; used: number; limit: number };
 export type PricingView = { plan: PlanId; v1Until: string | null; units: number; estimateTotal: number; interval: BillingInterval; paidYearUntil: string | null; nextDue: string | null; yearFeeTotal: number };
-export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean; geofenceMode?: GeofenceMode; card?: CardView | null; invoices?: InvoiceView[]; pricing?: PricingView | null; ai?: AiView | null };
+export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean; geofenceMode?: GeofenceMode; card?: CardView | null; invoices?: InvoiceView[]; pricing?: PricingView | null; ai?: AiView | null; paymentMethod?: "card" | "krafa" | null };
 
 const DEMO: SettingsData = {
   departments: [
@@ -170,13 +170,19 @@ export async function getSettingsData(): Promise<SettingsData> {
       if (te) { const d = new Date(te); trialEndsAt = `${d.getDate()}.${d.getMonth() + 1}.${d.getFullYear()}`; }
     }
 
+    // Greiðsluleið (0083) — þolir að dálkinn vanti.
+    const pmRes = await supabase.from("companies").select("payment_method").eq("id", company).maybeSingle();
+    const paymentMethod = pmRes.error ? null : ((pmRes.data?.payment_method as "card" | "krafa" | null) ?? null);
+
     // Áskrift: skráð kort + reikningar (töflur koma með 0050 — þola að vanta)
     let card: CardView | null = null; let invoices: InvoiceView[] = [];
     try {
       const pm = await supabase.from("payment_methods").select("card_summary, card_brand, card_expiry").eq("company_id", company).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (pm.data) card = { last4: (pm.data.card_summary as string) ?? null, brand: (pm.data.card_brand as string) ?? null, expiry: (pm.data.card_expiry as string) ?? null };
-      const inv = await supabase.from("invoices").select("id, period_start, period_end, users_count, active_employees, esign_count, total_amount, status, paid_at").eq("company_id", company).order("period_start", { ascending: false }).limit(24);
-      invoices = (inv.data ?? []).map((r) => ({ id: r.id as string, periodStart: r.period_start as string, periodEnd: r.period_end as string, users: r.users_count as number, active: (r.active_employees as number | null) ?? null, esigns: (r.esign_count as number) ?? 0, total: r.total_amount as number, status: r.status as string, paidAt: (r.paid_at as string) ?? null }));
+      const cols = "id, period_start, period_end, users_count, active_employees, esign_count, total_amount, status, paid_at";
+      let inv = await supabase.from("invoices").select(`${cols}, payment_method, due_date`).eq("company_id", company).order("period_start", { ascending: false }).limit(24);
+      if (inv.error) inv = await supabase.from("invoices").select(cols).eq("company_id", company).order("period_start", { ascending: false }).limit(24) as typeof inv; // fyrir 0083
+      invoices = (inv.data ?? []).map((r) => ({ id: r.id as string, periodStart: r.period_start as string, periodEnd: r.period_end as string, users: r.users_count as number, active: (r.active_employees as number | null) ?? null, esigns: (r.esign_count as number) ?? 0, total: r.total_amount as number, status: r.status as string, paidAt: (r.paid_at as string) ?? null, method: (r.payment_method as "card" | "krafa" | null) ?? null, dueDate: (r.due_date as string | null) ?? null }));
     } catch { /* fyrir 0050 */ }
     return {
       departments,
@@ -201,7 +207,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       })),
       apiKeys,
       companyId: company,
-      kioskToken, card, invoices, pricing, ai, geofenceMode,
+      kioskToken, card, invoices, pricing, ai, geofenceMode, paymentMethod,
       company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", postalCode, city, phone: c.phone ?? "", email: c.email ?? "", feedPostPolicy, payPeriodStart: ppd, plan, trialEndsAt, billingStatus, accessEndsAt, laborTarget, leaveCap, esignProvider, taktikalAvailable },
       live: true,
     };

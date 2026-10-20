@@ -9,6 +9,8 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { isVaktoAdmin } from "@/lib/vakto-admin.server";
 import { isDemoCompany } from "@/lib/demo.server";
 import { PhotoProvider } from "@/components/app/avatar";
+import { BillingNotice } from "@/components/app/billing-notice";
+import { getBillingNotice } from "@/lib/billing-notice.server";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/);
@@ -88,12 +90,12 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [{ country, ...account }, vaktoAdmin, photos] = await Promise.all([getAccount(), isVaktoAdmin(), getPhotos()]);
+  const [{ country, ...account }, vaktoAdmin, photos, notice] = await Promise.all([getAccount(), isVaktoAdmin(), getPhotos(), getBillingNotice()]);
   return (
     <LangProvider>
       <CountryProvider value={country}>
         <PullToRefresh />
-        <PhotoProvider photos={photos}><AppShell account={{ ...account, vaktoAdmin }}>{children}</AppShell></PhotoProvider>
+        <PhotoProvider photos={photos}><AppShell account={{ ...account, vaktoAdmin }}><BillingNotice notice={notice} />{children}</AppShell></PhotoProvider>
       </CountryProvider>
     </LangProvider>
   );

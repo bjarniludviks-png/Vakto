@@ -20,7 +20,7 @@ const A = {
       ["Kjarasamningar og skilmálar tóku tíma.", "Nú hjálpar gervigreind að finna rétta kjarasamninginn og semja skilmála á faglegan hátt. Þeir fara beint í ráðningarsamninginn, sem er undirritaður rafrænt."],
     ],
     quote: "„Ég var alltof oft að taka eftir öllum yfirvinnutímunum hjá starfsfólkinu þegar mánuðurinn var gerður upp. Nú er það út sögunni.“",
-    ctaH: "Prófaðu VAKTO í þínum rekstri.", ctaP: "14 dagar frítt, engin binding. Eða sendu mér línu á ", try: "Prófa frítt",
+    ctaH: "Prófaðu VAKTO í þínum rekstri.", ctaP: "14 daga frí prufa, ekkert kort, engin binding. Eða sendu mér línu á ", try: "Prófa frítt",
   },
   en: {
     h1: "I built the system I needed.", by: "Bjarni Lúðvíksson, founder of VAKTO", alt: "Bjarni Lúðvíksson, founder of VAKTO",
@@ -35,7 +35,7 @@ const A = {
       ["Union agreements and terms took time.", "Now AI helps find the right union agreement and draft terms professionally. They go straight into the employment contract, which is signed electronically."],
     ],
     quote: "“Far too often I only noticed all the staff overtime when the month was being closed. That's a thing of the past.”",
-    ctaH: "Try VAKTO in your business.", ctaP: "14 days free, no commitment. Or drop me a line at ", try: "Try free",
+    ctaH: "Try VAKTO in your business.", ctaP: "14-day free trial, no card, no commitment. Or drop me a line at ", try: "Try free",
   },
 };
 

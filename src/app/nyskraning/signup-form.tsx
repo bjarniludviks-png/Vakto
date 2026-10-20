@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { isValidKennitala } from "@/lib/kennitala";
-import { checkPromo, createOwnerAccount, requestSignupCode, startCardSetup, verifySignupCode } from "./actions";
+import { checkPromo, createOwnerAccount, requestSignupCode, verifySignupCode } from "./actions";
 import { passwordStrength, PASSWORD_MIN } from "@/lib/password";
 import Turnstile, { TURNSTILE_SITE_KEY } from "@/components/turnstile";
 import { trackSignup } from "@/components/site/analytics";
@@ -12,12 +12,8 @@ import { trackSignup } from "@/components/site/analytics";
 export type SignupLang = "is" | "en" | "pl";
 const L = {
   is: {
-    per: "kr/mán · 5 virkir starfsmenn innifaldir",
-    extra: "+1.490 kr á hvern virkan starfsmann umfram · árlega 8.490 + 1.270",
-    cur: "kr",
     st1: "1 · Netfang",
     st2: "2 · Aðgangur",
-    st3: "3 · Prufa",
     botWait: "Augnablik — bot-vörnin er að klára.",
     codeFail: "Tókst ekki að senda kóða",
     netErr: "Tókst ekki að tengjast — reyndu aftur.",
@@ -28,19 +24,13 @@ const L = {
     createFail: "Tókst ekki að stofna aðgang",
     supa: "Tókst ekki að tengjast — er Supabase stillt?",
     fail: "Tókst ekki",
-    trialH: "14 daga frí prufa",
-    trialSub: "Skráðu kort núna — ekkert er dregið fyrr en prufan er búin, og þú getur hætt hvenær sem er.",
-    vatNote: "Verð án VSK · fyrsta gjaldið er tekið eftir 14 daga · kvittun í pósti",
-    opening: "Opna greiðslusíðu…",
-    startTrial: "Skrá kort og byrja prufuna",
-    cardNote: "Kortið er skráð hjá Straumi (Kvika) á öruggri greiðslusíðu · VAKTO geymir aldrei kortanúmer · hættu hvenær sem er í Stillingum",
     createH: "Stofna aðgang",
-    createSub: "Við sendum þér 6 stafa kóða til að staðfesta netfangið — kvittanir og „gleymt lykilorð“ fara þangað.",
+    createSub: "Við sendum þér 6 stafa kóða til að staðfesta netfangið. Kvittanir og „gleymt lykilorð“ fara þangað.",
     workEmail: "Vinnunetfang",
     emailPh: "netfang@fyrirtaeki.is",
     sending: "Sendi kóða…",
     sendCode: "Senda staðfestingarkóða",
-    trialNote: "14 daga frí prufa · engin binding · kort skráð í síðasta skrefi, ekkert dregið fyrr en prufan er búin.",
+    trialNote: "14 daga frí prufa · ekkert kort · greitt með korti eða kröfu í heimabanka · engin binding.",
     haveAcc: "Ertu með aðgang?",
     signIn: "Skrá inn",
     codeH: "Sláðu inn kóðann",
@@ -71,20 +61,14 @@ const L = {
     agreeC: " VAKTO.",
     creating: "Stofna…",
     cont: "Halda áfram",
-    price: "9.990 kr",
     ktErr: "Sláðu inn gilda kennitölu fyrirtækisins (10 tölustafir).",
     ktLbl: "Kennitala fyrirtækis",
     promoLbl: "Tilboðskóði (valfrjálst)", promoPh: "t.d. VAKTO2MAN", promoBad: "Kóðinn fannst ekki.",
     promoNote: (d: number) => `Tilboð: ${d >= 59 ? "tveir mánuðir" : `${d} dagar`} frítt í stað 14 daga.`,
-    promoH: (d: number) => (d >= 59 ? "Tveir mánuðir frítt" : `${d} dagar frítt`),
   },
   en: {
-    per: "ISK/mo · 5 active employees included",
-    extra: "+ISK 1,490 per additional active employee · annually 8,490 + 1,270",
-    cur: "ISK",
     st1: "1 · Email",
     st2: "2 · Account",
-    st3: "3 · Trial",
     botWait: "One moment, the bot check is finishing.",
     codeFail: "Couldn't send the code",
     netErr: "Couldn't connect. Please try again.",
@@ -95,19 +79,13 @@ const L = {
     createFail: "Couldn't create the account",
     supa: "Couldn't connect. Please try again.",
     fail: "Something went wrong",
-    trialH: "14-day free trial",
-    trialSub: "Add a card now. Nothing is charged until the trial ends, and you can cancel any time.",
-    vatNote: "Prices excl. VAT · first charge after 14 days · receipt by email",
-    opening: "Opening payment page…",
-    startTrial: "Add card and start the trial",
-    cardNote: "Your card is registered with Straumur (Kvika) on a secure payment page · VAKTO never stores card numbers · cancel any time in Settings",
     createH: "Create an account",
     createSub: "We'll send you a 6-digit code to confirm your email. Receipts and password resets go there.",
     workEmail: "Work email",
     emailPh: "name@company.com",
     sending: "Sending code…",
     sendCode: "Send confirmation code",
-    trialNote: "14-day free trial · no commitment · card added in the last step, nothing charged until the trial ends.",
+    trialNote: "14-day free trial · no card · pay by card or bank claim (krafa) · no commitment.",
     haveAcc: "Already have an account?",
     signIn: "Sign in",
     codeH: "Enter the code",
@@ -138,20 +116,14 @@ const L = {
     agreeC: ".",
     creating: "Creating…",
     cont: "Continue",
-    price: "ISK 9,990",
     ktErr: "Enter a valid Icelandic company ID (kennitala, 10 digits).",
     ktLbl: "Company ID (kennitala)",
     promoLbl: "Offer code (optional)", promoPh: "e.g. VAKTO2MAN", promoBad: "Code not found.",
     promoNote: (d: number) => `Offer: ${d} days free instead of 14.`,
-    promoH: (d: number) => `${d} days free`,
   },
   pl: {
-    per: "ISK/mies. · 5 aktywnych pracowników w cenie",
-    extra: "+1 490 ISK za każdego kolejnego aktywnego pracownika · rocznie 8 490 + 1 270",
-    cur: "ISK",
     st1: "1 · E-mail",
     st2: "2 · Konto",
-    st3: "3 · Okres próbny",
     botWait: "Chwileczkę — trwa weryfikacja zabezpieczenia przed botami.",
     codeFail: "Nie udało się wysłać kodu",
     netErr: "Nie udało się połączyć — spróbuj ponownie.",
@@ -162,19 +134,13 @@ const L = {
     createFail: "Nie udało się utworzyć konta",
     supa: "Nie udało się połączyć — spróbuj ponownie.",
     fail: "Coś poszło nie tak",
-    trialH: "14 dni za darmo",
-    trialSub: "Dodaj kartę teraz — nic nie zostanie pobrane do końca okresu próbnego i możesz zrezygnować w każdej chwili.",
-    vatNote: "Ceny bez VAT · pierwsza opłata po 14 dniach · potwierdzenie e-mailem",
-    opening: "Otwieranie strony płatności…",
-    startTrial: "Dodaj kartę i rozpocznij okres próbny",
-    cardNote: "Karta jest rejestrowana w Straumur (Kvika) na bezpiecznej stronie płatności · VAKTO nigdy nie przechowuje numerów kart · zrezygnuj w każdej chwili w Ustawieniach",
     createH: "Załóż konto",
     createSub: "Wyślemy Ci 6-cyfrowy kod, aby potwierdzić adres e-mail. Na niego trafiają potwierdzenia płatności i resetowanie hasła.",
     workEmail: "Służbowy e-mail",
     emailPh: "imie@firma.pl",
     sending: "Wysyłanie kodu…",
     sendCode: "Wyślij kod potwierdzający",
-    trialNote: "14 dni za darmo · bez zobowiązań · kartę dodajesz w ostatnim kroku, nic nie jest pobierane do końca okresu próbnego.",
+    trialNote: "14 dni za darmo · bez karty · płatność kartą lub poleceniem zapłaty w banku (krafa) · bez zobowiązań.",
     haveAcc: "Masz już konto?",
     signIn: "Zaloguj się",
     codeH: "Wpisz kod",
@@ -205,12 +171,10 @@ const L = {
     agreeC: ".",
     creating: "Tworzenie…",
     cont: "Dalej",
-    price: "9 990 ISK",
     ktErr: "Wpisz prawidłowy islandzki numer firmy (kennitala, 10 cyfr).",
     ktLbl: "Numer firmy (kennitala)",
     promoLbl: "Kod promocyjny (opcjonalnie)", promoPh: "np. VAKTO2MAN", promoBad: "Nie znaleziono kodu.",
     promoNote: (d: number) => `Promocja: ${d} dni za darmo zamiast 14.`,
-    promoH: (d: number) => `${d} dni za darmo`,
   },
 };
 
@@ -222,11 +186,11 @@ const Bars = () => (
   </svg></div>
 );
 
-type Step = "email" | "code" | "account" | "card";
-const STEP_IDS: Step[] = ["email", "account", "card"];
+type Step = "email" | "code" | "account";
+const STEP_IDS: Step[] = ["email", "account"];
 
 function Steps({ cur, s }: { cur: Step; s: (typeof L)["is"] }) {
-  const STEPS = STEP_IDS.map((id, i) => ({ id, label: [s.st1, s.st2, s.st3][i] }));
+  const STEPS = STEP_IDS.map((id, i) => ({ id, label: [s.st1, s.st2][i] }));
   const idx = STEPS.findIndex((s) => s.id === (cur === "code" ? "email" : cur));
   return (
     <div className="steps2">
@@ -330,45 +294,11 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
         await supabase.auth.signInWithPassword({ email, password });
       }
       trackSignup();
-      setStep("card");
+      // Ekkert kort í nýskráningu: beint inn í VAKTO (greiðsluleið valin síðar í Stillingum → Áskrift).
+      window.location.assign("/maelabord");
     } catch {
       setError(s.supa);
     } finally { setBusy(false); }
-  }
-
-  async function finish(e: React.FormEvent) {
-    e.preventDefault();
-    // Prufan hefst núna. Kortið er skráð hjá Straumi (0 kr) og fyrsta gjaldið
-    // tekið þegar prufan er búin — eða beint inn ef greiðslur eru ekki tengdar.
-    setBusy(true); setError(null);
-    const r = await startCardSetup(window.location.origin);
-    if (!r.ok) { setError(r.error ?? s.fail); setBusy(false); return; }
-    window.location.assign(r.skip ? "/maelabord" : r.url!);
-  }
-
-  if (step === "card") {
-    return (
-      <form className="form" onSubmit={finish}>
-        <div className="brand"><Bars /><b>VAKTO</b></div>
-        <Steps cur="card" s={s} />
-        {promo && <div className="promo-note">{s.promoNote(promo.days)}</div>}
-        <h1>{promo ? s.promoH(promo.days) : s.trialH}</h1>
-        <div className="sub">{s.trialSub}</div>
-
-        <div className="planpick" style={{ gridTemplateColumns: "1fr" }}>
-          <div className="planopt on" style={{ cursor: "default" }}>
-            <div className="pn">VAKTO</div>
-            <div className="pp">{s.price} <small>{s.per}</small></div>
-            <div className="pb">{s.extra}</div>
-            <div className="pb">{s.vatNote}</div>
-          </div>
-        </div>
-
-        <Err msg={error} />
-        <button className="btn" type="submit" disabled={busy}>{busy ? s.opening : s.startTrial}</button>
-        <p className="pcy">{s.cardNote}</p>
-      </form>
-    );
   }
 
   if (step === "email") {
