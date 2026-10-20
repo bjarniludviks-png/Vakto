@@ -1797,6 +1797,17 @@ export const DICT: Dict = {
   "virkir dagar": { is: "virkir dagar", en: "workdays", vi: "ngày làm việc", pl: "dni robocze" },
   "Beiðnin er lengri en orlofið sem þú átt eftir — vaktstjóri sér það þegar hann afgreiðir hana.": { is: "Beiðnin er lengri en orlofið sem þú átt eftir — vaktstjóri sér það þegar hann afgreiðir hana.", en: "This request is longer than your remaining vacation — your manager will see that when reviewing it.", vi: "Yêu cầu dài hơn số phép còn lại — quản lý sẽ thấy khi duyệt.", pl: "Wniosek jest dłuższy niż pozostały Ci urlop — kierownik zmiany zobaczy to przy jego rozpatrywaniu." },
   "Hjálp": { is: "Hjálp", en: "Help", vi: "Trợ giúp", pl: "Pomoc" },
+  "Segja upp áskrift": { is: "Segja upp áskrift", en: "Cancel subscription", vi: "Hủy gói đăng ký", pl: "Anuluj subskrypcję" },
+  "Uppsögn skráð": { is: "Uppsögn skráð", en: "Cancellation scheduled", vi: "Đã đăng ký hủy", pl: "Anulowanie zaplanowane" },
+  "Hætta við uppsögn": { is: "Hætta við uppsögn", en: "Undo cancellation", vi: "Hoàn tác hủy", pl: "Cofnij anulowanie" },
+  "Hætt við uppsögn. Áskriftin heldur áfram.": { is: "Hætt við uppsögn. Áskriftin heldur áfram.", en: "Cancellation withdrawn. Your subscription continues.", vi: "Đã hoàn tác hủy. Gói đăng ký tiếp tục.", pl: "Anulowanie cofnięte. Subskrypcja trwa dalej." },
+  "Áskriftin rennur út": { is: "Áskriftin rennur út", en: "Subscription ends", vi: "Gói đăng ký kết thúc", pl: "Subskrypcja wygasa" },
+  "Ekkert verður rukkað framar.": { is: "Ekkert verður rukkað framar.", en: "Nothing more will be charged.", vi: "Sẽ không bị tính phí thêm.", pl: "Nie zostaną pobrane żadne dalsze opłaty." },
+  "Ekkert verður rukkað framar. Aðgangurinn helst opinn til": { is: "Ekkert verður rukkað framar. Aðgangurinn helst opinn til", en: "Nothing more will be charged. Access stays open until", vi: "Sẽ không bị tính phí thêm. Quyền truy cập vẫn mở đến", pl: "Nie zostaną pobrane żadne dalsze opłaty. Dostęp pozostaje otwarty do" },
+  "og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.": { is: "og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.", en: "and then closes. Your data is kept and you can undo the cancellation until then.", vi: "rồi sẽ đóng. Dữ liệu được giữ lại và bạn có thể hoàn tác việc hủy trước thời điểm đó.", pl: "i wtedy zostanie zamknięty. Dane są zachowane, a do tego czasu możesz cofnąć anulowanie." },
+  "Ekkert verður rukkað framar. Aðgangurinn helst opinn út greitt tímabil og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.": { is: "Ekkert verður rukkað framar. Aðgangurinn helst opinn út greitt tímabil og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.", en: "Nothing more will be charged. Access stays open until the end of the paid period and then closes. Your data is kept and you can undo the cancellation until then.", vi: "Sẽ không bị tính phí thêm. Quyền truy cập vẫn mở đến hết kỳ đã thanh toán rồi sẽ đóng. Dữ liệu được giữ lại và bạn có thể hoàn tác việc hủy trước thời điểm đó.", pl: "Nie zostaną pobrane żadne dalsze opłaty. Dostęp pozostaje otwarty do końca opłaconego okresu, a potem zostanie zamknięty. Dane są zachowane, a do tego czasu możesz cofnąć anulowanie." },
+  "Já, segja upp": { is: "Já, segja upp", en: "Yes, cancel", vi: "Có, hủy", pl: "Tak, anuluj" },
+  "Augnablik…": { is: "Augnablik…", en: "One moment…", vi: "Đợi một chút…", pl: "Chwileczkę…" },
 };
 
 const Ctx = createContext<{ lang: Lang; setLang: (l: Lang) => void }>({ lang: "is", setLang: () => {} });

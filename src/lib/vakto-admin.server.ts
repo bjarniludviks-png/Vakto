@@ -26,7 +26,7 @@ export const IMPERSONATION_UI_COOKIE = "vakto-impersonating-ui";
 export const IMPERSONATION_MAX_AGE = 8 * 3600; // seconds
 
 
-export type BillingStatus = "paying" | "trial" | "trial_expired" | "unpaid" | "free" | "suspended" | "none";
+export type BillingStatus = "paying" | "trial" | "trial_expired" | "unpaid" | "free" | "suspended" | "canceled" | "none";
 export type AdminCompany = {
   id: string;
   name: string;
@@ -147,7 +147,7 @@ export async function logPlatform(
 // The webhook should write billing_status = 'paying'/'unpaid' so everything
 // below (MRR, gating, badges) keeps working unchanged.
 function deriveStatus(manual: string | null, trialEndsAt: string | null, plan: string | null): BillingStatus {
-  if (manual === "paying" || manual === "unpaid" || manual === "free" || manual === "suspended") return manual;
+  if (manual === "paying" || manual === "unpaid" || manual === "free" || manual === "suspended" || manual === "canceled") return manual;
   if (plan === "free") return "free";
   if (trialEndsAt) return new Date(trialEndsAt).getTime() > Date.now() ? "trial" : "trial_expired";
   return plan ? "trial_expired" : "none";

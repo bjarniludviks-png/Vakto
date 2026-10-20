@@ -1,11 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { nf } from "@/lib/format";
 import { PLANS, ESIGN_PRICE, AI_ADDON_PRICE, AI_ADDON_QUESTIONS, AI_FREE_QUESTIONS } from "@/lib/pricing";
-import { setBillingInterval, startCardChange, setAiAddon } from "./actions";
+import { setBillingInterval, startCardChange, setAiAddon, cancelSubscription, resumeSubscription } from "./actions";
 import type { SettingsData } from "./settings.server";
 import { CardBrandLogo, brandName, brandOf } from "./card-brand";
 import "./billing.css";
@@ -16,6 +17,7 @@ const STATUS: Record<string, { label: string; tone: "good" | "warn" | "bad" | "m
   unpaid: { label: "Ógreitt", tone: "bad" },
   suspended: { label: "Lokað", tone: "bad" },
   free: { label: "Frí áskrift", tone: "mut" },
+  canceled: { label: "Uppsögn skráð", tone: "warn" },
 };
 
 const INV_STATUS: Record<string, { label: string; tone: "good" | "warn" | "bad" | "mut" }> = {
@@ -41,6 +43,10 @@ export function BillingPanel({ data }: { data: SettingsData }) {
   const st = STATUS[data.company?.billingStatus ?? "trial"] ?? STATUS.trial;
   const card = data.card ?? null;
   const brand = brandOf(card?.brand);
+  const canceled = data.company?.billingStatus === "canceled";
+  const endsAt = isoToIs(data.company?.accessEndsAt);
+  const [ask, setAsk] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   async function changeCard() {
     const r = await startCardChange(window.location.origin);
@@ -56,6 +62,16 @@ export function BillingPanel({ data }: { data: SettingsData }) {
     const r = await setBillingInterval(iv);
     toast(r.ok ? (iv === "year" ? t("Árleg greiðsla tekur gildi á næsta gjalddaga") : t("Mánaðarleg greiðsla vistuð")) : (r.error ?? t("Tókst ekki")));
     if (r.ok) router.refresh();
+  }
+
+  async function cancelSub(on: boolean) {
+    setBusy(true);
+    const r = on ? await cancelSubscription() : await resumeSubscription();
+    setBusy(false);
+    if (!r.ok) { toast(r.error ?? t("Tókst ekki")); return; }
+    setAsk(false);
+    toast(on ? t("Uppsögn skráð") : t("Hætt við uppsögn. Áskriftin heldur áfram."));
+    router.refresh();
   }
 
   const intervalNote = !pr ? null
@@ -84,7 +100,8 @@ export function BillingPanel({ data }: { data: SettingsData }) {
           )}
           <div className="bill-facts">
             {pr?.nextDue && data.company?.billingStatus === "paying" && <div><span>{t("Næsti gjalddagi")}</span><b>{pr.nextDue}</b></div>}
-            {data.company?.trialEndsAt && data.company?.billingStatus !== "paying" && <div><span>{t("Prufa gildir til")}</span><b>{data.company.trialEndsAt}</b></div>}
+            {canceled && endsAt && <div><span>{t("Áskriftin rennur út")}</span><b>{endsAt}</b></div>}
+            {data.company?.trialEndsAt && data.company?.billingStatus !== "paying" && !canceled && <div><span>{t("Prufa gildir til")}</span><b>{data.company.trialEndsAt}</b></div>}
             {pr?.plan === "v1"
               ? <div><span>{t("Notendur núna")}</span><b>{data.users.length}</b></div>
               : <div><span>{t("Virkir síðustu 30 daga")}</span><b>{pr?.units ?? "—"}</b></div>}
@@ -180,11 +197,38 @@ export function BillingPanel({ data }: { data: SettingsData }) {
               </tbody>
             </table></div>
           )}
-          <div className="bill-foot">
-            <a className="btn ghost" href="mailto:hallo@vakto.is?subject=Uppsögn%20áskriftar">{t("Segja upp áskrift")}</a>
-          </div>
+          {canceled ? (
+            <div className="bill-foot" style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <p className="bill-fine" style={{ marginRight: "auto" }}>{endsAt ? `${t("Áskriftin rennur út")} ${endsAt}. ${t("Ekkert verður rukkað framar.")}` : t("Ekkert verður rukkað framar.")}</p>
+              <button className="btn" disabled={busy} onClick={() => cancelSub(false)}>{t("Hætta við uppsögn")}</button>
+            </div>
+          ) : data.company?.billingStatus !== "free" && (
+            <div className="bill-foot">
+              <button className="btn ghost" onClick={() => setAsk(true)}>{t("Segja upp áskrift")}</button>
+            </div>
+          )}
         </div>
       </section>
+
+      {ask && (
+        <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && !busy && setAsk(false)}>
+          <div className="mbg" onClick={() => !busy && setAsk(false)} />
+          <div className="modal" style={{ maxWidth: 460 }}>
+            <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Segja upp áskrift")}</div><button className="x" onClick={() => setAsk(false)} disabled={busy}>✕</button></div>
+            <div className="mb">
+              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55 }}>
+                {endsAt
+                  ? `${t("Ekkert verður rukkað framar. Aðgangurinn helst opinn til")} ${endsAt} ${t("og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.")}`
+                  : t("Ekkert verður rukkað framar. Aðgangurinn helst opinn út greitt tímabil og lokast þá. Gögnin eru geymd og þú getur hætt við uppsögnina fram að því.")}
+              </p>
+              <div style={{ display: "flex", gap: 9, marginTop: 18, flexWrap: "wrap" }}>
+                <button className="btn" disabled={busy} onClick={() => cancelSub(true)} style={{ background: "var(--bad)", borderColor: "var(--bad)" }}>{busy ? t("Augnablik…") : t("Já, segja upp")}</button>
+                <button className="btn ghost" disabled={busy} onClick={() => setAsk(false)}>{t("Hætta við")}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

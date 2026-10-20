@@ -58,6 +58,31 @@ export function nextDueDate(anchorIso: string | null, now = new Date()): string 
   return iso(d);
 }
 
+type PeriodCo = { trial_ends_at?: unknown; billing_anchor?: unknown; billing_year_start?: unknown };
+
+/** Tímabilið sem stendur yfir, sama reikniregla og runBillingDay: mánuðir frá billing_anchor (eða lokum prufu);
+ *  innan greidds árs (billing_year_start + 12 mán.) lýkur tímabilinu við lok ársins. */
+export function currentPeriod(co: PeriodCo, now = new Date()): { start: Date; end: Date; inTrial: boolean } {
+  const trialEnds = co.trial_ends_at ? new Date(co.trial_ends_at as string) : null;
+  if (trialEnds && trialEnds.getTime() > now.getTime()) return { start: now, end: trialEnds, inTrial: true };
+  let start = new Date(co.billing_anchor ? (co.billing_anchor as string) : trialEnds ?? now);
+  while (addMonths(start, 1).getTime() <= now.getTime()) start = addMonths(start, 1);
+  let end = addMonths(start, 1);
+  const ys = co.billing_year_start ? new Date(co.billing_year_start as string) : null;
+  if (ys) { const ye = addMonths(ys, 12); if (start.getTime() >= ys.getTime() && start.getTime() < ye.getTime()) end = ye; }
+  return { start, end, inTrial: false };
+}
+
+/** Uppsögn: aðgangur helst út greitt tímabil (eða prufuna). Yfirstandandi tímabil ógreitt → aðgangur rennur út strax (now).
+ *  Skilar ISO-tíma. Eftir að tímabilinu lýkur er nýja tímabilið ógreitt (uppsögn er aldrei rukkuð) → now → lokað. */
+export async function accessEndsAt(companyId: string, co: PeriodCo, now = new Date()): Promise<string> {
+  const p = currentPeriod(co, now);
+  if (p.inTrial) return p.end.toISOString();
+  const { data } = await createAdminClient().from("invoices").select("id").eq("company_id", companyId).eq("status", "paid")
+    .lte("period_start", iso(p.start)).gte("period_end", iso(p.end)).limit(1);
+  return ((data?.length ?? 0) > 0 ? p.end : now).toISOString();
+}
+
 export async function activeCard(companyId: string) {
   const admin = createAdminClient();
   const { data } = await admin.from("payment_methods").select("id, token, card_summary, card_brand, card_expiry, created_at").eq("company_id", companyId).eq("status", "active").order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -105,6 +130,14 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
     const id = co.id as string, name = (co.name as string) ?? "";
     const status = (co.billing_status as string | null) ?? null;
     if (status === "free" || status === "suspended") continue;
+    // Uppsögn: aldrei rukkað né sendar áminningar; lokað þegar greiddu tímabili (eða prufu) lýkur.
+    if (status === "canceled") {
+      if (now.getTime() >= new Date(await accessEndsAt(id, co, now)).getTime()) {
+        await admin.from("companies").update({ billing_status: "suspended" }).eq("id", id);
+        out.suspended++;
+      }
+      continue;
+    }
     const trialEnds = co.trial_ends_at ? new Date(co.trial_ends_at as string) : null;
 
     // 1) Áminning 3 dögum fyrir lok prufu
