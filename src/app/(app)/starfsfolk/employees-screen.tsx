@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PageHeader } from "@/components/app/page-header";
 import { Autocomplete } from "@/components/app/autocomplete";
 import { UNIONS, PENSION_FUNDS } from "@/lib/is-lists";
 import { toast } from "@/components/app/toast";
@@ -912,6 +911,28 @@ const CONTRACT_STATUS: Record<string, { label: string; tag: string }> = {
   void: { label: "ógilt", tag: "mut" },
 };
 
+/** „⋯“-hnappur með lítilli valmynd (t.d. eyðing) — lokast við smell utan hennar eða Escape. */
+function RowMenu({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: PointerEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", esc);
+    return () => { document.removeEventListener("pointerdown", away); document.removeEventListener("keydown", esc); };
+  }, [open]);
+  return (
+    <div className="rmenu" ref={ref}>
+      <button type="button" className="rmenu-b" aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
+      </button>
+      {open && <div className="rmenu-p" role="menu" onClick={() => setOpen(false)}>{children}</div>}
+    </div>
+  );
+}
+
 /** Employment contracts: generate from employee data, send for e-signature
  * (0058: employer signs on send, employee confirms with an emailed code). */
 function ContractTab({ employeeId, contractor = false }: { employeeId: string; contractor?: boolean }) {
@@ -981,15 +1002,29 @@ function ContractTab({ employeeId, contractor = false }: { employeeId: string; c
       )}
       <div className="docs">
         {contracts.map((c) => (
-          <div className="docrow" key={c.id}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /></svg>
-            <span style={{ cursor: "pointer" }} onClick={() => setView(c)}>{c.title}</span>
-            <span className={`tag ${CONTRACT_STATUS[c.status]?.tag ?? "mut"}`}>{t(CONTRACT_STATUS[c.status]?.label ?? c.status)}</span>
-            <span className="dl">{c.signed_at ?? c.created}</span>
-            <button className="btn ghost sm" type="button" onClick={async () => downloadContractPdf(c.title, c.content, c.status === "draft" ? [] : await getContractSignatures(c.id))}>PDF</button>
-            {c.status === "draft" && <button className="btn sm" type="button" onClick={() => mark(c, "sent")}>{t("Undirrita & senda")}</button>}
-            {c.status !== "signed" && c.status !== "void" && <button className="btn ghost sm" type="button" title={t("Ef samningurinn var undirritaður á pappír")} onClick={() => mark(c, "signed")}>{t("Merkja undirritað")}</button>}
-            {c.status !== "signed" && <button className="x" type="button" title={t("Eyða samningi")} onClick={() => remove(c)} style={{ color: "var(--bad)" }}>✕</button>}
+          // Spjald: titill + staða efst, dagsetning smá, aðgerðir í röð (brotna á síma), eyðing í „⋯“-valmynd.
+          <div className="ctr" key={c.id}>
+            <svg className="ctr-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /></svg>
+            <div className="ctr-main">
+              <button type="button" className="ctr-title" onClick={() => setView(c)}>{c.title}</button>
+              <div className="ctr-meta">
+                <span className={`tag ${CONTRACT_STATUS[c.status]?.tag ?? "mut"}`}>{t(CONTRACT_STATUS[c.status]?.label ?? c.status)}</span>
+                <span className="dl">{docDate(c.signed_at ?? c.created) || (c.signed_at ?? c.created)}</span>
+              </div>
+            </div>
+            <div className="ctr-act">
+              <button className="btn ghost sm" type="button" onClick={async () => downloadContractPdf(c.title, c.content, c.status === "draft" ? [] : await getContractSignatures(c.id))}>PDF</button>
+              {c.status === "draft" && <button className="btn sm" type="button" onClick={() => mark(c, "sent")}>{t("Undirrita & senda")}</button>}
+              {c.status !== "signed" && c.status !== "void" && <button className="btn ghost sm" type="button" title={t("Ef samningurinn var undirritaður á pappír")} onClick={() => mark(c, "signed")}>{t("Merkja undirritað")}</button>}
+            </div>
+            {c.status !== "signed" && (
+              <RowMenu label={t("Fleiri aðgerðir")}>
+                <button type="button" className="danger" onClick={() => remove(c)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
+                  {t("Eyða samningi")}
+                </button>
+              </RowMenu>
+            )}
           </div>
         ))}
       </div>
