@@ -1,6 +1,7 @@
 import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
-import { modelFor } from "@/lib/ai/models";
+import { modelFor, SCHEDULE_EFFORT } from "@/lib/ai/models";
+import { completedShiftCells } from "@/lib/ai/stream";
 
 export type AiItem = { kind: "good" | "info" | "warn" | "bad"; title: string; detail: string; tag: string };
 /** One proposed shift: day 0=mánudagur … 6=sunnudagur, times HH:MM. */
@@ -11,6 +12,12 @@ const SCHEMA = {
   type: "object",
   properties: {
     summary: { type: "string", description: "Stutt samantekt á tillögunni á íslensku" },
+    // Vaktirnar á undan items: framvindan („14 vaktir“) byrjar fyrr og items lýsa planinu eftir að það er komið.
+    shifts: {
+      type: "array",
+      description: "FULLT vaktaplan vikunnar sem tillagan felur í sér — ein vakt per streng á forminu \"Nafn|dagur|HH:MM|HH:MM\" (dagur 0=mánudagur … 6=sunnudagur), t.d. \"Anna|0|08:00|16:00\". Líka óbreyttar vaktir. Tómt fylki ef engin vaktabreyting á við.",
+      items: { type: "string", pattern: "^[^|]+\\|[0-6]\\|\\d{2}:\\d{2}\\|\\d{2}:\\d{2}$" },
+    },
     items: {
       type: "array",
       items: {
@@ -26,23 +33,8 @@ const SCHEMA = {
       },
     },
     laborPct: { type: "string", description: "Áætlað laun% eftir breytingu, t.d. 31,8%" },
-    shifts: {
-      type: "array",
-      description: "FULLT vaktaplan vikunnar sem tillagan felur í sér — ein færsla fyrir hverja vakt, líka óbreyttar vaktir. Tómt fylki ef engin vaktabreyting á við.",
-      items: {
-        type: "object",
-        properties: {
-          employee: { type: "string", description: "Fornafn starfsmanns nákvæmlega eins og það birtist í samhenginu" },
-          day: { type: "integer", description: "Vikudagur: 0=mánudagur, 1=þriðjudagur … 6=sunnudagur (aðeins 0–6)" },
-          start: { type: "string", description: "Upphaf vaktar, HH:MM (24 klst)" },
-          end: { type: "string", description: "Lok vaktar, HH:MM (24 klst)" },
-        },
-        required: ["employee", "day", "start", "end"],
-        additionalProperties: false,
-      },
-    },
   },
-  required: ["summary", "items", "laborPct", "shifts"],
+  required: ["summary", "shifts", "items", "laborPct"],
   additionalProperties: false,
 } as const;
 
@@ -66,7 +58,7 @@ Ef samhengið inniheldur beiðnir, frí eða framboð: nefndu í items hvaða be
 kind='good' eða 'info') og hverjar EKKI var hægt að verða við og hvers vegna (kind='warn').
 Settu þær saman í eitt eða tvö atriði ef margar eru — ekki búa til beiðnir sem ekki eru í samhenginu.
 Skilaðu líka 'shifts': FULLT vaktaplan vikunnar fyrir þá starfsmenn sem tillagan snertir — hver vakt
-sem hlutur {employee, day, start, end} þar sem day er 0=mánudagur … 6=sunnudagur og tímar HH:MM.
+sem strengur "Nafn|dagur|byrjun|endir" þar sem dagur er 0=mánudagur … 6=sunnudagur og tímar HH:MM.
 Notaðu fornöfnin nákvæmlega eins og þau birtast í samhenginu. Ef starfsmaður í tillögunni á að halda
 núverandi vakt skaltu samt hafa hana með (planið fyrir viðkomandi er skipt út í heild).`;
 
@@ -87,16 +79,23 @@ export function isAiConfigured() {
   return Boolean(process.env.ANTHROPIC_API_KEY);
 }
 
-/** `requests` = beiðnir/frí/framboð vikunnar, byggt á þjóninum (formatPlanRequests) — ekki frá vafranum. */
-export async function getAiScheduleProposal(prompt: string, context: string, lang = "is", requests = "", opts: { demo?: boolean } = {}): Promise<AiProposal> {
+/** Framvinda á meðan líkanið vinnur: hugsar → skrifar tillöguna (shifts = fullkláraðar vaktir hingað til). */
+export type AiProgress = { stage: "think" | "write"; shifts: number };
+
+/**
+ * `requests` = beiðnir/frí/framboð vikunnar, byggt á þjóninum (formatPlanRequests) — ekki frá vafranum.
+ * Streymt frá Claude svo `onProgress` geti sýnt framvindu (fjöldi vakta sem komnar eru) í stað auðrar biðar.
+ */
+export async function getAiScheduleProposal(prompt: string, context: string, lang = "is", requests = "", opts: { demo?: boolean } = {}, onProgress?: (p: AiProgress) => void): Promise<AiProposal> {
   if (!isAiConfigured()) return { ...DEMO, summary: prompt ? `„${prompt}" — ${DEMO.summary}` : DEMO.summary };
 
   const client = new Anthropic();
-  const response = await client.messages.create({
+  const stream = client.messages.stream({
     model: modelFor("plan", opts),
-    max_tokens: 4096,
+    // Hugsun telst með í max_tokens — 4096 gat klippt heila viku (50+ vaktir) í sundur.
+    max_tokens: 16000,
     thinking: { type: "adaptive" },
-    output_config: { effort: "medium", format: { type: "json_schema", schema: SCHEMA } },
+    output_config: { effort: SCHEDULE_EFFORT, format: { type: "json_schema", schema: SCHEMA } },
     system: SYSTEM,
     messages: [
       {
@@ -105,12 +104,27 @@ export async function getAiScheduleProposal(prompt: string, context: string, lan
       },
     ],
   });
+  let json = "";
+  let sent = -1;
+  for await (const ev of stream) {
+    if (ev.type === "content_block_start") onProgress?.({ stage: ev.content_block.type === "text" ? "write" : "think", shifts: Math.max(0, sent) });
+    else if (ev.type === "content_block_delta" && ev.delta.type === "text_delta") {
+      json += ev.delta.text;
+      const n = completedShiftCells(json);
+      if (n !== sent) { sent = n; onProgress?.({ stage: "write", shifts: n }); }
+    }
+  }
+  const response = await stream.finalMessage();
 
   if (response.stop_reason === "refusal") {
     throw new Error("AI hafnaði beiðninni");
   }
+  if (response.stop_reason === "max_tokens") throw new Error("Svar AI var of langt");
   const text = response.content.find((b) => b.type === "text");
   if (!text || text.type !== "text") throw new Error("Ekkert svar frá AI");
-  const parsed = JSON.parse(text.text) as Omit<AiProposal, "live">;
-  return { ...parsed, live: true };
+  // Vaktirnar koma sem stuttir strengir (≈60 % færri úttakstákn en hlutir → fljótara svar); viðmótið fær hluti.
+  const parsed = JSON.parse(text.text) as Omit<AiProposal, "live" | "shifts"> & { shifts: string[] };
+  const shifts = (parsed.shifts ?? []).map((x) => x.split("|").map((p) => p.trim())).filter((p) => p.length >= 4)
+    .map(([employee, day, start, end]) => ({ employee, day: Number(day), start, end }));
+  return { ...parsed, shifts, live: true };
 }

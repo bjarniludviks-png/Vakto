@@ -5,7 +5,6 @@ import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { nf, dec1, krCompact } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
-import { AsyncButton } from "@/components/app/async-button";
 import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, getWeekBudget, type ShiftInput } from "./actions";
 import { getCompanyDepartments, getDepartmentColors } from "../starfsfolk/actions";
 import { getDashboardPeriod } from "../maelabord/actions";
@@ -14,6 +13,7 @@ import type { ReqItem } from "./requests.server";
 import type { ScheduleInitial } from "./schedule.server";
 import type { WeekBudget } from "@/lib/labor";
 import OpenShifts from "./open-shifts";
+import { isNdjson, readNdjson, type ScheduleEvent } from "@/lib/ai/stream";
 
 type Emp = [string, string, string, string]; // initials, name, dept, color
 type ShiftDef = { l: string; s: string; h: number; c: "day" | "eve" | "off" };
@@ -21,6 +21,8 @@ type ShiftType = { nm: string; t: string; prem: string; bg: string; bd: string; 
 type AiItem = { kind: "good" | "info" | "warn" | "bad"; title: string; detail: string; tag: string };
 type AiShift = { employee: string; day: number; start: string; end: string };
 // blocked = vaktir sem þjónninn fjarlægði því starfsmaður er í samþykktu fríi.
+/** Framvinda „Biðja AI“: hvaða stig og hve margar vaktir eru komnar. */
+type AiStage = { stage: "read" | "think" | "write"; shifts: number };
 type AiProposal = { summary: string; items: AiItem[]; laborPct: string; shifts?: AiShift[]; blocked?: { employee: string; day: number }[]; live: boolean; error?: string };
 type MonthBlock = { name: string; time: string; hrs: number; type: string };
 
@@ -121,7 +123,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   useEffect(() => {
     getCompanyDepartments().then((d) => { if (initial || d.length) setDeptList(d); }).catch(() => {});
     getDepartmentColors().then(setDeptColors).catch(() => {});
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- aðeins við fyrstu birtingu
   // Unified right-click menu (week/day/month views).
   type CtxItem = { label: string; danger?: boolean; color?: string; act: () => void };
   const [ctx, setCtx] = useState<{ x: number; y: number; items: CtxItem[] } | null>(null);
@@ -138,6 +140,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [aiQuery, setAiQuery] = useState("");
   const [aiProposal, setAiProposal] = useState<AiProposal | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiStage, setAiStage] = useState<AiStage | null>(null); // framvinda á meðan AI vinnur
   const { t, lang } = useLang();
 
   const vis = useMemo(
@@ -167,9 +170,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   // [startHour, endHour] for a cell (real times, else the SH label like "07–15").
   const cellSpan = (r: number, c: number, code: string): [number, number] | null => {
     const tt = cellTimes[ckey(r, c)];
-    if (tt) { const [sh, sm] = tt.start.split(":").map(Number); const [eh, em] = tt.end.split(":").map(Number); let s = sh + (sm || 0) / 60, e = eh + (em || 0) / 60; if (e <= s) e += 24; return [s, e]; }
+    if (tt) { const [sh, sm] = tt.start.split(":").map(Number); const [eh, em] = tt.end.split(":").map(Number); const s = sh + (sm || 0) / 60; let e = eh + (em || 0) / 60; if (e <= s) e += 24; return [s, e]; }
     const m = (SH[code]?.l ?? "").match(/(\d{1,2})\D+(\d{1,2})/);
-    if (m) { let s = +m[1], e = +m[2]; if (e <= s) e += 24; return [s, e]; }
+    if (m) { const s = +m[1]; let e = +m[2]; if (e <= s) e += 24; return [s, e]; }
     return null;
   };
   // Premium hours in a cell (outside 08–17 on weekdays, or any weekend hour) —
@@ -449,6 +452,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     setAiQuery(prompt);
     setAiProposal(null);
     setAiLoading(true);
+    setAiStage({ stage: "read", shifts: 0 });
     setModal("aiResult");
     // Current plan of the visible week, per employee — so the AI proposes real shifts.
     const planLines = vis.map((r) => {
@@ -481,14 +485,23 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         // weekStart: þjónninn sækir beiðnir, frí og framboð vikunnar sjálfur.
         body: JSON.stringify({ prompt, context, lang, weekStart: weekMonISO }),
       });
-      const data = (await res.json()) as AiProposal & { ok?: boolean; error?: string };
-      if (!res.ok || data.ok === false) { toast(t("Tókst ekki að ná í AI — reyndu aftur.")); setAiProposal(null); return; }
+      // Streymt svar: stig (les → hugsar → skrifar) og fjöldi vakta jafnóðum; „done“ er tillagan.
+      let data: (AiProposal & { ok?: boolean; error?: string }) | null = null;
+      if (isNdjson(res)) {
+        await readNdjson<ScheduleEvent>(res, (ev) => {
+          if (ev.t === "stage") setAiStage((p) => ({ shifts: p?.shifts ?? 0, stage: ev.stage }));
+          else if (ev.t === "progress") setAiStage({ stage: "write", shifts: ev.shifts });
+          else if (ev.t === "done") data = ev as unknown as AiProposal & { ok?: boolean };
+        });
+      } else data = (await res.json()) as AiProposal & { ok?: boolean; error?: string };
+      if (!data || !res.ok || data.ok === false) { toast(t("Tókst ekki að ná í AI — reyndu aftur.")); setAiProposal(null); return; }
       setAiProposal(data);
     } catch {
       toast(t("Tókst ekki að ná í AI — reyndu aftur."));
       setAiProposal(null);
     } finally {
       setAiLoading(false);
+      setAiStage(null);
     }
   }
 
@@ -1088,7 +1101,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       )}
       {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end, type: cellTypes[ckey(sel.r, sel.c)] }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
       {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} names={emp.map((e) => e[1])} depts={[...new Set(emp.map((e) => e[2]).filter(Boolean))]} />}
-      {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={approveAiProposal} />}
+      {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} stage={aiStage} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={approveAiProposal} />}
     </div>
   );
 }
@@ -1229,7 +1242,7 @@ function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOp
   const { t: tr } = useLang();
   const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   const [rows, setRows] = useState(entries);
-  useEffect(() => { setRows(entries); }, [entries]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setRows(entries); }, [entries]); // eslint-disable-line react-hooks/set-state-in-effect -- nýjar færslur utan frá
   const [nName, setNName] = useState(names[0] ?? "");
   const t0 = (types[0]?.t ?? "08:00–16:00").split("–");
   const [nStart, setNStart] = useState(t0[0]?.slice(0, 5) ?? "08:00");
@@ -1577,8 +1590,20 @@ const KIND_ICON: Record<AiItem["kind"], React.ReactNode> = {
   bad: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
 };
 
-function AiResultModal({ query, proposal, loading, onClose, onEdit, onApprove }: { query: string; proposal: AiProposal | null; loading: boolean; onClose: () => void; onEdit: () => void; onApprove: () => void }) {
+function AiResultModal({ query, proposal, loading, stage, onClose, onEdit, onApprove }: { query: string; proposal: AiProposal | null; loading: boolean; stage: AiStage | null; onClose: () => void; onEdit: () => void; onApprove: () => void }) {
   const { t: tr } = useLang();
+  // Sekúndur frá því beðið var um — uppfært einu sinni á sekúndu á meðan AI vinnur.
+  // (glugginn opnast um leið og beðið er um tillöguna, svo upphafstíminn er tíminn sem hann opnaðist)
+  const [start] = useState(() => Date.now());
+  const [now, setNow] = useState(start);
+  useEffect(() => { if (!loading) return; const id = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(id); }, [loading]);
+  const secs = Math.max(0, Math.round((now - start) / 1000));
+  const steps: { key: AiStage["stage"]; label: string }[] = [
+    { key: "read", label: tr("Les beiðnir, frí og framboð") },
+    { key: "think", label: tr("Hugsar um vikuna") },
+    { key: "write", label: stage?.stage === "write" && stage.shifts ? `${tr("Skrifar tillöguna")} · ${stage.shifts} ${tr("vaktir")}` : tr("Skrifar tillöguna") },
+  ];
+  const at = stage ? steps.findIndex((x) => x.key === stage.stage) : -1;
   return (
     <Modal onClose={onClose} title={tr("Tillaga AI")}>
       <div className="ai" style={{ margin: "0 0 14px" }}>
@@ -1590,8 +1615,14 @@ function AiResultModal({ query, proposal, loading, onClose, onEdit, onApprove }:
         </div>
       </div>
       {loading ? (
-        <div className="muted" style={{ fontSize: 13, padding: "18px 4px", textAlign: "center" }}>
-          {tr("sched:ailoading")}
+        <div className="ai-steps" aria-live="polite">
+          {steps.map((x, i) => (
+            <div key={x.key} className={`ai-step${i < at ? " done" : i === at ? " on" : ""}`}>
+              <span className="ai-step-ic">{i < at ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg> : i === at ? <span className="vai-dots"><i /><i /><i /></span> : null}</span>
+              <span>{x.label}</span>
+            </div>
+          ))}
+          <div className="muted" style={{ fontSize: 12, textAlign: "center", marginTop: 4 }}>{tr("sched:ailoading")}{secs ? ` · ${secs} s` : ""}</div>
         </div>
       ) : (
         <div className="att">
