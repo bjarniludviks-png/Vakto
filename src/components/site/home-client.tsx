@@ -376,7 +376,7 @@ function slidesFor(t: ReturnType<typeof useT>, base = SHOT): Slide[] {
   const [a, b, c, d] = t.slides;
   return [
     // eslint-disable-next-line @next/next/no-img-element
-    { ...a, v: <div className="ah-sl-shot"><img src={`${base}/light/ai.jpg`} alt={a.alt} width={1209} height={1656} loading="lazy" decoding="async" draggable={false} /></div> },
+    { ...a, v: <div className="ah-sl-wide"><img src={`${base}/light/innsyn.jpg`} alt={a.alt} width={2544} height={1760} loading="lazy" decoding="async" draggable={false} /></div> },
     { ...b, v: <div className="ah-sl-phones"><Phone src={`${base}/light/app-vaktir.png`} alt={b.alt} /><Phone src={`${base}/light/app-spjall.png`} alt={b.alt2 ?? ""} className="ah-sl-lo" /></div> },
     { ...c, v: <div className="ah-sl-phones"><Phone src={`${base}/light/app-frettir.png`} alt={c.alt} /></div> },
     // eslint-disable-next-line @next/next/no-img-element
