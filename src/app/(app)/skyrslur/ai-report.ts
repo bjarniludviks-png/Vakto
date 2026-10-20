@@ -8,7 +8,8 @@
 // so the feature works today and upgrades itself when the key lands.
 // ============================================================
 
-import { getManagerReport, type ReportKind } from "./actions";
+import { getManagerReport } from "./actions";
+import type { ReportKind } from "@/lib/manager-report.server";
 import { getDashboardPeriod } from "../maelabord/actions";
 import { getPerfHistory } from "../frammistada/perf.server";
 import { dec1, nf, krCompact } from "@/lib/format";
