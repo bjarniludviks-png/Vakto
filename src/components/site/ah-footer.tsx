@@ -17,7 +17,7 @@ const F = {
   is: {
     desc: "Vaktaplan, stimpilklukka, laun og ráðningarsamningar. Og launin sem hlutfall af veltu í rauntíma. Hannað fyrir íslenska vinnustaði.",
     cols: [
-      { h: "Vara", links: [["/#kerfid", "Eiginleikar"], ["/#kynning", "Kynntu þér VAKTO"], ["/#samningar", "Samningar"], ["/#verd", "Verð"], ["/nyskraning", "Prófa frítt"]] },
+      { h: "Vara", links: [["/#kerfid", "Eiginleikar"], ["/#kynning", "Kynntu þér VAKTO"], ["/#samningar", "Samningar"], ["/verd", "Verð"], ["/nyskraning", "Prófa frítt"]] },
       { h: "Fyrirtækið", links: [["/um-okkur", "Um okkur"], ["mailto:hallo@vakto.is", "Hafa samband"], ["/login", "Innskráning"]] },
       { h: "Lögfræði", links: [["/personuvernd", "Persónuvernd"], ["/skilmalar", "Skilmálar"], ["/vafrakokur", "Vafrakökur"]] },
       { h: "Fylgdu okkur", links: SOCIAL },
@@ -27,7 +27,7 @@ const F = {
   en: {
     desc: "Scheduling, time clock, payroll and employment contracts. Plus labor as a share of revenue in real time. Built for Icelandic workplaces.",
     cols: [
-      { h: "Product", links: [["/#kerfid", "Features"], ["/#kynning", "Get to know VAKTO"], ["/#samningar", "Contracts"], ["/#verd", "Pricing"], ["/nyskraning", "Try free"]] },
+      { h: "Product", links: [["/#kerfid", "Features"], ["/#kynning", "Get to know VAKTO"], ["/#samningar", "Contracts"], ["/verd", "Pricing"], ["/nyskraning", "Try free"]] },
       { h: "Company", links: [["/um-okkur", "About"], ["mailto:hallo@vakto.is", "Contact"], ["/login", "Sign in"]] },
       { h: "Legal", links: [["/personuvernd", "Privacy"], ["/skilmalar", "Terms"], ["/vafrakokur", "Cookies"]] },
       { h: "Follow us", links: SOCIAL },

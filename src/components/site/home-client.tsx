@@ -539,7 +539,10 @@ function Pricing() {
         <div className="ah-amt">{t.amt}<small>{t.per}</small></div>
         <p>{t.price1}<br />{t.price2}</p>
         <p className="ah-fine">{t.fine}</p>
-        <a className="ah-btn ah-btn-lg" href="/nyskraning">{t.try}</a>
+        <div className="ah-ctas">
+          <a className="ah-btn ah-btn-lg" href="/verd">{t.seePrice}</a>
+          <a className="ah-link" href="/nyskraning">{t.try}</a>
+        </div>
       </div>
     </section>
   );

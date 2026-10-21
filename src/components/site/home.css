@@ -201,6 +201,7 @@ html:has(.ah),html:has(.ah) body,html:has(.ah-auth),html:has(.ah-auth) body{back
 .ah-amt small{font-size:20px;font-weight:500;color:var(--ink3);letter-spacing:-.01em;margin-left:6px}
 .ah-price-card p{color:var(--ink2);font-size:17px;margin:18px 0 0}
 .ah-price-card .ah-fine{font-size:14px;color:var(--ink3);margin:10px 0 30px}
+.ah-price-card .ah-ctas{margin-top:0}
 
 /* ---------- fótur ---------- */
 .ah-foot{position:relative;z-index:1;padding:64px var(--gr) calc(28px + env(safe-area-inset-bottom,0px)) var(--gl);border-top:1px solid var(--line);font-size:14px;color:var(--ink3)}
