@@ -126,7 +126,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/og/") ||
     pathname.startsWith("/um-okkur") ||
     pathname.startsWith("/fjarfestar") ||
-    pathname.startsWith("/personuvernd") || pathname.startsWith("/skilmalar") || pathname.startsWith("/vafrakokur") ||
+    pathname.startsWith("/personuvernd") || pathname.startsWith("/eyda-adgangi") || pathname.startsWith("/skilmalar") || pathname.startsWith("/vafrakokur") ||
     pathname.startsWith("/kiosk") ||
     // PWA / icon assets must be reachable without auth (home-screen install).
     pathname === "/manifest.webmanifest" ||
@@ -144,6 +144,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/straumur/") ||
     // Mobile-app notifications — authenticated by the caller's Supabase bearer token.
     pathname.startsWith("/api/app/") ||
+    pathname === "/api/account/delete-request" || // eyðing aðgangs úr appinu (Bearer)
     pathname.startsWith("/api/wallet/") || // sannreynir sjálft (kaka, Bearer eða undirrituð slóð)
     // Dagatalsstraumur (ICS) — leynitengill per starfsmann, engin innskráning.
     pathname.startsWith("/api/cal/") ||

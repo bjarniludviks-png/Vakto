@@ -76,7 +76,7 @@ export function PrivacyBody() {
       </ul>
 
       <h2>7. Réttindi þín</h2>
-      <p>Þú átt rétt á aðgangi að upplýsingum um þig, leiðréttingu, eyðingu, takmörkun vinnslu, flutningi gagna og að andmæla vinnslu sem byggir á lögmætum hagsmunum. Sé vinnslan byggð á samþykki máttu afturkalla það hvenær sem er. Beiðnir sendast á <a href="mailto:hallo@vakto.is">hallo@vakto.is</a> og við svörum innan 30 daga. Starfsfólk viðskiptavina beinir beiðnum fyrst til vinnuveitanda síns (ábyrgðaraðila); við aðstoðum hann við að svara. Þú getur einnig kvartað til <a href="https://www.personuvernd.is" target="_blank" rel="noreferrer">Persónuverndar</a>.</p>
+      <p>Þú átt rétt á aðgangi að upplýsingum um þig, leiðréttingu, eyðingu, takmörkun vinnslu, flutningi gagna og að andmæla vinnslu sem byggir á lögmætum hagsmunum. Sé vinnslan byggð á samþykki máttu afturkalla það hvenær sem er. Beiðnir sendast á <a href="mailto:hallo@vakto.is">hallo@vakto.is</a> og við svörum innan 30 daga. Starfsfólk viðskiptavina beinir beiðnum fyrst til vinnuveitanda síns (ábyrgðaraðila); við aðstoðum hann við að svara. Þú getur einnig kvartað til <a href="https://www.personuvernd.is" target="_blank" rel="noreferrer">Persónuverndar</a>. Hvernig þú eyðir aðgangi þínum er lýst á <a href="/eyda-adgangi">vakto.is/eyda-adgangi</a>.</p>
 
       <h2>8. Öryggi</h2>
       <p>Aðgangur er varinn með lykilorðum og innskráningarhlekkjum, allar tengingar eru dulkóðaðar, gögn eru aðskilin milli fyrirtækja í gagnagrunni, kiosk-stimpilklukkan er varin með leynilykli fyrirtækisins og allar mikilvægar aðgerðir eru skráðar í aðgerðaskrá. Verði öryggisbrestur sem varðar persónuupplýsingar tilkynnum við viðskiptavinum án ótilhlýðilegrar tafar og Persónuvernd innan 72 klukkustunda þegar það á við.</p>
