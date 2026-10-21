@@ -3,12 +3,12 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
 import { View, Pressable, ScrollView, RefreshControl, TextInput } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { SquarePen, MessageCircle, Hash, BellOff, Search, X, Users, UserRound, Check, ChevronLeft } from "lucide-react-native";
+import { SquarePen, MessageCircle, Hash, BellOff, Search, X, Users, UserRound, Check, ChevronLeft, Plus } from "lucide-react-native";
 import { Header, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, Sheet, Empty, Row, Btn, Seg, useToast } from "../../src/components/ui";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listConversations, listPeople, startDM, createGroup, subscribeChat, type Conversation, type Person } from "../../src/lib/api/chat";
+import { listConversations, listPeople, startDM, createGroup, subscribeChat, teamPicks, defaultGroupName, type Conversation, type Person } from "../../src/lib/api/chat";
 import { getMuted, onMuteChange, getDnd, dndLabel } from "../../src/lib/mute";
 
 function when(ts: string | null): string {
@@ -70,11 +70,11 @@ export default function Spjall() {
     return list;
   }, [convs, onlyUnread, search, muted]);
   const unreadTotal = (convs ?? []).filter((c) => c.unread > 0 && !muted.has(c.id)).length;
-  // # Almennt fyrst, svo nýjustu samtölin (listinn kemur raðaður eftir virkni)
-  const pins = useMemo(() => {
-    const list = convs ?? [];
-    return [...list.filter((c) => c.kind === "general"), ...list.filter((c) => c.kind !== "general").slice(0, 8)];
-  }, [convs]);
+  // nýjustu samtölin (listinn kemur raðaður eftir virkni — ekkert fest)
+  const pins = useMemo(() => (convs ?? []).slice(0, 8), [convs]);
+  // flýtival í hópavali: „+ Allir í <deild>“ / „+ Allir á <stað>“
+  const teams = useMemo(() => teamPicks(people), [people]);
+  const fallbackName = useMemo(() => defaultGroupName(people.filter((p) => sel.has(p.userId)).map((p) => p.name)), [people, sel]);
 
   async function openNew(mode: "dm" | "group") {
     if (!me) return;
@@ -88,14 +88,16 @@ export default function Spjall() {
     if (r.ok && r.id) router.push(`/spjall/${r.id}?name=${encodeURIComponent(p.name)}`);
   }
   async function makeGroup() {
-    if (!me || !groupName.trim() || sel.size === 0) return;
+    // heiti valfrjálst eins og í Messenger: autt → „Anna, Jón og 3 fleiri“
+    const name = groupName.trim() || fallbackName;
+    if (!me || !name || sel.size === 0) return;
     setBusy(true);
-    const r = await createGroup(me, groupName, [...sel]);
+    const r = await createGroup(me, name, [...sel]);
     setBusy(false);
     if (!r.ok || !r.id) { toast(r.error ?? "Tókst ekki að stofna hóp"); return; }
     setNewMode(null);
-    toast(trf("Hópurinn „{x}“ stofnaður", groupName.trim()));
-    router.push(`/spjall/${r.id}?name=${encodeURIComponent(groupName.trim())}`);
+    toast(trf("Hópurinn „{x}“ stofnaður", name));
+    router.push(`/spjall/${r.id}?name=${encodeURIComponent(name)}`);
   }
 
   return (
@@ -110,7 +112,7 @@ export default function Spjall() {
           <TextInput value={search ?? ""} onChangeText={(v) => setSearch(v)} placeholder={tr("Leita í spjalli…")} placeholderTextColor={colors.ink3} returnKeyType="search" style={{ flex: 1, paddingVertical: 11, fontSize: 16, fontFamily: font.regular, color: colors.ink }} />
           {search ? <Pressable onPress={() => setSearch(null)} hitSlop={8} accessibilityLabel={tr("Hreinsa")}><X color={colors.ink3} size={18} /></Pressable> : null}
         </View>
-        {/* fastir hringir: # Almennt + nýjustu samtölin (eins og efsta röðin í Messenger) */}
+        {/* hringir: nýjustu samtölin (eins og efsta röðin í Messenger) */}
         {pins.length && !search ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}>
             {pins.map((c) => {
@@ -139,7 +141,13 @@ export default function Spjall() {
         ) : null}
       </View>
       <ScrollView style={{ backgroundColor: colors.panel }} contentInsetAdjustmentBehavior="automatic" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive" contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled" refreshControl={<RefreshControl refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} tintColor={colors.brand} />}>
-        {convs && visible.length === 0 ? <Empty icon={<MessageCircle color={colors.brandDeep} size={26} />} title={onlyUnread ? "Allt lesið" : search ? "Ekkert fannst" : "Engin samtöl enn"} sub={onlyUnread ? "Engin ólesin skilaboð." : search ? "Prófaðu annað leitarorð." : "Ýttu á + til að byrja spjall."} /> : null}
+        {convs && visible.length === 0 ? <Empty icon={<MessageCircle color={colors.brandDeep} size={26} />} title={onlyUnread ? "Allt lesið" : search ? "Ekkert fannst" : "Engin samtöl enn"} sub={onlyUnread ? "Engin ólesin skilaboð." : search ? "Prófaðu annað leitarorð." : "Búðu til hóp eða sendu einhverjum skilaboð."} /> : null}
+        {convs && convs.length === 0 && !search && !onlyUnread ? (
+          <View style={{ flexDirection: "row", gap: 10, justifyContent: "center", paddingHorizontal: 16, marginTop: -16 }}>
+            <Btn title="Nýr hópur" icon={<Users color="#fff" size={17} />} onPress={() => openNew("group")} />
+            <Btn title="Ný skilaboð" variant="ghost" onPress={() => openNew("dm")} />
+          </View>
+        ) : null}
         {visible.map((c) => {
           // Messenger-röð: 56px mynd, nafn + tími til hægri, síðustu skilaboð; ólesið = feitletrað + punktur
           const un = c.unread > 0 && !muted.has(c.id);
@@ -193,8 +201,22 @@ export default function Spjall() {
 
         {newMode === "group" ? (
           <>
-            <TextInput value={groupName} onChangeText={setGroupName} placeholder={tr("Nafn hópsins, t.d. Helgarvaktin")} placeholderTextColor={colors.ink3} style={{ borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, fontSize: 15, fontFamily: font.regular, color: colors.ink, backgroundColor: colors.panel2 }} />
+            <TextInput value={groupName} onChangeText={setGroupName} placeholder={fallbackName ? trf("{x} (valfrjálst)", fallbackName) : tr("Nafn hópsins, t.d. Helgarvaktin")} placeholderTextColor={colors.ink3} style={{ borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 12, fontSize: 15, fontFamily: font.regular, color: colors.ink, backgroundColor: colors.panel2 }} />
             <Txt weight="bold" size={12} color={colors.ink3} style={{ letterSpacing: 0.8 }}>MEÐLIMIR · {sel.size} valdir</Txt>
+            {teams.length ? (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                {teams.map((tp) => {
+                  const all = tp.userIds.every((u) => sel.has(u));
+                  return (
+                    <Pressable key={tp.key} disabled={all} accessibilityRole="button" onPress={() => setSel((s) => new Set([...s, ...tp.userIds]))}
+                      style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: all ? "transparent" : colors.line, backgroundColor: all ? colors.brandSoft : pressed ? colors.panel2 : colors.panel })}>
+                      {all ? <Check color={colors.brandDeep} size={14} /> : <Plus color={colors.ink2} size={14} />}
+                      <Txt size={13} weight="semibold" color={all ? colors.brandDeep : colors.ink2}>{trf(tp.kind === "dept" ? "Allir í {x}" : "Allir á {x}", tp.name)}</Txt>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ) : null}
             <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
               {people.length === 0 ? <Muted style={{ padding: 14 }}>Sæki samstarfsfólk…</Muted> : null}
               {people.map((p, i) => {
@@ -206,7 +228,7 @@ export default function Spjall() {
                 );
               })}
             </View>
-            <Btn title="Stofna hóp" size="lg" loading={busy} disabled={!groupName.trim() || sel.size === 0} onPress={makeGroup} />
+            <Btn title="Stofna hóp" size="lg" loading={busy} disabled={sel.size === 0} onPress={makeGroup} />
           </>
         ) : null}
       </Sheet>

@@ -57,7 +57,9 @@ export const PUBLIC_DEMO = {
     ["Guðrún Ýr Einarsdóttir", 1, "Salur", "Þjónn", "#7c3aed", 70],
     ["Jakub Kowalski", 1, "Salur", "Þjónn", "#65a30d", 50],
   ] as [string, number, string, string, string, number][],
-  channels: [["Almennt", "general"], ["Eldhús-teymið", "group"]] as [string, string][],
+  // Venjulegir hópar með nöfnum (eins og fólk býr til sjálft) — VAKTO stofnar ekki „Almennt“ lengur.
+  // Endurstillingin eyðir öðrum rásum demo-fyrirtækisins (gömlu „Almennt“/„Eldhús-teymið“ fara því út).
+  channels: [["Vaktin", "group"], ["Eldhúsið", "group"]] as [string, string][],
 };
 
 export type DemoBase = { locations: string[]; departments: Record<string, string>; positions: Record<string, string>; employees: string[]; staffNames: string[] };
@@ -287,25 +289,28 @@ export async function seedDemoData(db: Db, companyId: string, opts: SeedOptions 
     demoUsers.push({ uid, name: e.full_name });
   }
   const chans = (await db.from("channels").select("id, name, kind").eq("company_id", COMPANY)).data ?? [];
-  const general = chans.find((c) => c.kind === "general");
-  const group = chans.find((c) => c.kind === "group");
-  for (const c of chans) for (const u of demoUsers) await db.from("channel_members").upsert({ channel_id: c.id, user_id: u.uid });
+  // Sáðhóparnir eftir nafni; eldri sáðgrunnar (t.d. staging) falla á fyrstu rásir sem til eru.
+  const [teamName, kitchenName] = PUBLIC_DEMO.channels.map(([n]) => n);
+  const nonDm = chans.filter((c) => c.kind !== "dm");
+  const team = chans.find((c) => c.name === teamName) ?? nonDm.find((c) => c.kind === "general") ?? nonDm[0];
+  const kitchen = chans.find((c) => c.name === kitchenName) ?? nonDm.find((c) => c !== team && c.kind === "group");
+  for (const c of [team, kitchen]) if (c) for (const u of demoUsers) await db.from("channel_members").upsert({ channel_id: c.id, user_id: u.uid });
   const at = (daysAgo: number, hm: string) => { const d = addDays(today, -daysAgo); const [h, m] = hm.split(":").map(Number); d.setHours(h, m, 0, 0); return d.toISOString(); };
   const u = (i: number) => demoUsers[i]?.uid ?? owner;
   const first = (i: number) => (demoUsers[i]?.name ?? "").split(" ")[0];
-  const convo: [typeof general, string | undefined, number, string, string][] = [
-    [general, u(0), 1, "16:05", `Getur einhver tekið laugardagsvaktina mína 15–23? Er komin með flensu.`],
-    [general, u(1), 1, "16:09", `Ég get það — er laus á laugardaginn.`],
-    [general, u(0), 1, "16:10", `Takk ${first(1)}, þú ert bjargvættur!`],
-    [general, owner, 1, "16:22", `Búinn að samþykkja vaktaskiptin, planið er uppfært. Góðan bata ${first(0)}.`],
-    [general, u(2), 0, "08:14", `Mjólkin er að klárast — panta ég í dag?`],
-    [general, owner, 0, "08:16", `Já takk, tvo kassa. Og minnið á nýja matseðilinn sem fer í loftið á fimmtudag.`],
-    [group, u(2), 2, "14:40", `Súpan í dag er sætkartöflu — uppskriftin er í handbókinni undir „Súpur".`],
-    [group, u(3), 2, "14:41", `Frábært, hvað gerum við margar skammta?`],
-    [group, u(2), 2, "14:43", `40 skammta, það seldist upp síðast.`],
+  const convo: [typeof kitchen, string | undefined, number, string, string][] = [
+    [team, u(0), 1, "16:05", `Getur einhver tekið laugardagsvaktina mína 15–23? Er komin með flensu.`],
+    [team, u(1), 1, "16:09", `Ég get það — er laus á laugardaginn.`],
+    [team, u(0), 1, "16:10", `Takk ${first(1)}, þú ert bjargvættur!`],
+    [team, owner, 1, "16:22", `Búinn að samþykkja vaktaskiptin, planið er uppfært. Góðan bata ${first(0)}.`],
+    [team, u(2), 0, "08:14", `Mjólkin er að klárast — panta ég í dag?`],
+    [team, owner, 0, "08:16", `Já takk, tvo kassa. Og minnið á nýja matseðilinn sem fer í loftið á fimmtudag.`],
+    [kitchen, u(2), 2, "14:40", `Súpan í dag er sætkartöflu — uppskriftin er í handbókinni undir „Súpur".`],
+    [kitchen, u(3), 2, "14:41", `Frábært, hvað gerum við margar skammta?`],
+    [kitchen, u(2), 2, "14:43", `40 skammta, það seldist upp síðast.`],
   ];
   let messages = 0;
-  if (general) {
+  if (team || kitchen) {
     await db.from("messages").delete().eq("company_id", COMPANY).gte("created_at", addDays(today, -3).toISOString());
     const rows = convo.filter(([c]) => c).map(([c, sender, dAgo, hm, body]) => ({ company_id: COMPANY, channel_id: c!.id, sender_id: sender, body, kind: "text", created_at: at(dAgo, hm) }));
     const { error } = await db.from("messages").insert(rows); if (error) log(`messages: ${error.message}`); else messages = rows.length;

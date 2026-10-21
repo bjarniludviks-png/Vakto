@@ -94,9 +94,9 @@ for (const [full_name, department_id, position_id, avatar_color] of STAFF) {
   }));
 }
 
-// ---- rásir (Almennt + eldhúshópur)
-const gen = await one("channels", { company_id: C, kind: "general" }, { name: "Almennt", created_by: ownerId });
-const grp = await one("channels", { company_id: C, name: "Eldhús-teymið" }, { kind: "group", created_by: ownerId });
+// ---- rásir: venjulegir hópar með nöfnum (VAKTO stofnar ekki „Almennt“ — sömu nöfn og PUBLIC_DEMO.channels)
+const gen = await one("channels", { company_id: C, name: "Vaktin" }, { kind: "group", created_by: ownerId });
+const grp = await one("channels", { company_id: C, name: "Eldhúsið" }, { kind: "group", created_by: ownerId });
 
 // ---- prófunarstarfsmaðurinn = Anna Björk
 const reviewPw = pw();

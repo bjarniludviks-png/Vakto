@@ -5,7 +5,11 @@ import { tr, trf } from "../../../src/lib/i18n";
 import { supabase } from "../supabase";
 import type { Me } from "./me";
 
-export type Person = { userId: string; name: string; color: string | null; photo: string | null; role: string | null; dept: string | null };
+export type Person = {
+  userId: string; name: string; color: string | null; photo: string | null; role: string | null; dept: string | null;
+  // fyrir flýtival í hópavali („+ Allir í Eldhúsi“)
+  deptId?: string | null; locId?: string | null; loc?: string | null; active?: boolean;
+};
 
 export type Conversation = {
   id: string;
@@ -44,14 +48,18 @@ export async function peopleMap(companyId: string, force = false): Promise<Map<s
   if (!force && peopleCache && peopleCache.companyId === companyId && Date.now() - peopleCache.at < 60000) return peopleCache.map;
   const { data } = await supabase
     .from("coworkers")
-    .select("user_id, full_name, avatar_color, photo_url, title, positions(name), departments(name)")
+    .select("user_id, full_name, avatar_color, photo_url, title, status, department_id, location_id, positions(name), departments(name), locations(name)")
     .eq("company_id", companyId)
     .not("user_id", "is", null);
   const m = new Map<string, Person>();
   for (const r of data ?? []) {
     const pos = (Array.isArray(r.positions) ? r.positions[0] : r.positions) as { name?: string } | null;
     const dep = (Array.isArray(r.departments) ? r.departments[0] : r.departments) as { name?: string } | null;
-    m.set(r.user_id as string, { userId: r.user_id as string, name: r.full_name, color: r.avatar_color, photo: r.photo_url, role: r.title ?? pos?.name ?? null, dept: dep?.name ?? null });
+    const loc = (Array.isArray(r.locations) ? r.locations[0] : r.locations) as { name?: string } | null;
+    m.set(r.user_id as string, {
+      userId: r.user_id as string, name: r.full_name, color: r.avatar_color, photo: r.photo_url, role: r.title ?? pos?.name ?? null, dept: dep?.name ?? null,
+      deptId: r.department_id ?? null, locId: r.location_id ?? null, loc: loc?.name ?? null, active: r.status !== "inactive",
+    });
   }
   peopleCache = { companyId, at: Date.now(), map: m };
   return m;
@@ -79,14 +87,43 @@ export async function markChannelRead(channelId: string): Promise<void> {
   await supabase.from("channel_reads").upsert({ channel_id: channelId, user_id: auth.user.id, last_read_at: new Date().toISOString() }, { onConflict: "channel_id,user_id" });
 }
 
+/** Flýtival í hópavali: deildir og staðir með virku starfsfólki (ekki ég). */
+export type TeamPick = { key: string; kind: "dept" | "loc"; name: string; userIds: string[] };
+export function teamPicks(people: Person[]): TeamPick[] {
+  const by = new Map<string, TeamPick>();
+  const add = (key: string, kind: TeamPick["kind"], name: string | null | undefined, uid: string) => {
+    if (!name) return;
+    const t = by.get(key) ?? { key, kind, name, userIds: [] };
+    if (!t.userIds.includes(uid)) t.userIds.push(uid);
+    by.set(key, t);
+  };
+  for (const p of people) {
+    if (p.active === false) continue;
+    if (p.deptId) add(`dept:${p.deptId}`, "dept", p.dept, p.userId);
+    if (p.locId) add(`loc:${p.locId}`, "loc", p.loc, p.userId);
+  }
+  return [...by.values()].sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name, "is") : a.kind === "dept" ? -1 : 1));
+}
+
+/** Sjálfgefið heiti hóps (Messenger): „Anna og Jón“, „Anna, Jón og Gunna“, „Anna, Jón og 3 fleiri“. */
+export function defaultGroupName(names: string[]): string {
+  const f = names.map((n) => n.split(/\s+/)[0]);
+  if (f.length <= 1) return f[0] ?? "";
+  if (f.length <= 3) return trf("{x} og {x}", f.slice(0, -1).join(", "), f[f.length - 1]); // trf fyllir {x} í röð
+  return trf("{x} og {n} fleiri", f.slice(0, 2).join(", "), f.length - 2);
+}
+
 export async function listConversations(me: Me): Promise<Conversation[]> {
-  const [{ data: chs }, { data: auth }, people, unread] = await Promise.all([
-    supabase.from("channels").select("id, name, kind, created_at, photo_url").eq("company_id", me.companyId),
+  // auto_key kemur með 0046 — falla á eldri lögun ef dálkinn vantar
+  const chQ = (cols: string) => supabase.from("channels").select(cols).eq("company_id", me.companyId);
+  const [chRes, { data: auth }, people, unread] = await Promise.all([
+    chQ("id, name, kind, created_at, photo_url, auto_key"),
     supabase.auth.getUser(),
     peopleMap(me.companyId),
     unreadCounts(),
   ]);
-  const channels = chs ?? [];
+  type Ch = { id: string; name: string; kind: string; created_at: string; photo_url: string | null; auto_key?: string | null };
+  let channels = (chRes.error ? (await chQ("id, name, kind, created_at, photo_url")).data ?? [] : chRes.data ?? []) as unknown as Ch[];
   if (!channels.length) return [];
   const myId = auth.user?.id;
   const ids = channels.map((c) => c.id);
@@ -98,6 +135,18 @@ export async function listConversations(me: Me): Promise<Conversation[]> {
   for (const m of msgs ?? []) if (!lastBy.has(m.channel_id)) lastBy.set(m.channel_id, { body: m.body, kind: m.kind, at: m.created_at, from: m.sender_id });
   const memBy = new Map<string, string[]>();
   for (const m of members ?? []) memBy.set(m.channel_id, [...(memBy.get(m.channel_id) ?? []), m.user_id]);
+  // VAKTO stofnar engar rásir sjálft: eldri „Almennt“ og deildar-/staðarrásir eru venjuleg
+  // samtöl og birtast aðeins hafi einhver skrifað í þær (tómar ónotaðar rásir hverfa).
+  const legacy = channels.filter((c) => (c.kind === "general" || !!c.auto_key) && !lastBy.has(c.id));
+  if (legacy.length) {
+    const used = await Promise.all(legacy.map(async (c) => {
+      const { data } = await supabase.from("messages").select("id").eq("channel_id", c.id).limit(1);
+      return (data ?? []).length > 0 ? c.id : null;
+    }));
+    const keep = new Set(used.filter(Boolean) as string[]);
+    channels = channels.filter((c) => !legacy.includes(c) || keep.has(c.id));
+  }
+  const createdBy = new Map(channels.map((c) => [c.id, c.created_at]));
 
   const conv: Conversation[] = channels.map((c) => {
     const last = lastBy.get(c.id);
@@ -118,10 +167,9 @@ export async function listConversations(me: Me): Promise<Conversation[]> {
       other,
     };
   });
-  return conv.sort((a, b) => {
-    if ((a.kind === "general") !== (b.kind === "general")) return a.kind === "general" ? -1 : 1;
-    return (b.lastAt ?? "") < (a.lastAt ?? "") ? -1 : 1;
-  });
+  // nýjasta virkni efst, ekkert fest (nýr tómur hópur raðast eftir stofndegi)
+  const at = (c: Conversation) => c.lastAt ?? createdBy.get(c.id) ?? "";
+  return conv.sort((a, b) => at(b).localeCompare(at(a)));
 }
 
 /** Síðustærð spjallþráðar: NÝJUSTU skilaboðin; eldri sótt með bendli („Sýna eldri skilaboð“). */
@@ -271,7 +319,7 @@ export async function listAttachments(me: Me, channelId: string): Promise<Attach
   return (data ?? []).map((m) => ({ id: m.id, kind: (m.kind === "image" ? "image" : m.kind === "audio" ? "audio" : "file") as Attachment["kind"], url: m.attachment_url as string, name: m.kind === "image" ? "Mynd" : (m.body || "Skjal"), at: m.created_at, sender: people.get(m.sender_id)?.name.split(/\s+/)[0] ?? "" }));
 }
 
-/** Yfirgefa hóp/einkaspjall (ekki Almennt). */
+/** Yfirgefa hóp/einkaspjall (ekki eldra „Almennt“ — þar er aðild óbein). */
 export async function leaveChannel(channelId: string): Promise<{ ok: boolean; error?: string }> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
