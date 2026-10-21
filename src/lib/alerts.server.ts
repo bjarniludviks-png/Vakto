@@ -17,6 +17,7 @@ import { sendPushToUser } from "@/lib/push";
 import { nf, dec1 } from "@/lib/format";
 import type { Employee } from "@/lib/employees";
 import { describeAlert, normalizeAlert, REPORT_TITLE, RANGE_LABEL, type AlertRule, type AlertPeriod, type ReportRange, type ReportSchedule, type AlertChannel } from "@/lib/alerts";
+import { asPlan, planAllows } from "@/lib/plan-features";
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://vakto.is";
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -269,6 +270,9 @@ export async function runAlerts(now = new Date()): Promise<{ ok: boolean; rules:
   }
   let rules = 0, sent = 0, errors = 0;
   for (const [companyId, rows] of byCo) {
+    // Vaktarar og skýrslur á tímaáætlun fylgja Vexti og Rekstri (0089); reglur haldast ef skipt er aftur upp.
+    const { data: pl } = await db.from("companies").select("plan").eq("id", companyId).maybeSingle();
+    if (pl && !planAllows(asPlan(pl.plan), "alerts")) continue;
     const { data: c } = await db.from("companies").select("name").eq("id", companyId).maybeSingle();
     const pp = await db.from("companies").select("pay_period_start").eq("id", companyId).maybeSingle(); // þolir að 0036 vanti
     const ps = Number(pp.error ? 1 : pp.data?.pay_period_start);

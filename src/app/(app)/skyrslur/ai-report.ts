@@ -17,6 +17,7 @@ import { userError } from "@/lib/user-error";
 import { demoAiGate } from "@/lib/ai/ai-plan.server";
 import { currentUserIsDemo } from "@/lib/demo.server";
 import { modelFor } from "@/lib/ai/models";
+import { recordAiUsage } from "@/lib/ai/usage.server";
 
 export type AiChart = { labels: string[]; values: number[]; label: string };
 export type AiReportResult = {
@@ -157,6 +158,7 @@ ${JSON.stringify(compact)}
 SPURNING: ${question}`,
       }],
     });
+    await recordAiUsage({ model: msg.model, usage: msg.usage, feature: "ai_report" });
     const block = msg.content.find((b) => b.type === "text");
     const parsed = block && "text" in block ? JSON.parse(block.text) : null;
     if (!parsed?.summary) return fallbackAnswer(question, ctx);

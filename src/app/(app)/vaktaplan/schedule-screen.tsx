@@ -494,7 +494,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
           else if (ev.t === "done") data = ev as unknown as AiProposal & { ok?: boolean };
         });
       } else data = (await res.json()) as AiProposal & { ok?: boolean; error?: string };
-      if (!data || !res.ok || data.ok === false) { toast(t("Tókst ekki að ná í AI — reyndu aftur.")); setAiProposal(null); return; }
+      if (!data || !res.ok || data.ok === false) { toast((data as { error?: string } | null)?.error ?? t("Tókst ekki að ná í AI — reyndu aftur.")); setAiProposal(null); return; } // t.d. leið/kvóti: „Í boði í Vexti …“
       setAiProposal(data);
     } catch {
       toast(t("Tókst ekki að ná í AI — reyndu aftur."));

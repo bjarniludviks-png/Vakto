@@ -53,7 +53,7 @@ if (!company) {
   const far = new Date(Date.now() + 3650 * 864e5).toISOString();
   const { data, error } = await db.from("companies").insert({
     name: NAME, location: "Reykjavík", country: "IS", address: "Laugavegur 1", postal_code: "101", city: "Reykjavík",
-    plan: "vakto", trial_ends_at: far, billing_status: "free", card_required: false, admin_note: NOTE,
+    plan: "rekstur", trial_ends_at: far, billing_status: "free", card_required: false, admin_note: NOTE,
     geofence_mode: "off", labor_target: 30, feed_post_policy: "everyone", revenue_mode: "manual",
   }).select("id, name").single();
   if (error) die("companies", error);

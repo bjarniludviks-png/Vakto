@@ -8,9 +8,10 @@ import { formatKennitala, isValidKennitala } from "@/lib/kennitala";
 import { requestEmailCode, verifyEmailCode, consumeProof } from "@/lib/signup-verify.server";
 import { validatePassword } from "@/lib/password.server";
 import { verifyTurnstile } from "@/lib/turnstile.server";
+import { TRIAL_DAYS } from "@/lib/plans";
 
 /** Útgáfa skilmálanna sem nýskráning samþykkir (dagsetning síðustu breytingar á /skilmalar). */
-const TERMS_VERSION = "2026-09-30";
+const TERMS_VERSION = "2026-10-21"; // áskriftarleiðir (0089)
 
 export type SignupResult = { ok: boolean; demo?: boolean; error?: string };
 
@@ -47,7 +48,10 @@ export async function setCompanyPlan(): Promise<{ ok: boolean }> {
     const admin = createAdminClient();
     const { data: co } = await admin.from("companies").select("trial_ends_at, billing_status").eq("id", profile.company_id).maybeSingle();
     if (!co || co.trial_ends_at || co.billing_status) return { ok: true };
-    await admin.from("companies").update({ plan: "vakto", trial_ends_at: new Date(Date.now() + 14 * 86400000).toISOString() }).eq("id", profile.company_id);
+    // Fría leiðin fær enga prufu (ekkert kort); annars prufa á núverandi leið (sjálfgefið Vöxtur).
+    const { data: cur } = await admin.from("companies").select("plan").eq("id", profile.company_id).maybeSingle();
+    if (cur?.plan === "free") return { ok: true };
+    await admin.from("companies").update({ trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 86400000).toISOString() }).eq("id", profile.company_id);
     return { ok: true };
   } catch {
     return { ok: false };
@@ -70,7 +74,7 @@ export async function verifySignupCode(email: string, code: string): Promise<{ o
   try { return await verifyEmailCode(email, code); } catch (e) { { console.error("[signup]", e); return { ok: false, error: "Nýskráning tókst ekki — reyndu aftur eða hafðu samband við hallo@vakto.is." }; } }
 }
 
-export async function createOwnerAccount(input: { fullName: string; companyName: string; email: string; password: string; country?: string; proof?: string; termsAccepted?: boolean; promo?: string; kennitala?: string }): Promise<SignupResult> {
+export async function createOwnerAccount(input: { fullName: string; companyName: string; email: string; password: string; country?: string; proof?: string; termsAccepted?: boolean; promo?: string; kennitala?: string; plan?: string }): Promise<SignupResult> {
   const fullName = input.fullName?.trim();
   const companyName = input.companyName?.trim();
   const email = input.email?.trim().toLowerCase();
@@ -96,10 +100,12 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
     const userId = created.user.id;
     const prov = await provisionCompanyForUser(userId, email, fullName, companyName, input.country);
     if (!prov.ok) return { ok: false, error: prov.error };
-    // Prufan hefst núna; aðgangur opnast ekki fyrr en kort er skráð (middleware + card_required).
+    // Leið úr /verd (?plan=): Frítt → ekkert kort, engin prufa, aldrei rukkað. Grunnur/Vöxtur (sjálfgefið) →
+    // prufan hefst núna (á Vexti) og aðgangur opnast ekki fyrr en kort er skráð (middleware + card_required).
     if (prov.companyId) {
-      const trialEnds = new Date(Date.now() + (promoDays(input.promo) ?? 14) * 86400000).toISOString();
-      await admin.from("companies").update({ plan: "vakto", trial_ends_at: trialEnds, card_required: true, ...(isValidKennitala(input.kennitala ?? "") ? { kennitala: formatKennitala(input.kennitala!) } : {}), terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }).eq("id", prov.companyId);
+      const tier = input.plan === "free" || input.plan === "grunnur" ? input.plan : "voxtur";
+      const trialEnds = tier === "free" ? null : new Date(Date.now() + (promoDays(input.promo) ?? TRIAL_DAYS) * 86400000).toISOString();
+      await admin.from("companies").update({ plan: tier, trial_ends_at: trialEnds, card_required: tier !== "free", ...(isValidKennitala(input.kennitala ?? "") ? { kennitala: formatKennitala(input.kennitala!) } : {}), terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }).eq("id", prov.companyId);
     }
     await sendWelcomeEmail(email, fullName, companyName); // no-op until Resend is configured
     await sendSignupAlert({ company: companyName, name: fullName, email, country: input.country, companyId: prov.companyId, kennitala: isValidKennitala(input.kennitala ?? "") ? formatKennitala(input.kennitala!) : null, promo: promoDays(input.promo) ? input.promo!.trim().toUpperCase() : null }).catch((e) => console.error("[signup-alert]", e));

@@ -4,7 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { VAKTO_KNOWLEDGE } from "@/lib/ai/vakto-knowledge";
 import { READ_TOOLS, WRITE_TOOLS, WRITE_NAMES, runReadTool, describeWrite, type PendingAction } from "@/lib/ai/assistant-tools";
 import { assistantUser, rateLimited } from "@/lib/ai/assistant-auth";
-import { aiAllowance, bumpAiUsage, demoAiCheck, recordDemoVisitorAi } from "@/lib/ai/ai-plan.server";
+import { aiStop, bumpAiUsage, demoAiCheck, recordDemoVisitorAi } from "@/lib/ai/ai-plan.server";
+import { addUsage, recordAiUsage, type AiUsage } from "@/lib/ai/usage.server";
+import { companyPlan } from "@/lib/plan.server";
+import { planAllows } from "@/lib/plan-features";
 import { modelFor, PLAN_CHAT_EFFORT } from "@/lib/ai/models";
 import { ndjsonStream, NDJSON_HEADERS, completedShiftStrings, partialNumber, partialString, partialStringOpen, type AssistantEvent } from "@/lib/ai/stream";
 
@@ -23,23 +26,15 @@ export async function POST(request: Request) {
   if ("error" in me) return NextResponse.json({ ok: false, error: me.error }, { status: me.status });
   if (rateLimited(me.userId)) return NextResponse.json({ ok: false, error: "Of margar fyrirspurnir í einu — bíddu aðeins." }, { status: 429 });
 
-  // Mánaðarheimild (0075): 25 frítt, 500 með viðbót eða í prufu. Þegar hún er búin svarar
+  // Heimild (0089): leið, kvóti mánaðarins (+ AI-pakkar) og kostnaðarþak. Þegar hún er búin svarar
   // aðstoðarmaðurinn ekki; spjallið sýnir þá hnapp á Stillingar → Áskrift.
   const demo = await demoAiCheck(); // opið demo: dagsþök alls + per gest (talið hér að neðan eins og annað)
   if (demo?.stop) return NextResponse.json({ ok: false, error: demo.stop, signup: demo.signup }, { status: 429 });
   const model = modelFor("chat", { demo: !!demo }); // demo → Haiku
-  const allowance = await aiAllowance(me.companyId).catch(() => null);
-  if (allowance && allowance.used >= allowance.limit) {
-    const free = allowance.mode === "free";
-    return NextResponse.json({
-      ok: false, limit: { mode: allowance.mode, used: allowance.used, limit: allowance.limit, canUpgrade: free && me.role === "owner" },
-      error: free
-        ? (me.role === "owner"
-          ? `Fríu spurningarnar ${allowance.limit} í þessum mánuði eru búnar. Kveiktu á VAKTO AI-viðbótinni (1.990 kr/mán, allt að 500 spurningar) í Stillingum → Áskrift.`
-          : `Fríu spurningarnar ${allowance.limit} í þessum mánuði eru búnar. Stjórnandi fyrirtækisins getur kveikt á VAKTO AI-viðbótinni í Stillingum → Áskrift.`)
-        : `Spurningarnar ${allowance.limit} í þessum mánuði eru búnar. Heimildin endurnýjast 1. næsta mánaðar; hafðu samband á hallo@vakto.is ef þig vantar meira.`,
-    }, { status: 402 });
-  }
+  const stop = demo ? null : await aiStop(me.companyId, me.role).catch(() => null);
+  if (stop) return NextResponse.json({ ok: false, error: stop.error, ...(stop.limit ? { limit: stop.limit } : {}) }, { status: 402 });
+  // AI-vaktaplan (plan_week) fylgir Vexti og Rekstri.
+  const canPlan = !!demo || planAllows((await companyPlan(me.companyId)).features, "ai_schedule");
 
   let body: { messages?: Msg[]; path?: string; lang?: string; conversationId?: string } = {};
   try { body = await request.json(); } catch { /* tómt */ }
@@ -55,7 +50,7 @@ export async function POST(request: Request) {
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   // Föstu leiðbeiningarnar (og verkfærin) eru vistaðar í skyndiminni Anthropic (prompt caching) —
   // breytilega samhengið (fyrirtæki, notandi, dagur, síða) kemur í sérstökum kubbi á eftir.
-  const context = `Fyrirtæki: ${me.company}. Notandi: ${me.name} (${me.role === "owner" ? "stjórnandi" : "vaktstjóri"}). Í dag er ${DAYS_IS[now.getDay()]} ${today}. Notandinn er á síðunni ${body.path ?? "/"}.`;
+  const context = `Fyrirtæki: ${me.company}. Notandi: ${me.name} (${me.role === "owner" ? "stjórnandi" : "vaktstjóri"}). Í dag er ${DAYS_IS[now.getDay()]} ${today}. Notandinn er á síðunni ${body.path ?? "/"}.${canPlan ? "" : " Áskriftarleið fyrirtækisins (Grunnur) inniheldur ekki AI-vaktaplan fyrir heila viku, vaktara né skýrslur á tímaáætlun — ef beðið er um það, segðu vingjarnlega að það sé í boði í Vexti (sjá vakto.is/verd) og bjóddu aðra hjálp."}`;
   const instructions = `Þú ert VAKTO AI, aðstoðarmaður inni í vaktakerfinu VAKTO. Fyrirtækið, notandinn, dagurinn í dag og síðan sem notandinn er á koma fram í lok leiðbeininganna.
 
 Hlutverk þín:
@@ -80,14 +75,16 @@ ${VAKTO_KNOWLEDGE}`;
   // vaktir plan_week jafnóðum og þær eru skrifaðar, tillögur um leið og þær eru tilbúnar og loks
   // „done“ með sama innihaldi og JSON-svarið var áður. Ping á 5 sek. fresti heldur tengingunni opinni.
   const question = history[history.length - 1].content as string;
-  const planning = isPlanningRequest(question);
+  const planning = canPlan && isPlanningRequest(question);
   const run = async (send: (ev: AssistantEvent) => void): Promise<Record<string, unknown>> => {
     const client = new Anthropic();
-    const all = [...READ_TOOLS, ...WRITE_TOOLS];
+    const all = [...READ_TOOLS, ...WRITE_TOOLS.filter((t) => canPlan || t.name !== "plan_week")];
     const tools: Anthropic.Tool[] = all.map((t, i) => (i === all.length - 1 ? { ...t, cache_control: { type: "ephemeral" } } : t));
     const actions: PendingAction[] = [];
     const msgs: Anthropic.MessageParam[] = [...history];
     let reply = "";
+    let usage: AiUsage = {};
+    const track = () => recordAiUsage({ model, usage, feature: "assistant", companyId: me.companyId, userId: me.userId });
     try {
       // Vaktaplansbeiðni: samhengi vikunnar sótt strax og sett með spurningunni — sparar heila umferð
       // (líkanið kallaði alltaf fyrst á week_planning_context). Vilji það aðra viku kallar það sjálft.
@@ -132,6 +129,7 @@ ${VAKTO_KNOWLEDGE}`;
             }
           }
           res = await stream.finalMessage();
+          usage = addUsage(usage, res.usage);
         } catch (e) {
           // plan_week streymir inntakinu óbuffrað: ef JSON-ið er ógilt reynum við umferðina einu sinni enn.
           if (e instanceof Anthropic.APIError || jsonRetries++ >= 1) throw e;
@@ -172,9 +170,10 @@ ${VAKTO_KNOWLEDGE}`;
       }
     } catch (e) {
       console.error("[assistant]", e instanceof Error ? e.message : e);
+      await track();
       return { ok: false, error: lang === "en" ? "VAKTO AI could not answer right now. Try again." : "VAKTO AI gat ekki svarað núna. Reyndu aftur." };
     }
-    await bumpAiUsage(me.companyId);
+    await Promise.all([bumpAiUsage(me.companyId), track()]);
     if (demo) await recordDemoVisitorAi(demo.companyId, demo.key);
     // Vista samtalið (þolir að töflurnar vanti — þá er sagan aðeins í vafranum).
     let messageId: string | null = null;

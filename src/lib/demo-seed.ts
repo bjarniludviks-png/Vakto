@@ -32,7 +32,7 @@ export const PUBLIC_DEMO = {
     name: "Kaffi Sól", location: "Reykjavík", country: "IS", address: "Laugavegur 12", postal_code: "101", city: "Reykjavík",
     // Gervikennitala (ekki til í fyrirtækjaskrá) — svo „Fyrstu skrefin“ séu kláruð í demóinu.
     kennitala: "650000-0000", phone: "555 0000", email: `kaffisol@demo.vakto.is`,
-    plan: "vakto", billing_status: "free", card_required: false, ai_addon: false,
+    plan: "rekstur", billing_status: "free", card_required: false, ai_addon: false, // allir eiginleikar til sýnis (0089)
     geofence_mode: "off", labor_target: 30, feed_post_policy: "everyone", revenue_mode: "manual",
   },
   locations: ["Laugavegur", "Hafnartorg"],

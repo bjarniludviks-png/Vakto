@@ -9,12 +9,15 @@ import { passwordStrength, PASSWORD_MIN } from "@/lib/password";
 import Turnstile, { TURNSTILE_SITE_KEY } from "@/components/turnstile";
 import { trackSignup } from "@/components/site/analytics";
 import { VaktoLogo } from "@/components/brand/vakto-logo";
+import { getPlan, type PlanId } from "@/lib/plans";
+import { nf } from "@/lib/format";
 
 export type SignupLang = "is" | "en" | "pl";
 const L = {
   is: {
-    per: "kr/mán · 5 virkir starfsmenn innifaldir",
-    extra: "+1.490 kr á hvern virkan starfsmann umfram · árlega 8.490 + 1.270",
+    per: (n: number) => `kr/mán · ${n} virkir starfsmenn innifaldir`,
+    extra: (x: string) => `+${x} kr á hvern virkan starfsmann umfram · 15% afsláttur ef greitt árlega`,
+    trialPlan: "Prufan er á Vexti (allir eiginleikar). Þú velur leið hvenær sem er í Stillingum → Áskrift.",
     cur: "kr",
     st1: "1 · Netfang",
     st2: "2 · Aðgangur",
@@ -80,8 +83,9 @@ const L = {
     promoH: (d: number) => (d >= 59 ? "Tveir mánuðir frítt" : `${d} dagar frítt`),
   },
   en: {
-    per: "ISK/mo · 5 active employees included",
-    extra: "+ISK 1,490 per additional active employee · annually 8,490 + 1,270",
+    per: (n: number) => `ISK/mo · ${n} active employees included`,
+    extra: (x: string) => `+ISK ${x} per additional active employee · 15% off when paid annually`,
+    trialPlan: "The trial runs on Vöxtur (all features). Change plan any time in Settings → Subscription.",
     cur: "ISK",
     st1: "1 · Email",
     st2: "2 · Account",
@@ -147,8 +151,9 @@ const L = {
     promoH: (d: number) => `${d} days free`,
   },
   pl: {
-    per: "ISK/mies. · 5 aktywnych pracowników w cenie",
-    extra: "+1 490 ISK za każdego kolejnego aktywnego pracownika · rocznie 8 490 + 1 270",
+    per: (n: number) => `ISK/mies. · ${n} aktywnych pracowników w cenie`,
+    extra: (x: string) => `+${x} ISK za każdego kolejnego aktywnego pracownika · 15% zniżki przy płatności rocznej`,
+    trialPlan: "Okres próbny działa na planie Vöxtur (wszystkie funkcje). Plan można zmienić w Ustawieniach → Subskrypcja.",
     cur: "ISK",
     st1: "1 · E-mail",
     st2: "2 · Konto",
@@ -238,6 +243,12 @@ const Err = ({ msg }: { msg: string | null }) => msg ? <div style={{ color: "var
 export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
   const s = L[lang];
   const [step, setStep] = useState<Step>("email");
+  // /nyskraning?plan=free|grunnur|voxtur (hnapparnir á /verd). Frítt: ekkert kort, engin prufa.
+  // Lesið við notkun (eftir samskipti notanda), ekki í render → engin hydration-misræmi.
+  const urlPlan = (): Exclude<PlanId, "rekstur"> => {
+    const p = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("plan");
+    return p === "free" || p === "grunnur" ? p : "voxtur";
+  };
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [proof, setProof] = useState<string | null>(null);
@@ -312,7 +323,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
     if (!isValidKennitala(kennitala)) { setError(s.ktErr); return; }
     setBusy(true);
     try {
-      const res = await createOwnerAccount({ fullName, companyName, email, password, country: "IS", proof: proof ?? undefined, termsAccepted: terms, promo: promo?.code ?? (promoInput.trim() || undefined), kennitala });
+      const res = await createOwnerAccount({ fullName, companyName, email, password, country: "IS", proof: proof ?? undefined, termsAccepted: terms, promo: promo?.code ?? (promoInput.trim() || undefined), kennitala, plan: urlPlan() });
       if (!res.ok) {
         setError(res.error ?? s.createFail);
         if (/Staðfesting netfangs/.test(res.error ?? "")) { setProof(null); setStep("email"); }
@@ -323,6 +334,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
         await supabase.auth.signInWithPassword({ email, password });
       }
       trackSignup();
+      if (urlPlan() === "free") { window.location.assign("/maelabord"); return; } // fría leiðin: ekkert kort
       setStep("card");
     } catch {
       setError(s.supa);
@@ -350,9 +362,10 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
 
         <div className="planpick" style={{ gridTemplateColumns: "1fr" }}>
           <div className="planopt on" style={{ cursor: "default" }}>
-            <div className="pn">VAKTO</div>
-            <div className="pp">{s.price} <small>{s.per}</small></div>
-            <div className="pb">{s.extra}</div>
+            <div className="pn">VAKTO {getPlan(urlPlan()).name}</div>
+            <div className="pp">{nf(getPlan(urlPlan()).base)} {s.cur} <small>{s.per(getPlan(urlPlan()).included)}</small></div>
+            <div className="pb">{s.extra(nf(getPlan(urlPlan()).extraPerEmployee ?? 0))}</div>
+            <div className="pb">{s.trialPlan}</div>
             <div className="pb">{s.vatNote}</div>
           </div>
         </div>

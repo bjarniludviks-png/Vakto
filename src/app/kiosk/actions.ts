@@ -21,8 +21,9 @@ const last4 = (kt: string | null) => (kt ?? "").replace(/\D/g, "").slice(-4);
 async function companyByKey(admin: ReturnType<typeof createAdminClient>, kioskKey: string): Promise<{ id: string; name: string } | null> {
   const key = (kioskKey ?? "").trim();
   if (!/^[a-f0-9]{32}$/.test(key)) return null;
-  const { data } = await admin.from("companies").select("id, name").eq("kiosk_token", key).maybeSingle();
+  const { data } = await admin.from("companies").select("id, name, plan").eq("kiosk_token", key).maybeSingle();
   if (!data) return null;
+  if (data.plan === "free") return null; // stimpilklukka/kiosk fylgir ekki fríu leiðinni (0089)
   // Spjaldtölvan á staðnum er virkust rétt við upphaf vakta — góður tími til að athuga „mætti ekki“.
   after(() => checkNoShows(data.id as string));
   return { id: data.id as string, name: data.name as string };

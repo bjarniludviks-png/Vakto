@@ -16,6 +16,7 @@ import { employerSign, metaFrom, notifyContractEmployee, startTaktikalSigning } 
 import { taktikalEnabled } from "@/lib/taktikal.server";
 import { sendTerminationLetterEmail, sendTerminationSignEmail } from "@/lib/email";
 import { todayIs } from "@/lib/terminations.server";
+import { planBlock } from "@/lib/plan.server";
 import {
   ACCESS_MONTHS, NOTE_REQUIRED, REASON_LABEL, addMonths, buildLetter, isDate, isReason, letterTitleIs, okIso, shiftCutoff,
   type DocumentMode, type NoticeUnit, type ShiftAction, type TerminationReason,
@@ -109,6 +110,7 @@ const SHIFT_ACTIONS: ShiftAction[] = ["keep", "unassign", "delete"];
 
 export async function createTermination(input: CreateTerminationInput): Promise<TermResult> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  { const pb = await planBlock("terminations"); if (pb) return { ok: false, error: pb }; } // áskriftarleið (0089)
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   // ---- sannprófun ----
   if (!isReason(input.reason)) return { ok: false, error: "Veldu ástæðu" };

@@ -15,6 +15,7 @@ import { notifyEmployee } from "@/lib/push";
 import type { PayrollView } from "./payroll.server";
 import { userError } from "@/lib/user-error";
 import { allRows } from "@/lib/supabase/all-rows";
+import { planBlock } from "@/lib/plan.server";
 
 export type RunResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
 export type ContractorBill = { id: string; name: string; av: string; c: string; hours: number; amount: number; monthly: boolean };
@@ -158,6 +159,7 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
 /** onlyIds: keyra aðeins fyrir valda starfsmenn (hakað í töflunni). Tómt/undefined = allir. */
 export async function runPayroll(from?: string, to?: string, settleIds: string[] = [], onlyIds?: string[]): Promise<RunResult> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  { const pb = await planBlock("payroll"); if (pb) return { ok: false, error: pb }; } // áskriftarleið (0089)
   if (!isSupabaseConfigured()) return { ok: true, demo: true, count: 0 };
   try {
     const supabase = await createClient();
@@ -376,6 +378,7 @@ export async function getPaydayItemNames(from: string, to: string): Promise<stri
 
 export async function sendToPayday(from: string, to: string, onlyIds?: string[]): Promise<{ ok: boolean; error?: string; count?: number; skipped?: string[] }> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  { const pb = await planBlock("payroll"); if (pb) return { ok: false, error: pb }; } // áskriftarleið (0089)
   if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
   try {
     const supabase = await createClient();

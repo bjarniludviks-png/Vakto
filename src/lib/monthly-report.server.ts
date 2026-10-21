@@ -93,9 +93,14 @@ export async function buildMonthlyReport(companyId: string, now = new Date()): P
 }
 
 /** 2–3 setningar frá Claude ef ANTHROPIC_API_KEY er til — annars/ef villa: null. Stöðvar aldrei póstinn. */
-export async function aiCommentary(d: MonthlyReportData): Promise<{ is: string; en: string } | null> {
+export async function aiCommentary(d: MonthlyReportData, companyId?: string): Promise<{ is: string; en: string } | null> {
   if (!process.env.ANTHROPIC_API_KEY) return null;
   try {
+    // Leið án AI (Frítt) eða kostnaðarþak náð → skýrslan fer án umsagnar (telst ekki spurning).
+    if (companyId) {
+      const { aiStop } = await import("@/lib/ai/ai-plan.server");
+      if (await aiStop(companyId, null)) return null;
+    }
     const { default: Anthropic } = await import("@anthropic-ai/sdk");
     const client = new Anthropic({ timeout: 25_000, maxRetries: 1 });
     const facts = {
@@ -126,6 +131,8 @@ export async function aiCommentary(d: MonthlyReportData): Promise<{ is: string; 
         content: `Þú skrifar stutta umsögn (2–3 setningar) í mánaðarskýrslu VAKTO til eiganda veitingastaðar/fyrirtækis. Notaðu AÐEINS tölurnar hér að neðan, aldrei giska. Laun % af veltu: lægra er betra; berðu saman við markmið og fyrri mánuð og nefndu eitt hagnýtt atriði ef tilefni er til. Íslenskt talnasnið (punktur í þúsundum, komma í brotum). Engin emoji, engar fyrirsagnir.\n\nGÖGN: ${JSON.stringify(facts)}`,
       }],
     });
+    const { recordAiUsage } = await import("@/lib/ai/usage.server");
+    await recordAiUsage({ model: msg.model, usage: msg.usage, feature: "monthly_report", companyId: companyId ?? null, userId: null });
     const block = msg.content.find((b) => b.type === "text");
     const parsed = block && "text" in block ? JSON.parse(block.text) as { is?: string; en?: string } : null;
     return parsed?.is && parsed.en ? { is: parsed.is.trim(), en: parsed.en.trim() } : null;
@@ -149,7 +156,7 @@ async function deliver(to: string[], d: MonthlyReportData): Promise<number> {
 /** Prufa: skýrsla síðasta mánaðar á eitt netfang strax (breytir ekki „sent“-merkinu). */
 export async function sendMonthlyReportTest(companyId: string, to: string): Promise<{ ok: boolean; skipped?: boolean }> {
   const { data } = await buildMonthlyReport(companyId);
-  data.commentary = await aiCommentary(data);
+  data.commentary = await aiCommentary(data, companyId);
   const r = await sendEmail({ to, subject: `[Prufa] ${monthlyReportSubject(data)}`, html: monthlyReportHtml(data), text: monthlyReportText(data) });
   return { ok: r.ok, skipped: r.skipped };
 }
@@ -192,7 +199,7 @@ export async function runMonthlyReports(now = new Date()): Promise<MonthlyRunRes
         .eq("id", id).or(`monthly_report_sent.is.null,monthly_report_sent.neq.${ym}`).select("id");
       if (!claimed?.length) { skip("already"); continue; }
 
-      data.commentary = await aiCommentary(data);
+      data.commentary = await aiCommentary(data, id);
       const n = await deliver(to, data);
       if (n === 0) {
         // Ekkert fór (enginn RESEND-lykill eða villa) → sleppa merkinu svo næsta keyrsla reyni aftur.

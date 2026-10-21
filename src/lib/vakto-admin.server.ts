@@ -1,5 +1,7 @@
 import "server-only";
-import { invoiceFor, planFor, type PlanId } from "@/lib/pricing";
+import { planFor, type PlanId } from "@/lib/pricing";
+import { planInvoice } from "@/lib/invoice-calc";
+import { asPlan } from "@/lib/plan-features";
 // VAKTO super-admin (the SaaS owner's view over ALL companies) — strictly
 // gated by email allowlist, then reads with the service-role client since the
 // data spans every tenant. Never expose any of this through normal RLS paths.
@@ -45,6 +47,9 @@ export type AdminCompany = {
   manualStatus: string | null; // raw billing_status column (admin override)
   mrr: number;                 // kr/mán án VSK this company contributes (0 unless paying) — síðustu 30 dagar
   pricePlan: PlanId;
+  legacyUntil: string | null;   // eldra verð gildir til (0089)
+  aiCostMonth: number;          // AI-kostnaður (Anthropic) frá upphafi almanaksmánaðar, kr (0089)
+  aiPacks: number;              // AI-pakkar teknir í mánuðinum
   activeEmployees30d: number;   // virkir (vakt eða stimplun) síðustu 30 daga — grunnur v2-verðs
   esigns30d: number;            // fullgildar undirskriftir síðustu 30 daga
   adminNote: string | null;    // companies.admin_note (0047)
@@ -149,15 +154,17 @@ export async function logPlatform(
 // below (MRR, gating, badges) keeps working unchanged.
 function deriveStatus(manual: string | null, trialEndsAt: string | null, plan: string | null): BillingStatus {
   if (manual === "paying" || manual === "unpaid" || manual === "free" || manual === "suspended" || manual === "canceled") return manual;
-  if (plan === "free") return "free";
+  if (plan === "free") return "free"; // Fría leiðin (0089) — aldrei rukkuð
   if (trialEndsAt) return new Date(trialEndsAt).getTime() > Date.now() ? "trial" : "trial_expired";
-  return plan ? "trial_expired" : "none";
+  return "none";
 }
 
-/** Mánaðartekjur án VSK eftir verðskrá fyrirtækisins (src/lib/pricing.ts). */
-function mrrOf(status: BillingStatus, plan: PlanId, users: number, active: number, esigns: number): number {
+/** Mánaðartekjur án VSK eftir áskriftarleið (0089, src/lib/plans.ts) — eldra verð ef það gildir og er lægra. */
+function mrrOf(status: BillingStatus, c: Record<string, unknown>, old: PlanId, users: number, active: number, esigns: number, aiPacks: number): number {
   if (status !== "paying") return 0;
-  const a = invoiceFor(plan, plan === "v1" ? users : active, esigns);
+  const lu = c.legacy_price_until as string | null;
+  const legacy = lu && lu.slice(0, 10) >= new Date().toISOString().slice(0, 10) ? { plan: old, units: old === "v1" ? users : active } : null;
+  const a = planInvoice({ plan: asPlan(c.plan), active, esigns, aiPacks, yearly: c.billing_interval === "year", legacy });
   return a.total - a.vat;
 }
 
@@ -195,8 +202,11 @@ export async function getAdminOverview(): Promise<AdminOverview> {
     let needsMigration = false;
     let needsPlatformMigration = false;
     let comps = await db.from("companies")
-      .select("id, name, kennitala, country, created_at, plan, trial_ends_at, billing_status, admin_note, price_plan, price_v1_until")
+      .select("id, name, kennitala, country, created_at, plan, trial_ends_at, billing_status, admin_note, price_plan, price_v1_until, legacy_price_until, billing_interval")
       .order("created_at", { ascending: true });
+    if (comps.error) comps = await db.from("companies") // fyrir 0089
+      .select("id, name, kennitala, country, created_at, plan, trial_ends_at, billing_status, admin_note, price_plan, price_v1_until")
+      .order("created_at", { ascending: true }) as typeof comps;
     if (comps.error) {
       needsPlatformMigration = true;
       comps = await db.from("companies")
@@ -233,6 +243,15 @@ export async function getAdminOverview(): Promise<AdminOverview> {
       else { if (!active30.has(k)) active30.set(k, new Set()); active30.get(k)!.add(String(r.ref)); }
     }
     if (platRes.error) needsPlatformMigration = true;
+    // AI-kostnaður og pakkar almanaksmánaðarins (0089) — þolir að töflurnar vanti.
+    const now = new Date(), monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const [costRes, packRes] = await Promise.all([
+      allRows<{ company_id: string | null; cost_isk: number }>((a, b) => db.from("ai_usage_calls").select("id, company_id, cost_isk").gte("created_at", monthStart.toISOString()).order("id").range(a, b)),
+      db.from("ai_usage").select("company_id, packs").eq("month", monthStart.toISOString().slice(0, 10)),
+    ]);
+    const aiCost = new Map<string, number>(), aiPacks = new Map<string, number>();
+    for (const r of costRes.data ?? []) if (r.company_id) aiCost.set(r.company_id, (aiCost.get(r.company_id) ?? 0) + Number(r.cost_isk ?? 0));
+    for (const r of (packRes.error ? [] : packRes.data ?? []) as { company_id: string; packs?: number }[]) aiPacks.set(r.company_id, r.packs ?? 0);
 
     const countBy = (list: { company_id?: unknown }[] | null) => {
       const m = new Map<string, number>();
@@ -287,8 +306,11 @@ export async function getAdminOverview(): Promise<AdminOverview> {
         trialDaysLeft: daysLeft(trialEndsAt),
         billingStatus: status,
         manualStatus: manual,
-        mrr: mrrOf(status, plan, u, active30.get(id)?.size ?? 0, esign30.get(id) ?? 0),
+        mrr: mrrOf(status, c, plan, u, active30.get(id)?.size ?? 0, esign30.get(id) ?? 0, aiPacks.get(id) ?? 0),
         pricePlan: plan,
+        legacyUntil: (c.legacy_price_until as string | null) ?? null,
+        aiCostMonth: Math.round(aiCost.get(id) ?? 0),
+        aiPacks: aiPacks.get(id) ?? 0,
         activeEmployees30d: active30.get(id)?.size ?? 0,
         esigns30d: esign30.get(id) ?? 0,
         adminNote: (c.admin_note as string) ?? null,

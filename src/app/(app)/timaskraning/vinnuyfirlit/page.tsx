@@ -2,10 +2,15 @@ import OverviewScreen from "./overview-screen";
 import { listWorkOverviews } from "./actions";
 import { getPayPeriodStart } from "@/lib/pay-period.server";
 import { lastPayPeriod } from "@/lib/periods";
+import { currentPlan } from "@/lib/plan.server";
+import { planAllows } from "@/lib/plan-features";
+import { UpgradePrompt } from "@/components/app/upgrade-prompt";
 
 const okDate = (s?: string) => !!s && /^\d{4}-\d{2}-\d{2}$/.test(s);
 
 export default async function VinnuyfirlitPage({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
+  const plan = await currentPlan(); // áskriftarleið (0089)
+  if (plan && !planAllows(plan, "work_overview")) return <UpgradePrompt feature="work_overview" />;
   const sp = await searchParams;
   const startDay = await getPayPeriodStart();
   const def = lastPayPeriod(startDay);

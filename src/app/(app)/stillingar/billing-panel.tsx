@@ -5,8 +5,9 @@ import { useRouter } from "next/navigation";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { nf } from "@/lib/format";
-import { PLANS, ESIGN_PRICE, AI_ADDON_PRICE, AI_ADDON_QUESTIONS, AI_FREE_QUESTIONS } from "@/lib/pricing";
-import { setBillingInterval, startCardChange, setAiAddon, cancelSubscription, resumeSubscription } from "./actions";
+import Link from "next/link";
+import { PLANS, AI_PACK, ESIGN_PRICE, annualMonthly, getPlan, type PlanId } from "@/lib/plans";
+import { setBillingInterval, startCardChange, setAiPacks, setPlan, cancelSubscription, resumeSubscription } from "./actions";
 import type { SettingsData } from "./settings.server";
 import { CardBrandLogo, brandName, brandOf } from "./card-brand";
 import "./billing.css";
@@ -39,7 +40,8 @@ export function BillingPanel({ data }: { data: SettingsData }) {
   const router = useRouter();
   const pr = data.pricing ?? null;
   const yearly = pr?.interval === "year";
-  const plan = PLANS[pr?.plan ?? "v2"];
+  const plan = getPlan(pr?.plan ?? "voxtur");
+  const price = (n: number) => (yearly ? annualMonthly(n) : n);
   const st = STATUS[data.company?.billingStatus ?? "trial"] ?? STATUS.trial;
   const card = data.card ?? null;
   const brand = brandOf(card?.brand);
@@ -53,9 +55,19 @@ export function BillingPanel({ data }: { data: SettingsData }) {
     if (r.ok && r.url) window.location.assign(r.url);
     else toast(r.error ?? t("Tókst ekki"));
   }
-  async function toggleAi(on: boolean) {
-    const r = await setAiAddon(on);
-    toast(r.ok ? (on ? t("Kveikt á VAKTO AI") : t("Slökkt á VAKTO AI-viðbótinni")) : (r.error ?? t("Tókst ekki")));
+  const [cap, setCap] = useState(String(data.ai?.packCap ?? 10));
+  async function toggleAi(on: boolean, newCap?: number) {
+    const r = await setAiPacks(on, newCap);
+    toast(r.ok ? (newCap !== undefined && on ? t("Hámark vistað") : on ? t("Kveikt á AI-pökkum") : t("Slökkt á AI-pökkum")) : (r.error ?? t("Tókst ekki")));
+    if (r.ok) router.refresh();
+  }
+  const [pick, setPick] = useState<PlanId | null>(null);
+  async function changePlan(id: PlanId) {
+    setBusy(true);
+    const r = await setPlan(id);
+    setBusy(false);
+    setPick(null);
+    toast(r.ok ? `${t("Leið breytt í")} ${getPlan(id).name}` : (r.error ?? t("Tókst ekki")));
     if (r.ok) router.refresh();
   }
   async function pickInterval(iv: "month" | "year") {
@@ -78,8 +90,8 @@ export function BillingPanel({ data }: { data: SettingsData }) {
     : pr.paidYearUntil
       ? (yearly ? `${t("Árið er greitt til")} ${pr.paidYearUntil}.` : `${t("Greitt ár gildir til")} ${pr.paidYearUntil}${t("; mánaðarleg greiðsla tekur við eftir það.")}`)
       : yearly
-        ? `${t("Árgjaldið")} (${nf(pr.yearFeeTotal)} kr ${t("m. VSK")}) ${t("verður tekið á næsta gjalddaga")}${pr.nextDue ? ` (${pr.nextDue})` : ""}. ${t("Virkir umfram 5 eru gerðir upp mánaðarlega á árlegum kjörum.")}`
-        : `${t("Árleg greiðsla sparar um 15%. Hún tekur gildi á næsta gjalddaga, svo mánuðurinn sem þú hefur greitt nýtist að fullu.")}`;
+        ? `${t("Árgjaldið")} (${nf(pr.yearFeeTotal)} kr ${t("m. VSK")}) ${t("verður tekið á næsta gjalddaga")}${pr.nextDue ? ` (${pr.nextDue})` : ""}. ${t("Virkir umfram innifalda eru gerðir upp mánaðarlega á árlegum kjörum.")}`
+        : `${t("Árleg greiðsla sparar 15%. Hún tekur gildi á næsta gjalddaga, svo mánuðurinn sem þú hefur greitt nýtist að fullu.")}`;
 
   return (
     <div className="bill owner-only">
@@ -88,24 +100,22 @@ export function BillingPanel({ data }: { data: SettingsData }) {
           <div className="bill-plan-head">
             <div>
               <div className="bill-eyebrow">{t("Áskrift")}</div>
-              <div className="bill-plan-name">VAKTO · {yearly ? t("Árleg greiðsla") : t("Mánaðarleg greiðsla")}</div>
+              <div className="bill-plan-name">VAKTO {plan.name} · {yearly ? t("Árleg greiðsla") : t("Mánaðarleg greiðsla")}</div>
             </div>
             <span className={`bill-pill ${st.tone}`}>{t(st.label)}</span>
           </div>
           {pr && (
             <div className="bill-amount">
               <b>{nf(pr.estimateTotal)} kr</b>
-              <span>{t("á mánuði m. VSK, áætlað")}</span>
+              <span>{t("á mánuði m. VSK, áætlað")} · {nf(pr.estimateNet)} kr {t("án VSK")}</span>
             </div>
           )}
           <div className="bill-facts">
             {pr?.nextDue && data.company?.billingStatus === "paying" && <div><span>{t("Næsti gjalddagi")}</span><b>{pr.nextDue}</b></div>}
             {canceled && endsAt && <div><span>{t("Áskriftin rennur út")}</span><b>{endsAt}</b></div>}
             {data.company?.trialEndsAt && data.company?.billingStatus !== "paying" && !canceled && <div><span>{t("Prufa gildir til")}</span><b>{data.company.trialEndsAt}</b></div>}
-            {pr?.plan === "v1"
-              ? <div><span>{t("Notendur núna")}</span><b>{data.users.length}</b></div>
-              : <div><span>{t("Virkir síðustu 30 daga")}</span><b>{pr?.units ?? "—"}</b></div>}
-            {pr?.plan === "v1" && pr.v1Until && <div><span>{t("Eldra verð gildir til")}</span><b>{pr.v1Until}</b></div>}
+            <div><span>{t("Virkir starfsmenn í þessum mánuði")}</span><b>{pr?.units ?? "—"}{pr ? ` / ${plan.included} ${t("innifaldir")}` : ""}</b></div>
+            {pr?.legacyUntil && <div><span>{t("Eldra verð gildir til")}</span><b>{pr.legacyUntil}{pr.legacyApplies ? ` · ${t("lægra verðið gildir")}` : ""}</b></div>}
           </div>
           {pr && (
             <div className="bill-interval">
@@ -137,11 +147,55 @@ export function BillingPanel({ data }: { data: SettingsData }) {
         </section>
       </div>
 
-      {data.ai && (
+      <section className="card" id="leidir">
+        <div className="ch">
+          <div><div className="ct">{t("Áskriftarleið")}</div><div className="cs">{t("breyting gildir strax; nýja verðið á næsta reikningi")} · <Link href="/verd" style={{ color: "var(--brand)", fontWeight: 600 }}>{t("sjá samanburð á leiðum")}</Link></div></div>
+        </div>
+        <div className="cb" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10 }}>
+          {PLANS.map((p) => {
+            const cur = p.id === plan.id;
+            return (
+              <div key={p.id} style={{ border: `1px solid ${cur ? "var(--brand)" : "var(--line)"}`, borderRadius: 12, padding: 14, display: "grid", gap: 6 }}>
+                <div style={{ fontWeight: 650 }}>{p.name}</div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{nf(price(p.base))} kr<span style={{ fontSize: 12, fontWeight: 500, color: "var(--ink3)" }}>/mán</span></div>
+                <div style={{ fontSize: 12, color: "var(--ink3)", lineHeight: 1.45 }}>
+                  {p.extraPerEmployee === null ? `${t("allt að")} ${p.included} ${t("starfsmenn, aðeins vefur")}` : `${p.included} ${t("virkir innifaldir")}, +${nf(price(p.extraPerEmployee))} kr ${t("á hvern umfram")}`}
+                  <br />{p.aiQuestions ? `${p.aiQuestions} ${t("AI-spurningar á mánuði")}` : t("án VAKTO AI")}
+                </div>
+                {cur
+                  ? <span className="bill-pill good" style={{ justifySelf: "start" }}>{t("Núverandi leið")}</span>
+                  : <button className="btn ghost sm" style={{ justifySelf: "start" }} disabled={busy} onClick={() => setPick(p.id)}>{t("Velja")} {p.name}</button>}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {pick && (
+        <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && !busy && setPick(null)}>
+          <div className="mbg" onClick={() => !busy && setPick(null)} />
+          <div className="modal" style={{ maxWidth: 460 }}>
+            <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Skipta yfir í")} {getPlan(pick).name}</div><button className="x" onClick={() => setPick(null)} disabled={busy}>✕</button></div>
+            <div className="mb">
+              <p style={{ margin: 0, fontSize: 14, lineHeight: 1.55 }}>
+                {pick === "free"
+                  ? t("Fría leiðin er aðeins vaktaplan á vefnum: starfsfólk kemst ekki í appið, engin stimpilklukka, spjall, beiðnir, launakeyrslur, samningar né VAKTO AI. Mest 5 starfsmenn og 1 staður. Gögnin haldast og þú getur skipt aftur hvenær sem er.")
+                  : `${getPlan(pick).name}: ${nf(price(getPlan(pick).base))} kr/mán ${t("án VSK með")} ${getPlan(pick).included} ${t("virkum starfsmönnum. Breytingin gildir strax og nýja verðið kemur á næsta reikning.")}`}
+              </p>
+              <div style={{ display: "flex", gap: 9, marginTop: 18, flexWrap: "wrap" }}>
+                <button className="btn" disabled={busy} onClick={() => changePlan(pick)}>{busy ? t("Augnablik…") : `${t("Já, skipta yfir í")} ${getPlan(pick).name}`}</button>
+                <button className="btn ghost" disabled={busy} onClick={() => setPick(null)}>{t("Hætta við")}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {data.ai && plan.aiQuestions > 0 && (
         <section className="card bill-ai" id="vakto-ai">
           <div className="ch">
             <div><div className="ct">VAKTO AI</div><div className="cs">{t("aðstoðarmaðurinn í horninu: tölur, vaktaplan og breytingar sem þú staðfestir")}</div></div>
-            <span className={`bill-pill ${data.ai.on ? "good" : data.ai.mode === "trial" ? "warn" : "mut"}`}>{data.ai.on ? t("Viðbót á") : data.ai.mode === "trial" ? t("Opið í prufu") : t("Frí útgáfa")}</span>
+            <span className={`bill-pill ${data.ai.packEnabled ? "good" : "mut"}`}>{data.ai.packEnabled ? t("AI-pakkar á") : `${data.ai.included} ${t("á mánuði")}`}</span>
           </div>
           <div className="cb">
             <div className="bill-ai-use">
@@ -149,14 +203,20 @@ export function BillingPanel({ data }: { data: SettingsData }) {
               <div className="bill-meter" aria-hidden><i style={{ width: `${Math.min(100, Math.round((data.ai.used / Math.max(1, data.ai.limit)) * 100))}%` }} /></div>
             </div>
             <p className="bill-ai-note">
-              {data.ai.on
-                ? `${t("Viðbótin kostar")} ${nf(AI_ADDON_PRICE)} kr/mán ${t("án VSK og bætist á mánaðarreikninginn. Allt að")} ${nf(AI_ADDON_QUESTIONS)} ${t("spurningar á mánuði.")}`
-                : `${t("Án viðbótar fylgja")} ${AI_FREE_QUESTIONS} ${t("spurningar á mánuði frítt")}${data.ai.mode === "trial" ? t(" (í prufu allt að 500)") : ""}. ${t("Viðbótin kostar")} ${nf(AI_ADDON_PRICE)} kr/mán ${t("án VSK, allt að")} ${nf(AI_ADDON_QUESTIONS)} ${t("spurningar á mánuði, engin binding.")}`}
+              {`${plan.name} ${t("inniheldur")} ${data.ai.included} ${t("spurningar á mánuði.")} `}
+              {data.ai.packEnabled
+                ? `${t("Þegar þær klárast bætist sjálfkrafa við pakki með")} ${AI_PACK.questions} ${t("spurningum á")} ${nf(AI_PACK.price)} kr ${t("án VSK, mest")} ${data.ai.packCap} ${t("pakkar á mánuði. Pakkar mánaðarins:")} ${data.ai.packs}.`
+                : `${t("Með AI-pökkum bætist sjálfkrafa við")} ${AI_PACK.questions} ${t("spurningar á")} ${nf(AI_PACK.price)} kr ${t("þegar þær klárast — aðeins greitt fyrir pakka sem eru notaðir, með hámarki sem þú velur.")}`}
             </p>
-            <div className="bill-foot" style={{ justifyContent: "flex-start", marginTop: 4 }}>
-              {data.ai.on
-                ? <button className="btn ghost" onClick={() => toggleAi(false)}>{t("Slökkva á viðbót")}</button>
-                : <button className="btn" onClick={() => toggleAi(true)}>{t("Kveikja á VAKTO AI")} · {nf(AI_ADDON_PRICE)} kr/mán</button>}
+            <div className="bill-foot" style={{ justifyContent: "flex-start", marginTop: 4, gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+              {data.ai.packEnabled
+                ? <button className="btn ghost" onClick={() => toggleAi(false)}>{t("Slökkva á AI-pökkum")}</button>
+                : <button className="btn" onClick={() => toggleAi(true)}>{t("Kveikja á AI-pökkum")} · {nf(AI_PACK.price)} kr / {AI_PACK.questions}</button>}
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13 }}>
+                {t("Hámark á mánuði")}
+                <input type="number" min={1} max={100} value={cap} onChange={(e) => setCap(e.target.value)} style={{ width: 70, border: "1px solid var(--line)", borderRadius: 8, padding: "6px 8px", font: "inherit", background: "var(--panel)", color: "var(--ink)" }} />
+              </label>
+              <button className="btn ghost sm" onClick={() => toggleAi(data.ai!.packEnabled, Number(cap))}>{t("Vista hámark")}</button>
             </div>
           </div>
         </section>
@@ -165,11 +225,11 @@ export function BillingPanel({ data }: { data: SettingsData }) {
       <section className="card">
         <div className="ch"><div><div className="ct">{t("Verðskrá")}</div><div className="cs">{t("öll verð án VSK")}</div></div></div>
         <div className="cb bill-price">
-          <div><span>{t("Grunngjald")}<em>{plan.included} {pr?.plan === "v1" ? t("notendur innifaldir") : t("virkir starfsmenn innifaldir")}</em></span><b>{nf(yearly ? plan.baseYear : plan.base)} kr/mán</b></div>
-          <div><span>{pr?.plan === "v1" ? t("Hver notandi umfram") : t("Hver virkur starfsmaður umfram")}</span><b>{nf(yearly ? plan.extraYear : plan.extra)} kr/mán</b></div>
-          <div><span>{t("Undirritun með rafrænum skilríkjum")}<em>{t("valkvætt")}</em></span><b>{nf(ESIGN_PRICE)} kr</b></div>
-          <div><span>VAKTO AI<em>{t("valkvæð viðbót, allt að")} {nf(AI_ADDON_QUESTIONS)} {t("spurningar á mánuði")}</em></span><b>{nf(AI_ADDON_PRICE)} kr/mán</b></div>
-          {pr?.plan !== "v1" && <p>{t("Virkur starfsmaður = átti vakt eða stimplaði sig á tímabilinu. Grunngjaldið er greitt fyrirfram; virkir umfram 5 og undirskriftir eru gerð upp eftir á fyrir mánuðinn sem lauk. Engin binding.")}</p>}
+          <div><span>{t("Grunnverð")} · {plan.name}<em>{plan.included} {plan.extraPerEmployee === null ? t("starfsmenn að hámarki") : t("virkir starfsmenn innifaldir")}</em></span><b>{nf(price(plan.base))} kr/mán</b></div>
+          {plan.extraPerEmployee !== null && <div><span>{t("Hver virkur starfsmaður umfram")}</span><b>{nf(price(plan.extraPerEmployee))} kr/mán</b></div>}
+          {plan.aiQuestions > 0 && <div><span>{t("AI-pakki")}<em>{AI_PACK.questions} {t("spurningar, aðeins ef kveikt")}</em></span><b>{nf(AI_PACK.price)} kr</b></div>}
+          <div><span>{t("Undirskrift með rafrænum skilríkjum")}<em>{t("valkvætt")}</em></span><b>{nf(ESIGN_PRICE)} kr</b></div>
+          <p>{t("Virkur starfsmaður = átti vakt eða stimplaði sig í mánuðinum. Grunnverðið er greitt fyrirfram; virkir umfram innifalda, AI-pakkar og undirskriftir eru gerð upp eftir á fyrir mánuðinn sem lauk. Árleg greiðsla: 15% afsláttur af grunnverði og verði á starfsmann. Engin binding.")}</p>
         </div>
       </section>
 

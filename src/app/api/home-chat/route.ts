@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { systemPrompt } from "@/lib/ai/vakto-knowledge";
 import { HOME_CHAT_MODEL } from "@/lib/ai/models";
+import { recordAiUsage } from "@/lib/ai/usage.server";
 
 // Spjallgaurinn á heimasíðunni. Gestir eru ekki innskráðir — hver þráður er
 // auðkenndur með handahófs-token sem vafrinn geymir. Skrifað með service-role.
@@ -77,6 +78,7 @@ export async function POST(req: Request) {
     while (merged.length && merged[0].role !== "user") merged.shift();
     const client = new Anthropic();
     const res = await client.messages.create({ model: MODEL, max_tokens: 500, system: systemPrompt(lang), messages: merged });
+    await recordAiUsage({ model: res.model, usage: res.usage, feature: "home_chat", companyId: null, userId: null }); // nafnlausir gestir
     const reply = res.content.filter((c) => c.type === "text").map((c) => (c as { text: string }).text).join("").trim()
       || pick({ is: "Ég er ekki viss um þetta — viltu tala við manneskju?", en: "I'm not sure about that — want to talk to a person?", pl: "Nie jestem tego pewien — chcesz porozmawiać z człowiekiem?" });
     await admin.from("support_messages").insert({ thread_id: threadId, role: "assistant", body: reply });

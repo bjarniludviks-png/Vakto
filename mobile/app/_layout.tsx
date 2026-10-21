@@ -10,7 +10,7 @@ import { colors, useTheme, loadThemeMode } from "../src/theme";
 import { loadLang } from "../src/lib/i18n";
 import { isManager } from "../src/lib/api/ops";
 import { supabase } from "../src/lib/supabase";
-import { getAccessState, markAccessClosed, READONLY_ROUTES } from "../src/lib/api/access";
+import { appBlockedMsg, getAccessState, markAccessClosed, markAppBlocked, READONLY_ROUTES } from "../src/lib/api/access";
 import { launchRoute, onPushTap } from "../src/lib/push";
 
 function Gate({ children }: { children: React.ReactNode }) {
@@ -28,6 +28,8 @@ function Gate({ children }: { children: React.ReactNode }) {
     getAccessState().then((a) => {
       if (!live) return;
       if (a.state === "closed") { markAccessClosed(); supabase.auth.signOut().catch(() => {}); }
+      // Fría leiðin: appið ekki í boði → út með skilaboðum (innskráningarskjárinn sýnir þau).
+      else if (!a.app) { markAppBlocked(appBlockedMsg(a.role)); supabase.auth.signOut().catch(() => {}); setAccess("closed"); return; }
       setAccess(a.state);
     }).catch(() => live && setAccess("active"));
     return () => { live = false; };

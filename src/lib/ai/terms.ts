@@ -9,6 +9,7 @@ import "server-only";
 
 import Anthropic from "@anthropic-ai/sdk";
 import { modelFor } from "@/lib/ai/models";
+import { recordAiUsage } from "@/lib/ai/usage.server";
 
 export type TermClause = { titleIs: string; titleEn: string; textIs: string; textEn: string };
 export type TermFlag = { clause: string; severity: "high" | "medium"; issueIs: string; issueEn: string };
@@ -77,6 +78,7 @@ export async function draftContractTerms(input: { description?: string; current?
       system: SYSTEM,
       messages: [{ role: "user", content: parts }],
     }).finalMessage();
+    await recordAiUsage({ model: msg.model, usage: msg.usage, feature: "contract_terms" });
     if (msg.stop_reason === "refusal") return { ...empty, error: "AI hafnaði beiðninni." };
     if (msg.stop_reason === "max_tokens") return { ...empty, error: "Svarið varð of langt — styttu lýsinguna." };
     const block = msg.content.find((b) => b.type === "text");
