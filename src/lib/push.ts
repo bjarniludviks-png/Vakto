@@ -14,7 +14,8 @@ function init(): boolean {
 }
 export function pushConfigured(): boolean { return !!(PUB && PRIV); }
 
-export type PushPayload = { title: string; body: string; url?: string; tag?: string };
+/** url = vefslóð (vefpush); appUrl = leið í appinu (Expo, t.d. "/samningur?id=…") — annars fer url í appið. */
+export type PushPayload = { title: string; body: string; url?: string; appUrl?: string; tag?: string };
 
 /** Notify all owners/managers of a company (e.g. a new employee request). */
 export async function notifyManagers(companyId: string | null | undefined, payload: PushPayload): Promise<void> {
@@ -82,7 +83,7 @@ async function sendExpo(devices: { id: string; token: string }[], payload: PushP
     const r = await fetch("https://exp.host/--/api/v2/push/send", {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json", ...(process.env.EXPO_ACCESS_TOKEN ? { Authorization: `Bearer ${process.env.EXPO_ACCESS_TOKEN}` } : {}) },
-      body: JSON.stringify(devices.map((d) => ({ to: d.token, title: payload.title, body: payload.body, sound: "default", data: { url: payload.url ?? "/", tag: payload.tag ?? "" }, channelId: "default" }))),
+      body: JSON.stringify(devices.map((d) => ({ to: d.token, title: payload.title, body: payload.body, sound: "default", data: { url: payload.appUrl ?? payload.url ?? "/", tag: payload.tag ?? "" }, channelId: "default" }))),
     });
     const j = (await r.json()) as { data?: { status: string; details?: { error?: string } }[] };
     (j.data ?? []).forEach(async (t, i) => {

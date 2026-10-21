@@ -12,7 +12,7 @@ import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { logAudit } from "@/lib/audit";
 import { userError } from "@/lib/user-error";
 import { buildContractPdf } from "@/lib/contract-pdf";
-import { employerSign, metaFrom, startTaktikalSigning } from "@/lib/esign.server";
+import { employerSign, metaFrom, notifyContractEmployee, startTaktikalSigning } from "@/lib/esign.server";
 import { taktikalEnabled } from "@/lib/taktikal.server";
 import { sendTerminationLetterEmail, sendTerminationSignEmail } from "@/lib/email";
 import { todayIs } from "@/lib/terminations.server";
@@ -228,6 +228,7 @@ export async function createTermination(input: CreateTerminationInput): Promise<
           try { await employerSign(c.id as string, { userId: ctx.userId, name: ctx.name, email: ctx.email }, metaFrom(await headers())); }
           catch (err) { console.error("[createTermination] employerSign", err); }
           await sendTerminationSignEmail(emp.email as string, emp.full_name as string, letterInput.company.name, title);
+          await notifyContractEmployee(c.id as string, "sign"); // push í appið; kastar aldrei
         }
       }
     } else if (input.documentMode === "send") {

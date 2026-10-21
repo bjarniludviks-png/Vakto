@@ -11,6 +11,7 @@ import { loadLang } from "../src/lib/i18n";
 import { isManager } from "../src/lib/api/ops";
 import { supabase } from "../src/lib/supabase";
 import { getAccessState, markAccessClosed, READONLY_ROUTES } from "../src/lib/api/access";
+import { launchRoute, onPushTap } from "../src/lib/push";
 
 function Gate({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -34,6 +35,7 @@ function Gate({ children }: { children: React.ReactNode }) {
 
   // Stjórnendur lenda á mælaborðinu þegar appið opnast; starfsfólk á Heim.
   const landed = useRef(false);
+  const pushed = useRef(false); // opnað úr push → ekki skipta yfir á mælaborðið
   useEffect(() => {
     if (loading) return;
     const onLogin = segments[0] === "login";
@@ -46,9 +48,18 @@ function Gate({ children }: { children: React.ReactNode }) {
     if (session && onLogin) { router.replace("/"); return; }
     if (session && !onLogin && !landed.current && segments.length <= 1) {
       landed.current = true;
-      isManager().then((m) => { if (m) router.replace("/maelabord"); }).catch(() => {});
+      isManager().then((m) => { if (m && !pushed.current) router.replace("/maelabord"); }).catch(() => {});
     }
   }, [session, loading, segments, router, access]);
+
+  // Smellt á push (t.d. samningur til undirritunar) → opna þann skjá, bæði við kaldræsingu og í gangi.
+  const ready = !!session && access !== null && access !== "closed";
+  useEffect(() => {
+    if (!ready) return;
+    const go = (url: string) => { pushed.current = true; router.push(url as never); };
+    launchRoute().then((u) => { if (u) go(u); }).catch(() => {});
+    return onPushTap(go);
+  }, [ready, router]);
 
   if (loading || (session && access === null)) {
     return (
