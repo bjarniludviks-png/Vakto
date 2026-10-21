@@ -69,3 +69,34 @@ export async function pushEnabled(): Promise<boolean> {
   const { status } = await Notifications.getPermissionsAsync();
   return status === "granted";
 }
+
+/* Smellt á tilkynningu → réttur skjár. Þjónninn setur data.url (t.d. "/samningur?id=…", sjá
+ * appUrl í src/lib/push.ts á vefnum). Aðeins leiðir sem eru til í appinu; annað opnar appið bara. */
+const APP_ROUTES = ["samningur", "skjol", "frettaveita"];
+const handled = new Set<string>();
+
+function routeOf(r: Notifications.NotificationResponse | null | undefined): string | null {
+  if (!r) return null;
+  const id = r.notification.request.identifier;
+  if (handled.has(id)) return null;
+  const url = (r.notification.request.content.data as { url?: unknown } | null)?.url;
+  if (typeof url !== "string" || !url.startsWith("/")) return null;
+  if (!APP_ROUTES.includes(url.slice(1).split(/[?/#]/)[0])) return null;
+  handled.add(id);
+  return url;
+}
+
+/** Kaldræsing: tilkynningin sem opnaði appið (einu sinni), eða null. */
+export async function launchRoute(): Promise<string | null> {
+  if (Platform.OS === "web") return null;
+  try { return routeOf(await Notifications.getLastNotificationResponseAsync()); } catch { return null; }
+}
+
+/** Appið opið/í bakgrunni: kallar á go(url) þegar smellt er á tilkynningu. Skilar afskráningu. */
+export function onPushTap(go: (url: string) => void): () => void {
+  if (Platform.OS === "web") return () => {};
+  try {
+    const sub = Notifications.addNotificationResponseReceivedListener((r) => { const u = routeOf(r); if (u) go(u); });
+    return () => sub.remove();
+  } catch { return () => {}; }
+}

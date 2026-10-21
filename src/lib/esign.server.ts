@@ -17,6 +17,7 @@ import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { sendContractCodeEmail, sendSignedContractEmail, sendTaktikalSignEmail } from "@/lib/email";
+import { notifyEmployee } from "@/lib/push";
 import { buildContractPdf, type SignatureRecord } from "@/lib/contract-pdf";
 import { createSigningProcess, fetchProcessState, fetchSignedPdf, taktikalConfigured, TAKTIKAL_EVENT, type TaktikalSigneeState, type TaktikalWebhook } from "@/lib/taktikal.server";
 
@@ -64,6 +65,29 @@ function docNames(title: string | null | undefined): { label: string; ascii: str
     .replace(/æ/g, "ae").replace(/Æ/g, "Ae").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "") || "Samningur";
   const type = label === "Verksamningur" || label === "Ráðningarsamningur" ? "Samningur" : "Starfslok";
   return { label, ascii, type };
+}
+
+/** Push til starfsmannsins um samning/bréf: „sign“ = bíður undirritunar (appið opnar /samningur?id=…),
+ *  „stored“ = undirritað eintak komið í Skjöl. Opið demo sleppt; kastar aldrei (má ekki stöðva sendingu). */
+export async function notifyContractEmployee(contractId: string, kind: "sign" | "stored"): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const { data: c } = await admin.from("contracts").select("employee_id, company_id, title, companies(name)").eq("id", contractId).maybeSingle();
+    if (!c?.employee_id || (await demoBlocked(c.company_id as string))) return;
+    const co = ((Array.isArray(c.companies) ? c.companies[0] : c.companies) as { name?: string } | null)?.name || "Vinnuveitandinn þinn";
+    const dn = docNames(c.title as string);
+    const letter = dn.type === "Starfslok"; // t.d. uppsagnarbréf: lesið og móttaka staðfest
+    const payload = kind === "sign"
+      ? letter
+        ? { title: `${dn.label} til lestrar`, body: `${co} sendi þér bréf. Opnaðu til að lesa og staðfesta móttöku.` }
+        : { title: `${dn.label} til undirritunar`, body: `${co} sendi þér samning. Opnaðu til að lesa og undirrita.` }
+      : letter
+        ? { title: `${dn.label} — undirritað`, body: "Undirritað eintak er komið í Skjöl." }
+        : { title: "Samningurinn er undirritaður", body: "Undirritaður samningur er kominn í Skjöl." };
+    await notifyEmployee(c.employee_id as string, {
+      ...payload, url: "/mitt-svaedi", appUrl: kind === "sign" ? `/samningur?id=${contractId}` : "/skjol", tag: `contract-${contractId}`,
+    });
+  } catch (e) { console.error("notifyContractEmployee", e); }
 }
 
 /** Finnur samning sem kallandinn (starfsmaður) á og er í undirritunarferli. */
@@ -409,7 +433,12 @@ async function applyTaktikalState(
       if (obs.signedDocument) pdf = Buffer.from(obs.signedDocument, "base64");
     }
     if (pdf && pdf.subarray(0, 5).toString() === "%PDF-") {
-      try { if (await deliverTaktikalCopy(contractId, pdf)) changes.push("pdf_stored"); } catch (e) { console.error("taktikal deliver", e); }
+      try {
+        if (await deliverTaktikalCopy(contractId, pdf)) {
+          changes.push("pdf_stored");
+          await notifyContractEmployee(contractId, "stored"); // aðeins sú keyrsla sem vistaði PDF-ið
+        }
+      } catch (e) { console.error("taktikal deliver", e); }
     }
   }
   return { known: true, status, changes };
@@ -485,6 +514,8 @@ async function inviteTaktikalEmployee(contractId: string) {
   const co = one(c.companies as { name?: string } | null);
   const tk = one(c.contract_taktikal as { employee_url?: string } | null);
   if (emp?.email && tk?.employee_url) await sendTaktikalSignEmail(emp.email, emp.full_name ?? "", co?.name ?? "Vinnuveitandinn þinn", tk.employee_url);
+  // Röðin komin að starfsmanni → líka push í appið (kallað aðeins á stöðubreytingunni eða við handvirka endursendingu).
+  if (tk?.employee_url) await notifyContractEmployee(contractId, "sign");
 }
 
 /** Undirritað PDF fær fast geymslunafn per samning (`<company>/<employee>/<contractId>-…`) svo hægt

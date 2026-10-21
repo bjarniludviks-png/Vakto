@@ -11,6 +11,7 @@ import { useMe } from "../../src/lib/me-context";
 import { supabase } from "../../src/lib/supabase";
 import { getMonthPay } from "../../src/lib/api/home";
 import { listMyRequests } from "../../src/lib/api/requests";
+import { countAwaitingContracts } from "../../src/lib/api/docs";
 import type { MonthPay } from "../../src/lib/api/pay";
 import { kr, dec1 } from "../../src/lib/format";
 import { unregisterPush } from "../../src/lib/push";
@@ -24,12 +25,14 @@ export default function Eg() {
   const [pending, setPending] = useState(0);
   const [reqCount, setReqCount] = useState(0);
   const [manager, setManager] = useState(false);
+  const [awaiting, setAwaiting] = useState(0); // samningar sem bíða minnar undirritunar
   React.useEffect(() => { if (Platform.OS === "ios") isManager().then(setManager).catch(() => {}); }, [me]);
 
   useFocusEffect(useCallback(() => {
     if (!me) return;
     getMonthPay(me).then(setPay).catch(() => {});
     listMyRequests(me).then((r) => { setReqCount(r.length); setPending(r.filter((x) => x.status === "pending").length); }).catch(() => {});
+    countAwaitingContracts(me).then(setAwaiting).catch(() => {});
   }, [me]));
 
   const pct = pay && pay.projectedKr > 0 ? pay.earnedKr / pay.projectedKr : 0;
@@ -75,7 +78,18 @@ export default function Eg() {
       </List>
 
       <List>
-        <Row icon={<IconBox><FileText color={colors.ink2} size={19} /></IconBox>} title="Ráðningarsamningur" sub="Lesa eða undirrita" onPress={() => router.push("/samningur")} />
+        <Row
+          icon={<IconBox><FileText color={colors.ink2} size={19} /></IconBox>}
+          title="Samningar" sub="Ráðningarsamningur og önnur skjöl til undirritunar" onPress={() => router.push("/samningur")}
+          right={awaiting > 0 ? (
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <View style={{ minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 6, backgroundColor: colors.bad, alignItems: "center", justifyContent: "center" }}>
+                <Txt weight="bold" size={11.5} color="#fff">{String(awaiting)}</Txt>
+              </View>
+              <ChevronRight color={colors.ink3} size={18} />
+            </View>
+          ) : undefined}
+        />
         <Row icon={<IconBox><Settings color={colors.ink2} size={19} /></IconBox>} title="Stillingar" sub="Tilkynningar, prófíll, lykilorð" onPress={() => router.push("/stillingar")} />
         <Row
           icon={<IconBox tone="bad"><LogOut color={iconColor("bad")} size={19} /></IconBox>}

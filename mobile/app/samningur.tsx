@@ -1,19 +1,66 @@
-// Ráðningarsamningur — sýnir nýjasta sendan/undirritaðan samning.
+// Samningar — án `id`: listi yfir alla mína samninga/bréf (sent + undirritað, nýjast fyrst);
+// sé aðeins einn opnast hann beint. Með `id` (t.d. úr push): sá samningur, lesa og undirrita.
 import React, { useCallback, useEffect, useState } from "react";
 import { useTheme } from "../src/theme";
-import { View, TextInput, Pressable, Linking } from "react-native";
-import { Check } from "lucide-react-native";
+import { View, TextInput, Pressable, Linking, ActivityIndicator } from "react-native";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
+import { Check, FileText, ChevronRight } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
-import { Card, Txt, Muted, Pill, Btn, useToast } from "../src/components/ui";
+import { Card, Txt, Muted, Pill, Btn, IconBox, iconColor, useToast } from "../src/components/ui";
 import { inputStyle } from "../src/components/request-sheets";
 import { colors } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
-import { getMyContract, requestContractCode, signContract, taktikalLink, type Contract } from "../src/lib/api/docs";
-import { tr } from "../src/lib/i18n";
+import { listMyContracts, getContract, requestContractCode, signContract, taktikalLink, type Contract } from "../src/lib/api/docs";
+import { tr, trf } from "../src/lib/i18n";
 import { parseContract, splitLang, contractSummary, visibleRows, isBlank } from "../src/lib/contract";
 
+/** 2026-10-21T… → 21.10.2026 */
+const dmy = (iso: string | null) => { const [y, m, d] = String(iso ?? "").slice(0, 10).split("-"); return d ? `${d}.${m}.${y}` : ""; };
 
 export default function Samningur() {
+  useTheme();
+  const { me } = useMe();
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const [list, setList] = useState<Contract[] | null>(null);
+
+  // Listinn er sóttur við hverja heimkomu (t.d. eftir undirritun í smáatriðum).
+  useFocusEffect(useCallback(() => {
+    if (!me || id) return;
+    listMyContracts(me).then(setList).catch(() => setList([]));
+  }, [me, id]));
+
+  if (id) return <ContractDetail id={String(id)} />;
+  if (list?.length === 1) return <ContractDetail id={list[0].id} />;
+  return (
+    <Screen title="Samningar" back>
+      {list === null ? <ActivityIndicator color={colors.brand} style={{ marginTop: 24 }} /> : null}
+      {list && !list.length ? (
+        <Card>
+          <Muted>Enginn samningur hefur verið sendur á þig ennþá.</Muted>
+        </Card>
+      ) : null}
+      {(list ?? []).map((c) => (
+        <Pressable key={c.id} onPress={() => router.push(`/samningur?id=${c.id}`)} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
+          <Card style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <IconBox tone={c.awaitingMe ? "warn" : "info"}><FileText color={iconColor(c.awaitingMe ? "warn" : "info")} size={19} /></IconBox>
+            <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+              <Txt weight="bold" size={14.5} numberOfLines={2}>{c.title}</Txt>
+              <Pill
+                label={c.status === "signed" ? trf("Undirritað {x}", dmy(c.signedAt)).trim() : tr("Bíður undirritunar")}
+                tone={c.status === "signed" ? "good" : "warn"}
+              />
+            </View>
+            <ChevronRight color={colors.ink3} size={18} />
+          </Card>
+        </Pressable>
+      ))}
+    </Screen>
+  );
+}
+
+/** Einn samningur: lesa og undirrita (kóði á netfang eða Taktikal). */
+function ContractDetail({ id }: { id: string }) {
   useTheme();
   const { me } = useMe();
   const [contract, setContract] = useState<Contract | null>(null);
@@ -46,9 +93,9 @@ export default function Samningur() {
 
   const load = useCallback(async () => {
     if (!me) return;
-    setContract(await getMyContract(me));
+    setContract(await getContract(me, id).catch(() => null));
     setLoaded(true);
-  }, [me]);
+  }, [me, id]);
 
   useEffect(() => {
     load();
@@ -58,7 +105,7 @@ export default function Samningur() {
     <Screen title={contract && !/^(Ráðningarsamningur|Verksamningur)/.test(contract.title) ? "Starfslok" : "Ráðningarsamningur"} back>
       {loaded && !contract ? (
         <Card>
-          <Muted>Enginn samningur hefur verið sendur á þig ennþá.</Muted>
+          <Muted>Samningurinn fannst ekki.</Muted>
         </Card>
       ) : null}
       {contract ? (

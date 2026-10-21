@@ -12,7 +12,7 @@ import { sendContractEmail } from "@/lib/email";
 import { inviteToCompany } from "@/lib/invite.server";
 import type { CustomRules } from "@/lib/payrules";
 import { headers } from "next/headers";
-import { employerSign, metaFrom, resendTaktikalInvite, signedPdfPath, startTaktikalSigning, syncTaktikalContract, type TaktikalSyncResult } from "@/lib/esign.server";
+import { employerSign, metaFrom, notifyContractEmployee, resendTaktikalInvite, signedPdfPath, startTaktikalSigning, syncTaktikalContract, type TaktikalSyncResult } from "@/lib/esign.server";
 import { taktikalEnabled } from "@/lib/taktikal.server";
 import type { SignatureRecord } from "@/lib/contract-pdf";
 import { userError } from "@/lib/user-error";
@@ -1072,6 +1072,7 @@ export async function setContractStatus(
       const emp = (Array.isArray(row.employees) ? row.employees[0] : row.employees) as { full_name?: string; email?: string } | null;
       const co = (Array.isArray(row.companies) ? row.companies[0] : row.companies) as { name?: string } | null;
       if (emp?.email) void sendContractEmail(emp.email, emp.full_name ?? "", co?.name ?? "Fyrirtækið þitt");
+      await notifyContractEmployee(id, "sign"); // push í appið (opnar samninginn); kastar aldrei
     }
     revalidatePath("/starfsfolk");
     return { ok: true };
@@ -1118,6 +1119,7 @@ export async function resendContract(employeeId: string): Promise<ActionResult &
     } else {
       const co = (Array.isArray(open.companies) ? open.companies[0] : open.companies) as { name?: string } | null;
       await sendContractEmail(emp.email, emp.full_name ?? "", co?.name ?? "Fyrirtækið þitt");
+      await notifyContractEmployee(open.id as string, "sign");
     }
     const { data: { user } } = await supabase.auth.getUser();
     await logAudit(supabase, company, user?.id ?? null, { action: "contract.resend", entity: "contracts", entityId: open.id as string, detail: `Samningur sendur aftur — ${emp.full_name ?? ""} (${emp.email})` });

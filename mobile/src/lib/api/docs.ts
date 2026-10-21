@@ -40,7 +40,7 @@ export async function signedUrl(path: string): Promise<{ ok: boolean; url?: stri
   return { ok: true, url: data.signedUrl };
 }
 
-/** My employment contract (sent or signed), like getMyContract on the web. */
+/** Samningar og bréf (ráðningar-/verksamningur, starfslokabréf) sem send hafa verið á mig. */
 export type Contract = {
   id: string;
   title: string;
@@ -48,20 +48,49 @@ export type Contract = {
   status: string;
   signedAt: string | null;
   signedVia: string | null;
+  /** Bíður MÍN: sendur og (við Taktikal) vinnuveitandinn búinn að skrifa undir. */
+  awaitingMe: boolean;
 };
 
-export async function getMyContract(me: Me): Promise<Contract | null> {
+const COLS = "id, title, content, status, signed_at, signed_via, employer_signed_at";
+type Raw = { id: string; title: string; content: string; status: string; signed_at: string | null; signed_via: string | null; employer_signed_at: string | null };
+const toContract = (c: Raw): Contract => ({
+  id: c.id, title: c.title, content: c.content, status: c.status, signedAt: c.signed_at, signedVia: c.signed_via ?? null,
+  awaitingMe: c.status === "sent" && (c.signed_via !== "taktikal" || !!c.employer_signed_at),
+});
+
+/** Allir mínir samningar (sendir + undirritaðir), nýjasti fyrst. */
+export async function listMyContracts(me: Me): Promise<Contract[]> {
   const { data } = await supabase
     .from("contracts")
-    .select("id, title, content, status, signed_at, signed_via")
+    .select(COLS)
     .eq("employee_id", me.empId)
     .in("status", ["sent", "signed"])
     .order("created_at", { ascending: false })
-    .limit(1);
-  const c = data?.[0];
-  return c
-    ? { id: c.id, title: c.title, content: c.content, status: c.status, signedAt: c.signed_at, signedVia: c.signed_via ?? null }
-    : null;
+    .limit(50);
+  return ((data ?? []) as Raw[]).map(toContract);
+}
+
+/** Einn samningur (RLS: aðeins minn). */
+export async function getContract(me: Me, id: string): Promise<Contract | null> {
+  const { data } = await supabase
+    .from("contracts")
+    .select(COLS)
+    .eq("id", id)
+    .eq("employee_id", me.empId)
+    .in("status", ["sent", "signed"])
+    .maybeSingle();
+  return data ? toContract(data as Raw) : null;
+}
+
+/** Fjöldi samninga sem bíða minnar undirritunar (merki á „Samningar“ í Ég). */
+export async function countAwaitingContracts(me: Me): Promise<number> {
+  const { data } = await supabase
+    .from("contracts")
+    .select("status, signed_via, employer_signed_at")
+    .eq("employee_id", me.empId)
+    .eq("status", "sent");
+  return (data ?? []).filter((c) => c.signed_via !== "taktikal" || !!c.employer_signed_at).length;
 }
 
 // Rafræn undirritun (0058) fer um vefþjóninn: kóði á netfang → staðfesting →
