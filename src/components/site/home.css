@@ -573,6 +573,19 @@ img.ah-pass-av{object-fit:cover;border:2px solid rgba(255,255,255,.55);padding:0
 .ah-hey-who{margin:14px 0 0;font-size:14px;color:#6e6e73}
 @media (max-width:980px){.ah-hey-grid{grid-template-columns:1fr;max-width:560px;margin:0 auto}}
 @media (max-width:700px){.ah-hey-col{padding:24px 18px;border-radius:24px}.ah-hey-q{font-size:15px}.ah-hey-ok{font-size:15.5px}}
+.ah-hey-swipe{display:none}
+@media (max-width:700px){
+  .ah-hey .ah-hey-grid{display:none}
+  .ah-hey-swipe{display:block;margin:0 -16px}
+  .ah-hey-track{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;padding:4px 16px 18px;scroll-padding-inline:16px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .ah-hey-track::-webkit-scrollbar{display:none}
+  .ah-hey-card{flex:0 0 84%;scroll-snap-align:start;background:rgba(255,255,255,.88);border-radius:22px;padding:18px 16px 20px;box-shadow:0 0 0 1px var(--line),0 16px 36px -26px rgba(40,25,10,.3)}
+  .ah-hey-card h3{font-size:12px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--ink3);margin:0 0 12px}
+  .ah-hey-card .ah-hey-q{margin:0 0 10px 0}
+  .ah-hey-dots{display:flex;justify-content:center;gap:6px}
+  .ah-hey-dots span{width:6px;height:6px;border-radius:3px;background:var(--line);transition:width .2s,background .2s}
+  .ah-hey-dots span.on{width:18px;background:var(--brand)}
+}
 
 /* ---------- Kynning á vinnustaðnum ---------- */
 .ah-visit{padding-top:40px}

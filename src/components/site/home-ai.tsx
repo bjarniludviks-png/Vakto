@@ -80,6 +80,7 @@ export function HeyVakto() {
           </div>
         ))}
       </div>
+      <HeySwipe groups={t.groups} pre={t.pre} />
       <div className="ah-hey-foot">
         <p className="ah-hey-ok">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z" /><path d="M8.8 12.2l2.2 2.2 4.2-4.4" /></svg>
@@ -88,6 +89,35 @@ export function HeyVakto() {
         <p className="ah-hey-who">{t.who}</p>
       </div>
     </section>
+  );
+}
+
+/** Sími: eitt dæmi per spjald, flett til hliðar (næsta spjald gægist inn). Tölva/spjaldtölva: dálkarnir hér að ofan. */
+function HeySwipe({ groups, pre }: { groups: { h: string; items: { q: string; a: string }[] }[]; pre: string }) {
+  const cards = groups.flatMap((g) => g.items.map((it) => ({ ...it, h: g.h })));
+  const ref = useRef<HTMLDivElement>(null);
+  const [at, setAt] = useState(0);
+  function onScroll() {
+    const el = ref.current;
+    const first = el?.firstElementChild as HTMLElement | null;
+    if (!el || !first) return;
+    setAt(Math.min(cards.length - 1, Math.round(el.scrollLeft / (first.offsetWidth + 12))));
+  }
+  return (
+    <div className="ah-hey-swipe">
+      <div className="ah-hey-track" ref={ref} onScroll={onScroll}>
+        {cards.map((c) => (
+          <div className="ah-hey-card" key={c.q}>
+            <h3>{c.h}</h3>
+            <p className="ah-hey-q"><span>{pre}</span> {c.q}</p>
+            <p className="ah-hey-a"><Spark />{c.a}</p>
+          </div>
+        ))}
+      </div>
+      <div className="ah-hey-dots" aria-hidden="true">
+        {cards.map((c, i) => <span key={c.q} className={i === at ? "on" : undefined} />)}
+      </div>
+    </div>
   );
 }
 
