@@ -1,7 +1,10 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { chargeToken, straumurConfigured } from "@/lib/straumur";
-import { invoiceFor, planFor, baseModeFor, type PlanId, type BillingInterval } from "@/lib/pricing";
+import { planFor, baseModeFor, type BillingInterval } from "@/lib/pricing";
+import { planInvoice } from "@/lib/invoice-calc";
+import { getPlan } from "@/lib/plans";
+import { asPlan } from "@/lib/plan-features";
 import { issuePaydayInvoice, issueMissingPaydayInvoices } from "@/lib/billing-payday.server";
 import { sendTrialReminderEmail, sendCardMissingEmail, sendPaymentFailedEmail, sendReceiptEmail, sendSuspendedEmail } from "@/lib/email";
 import { allRows } from "@/lib/supabase/all-rows";
@@ -46,14 +49,24 @@ export async function esignCount(companyId: string, from: string, to: string): P
   return count ?? 0;
 }
 
-/** Áætlaður mánaðarreikningur (með VSK) miðað við síðustu 30 daga — fyrir áminningar og Stillingar. */
-export async function estimateMonthly(companyId: string, plan: PlanId, now = new Date(), interval: BillingInterval = "month", ai = false) {
-  const to = iso(new Date(now.getTime() + 86400000)), from = iso(new Date(now.getTime() - 30 * 86400000));
-  const units = plan === "v1" ? await usersCount(companyId) : await activeEmployees(companyId, from, to);
-  // Árlegt: mánaðarígildi (baseYear + umfram á árlegum kjörum) — sjálft árgjaldið er 12 × baseYear.
-  const a = interval === "year" ? invoiceFor(plan, units, 0, { base: "none", yearly: true, ai }) : invoiceFor(plan, units, 0, { ai });
-  if (interval === "year") { const b = invoiceFor(plan, 0, 0, { base: "year" }); const monthBase = Math.round(b.base / 12); const net = monthBase + a.extra + a.ai; const vat = Math.round(net * 0.24); return { units, ...a, base: monthBase, vat, total: net + vat }; }
-  return { units, ...a };
+/** Eldra verð í gildi á degi `on`? (legacy_price_until ≥ on) → verðskrá og einingar hennar. */
+async function legacyFor(companyId: string, co: { legacy_price_until?: unknown; price_plan?: unknown; price_v1_until?: unknown }, on: Date, active: number) {
+  const until = co.legacy_price_until as string | null | undefined;
+  if (!until || until.slice(0, 10) < on.toISOString().slice(0, 10)) return null;
+  const old = planFor({ price_plan: co.price_plan as string | null, price_v1_until: co.price_v1_until as string | null }, on);
+  return { plan: old, units: old === "v1" ? await usersCount(companyId) : active };
+}
+
+/** Áætlaður mánaðarreikningur (með VSK) fyrir Stillingar og áminningar: virkir þennan almanaksmánuð,
+ *  AI-pakkar sem þegar eru teknir. Árlegt: mánaðarígildi (annualMonthly). */
+export async function estimateMonthly(companyId: string, co: { plan?: unknown; billing_interval?: unknown; legacy_price_until?: unknown; price_plan?: unknown; price_v1_until?: unknown }, now = new Date()) {
+  const month = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}-01`;
+  const to = iso(new Date(now.getTime() + 86400000));
+  const active = await activeEmployees(companyId, month, to);
+  const { data: u } = await createAdminClient().from("ai_usage").select("packs").eq("company_id", companyId).eq("month", month).maybeSingle();
+  const plan = asPlan(co.plan), yearly = co.billing_interval === "year";
+  const legacy = await legacyFor(companyId, co, now, active);
+  return { units: active, plan, ...planInvoice({ plan, active, aiPacks: (u?.packs as number | undefined) ?? 0, yearly, legacy }) };
 }
 
 /** Næsti gjalddagi (upphaf næsta tímabils) frá billing_anchor. */
@@ -131,8 +144,9 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
   const admin = createAdminClient();
   const out: BillingRunResult = { reminders: 0, expired: 0, invoices: 0, paid: 0, failed: 0, suspended: 0, retried: 0, paydayInvoices: 0 };
   const { data: companies } = await admin.from("companies")
-    .select("id, name, plan, price_plan, price_v1_until, billing_interval, billing_year_start, trial_ends_at, billing_status, billing_anchor, trial_reminder_sent_at, trial_expired_sent_at, ai_addon")
-    .not("plan", "is", null);
+    .select("id, name, plan, price_plan, price_v1_until, legacy_price_until, billing_interval, billing_year_start, billing_year_plan, trial_ends_at, billing_status, billing_anchor, trial_reminder_sent_at, trial_expired_sent_at")
+    // Áskrift hafin (nýskráning setur trial_ends_at). Eldri fyrirtæki án hennar eru aldrei rukkuð (eins og áður: plan NULL).
+    .or("trial_ends_at.not.is.null,billing_anchor.not.is.null");
   for (const co of companies ?? []) {
     const id = co.id as string, name = (co.name as string) ?? "";
     const status = (co.billing_status as string | null) ?? null;
@@ -145,6 +159,9 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
       }
       continue;
     }
+    // Fría leiðin (0089): ekkert rukkað, engar áminningar um kort.
+    const tier = asPlan(co.plan);
+    if (tier === "free") continue;
     const trialEnds = co.trial_ends_at ? new Date(co.trial_ends_at as string) : null;
 
     // 1) Áminning 3 dögum fyrir lok prufu
@@ -152,12 +169,11 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
       const d = daysBetween(now, trialEnds);
       if (d >= 0 && d <= 3) {
         const card = await activeCard(id);
-        // Fyrsti reikningur eftir prufu = grunngjald (v2: notkun í prufunni er ekki rukkuð; v1: notendur fyrirfram).
-        const plan = planFor(co, now);
-        const users = await usersCount(id);
-        const first = invoiceFor(plan, plan === "v1" ? users : 0, 0, { ai: !!co.ai_addon });
-        const note = plan === "v1" ? `${users} notendur` : `grunngjald með 5 virkum starfsmönnum`;
-        const noteEn = plan === "v1" ? `${users} users` : `base fee incl. 5 active employees`;
+        // Fyrsti reikningur eftir prufu = grunngjald leiðarinnar (notkun í prufunni er ekki rukkuð).
+        const p = getPlan(tier);
+        const first = planInvoice({ plan: tier, active: 0, yearly: co.billing_interval === "year", base: co.billing_interval === "year" ? "year" : "month" });
+        const note = `${p.name}: grunngjald með ${p.included} virkum starfsmönnum`;
+        const noteEn = `${p.name}: base fee incl. ${p.included} active employees`;
         for (const to of await ownerEmails(id)) await sendTrialReminderEmail(to, name, { daysLeft: d, hasCard: !!card, total: first.total, note, noteEn }).catch((e) => console.error("email:", e));
         await admin.from("companies").update({ trial_reminder_sent_at: now.toISOString() }).eq("id", id);
         out.reminders++;
@@ -193,7 +209,6 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
         // gerð upp eftir á fyrir tímabilið sem lauk. Fyrsti reikningur eftir prufu: engin notkun.
         // Árlegt: árgjaldið (12 × baseYear) tekið í upphafi ársins, síðan aðeins notkun á árlegum kjörum.
         // Skipt aftur í mánaðarlegt gildir þegar greidda árið rennur út.
-        const plan = planFor(co, periodStart);
         const prevStart = addMonths(periodStart, -1);
         const hasUsage = prevStart.getTime() >= anchor.getTime();
         const uFrom = iso(prevStart), uTo = iso(periodStart);
@@ -202,18 +217,26 @@ export async function runBillingDay(now = new Date()): Promise<BillingRunResult>
         try { active = hasUsage ? await activeEmployees(id, uFrom, uTo) : 0; }
         catch (e) { console.error("[billing] notkun ólesanleg — reikningur bíður til morguns:", id, e); continue; } // idempotent: reynt aftur næsta dag
         const users = await usersCount(id);
-        const units = plan === "v1" ? users : active;   // v1: notendur fyrirfram eins og áður
         const interval = ((co.billing_interval as string) === "year" ? "year" : "month") as BillingInterval;
         const yearStart = co.billing_year_start ? new Date(co.billing_year_start as string) : null;
         const { mode: baseMode, startYear } = baseModeFor({ interval, yearStart, periodStart });
-        if (startYear) await admin.from("companies").update({ billing_year_start: iso(periodStart) }).eq("id", id);
+        if (startYear) await admin.from("companies").update({ billing_year_start: iso(periodStart), billing_year_plan: tier }).eq("id", id);
         const yearlyRates = baseMode !== "month";
-        const p = invoiceFor(plan, units, esigns, { base: baseMode, yearly: yearlyRates, ai: !!co.ai_addon });
+        // AI-pakkar almanaksmánaðarins sem notkunartímabilið hófst í (lokið fyrir gjalddaga; hver mánuður einu sinni).
+        let aiPacks = 0;
+        if (hasUsage) {
+          const m = `${uFrom.slice(0, 7)}-01`;
+          const { data: au } = await admin.from("ai_usage").select("packs").eq("company_id", id).eq("month", m).maybeSingle();
+          aiPacks = (au?.packs as number | undefined) ?? 0;
+        }
+        const legacy = await legacyFor(id, co, periodStart, active);
+        const yearPlan = startYear ? tier : co.billing_year_plan ? asPlan(co.billing_year_plan) : tier;
+        const p = planInvoice({ plan: tier, active, esigns, aiPacks, base: baseMode, yearly: yearlyRates, yearPlan, legacy });
         const periodEnd = baseMode === "year" ? addMonths(periodStart, 12) : addMonths(periodStart, 1);
         const settled = p.total === 0; // greitt ár og engin notkun umfram → skráð sem uppgert, ekkert tekið af korti
         const { data: inv } = await admin.from("invoices").insert({
           company_id: id, period_start: iso(periodStart), period_end: iso(periodEnd), users_count: users,
-          active_employees: plan === "v2" ? active : null, esign_count: esigns, esign_amount: p.esign,
+          active_employees: active, plan: tier, ai_packs: p.aiPacks, legacy: p.legacy, esign_count: esigns, esign_amount: p.esign,
           usage_start: hasUsage ? uFrom : null, usage_end: hasUsage ? uTo : null, billing_interval: yearlyRates ? "year" : "month",
           base_amount: p.base, extra_amount: p.extra, ai_amount: p.ai, vat_amount: p.vat, total_amount: p.total, reference: `inv:${crypto.randomUUID()}`,
           ...(settled ? { status: "paid", paid_at: new Date().toISOString() } : {}),

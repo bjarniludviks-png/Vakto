@@ -13,6 +13,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { modelFor } from "@/lib/ai/models";
 import type { RuleSet } from "@/lib/rules";
 import { strictSchema, stripUnset } from "./schema";
+import { recordAiUsage } from "@/lib/ai/usage.server";
 
 export type AgreementSource = { field: string; value: string; quote: string; location: string };
 export type AgreementResult = {
@@ -104,6 +105,7 @@ export async function readAgreement(input: { pdfBase64?: string; text?: string; 
       }],
     });
     const msg = await stream.finalMessage();
+    await recordAiUsage({ model: msg.model, usage: msg.usage, feature: "agreement" });
     if (msg.stop_reason === "refusal") return { ...empty, error: "AI hafnaði að lesa skjalið." };
     if (msg.stop_reason === "max_tokens") return { ...empty, error: "Samningurinn var of langur til að klára — prófaðu að hlaða upp aðeins viðeigandi köflum." };
     const block = msg.content.find((b) => b.type === "text");

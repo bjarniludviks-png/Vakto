@@ -2,6 +2,7 @@ import "server-only";
 import Anthropic from "@anthropic-ai/sdk";
 import { modelFor, SCHEDULE_EFFORT } from "@/lib/ai/models";
 import { completedShiftCells } from "@/lib/ai/stream";
+import { recordAiUsage } from "@/lib/ai/usage.server";
 
 export type AiItem = { kind: "good" | "info" | "warn" | "bad"; title: string; detail: string; tag: string };
 /** One proposed shift: day 0=mánudagur … 6=sunnudagur, times HH:MM. */
@@ -86,7 +87,7 @@ export type AiProgress = { stage: "think" | "write"; shifts: number };
  * `requests` = beiðnir/frí/framboð vikunnar, byggt á þjóninum (formatPlanRequests) — ekki frá vafranum.
  * Streymt frá Claude svo `onProgress` geti sýnt framvindu (fjöldi vakta sem komnar eru) í stað auðrar biðar.
  */
-export async function getAiScheduleProposal(prompt: string, context: string, lang = "is", requests = "", opts: { demo?: boolean } = {}, onProgress?: (p: AiProgress) => void): Promise<AiProposal> {
+export async function getAiScheduleProposal(prompt: string, context: string, lang = "is", requests = "", opts: { demo?: boolean; companyId?: string; userId?: string } = {}, onProgress?: (p: AiProgress) => void): Promise<AiProposal> {
   if (!isAiConfigured()) return { ...DEMO, summary: prompt ? `„${prompt}" — ${DEMO.summary}` : DEMO.summary };
 
   const client = new Anthropic();
@@ -115,6 +116,7 @@ export async function getAiScheduleProposal(prompt: string, context: string, lan
     }
   }
   const response = await stream.finalMessage();
+  await recordAiUsage({ model: response.model, usage: response.usage, feature: "ai_schedule", companyId: opts.companyId, userId: opts.userId });
 
   if (response.stop_reason === "refusal") {
     throw new Error("AI hafnaði beiðninni");

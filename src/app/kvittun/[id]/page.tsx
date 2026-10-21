@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { nf } from "@/lib/format";
-import { ESIGN_PRICE } from "@/lib/pricing";
+import { AI_PACK, ESIGN_PRICE, getPlan, type PlanId } from "@/lib/plans";
 import { brandName } from "@/app/(app)/stillingar/card-brand";
 import { PrintButton } from "./print-button";
 import { VaktoLogo } from "@/components/brand/vakto-logo";
@@ -30,7 +30,7 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
   if (!user) redirect(`/login?next=/kvittun/${id}`);
 
   const { data: inv } = await supabase.from("invoices")
-    .select("id, company_id, period_start, period_end, base_amount, extra_amount, vat_amount, total_amount, status, paid_at, reference, active_employees, users_count, esign_count, esign_amount, billing_interval, usage_start, usage_end, payday_invoice_id, payday_invoice_number, ai_amount")
+    .select("id, company_id, period_start, period_end, base_amount, extra_amount, vat_amount, total_amount, status, paid_at, reference, active_employees, users_count, esign_count, esign_amount, billing_interval, usage_start, usage_end, payday_invoice_id, payday_invoice_number, ai_amount, ai_packs, plan, legacy")
     .eq("id", id).maybeSingle();
   if (!inv || inv.status !== "paid") notFound();
 
@@ -41,12 +41,18 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
 
   const yearly = inv.billing_interval === "year";
   const active = (inv.active_employees as number | null) ?? (inv.users_count as number) ?? 0;
-  const extraUnits = Math.max(0, active - 5);
+  // Leið (0089) á reikningnum; eldri reikningar: „VAKTO áskrift“ og 5 innifaldir.
+  const tier = typeof inv.plan === "string" && ["free", "grunnur", "voxtur", "rekstur"].includes(inv.plan) ? getPlan(inv.plan as PlanId) : null;
+  const name = tier ? `VAKTO ${tier.name}` : "VAKTO áskrift";
+  const included = inv.legacy || !tier ? 5 : tier.included;
+  const extraUnits = Math.max(0, active - included);
+  const usage = inv.usage_start ? `${d(inv.usage_start)} – ${d(inv.usage_end)}` : undefined;
+  const packs = (inv.ai_packs as number | null) ?? 0;
   const lines: { label: string; sub?: string; amount: number }[] = [];
-  if ((inv.base_amount as number) > 0) lines.push({ label: yearly ? "VAKTO áskrift, árgjald" : "VAKTO áskrift, grunngjald", sub: `${d(inv.period_start)} – ${d(inv.period_end)}`, amount: inv.base_amount as number });
-  if ((inv.extra_amount as number) > 0) lines.push({ label: `Virkir starfsmenn umfram 5 (${extraUnits})`, sub: inv.usage_start ? `${d(inv.usage_start)} – ${d(inv.usage_end)}` : undefined, amount: inv.extra_amount as number });
-  if (((inv.ai_amount as number | null) ?? 0) > 0) lines.push({ label: "VAKTO AI, viðbót", sub: `${d(inv.period_start)} – ${d(inv.period_end)}`, amount: inv.ai_amount as number });
-  if ((inv.esign_amount as number) > 0) lines.push({ label: `Undirritanir með rafrænum skilríkjum (${inv.esign_count} × ${nf(ESIGN_PRICE)} kr)`, amount: inv.esign_amount as number });
+  if ((inv.base_amount as number) > 0) lines.push({ label: yearly ? `${name}, árgjald (15% afsláttur)` : `${name}, grunngjald`, sub: `${d(inv.period_start)} – ${d(inv.period_end)}${inv.legacy ? " · eldra verð" : ""}`, amount: inv.base_amount as number });
+  if ((inv.extra_amount as number) > 0) lines.push({ label: `Virkir starfsmenn umfram ${included} (${extraUnits})`, sub: usage, amount: inv.extra_amount as number });
+  if (((inv.ai_amount as number | null) ?? 0) > 0) lines.push({ label: packs ? `VAKTO AI-pakkar (${packs} × ${AI_PACK.questions} spurningar)` : "VAKTO AI, viðbót", sub: usage ?? `${d(inv.period_start)} – ${d(inv.period_end)}`, amount: inv.ai_amount as number });
+  if ((inv.esign_amount as number) > 0) lines.push({ label: `Undirskriftir með rafrænum skilríkjum (${inv.esign_count} × ${nf(ESIGN_PRICE)} kr)`, amount: inv.esign_amount as number });
   const net = (inv.total_amount as number) - (inv.vat_amount as number);
   const addr = [co?.address, [co?.postal_code, co?.city].filter(Boolean).join(" ")].filter(Boolean).join(", ");
 

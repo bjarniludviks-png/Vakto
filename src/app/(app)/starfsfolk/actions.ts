@@ -18,6 +18,7 @@ import type { SignatureRecord } from "@/lib/contract-pdf";
 import { userError } from "@/lib/user-error";
 import type { PaySettings } from "@/lib/paysettings";
 import { normKennitala } from "@/lib/staff-import";
+import { employeeBlock } from "@/lib/plan.server";
 
 export type NewEmployeeInput = {
   fullName: string;
@@ -117,6 +118,8 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
     const supabase = await createClient();
     const company = await companyId(supabase);
     if (!company) return { ok: false, error: "Fyrirtæki fannst ekki — tengdu reikninginn." };
+    const eb = await employeeBlock(company); // Frítt: mest 5 starfsmenn (0089)
+    if (eb) return { ok: false, error: eb };
     let tplRes = await resolveUnionTemplate(supabase, company, input.union);
     if (!tplRes.payRule && input.ruleTemplateId)
       tplRes = await resolveUnionTemplate(supabase, company, `tpl:${input.ruleTemplateId}`);

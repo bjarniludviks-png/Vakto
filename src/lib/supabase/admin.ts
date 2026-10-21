@@ -5,8 +5,8 @@ import { DEMO_READONLY_HEADER, DEMO_READONLY_MSG } from "@/lib/demo-readonly";
 // sjálfgefin lokun: skrif á REST/Storage innan beiðni demo-notanda fá 403 — nema þetta (talning
 // AI-spurninga, forsíðuspjall, lesköll sem nota POST).
 const DEMO_WRITE_ALLOW = [
-  /\/rest\/v1\/rpc\/(ai_usage_bump|chat_unread_counts|company_has_card|is_platform_admin|my_geofence_mode)(\?|$)/,
-  /\/rest\/v1\/(audit_log|ai_conversations|ai_messages|support_threads|support_messages|site_visits)(\?|$)/,
+  /\/rest\/v1\/rpc\/(ai_usage_bump|ai_usage_count|ai_cost_since|plan_allows|chat_unread_counts|company_has_card|is_platform_admin|my_geofence_mode)(\?|$)/,
+  /\/rest\/v1\/(audit_log|ai_conversations|ai_messages|ai_usage_calls|support_threads|support_messages|site_visits)(\?|$)/,
   /\/storage\/v1\/object\/(sign|list)\//,
 ];
 

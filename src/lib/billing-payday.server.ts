@@ -1,5 +1,6 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { AI_PACK, ESIGN_PRICE, getPlan, type PlanId } from "@/lib/plans";
 
 // Reikningar fyrir VAKTO-áskriftina, gefnir út í Payday BGL Ventures (seljandans) þegar
 // greiðsla af korti hefur farið í gegn. Payday heldur númeraröðinni, bókar tekjurnar og
@@ -84,7 +85,7 @@ export async function issuePaydayInvoice(invoiceId: string, ownerEmail?: string 
   if (!paydayInvoicingConfigured()) return null;
   const admin = createAdminClient();
   const { data: inv } = await admin.from("invoices")
-    .select("id, company_id, status, period_start, period_end, base_amount, extra_amount, esign_amount, esign_count, active_employees, users_count, total_amount, ai_amount, paid_at, reference, billing_interval, usage_start, usage_end, payday_invoice_id, payday_invoice_number, payday_attempts")
+    .select("id, company_id, status, period_start, period_end, base_amount, extra_amount, esign_amount, esign_count, active_employees, users_count, total_amount, ai_amount, ai_packs, plan, legacy, paid_at, reference, billing_interval, usage_start, usage_end, payday_invoice_id, payday_invoice_number, payday_attempts")
     .eq("id", invoiceId).maybeSingle();
   if (!inv || inv.status !== "paid" || (inv.total_amount as number) <= 0) return null;
   if (inv.payday_invoice_id) return (inv.payday_invoice_number as number | null) ?? null;
@@ -106,10 +107,17 @@ export async function issuePaydayInvoice(invoiceId: string, ownerEmail?: string 
     const active = (inv.active_employees as number | null) ?? (inv.users_count as number) ?? 0;
     const lines: { description: string; comment?: string; quantity: number; unitPriceExcludingVat: number; vatPercentage: number; discountPercentage: number }[] = [];
     const line = (description: string, amount: number, comment?: string) => { if (amount > 0) lines.push({ description, ...(comment ? { comment } : {}), quantity: 1, unitPriceExcludingVat: amount, vatPercentage: VAT, discountPercentage: 0 }); };
-    line(yearly ? "VAKTO áskrift, árgjald" : "VAKTO áskrift, grunngjald", inv.base_amount as number, `${isIs(inv.period_start as string)} – ${isIs(inv.period_end as string)}`);
-    line(`Virkir starfsmenn umfram 5 (${Math.max(0, active - 5)})`, inv.extra_amount as number, inv.usage_start ? `${isIs(inv.usage_start as string)} – ${isIs(inv.usage_end as string)}` : undefined);
-    line(`Undirritanir með rafrænum skilríkjum (${inv.esign_count})`, inv.esign_amount as number);
-    line("VAKTO AI, viðbót", (inv.ai_amount as number | null) ?? 0, `${isIs(inv.period_start as string)} – ${isIs(inv.period_end as string)}`);
+    // Leið (0089): „VAKTO Vöxtur, grunngjald“; eldri reikningar án leiðar: „VAKTO áskrift“.
+    const tier = typeof inv.plan === "string" && ["free", "grunnur", "voxtur", "rekstur"].includes(inv.plan) ? getPlan(inv.plan as PlanId) : null;
+    const name = tier ? `VAKTO ${tier.name}` : "VAKTO áskrift";
+    const included = inv.legacy || !tier ? 5 : tier.included;
+    const usage = inv.usage_start ? `${isIs(inv.usage_start as string)} – ${isIs(inv.usage_end as string)}` : undefined;
+    const legacyNote = inv.legacy ? " · eldra verð" : "";
+    line(yearly ? `${name}, árgjald (15% afsláttur)` : `${name}, grunngjald`, inv.base_amount as number, `${isIs(inv.period_start as string)} – ${isIs(inv.period_end as string)}${legacyNote}`);
+    line(`Virkir starfsmenn umfram ${included} (${Math.max(0, active - included)})`, inv.extra_amount as number, usage);
+    line(`Undirskriftir með rafrænum skilríkjum (${inv.esign_count} × ${ESIGN_PRICE} kr)`, inv.esign_amount as number, usage);
+    const packs = (inv.ai_packs as number | null) ?? 0;
+    line(packs ? `VAKTO AI-pakkar (${packs} × ${AI_PACK.questions} spurningar)` : "VAKTO AI, viðbót", (inv.ai_amount as number | null) ?? 0, usage ?? `${isIs(inv.period_start as string)} – ${isIs(inv.period_end as string)}`);
     if (!lines.length) return null;
 
     const paid = isDate((inv.paid_at as string) ?? new Date().toISOString());

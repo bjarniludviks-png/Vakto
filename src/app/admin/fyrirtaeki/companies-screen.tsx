@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { nf } from "@/lib/format";
-import { PLANS, ESIGN_PRICE } from "@/lib/pricing";
+import { PLANS, ESIGN_PRICE } from "@/lib/plans";
 import type { AdminOverview, AdminCompany } from "@/lib/vakto-admin.server";
 import { setBillingStatus, extendTrial } from "../actions";
 import { StatusBadge, TrialClock, niceDate, planLabel, relDate } from "../ui";
@@ -109,7 +109,13 @@ export default function CompaniesScreen({ data }: { data: AdminOverview }) {
                     </div>
                     <TrialClock c={c} />
                   </td>
-                  <td className="r" style={c.mrr > 0 ? { fontWeight: 650 } : undefined}>{c.mrr > 0 ? nf(c.mrr) : "—"}</td>
+                  <td className="r" style={c.mrr > 0 ? { fontWeight: 650 } : undefined}>
+                    {c.mrr > 0 ? nf(c.mrr) : "—"}
+                    {/* AI-kostnaður mánaðarins (Anthropic) — rautt yfir 30 % þakinu */}
+                    <div className="muted" style={{ fontSize: 11, fontWeight: 400, ...(c.mrr > 0 && c.aiCostMonth > c.mrr * 0.3 ? { color: "var(--bad)" } : {}) }} title="AI-kostnaður þennan mánuð">
+                      AI {nf(c.aiCostMonth)} kr{c.aiPacks ? ` · ${c.aiPacks} pk.` : ""}
+                    </div>
+                  </td>
                   <td className="muted" style={{ fontSize: 12, maxWidth: 170, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.adminNote ?? undefined}>
                     {c.adminNote ?? "—"}
                   </td>
@@ -142,9 +148,9 @@ export default function CompaniesScreen({ data }: { data: AdminOverview }) {
         </div>
         <div className="cb" style={{ borderTop: "1px solid var(--line2)" }}>
           <p className="muted" style={{ fontSize: 12, lineHeight: 1.55, margin: 0 }}>
-            Verðskrá (án VSK): {nf(PLANS.v2.base)} kr/mán með {PLANS.v2.included} virkum starfsmönnum + {nf(PLANS.v2.extra)} kr á hvern virkan umfram
-            („virkur“ = vakt eða stimplun í mánuðinum) + {nf(ESIGN_PRICE)} kr á hverja fullgilda undirskrift. Eldri viðskiptavinir (v1):
-            {" "}{nf(PLANS.v1.base)} + {nf(PLANS.v1.extra)} kr á notanda umfram {PLANS.v1.included}. MRR telur aðeins fyrirtæki merkt „Borgar“ og miðar við síðustu 30 daga.
+            Leiðir (án VSK): {PLANS.map((p) => `${p.name} ${nf(p.base)} kr (${p.included} innif.${p.extraPerEmployee ? `, +${nf(p.extraPerEmployee)}` : ""})`).join(" · ")}
+            {" "}+ {nf(ESIGN_PRICE)} kr á undirskrift + AI-pakkar. „Virkur“ = vakt eða stimplun í mánuðinum. Eldra verð (min(gamla, nýja)) til legacy-dags.
+            MRR telur aðeins fyrirtæki merkt „Borgar“ og miðar við síðustu 30 daga. AI = kostnaður Anthropic-kalla þennan almanaksmánuð (þak 30 % af áskrift).
           </p>
         </div>
       </div>

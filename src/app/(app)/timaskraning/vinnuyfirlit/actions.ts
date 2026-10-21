@@ -17,6 +17,7 @@ import { getMyScope, scopeRows } from "@/lib/scope.server";
 import { notifyEmployee, notifyManagers } from "@/lib/push";
 import { logAudit } from "@/lib/audit";
 import { userError } from "@/lib/user-error";
+import { planBlock } from "@/lib/plan.server";
 
 type Db = Awaited<ReturnType<typeof createClient>>;
 const okDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
@@ -68,6 +69,7 @@ export type WoResult = { ok: boolean; error?: string; count?: number; skipped?: 
  * sem starfsmaður hefur staðfest eða sem er lokið; endurreiknuð yfirlit fara aftur í drög. */
 export async function generateWorkOverviews(from: string, to: string, onlyIds?: string[]): Promise<WoResult> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  { const pb = await planBlock("work_overview"); if (pb) return { ok: false, error: pb }; } // áskriftarleið (0089)
   if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
   if (!okDate(from) || !okDate(to) || to < from) return { ok: false, error: "Ógilt tímabil" };
   try {

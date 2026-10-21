@@ -7,8 +7,13 @@ import { getMyScope, scopeRows } from "@/lib/scope.server";
 import { checkLongPunches } from "@/lib/punch-check.server";
 import { checkNoShows } from "@/lib/noshow.server";
 import { after } from "next/server";
+import { currentPlan } from "@/lib/plan.server";
+import { planAllows } from "@/lib/plan-features";
+import { UpgradePrompt } from "@/components/app/upgrade-prompt";
 
 export default async function TimaskraningPage() {
+  const plan = await currentPlan(); // áskriftarleið (0089)
+  if (plan && !planAllows(plan, "clock")) return <UpgradePrompt feature="clock" />;
   // Opportunistic "Ertu enn að vinna?" check — the daily cron is the backstop.
   void checkLongPunches();
   after(() => checkNoShows());

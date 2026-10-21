@@ -11,6 +11,7 @@ import { logAudit } from "@/lib/audit";
 import { describeAlert, normalizeAlert, REPORTS, type AlertRule, type AlertReport } from "@/lib/alerts";
 import { ruleFromRow, emailReport, reportRange } from "@/lib/alerts.server";
 import { getManagerReport } from "@/app/(app)/skyrslur/actions";
+import { planBlock } from "@/lib/plan.server";
 
 type Ctx = { supabase: Awaited<ReturnType<typeof createClient>>; userId: string; companyId: string; email: string | null };
 type Res = { ok: boolean; error?: string; missing?: boolean };
@@ -45,6 +46,7 @@ export async function listAlerts(): Promise<AlertsData> {
 /** Nýr vaktari eða skýrsla á tímaáætlun. `via` merkir reglur sem VAKTO AI bjó til. */
 export async function createAlert(input: unknown, via: "ui" | "ai" = "ui"): Promise<Res & { id?: string }> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  { const pb = await planBlock("alerts"); if (pb) return { ok: false, error: pb }; } // áskriftarleið (0089)
   const c = await ctx();
   if ("error" in c) return { ok: false, error: c.error };
   const n = normalizeAlert(input);

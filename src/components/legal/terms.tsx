@@ -1,5 +1,5 @@
 // Efni síðunnar /skilmalar — birt í AhLegal (src/components/site/ah-legal.tsx) — (/skilmalar).
-export const TERMS_META = { title: "Þjónustuskilmálar", updated: "14. október 2026" };
+export const TERMS_META = { title: "Þjónustuskilmálar", updated: "21. október 2026" };
 
 export function TermsBody() {
   return (
@@ -18,8 +18,21 @@ export function TermsBody() {
 
       <h2>3. Verð og greiðslur</h2>
       <ul>
-        <li>Áskrift kostar <b>9.990 kr. á mánuði</b> fyrir fyrirtækið með 5 virka starfsmenn innifalda og <b>1.490 kr. á mánuði fyrir hvern virkan starfsmann umfram 5</b>. Virkur starfsmaður er sá sem átti skráða vakt eða stimplaði sig á tímabilinu. Grunngjaldið er greitt fyrirfram en virkir starfsmenn umfram 5 eru gerðir upp eftir á fyrir tímabilið sem lauk. Undirritun samninga með rafrænum skilríkjum er valkvæð og kostar <b>490 kr. á hverja undirskrift</b>. VAKTO AI-aðstoðarmaðurinn er innifalinn með allt að 25 spurningum á mánuði; valkvæð viðbót sem kostar <b>1.990 kr. á mánuði</b> veitir allt að 500 spurningar á mánuði, er innheimt með mánaðargjaldinu á meðan kveikt er á henni og má slökkva á hvenær sem er. Sé greitt árlega fyrirfram er veittur um 15% afsláttur (8.490 kr. + 1.270 kr. á virkan starfsmann umfram). Öll verð eru án virðisaukaskatts.</li>
-        <li>Nýir viðskiptavinir fá <b>14 daga fría prufu</b> með öllu innifalið. Greiðslukort er skráð við nýskráningu á öruggri greiðslusíðu Straums (Kvika banka); VAKTO geymir aldrei kortanúmer. Ekkert er dregið af kortinu á meðan prufan stendur. Að prufu lokinni hefst áskriftin sjálfkrafa og mánaðargjaldið er tekið af kortinu á gjalddaga, nema áskriftinni hafi verið sagt upp áður.</li>
+        <li>VAKTO býðst í fjórum áskriftarleiðum. Verð á mánuði, án virðisaukaskatts:
+          <ul>
+            <li><b>Frítt</b> — 0 kr. Vaktaplan á vefnum (deiling sem PDF/hlekkur og tölvupóstur um vaktir) fyrir allt að 5 starfsmenn og 1 stað. Starfsmannaappið, stimpilklukka, spjall, beiðnir, launakeyrslur, ráðningarsamningar og VAKTO AI fylgja ekki.</li>
+            <li><b>Grunnur</b> — 9.990 kr. með 8 virkum starfsmönnum innifalda, og 1.190 kr. fyrir hvern virkan starfsmann umfram. 1 staður, 25 AI-spurningar á mánuði.</li>
+            <li><b>Vöxtur</b> — 24.990 kr. með 25 virkum starfsmönnum innifalda, og 990 kr. fyrir hvern virkan starfsmann umfram. Fleiri staðir, AI-vaktaplan, vaktarar og skýrslur á tímaáætlun, vinnuyfirlit og starfslok; 100 AI-spurningar á mánuði.</li>
+            <li><b>Rekstur</b> — 54.990 kr. með 60 virkum starfsmönnum innifalda, og 790 kr. fyrir hvern virkan starfsmann umfram. Allt í Vexti auk aukinnar þjónustu; 300 AI-spurningar á mánuði.</li>
+          </ul>
+        </li>
+        <li>Virkur starfsmaður er sá sem átti skráða vakt eða stimplaði sig í mánuðinum; ekki er greitt fyrir skráða starfsmenn sem vinna ekki. Grunnverðið er greitt fyrirfram en virkir starfsmenn umfram innifalda eru gerðir upp eftir á fyrir mánuðinn sem lauk.</li>
+        <li><b>AI-pakkar:</b> klárist AI-spurningarnar sem fylgja leiðinni getur stjórnandi kveikt á AI-pökkum: 50 spurningar á <b>1.490 kr.</b>, aðeins innheimt fyrir pakka sem eru notaðir og aldrei umfram það hámark á mánuði sem stjórnandinn velur. Til að verja þjónustuna gegn misnotkun má VAKTO gera hlé á VAKTO AI út mánuðinn ef kostnaður við notkunina verður óhóflegur miðað við áskriftina.</li>
+        <li>Undirritun samninga með rafrænum skilríkjum er valkvæð og kostar <b>490 kr. á hverja undirskrift</b>; undirritun með kóða í tölvupósti er alltaf innifalin. AI-pakkar og undirskriftir eru gerð upp eftir á.</li>
+        <li>Sé greitt árlega fyrirfram er veittur <b>15% afsláttur</b> af grunnverði og verði á hvern virkan starfsmann (námundað að 10 kr.). Afslátturinn gildir ekki um AI-pakka og undirskriftir.</li>
+        <li>Skipta má um leið hvenær sem er í Stillingum → Áskrift. Breytingin tekur gildi strax fyrir eiginleika og nýja verðið á næsta reikningi; ekki er endurgreitt né innheimt hlutfallslega fyrir yfirstandandi tímabil. Ef skipt er upp á meðan árgjald er í gildi bætist mismunur grunnverðsins við mánaðarreikningana út árið.</li>
+        <li><b>Eldra verð:</b> viðskiptavinir sem greiddu samkvæmt eldri verðskrá áður en leiðirnar tóku gildi halda henni í 12 mánuði — á því tímabili er innheimt það sem lægra er, eldra verðið eða nýja verðið, fyrir grunnverð og virka starfsmenn.</li>
+        <li>Nýir viðskiptavinir á Grunni eða Vexti fá <b>14 daga fría prufu</b> með öllum eiginleikum Vaxtar. Greiðslukort er skráð við nýskráningu á öruggri greiðslusíðu Straums (Kvika banka); VAKTO geymir aldrei kortanúmer. Ekkert er dregið af kortinu á meðan prufan stendur. Að prufu lokinni hefst áskriftin sjálfkrafa og mánaðargjaldið er tekið af kortinu á gjalddaga, nema áskriftinni hafi verið sagt upp áður. Fría leiðin krefst ekki greiðslukorts.</li>
         <li>Mánaðargjaldið er tekið af skráðu korti fyrirfram fyrir hvert tímabil og kvittun send í tölvupósti. Takist greiðsla ekki er reynt aftur næstu daga og viðskiptavinur látinn vita; berist greiðsla ekki innan 14 daga má VAKTO loka aðgangi þar til greitt er. Gögn eru varðveitt á meðan.</li>
         <li>VAKTO má breyta verðum með minnst 60 daga fyrirvara; breytingar taka gildi við næsta reikningstímabil eftir fyrirvarann.</li>
       </ul>

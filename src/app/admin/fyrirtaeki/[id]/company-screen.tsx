@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/app/toast";
 import { nf } from "@/lib/format";
-import { invoiceFor } from "@/lib/pricing";
+import { planInvoice } from "@/lib/invoice-calc";
+import { asPlan } from "@/lib/plan-features";
 import type { AdminCompany, AdminCompanyDetail, AdminCompanyBilling } from "@/lib/vakto-admin.server";
 import { setBillingStatus, extendTrial, impersonateUser, impersonateCompanyOwner, saveAdminNote, sendLoginLink } from "../../actions";
 import { AuditRows, CARD_BRANDS, INVOICE_IS, ROLE_IS, StatusBadge, niceDate, niceDateTime, planLabel, relDate } from "../../ui";
@@ -49,7 +50,8 @@ export default function CompanyScreen({ company: c, detail, billing }: { company
 
   const users = [...detail.users].sort((a, b) => ROLE_ORDER.indexOf(a.role ?? "employee") - ROLE_ORDER.indexOf(b.role ?? "employee"));
   const admins = users.filter((u) => u.role === "owner" || u.role === "manager").length;
-  const est = (() => { const a = invoiceFor(c.pricePlan, c.pricePlan === "v1" ? c.users : c.activeEmployees30d, c.esigns30d); return a.total - a.vat; })();
+  // Áætlun án VSK eftir leið (0089); eldra verð ef það gildir og er lægra.
+  const est = (() => { const legacy = c.legacyUntil && c.legacyUntil >= new Date().toISOString().slice(0, 10) ? { plan: c.pricePlan, units: c.pricePlan === "v1" ? c.users : c.activeEmployees30d } : null; const a = planInvoice({ plan: asPlan(c.plan), active: c.activeEmployees30d, esigns: c.esigns30d, aiPacks: c.aiPacks, legacy }); return a.total - a.vat; })();
   const card = billing.cards.find((p) => p.status === "active") ?? null;
   const oldCards = billing.cards.filter((p) => p !== card);
 
@@ -85,7 +87,8 @@ export default function CompanyScreen({ company: c, detail, billing }: { company
               <div className="ch"><div><div className="ct">Áskrift</div><div className="cs">Plan, prufa og það sem fyrirtækið greiðir</div></div></div>
               <div className="cb">
                 <dl className="adm-kv">
-                  <dt>Plan</dt><dd>{planLabel(c.plan)} · verðskrá {c.pricePlan === "v1" ? "v1 (eldra verð)" : "v2"}</dd>
+                  <dt>Leið</dt><dd>{planLabel(c.plan)}{c.legacyUntil ? ` · eldra verð (${c.pricePlan}) til ${c.legacyUntil}` : ""}</dd>
+                  <dt>AI þennan mánuð</dt><dd>{nf(c.aiCostMonth)} kr kostnaður{c.aiPacks ? ` · ${c.aiPacks} AI-pakkar` : ""}</dd>
                   <dt>Greiðslutíðni</dt><dd>{billing.interval === "year" ? "Árlega" : "Mánaðarlega"}{billing.anchor ? ` · fyrsti gjalddagi ${niceDate(billing.anchor)}` : ""}</dd>
                   <dt>Prufa til</dt><dd>{c.trialEndsAt ? niceDate(c.trialEndsAt) : "—"}{c.trialDaysLeft !== null && c.billingStatus === "trial" ? ` (${c.trialDaysLeft} d. eftir)` : ""}</dd>
                   <dt>MRR</dt><dd>{c.mrr > 0 ? `${nf(c.mrr)} kr/mán án VSK` : `0 kr — áætlað ${nf(est)} kr/mán ef borgar`}</dd>

@@ -48,7 +48,7 @@ export const ACTION_IS: Record<string, string> = {
   "team.remove": "Fjarlægt úr teymi",
   "team.role": "Hlutverk í teymi",
 };
-const PLAN_IS: Record<string, string> = { vakto: "VAKTO", free: "Frítt (eldra)", pro: "Pro (eldra)", standard: "Standard", starter: "Starter" };
+const PLAN_IS: Record<string, string> = { free: "Frítt", grunnur: "Grunnur", voxtur: "Vöxtur", rekstur: "Rekstur", vakto: "VAKTO (eldra)" };
 export const planLabel = (p: string | null) => (p ? PLAN_IS[p] ?? p : "Ekkert plan");
 export const CARD_BRANDS: Record<string, string> = { VI: "Visa", VISA: "Visa", MC: "Mastercard", MASTERCARD: "Mastercard", AX: "Amex", AMEX: "Amex", MAESTRO: "Maestro" };
 export const INVOICE_IS: Record<string, { label: string; cls: string }> = {

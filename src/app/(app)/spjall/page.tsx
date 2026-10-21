@@ -3,6 +3,9 @@ import { listConversations } from "./actions";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { isDemoCompany } from "@/lib/demo.server";
+import { currentPlan } from "@/lib/plan.server";
+import { planAllows } from "@/lib/plan-features";
+import { UpgradePrompt } from "@/components/app/upgrade-prompt";
 
 /** VAKTO AI sem fest samtal: sömu reglur og fljótandi spjallið — aðeins stjórnendur og vaktstjórar
  * (sjá assistantUser í lib/ai/assistant-auth.ts, sem /api/assistant athugar líka). */
@@ -20,6 +23,8 @@ async function aiAccess(): Promise<{ enabled: boolean; demo: boolean }> {
 }
 
 export default async function SpjallPage() {
+  const plan = await currentPlan(); // áskriftarleið (0089)
+  if (plan && !planAllows(plan, "chat")) return <UpgradePrompt feature="chat" />;
   const [initial, ai] = await Promise.all([listConversations(), aiAccess()]);
   return <ChatScreen initial={initial} ai={ai} />;
 }

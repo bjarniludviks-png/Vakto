@@ -5,7 +5,9 @@ import { getEmployees } from "@/lib/employees.server";
 import { nf } from "@/lib/format";
 import { taktikalEnabled } from "@/lib/taktikal.server";
 import { estimateMonthly, nextDueDate, accessEndsAt as accessEnd } from "@/lib/billing.server";
-import { planFor, invoiceFor, type PlanId, type BillingInterval } from "@/lib/pricing";
+import { type BillingInterval } from "@/lib/pricing";
+import { type PlanId } from "@/lib/plans";
+import { planInvoice } from "@/lib/invoice-calc";
 
 export type LocationRow = { id?: string; name: string; staff: number; timezone: string; lat?: number | null; lng?: number | null; radius?: number };
 export type GeofenceMode = "off" | "flag" | "block";
@@ -17,9 +19,10 @@ export type DepartmentRow = { id: string; name: string; location: string; staff:
 export type CardView = { last4: string | null; brand: string | null; expiry: string | null };
 export type InvoiceView = { id: string; periodStart: string; periodEnd: string; users: number; active: number | null; esigns: number; total: number; status: string; paidAt: string | null };
 /** Verðskrá og áætlun (síðustu 30 dagar) fyrir Áskrift-spjaldið. */
-/** VAKTO AI-viðbótin (0075): kveikt/slökkt og notkun í mánuðinum. */
-export type AiView = { on: boolean; mode: "addon" | "trial" | "free"; used: number; limit: number };
-export type PricingView = { plan: PlanId; v1Until: string | null; units: number; estimateTotal: number; interval: BillingInterval; paidYearUntil: string | null; nextDue: string | null; yearFeeTotal: number };
+/** VAKTO AI (0089): spurningar mánaðarins, innifaldar per leið, AI-pakkar (kveikt + hámark). */
+export type AiView = { used: number; included: number; packs: number; limit: number; packEnabled: boolean; packCap: number };
+/** Áskriftarleið og áætlun (virkir þennan mánuð) fyrir Áskrift-spjaldið. */
+export type PricingView = { plan: PlanId; legacyUntil: string | null; legacyApplies: boolean; units: number; estimateTotal: number; estimateNet: number; interval: BillingInterval; paidYearUntil: string | null; nextDue: string | null; yearFeeTotal: number };
 export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean; geofenceMode?: GeofenceMode; card?: CardView | null; invoices?: InvoiceView[]; pricing?: PricingView | null; ai?: AiView | null };
 
 const DEMO: SettingsData = {
@@ -139,28 +142,27 @@ export async function getSettingsData(): Promise<SettingsData> {
     // Subscription state (0020 / 0027) — tolerant of missing columns.
     let plan: string | null = null, trialEndsAt: string | null = null, billingStatus: string | null = null, accessEndsAt: string | null = null;
     let pricing: PricingView | null = null;
-    const sub = await supabase.from("companies").select("plan, trial_ends_at, billing_status, price_plan, price_v1_until, billing_interval, billing_year_start, billing_anchor, ai_addon").eq("id", company).maybeSingle();
+    const sub = await supabase.from("companies").select("plan, trial_ends_at, billing_status, price_plan, price_v1_until, legacy_price_until, billing_interval, billing_year_start, billing_anchor, ai_pack_enabled, ai_pack_cap").eq("id", company).maybeSingle();
     let ai: AiView | null = null;
     if (!sub.error && sub.data) {
-      const pp = planFor({ price_plan: sub.data.price_plan as string | null, price_v1_until: sub.data.price_v1_until as string | null });
       const isDate = (x: string | null) => (x ? x.slice(0, 10).split("-").reverse().map((v) => String(Number(v))).join(".") : null);
       try {
         const interval = ((sub.data.billing_interval as string) === "year" ? "year" : "month") as BillingInterval;
-        const est = await estimateMonthly(company, pp, new Date(), interval, !!sub.data.ai_addon);
-        const until = pp === "v1" ? (sub.data.price_v1_until as string | null) : null;
+        const est = await estimateMonthly(company, sub.data);
+        const until = sub.data.legacy_price_until as string | null;
         const ys = sub.data.billing_year_start as string | null;
         let paidYearUntil: string | null = null;
         if (ys) { const e = new Date(ys); e.setUTCMonth(e.getUTCMonth() + 12); if (e.getTime() > Date.now()) paidYearUntil = isDate(e.toISOString()); }
         const anchor = (sub.data.billing_anchor as string | null) ?? (sub.data.trial_ends_at as string | null);
         pricing = {
-          plan: pp, v1Until: isDate(until), units: est.units, estimateTotal: est.total, interval, paidYearUntil,
-          nextDue: isDate(nextDueDate(anchor)), yearFeeTotal: invoiceFor(pp, 0, 0, { base: "year" }).total,
+          plan: est.plan, legacyUntil: isDate(until), legacyApplies: est.legacy, units: est.units, estimateTotal: est.total, estimateNet: est.total - est.vat,
+          interval, paidYearUntil, nextDue: isDate(nextDueDate(anchor)), yearFeeTotal: planInvoice({ plan: est.plan, active: 0, base: "year" }).total,
         };
       } catch (e) { console.error("estimateMonthly", e); }
       try {
         const { aiAllowance } = await import("@/lib/ai/ai-plan.server");
         const a = await aiAllowance(company);
-        ai = { on: !!sub.data.ai_addon, mode: a.mode, used: a.used, limit: a.limit };
+        ai = { used: a.used, included: a.included, packs: a.packs, limit: a.limit, packEnabled: a.packEnabled, packCap: (sub.data.ai_pack_cap as number | null) ?? 10 };
       } catch (e) { console.error("aiAllowance", e); }
       plan = (sub.data.plan as string | null) ?? null;
       billingStatus = (sub.data.billing_status as string | null) ?? null;

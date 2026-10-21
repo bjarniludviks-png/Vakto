@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getAiScheduleProposal, type AiItem } from "@/lib/ai/schedule";
 import { assistantUser, rateLimited } from "@/lib/ai/assistant-auth";
-import { demoAiGate } from "@/lib/ai/ai-plan.server";
+import { aiGate } from "@/lib/ai/ai-plan.server";
 import { isDemoCompany } from "@/lib/demo.server";
 import { ndjsonStream, NDJSON_HEADERS, type ScheduleEvent } from "@/lib/ai/stream";
 import { getPlanRequests, formatPlanRequests, guardLeaveShifts, weekDatesFrom, dayShortIS, type PlanRequests } from "@/lib/ai/plan-requests.server";
@@ -13,8 +13,9 @@ export async function POST(request: Request) {
   const me = await assistantUser(supabase);
   if ("error" in me) return NextResponse.json({ ok: false, error: me.error }, { status: me.status });
   if (rateLimited(me.userId)) return NextResponse.json({ ok: false, error: "Of margar fyrirspurnir í einu — bíddu aðeins." }, { status: 429 });
-  const demoStop = await demoAiGate();
-  if (demoStop) return NextResponse.json({ ok: false, error: demoStop }, { status: 429 });
+  // Leið (AI-vaktaplan: Vöxtur+), kvóti, kostnaðarþak og demo-þök — telur eina spurningu.
+  const stop = await aiGate({ feature: "ai_schedule" });
+  if (stop) return NextResponse.json({ ok: false, error: stop }, { status: 402 });
 
   let prompt = "";
   let context = "";
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
     send({ t: "stage", stage: "think" });
     try {
       let last = "";
-      const proposal = await getAiScheduleProposal(prompt, context, lang, reqs ? formatPlanRequests(reqs) : "", { demo }, (p) => {
+      const proposal = await getAiScheduleProposal(prompt, context, lang, reqs ? formatPlanRequests(reqs) : "", { demo, companyId: me.companyId, userId: me.userId }, (p) => {
         const key = `${p.stage}:${p.shifts}`;
         if (key === last) return;
         if (p.stage !== last.split(":")[0]) send({ t: "stage", stage: p.stage });

@@ -164,6 +164,8 @@ export async function addLocation(input: { name: string }): Promise<SettingsResu
     const supabase = await createClient();
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
+    const lb = await locationBlock(ctx.company); // Frítt/Grunnur: 1 staður (0089)
+    if (lb) return { ok: false, error: lb };
     const { error } = await supabase.from("locations").insert({
       company_id: ctx.company, name: input.name.trim(),
     });
@@ -631,6 +633,8 @@ import type { RuleSet, RuleTemplate } from "@/lib/rules";
 import { RULE_PRESETS } from "@/lib/rules";
 import { userError } from "@/lib/user-error";
 import type { PaySettings } from "@/lib/paysettings";
+import { recordAiUsage } from "@/lib/ai/usage.server";
+import { locationBlock } from "@/lib/plan.server";
 
 export type RuleTemplateInput = {
   id?: string;
@@ -776,6 +780,7 @@ ${input.freeText ? `Spurning notandans (svaraðu henni með reglunum): ${input.f
 Notaðu premiums-listann fyrir öll álög (heiti + % + tímabil/dagar ef við á). Skilaðu raunhæfum tölum fyrir þetta samhengi og taktu skýrt fram í explanation hvað notandinn þarf að staðfesta sjálfur. Þetta er TILLAGA — ekki lögfræðiráðgjöf.`,
       }],
     });
+    await recordAiUsage({ model: msg.model, usage: msg.usage, feature: "rule_suggest" });
     const block = msg.content.find((b) => b.type === "text");
     const parsed = block && "text" in block ? stripUnset(JSON.parse(block.text)) : null;
     if (!parsed?.rules) return fallback;
@@ -1028,27 +1033,70 @@ export async function setBillingInterval(interval: "month" | "year"): Promise<Se
   }
 }
 
-/** VAKTO AI-viðbótin (0075) á/af. Gildir strax; rukkuð á hverjum mánaðarreikningi sem myndast á meðan hún er á. */
-export async function setAiAddon(on: boolean): Promise<SettingsResult> {
+async function ownerCtx(): Promise<{ supabase: Awaited<ReturnType<typeof createClient>>; userId: string; company: string } | { error: string }> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { error: "Ekki innskráð(ur)" };
+  const { data: profile } = await supabase.from("users").select("company_id, role").eq("id", user.id).maybeSingle();
+  if (!profile?.company_id || profile.role !== "owner") return { error: "Aðeins stjórnandi getur breytt áskriftinni" };
+  return { supabase, userId: user.id, company: profile.company_id as string };
+}
+
+/** Skipta um áskriftarleið (0089). Gildir strax fyrir eiginleika; verðið á næsta reikningi (engin hlutfallsleg
+ *  leiðrétting innan tímabils). Frítt: mest 5 starfsmenn og 1 staður; Grunnur: 1 staður.
+ *  Frá Fríu yfir í greidda leið án fyrri prufu → 14 daga prufa áður en fyrst er rukkað. */
+export async function setPlan(plan: string): Promise<SettingsResult> {
   if (await demoBlocked()) return demoResult();
+  if (!["free", "grunnur", "voxtur", "rekstur"].includes(plan)) return { ok: false, error: "Ógild leið" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
-    const { data: profile } = await supabase.from("users").select("company_id, role").eq("id", user.id).maybeSingle();
-    if (!profile?.company_id || profile.role !== "owner") return { ok: false, error: "Aðeins stjórnandi getur breytt áskriftinni" };
+    const c = await ownerCtx();
+    if ("error" in c) return { ok: false, error: c.error };
     const { createAdminClient } = await import("@/lib/supabase/admin");
-    const { error } = await createAdminClient().from("companies").update({ ai_addon: !!on, ai_addon_since: on ? new Date().toISOString() : null }).eq("id", profile.company_id);
-    if (error) return dbFail("setAiAddon", error);
-    await logAudit(supabase, profile.company_id as string, user.id, { action: "company.ai_addon", entity: "companies", detail: on ? "VAKTO AI-viðbót: kveikt" : "VAKTO AI-viðbót: slökkt" });
-    revalidatePath("/stillingar");
+    const admin = createAdminClient();
+    const { PLAN_LIMITS } = await import("@/lib/plan-features");
+    const { getPlan, TRIAL_DAYS } = await import("@/lib/plans");
+    const lim = PLAN_LIMITS[plan as keyof typeof PLAN_LIMITS];
+    const [{ count: emps }, { count: locs }, { data: co }] = await Promise.all([
+      admin.from("employees").select("id", { count: "exact", head: true }).eq("company_id", c.company).neq("status", "inactive"),
+      admin.from("locations").select("id", { count: "exact", head: true }).eq("company_id", c.company),
+      admin.from("companies").select("plan, trial_ends_at, billing_anchor").eq("id", c.company).maybeSingle(),
+    ]);
+    if (lim.employees !== null && (emps ?? 0) > lim.employees) return { ok: false, error: `${getPlan(plan as "free").name} er fyrir allt að ${lim.employees} starfsmenn — þið eruð með ${emps}. Gerðu starfsmenn óvirka fyrst eða veldu aðra leið.` };
+    if (lim.locations !== null && (locs ?? 0) > lim.locations) return { ok: false, error: `${getPlan(plan as "free").name} er fyrir ${lim.locations} stað — þið eruð með ${locs}. Veldu Vöxt eða Rekstur.` };
+    const startTrial = plan !== "free" && !co?.trial_ends_at && !co?.billing_anchor;
+    const { error } = await admin.from("companies").update({
+      plan, ...(startTrial ? { trial_ends_at: new Date(Date.now() + TRIAL_DAYS * 86400000).toISOString() } : {}),
+    }).eq("id", c.company);
+    if (error) return dbFail("setPlan", error);
+    await logAudit(c.supabase, c.company, c.userId, { action: "company.plan", entity: "companies", detail: `Áskriftarleið: ${getPlan((co?.plan as "free") ?? "voxtur")?.name ?? co?.plan} → ${getPlan(plan as "free").name}` });
+    revalidatePath("/", "layout");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
   }
 }
 
+/** AI-pakkar (0089): 50 spurningar á 1.490 kr þegar innifaldar spurningar klárast, mest `cap` á mánuði.
+ *  Leysir af gömlu AI-viðbótina (1.990 kr/500). Gildir strax. */
+export async function setAiPacks(on: boolean, cap?: number): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult();
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  const n = cap === undefined ? undefined : Math.round(Number(cap));
+  if (n !== undefined && (!Number.isFinite(n) || n < 1 || n > 100)) return { ok: false, error: "Hámark pakka á mánuði er 1–100" };
+  try {
+    const c = await ownerCtx();
+    if ("error" in c) return { ok: false, error: c.error };
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { error } = await createAdminClient().from("companies").update({ ai_pack_enabled: !!on, ...(n !== undefined ? { ai_pack_cap: n } : {}) }).eq("id", c.company);
+    if (error) return dbFail("setAiPacks", error);
+    await logAudit(c.supabase, c.company, c.userId, { action: "company.ai_packs", entity: "companies", detail: on ? `AI-pakkar: kveikt${n !== undefined ? `, hámark ${n} á mánuði` : ""}` : "AI-pakkar: slökkt" });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
 
 /** Sjálfgefnir launaliðir fyrirtækis (0081 companies.pay_defaults): lífeyrir, félagsgjald, sjóðir og orlof.
  *  Gilda fyrir alla starfsmenn sem hafa ekki eigin stillingu. */

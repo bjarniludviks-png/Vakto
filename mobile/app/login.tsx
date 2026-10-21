@@ -10,7 +10,7 @@ import { supabase, isSupabaseConfigured } from "../src/lib/supabase";
 import { Txt, Btn, Muted } from "../src/components/ui";
 import { MARK_BARS, WHITE_BAR_OPACITY, VaktoWordmark, logoGap } from "../src/components/vakto-logo";
 import { colors, radius, font, useTheme } from "../src/theme";
-import { ACCESS_CLOSED_MSG, getAccessState, takeAccessClosed } from "../src/lib/api/access";
+import { ACCESS_CLOSED_MSG, appBlockedMsg, getAccessState, takeAccessClosed, takeAppBlocked } from "../src/lib/api/access";
 import { ACCOUNT_DELETED_MSG, takeAccountDeleted } from "../src/lib/api/account";
 
 // Sama merki og alls staðar (hvíta útgáfan á appelsínugulu): súlurnar í 28-kassa, kvarðaðar í LOGO px.
@@ -38,7 +38,7 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
-  const [error, setError] = useState<string | null>(() => (takeAccessClosed() ? tr(ACCESS_CLOSED_MSG) : null));
+  const [error, setError] = useState<string | null>(() => { if (takeAccessClosed()) return tr(ACCESS_CLOSED_MSG); const b = takeAppBlocked(); return b ? tr(b) : null; });
   const [note, setNote] = useState<string | null>(() => (takeAccountDeleted() ? ACCOUNT_DELETED_MSG : null));
   const [busy, setBusy] = useState(false);
   const [sending, setSending] = useState(false);
@@ -92,7 +92,11 @@ export default function Login() {
     const { error: err } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
     if (err) setError(/banned/i.test(err.message) ? tr(ACCESS_CLOSED_MSG) : "Innskráning tókst ekki — athugaðu netfang og lykilorð.");
-    else if ((await getAccessState()).state === "closed") { takeAccessClosed(); await supabase.auth.signOut(); setError(tr(ACCESS_CLOSED_MSG)); }
+    else {
+      const a = await getAccessState();
+      if (a.state === "closed") { takeAccessClosed(); await supabase.auth.signOut(); setError(tr(ACCESS_CLOSED_MSG)); }
+      else if (!a.app) { takeAppBlocked(); await supabase.auth.signOut(); setError(tr(appBlockedMsg(a.role))); } // fría leiðin (0089)
+    }
     // Gate in _layout redirects on success.
   }
 
