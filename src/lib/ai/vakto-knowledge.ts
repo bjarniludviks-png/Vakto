@@ -1,4 +1,22 @@
 import "server-only";
+import { AI_PACK, ANNUAL_DISCOUNT, ESIGN_PRICE, PLANS, QUOTE_ABOVE_EMPLOYEES, TRIAL_DAYS, cheapestPlan, getPlan, type PlanId } from "@/lib/plans";
+import { nf } from "@/lib/format";
+
+const GRUNNUR = getPlan("grunnur");
+/** Fyrsti starfsmannafjöldi þar sem leiðin verður ódýrust (án AI-viðbótar). */
+const crossover = (id: PlanId) => { for (let n = 1; n <= QUOTE_ABOVE_EMPLOYEES; n++) if (cheapestPlan(n).plan.id === id) return n; return QUOTE_ABOVE_EMPLOYEES; };
+// Ein lína per leið, beint úr src/lib/plans.ts (sama skrá og verðsíðan og reikningagerðin).
+const PLAN_FEATURES: Record<string, string> = {
+  free: "aðeins á vefnum, 1 staður: vaktaplan á vefnum, deila plani sem PDF eða hlekk, vaktir í tölvupósti. EKKI app fyrir starfsfólk, stimpilklukka, spjall/beiðnir/fréttaveita, laun, samningar eða VAKTO AI. Ekki hægt að bæta við starfsmönnum",
+  grunnur: "app fyrir starfsfólk, stimpilklukka í síma og spjaldtölvu, spjall, beiðnir og fréttaveita, launakeyrsla, launaseðlar og Payday, ráðningarsamningar með undirritun, laun % af veltu og skýrslur",
+  voxtur: "allt í Grunni og: fleiri staðir og deildir, AI setur upp vaktaplanið, vaktarar og skýrslur í pósti, vinnuyfirlit og starfslok",
+  rekstur: "allt í Vexti og: forgangsþjónusta, aðstoð við innleiðingu, sérsniðnar launareglur, sami tengiliður hjá VAKTO",
+};
+const PLANS_KNOWLEDGE = PLANS.map((p) =>
+  p.extraPerEmployee === null
+    ? `- ${p.name}: 0 kr, allt að ${p.included} starfsmenn, ${PLAN_FEATURES[p.id]}.`
+    : `- ${p.name}: ${nf(p.base)} kr/mán, ${p.included} virkir starfsmenn innifaldir, ${nf(p.extraPerEmployee)} kr á hvern virkan starfsmann umfram. VAKTO AI: ${p.aiQuestions} spurningar á mánuði. ${PLAN_FEATURES[p.id][0].toUpperCase()}${PLAN_FEATURES[p.id].slice(1)}.`,
+).join("\n");
 
 // Það sem spjallgaurinn á heimasíðunni má segja um VAKTO. Aðeins staðreyndir
 // sem eru sannar í kerfinu í dag — hann má ekki finna upp verð, tengingar eða
@@ -36,16 +54,18 @@ export const VAKTO_KNOWLEDGE = `
 - Vaktarar og sjálfvirkar skýrslur (Stillingar → Vaktarar og skýrslur, eða beðið um þá í VAKTO AI): stjórnandi eða vaktstjóri fær tölvupóst eða push-tilkynningu ef starfsmaður nálgast eða fer yfir ákveðinn tímafjölda á viku, mánuði eða launatímabili (t.d. 180 klst. á mánuði, viðvörun við 90 % og líka ef planaðar vaktir munu fara yfir), ef yfirvinna starfsmanns fer yfir ákveðinn fjölda tíma, eða ef laun % af veltu fer yfir mörk. Hver viðvörun kemur einu sinni per starfsmann per tímabil. Skýrslur úr Skýrslusafninu (launatímar, yfirvinna, mæting, launakostnaður, kostnaður per deild, fjarvistir) má fá sendar sjálfkrafa daglega, vikulega eða mánaðarlega kl. 8 að morgni sem töflu í tölvupósti með Excel-viðhengi, eða strax („sendu mér mætingarskýrslu síðasta mánaðar“). Vaktarar eru metnir einu sinni á dag kl. 8. Gleymd útstimplun og mætti ekki á vakt eru þegar tilkynnt sjálfkrafa.
 - Handbækur/skjöl: hægt að hlaða upp skjölum fyrirtækisins og starfsmanna (t.d. handbók) sem starfsfólk sér í appinu.
 
-## Verð (án VSK)
-- Eitt verð fyrir allt kerfið: 9.990 kr á mánuði fyrir fyrirtækið með 5 virka starfsmenn innifalda, og 1.490 kr á mánuði fyrir hvern virkan starfsmann umfram 5. „Virkur“ = átti vakt eða stimplaði sig í mánuðinum — ekki er greitt fyrir skráða starfsmenn sem vinna ekki. Engin þrep, ekkert læst í kerfinu sjálfu.
-- Árleg greiðsla: um 15% afsláttur (8.490 kr/mán + 1.270 kr á auka virkan starfsmann).
-- Valkvætt: undirritun ráðningarsamninga með rafrænum skilríkjum (Taktikal) kostar 490 kr á undirskrift (980 kr á samning, báðir aðilar). Ókeypis undirritun með kóða í tölvupósti er innifalin.
-- VAKTO AI (aðstoðarmaðurinn): 25 spurningar á mánuði innifaldar fyrir fyrirtækið. Valkvæð viðbót, 1.990 kr/mán, gefur allt að 500 spurningar á mánuði; kveikt og slökkt í Stillingum → Áskrift, engin binding. Í 14 daga prufunni er allt að 500 spurningar opið.
-- Dæmi: staður með 12 virka starfsmenn = 9.990 + 7 × 1.490 = 20.420 kr/mán (án VSK).
-- 14 daga frí prufa með öllu. Kort er skráð við nýskráningu á greiðslusíðu Straums (Kvika) en ekkert dregið fyrr en prufan er búin; þá er mánaðargjaldið tekið sjálfkrafa af kortinu og kvittun send. Engin binding, hægt að segja upp hvenær sem er í Stillingum → Áskrift. VAKTO geymir aldrei kortanúmer. Keðjur með marga staði: hafa samband um tilboð.
+## Verð (án VSK, á mánuði) — öll verðskráin er á vakto.is/verd
+${PLANS_KNOWLEDGE}
+- „Virkur starfsmaður“ = var á vakt eða stimplaði sig inn í mánuðinum. Ekki er greitt fyrir skráða starfsmenn sem vinna ekki (t.d. sumarstarfsfólk yfir veturinn).
+- Viðbætur: meira VAKTO AI kostar ${nf(AI_PACK.price)} kr fyrir hverjar ${AI_PACK.questions} spurningar umfram — aðeins ef stjórnandi kveikir á viðbótinni, og hann setur sjálfur hámark á mánuði. Þegar spurningarnar klárast hvílir VAKTO AI til næstu mánaðamóta; allt annað virkar áfram. Undirritun með rafrænum skilríkjum (Taktikal) kostar ${nf(ESIGN_PRICE)} kr á undirskrift (samningur = 2 undirskriftir); undirritun með kóða í tölvupósti er alltaf innifalin.
+- Árgreiðsla: ${Math.round(ANNUAL_DISCOUNT * 100)}% afsláttur af grunnverði og verði á starfsmann.
+- Dæmi: 12 virkir starfsmenn á Grunni = ${nf(GRUNNUR.base)} + ${12 - GRUNNUR.included} × ${nf(GRUNNUR.extraPerEmployee ?? 0)} = ${nf(GRUNNUR.base + (12 - GRUNNUR.included) * (GRUNNUR.extraPerEmployee ?? 0))} kr/mán. Vöxtur verður ódýrari en Grunnur þegar virkir starfsmenn eru orðnir ${crossover("voxtur")}, og Rekstur ódýrari en Vöxtur þegar þeir eru orðnir ${crossover("rekstur")}. Fleiri en ${QUOTE_ABOVE_EMPLOYEES} starfsmenn: tilboð (hafa samband).
+- Hægt að skipta um leið hvenær sem er í Stillingum. Engin binding; uppsögn gildir út greitt tímabil.
+- ${TRIAL_DAYS} daga frí prufa á Vexti. Ekkert kort þarf fyrir Frítt.
+- Núverandi viðskiptavinir halda eldra verði í 12 mánuði ef það er lægra.
 
 ## Að byrja
-- Skráning á vakto.is/nyskraning: nafn, fyrirtæki, netfang, lykilorð → kort skráð hjá Straumi (0 kr) → 14 daga prufan byrjar → inn í kerfið. Tekur um korter að setja upp fyrirtækið, staðina, deildirnar og starfsfólkið (Excel-innlestur).
+- Skráning á vakto.is/nyskraning: nafn, fyrirtæki, netfang, lykilorð → 14 daga prufan byrjar → inn í kerfið. Greiðslur fara um greiðslusíðu Straums (Kvika); VAKTO geymir aldrei kortanúmer. Tekur um korter að setja upp fyrirtækið, staðina, deildirnar og starfsfólkið (Excel-innlestur).
 - Innskráning: vakto.is/login. Gleymt lykilorð: hlekkur á innskráningarsíðu.
 - Stimpilklukka á spjaldtölvu: Stillingar → Staðir og teymi → Tæki á staðnum → afrita kiosk-slóð.
 - Mælaborðið má sérsníða: táknið við hliðina á dagsetningunni felur, sýnir og raðar spjöldum.

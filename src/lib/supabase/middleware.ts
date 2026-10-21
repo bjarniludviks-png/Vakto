@@ -125,6 +125,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/adgangur-lokadur") ||
     pathname.startsWith("/og/") ||
     pathname.startsWith("/um-okkur") ||
+    pathname === "/verd" ||
     pathname.startsWith("/fjarfestar") ||
     pathname.startsWith("/personuvernd") || pathname.startsWith("/eyda-adgangi") || pathname.startsWith("/skilmalar") || pathname.startsWith("/vafrakokur") ||
     pathname.startsWith("/kiosk") ||

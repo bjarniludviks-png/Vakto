@@ -3,6 +3,7 @@ import { siteViewport } from "@/components/site/viewport";
 import AppleHome from "@/components/site/home-client";
 import "@/components/site/home.css";
 import { SITE_URL } from "@/lib/site";
+import { PLANS } from "@/lib/plans";
 import { demoConfigured } from "@/lib/demo.server";
 
 // Forsíða vakto.is (okt. 2026): Apple-leg síða með alvöru skjámyndum úr kerfinu og appinu.
@@ -31,7 +32,7 @@ const LD = [
     "@context": "https://schema.org", "@type": "SoftwareApplication", name: "VAKTO", url: SITE_URL,
     applicationCategory: "BusinessApplication", operatingSystem: "Web, iOS, Android", inLanguage: ["is", "en"],
     description: DESC, publisher: { "@id": `${SITE_URL}/#org` },
-    offers: { "@type": "Offer", price: "9990", priceCurrency: "ISK", description: "Á mánuði án VSK, 5 virkir starfsmenn innifaldir, 1.490 kr á hvern virkan starfsmann umfram. 14 daga frí prufa." },
+    offers: { "@type": "AggregateOffer", lowPrice: "0", highPrice: String(Math.max(...PLANS.map((p) => p.base))), offerCount: PLANS.length, priceCurrency: "ISK", url: `${SITE_URL}/verd`, description: "Á mánuði án VSK. Frítt fyrir vaktaplan (allt að 5 starfsmenn); Grunnur, Vöxtur og Rekstur með launum, appi og stimpilklukku. 14 daga frí prufa." },
   },
 ];
 

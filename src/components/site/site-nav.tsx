@@ -12,7 +12,7 @@ const N = {
   en: { product: "Product", contracts: "Contracts", price: "Pricing", about: "About", login: "Sign in", try: "Try free", open: "Open menu", close: "Close menu" },
 };
 
-export default function SiteNav({ home = false, scrolled = true, dark = false, current }: { home?: boolean; scrolled?: boolean; dark?: boolean; current?: "about" }) {
+export default function SiteNav({ home = false, scrolled = true, dark = false, current }: { home?: boolean; scrolled?: boolean; dark?: boolean; current?: "about" | "price" }) {
   const t = N[useLangSync()];
   const a = home ? "" : "/";
   const [open, setOpen] = useState(false);
@@ -28,7 +28,8 @@ export default function SiteNav({ home = false, scrolled = true, dark = false, c
     <nav className={`ah-nav${scrolled || open ? " sc" : ""}${dark && !open ? " dk" : ""}${open ? " open" : ""}`}>
       <Link href="/" aria-label="VAKTO" onClick={close}><AhLogo /></Link>
       <div className="ah-nav-links">
-        <a href={`${a}#kerfid`}>{t.product}</a><a href={`${a}#samningar`}>{t.contracts}</a><a href={`${a}#verd`}>{t.price}</a>
+        <a href={`${a}#kerfid`}>{t.product}</a><a href={`${a}#samningar`}>{t.contracts}</a>
+        <Link href="/verd" aria-current={current === "price" ? "page" : undefined}>{t.price}</Link>
         <Link href="/um-okkur" aria-current={current === "about" ? "page" : undefined}>{t.about}</Link>
       </div>
       <div className="ah-nav-cta">
@@ -43,7 +44,7 @@ export default function SiteNav({ home = false, scrolled = true, dark = false, c
       <div id="ah-menu" className="ah-menu" hidden={!open}>
         <a href={`${a}#kerfid`} onClick={close}>{t.product}</a>
         <a href={`${a}#samningar`} onClick={close}>{t.contracts}</a>
-        <a href={`${a}#verd`} onClick={close}>{t.price}</a>
+        <Link href="/verd" onClick={close}>{t.price}</Link>
         <Link href="/um-okkur" onClick={close}>{t.about}</Link>
         <Link href="/login" onClick={close}>{t.login}</Link>
         <div className="ah-menu-lang"><LangToggle /></div>

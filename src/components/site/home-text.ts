@@ -1,5 +1,7 @@
 // Allur texti forsíðunnar á íslensku og ensku. Skjámyndirnar sjálfar eru úr íslenska viðmótinu.
 import type { SiteLang } from "./lang";
+import { getPlan } from "@/lib/plans";
+import { nf } from "@/lib/format";
 
 const is = {
   skip: "Fara beint í efni",
@@ -56,7 +58,7 @@ const is = {
       ] },
     ],
     confirmB: "Ekkert breytist án þín.", confirm: " VAKTO AI spyr alltaf áður en hann breytir nokkru. Þú sérð tillöguna og ýtir á Staðfesta.",
-    who: "Fyrir stjórnendur og vaktstjóra. 25 spurningar á mánuði innifaldar.",
+    who: "Fyrir stjórnendur og vaktstjóra. Frá 25 spurningum á mánuði, eftir leið.",
     videoAlt: "Myndband: VAKTO AI setur upp vaktaplan fyrir eldhúsið og stjórnandinn staðfestir tillöguna.",
     shotAlt: "Tillaga VAKTO AI: Moon færður á kvöldvakt á laugardag, launakostnaður óbreyttur 27,4%",
   },
@@ -75,9 +77,9 @@ const is = {
   walH: "Starfsmannaskírteinið er í símanum.",
   walP: "Í Apple og Google Wallet, með mynd, stöðu og QR-kóða. Kóðinn stimplar inn á spjaldtölvunni við innganginn, án þess að slá inn PIN.",
   sisH: "Frá sömu smiðju.", sisP: "BGL Ventures, fyrirtækið á bak við VAKTO, smíðar líka INVENTRA: rekstrarkerfi og gervigreind sem minnkar rýrnun hjá framleiðendum ferskvöru.", sisGo: "inventra.is",
-  priceH: "Eitt verð. Allt kerfið.", amt: "9.990 kr", per: "/mán",
-  price1: "5 virkir starfsmenn innifaldir.", price2: "1.490 kr á hvern virkan starfsmann umfram.",
-  fine: "Án VSK. Þú borgar aðeins fyrir þá sem unnu í mánuðinum. Undirskrift með rafrænum skilríkjum 490 kr. VAKTO AI: 25 spurningar á mánuði innifaldar, allt að 500 með viðbót á 1.990 kr/mán. 15% afsláttur ef greitt er árlega. 14 daga frí prufa, engin binding.",
+  priceH: "Vaktaplanið er frítt.", amt: "0 kr", per: "/mán",
+  price1: "Frítt fyrir vaktaplan.", price2: `Grunnur frá ${nf(getPlan("grunnur").base)} kr/mán.`,
+  fine: "Án VSK. Þú borgar aðeins fyrir þá sem unnu í mánuðinum. 14 daga frí prufa, engin binding.", seePrice: "Sjá verð",
 };
 
 const en: typeof is = {
@@ -134,7 +136,7 @@ const en: typeof is = {
       ] },
     ],
     confirmB: "Nothing changes without you.", confirm: " VAKTO AI always asks before it changes anything. You see the proposal and press Confirm.",
-    who: "For owners and shift managers. 25 questions a month included.",
+    who: "For owners and shift managers. From 25 questions a month, depending on plan.",
     videoAlt: "Video: VAKTO AI builds a schedule for the kitchen and the manager confirms the proposal.",
     shotAlt: "VAKTO AI suggestion: Moon moved to Saturday's evening shift, labor cost unchanged at 27.4%",
   },
@@ -152,9 +154,9 @@ const en: typeof is = {
   walH: "The employee ID card lives on the phone.",
   walP: "In Apple and Google Wallet, with photo, role and QR code. The code clocks in on the tablet by the entrance, no PIN needed.",
   sisH: "From the same makers.", sisP: "BGL Ventures, the company behind VAKTO, also builds INVENTRA: an operations system with AI that cuts waste for fresh-food producers.", sisGo: "inventra.is",
-  priceH: "One price. The whole system.", amt: "ISK 9,990", per: "/mo",
-  price1: "5 active employees included.", price2: "ISK 1,490 per additional active employee.",
-  fine: "Excl. VAT. You only pay for those who worked that month. Signing with electronic ID ISK 490. VAKTO AI: 25 questions a month included, up to 500 with the ISK 1,990/mo add-on. 15% off when paid annually. 14-day free trial, no commitment.",
+  priceH: "The schedule is free.", amt: "ISK 0", per: "/mo",
+  price1: "Free for scheduling.", price2: `Grunnur from ISK ${nf(getPlan("grunnur").base).replace(/\./g, ",")}/mo.`,
+  fine: "Excl. VAT. You only pay for those who worked that month. 14-day free trial, no commitment.", seePrice: "See pricing",
 };
 
 export const HOME_TEXT: Record<SiteLang, typeof is> = { is, en };
