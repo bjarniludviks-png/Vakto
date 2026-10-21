@@ -30,6 +30,16 @@ export function useLang(): Lang {
 
 type E = [string, string, string]; // [en, vi, pl]
 const D: Record<string, E> = {
+  // Eyða aðgangi (Apple 5.1.1(v))
+  "Eyða aðgangi": ["Delete account", "Xóa tài khoản", "Usuń konto"],
+  "Aðganginum þínum verður lokað strax og þú skráð(ur) út.": ["Your account will be closed immediately and you will be signed out.", "Tài khoản của bạn sẽ bị đóng ngay lập tức và bạn sẽ bị đăng xuất.", "Twoje konto zostanie natychmiast zamknięte, a Ty zostaniesz wylogowany/a."],
+  "Persónuupplýsingum þínum er eytt innan 30 daga.": ["Your personal data is deleted within 30 days.", "Dữ liệu cá nhân của bạn sẽ bị xóa trong vòng 30 ngày.", "Twoje dane osobowe zostaną usunięte w ciągu 30 dni."],
+  "Gögn sem vinnuveitandinn þarf lögum samkvæmt að geyma (t.d. launa- og tímaskráningar) eru geymd eins lengi og lög krefjast.": ["Records your employer is legally required to keep (e.g. payroll and time records) are retained for as long as the law requires.", "Dữ liệu mà chủ lao động bắt buộc phải lưu theo luật (VD: hồ sơ lương và chấm công) được lưu trữ trong thời gian luật yêu cầu.", "Dane, które pracodawca musi przechowywać zgodnie z prawem (np. ewidencja płac i czasu pracy), są przechowywane tak długo, jak wymaga tego prawo."],
+  "Eyða aðganginum mínum": ["Delete my account", "Xóa tài khoản của tôi", "Usuń moje konto"],
+  "Þú ert eigandi fyrirtækisins. Til að eyða fyrirtækinu og aðganginum skrifaðu okkur á hjalp@vakto.is": ["You are the owner of the company. To delete the company and your account, email us at hjalp@vakto.is", "Bạn là chủ sở hữu công ty. Để xóa công ty và tài khoản, hãy gửi email cho chúng tôi tại hjalp@vakto.is", "Jesteś właścicielem firmy. Aby usunąć firmę i konto, napisz do nas na hjalp@vakto.is"],
+  "Skrifa á hjalp@vakto.is": ["Email hjalp@vakto.is", "Gửi email tới hjalp@vakto.is", "Napisz na hjalp@vakto.is"],
+  "Aðgangi þínum hefur verið lokað og beiðni um eyðingu móttekin.": ["Your account has been closed and your deletion request received.", "Tài khoản của bạn đã bị đóng và yêu cầu xóa đã được tiếp nhận.", "Twoje konto zostało zamknięte, a prośba o usunięcie została przyjęta."],
+  "Engin tenging — reyndu aftur": ["No connection — try again", "Không có kết nối — hãy thử lại", "Brak połączenia — spróbuj ponownie"],
   // Starfslok (0088)
   "Starfslok": ["End of employment", "Kết thúc công việc", "Zakończenie zatrudnienia"],
   "Takk fyrir samstarfið": ["Thank you for working with us", "Cảm ơn bạn đã làm việc cùng chúng tôi", "Dziękujemy za współpracę"],

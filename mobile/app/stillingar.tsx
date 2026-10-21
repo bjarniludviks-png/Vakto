@@ -3,15 +3,16 @@ import React, { useEffect, useState } from "react";
 import { tr, trf, useLang, setLang, LANGS } from "../src/lib/i18n";
 import { View, Switch, Linking, Pressable, Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { Bell, BellOff, UserRound, KeyRound, LifeBuoy, FileText, CalendarPlus, Ban } from "lucide-react-native";
+import { Bell, BellOff, UserRound, KeyRound, LifeBuoy, FileText, CalendarPlus, Ban, Trash2, Mail } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
-import { List, Row, IconBox, Muted, useToast, Txt, Seg } from "../src/components/ui";
+import { List, Row, IconBox, Muted, useToast, Txt, Seg, Sheet, Btn } from "../src/components/ui";
 import { colors, useTheme, setThemeMode } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import { registerForPush, unregisterPush, pushEnabled } from "../src/lib/push";
 import { getDnd, setDnd, dndLabel, onMuteChange } from "../src/lib/mute";
 import { supabase } from "../src/lib/supabase";
 import { blockedUsers, unblockAll } from "../src/lib/api/moderation";
+import { myRole, requestAccountDeletion, markAccountDeleted, OWNER_DELETE_MSG, HELP_EMAIL } from "../src/lib/api/account";
 
 export default function Stillingar() {
   const { mode, dark } = useTheme();
@@ -50,6 +51,31 @@ export default function Stillingar() {
     if (!me?.email) { toast("Ekkert netfang skráð"); return; }
     const { error } = await supabase.auth.resetPasswordForEmail(me.email, { redirectTo: "https://www.vakto.is/nytt-lykilord" });
     toast(error ? error.message : trf("Póstur sendur á {x}", me.email));
+  }
+
+  // Eyða aðgangi (Apple 5.1.1(v)): staðfestingarblað → vefþjónninn lokar aðganginum → útskráning.
+  // Eigandi fyrirtækis fær í staðinn leiðbeiningar um að skrifa hjalp@ (fyrirtækið þarf að loka líka).
+  const [delOpen, setDelOpen] = useState(false);
+  const [delOwner, setDelOwner] = useState(false);
+  const [delBusy, setDelBusy] = useState(false);
+  async function openDelete() {
+    setDelOwner((await myRole().catch(() => null)) === "owner");
+    setDelOpen(true);
+  }
+  async function confirmDelete() {
+    setDelBusy(true);
+    const r = await requestAccountDeletion();
+    if (!r.ok) {
+      setDelBusy(false);
+      if (r.owner) { setDelOwner(true); return; }
+      toast(r.error ?? "Tókst ekki");
+      return;
+    }
+    await unregisterPush().catch(() => {});
+    markAccountDeleted();
+    setDelOpen(false);
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    setDelBusy(false);
   }
 
   return (
@@ -98,8 +124,26 @@ export default function Stillingar() {
       <Muted style={{ paddingHorizontal: 2 }}>UM VAKTO</Muted>
       <List>
         <Row icon={<IconBox><LifeBuoy color={colors.ink2} size={19} /></IconBox>} title="Hjálp" sub="hjalp@vakto.is" onPress={() => Linking.openURL("mailto:hjalp@vakto.is")} chevron={false} />
-        <Row icon={<IconBox><FileText color={colors.ink2} size={19} /></IconBox>} title="Persónuvernd og skilmálar" onPress={() => Linking.openURL("https://www.vakto.is/personuvernd")} chevron={false} last />
+        <Row icon={<IconBox><FileText color={colors.ink2} size={19} /></IconBox>} title="Persónuvernd og skilmálar" onPress={() => Linking.openURL("https://www.vakto.is/personuvernd")} chevron={false} />
+        <Row icon={<IconBox tone="bad"><Trash2 color={colors.bad} size={19} /></IconBox>} title="Eyða aðgangi" danger onPress={openDelete} chevron={false} last />
       </List>
+      <Sheet open={delOpen} onClose={() => { if (!delBusy) setDelOpen(false); }} title="Eyða aðgangi" scroll={false}>
+        {delOwner ? (
+          <>
+            <Txt size={14.5} color={colors.ink2} style={{ lineHeight: 21 }}>{OWNER_DELETE_MSG}</Txt>
+            <Btn title={`Skrifa á ${HELP_EMAIL}`} icon={<Mail color="#fff" size={18} />} onPress={() => Linking.openURL(`mailto:${HELP_EMAIL}?subject=${encodeURIComponent("Eyða fyrirtæki og aðgangi")}`).catch(() => toast(HELP_EMAIL))} />
+            <Btn title="Hætta við" variant="ghost" onPress={() => setDelOpen(false)} />
+          </>
+        ) : (
+          <>
+            <Txt size={14.5} color={colors.ink2} style={{ lineHeight: 21 }}>Aðganginum þínum verður lokað strax og þú skráð(ur) út.</Txt>
+            <Txt size={14.5} color={colors.ink2} style={{ lineHeight: 21 }}>Persónuupplýsingum þínum er eytt innan 30 daga.</Txt>
+            <Txt size={14.5} color={colors.ink2} style={{ lineHeight: 21 }}>Gögn sem vinnuveitandinn þarf lögum samkvæmt að geyma (t.d. launa- og tímaskráningar) eru geymd eins lengi og lög krefjast.</Txt>
+            <Btn title="Eyða aðganginum mínum" variant="danger" icon={<Trash2 color={colors.bad} size={18} />} loading={delBusy} onPress={confirmDelete} />
+            <Btn title="Hætta við" variant="ghost" disabled={delBusy} onPress={() => setDelOpen(false)} />
+          </>
+        )}
+      </Sheet>
       <View style={{ alignItems: "center", paddingTop: 8 }}><Txt size={11.5} color={colors.ink3}>VAKTO 1.0 · is.vakto.app</Txt></View>
     </Screen>
   );

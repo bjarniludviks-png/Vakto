@@ -11,6 +11,7 @@ import { Txt, Btn, Muted } from "../src/components/ui";
 import { MARK_BARS, WHITE_BAR_OPACITY, VaktoWordmark, logoGap } from "../src/components/vakto-logo";
 import { colors, radius, font, useTheme } from "../src/theme";
 import { ACCESS_CLOSED_MSG, getAccessState, takeAccessClosed } from "../src/lib/api/access";
+import { ACCOUNT_DELETED_MSG, takeAccountDeleted } from "../src/lib/api/account";
 
 // Sama merki og alls staðar (hvíta útgáfan á appelsínugulu): súlurnar í 28-kassa, kvarðaðar í LOGO px.
 const LOGO = 52;
@@ -38,7 +39,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(() => (takeAccessClosed() ? tr(ACCESS_CLOSED_MSG) : null));
-  const [note, setNote] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(() => (takeAccountDeleted() ? ACCOUNT_DELETED_MSG : null));
   const [busy, setBusy] = useState(false);
   const [sending, setSending] = useState(false);
   const pwRef = useRef<TextInput>(null);
