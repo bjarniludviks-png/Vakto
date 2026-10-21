@@ -5,7 +5,6 @@ import { after } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { initials } from "@/lib/employees";
 import { notifyEmployee, sendPushToUser } from "@/lib/push";
 import { userError } from "@/lib/user-error";
@@ -16,8 +15,8 @@ export type Conversation = {
   unread: number;
   /** Kind of the last message ('text' | 'image' | 'audio' | 'file') and whether I sent it. */
   lastKind: string | null; lastMine: boolean;
-  /** Automatic team channel: 'dept' (department) | 'loc' (location) | null (manual). */
-  autoKind: "dept" | "loc" | null;
+  /** Röðun: síðustu skilaboð, annars stofndagur samtalsins. */
+  sortAt: string;
 };
 /** Another member's read cursor in a channel (read receipts). */
 export type ChannelRead = { userId: string; name: string; lastReadAt: string };
@@ -30,6 +29,8 @@ export type ChatMessage = {
   photo: string | null;
 };
 export type Person = { userId: string; name: string; av: string; color: string; photo: string | null };
+/** Flýtival í hópavali: „Allir í <deild>“ / „Allir á <stað>“ — fólk með aðgang (ekki ég). */
+export type TeamPick = { key: string; kind: "dept" | "loc"; name: string; people: Person[] };
 export type Members = { members: Person[]; adminId: string | null; meId: string };
 
 const PALETTE = ["#5b50e6", "#18a06a", "#1fb6a6", "#e0533f", "#0891b2", "#ca8a04", "#9333ea", "#e11d48"];
@@ -130,100 +131,7 @@ async function channelReadsOf(supabase: Sb, ctx: { userId: string; company: stri
   }
 }
 
-// ensureTeamChannels runs on every list load — cap it to once a minute per
-// company per server instance (it is idempotent, so a cold start is harmless).
-const teamSyncAt = new Map<string, number>();
-
-/** Automatic team channels: one group per department and per location that has
- * at least one employee with a linked account. Members = that team's employees
- * + every manager/owner. Adds missing members, never removes anyone (manual
- * additions stick). Requires `channels.auto_key` — silently no-op before it. */
-export async function ensureTeamChannels(): Promise<{ ok: boolean }> {
-  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
-  if (!isSupabaseConfigured()) return { ok: false };
-  try {
-    const supabase = await createClient();
-    const ctx = await ctxOf(supabase);
-    if ("error" in ctx) return { ok: false };
-    await syncTeamChannels(ctx, true);
-    return { ok: true };
-  } catch (e) {
-    console.error("ensureTeamChannels failed:", e);
-    return { ok: false };
-  }
-}
-
-async function syncTeamChannels(ctx: { userId: string; company: string }, force = false): Promise<void> {
-  const last = teamSyncAt.get(ctx.company) ?? 0;
-  if (!force && Date.now() - last < 60_000) return;
-  teamSyncAt.set(ctx.company, Date.now());
-
-  // Service role: the sync must create channels the CALLER is not a member of
-  // (another department's room) without the caller ever gaining access to them
-  // — with the user's client the creator would stay visible via `created_by`.
-  // Everything below is still scoped to the caller's own company.
-  const db = createAdminClient();
-
-  const { data: locs, error: locErr } = await db.from("locations").select("id, name").eq("company_id", ctx.company);
-  if (locErr) return;
-  const locIds = (locs ?? []).map((l) => l.id as string);
-  const [{ data: deps }, { data: emps }] = await Promise.all([
-    locIds.length ? db.from("departments").select("id, name").in("location_id", locIds) : Promise.resolve({ data: [] as { id: string; name: string }[] }),
-    db.from("employees").select("user_id, department_id, location_id, role").eq("company_id", ctx.company).not("user_id", "is", null).neq("status", "inactive"),
-  ]);
-  const staff = (emps ?? []) as { user_id: string; department_id: string | null; location_id: string | null; role: string }[];
-  if (!staff.length) return;
-
-  // Managers/owners belong to every team channel (employees.role + users.role).
-  const { data: mgrUsers } = await db.from("users").select("id, role").eq("company_id", ctx.company).in("role", ["owner", "manager"]);
-  const managers = new Set<string>([
-    ...staff.filter((e) => e.role === "owner" || e.role === "manager").map((e) => e.user_id),
-    ...((mgrUsers ?? []) as { id: string }[]).map((u) => u.id),
-  ]);
-
-  type Want = { key: string; name: string; members: Set<string> };
-  const wanted: Want[] = [];
-  for (const d of (deps ?? []) as { id: string; name: string }[]) {
-    const m = staff.filter((e) => e.department_id === d.id).map((e) => e.user_id);
-    if (m.length) wanted.push({ key: `dept:${d.id}`, name: d.name, members: new Set([...m, ...managers]) });
-  }
-  for (const l of (locs ?? []) as { id: string; name: string }[]) {
-    const m = staff.filter((e) => e.location_id === l.id).map((e) => e.user_id);
-    if (m.length) wanted.push({ key: `loc:${l.id}`, name: l.name, members: new Set([...m, ...managers]) });
-  }
-  if (!wanted.length) return;
-
-  // Existing auto channels — the select fails (and we bail) before auto_key exists.
-  const { data: existing, error: exErr } = await db.from("channels").select("id, name, auto_key").eq("company_id", ctx.company).not("auto_key", "is", null);
-  if (exErr) return;
-  const byKey = new Map(((existing ?? []) as { id: string; name: string; auto_key: string }[]).map((c) => [c.auto_key, c]));
-
-  const missing = wanted.filter((w) => !byKey.has(w.key));
-  if (missing.length) {
-    // created_by stays null: nobody is the "founder" of a team channel.
-    await db.from("channels")
-      .upsert(missing.map((w) => ({ company_id: ctx.company, name: w.name, kind: "group", auto_key: w.key, created_by: null })), { onConflict: "auto_key", ignoreDuplicates: true });
-    const { data: again } = await db.from("channels").select("id, name, auto_key").eq("company_id", ctx.company).not("auto_key", "is", null);
-    for (const c of (again ?? []) as { id: string; name: string; auto_key: string }[]) byKey.set(c.auto_key, c);
-  }
-
-  // Keep names in step with the department/location + add missing members.
-  const chIds = wanted.map((w) => byKey.get(w.key)?.id).filter(Boolean) as string[];
-  const { data: memRows } = await db.from("channel_members").select("channel_id, user_id").in("channel_id", chIds.length ? chIds : ["00000000-0000-0000-0000-000000000000"]);
-  const have = new Set(((memRows ?? []) as { channel_id: string; user_id: string }[]).map((m) => `${m.channel_id}:${m.user_id}`));
-  const inserts: { channel_id: string; user_id: string }[] = [];
-  const renames: { id: string; name: string }[] = [];
-  for (const w of wanted) {
-    const ch = byKey.get(w.key);
-    if (!ch) continue;
-    if (ch.name !== w.name) renames.push({ id: ch.id, name: w.name });
-    for (const u of w.members) if (!have.has(`${ch.id}:${u}`)) inserts.push({ channel_id: ch.id, user_id: u });
-  }
-  if (inserts.length) await db.from("channel_members").upsert(inserts, { onConflict: "channel_id,user_id", ignoreDuplicates: true });
-  for (const r of renames) await db.from("channels").update({ name: r.name }).eq("id", r.id);
-}
-
-/** Conversations the user can see: general + their groups + their DMs. */
+/** Conversations the user can see: their groups + their DMs (+ eldra „Almennt“ ef það hefur verið notað). */
 export async function listConversations(): Promise<{ ok: boolean; items: Conversation[]; meId: string; meName: string; needsMigration?: boolean }> {
   if (!isSupabaseConfigured()) return { ok: false, items: [], meId: "", meName: "" };
   try {
@@ -231,21 +139,13 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, items: [], meId: "", meName: "" };
 
-    // Team channels per department/location (idempotent, throttled per company).
-    try { await syncTeamChannels(ctx); } catch (e) { console.error("syncTeamChannels:", e); }
-
+    // Spjall eins og Messenger: VAKTO stofnar engar rásir sjálft — fólk býr til hópa.
     // auto_key arrives with 0046, photo_url with 0042 — fall back to older shapes
-    let chRes = await supabase.from("channels").select("id, name, kind, created_by, photo_url, auto_key").eq("company_id", ctx.company).order("created_at");
-    if (chRes.error) chRes = (await supabase.from("channels").select("id, name, kind, created_by, photo_url").eq("company_id", ctx.company).order("created_at")) as unknown as typeof chRes;
-    if (chRes.error) chRes = (await supabase.from("channels").select("id, name, kind, created_by").eq("company_id", ctx.company).order("created_at")) as unknown as typeof chRes;
+    let chRes = await supabase.from("channels").select("id, name, kind, created_by, created_at, photo_url, auto_key").eq("company_id", ctx.company).order("created_at");
+    if (chRes.error) chRes = (await supabase.from("channels").select("id, name, kind, created_by, created_at, photo_url").eq("company_id", ctx.company).order("created_at")) as unknown as typeof chRes;
+    if (chRes.error) chRes = (await supabase.from("channels").select("id, name, kind, created_by, created_at").eq("company_id", ctx.company).order("created_at")) as unknown as typeof chRes;
     if (chRes.error) return { ok: false, items: [], meId: ctx.userId, meName: "", needsMigration: true };
-    let channels = chRes.data as { id: string; name: string; kind: string; created_by: string; photo_url?: string | null; auto_key?: string | null }[];
-    if (!channels.length) {
-      const { data: created } = await supabase.from("channels")
-        .insert({ company_id: ctx.company, name: "Almennt", kind: "general", created_by: ctx.userId })
-        .select("id, name, kind, created_by").single();
-      if (created) channels = [created as never];
-    }
+    let channels = chRes.data as { id: string; name: string; kind: string; created_by: string; created_at?: string; photo_url?: string | null; auto_key?: string | null }[];
     const ids = channels.map((c) => c.id);
 
     // member names per channel (to resolve DM titles) + last message + unread
@@ -262,7 +162,7 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
       const info = emps.get(m.user_id as string);
       memByCh.get(m.channel_id as string)!.push({ id: m.user_id as string, name: info?.name ?? u?.full_name ?? "?", photo: info?.photo ?? null });
     }
-    // Only channels the user actually belongs to — "Almennt" is company-wide.
+    // Only channels the user actually belongs to — eldra „Almennt“ nær til alls fyrirtækisins.
     // Without this, a left/deleted group would linger in everyone's list.
     channels = channels.filter((c) => c.kind === "general" || (memByCh.get(c.id) ?? []).some((m) => m.id === ctx.userId));
     const lastByCh = new Map<string, string>();
@@ -276,6 +176,18 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
       lastMeta.set(m.channel_id as string, { kind: (m.kind as string) ?? "text", mine: m.sender_id === ctx.userId });
     }
 
+    // Eldri sjálfvirkar rásir („Almennt“, deildar-/staðarrásir) eru nú venjuleg samtöl og
+    // birtast aðeins hafi einhver skrifað í þær — ónotaðar tómar rásir hverfa úr listanum.
+    const legacy = channels.filter((c) => (c.kind === "general" || !!c.auto_key) && !lastAtByCh.has(c.id));
+    if (legacy.length) {
+      const used = await Promise.all(legacy.map(async (c) => {
+        const { data } = await supabase.from("messages").select("id").eq("channel_id", c.id).limit(1);
+        return (data ?? []).length > 0 ? c.id : null;
+      }));
+      const keep = new Set(used.filter(Boolean) as string[]);
+      channels = channels.filter((c) => !legacy.includes(c) || keep.has(c.id));
+    }
+
     const items: Conversation[] = channels.map((c) => {
       const dm = c.kind === "dm";
       const others = (memByCh.get(c.id) ?? []).filter((m) => m.id !== ctx.userId);
@@ -283,16 +195,15 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
         : dm ? (others[0]?.name ?? "Bein skilaboð")
           : c.name;
       const first = name.split(/\s+/)[0];
-      const autoKind = c.auto_key?.startsWith("dept:") ? "dept" : c.auto_key?.startsWith("loc:") ? "loc" : null;
       return {
         id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: colorOf(first),
         last: lastByCh.get(c.id) ?? "", lastAt: lastAtByCh.get(c.id) ?? null, dm, photo: dm ? (others[0]?.photo ?? null) : (c.photo_url ?? null),
-        unread: unread[c.id] ?? 0, autoKind,
+        unread: unread[c.id] ?? 0, sortAt: lastAtByCh.get(c.id) ?? c.created_at ?? "",
         lastKind: lastMeta.get(c.id)?.kind ?? null, lastMine: lastMeta.get(c.id)?.mine ?? false,
       };
     });
-    // Newest activity on top; the company-wide "Almennt" channel stays pinned first.
-    items.sort((a, b) => (a.kind === "general" ? -1 : b.kind === "general" ? 1 : (b.lastAt ?? "").localeCompare(a.lastAt ?? "")));
+    // Nýjasta virkni efst — ekkert fest (nýr tómur hópur raðast eftir stofndegi).
+    items.sort((a, b) => b.sortAt.localeCompare(a.sortAt));
     const meName = emps.get(ctx.userId)?.name ?? (await supabase.from("users").select("full_name").eq("id", ctx.userId).maybeSingle()).data?.full_name ?? "";
     return { ok: true, items, meId: ctx.userId, meName: meName.includes("@") ? "" : meName };
   } catch (e) {
@@ -314,6 +225,38 @@ export async function searchPeople(q: string): Promise<Person[]> {
     return (data ?? [])
       .filter((e) => e.user_id && e.user_id !== ctx.userId)
       .map((e) => ({ userId: e.user_id as string, name: e.full_name as string, av: initials(e.full_name as string), color: colorOf((e.full_name as string).split(/\s+/)[0]), photo: (e.photo_url as string | null) ?? null }));
+  } catch {
+    return [];
+  }
+}
+
+/** Deildir og staðir sem hafa starfsfólk með aðgang — til að bæta öllum hópnum í einu. */
+export async function listTeamPicks(): Promise<TeamPick[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return [];
+    const { data } = await supabase.from("coworkers").select("user_id, full_name, photo_url, status, department_id, location_id, departments(name), locations(name)")
+      .eq("company_id", ctx.company).not("user_id", "is", null);
+    const by = new Map<string, TeamPick>();
+    for (const e of data ?? []) {
+      if (!e.user_id || e.user_id === ctx.userId || e.status === "inactive") continue;
+      const dep = (Array.isArray(e.departments) ? e.departments[0] : e.departments) as { name?: string } | null;
+      const loc = (Array.isArray(e.locations) ? e.locations[0] : e.locations) as { name?: string } | null;
+      const full = e.full_name as string;
+      const person: Person = { userId: e.user_id as string, name: full, av: initials(full), color: colorOf(full.split(/\s+/)[0]), photo: (e.photo_url as string | null) ?? null };
+      const add = (key: string, kind: TeamPick["kind"], name?: string) => {
+        if (!name) return;
+        const t = by.get(key) ?? { key, kind, name, people: [] };
+        if (!t.people.some((x) => x.userId === person.userId)) t.people.push(person);
+        by.set(key, t);
+      };
+      if (e.department_id) add(`dept:${e.department_id}`, "dept", dep?.name);
+      if (e.location_id) add(`loc:${e.location_id}`, "loc", loc?.name);
+    }
+    // Deildir fyrst, svo staðir; tvær deildir með sama heiti (á ólíkum stöðum) sameinast ekki.
+    return [...by.values()].sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name, "is") : a.kind === "dept" ? -1 : 1));
   } catch {
     return [];
   }
@@ -372,7 +315,6 @@ export async function listMembers(channelId: string): Promise<Members> {
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return empty;
     const { data: ch } = await supabase.from("channels").select("created_by").eq("id", channelId).maybeSingle();
-    const team = await isAutoChannel(supabase, channelId);
     const [{ data }, emps] = await Promise.all([
       supabase.from("channel_members").select("user_id, users(full_name)").eq("channel_id", channelId),
       empNameMap(supabase, ctx.company),
@@ -383,7 +325,7 @@ export async function listMembers(channelId: string): Promise<Members> {
       const name = info?.name ?? u?.full_name ?? "?";
       return { userId: m.user_id as string, name, av: initials(name), color: colorOf(name.split(/\s+/)[0]), photo: info?.photo ?? null };
     });
-    return { members, adminId: team ? null : ((ch?.created_by as string) ?? null), meId: ctx.userId };
+    return { members, adminId: (ch?.created_by as string) ?? null, meId: ctx.userId };
   } catch {
     return empty;
   }
@@ -413,7 +355,6 @@ export async function removeMember(channelId: string, userId: string): Promise<{
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { data: ch } = await supabase.from("channels").select("created_by").eq("id", channelId).maybeSingle();
     if ((ch?.created_by as string) !== ctx.userId) return { ok: false, error: "Aðeins stofnandi getur fjarlægt" };
-    if (await isAutoChannel(supabase, channelId)) return { ok: false, error: "Meðlimir deildar- og staðarrása fylgja starfsmannaskránni" };
     const { error } = await supabase.from("channel_members").delete().eq("channel_id", channelId).eq("user_id", userId);
     if (error) return { ok: false, error: userError(error) };
     return { ok: true };
@@ -429,7 +370,6 @@ export async function leaveChannel(channelId: string): Promise<{ ok: boolean; er
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    if (await isAutoChannel(supabase, channelId)) return { ok: false, error: "Ekki er hægt að hætta í deildar- eða staðarrás" };
     const { error } = await supabase.from("channel_members").delete().eq("channel_id", channelId).eq("user_id", ctx.userId);
     if (error) return { ok: false, error: userError(error) };
     return { ok: true };
@@ -651,16 +591,6 @@ export async function deleteMessage(messageId: string): Promise<{ ok: boolean; e
   }
 }
 
-/** Team channels (department/location) are named after their team — not renamable, not leavable. */
-async function isAutoChannel(supabase: Sb, channelId: string): Promise<boolean> {
-  try {
-    const { data } = await supabase.from("channels").select("auto_key").eq("id", channelId).maybeSingle();
-    return !!(data as { auto_key?: string | null } | null)?.auto_key;
-  } catch {
-    return false;
-  }
-}
-
 /** Rename a group (any member — RLS `channels_member_update`). */
 export async function renameChannel(channelId: string, name: string): Promise<{ ok: boolean; error?: string }> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
@@ -671,7 +601,6 @@ export async function renameChannel(channelId: string, name: string): Promise<{ 
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    if (await isAutoChannel(supabase, channelId)) return { ok: false, error: "Deildar- og staðarrásir fá heiti sitt úr stillingum" };
     const { data, error } = await supabase.from("channels").update({ name: nm }).eq("id", channelId).eq("kind", "group").select("id");
     if (error) return { ok: false, error: userError(error) };
     if (!data?.length) return { ok: false, error: "Ekki tókst að breyta heiti" };

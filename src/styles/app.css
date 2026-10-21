@@ -1026,6 +1026,16 @@ html.dark .msgr{--msg-them:#262833}
 .msgr-empty .side-sub{font-size:13px}
 .msgr-empty p{font-size:13.5px;margin:12px 0 0}
 .msgr-empty-ic{width:64px;height:64px;border-radius:50%;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center}
+/* tómur samtalalisti: hvatning til að búa til hóp eða senda skilaboð */
+.msgr-none{margin:28px auto 0}
+.msgr-none-acts{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:16px}
+.msgr-none-acts .btn{display:inline-flex;align-items:center;gap:6px}
+.msgr-none-acts .btn svg{width:15px;height:15px}
+/* flýtival í hópavali: + Allir í <deild> / + Allir á <stað> */
+.team-picks{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.tpick{border:1px solid var(--line);background:var(--panel);color:var(--ink2);border-radius:999px;padding:5px 11px;font:inherit;font-size:12.5px;font-weight:500;cursor:pointer;white-space:nowrap}
+.tpick:hover:not(:disabled){border-color:var(--brand);color:var(--brand)}
+.tpick.on,.tpick:disabled{background:var(--brand-soft);border-color:transparent;color:var(--brand);cursor:default}
 .msgr-skel{display:flex;flex-direction:column;gap:12px;margin-top:auto;padding-bottom:8px}
 .msgr-skel i{height:34px;border-radius:18px;display:block}
 .msgr-skel i.me{align-self:flex-end}

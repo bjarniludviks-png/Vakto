@@ -13,9 +13,9 @@ import {
 import {
   listConversations, listMessages, sendChatMessage, createGroup, startDM, searchPeople,
   listMembers, addMembers, removeMember, leaveChannel, uploadChatMedia,
-  renameChannel, setChannelPhoto, setMessageReaction, deleteMessage,
+  renameChannel, setChannelPhoto, setMessageReaction, deleteMessage, listTeamPicks,
   markChannelRead, listChannelReads, listChatMedia, searchChannelMessages,
-  type Conversation, type ChatMessage, type Person, type Members, type ChannelRead, type ChatMedia, type ChatHit,
+  type Conversation, type ChatMessage, type Person, type Members, type TeamPick, type ChannelRead, type ChatMedia, type ChatHit,
 } from "./actions";
 
 import { REACTIONS } from "@/lib/reactions";
@@ -126,7 +126,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const [search, setSearch] = useState("");
   const [emoji, setEmoji] = useState(false);
   const [rec, setRec] = useState(false);
-  const [modal, setModal] = useState<null | "new" | "info">(null);
+  const [modal, setModal] = useState<null | "new" | "group" | "info">(null);
   const [people, setPeople] = useState<Person[]>([]);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [reactFor, setReactFor] = useState<string | null>(null);
@@ -627,10 +627,8 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const q = search.trim().toLowerCase();
   const shown = convs.filter((c) => !q || c.name.toLowerCase().includes(q));
   const aiShown = ai.enabled && (!q || "vakto ai".includes(q) || q.includes("ai"));
-  const pinned = shown.filter((c) => c.kind === "general");
-  const rest = shown.filter((c) => c.kind !== "general");
-  const teamLabel = (c: Conversation) => (c.autoKind === "dept" ? t("Deild") : c.autoKind === "loc" ? t("Staður") : null);
-  const subtitleOf = (c: Conversation) => c.dm ? t("Bein skilaboð") : c.kind === "general" ? t("Allt starfsfólkið") : c.autoKind === "dept" ? t("Deildarrás") : c.autoKind === "loc" ? t("Staðarrás") : t("Grúppa");
+  // Ekkert fest nema VAKTO AI — samtölin koma raðað eftir nýjustu virkni.
+  const subtitleOf = (c: Conversation) => c.dm ? t("Bein skilaboð") : c.kind === "general" ? t("Allt starfsfólkið") : t("Grúppa");
   const nameOf = (c: Conversation) => (c.kind === "general" ? "# " + c.name : c.name);
   const aiLast = [...aiChat.msgs].reverse().find((m) => m.content.trim());
 
@@ -647,9 +645,8 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
 
   function convRow(c: Conversation) {
     const un = c.id !== active?.id && c.unread > 0;
-    const label = teamLabel(c);
     const kindIcon = c.lastKind === "image" ? I.image : c.lastKind === "audio" ? I.mic : c.lastKind === "file" ? I.file : null;
-    const preview = c.last ? (c.lastKind === "image" || c.lastKind === "audio" ? t(c.last) : c.last) : (label ? "" : c.dm ? t("Bein skilaboð") : t("Grúppa"));
+    const preview = c.last ? (c.lastKind === "image" || c.lastKind === "audio" ? t(c.last) : c.last) : (c.dm ? t("Bein skilaboð") : t("Grúppa"));
     return (
       <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}${un ? " un" : ""}`} onClick={() => open(c)} role="button" tabIndex={0}
         onKeyDown={(e) => { if (e.key === "Enter") open(c); }} title={un ? `${c.unread} ${t("ólesin")}` : undefined}>
@@ -661,7 +658,6 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
           </div>
           <span className="pv">
             <span className="pv-t">
-              {label && <span className="pv-k">{label}{c.last ? " · " : ""}</span>}
               {c.last && c.lastMine && <>{t("Þú")}: </>}
               {kindIcon && <span className="pv-i">{kindIcon}</span>}
               {preview}
@@ -688,13 +684,12 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   }
   function pressEnd() { const p = pressRef.current; if (p.t) { clearTimeout(p.t); p.t = null; } }
 
-  // Fastir hringir efst (sími): VAKTO AI, # Almennt, svo nýjustu samtölin.
+  // Hringir efst (sími): VAKTO AI, svo nýjustu samtölin.
   const pins: ({ ai: true } | Conversation)[] = q ? [] : [
     ...(aiShown ? [{ ai: true as const }] : []),
-    ...pinned,
-    ...rest.slice(0, 8),
+    ...shown.slice(0, 8),
   ];
-  const pinLabel = (c: Conversation) => (c.kind === "general" ? c.name : c.dm ? firstName(c.name) : c.name);
+  const pinLabel = (c: Conversation) => (c.dm ? firstName(c.name) : c.name);
   // Sími + texti í innslætti: táknin falla saman í ör (eins og Messenger) þar til ýtt er á hana.
   const toolsCompact = phone && !!val.trim() && !toolsOpen;
 
@@ -727,7 +722,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                 ))}
               </div>
             )}
-            {(aiShown || pinned.length > 0) && <div className="chat-sec">{t("Fest")}</div>}
+            {aiShown && <div className="chat-sec">{t("Fest")}</div>}
             {aiShown && (
               <div className={`conv conv-ai${aiOpen ? " on" : ""}`} onClick={openAi} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter") openAi(); }}>
                 <AiAvatar size={phone ? 56 : 44} />
@@ -737,9 +732,19 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                 </div>
               </div>
             )}
-            {pinned.map(convRow)}
-            {rest.length > 0 && (aiShown || pinned.length > 0) && <div className="chat-sec">{t("Samtöl")}</div>}
-            {rest.map(convRow)}
+            {shown.length > 0 && aiShown && <div className="chat-sec">{t("Samtöl")}</div>}
+            {shown.map(convRow)}
+            {!q && convs.length === 0 && (
+              <div className="msgr-empty msgr-none">
+                <span className="msgr-empty-ic">{I.chat}</span>
+                <b>{t("Engin samtöl enn")}</b>
+                <span className="side-sub">{t("Búðu til hóp eða sendu einhverjum skilaboð.")}</span>
+                <div className="msgr-none-acts">
+                  <button className="btn sm" onClick={() => setModal("group")}>{I.plus}{t("Nýr hópur")}</button>
+                  <button className="btn ghost sm" onClick={() => setModal("new")}>{t("Ný skilaboð")}</button>
+                </div>
+              </div>
+            )}
             {q && shown.length === 0 && !aiShown && (
               <div className="muted" style={{ fontSize: 12.5, padding: "4px 16px 10px" }}>{t("Ekkert samtal fannst")}</div>
             )}
@@ -984,7 +989,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
         )}
       </div>
 
-      {modal === "new" && <NewChatModal onClose={() => setModal(null)} onDone={(id) => { setModal(null); void openById(id); }} />}
+      {(modal === "new" || modal === "group") && <NewChatModal group={modal === "group"} onClose={() => setModal(null)} onDone={(id) => { setModal(null); void openById(id); }} />}
       {modal === "info" && active && <InfoModal conv={active} onClose={() => setModal(null)} onLeft={() => { setModal(null); setActive(null); reloadConvs(); }} onChanged={() => { reloadConvs(); setInfoVer((v) => v + 1); }} />}
     </>
   );
@@ -1090,7 +1095,7 @@ function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, da
       <div className="side-sec side-list">
         <button onClick={() => { setSearching(true); setQ(""); document.querySelector(".msgr-side")?.scrollTo({ top: 0, behavior: "smooth" }); }}>{I.search}<span>{t("Leita í samtali")}</span></button>
         {manageable && <button onClick={onManage}>{I.settings}<span>{t("Stjórna grúppu")}</span></button>}
-        {manageable && !conv.autoKind && <button className="danger" onClick={onLeave}>{I.leave}<span>{t("Hætta í grúppu")}</span></button>}
+        {manageable && <button className="danger" onClick={onLeave}>{I.leave}<span>{t("Hætta í grúppu")}</span></button>}
       </div>
     </div>
   );
@@ -1141,20 +1146,32 @@ function PeoplePicker({ selected, onToggle }: { selected: Set<string>; onToggle:
   );
 }
 
-/** New chat: one person → direct message; several → a named group. */
-function NewChatModal({ onClose, onDone }: { onClose: () => void; onDone: (id: string) => void }) {
+/** Sjálfgefið heiti hóps eins og í Messenger: „Anna og Jón“, „Anna, Jón og Gunna“, „Anna, Jón og 3 fleiri“. */
+function defaultGroupName(sel: Person[], t: (s: string) => string): string {
+  const f = sel.map((p) => firstName(p.name));
+  if (f.length <= 1) return f[0] ?? "";
+  if (f.length <= 3) return `${f.slice(0, -1).join(", ")} ${t("chat:and")} ${f[f.length - 1]}`;
+  return `${f.slice(0, 2).join(", ")} ${t("chat:and")} ${f.length - 2} ${t("fleiri")}`;
+}
+
+/** New chat: one person → direct message; several (or „Nýr hópur“) → a group. Heiti er valfrjálst. */
+function NewChatModal({ group = false, onClose, onDone }: { group?: boolean; onClose: () => void; onDone: (id: string) => void }) {
   const { t } = useLang();
   const [name, setName] = useState("");
   const [sel, setSel] = useState<Person[]>([]);
   const [busy, setBusy] = useState(false);
+  const [teams, setTeams] = useState<TeamPick[]>([]);
+  useEffect(() => { listTeamPicks().then(setTeams); }, []);
   const ids = new Set(sel.map((p) => p.userId));
-  const isGroup = sel.length > 1;
+  const isGroup = group || sel.length > 1;
+  const fallbackName = defaultGroupName(sel, t);
   function toggle(p: Person) { setSel((s) => ids.has(p.userId) ? s.filter((x) => x.userId !== p.userId) : [...s, p]); }
+  /** „+ Allir í Eldhúsi“: bætir öllum í deildinni/staðnum við valið (þeir sem eru þegar valdir haldast). */
+  function addTeam(tp: TeamPick) { setSel((s) => [...s, ...tp.people.filter((p) => !s.some((x) => x.userId === p.userId))]); }
   async function create() {
     if (!sel.length) { toast(t("Veldu meðlimi")); return; }
-    if (isGroup && !name.trim()) { toast("Sláðu inn heiti"); return; }
     setBusy(true);
-    const r = isGroup ? await createGroup(name, sel.map((p) => p.userId)) : await startDM(sel[0].userId);
+    const r = isGroup ? await createGroup(name.trim() || fallbackName, sel.map((p) => p.userId)) : await startDM(sel[0].userId);
     setBusy(false);
     if (r.ok && r.id) onDone(r.id); else toast(r.error ?? "Villa");
   }
@@ -1162,11 +1179,23 @@ function NewChatModal({ onClose, onDone }: { onClose: () => void; onDone: (id: s
     <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="mbg" onClick={onClose} />
       <div className="modal">
-        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Nýtt spjall")}</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{group ? t("Nýr hópur") : t("Nýtt spjall")}</div><button className="x" onClick={onClose}>✕</button></div>
         <div className="mb">
           {sel.length > 0 && <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>{sel.map((p) => <span key={p.userId} className="tag" style={{ background: "var(--brand-soft)", color: "var(--brand)", cursor: "pointer" }} onClick={() => toggle(p)}>{p.name} ✕</span>)}</div>}
-          {isGroup && <div className="field"><label>{t("Heiti grúppu")}</label><input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("t.d. Eldhús, Kvöldvakt…")} /></div>}
+          {isGroup && <div className="field"><label>{t("Heiti grúppu")} <span className="muted">({t("valfrjálst")})</span></label><input value={name} onChange={(e) => setName(e.target.value)} placeholder={fallbackName || t("t.d. Eldhús, Kvöldvakt…")} /></div>}
           <label className="muted" style={{ fontSize: 12, display: "block", marginBottom: 6 }}>{t("Veldu meðlimi")}</label>
+          {teams.length > 0 && (
+            <div className="team-picks">
+              {teams.map((tp) => {
+                const all = tp.people.every((p) => ids.has(p.userId));
+                return (
+                  <button key={tp.key} type="button" className={`tpick${all ? " on" : ""}`} disabled={all} onClick={() => addTeam(tp)} title={`${tp.people.length} ${t("manns")}`}>
+                    {all ? "✓" : "+"} {tp.kind === "dept" ? t("Allir í") : t("Allir á")} {tp.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           <PeoplePicker selected={ids} onToggle={toggle} />
           <div style={{ display: "flex", gap: 9, marginTop: 12 }}>
             <button className="btn" disabled={busy || !sel.length} onClick={create}>{isGroup ? t("Búa til grúppu") : t("Senda skilaboð")}</button>
@@ -1189,9 +1218,7 @@ function InfoModal({ conv, onClose, onLeft, onChanged }: { conv: Conversation; o
   useEffect(reload, [conv.id]);
   const admin = !!m.adminId && m.adminId === m.meId;
   const group = conv.kind === "group";
-  // Department/location channels mirror settings: no rename, no leaving.
-  const team = !!conv.autoKind;
-  const kindLabel = conv.autoKind === "dept" ? t("Deildarrás") : conv.autoKind === "loc" ? t("Staðarrás") : t("Grúppa");
+  const kindLabel = t("Grúppa");
   async function remove(p: Person) { const r = await removeMember(conv.id, p.userId); if (r.ok) { reload(); onChanged(); } else toast(r.error ?? "Villa"); }
   async function leave() { if (!window.confirm(`Hætta í „${conv.name}"?`)) return; const r = await leaveChannel(conv.id); if (r.ok) onLeft(); else toast(r.error ?? "Villa"); }
   async function add(p: Person) { const r = await addMembers(conv.id, [p.userId]); if (r.ok) { reload(); setAdding(false); onChanged(); } else toast(r.error ?? "Villa"); }
@@ -1225,7 +1252,7 @@ function InfoModal({ conv, onClose, onLeft, onChanged }: { conv: Conversation; o
                 </span>
               </button>
               <div style={{ flex: 1, minWidth: 0 }}>
-                {editingName && !team ? (
+                {editingName ? (
                   <div style={{ display: "flex", gap: 7 }}>
                     <input autoFocus value={nameVal} onChange={(e) => setNameVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && saveName()} style={{ flex: 1, minWidth: 0 }} />
                     <button className="btn sm" onClick={saveName}>{t("Vista")}</button>
@@ -1233,11 +1260,9 @@ function InfoModal({ conv, onClose, onLeft, onChanged }: { conv: Conversation; o
                 ) : (
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <b style={{ fontSize: 15 }}>{conv.name}</b>
-                    {!team && (
-                      <button className="iconbtn" title={t("Breyta heiti")} onClick={() => { setNameVal(conv.name); setEditingName(true); }}>
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9" /><path d="M16.5 3.5a2 2 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" /></svg>
-                      </button>
-                    )}
+                    <button className="iconbtn" title={t("Breyta heiti")} onClick={() => { setNameVal(conv.name); setEditingName(true); }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9" /><path d="M16.5 3.5a2 2 0 0 1 3 3L8 18l-4 1 1-4 11.5-11.5Z" /></svg>
+                    </button>
                   </div>
                 )}
                 <span className="muted" style={{ fontSize: 12 }}>{kindLabel} · {m.members.length} {t("meðlimir")}</span>
@@ -1262,9 +1287,7 @@ function InfoModal({ conv, onClose, onLeft, onChanged }: { conv: Conversation; o
                   </div>
                 ))}
               </div>
-              {team
-                ? <p className="muted" style={{ fontSize: 12, marginTop: 14, marginBottom: 0 }}>{t("Meðlimir fylgja starfsmannaskránni — rásin uppfærist sjálfkrafa.")}</p>
-                : <button className="btn ghost" style={{ marginTop: 14, color: "var(--bad)" }} onClick={leave}>{t("Hætta í grúppu")}</button>}
+              <button className="btn ghost" style={{ marginTop: 14, color: "var(--bad)" }} onClick={leave}>{t("Hætta í grúppu")}</button>
             </>
           )}
         </div>
