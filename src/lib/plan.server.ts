@@ -23,8 +23,10 @@ export const companyPlan = cache(async (companyId: string): Promise<CompanyPlan>
   const c = (r.data ?? {}) as Record<string, unknown>;
   const plan = asPlan(c.plan);
   const inTrial = !!c.trial_ends_at && new Date(c.trial_ends_at as string).getTime() > Date.now() && c.billing_status !== "paying";
+  // Eldri viðskiptavinir (legacy_price_until) halda öllu sem þeir höfðu (Vöxtur) á meðan eldra verð gildir.
+  const legacy = !!c.legacy_price_until && (c.legacy_price_until as string) >= new Date().toISOString().slice(0, 10);
   return {
-    id: companyId, plan, features: plan === "grunnur" && inTrial ? "voxtur" : plan, billingStatus: (c.billing_status as string | null) ?? null,
+    id: companyId, plan, features: plan === "grunnur" && (inTrial || legacy) ? "voxtur" : plan, billingStatus: (c.billing_status as string | null) ?? null,
     trialEndsAt: (c.trial_ends_at as string | null) ?? null, legacyUntil: (c.legacy_price_until as string | null) ?? null,
     interval: c.billing_interval === "year" ? "year" : "month",
     aiPackEnabled: !!c.ai_pack_enabled, aiPackCap: typeof c.ai_pack_cap === "number" ? c.ai_pack_cap : 10,

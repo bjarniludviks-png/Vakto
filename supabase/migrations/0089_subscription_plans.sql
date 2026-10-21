@@ -34,8 +34,9 @@ update public.companies set plan = 'rekstur'
 -- b) Eldri fyrirtæki án áskriftar (plan NULL, aldrei í reikningakeyrslunni): óbreytt aðgengi.
 update public.companies set plan = 'rekstur'
   where plan is null and trial_ends_at is null and billing_anchor is null;
--- c) Í prufu (ekki enn greitt): Vöxtur.
-update public.companies set plan = 'voxtur'
+-- c) Í prufu (ekki enn greitt): Vöxtur — skráðu sig á gamla verðinu, svo eldra verð gildir í 12 mánuði.
+update public.companies set plan = 'voxtur',
+    legacy_price_until = coalesce(legacy_price_until, (current_date + interval '12 months')::date)
   where (plan is null or plan not in ('free', 'grunnur', 'voxtur', 'rekstur'))
     and trial_ends_at > now() and billing_status is distinct from 'paying';
 -- d) Önnur (greiðandi / prufu lokið): ódýrasta GREIDDA leið miðað við virka starfsmenn síðustu 30 daga
@@ -110,7 +111,10 @@ $$;
 -- Leið sem gildir fyrir eiginleika: Grunnur í prufu (ekki enn greitt) fær Vöxt — prufan er á Vexti.
 create or replace function public.company_feature_plan(p_company uuid) returns text
 language sql stable security definer set search_path = public as $$
-  select case when c.plan = 'grunnur' and c.trial_ends_at > now() and c.billing_status is distinct from 'paying'
+  -- Grunnur fær eiginleika Vaxtar í prufu og á meðan eldra verð gildir (eldri viðskiptavinir missa ekkert).
+  select case when c.plan = 'grunnur'
+               and ((c.trial_ends_at > now() and c.billing_status is distinct from 'paying')
+                    or c.legacy_price_until >= (now() at time zone 'Atlantic/Reykjavik')::date)
               then 'voxtur' else c.plan end
   from public.companies c where c.id = p_company;
 $$;
