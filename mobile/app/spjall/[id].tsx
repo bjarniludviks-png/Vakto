@@ -138,6 +138,11 @@ export default function Thread() {
   const [loadingOlder, setLoadingOlder] = useState(false);
   // fylgja nýjum skilaboðum aðeins meðan lesandinn er neðst í þræðinum
   const atBottom = useRef(true);
+  // Þráðurinn opnast neðst: þar til notandinn dregur sjálfur ráða forritaðar skrunanir og stærðarbreytingar
+  // (myndir, sýndarlistinn) ekki atBottom — annars stöðvast hann ofarlega.
+  const dragged = useRef(false);
+  // maintainVisibleContentPosition heldur líka fyrstu línunni kyrri við fyrstu hleðslu; aðeins kveikt eftir „Sýna eldri“.
+  const [keepPos, setKeepPos] = useState(false);
 
   const load = useCallback(async () => {
     if (!me || !id) return;
@@ -158,6 +163,7 @@ export default function Thread() {
     const oldest = msgs.find((m) => !m.id.startsWith("tmp-"));
     if (!me || !id || !oldest || loadingOlder) return;
     setLoadingOlder(true);
+    setKeepPos(true);
     const [r, blocked] = await Promise.all([listMessages(me, id, { createdAt: oldest.createdAt, id: oldest.id }), blockedUsers()]);
     setLoadingOlder(false);
     const older = r.messages.filter((m) => m.me || !blocked.has(m.senderId));
@@ -279,10 +285,11 @@ export default function Thread() {
         contentContainerStyle={{ padding: 14, paddingBottom: 8 }}
         onContentSizeChange={() => { if (atBottom.current) list.current?.scrollToEnd({ animated: false }); }}
         onLayout={() => { if (atBottom.current) list.current?.scrollToEnd({ animated: false }); }}
-        onScroll={(e) => { const n = e.nativeEvent; atBottom.current = n.contentSize.height - n.contentOffset.y - n.layoutMeasurement.height < 80; }}
+        onScrollBeginDrag={() => { dragged.current = true; }}
+        onScroll={(e) => { if (!dragged.current) return; const n = e.nativeEvent; atBottom.current = n.contentSize.height - n.contentOffset.y - n.layoutMeasurement.height < 80; }}
         scrollEventThrottle={100}
         // eldri skilaboð bætast ofan við → sjónarhornið helst kyrrt
-        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+        maintainVisibleContentPosition={keepPos ? { minIndexForVisible: 0 } : undefined}
         keyboardDismissMode="interactive"
         ListHeaderComponent={more && msgs.length ? (
           <View style={{ width: W - 28, alignItems: "center", paddingVertical: 6 }}>

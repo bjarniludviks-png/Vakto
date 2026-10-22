@@ -52,6 +52,29 @@ function groupFlags(msgs: ChatMessage[], i: number): { first: boolean; last: boo
 }
 
 /** Person avatar — profile photo when set, else colored initials. */
+/** Mynd opnast yfir spjallinu; Cmd/Ctrl/Shift/miðsmellur opnar enn í nýjum flipa. */
+function openImage(e: React.MouseEvent, url: string, view: (url: string) => void) {
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+  e.preventDefault();
+  view(url);
+}
+
+function ImageViewer({ url, onClose }: { url: string; onClose: () => void }) {
+  const { t } = useLang();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div className="imgview" role="dialog" aria-modal="true" onClick={onClose}>
+      <button type="button" className="imgview-x" aria-label={t("Loka")} autoFocus onClick={onClose}>{I.close}</button>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={url} alt="" onClick={(e) => e.stopPropagation()} />
+    </div>
+  );
+}
+
 function PersonAvatar({ p, size }: { p: Person; size: number }) {
   if (p.photo) {
     // eslint-disable-next-line @next/next/no-img-element
@@ -145,7 +168,8 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const [memberCount, setMemberCount] = useState<number | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [sheetFor, setSheetFor] = useState<ChatMessage | null>(null);
-  const pressRef = useRef<{ t: ReturnType<typeof setTimeout> | null; x: number; y: number }>({ t: null, x: 0, y: 0 });
+  const pressRef = useRef<{ t: ReturnType<typeof setTimeout> | null; x: number; y: number; fired?: boolean }>({ t: null, x: 0, y: 0 });
+  const [viewer, setViewer] = useState<string | null>(null);
   const camRef = useRef<HTMLInputElement | null>(null);
   // Relative times ("5 mín") render only after mount — server and browser clocks/time zones differ.
   const [now, setNow] = useState<number | null>(null);
@@ -675,8 +699,8 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     if (!phone || e.pointerType === "mouse") return;
     const p = pressRef.current;
     if (p.t) clearTimeout(p.t);
-    p.x = e.clientX; p.y = e.clientY;
-    p.t = setTimeout(() => { p.t = null; navigator.vibrate?.(8); setSheetFor(m); }, 420);
+    p.x = e.clientX; p.y = e.clientY; p.fired = false;
+    p.t = setTimeout(() => { p.t = null; p.fired = true; navigator.vibrate?.(8); setSheetFor(m); }, 420);
   }
   function pressMove(e: React.PointerEvent) {
     const p = pressRef.current;
@@ -833,7 +857,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                       )}
                       {img
                         // eslint-disable-next-line @next/next/no-img-element
-                        ? <a href={m.url!} target="_blank" rel="noreferrer"><img src={m.url!} alt="" /></a>
+                        ? <a href={m.url!} target="_blank" rel="noreferrer" onClick={(e) => { if (pressRef.current.fired) e.preventDefault(); else openImage(e, m.url!, setViewer); }}><img src={m.url!} alt="" /></a>
                         : m.kind === "audio" && m.url ? <audio controls src={m.url} style={{ height: 36 }} />
                           : m.kind === "file" && m.url ? <a className="mfile" href={m.url} target="_blank" rel="noreferrer">{I.file}<span>{m.body || t("Skjal")}</span></a>
                             : m.body}
@@ -954,7 +978,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
               {aiOpen
                 ? <AiDetails chat={aiChat} show={sideShown} onOpened={() => setSideOver(false)} />
                 : active && <ConvDetails key={active.id} conv={active} subtitle={subtitleOf(active)} name={nameOf(active)} version={infoVer} show={sideShown}
-                  onManage={() => setModal("info")} onJump={jumpTo} dayLabel={dayLabel}
+                  onManage={() => setModal("info")} onJump={jumpTo} onView={setViewer} dayLabel={dayLabel}
                   onLeave={async () => {
                     if (!window.confirm(`${t("Hætta í grúppu")}: „${active.name}“?`)) return;
                     const r = await leaveChannel(active.id);
@@ -991,14 +1015,15 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
 
       {(modal === "new" || modal === "group") && <NewChatModal group={modal === "group"} onClose={() => setModal(null)} onDone={(id) => { setModal(null); void openById(id); }} />}
       {modal === "info" && active && <InfoModal conv={active} onClose={() => setModal(null)} onLeft={() => { setModal(null); setActive(null); reloadConvs(); }} onChanged={() => { reloadConvs(); setInfoVer((v) => v + 1); }} />}
+      {viewer && <ImageViewer url={viewer} onClose={() => setViewer(null)} />}
     </>
   );
 }
 
 /** Details for a channel: big avatar, search in the thread, members, media & files. */
-function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, dayLabel, onLeave }: {
+function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, onView, dayLabel, onLeave }: {
   conv: Conversation; name: string; subtitle: string; version: number; show: boolean;
-  onManage: () => void; onJump: (id: string) => void; dayLabel: (iso: string) => string; onLeave: () => void;
+  onManage: () => void; onJump: (id: string) => void; onView: (url: string) => void; dayLabel: (iso: string) => string; onLeave: () => void;
 }) {
   const { t } = useLang();
   const [members, setMembers] = useState<Members | null>(null);
@@ -1077,7 +1102,7 @@ function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, da
                 <div className="side-grid">
                   {pics.map((m) => (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <a key={m.id} href={m.url} target="_blank" rel="noreferrer"><img src={m.url} alt="" loading="lazy" /></a>
+                    <a key={m.id} href={m.url} target="_blank" rel="noreferrer" onClick={(e) => openImage(e, m.url, onView)}><img src={m.url} alt="" loading="lazy" /></a>
                   ))}
                 </div>
               )}
