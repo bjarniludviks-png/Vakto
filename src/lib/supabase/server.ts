@@ -1,9 +1,30 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+
+const JWT = /^[\w-]+\.[\w-]+\.[\w-]+$/;
 
 /** Supabase client for use in Server Components, Route Handlers and Server Actions. */
 export async function createClient() {
   const cookieStore = await cookies();
+
+  // Appið (VAKTO AI o.fl. undir /api/app/) sendir Supabase-aðgangslykil starfsmannsins sem Bearer
+  // í stað köku. Þá keyra sömu aðgerðir og á vefnum með þeim lykli: RLS og auth.getUser() sjá
+  // notandann eins og hann væri innskráður í vafra. Kökulota gengur alltaf fyrir.
+  const bearer = (await headers()).get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];
+  const cookieSession = cookieStore.getAll().some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"));
+  if (bearer && JWT.test(bearer) && !cookieSession) {
+    const client = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: { getAll: () => [], setAll() {} },
+        global: { headers: { Authorization: `Bearer ${bearer}` } },
+      },
+    );
+    const getUser = client.auth.getUser.bind(client.auth);
+    client.auth.getUser = (jwt?: string) => getUser(jwt ?? bearer);
+    return client;
+  }
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
