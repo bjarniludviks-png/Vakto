@@ -59,6 +59,11 @@ function openImage(e: React.MouseEvent, url: string, view: (url: string) => void
   view(url);
 }
 
+/** Supabase Storage: ?download setur Content-Disposition: attachment (download-eigindið virkar ekki milli léna). */
+function downloadUrl(url: string) {
+  try { const u = new URL(url); u.searchParams.set("download", ""); return u.toString(); } catch { return url; }
+}
+
 function ImageViewer({ url, onClose }: { url: string; onClose: () => void }) {
   const { t } = useLang();
   useEffect(() => {
@@ -68,7 +73,10 @@ function ImageViewer({ url, onClose }: { url: string; onClose: () => void }) {
   }, [onClose]);
   return (
     <div className="imgview" role="dialog" aria-modal="true" onClick={onClose}>
-      <button type="button" className="imgview-x" aria-label={t("Loka")} autoFocus onClick={onClose}>{I.close}</button>
+      <div className="imgview-bar" onClick={(e) => e.stopPropagation()}>
+        <a className="imgview-btn" href={downloadUrl(url)} download aria-label={t("Hlaða niður")} title={t("Hlaða niður")}>{I.download}</a>
+        <button type="button" className="imgview-btn" aria-label={t("Loka")} autoFocus onClick={onClose}>{I.close}</button>
+      </div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={url} alt="" onClick={(e) => e.stopPropagation()} />
     </div>
@@ -104,6 +112,7 @@ const I = {
   compose: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>,
   search: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.4-3.4" /></svg>,
   plus: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 5v14M5 12h14" /></svg>,
+  download: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 4v11M7 10l5 5 5-5M5 20h14" /></svg>,
   close: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 6l12 12M18 6 6 18" /></svg>,
   image: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" /></svg>,
   mic: <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="3" width="6" height="12" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" /></svg>,

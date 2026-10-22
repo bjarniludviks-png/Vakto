@@ -127,6 +127,8 @@ const D: Record<string, E> = {
   "Góða nótt": ["Good night", "Chúc ngủ ngon", "Dobranoc"], "Góðan daginn": ["Good morning", "Chào buổi sáng", "Dzień dobry"], "Góðan dag": ["Good afternoon", "Chào buổi chiều", "Dzień dobry"], "Gott kvöld": ["Good evening", "Chào buổi tối", "Dobry wieczór"],
   "Næsta vakt": ["Next shift", "Ca tiếp theo", "Następna zmiana"], "Næsta vakt · í dag": ["Next shift · today", "Ca tiếp theo · hôm nay", "Następna zmiana · dziś"], "Næsta vakt · á morgun": ["Next shift · tomorrow", "Ca tiếp theo · ngày mai", "Następna zmiana · jutro"],
   "í dag": ["today", "hôm nay", "dziś"], "á morgun": ["tomorrow", "ngày mai", "jutro"], "Í dag": ["Today", "Hôm nay", "Dziś"], "Í gær": ["Yesterday", "Hôm qua", "Wczoraj"], "Frí": ["Off", "Nghỉ", "Wolne"],
+  "Vista mynd": ["Save image", "Lưu ảnh", "Zapisz zdjęcie"],
+  "Tókst ekki að vista mynd": ["Could not save image", "Không lưu được ảnh", "Nie udało się zapisać zdjęcia"],
   "Staðsetning skráð við stimplun": ["Location recorded when clocking", "Vị trí được ghi khi chấm công", "Lokalizacja zapisana przy odbiciu"],
   "Orlof eftir": ["Holiday left", "Ngày phép còn lại", "Pozostały urlop"], "Þessi beiðni": ["This request", "Yêu cầu này", "Ten wniosek"],
   "dagar": ["days", "ngày", "dni"], "virkur dagur": ["workday", "ngày làm việc", "dzień roboczy"], "virkir dagar": ["workdays", "ngày làm việc", "dni robocze"],

@@ -1021,9 +1021,10 @@ html.dark .msgr{--msg-them:#262833}
 .imgview{position:fixed;inset:0;z-index:85;background:rgba(12,13,17,.88);display:flex;align-items:center;justify-content:center;
   padding:calc(env(safe-area-inset-top,0px) + 56px) 16px calc(env(safe-area-inset-bottom,0px) + 24px);animation:imgview-in .15s ease}
 .imgview img{max-width:100%;max-height:100%;object-fit:contain;border-radius:10px;box-shadow:0 24px 60px rgba(0,0,0,.4)}
-.imgview-x{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;width:40px;height:40px;border-radius:50%;
-  background:rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;border:0}
-.imgview-x:hover{background:rgba(255,255,255,.26)}
+.imgview-bar{position:absolute;top:calc(env(safe-area-inset-top,0px) + 12px);right:14px;display:flex;gap:8px}
+.imgview-btn{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.14);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;border:0}
+.imgview-btn:hover{background:rgba(255,255,255,.26)}
+.imgview-btn svg{stroke-width:2}
 @keyframes imgview-in{from{opacity:0}to{opacity:1}}
 .mrow.flash .mbub{animation:mflash 2.2s ease}
 @keyframes mflash{0%,45%{box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 55%,transparent)}100%{box-shadow:0 0 0 0 transparent}}

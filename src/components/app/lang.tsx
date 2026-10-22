@@ -1488,6 +1488,7 @@ export const DICT: Dict = {
   "Litur": { is: "Litakóði", en: "Visual color assignment", vi: "Màu sắc", pl: "Kolor" },
   "Bæta við": { is: "Bæta við", en: "Add", vi: "Thêm", pl: "Dodaj" },
   "Loka": { is: "Loka", en: "Close", vi: "Đóng", pl: "Zamknij" },
+  "Hlaða niður": { is: "Hlaða niður", en: "Download", vi: "Tải xuống", pl: "Pobierz" },
   "Veldu starfsmann til að bæta í vaktaplanið.": { is: "Veldu viðeigandi starfsmann til að bæta við vaktaplanið.", en: "Select an employee to allocate within the schedule matrix.", vi: "Chọn nhân viên để thêm vào lịch làm việc.", pl: "Wybierz pracownika, którego chcesz dodać do grafiku." },
   "+ bæta": { is: "+ bæta við", en: "+ assign", vi: "+ thêm", pl: "+ dodaj" },
   "Vaktategund": { is: "Vaktategund", en: "Shift configuration type", vi: "Loại ca làm", pl: "Rodzaj zmiany" },
