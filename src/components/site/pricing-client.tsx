@@ -173,7 +173,7 @@ export default function PricingClient() {
               </thead>
               {t.cmp.map((grp) => (
                 <tbody key={grp.g}>
-                  <tr className="vp-grp"><th scope="colgroup" colSpan={5}>{grp.g}</th></tr>
+                  <tr className="vp-grp"><th scope="colgroup" colSpan={5}><span>{grp.g}</span></th></tr>
                   {grp.rows === "price" ? (
                     <>
                       <tr><th scope="row">{t.cmpBase}</th>{PLANS.map((p) => <td key={p.id} className={p.id === HOT ? "hot" : ""}><b>{p.base ? m(price(p.base)) : t.cmpFree}</b></td>)}</tr>

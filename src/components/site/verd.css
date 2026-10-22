@@ -85,7 +85,9 @@
 .vp-cmp thead th:first-child{left:0;z-index:2}
 .vp-cmp .hot{background:rgba(233,112,15,.06)}
 .vp-cmp thead th.hot{color:#b85309;background:#fdf1e6}
-.vp-grp th{text-align:left;font-size:13px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:#6e6e73;background:#f7f7f9;padding-top:18px;padding-bottom:10px;position:sticky;left:0}
+.vp-grp th{text-align:left;font-size:13px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:#6e6e73;background:#f7f7f9;padding-top:18px;padding-bottom:10px}
+/* röðin spannar alla dálka og rennur með; textinn sjálfur helst kyrr vinstra megin */
+.vp-grp th span{position:sticky;left:16px;display:inline-block}
 .vp-cmp td b{font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
 .vp-y,.vp-n{display:inline-grid;place-items:center}
 .vp-y svg,.vp-n svg{width:20px;height:20px;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
