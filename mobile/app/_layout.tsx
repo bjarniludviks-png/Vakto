@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
@@ -8,7 +8,6 @@ import { MeProvider } from "../src/lib/me-context";
 import { ToastProvider } from "../src/components/ui";
 import { colors, useTheme, loadThemeMode } from "../src/theme";
 import { loadLang } from "../src/lib/i18n";
-import { isManager } from "../src/lib/api/ops";
 import { supabase } from "../src/lib/supabase";
 import { appBlockedMsg, getAccessState, markAccessClosed, markAppBlocked, READONLY_ROUTES } from "../src/lib/api/access";
 import { launchRoute, onPushTap } from "../src/lib/push";
@@ -35,30 +34,23 @@ function Gate({ children }: { children: React.ReactNode }) {
     return () => { live = false; };
   }, [uid]);
 
-  // Stjórnendur lenda á mælaborðinu þegar appið opnast; starfsfólk á Heim.
-  const landed = useRef(false);
-  const pushed = useRef(false); // opnað úr push → ekki skipta yfir á mælaborðið
   useEffect(() => {
     if (loading) return;
     const onLogin = segments[0] === "login";
-    if (!session && !onLogin) { landed.current = false; router.replace("/login"); return; }
+    if (!session && !onLogin) { router.replace("/login"); return; }
     if (session && access === null) return; // bíður eftir aðgangsstöðu
     if (session && access === "readonly") {
       if (!READONLY_ROUTES.includes(String(segments[0] ?? ""))) router.replace("/starfslok");
       return;
     }
     if (session && onLogin) { router.replace("/"); return; }
-    if (session && !onLogin && !landed.current && segments.length <= 1) {
-      landed.current = true;
-      isManager().then((m) => { if (m && !pushed.current) router.replace("/maelabord"); }).catch(() => {});
-    }
   }, [session, loading, segments, router, access]);
 
   // Smellt á push (t.d. samningur til undirritunar) → opna þann skjá, bæði við kaldræsingu og í gangi.
   const ready = !!session && access !== null && access !== "closed";
   useEffect(() => {
     if (!ready) return;
-    const go = (url: string) => { pushed.current = true; router.push(url as never); };
+    const go = (url: string) => { router.push(url as never); };
     launchRoute().then((u) => { if (u) go(u); }).catch(() => {});
     return onPushTap(go);
   }, [ready, router]);

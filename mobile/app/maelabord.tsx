@@ -1,26 +1,27 @@
-// Mælaborð — flipi sem aðeins eigendur og vaktstjórar sjá. Laun sem hlutfall
+// Mælaborð — skjár sem aðeins eigendur og vaktstjórar sjá (opnast af Heim eða úr „Ég“). Laun sem hlutfall
 // af veltu fyrir valið tímabil með fráviki frá markmiði, velta og kostnaður
 // með samanburði við sama tímabil á undan, tímar og yfirvinna, hverjir eru á
 // vakt núna, beiðnir sem bíða og vaktir sem enginn er á.
 import React, { useCallback, useState } from "react";
 import { View, Pressable, TextInput } from "react-native";
 import { useFocusEffect } from "expo-router";
+import { ClockOutSheet } from "../src/components/clock-out-sheet";
 import { Clock, Check, X, CalendarClock, TrendingUp, TrendingDown, ChevronLeft, ChevronRight, Plus, LogOut, ListChecks, Flag } from "lucide-react-native";
-import { tr, trf } from "../../src/lib/i18n";
-import { Screen } from "../../src/components/screen";
-import { Card, Txt, Muted, Eyebrow, Avatar, Btn, Divider, Seg, Sheet, useToast } from "../../src/components/ui";
-import { colors, font, useTheme } from "../../src/theme";
-import { useMe } from "../../src/lib/me-context";
-import { dec1, kr, nf } from "../../src/lib/format";
+import { tr, trf } from "../src/lib/i18n";
+import { Screen } from "../src/components/screen";
+import { Card, Txt, Muted, Eyebrow, Avatar, Btn, Divider, Seg, Sheet, useToast } from "../src/components/ui";
+import { colors, font, useTheme } from "../src/theme";
+import { useMe } from "../src/lib/me-context";
+import { dec1, kr, nf } from "../src/lib/format";
 import {
   getOps, decideRequest, openShiftLabel, myCompanyId, targetGapKr, rangeLabel, addDays,
   managerClockOut, listLocations, getManualRevenue, saveManualRevenue,
   type Ops, type PendingReq, type PeriodId, type PeriodSel, type OnShift, type LocationRow,
-} from "../../src/lib/api/ops";
-import { iso } from "../../src/lib/api/me";
-import { getCompanyTasks, type StaffTasks } from "../../src/lib/api/tasks";
-import { TaskChecklist } from "../../src/components/tasks";
-import { openReports, resolveReport, type Report } from "../../src/lib/api/moderation";
+} from "../src/lib/api/ops";
+import { iso } from "../src/lib/api/me";
+import { getCompanyTasks, type StaffTasks } from "../src/lib/api/tasks";
+import { TaskChecklist } from "../src/components/tasks";
+import { openReports, resolveReport, type Report } from "../src/lib/api/moderation";
 
 export default function Maelabord() {
   useTheme();
@@ -66,6 +67,7 @@ export default function Maelabord() {
     <Screen
       title={tr("Mælaborð")}
       subtitle={tr("Staðan á vinnustaðnum")}
+      back
       refreshing={refreshing}
       onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}
       header={
@@ -299,49 +301,6 @@ export default function Maelabord() {
 }
 
 const inputStyle = { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.panel2, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 13, fontSize: 22, fontFamily: font.semibold, color: colors.ink } as const;
-
-/** Stjórnandi stimplar út starfsmann sem gleymdi því. Tíminn er í dag, eða í gær ef hann er ekki liðinn í dag. */
-function ClockOutSheet({ who, onClose, onDone }: { who: OnShift | null; onClose: () => void; onDone: () => void }) {
-  const toast = useToast();
-  const [time, setTime] = useState("");
-  const [busy, setBusy] = useState(false);
-  React.useEffect(() => {
-    if (who) { const n = new Date(); setTime(`${String(n.getHours()).padStart(2, "0")}:${String(n.getMinutes()).padStart(2, "0")}`); }
-  }, [who]);
-  const onTime = (v: string) => { const d = v.replace(/\D/g, "").slice(0, 4); setTime(d.length > 2 ? `${d.slice(0, 2)}:${d.slice(2)}` : d); };
-  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
-  let at: Date | null = null;
-  if (m) { at = new Date(); at.setHours(Number(m[1]), Number(m[2]), 0, 0); if (at.getTime() > Date.now() + 60000) at = addDays(at, -1); }
-  async function save() {
-    if (!who || !at) return;
-    setBusy(true);
-    const r = await managerClockOut(who.id, at);
-    setBusy(false);
-    if (!r.ok) { toast(tr(r.error ?? "Tókst ekki")); return; }
-    onDone();
-  }
-  return (
-    <Sheet open={!!who} onClose={onClose} title={tr("Stimpla út")}>
-      {who ? (
-        <View style={{ gap: 14 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-            <Avatar name={who.name} size={42} color={who.color} photo={who.photo} />
-            <View style={{ flex: 1 }}>
-              <Txt weight="bold" size={16}>{who.name}</Txt>
-              <Muted size={13}>{trf("Stimplaði inn {n}", `${rangeLabel(iso(new Date(who.clockIn)), iso(new Date(who.clockIn)))} · ${who.since}`)}</Muted>
-            </View>
-          </View>
-          <View style={{ gap: 6 }}>
-            <Muted size={12}>{tr("Útstimplun kl.")}</Muted>
-            <TextInput value={time} onChangeText={onTime} keyboardType="number-pad" placeholder="16:00" placeholderTextColor={colors.ink3} maxLength={5} style={[inputStyle, { fontVariant: ["tabular-nums"] }]} />
-            {at && iso(at) !== iso(new Date()) ? <Muted size={12}>{tr("Tíminn er ekki liðinn í dag — skráð á gærdaginn.")}</Muted> : null}
-          </View>
-          <Btn title={tr("Stimpla út")} loading={busy} disabled={!at} onPress={save} />
-        </View>
-      ) : null}
-    </Sheet>
-  );
-}
 
 /** Handskráð velta dagsins — fyrir þá sem eru ekki með sölukerfi tengt. */
 function RevenueSheet({ open, me, onClose, onDone }: { open: boolean; me: Parameters<typeof myCompanyId>[0]; onClose: () => void; onDone: () => void }) {
