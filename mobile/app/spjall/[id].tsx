@@ -145,23 +145,26 @@ export default function Thread() {
   const typingRef = useRef<ReturnType<typeof typingChannel> | null>(null);
   const lastTyped = useRef(0);
 
-  // lyklaborðið opnast → nýjustu skilaboðin haldast í sjónmáli
+  // lyklaborðið opnast → nýjustu skilaboðin haldast í sjónmáli. Meðan það er opið fer
+  // heimastikubilið (insets.bottom) ekki undir innsláttinn, annars myndast autt bil ofan við lyklaborðið.
+  const [kbOpen, setKbOpen] = useState(false);
   useEffect(() => {
-    const toEnd = () => setTimeout(() => list.current?.scrollToEnd({ animated: true }), 60);
-    const subs = [Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", toEnd), Keyboard.addListener("keyboardDidShow", toEnd)];
+    const show = () => { setKbOpen(true); if (atBottom.current) setTimeout(toBottom, 60); };
+    const hide = () => setKbOpen(false);
+    const subs = [
+      Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow", show),
+      Keyboard.addListener(Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide", hide),
+    ];
     return () => subs.forEach((x) => x.remove());
   }, []);
 
   // „Sýna eldri skilaboð“: eru eldri skilaboð en þau sem eru hlaðin?
   const [more, setMore] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
-  // fylgja nýjum skilaboðum aðeins meðan lesandinn er neðst í þræðinum
+  // Listinn er öfugur (inverted): offset 0 = nýjustu skilaboðin neðst, svo þráðurinn opnast alltaf
+  // neðst og eldri síður bætast ofan við án þess að sjónarhornið hoppi.
   const atBottom = useRef(true);
-  // Þráðurinn opnast neðst: þar til notandinn dregur sjálfur ráða forritaðar skrunanir og stærðarbreytingar
-  // (myndir, sýndarlistinn) ekki atBottom — annars stöðvast hann ofarlega.
-  const dragged = useRef(false);
-  // maintainVisibleContentPosition heldur líka fyrstu línunni kyrri við fyrstu hleðslu; aðeins kveikt eftir „Sýna eldri“.
-  const [keepPos, setKeepPos] = useState(false);
+  const toBottom = () => list.current?.scrollToOffset({ offset: 0, animated: true });
 
   const load = useCallback(async () => {
     if (!me || !id) return;
@@ -182,7 +185,6 @@ export default function Thread() {
     const oldest = msgs.find((m) => !m.id.startsWith("tmp-"));
     if (!me || !id || !oldest || loadingOlder) return;
     setLoadingOlder(true);
-    setKeepPos(true);
     const [r, blocked] = await Promise.all([listMessages(me, id, { createdAt: oldest.createdAt, id: oldest.id }), blockedUsers()]);
     setLoadingOlder(false);
     const older = r.messages.filter((m) => m.me || !blocked.has(m.senderId));
@@ -253,6 +255,7 @@ export default function Thread() {
     setText("");
     const rt = replyTo; setReplyTo(null);
     atBottom.current = true; // að senda fer alltaf niður á nýjustu skilaboðin
+    toBottom();
     // optimistic
     const tmp: ChatMessage = { id: "tmp-" + Date.now(), senderId: "me", sender: me.fullName.split(/\s+/)[0], senderFull: me.fullName, color: me.avatarColor, photo: me.photoUrl, me: true, body, at: new Date().toTimeString().slice(0, 5), createdAt: new Date().toISOString(), kind: "text", url: null, reactions: [], replyTo: rt ? { sender: rt.sender, body: rt.body } : null };
     setMsgs((cur) => [...cur, tmp]);
@@ -275,7 +278,7 @@ export default function Thread() {
       const last = !next || next.senderId !== m.senderId || new Date(next.createdAt).getTime() - new Date(m.createdAt).getTime() > 10 * 60000;
       out.push({ key: m.id, kind: "msg", m, first, last, showSender: first && !m.me && isGroup });
     });
-    return out;
+    return out.reverse(); // öfugur listi: nýjast fyrst
   }, [msgs, isGroup]);
 
   // „séð af“: aðrir sem hafa lesið eftir mín síðustu skilaboð
@@ -301,28 +304,25 @@ export default function Thread() {
         ref={list}
         data={rows}
         keyExtractor={(r) => r.key}
-        contentContainerStyle={{ padding: 14, paddingBottom: 8 }}
-        onContentSizeChange={() => { if (atBottom.current) list.current?.scrollToEnd({ animated: false }); }}
-        onLayout={() => { if (atBottom.current) list.current?.scrollToEnd({ animated: false }); }}
-        onScrollBeginDrag={() => { dragged.current = true; }}
-        onScroll={(e) => { if (!dragged.current) return; const n = e.nativeEvent; atBottom.current = n.contentSize.height - n.contentOffset.y - n.layoutMeasurement.height < 80; }}
+        inverted
+        contentContainerStyle={{ padding: 14, paddingTop: 8 }}
+        onScroll={(e) => { atBottom.current = e.nativeEvent.contentOffset.y < 80; }}
         scrollEventThrottle={100}
-        // eldri skilaboð bætast ofan við → sjónarhornið helst kyrrt
-        maintainVisibleContentPosition={keepPos ? { minIndexForVisible: 0 } : undefined}
         keyboardDismissMode="interactive"
-        ListHeaderComponent={more && msgs.length ? (
+        // öfugur listi: haus = neðst (skrifar…, séð af), fótur = efst (eldri skilaboð)
+        ListHeaderComponent={
+          <View style={{ gap: 6, width: W - 28 }}>
+            {typing ? <View style={{ alignSelf: "flex-start", marginLeft: 34, backgroundColor: colors.bubbleThem, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 }}><Muted size={13}>•••</Muted></View> : null}
+            {seenBy.length ? <View style={{ flexDirection: "row", alignSelf: "flex-end", gap: 2, marginTop: 4 }}>{seenBy.slice(0, 5).map((r) => <Avatar key={r.userId} name={r.name} size={16} />)}</View> : null}
+          </View>
+        }
+        ListFooterComponent={more && msgs.length ? (
           <View style={{ width: W - 28, alignItems: "center", paddingVertical: 6 }}>
             <Pressable onPress={loadOlder} disabled={loadingOlder} hitSlop={8} style={{ backgroundColor: colors.panel2, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 8, opacity: loadingOlder ? 0.6 : 1 }}>
               <Txt weight="semibold" size={13} color={colors.ink2}>{loadingOlder ? tr("Sæki…") : tr("Sýna eldri skilaboð")}</Txt>
             </Pressable>
           </View>
         ) : null}
-        ListFooterComponent={
-          <View style={{ gap: 6, width: W - 28 }}>
-            {typing ? <View style={{ alignSelf: "flex-start", marginLeft: 34, backgroundColor: colors.bubbleThem, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 }}><Muted size={13}>•••</Muted></View> : null}
-            {seenBy.length ? <View style={{ flexDirection: "row", alignSelf: "flex-end", gap: 2, marginTop: 4 }}>{seenBy.slice(0, 5).map((r) => <Avatar key={r.userId} name={r.name} size={16} />)}</View> : null}
-          </View>
-        }
         renderItem={({ item }) =>
           item.kind === "sep" ? (
             <View style={{ width: W - 28, alignItems: "center" }}>
@@ -347,7 +347,7 @@ export default function Thread() {
           <Pressable onPress={() => setReplyTo(null)} hitSlop={8}><X color={colors.ink3} size={18} /></Pressable>
         </View>
       ) : null}
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2, paddingHorizontal: 8, paddingTop: 6, paddingBottom: Math.max(8, insets.bottom), backgroundColor: colors.panel }}>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2, paddingHorizontal: 8, paddingTop: 6, paddingBottom: kbOpen ? 8 : Math.max(8, insets.bottom), backgroundColor: colors.panel }}>
         {compact ? (
           <Pressable onPress={() => setToolsOpen(true)} hitSlop={6} accessibilityLabel={tr("Fleiri valkostir")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }}>
             <ChevronRight color={colors.brand} size={24} />
