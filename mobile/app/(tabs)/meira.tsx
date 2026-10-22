@@ -1,9 +1,9 @@
 // Ég — laun, skírteini, skjöl, beiðnir, tímar, samstarfsfólk, stillingar, útskráning.
 import React, { useCallback, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
-import { View, Pressable, Alert, Platform } from "react-native";
+import { View, Pressable, Alert } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { IdCard, FolderOpen, Newspaper, FileText, FileCheck, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight } from "lucide-react-native";
+import { IdCard, FolderOpen, Gauge, FileText, FileCheck, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight } from "lucide-react-native";
 import { Screen, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, List, Row, IconBox, Eyebrow, Bar, Pill, iconColor } from "../../src/components/ui";
 import { colors, useTheme } from "../../src/theme";
@@ -26,7 +26,7 @@ export default function Eg() {
   const [reqCount, setReqCount] = useState(0);
   const [manager, setManager] = useState(false);
   const [awaiting, setAwaiting] = useState(0); // samningar sem bíða minnar undirritunar
-  React.useEffect(() => { if (Platform.OS === "ios") isManager().then(setManager).catch(() => {}); }, [me]);
+  React.useEffect(() => { isManager().then(setManager).catch(() => {}); }, [me]);
 
   useFocusEffect(useCallback(() => {
     if (!me) return;
@@ -68,7 +68,7 @@ export default function Eg() {
       </Pressable>
 
       <List>
-        {manager ? <Row icon={<IconBox tone="brand"><Newspaper color={iconColor("brand")} size={19} /></IconBox>} title="Fréttaveita" sub="Færslur og tilkynningar vinnustaðarins" onPress={() => router.push("/frettaveita")} /> : null}
+        {manager ? <Row icon={<IconBox tone="brand"><Gauge color={iconColor("brand")} size={19} /></IconBox>} title={tr("Mælaborð")} sub={tr("Velta, laun, tímar og beiðnir")} onPress={() => router.push("/maelabord")} /> : null}
         <Row icon={<IconBox tone="brand"><IdCard color={iconColor("brand")} size={19} /></IconBox>} title="Starfsmannaskírteini" sub="Sýna eða bæta í Wallet" onPress={() => router.push("/skirteini")} />
         <Row icon={<IconBox tone="info"><FolderOpen color={iconColor("info")} size={19} /></IconBox>} title="Skjöl" sub="Ráðningarsamningur, HACCP, handbækur" onPress={() => router.push("/skjol")} />
         <Row icon={<IconBox tone="brand"><FileCheck color={iconColor("brand")} size={19} /></IconBox>} title="Vinnuyfirlit" sub="Staðfestu tímana þína fyrir tímabilið" onPress={() => router.push("/vinnuyfirlit")} />

@@ -1,11 +1,11 @@
-// Heim — næsta vakt + stimplun, hverjir eru á vakt með þér, flýtihnappar,
-// tilkynningar. (Prototýpa 2026-09-23.)
+// Heim — næsta vakt + stimplun, staðurinn í dag (stjórnendur), hverjir eru á vakt
+// með þér, flýtihnappar, tilkynningar. (Prototýpa 2026-09-23.)
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
 import { View, Pressable, ScrollView, RefreshControl } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Bell, Clock, MapPin, CalendarPlus, ArrowLeftRight, Banknote, Check, CalendarDays, MessageCircle, Newspaper, LayoutGrid } from "lucide-react-native";
+import { Bell, Clock, MapPin, CalendarPlus, ArrowLeftRight, Banknote, Check, CalendarDays, MessageCircle, Newspaper, LayoutGrid, LogOut, ChevronRight, Gauge } from "lucide-react-native";
 import { IconBtn } from "../../src/components/screen";
 import { Card, Txt, Btn, Muted, Eyebrow, Avatar, useToast, Sheet, iconColor } from "../../src/components/ui";
 import { colors, radius, brandShadow, useTheme } from "../../src/theme";
@@ -17,6 +17,8 @@ import { estimateShift } from "../../src/lib/api/pay";
 import { iso } from "../../src/lib/api/me";
 import { kr, dec1 } from "../../src/lib/format";
 import { LeaveSheet, OfferSheet } from "../../src/components/request-sheets";
+import { ClockOutSheet } from "../../src/components/clock-out-sheet";
+import { isManager, myCompanyId, getOps, type Ops, type OnShift } from "../../src/lib/api/ops";
 
 const MONTHS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
 const DAYS = ["Sunnudagur", "Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur"];
@@ -42,11 +44,21 @@ export default function HomeScreen() {
   const [sheet, setSheet] = useState<null | "leave" | "offer" | "notis">(null);
   const [geofence, setGeofence] = useState<GeofenceMode>("off");
   const [tasks, setTasks] = useState<Task[]>([]);
+  // stjórnendur: staðan á vinnustaðnum í dag (sama og efst í Mælaborði)
+  const [ops, setOps] = useState<Ops | null>(null);
+  const [outFor, setOutFor] = useState<OnShift | null>(null);
   const [, tick] = useState(0);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const loadOps = useCallback(async () => {
+    if (!me || !(await isManager().catch(() => false))) { setOps(null); return; }
+    const companyId = await myCompanyId(me);
+    if (companyId) setOps(await getOps(companyId, { id: "day", offset: 0 }));
+  }, [me]);
+
   const load = useCallback(async () => {
     if (!me) return;
+    loadOps().catch(() => {});
     try {
       const [h, g, tk] = await Promise.all([getHome(me), getGeofenceMode(), getTodayTasks(me)]);
       setHome(h);
@@ -153,6 +165,8 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {ops ? <TodayCard ops={ops} onOpen={() => router.push("/maelabord")} onClockOut={setOutFor} /> : null}
+
         {/* verkefni dagsins — vaktstjóri setur þau í vaktaplaninu */}
         {tasks.length > 0 ? (
           <Card>
@@ -226,6 +240,7 @@ export default function HomeScreen() {
         </Card>
       </ScrollView>
 
+      <ClockOutSheet who={outFor} onClose={() => setOutFor(null)} onDone={() => { setOutFor(null); toast(tr("Stimplað út")); loadOps().catch(() => {}); }} />
       <LeaveSheet open={sheet === "leave"} onClose={() => setSheet(null)} onDone={load} />
       <OfferSheet open={sheet === "offer"} onClose={() => setSheet(null)} onDone={load} />
       <Sheet open={sheet === "notis"} onClose={() => setSheet(null)} title="Tilkynningar">
@@ -241,6 +256,73 @@ export default function HomeScreen() {
     else if (n.kind === "post") router.push("/frettir");
     else if (n.kind === "chat") router.push("/spjall");
   }
+}
+
+/** Stjórnendur: staðurinn í dag — hverjir eru stimplaðir inn (útstimplun beint héðan),
+ *  velta og laun af veltu, beiðnir og ómannaðar vaktir. Allt opnar fulla mælaborðið. */
+function TodayCard({ ops, onOpen, onClockOut }: { ops: Ops; onOpen: () => void; onClockOut: (x: OnShift) => void }) {
+  const p = ops.now;
+  const target = ops.laborTarget;
+  const pctColor = p.pct == null ? colors.ink : p.pct <= target ? colors.good : p.pct <= target + 5 ? colors.warn : colors.bad;
+  const shown = ops.onShift.slice(0, 4);
+  const more = ops.onShift.length - shown.length;
+  return (
+    <Card>
+      <Pressable onPress={onOpen} hitSlop={6} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Gauge color={colors.brandDeep} size={16} />
+        <View style={{ flex: 1 }}><Eyebrow>{tr("Staðurinn í dag")}</Eyebrow></View>
+        <Txt weight="bold" size={12.5} color={colors.brandDeep}>{tr("Mælaborð")}</Txt>
+        <ChevronRight color={colors.brandDeep} size={15} />
+      </Pressable>
+      <View style={{ flexDirection: "row", gap: 12, marginTop: 12 }}>
+        <Stat label={tr("Á vakt")} value={String(ops.onShift.length)} />
+        <Stat label={tr("Velta")} value={p.revenue > 0 ? kr(p.revenue) : "—"} />
+        <Stat label={tr("Laun af veltu")} value={p.pct != null ? `${dec1(p.pct)}%` : "—"} color={pctColor} />
+      </View>
+      {shown.length > 0 ? (
+        <View style={{ marginTop: 12, gap: 10 }}>
+          {shown.map((x) => (
+            <View key={x.id} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <Avatar name={x.name} size={32} color={x.color} photo={x.photo} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Txt weight="semibold" size={14} numberOfLines={1}>{x.name}</Txt>
+                <Muted size={12}>{trf("síðan {n}", x.since)}</Muted>
+              </View>
+              <Pressable onPress={() => onClockOut(x)} hitSlop={8} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 5, borderWidth: 1, borderColor: colors.line, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 6, opacity: pressed ? 0.6 : 1 })}>
+                <LogOut color={colors.ink2} size={13} />
+                <Txt size={12} weight="semibold" color={colors.ink2}>{tr("Stimpla út")}</Txt>
+              </Pressable>
+            </View>
+          ))}
+          {more > 0 ? <Pressable onPress={onOpen}><Muted size={12.5}>{trf("+{n} fleiri á vakt", more)}</Muted></Pressable> : null}
+        </View>
+      ) : <Muted style={{ marginTop: 10 }}>{tr("Enginn er stimplaður inn eins og er.")}</Muted>}
+      {ops.pending.length > 0 || ops.openShifts.length > 0 ? (
+        <Pressable onPress={onOpen} style={{ flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+          {ops.pending.length > 0 ? <Chip tone={colors.warn} label={trf("{n} beiðnir bíða", ops.pending.length)} /> : null}
+          {ops.openShifts.length > 0 ? <Chip tone={colors.bad} label={trf("{n} vaktir án starfsmanns", ops.openShifts.length)} /> : null}
+        </Pressable>
+      ) : null}
+    </Card>
+  );
+}
+
+function Stat({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <View style={{ flex: 1 }}>
+      <Muted size={12}>{label}</Muted>
+      <Txt weight="bold" size={18} color={color} style={{ fontVariant: ["tabular-nums"] }} numberOfLines={1} adjustsFontSizeToFit>{value}</Txt>
+    </View>
+  );
+}
+
+function Chip({ label, tone }: { label: string; tone: string }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.panel2, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 }}>
+      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: tone }} />
+      <Txt size={12.5} weight="semibold" color={colors.ink2}>{label}</Txt>
+    </View>
+  );
 }
 
 function Quick({ icon, title, sub, onPress }: { icon: React.ReactNode; title: string; sub: string; onPress: () => void }) {
