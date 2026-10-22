@@ -5,11 +5,13 @@ import { tr, trf } from "../../src/lib/i18n";
 import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions, Modal } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronLeft, ChevronRight, Send, X, Hash, CornerUpLeft, Trash2, Flag, Ban, Image as ImageIcon, Camera, CirclePlus, Info, BellOff, Bell, FileText, Images, LogOut } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, Send, X, Download, Hash, CornerUpLeft, Trash2, Flag, Ban, Image as ImageIcon, Camera, CirclePlus, Info, BellOff, Bell, FileText, Images, LogOut } from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { Linking, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
+import { File, Paths } from "expo-file-system";
+import * as Sharing from "expo-sharing";
 import { Txt, Muted, Avatar, Sheet, Row, useToast } from "../../src/components/ui";
 import { uploadImage } from "../../src/lib/api/feed";
 import { colors, font, useTheme } from "../../src/theme";
@@ -83,6 +85,23 @@ export default function Thread() {
   }
   const list = useRef<FlatList>(null);
   const [viewer, setViewer] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  /** Sækir myndina í skyndiminni og opnar deilingarblaðið („Vista mynd“ setur hana í Myndir). */
+  async function saveImage(url: string) {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const name = url.split("?")[0].split("/").pop() || `vakto-${Date.now()}.jpg`;
+      const dest = new File(Paths.cache, name);
+      if (dest.exists) dest.delete();
+      const file = await File.downloadFileAsync(url, dest);
+      await Sharing.shareAsync(file.uri, { UTI: "public.image", mimeType: file.type || "image/jpeg" });
+    } catch {
+      toast(tr("Tókst ekki að vista mynd"));
+    } finally {
+      setSaving(false);
+    }
+  }
   // tímastimplar eru faldir hægra megin við skjáinn; strok til vinstri dregur þá inn (eins og í Messenger)
   const { width: W } = useWindowDimensions();
   const pull = useRef(new Animated.Value(0)).current;
@@ -427,6 +446,11 @@ export default function Thread() {
           <Pressable onPress={() => setViewer(null)} hitSlop={12} accessibilityLabel={tr("Loka")} style={{ position: "absolute", top: insets.top + 10, right: 16, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,.16)", alignItems: "center", justifyContent: "center" }}>
             <X color="#fff" size={20} />
           </Pressable>
+          {viewer ? (
+            <Pressable onPress={() => saveImage(viewer)} disabled={saving} hitSlop={12} accessibilityLabel={tr("Vista mynd")} style={{ position: "absolute", top: insets.top + 10, right: 64, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,.16)", alignItems: "center", justifyContent: "center", opacity: saving ? 0.5 : 1 }}>
+              <Download color="#fff" size={19} />
+            </Pressable>
+          ) : null}
         </Pressable>
       </Modal>
     </KeyboardAvoidingView>
