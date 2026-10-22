@@ -10,6 +10,8 @@ import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { listConversations, listPeople, startDM, createGroup, subscribeChat, teamPicks, defaultGroupName, type Conversation, type Person } from "../../src/lib/api/chat";
 import { getMuted, onMuteChange, getDnd, dndLabel } from "../../src/lib/mute";
+import { isManager } from "../../src/lib/api/ops";
+import { AiAvatar } from "../../src/components/ai-avatar";
 
 function when(ts: string | null): string {
   if (!ts) return "";
@@ -45,6 +47,9 @@ export default function Spjall() {
   const [groupName, setGroupName] = useState("");
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  // VAKTO AI fest efst hjá stjórnendum og vaktstjórum (eins og á vefnum)
+  const [ai, setAi] = useState(false);
+  useEffect(() => { isManager().then(setAi).catch(() => {}); }, [me]);
 
   const [dnd, setDnd] = useState<number | null>(null);
   useEffect(() => {
@@ -115,6 +120,12 @@ export default function Spjall() {
         {/* hringir: nýjustu samtölin (eins og efsta röðin í Messenger) */}
         {pins.length && !search ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}>
+            {ai ? (
+              <Pressable onPress={() => router.push("/vakto-ai")} accessibilityLabel="VAKTO AI" style={({ pressed }) => ({ width: 66, alignItems: "center", gap: 6, opacity: pressed ? 0.7 : 1 })}>
+                <AiAvatar size={60} />
+                <Txt size={12.5} color={colors.ink2} numberOfLines={1} style={{ maxWidth: 66, textAlign: "center" }}>VAKTO AI</Txt>
+              </Pressable>
+            ) : null}
             {pins.map((c) => {
               const un = c.unread > 0 && !muted.has(c.id);
               return (
@@ -147,6 +158,15 @@ export default function Spjall() {
             <Btn title="Nýr hópur" icon={<Users color="#fff" size={17} />} onPress={() => openNew("group")} />
             <Btn title="Ný skilaboð" variant="ghost" onPress={() => openNew("dm")} />
           </View>
+        ) : null}
+        {ai && !search && !onlyUnread ? (
+          <Pressable onPress={() => router.push("/vakto-ai")} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 8, minHeight: 72, backgroundColor: pressed ? colors.panel2 : colors.panel })}>
+            <AiAvatar size={56} />
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Txt weight="semibold" size={16}>VAKTO AI</Txt>
+              <Txt size={14} color={colors.ink3} numberOfLines={1} style={{ marginTop: 3 }}>{tr("Spurðu um laun, tíma og vaktir")}</Txt>
+            </View>
+          </Pressable>
         ) : null}
         {visible.map((c) => {
           // Messenger-röð: 56px mynd, nafn + tími til hægri, síðustu skilaboð; ólesið = feitletrað + punktur

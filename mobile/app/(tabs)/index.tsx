@@ -18,6 +18,7 @@ import { iso } from "../../src/lib/api/me";
 import { kr, dec1 } from "../../src/lib/format";
 import { LeaveSheet, OfferSheet } from "../../src/components/request-sheets";
 import { ClockOutSheet } from "../../src/components/clock-out-sheet";
+import { AiAvatar } from "../../src/components/ai-avatar";
 import { isManager, myCompanyId, getOps, type Ops, type OnShift } from "../../src/lib/api/ops";
 
 const MONTHS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
@@ -165,7 +166,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {ops ? <TodayCard ops={ops} onOpen={() => router.push("/maelabord")} onClockOut={setOutFor} /> : null}
+        {ops ? <TodayCard ops={ops} onOpen={() => router.push("/maelabord")} onAsk={() => router.push("/vakto-ai")} onClockOut={setOutFor} /> : null}
 
         {/* verkefni dagsins — vaktstjóri setur þau í vaktaplaninu */}
         {tasks.length > 0 ? (
@@ -260,7 +261,7 @@ export default function HomeScreen() {
 
 /** Stjórnendur: staðurinn í dag — hverjir eru stimplaðir inn (útstimplun beint héðan),
  *  velta og laun af veltu, beiðnir og ómannaðar vaktir. Allt opnar fulla mælaborðið. */
-function TodayCard({ ops, onOpen, onClockOut }: { ops: Ops; onOpen: () => void; onClockOut: (x: OnShift) => void }) {
+function TodayCard({ ops, onOpen, onAsk, onClockOut }: { ops: Ops; onOpen: () => void; onAsk: () => void; onClockOut: (x: OnShift) => void }) {
   const p = ops.now;
   const target = ops.laborTarget;
   const pctColor = p.pct == null ? colors.ink : p.pct <= target ? colors.good : p.pct <= target + 5 ? colors.warn : colors.bad;
@@ -303,6 +304,11 @@ function TodayCard({ ops, onOpen, onClockOut }: { ops: Ops; onOpen: () => void; 
           {ops.openShifts.length > 0 ? <Chip tone={colors.bad} label={trf("{n} vaktir án starfsmanns", ops.openShifts.length)} /> : null}
         </Pressable>
       ) : null}
+      <Pressable onPress={onAsk} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: colors.line2, opacity: pressed ? 0.7 : 1 })}>
+        <AiAvatar size={28} />
+        <Txt weight="semibold" size={14} style={{ flex: 1 }}>{tr("Spyrja VAKTO AI")}</Txt>
+        <ChevronRight color={colors.ink3} size={16} />
+      </Pressable>
     </Card>
   );
 }
