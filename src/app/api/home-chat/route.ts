@@ -29,7 +29,7 @@ type Msg = { role: "user" | "assistant" | "owner"; body: string };
 
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "?";
-  let payload: { message?: string; lang?: string; threadId?: string; token?: string; page?: string };
+  let payload: { message?: string; lang?: string; threadId?: string; token?: string; page?: string; name?: string; email?: string };
   try { payload = await req.json(); } catch { return NextResponse.json({ ok: false }, { status: 400 }); }
   const text = (payload.message ?? "").toString().trim().slice(0, MAX_LEN);
   const lang: "is" | "en" | "pl" = payload.lang === "en" || payload.lang === "pl" ? payload.lang : "is";
@@ -38,16 +38,22 @@ export async function POST(req: Request) {
   if (!text) return NextResponse.json({ ok: false }, { status: 400 });
   if (!isSupabaseConfigured()) return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
 
+  // nafn + netfang sem gesturinn gaf upp í byrjun (svo eigandinn geti svarað í pósti síðar)
+  const email = (payload.email ?? "").toString().trim().slice(0, 200);
+  const who = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) ? { email, name: (payload.name ?? "").toString().trim().slice(0, 120) || null } : null;
   const admin = createAdminClient();
   // þráður: sækja með id+token, annars stofna
   let threadId = payload.threadId ?? null, token = payload.token ?? null, status = "bot";
   if (threadId && token) {
-    const { data } = await admin.from("support_threads").select("id, status").eq("id", threadId).eq("token", token).maybeSingle();
-    if (!data) { threadId = null; token = null; } else status = data.status as string;
+    const { data } = await admin.from("support_threads").select("id, status, email").eq("id", threadId).eq("token", token).maybeSingle();
+    if (!data) { threadId = null; token = null; } else {
+      status = data.status as string;
+      if (who && !data.email) await admin.from("support_threads").update(who).eq("id", data.id);
+    }
   }
   if (!threadId || !token) {
     token = newToken();
-    const { data, error } = await admin.from("support_threads").insert({ token, lang, page: (payload.page ?? "").toString().slice(0, 200) }).select("id").single();
+    const { data, error } = await admin.from("support_threads").insert({ token, lang, page: (payload.page ?? "").toString().slice(0, 200), ...(who ?? {}) }).select("id").single();
     if (error || !data) return NextResponse.json({ ok: false, error: "unavailable" }, { status: 503 });
     threadId = data.id as string;
   }
