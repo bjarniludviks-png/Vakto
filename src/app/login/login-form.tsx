@@ -81,7 +81,9 @@ export default function LoginForm({ lang = "is", demo = false }: { lang?: Lang; 
       } catch {}
       // Full navigation (not client transition) so the app shell loads with its
       // route-scoped CSS + fresh session — avoids the "needs a refresh" flash.
-      window.location.assign("/maelabord");
+      // ?next= aðeins innan síðunnar og aðeins fyrir samþykki tengdra forrita (/oauth/…).
+      const next = new URLSearchParams(window.location.search).get("next");
+      window.location.assign(next?.startsWith("/oauth/") ? next : "/maelabord");
     } catch {
       setError(s.errConnect);
     } finally {

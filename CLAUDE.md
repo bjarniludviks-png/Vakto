@@ -443,3 +443,19 @@
 - `publishSchedule` eyðir ekki lengur lausum vöktum (`.not("employee_id","is",null)`) — þær eru ekki í gridinu.
 - Appið (`mobile/src/lib/api/requests.ts` `applyForShift(me, note, shiftId)`) skrifar í `shift_claims` og kallar `/api/app/notify`
   með `shift_claim`; eldri app-útgáfur senda áfram textabeiðni í `shift_swaps` (birtist í beiðnaspjaldinu). Krefst OTA.
+
+## Tengd forrit — MCP (23. okt. 2026, migration 0090 á staging; prod við release)
+- Claude, ChatGPT o.fl. tengjast `https://www.vakto.is/api/mcp` (Streamable HTTP, JSON-svör, engin lota). Aðeins
+  LEStól: `READ_TOOLS` úr `lib/ai/assistant-tools.ts` + `about` (fyrirtæki, dagurinn í dag). Nýtt lestól í VAKTO AI
+  birtist sjálfkrafa hér líka — **aldrei bæta skrifverkfæri við MCP**. `scrub()` í `api/mcp/route.ts` fjarlægir
+  kennitölur, banka, heimilisföng o.fl. úr öllum svörum.
+- OAuth 2.1 sjálfsmíðað (`lib/mcp.server.ts`): lýsigögn `/.well-known/oauth-{protected-resource,authorization-server}`,
+  DCR `/api/oauth/register`, samþykki `/oauth/authorize` (+ `actions.ts`), lyklar `/api/oauth/token` (PKCE S256,
+  refresh snúið við hverja notkun). Okkar lyklar `vk_at_`/`vk_rt_` geymdir sem SHA-256 í `mcp_grants`.
+- Hver tenging fær EIGIN Supabase-lotu (magic link innleystur á þjóninum), dulkóðaða (AES-GCM, `MCP_TOKEN_KEY` eða
+  leitt af service-role-lykli) — fer aldrei út. Tólin keyra innan `actAs.run(jwt)` (`lib/supabase/server.ts`) svo
+  `createClient()` og RLS virka eins og á vefnum.
+- Skilyrði (athuguð við hvert kall): owner/manager, `companies.ai_external` (eigandi kveikir í Stillingum → Tengingar
+  eða á samþykktarsíðunni), `planAllows(features, "ai")`, ekki demo/lokað. Slökkt = allar tengingar eytt.
+- Stillingar → Tengingar → „Tengd forrit“ (`stillingar/ai-apps-panel.tsx`, `ai-apps-actions.ts`). Innskráning varðveitir
+  `?next=/oauth/…` (middleware + login-form).
