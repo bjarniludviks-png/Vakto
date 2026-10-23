@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import type { PayLine } from "@/lib/payroll";
 import { getExportLines, type HourBuckets } from "@/lib/payroll-export.server";
+import { createClient } from "@/lib/supabase/server";
 
 function csvCell(v: string | number): string {
   const s = String(v);
@@ -55,23 +56,47 @@ export async function GET(request: Request) {
     });
   }
 
-  let header: string[];
-  let rows: (string | number)[][];
   if (format === "dk") {
-    // DK launakerfi: kennitala + launaliðir í röð sem DK-innlestur skilur.
-    header = ["Kennitala", "Nafn", "Dagvinnustundir", "Yfirvinnustundir", "Dagvinna", "Álag", "Yfirvinna", "Uppbót", "Brúttó"];
-    rows = lines.map((l) => [kt[l.employeeId] ?? "", l.name, l.hours, "", l.dayPay, l.premiums, l.overtime, l.uppbot, l.gross]);
-  } else {
-    header = ["Nafn", "Tímar", "Dagvinna", "Álög", "Yfirvinna", "Uppbót", "Brúttó", "Staðgreiðsla", "Lífeyrir", "Félagsgjald", "Útborgað", "Kostnaður m. byrði"];
-    rows = lines.map((l) => [l.name, l.hours, l.dayPay, l.premiums, l.overtime, l.uppbot, l.gross, l.withholding, l.pension, l.union, l.net, l.cost]);
+    // dk Laun: CSV-innlestur í launakeyrslu (desk.dk.is „Lesa úr CSV-skrá inn í launakeyrslu“):
+    // Kennitala · Deild · Nafn · einn dálkur per launalið með NÚMER launaliðarins sem fyrirsögn, gildi = tímar.
+    // Launaliðirnir eru stilltir í Stillingum → Tengingar → DK (companies.dk_paycodes).
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: me } = user ? await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle() : { data: null };
+    const { data: co } = me?.company_id ? await supabase.from("companies").select("dk_paycodes").eq("id", me.company_id).maybeSingle() : { data: null };
+    const codes = (co?.dk_paycodes ?? null) as { dagvinna?: string; yfirvinna?: string; alag?: Record<string, string> } | null;
+    if (!codes?.dagvinna) return Response.redirect(new URL("/stillingar?tab=tengingar&dk=1", request.url), 303);
+    const cols: string[] = [];
+    const add = (c?: string) => { if (c && !cols.includes(c)) cols.push(c); };
+    add(codes.dagvinna); add(codes.yfirvinna);
+    const alagPcts = Object.keys(codes.alag ?? {}).map(Number).sort((a, b) => a - b);
+    for (const p of alagPcts) add(codes.alag?.[String(p)]);
+    const num = (n: number) => (Math.round(n * 100) / 100).toString().replace(".", ",");
+    const missing = new Set<number>();
+    // Fastlaunafólk er ekki með: DK greiðir mánaðarlaunin sjálft og tímar á dagvinnulið myndu tvígreiða.
+    const dkRows = lines.filter((l) => !got.monthly.has(l.employeeId)).map((l) => {
+      const h = hours.get(l.employeeId) ?? { dagvinna: l.hours, yfirvinna: 0, alag: {} };
+      const v = new Map<string, number>();
+      const put = (c: string | undefined, n: number) => { if (c && n) v.set(c, (v.get(c) ?? 0) + n); };
+      put(codes.dagvinna, h.dagvinna); put(codes.yfirvinna || codes.dagvinna, h.yfirvinna);
+      for (const [p, n] of Object.entries(h.alag)) { const c = codes.alag?.[String(Number(p))]; if (c) put(c, n); else if (n) missing.add(Number(p)); }
+      return { name: l.name, row: [(kt[l.employeeId] ?? "").replace(/\D/g, ""), "", l.name, ...cols.map((c) => (v.get(c) ? num(v.get(c)!) : ""))] };
+    }).filter((r) => r.row.slice(3).some(Boolean)).sort((a, b) => a.name.localeCompare(b.name, "is")).map((r) => r.row);
+    if (missing.size) console.warn("[dk export] álag án launaliðar:", [...missing]);
+    const body = "\uFEFF" + [["Kennitala", "Deild", "Nafn", ...cols], ...dkRows].map((r) => r.map(csvCell).join(";")).join("\r\n") + "\r\n";
+    const stamp = from && to ? `${from}_${to}` : "timabil";
+    return new Response(body, { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="dk-launakeyrsla-${stamp}.csv"` } });
   }
+
+  const header = ["Nafn", "Tímar", "Dagvinna", "Álög", "Yfirvinna", "Uppbót", "Brúttó", "Staðgreiðsla", "Lífeyrir", "Félagsgjald", "Útborgað", "Kostnaður m. byrði"];
+  const rows = lines.map((l) => [l.name, l.hours, l.dayPay, l.premiums, l.overtime, l.uppbot, l.gross, l.withholding, l.pension, l.union, l.net, l.cost]);
 
   const csv =
     "﻿" + // BOM so Excel reads Icelandic chars
     [header, ...rows].map((r) => r.map(csvCell).join(";")).join("\r\n") +
     "\r\n";
 
-  const filename = format === "dk" ? "vakto-dk.csv" : "vakto-laun.csv";
+  const filename = "vakto-laun.csv";
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

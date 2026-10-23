@@ -342,7 +342,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1, no
                 <span>{t("Álagsliðirnir eiga aðeins að vera álagið sjálft (t.d. 33% af dagvinnutaxta), ekki fullur taxti, því sömu tímar eru líka taldir í Dagvinnu. Annars er tvígreitt.")}</span>
               </div>
             )}
-            <div className="db2-it"><span className="pr-logo"><img src="/integrations/dk.png" alt="" /></span><span className="db2-tx"><b>DK</b><span>{t("launaskrá fyrir DK bókhald")}</span></span><button className="btn ghost sm" onClick={() => download("dk")}>{t("Sækja")}</button></div>
+            <div className="db2-it"><span className="pr-logo"><img src="/integrations/dk.png" alt="" /></span><span className="db2-tx"><b>DK</b><span>{t("tímar í launakeyrslu dk Laun")}</span></span><button className="btn ghost sm" onClick={() => download("dk")}>{t("Sækja")}</button></div>
             <div className="db2-it"><span className="pr-logo xl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5" /><path d="M3.5 9h17M3.5 14.5h17M9.5 3.5v17" /></svg></span><span className="db2-tx"><b>Excel</b><span>{t("sundurliðun per starfsmann")}</span></span><button className="btn ghost sm" onClick={() => download("excel")}>{t("Sækja")}</button></div>
           </div>
         </section>
