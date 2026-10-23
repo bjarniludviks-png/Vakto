@@ -20,6 +20,7 @@ const APPS: App[] = [
   { id: "inventra", name: "INVENTRA", logo: "inventra", cat: ["pos"], is: true, kind: "apikey", sub: ["Framleiðsla og sala", "Production and sales"], d: ["Systurkerfi VAKTO. Velta send beint með lykli.", "VAKTO's sister system. Revenue sent with a key."] },
   { id: "noona", name: "Noona", logo: "/integrations/noona.png", cat: ["pos", "book"], is: true, kind: "soon", sub: ["Kassakerfi og bókanir (áður SalesCloud)", "POS and bookings (formerly SalesCloud)"], d: ["Velta úr kassanum og bókanir næstu daga fyrir veltuspá.", "POS revenue and upcoming bookings for the forecast."] },
   { id: "dineout", name: "Dineout", logo: "/integrations/dineout.png", cat: ["pos", "book"], is: true, kind: "soon", sub: ["Kassakerfi og bókanir", "POS and bookings"], d: ["Velta og bókanir, gott fyrir veltuspá vaktaplansins.", "Revenue and bookings for the schedule forecast."] },
+  { id: "businesscentral", name: "Business Central", logo: "bc", cat: ["acc", "pos"], is: true, kind: "connect", sub: ["Microsoft Dynamics 365 og LS Central", "Microsoft Dynamics 365 and LS Central"], d: ["Velta úr fjárhagnum (tekjureikningar) sótt sjálfkrafa á hverjum degi.", "Revenue from the general ledger (income accounts), fetched daily."] },
   { id: "payday", name: "Payday", logo: "/integrations/payday.png", cat: ["pay", "acc"], is: true, kind: "export", sub: ["Laun og bókhald", "Payroll and accounting"], d: ["Tímaskrá flutt út fyrir launakeyrslu í Payday.", "Timesheet export for payroll in Payday."] },
   { id: "dk", name: "DK", logo: "/integrations/dk.png", cat: ["pay", "acc"], is: true, kind: "export", sub: ["Bókhald og laun", "Accounting and payroll"], d: ["Launaskrá flutt út fyrir DK.", "Payroll file export for DK."] },
   { id: "regla", name: "Regla", logo: "/integrations/regla.png", cat: ["acc"], is: true, kind: "soon", sub: ["Bókhald", "Accounting"], d: ["Velta úr bókhaldinu.", "Revenue from your books."] },
@@ -37,6 +38,7 @@ const ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 function Logo({ app, size = 40 }: { app: { logo: string; name: string }; size?: number }) {
   if (app.logo === "inventra") return <span className="tg-logo" style={{ width: size, height: size }}><span className="tg-inv"><i style={{ height: 8 }} /><i style={{ height: 12 }} /><i style={{ height: 16 }} /></span></span>;
+  if (app.logo === "bc") return <span className="tg-logo" style={{ width: size, height: size }}><svg viewBox="0 0 24 24" width={size - 16} height={size - 16} aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" fill="#0b8a7a" /><text x="12" y="16" textAnchor="middle" fontSize="9.5" fontWeight="700" fill="#fff" fontFamily="inherit">BC</text></svg></span>;
   if (app.logo === "zap") return <span className="tg-logo" style={{ width: size, height: size }}><svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="#ff4f00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z" /></svg></span>;
   // eslint-disable-next-line @next/next/no-img-element
   return <span className="tg-logo" style={{ width: size, height: size }}><img src={app.logo} alt="" width={size - 14} height={size - 14} /></span>;
@@ -224,7 +226,7 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
               const app = APPS.find((a) => a.id === i.provider);
               return (
                 <div key={i.id} className="tg-conn">
-                  <div className="tg-conn-h">{app && <Logo app={app} size={36} />}<span><b>{app?.name ?? i.provider}</b><small>{i.site.replace(/^https:\/\//, "")}{i.location ? ` · ${i.location}` : ""}</small></span>
+                  <div className="tg-conn-h">{app && <Logo app={app} size={36} />}<span><b>{app?.name ?? i.provider}</b><small>{i.provider === "businesscentral" ? i.site.split("|").slice(1).filter(Boolean).join(" · ") : i.site.replace(/^https:\/\//, "")}{i.location ? ` · ${i.location}` : ""}</small></span>
                     <span className={`tg-pill ${i.status === "connected" ? "good" : "bad"}`}>{i.status === "connected" ? L("Tengt", "Connected") : L("Villa", "Error")}</span></div>
                   {i.status === "error" && i.lastError && <div className="tg-err">{i.lastError}</div>}
                   <div className="tg-conn-n"><span>{L("Velta í gær", "Revenue yesterday")}</span><b>{i.lastAmount != null ? `${nf(i.lastAmount)} kr` : "—"}</b></div>
@@ -413,8 +415,14 @@ function ConnectModal({ app, L, locations, onClose, onDone }: { app: App; L: Lf;
   const [loc, setLoc] = useState(locations[0]?.id ?? "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const shop = app.id === "shopify";
-  const steps = shop
+  const shop = app.id === "shopify", bc = app.id === "businesscentral";
+  const [tenant, setTenant] = useState("");
+  const [env, setEnv] = useState("Production");
+  const steps = bc
+    ? [L("Í Azure (Microsoft Entra ID): App registrations → New registration, nefndu það VAKTO. Afritaðu Application (client) ID og Directory (tenant) ID.", "In Azure (Microsoft Entra ID): App registrations → New registration, name it VAKTO. Copy the Application (client) ID and Directory (tenant) ID."),
+       L("API permissions → Add → Dynamics 365 Business Central → Application permissions → API.ReadWrite.All → Grant admin consent. Svo Certificates & secrets → New client secret.", "API permissions → Add → Dynamics 365 Business Central → Application permissions → API.ReadWrite.All → Grant admin consent. Then Certificates & secrets → New client secret."),
+       L("Í Business Central: leitaðu að „Microsoft Entra Applications“ → New, settu inn Client ID, State: Enabled og heimildasettið D365 READ. VAKTO les þá aðeins, getur engu breytt.", "In Business Central: search for “Microsoft Entra Applications” → New, enter the Client ID, State: Enabled and the permission set D365 READ. VAKTO can then only read, never change anything.")]
+    : shop
     ? [L("Í Shopify: Settings → Apps and sales channels → Develop apps → Create an app (nefndu hana VAKTO).", "In Shopify: Settings → Apps and sales channels → Develop apps → Create an app (name it VAKTO)."),
        L("Configure Admin API scopes: hakaðu við read_orders og vistaðu. Smelltu svo á Install app.", "Configure Admin API scopes: tick read_orders and save. Then click Install app."),
        L("Afritaðu „Admin API access token“ og límdu hér. VAKTO les aðeins pantanir, aldrei kortaupplýsingar.", "Copy the Admin API access token and paste it here. VAKTO only reads orders, never card details.")]
@@ -428,8 +436,14 @@ function ConnectModal({ app, L, locations, onClose, onDone }: { app: App; L: Lf;
         <div className="mh"><Logo app={app} size={36} /><div style={{ fontSize: 16, fontWeight: 650 }}>{L("Tengja", "Connect")} {app.name}</div><button className="x" onClick={onClose}>✕</button></div>
         <div className="mb tg-modal">
           <ol className="tg-steps">{steps.map((s) => <li key={s}>{s}</li>)}</ol>
-          <label className="tg-field"><span>{shop ? L("Slóð verslunar", "Store address") : L("Slóð vefverslunar", "Store URL")}</span><input placeholder={shop ? "verslunin.myshopify.com" : "https://verslunin.is"} value={site} onChange={(e) => setSite(e.target.value)} autoComplete="off" /></label>
-          {shop
+          {bc ? <>
+            <label className="tg-field"><span>Tenant ID</span><input value={tenant} onChange={(e) => setTenant(e.target.value)} placeholder="xxxxxxxx-xxxx-… eða fyrirtaeki.onmicrosoft.com" autoComplete="off" /></label>
+            <label className="tg-field"><span>{L("Umhverfi", "Environment")}</span><input value={env} onChange={(e) => setEnv(e.target.value)} placeholder="Production" autoComplete="off" /></label>
+            <label className="tg-field"><span>{L("Fyrirtæki í BC (ef fleiri en eitt)", "Company in BC (if more than one)")}</span><input value={site} onChange={(e) => setSite(e.target.value)} placeholder="CRONUS Ísland hf." autoComplete="off" /></label>
+            <label className="tg-field"><span>Client ID</span><input value={key} onChange={(e) => setKey(e.target.value)} autoComplete="off" /></label>
+            <label className="tg-field"><span>Client secret</span><input value={secret} onChange={(e) => setSecret(e.target.value)} type="password" autoComplete="off" /></label>
+          </> : <label className="tg-field"><span>{shop ? L("Slóð verslunar", "Store address") : L("Slóð vefverslunar", "Store URL")}</span><input placeholder={shop ? "verslunin.myshopify.com" : "https://verslunin.is"} value={site} onChange={(e) => setSite(e.target.value)} autoComplete="off" /></label>}
+          {bc ? null : shop
             ? <label className="tg-field"><span>Admin API access token</span><input value={token} onChange={(e) => setToken(e.target.value)} placeholder="shpat_…" autoComplete="off" /></label>
             : <><label className="tg-field"><span>Consumer key</span><input value={key} onChange={(e) => setKey(e.target.value)} placeholder="ck_…" autoComplete="off" /></label>
                 <label className="tg-field"><span>Consumer secret</span><input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="cs_…" autoComplete="off" /></label></>}
@@ -437,7 +451,7 @@ function ConnectModal({ app, L, locations, onClose, onDone }: { app: App; L: Lf;
           {err && <div className="tg-err">{err}</div>}
           <button className="btn" disabled={busy} onClick={async () => {
             setBusy(true); setErr(null);
-            const r = await connectIntegration({ provider: shop ? "shopify" : "woocommerce", site, token, key, secret, locationId: loc || undefined });
+            const r = await connectIntegration({ provider: bc ? "businesscentral" : shop ? "shopify" : "woocommerce", site: bc ? `${tenant.trim()}|${env.trim()}|${site.trim()}` : site, token, key, secret, locationId: loc || undefined });
             setBusy(false);
             if (r.ok) { toast(`${app.name} ${L("tengt", "connected")}${r.total ? ` · ${nf(r.total)} kr ${L("sóttar", "fetched")}` : ""}`); onDone(); } else setErr(r.error ?? "Villa");
           }}>{busy ? L("Tengi og sæki veltu…", "Connecting and fetching…") : L("Tengja og sækja veltu", "Connect and fetch revenue")}</button>

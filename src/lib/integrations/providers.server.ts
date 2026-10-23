@@ -5,7 +5,7 @@ import { assertNotDemo } from "@/lib/demo.server";
 // Tengingar við kerfi sem senda veltu. Hvert kerfi skilar heildarveltu á dag (án VSK) fyrir tímabil.
 // Lyklar eru dulkóðaðir með AES-256-GCM; lykillinn er leiddur af leyndarmáli þjónsins.
 
-export type Provider = "shopify" | "woocommerce";
+export type Provider = "shopify" | "woocommerce" | "businesscentral";
 export type Creds = { token?: string; key?: string; secret?: string };
 
 const encKey = () => createHash("sha256").update(`${process.env.INTEGRATIONS_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "vakto"}:integrations`).digest();
@@ -22,8 +22,15 @@ export function decrypt(s: string): Creds {
   return JSON.parse(Buffer.concat([de.update(body), de.final()]).toString("utf8"));
 }
 
-/** Slóð verslunar: aðeins https og opinber hýsilnöfn (engar IP-tölur eða innri net). */
+/** Slóð verslunar: aðeins https og opinber hýsilnöfn (engar IP-tölur eða innri net).
+ *  Business Central: „tenant|umhverfi|fyrirtæki“ (hýsillinn er alltaf api.businesscentral.dynamics.com). */
 export function normalizeSite(provider: Provider, raw: string): string | null {
+  if (provider === "businesscentral") {
+    const [tenant = "", env = "", company = ""] = raw.split("|").map((x) => x.trim());
+    const okTenant = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant) || /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(tenant);
+    if (!okTenant || !/^[\w-]{1,30}$/.test(env || "Production") || company.length > 100) return null;
+    return `${tenant.toLowerCase()}|${env || "Production"}|${company}`;
+  }
   let s = raw.trim().toLowerCase().replace(/\/+$/, "");
   if (!/^https?:\/\//.test(s)) s = "https://" + s;
   let u: URL;
@@ -79,12 +86,82 @@ async function wooDaily(site: string, c: Creds, fromISO: string): Promise<Map<st
   return out;
 }
 
+// ---------- Microsoft Dynamics 365 Business Central (líka LS Central, sem er byggt á BC) ----------
+// Viðskiptavinurinn skráir forrit í Microsoft Entra (client credentials) og gefur því lesheimild í BC
+// („Microsoft Entra Applications“, heimildasett D365 READ). Velta = tekjufærslur í fjárhag:
+// kredit − debet á reikningum í flokknum „Income“, eftir bókunardegi.
+const BC_API = "https://api.businesscentral.dynamics.com/v2.0";
+
+async function bcToken(tenant: string, c: Creds): Promise<string> {
+  await assertNotDemo();
+  const res = await fetch(`https://login.microsoftonline.com/${encodeURIComponent(tenant)}/oauth2/v2.0/token`, {
+    method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, cache: "no-store", signal: AbortSignal.timeout(20000),
+    body: new URLSearchParams({ grant_type: "client_credentials", client_id: c.key ?? "", client_secret: c.secret ?? "", scope: "https://api.businesscentral.dynamics.com/.default" }),
+  }).catch(() => { throw new Error("Náði ekki sambandi við Microsoft — reyndu aftur."); });
+  const d = (await res.json().catch(() => ({}))) as { access_token?: string; error?: string; error_description?: string };
+  if (!res.ok || !d.access_token) {
+    if (d.error === "invalid_client") throw new Error("Client ID eða Client secret er rangt (eða leyndarmálið er útrunnið).");
+    if (d.error === "unauthorized_client" || /AADSTS700016/.test(d.error_description ?? "")) throw new Error("Forritið fannst ekki í þessum tenant — athugaðu Tenant ID og Client ID.");
+    if (/AADSTS90002/.test(d.error_description ?? "")) throw new Error("Tenant fannst ekki — athugaðu Tenant ID.");
+    throw new Error("Microsoft samþykkti ekki innskráninguna — athugaðu Tenant ID, Client ID og Client secret.");
+  }
+  return d.access_token;
+}
+
+async function bcGet(url: string, token: string): Promise<Record<string, unknown>> {
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(30000) })
+    .catch((e: unknown) => { throw new Error(e instanceof Error && e.name === "TimeoutError" ? "Business Central svaraði ekki í tæka tíð." : "Náði ekki sambandi við Business Central."); });
+  if (res.status === 401) throw new Error("Business Central hafnaði aðganginum — bættu forritinu við í BC (Microsoft Entra Applications), stilltu það á Enabled og gefðu því heimildasettið D365 READ.");
+  if (res.status === 403) throw new Error("Forritið hefur ekki lesheimild í Business Central — gefðu því heimildasettið D365 READ.");
+  if (res.status === 404) throw new Error("Umhverfið fannst ekki — athugaðu heiti umhverfis (oftast Production).");
+  if (!res.ok) throw new Error(`Business Central svaraði með villu (${res.status}).`);
+  return (await res.json()) as Record<string, unknown>;
+}
+
+/** Tengist og finnur fyrirtækið í BC (eftir nafni; ef nafn vantar og aðeins eitt er til, það). */
+async function bcCompany(site: string, c: Creds): Promise<{ token: string; base: string }> {
+  const [tenant, env, name] = site.split("|");
+  const token = await bcToken(tenant, c);
+  const root = `${BC_API}/${encodeURIComponent(tenant)}/${encodeURIComponent(env)}/api/v2.0`;
+  const list = ((await bcGet(`${root}/companies?$select=id,name,displayName`, token)).value ?? []) as { id: string; name: string; displayName?: string }[];
+  const want = name.trim().toLowerCase();
+  const hit = want ? list.find((x) => x.name.toLowerCase() === want || (x.displayName ?? "").toLowerCase() === want) : list.length === 1 ? list[0] : undefined;
+  if (!hit) throw new Error(want ? `Fyrirtækið „${name}“ fannst ekki í Business Central. Til eru: ${list.map((x) => x.name).join(", ") || "engin"}.` : `Fleiri en eitt fyrirtæki er í Business Central — sláðu inn heitið: ${list.map((x) => x.name).join(", ")}.`);
+  return { token, base: `${root}/companies(${hit.id})` };
+}
+
+async function bcDaily(site: string, c: Creds, fromISO: string): Promise<Map<string, number>> {
+  const { token, base } = await bcCompany(site, c);
+  const income = new Set<string>();
+  let url: string | null = `${base}/accounts?$filter=category eq 'Income' and accountType eq 'Posting'&$select=number`;
+  for (let i = 0; url && i < 20; i++) {
+    const d = await bcGet(url, token);
+    for (const a of (d.value ?? []) as { number: string }[]) income.add(a.number);
+    url = (d["@odata.nextLink"] as string | undefined) ?? null;
+  }
+  if (!income.size) throw new Error("Engir tekjureikningar (flokkur „Income“) fundust í bókhaldslyklinum.");
+  const out = new Map<string, number>();
+  url = `${base}/generalLedgerEntries?$filter=postingDate ge ${fromISO}&$select=postingDate,accountNumber,debitAmount,creditAmount`;
+  for (let i = 0; url && i < 400; i++) {
+    const d = await bcGet(url, token);
+    for (const e of (d.value ?? []) as { postingDate: string; accountNumber: string; debitAmount: number; creditAmount: number }[]) {
+      if (!income.has(e.accountNumber)) continue;
+      const day = dayOf(e.postingDate);
+      out.set(day, (out.get(day) ?? 0) + Number(e.creditAmount ?? 0) - Number(e.debitAmount ?? 0));
+    }
+    url = (d["@odata.nextLink"] as string | undefined) ?? null;
+  }
+  return out;
+}
+
 export async function fetchDaily(provider: Provider, site: string, c: Creds, fromISO: string): Promise<Map<string, number>> {
+  if (provider === "businesscentral") return bcDaily(site, c, fromISO);
   return provider === "shopify" ? shopifyDaily(site, c, fromISO) : wooDaily(site, c, fromISO);
 }
 
 /** Prófar tenginguna (ein lítil fyrirspurn) — kastar villu með skýrum skilaboðum ef hún virkar ekki. */
 export async function testConnection(provider: Provider, site: string, c: Creds): Promise<void> {
+  if (provider === "businesscentral") { await bcCompany(site, c); return; }
   if (provider === "shopify") await getJson(`https://${site}/admin/api/2025-01/shop.json`, { "X-Shopify-Access-Token": c.token ?? "" });
   else await getJson(`${site}/wp-json/wc/v3/orders?per_page=1`, { Authorization: "Basic " + Buffer.from(`${c.key}:${c.secret}`).toString("base64") });
 }
