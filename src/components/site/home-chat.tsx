@@ -10,6 +10,7 @@ import { VaktoMark } from "@/components/brand/vakto-logo";
 type Lang = "is" | "en" | "pl";
 type Msg = { id: string; role: "user" | "assistant" | "owner"; body: string };
 const KEY = "vakto-home-chat";
+const ME = "vakto-home-chat-me"; // nafn + netfang gestsins (beðið um áður en spjall hefst)
 
 const S: Record<Lang, Record<string, string>> = {
   is: {
@@ -21,6 +22,7 @@ const S: Record<Lang, Record<string, string>> = {
     humanMode: "Manneskja hjá VAKTO svarar hér.", waiting: "Sendi…", typing: "…", close: "Loka",
     err: "Tókst ekki að senda — reyndu aftur eða sendu póst á hallo@vakto.is.",
     owner: "VAKTO", bot: "Aðstoð", you: "Þú",
+    introTitle: "Byrjum á því hver þú ert", introSub: "Svo getum við svarað þér í pósti ef þú ferð af síðunni.", introGo: "Byrja spjall", introBad: "Sláðu inn gilt netfang.",
   },
   en: {
     open: "Ask about VAKTO", title: "VAKTO assistant", sub: "Instant answers · a person if needed",
@@ -31,6 +33,7 @@ const S: Record<Lang, Record<string, string>> = {
     humanMode: "A person at VAKTO replies here.", waiting: "Sending…", typing: "…", close: "Close",
     err: "Couldn't send — try again or email hallo@vakto.is.",
     owner: "VAKTO", bot: "Assistant", you: "You",
+    introTitle: "First, who are you?", introSub: "So we can reply by email if you leave the page.", introGo: "Start chat", introBad: "Enter a valid email.",
   },
   pl: {
     open: "Zapytaj o VAKTO", title: "Asystent VAKTO", sub: "Odpowiada od razu · w razie potrzeby człowiek",
@@ -41,6 +44,7 @@ const S: Record<Lang, Record<string, string>> = {
     humanMode: "Odpowiada tu osoba z VAKTO.", waiting: "Wysyłanie…", typing: "…", close: "Zamknij",
     err: "Nie udało się wysłać — spróbuj ponownie lub napisz na hallo@vakto.is.",
     owner: "VAKTO", bot: "Asystent", you: "Ty",
+    introTitle: "Najpierw: kim jesteś?", introSub: "Dzięki temu odpowiemy e-mailem, jeśli opuścisz stronę.", introGo: "Rozpocznij czat", introBad: "Podaj poprawny adres e-mail.",
   },
 };
 
@@ -55,6 +59,8 @@ export default function HomeChat({ lang, skin = "ny" }: { lang: Lang; skin?: "ny
   const [hName, setHName] = useState(""); const [hEmail, setHEmail] = useState(""); const [hMsg, setHMsg] = useState("");
   const [hDone, setHDone] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [me, setMe] = useState<{ name: string; email: string } | null>(null);
+  const [hasThread, setHasThread] = useState(false);
   const idRef = useRef<{ threadId: string; token: string } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -63,9 +69,23 @@ export default function HomeChat({ lang, skin = "ny" }: { lang: Lang; skin?: "ny
   useEffect(() => {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) idRef.current = JSON.parse(raw);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage er aðeins til í vafranum
+      if (raw) { idRef.current = JSON.parse(raw); setHasThread(true); }
+      const who = localStorage.getItem(ME);
+      if (who) setMe(JSON.parse(who));
     } catch {}
   }, []);
+  // Nafn og netfang áður en spjallið hefst (eldri þræðir án þeirra halda áfram eins og áður).
+  const needIntro = !me && !hasThread;
+  function saveIntro(e: React.FormEvent) {
+    e.preventDefault();
+    const name = hName.trim(), email = hEmail.trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { setErr(s.introBad); return; }
+    const who = { name, email };
+    setMe(who); setErr(null);
+    try { localStorage.setItem(ME, JSON.stringify(who)); } catch {}
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }
   async function refresh() {
     const t = idRef.current; if (!t) return;
     try {
@@ -91,10 +111,10 @@ export default function HomeChat({ lang, skin = "ny" }: { lang: Lang; skin?: "ny
     setVal(""); setErr(null); setBusy(true);
     setMsgs((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", body: text }]);
     try {
-      const r = await fetch("/api/home-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text, lang, page: location.pathname, ...(idRef.current ?? {}) }) });
+      const r = await fetch("/api/home-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: text, lang, page: location.pathname, ...(me ?? {}), ...(idRef.current ?? {}) }) });
       const j = await r.json();
       if (!j.ok) { setErr(j.error ?? s.err); return; }
-      idRef.current = { threadId: j.threadId, token: j.token };
+      idRef.current = { threadId: j.threadId, token: j.token }; setHasThread(true);
       try { localStorage.setItem(KEY, JSON.stringify(idRef.current)); } catch {}
       setStatus(j.status);
       if (j.reply) setMsgs((m) => [...m, { id: `a-${Date.now()}`, role: "assistant", body: j.reply }]);
@@ -108,7 +128,7 @@ export default function HomeChat({ lang, skin = "ny" }: { lang: Lang; skin?: "ny
       // enginn þráður enn: stofna hann með fyrstu skilaboðunum
       setBusy(true);
       try {
-        const r = await fetch("/api/home-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: hMsg || s.human, lang, page: location.pathname }) });
+        const r = await fetch("/api/home-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message: hMsg || s.human, lang, page: location.pathname, ...(me ?? {}) }) });
         const j = await r.json();
         if (j.ok) { idRef.current = { threadId: j.threadId, token: j.token }; try { localStorage.setItem(KEY, JSON.stringify(idRef.current)); } catch {} }
       } catch {} finally { setBusy(false); }
@@ -116,7 +136,7 @@ export default function HomeChat({ lang, skin = "ny" }: { lang: Lang; skin?: "ny
     }
     setBusy(true); setErr(null);
     try {
-      const r = await fetch("/api/home-chat/handoff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...idRef.current, name: hName, email: hEmail, message: hMsg, lang }) });
+      const r = await fetch("/api/home-chat/handoff", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...idRef.current, name: me?.name || hName, email: me?.email || hEmail, message: hMsg, lang }) });
       const j = await r.json();
       if (!j.ok) { setErr(j.error ?? s.err); return; }
       setHDone(true); setHandoff(false); setStatus("human");
@@ -148,13 +168,22 @@ export default function HomeChat({ lang, skin = "ny" }: { lang: Lang; skin?: "ny
                 {m.body}
               </div>
             ))}
+            {needIntro && (
+              <form className="hand" onSubmit={saveIntro}>
+                <b style={{ fontSize: 14 }}>{s.introTitle}</b>
+                <small style={{ opacity: .7, marginTop: -4 }}>{s.introSub}</small>
+                <input value={hName} onChange={(e) => setHName(e.target.value)} placeholder={s.hName} autoComplete="name" required />
+                <input value={hEmail} onChange={(e) => setHEmail(e.target.value)} placeholder={s.hEmail} type="email" autoComplete="email" required />
+                <div className="row"><button type="submit">{s.introGo}</button></div>
+              </form>
+            )}
             {busy && !handoff && <div className="m a typing">{s.typing}</div>}
             {hDone && <div className="note">{s.hDone}</div>}
             {err && <div className="note err">{err}</div>}
             {handoff && (
               <form className="hand" onSubmit={submitHandoff}>
-                <input value={hName} onChange={(e) => setHName(e.target.value)} placeholder={s.hName} autoComplete="name" required />
-                <input value={hEmail} onChange={(e) => setHEmail(e.target.value)} placeholder={s.hEmail} type="email" autoComplete="email" required />
+                {!me && <input value={hName} onChange={(e) => setHName(e.target.value)} placeholder={s.hName} autoComplete="name" required />}
+                {!me && <input value={hEmail} onChange={(e) => setHEmail(e.target.value)} placeholder={s.hEmail} type="email" autoComplete="email" required />}
                 <textarea value={hMsg} onChange={(e) => setHMsg(e.target.value)} placeholder={s.hMsg} rows={3} />
                 <div className="row">
                   <button type="button" className="ghost" onClick={() => setHandoff(false)}>{s.hCancel}</button>
@@ -164,7 +193,7 @@ export default function HomeChat({ lang, skin = "ny" }: { lang: Lang; skin?: "ny
             )}
             <div ref={endRef} />
           </div>
-          <div className="ft">
+          {!needIntro && <div className="ft">
             {status !== "human" && !handoff && (
               <button className="human" type="button" onClick={() => { setHandoff(true); setHDone(false); }}>{s.human}</button>
             )}
@@ -174,7 +203,7 @@ export default function HomeChat({ lang, skin = "ny" }: { lang: Lang; skin?: "ny
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></svg>
               </button>
             </form>
-          </div>
+          </div>}
         </div>
       )}
     </>
