@@ -151,12 +151,18 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/api/cal/") ||
     // Taktikal webhook — sannreynt með HMAC-lykli, engin innskráning.
     pathname.startsWith("/api/taktikal/") ||
+    // Tengd forrit (MCP): OAuth-lýsigögn, skráning/lyklar og MCP-þjónninn sannreyna sjálf (okkar lyklar, PKCE).
+    pathname.startsWith("/.well-known/oauth-") ||
+    pathname.startsWith("/api/oauth/") ||
+    pathname === "/api/mcp" ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml" ||
     pathname === "/favicon.ico";
 
   // Innskráður notandi á /login fer beint inn (lotan geymist í 400 daga) — nema villuskilaboð séu á leiðinni.
   if (user && pathname === "/login" && !request.nextUrl.searchParams.has("error")) {
+    const next = request.nextUrl.searchParams.get("next");
+    if (next?.startsWith("/oauth/")) return NextResponse.redirect(new URL(next, request.url));
     const { data: me } = await supabase.from("users").select("role").eq("id", user.id).maybeSingle();
     const dest = request.nextUrl.clone();
     dest.pathname = homeFor(((me?.role as Role) ?? "employee"));
@@ -167,6 +173,8 @@ export async function updateSession(request: NextRequest) {
   if (!user && !isPublic) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = "/login";
+    // Samþykki tengds forrits: aftur á sömu slóð eftir innskráningu.
+    if (pathname.startsWith("/oauth/")) loginUrl.search = `?next=${encodeURIComponent(pathname + request.nextUrl.search)}`;
     return NextResponse.redirect(loginUrl);
   }
 

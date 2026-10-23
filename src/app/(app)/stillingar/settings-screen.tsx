@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { IntegrationsPanel } from "./integrations-panel";
 import { BillingPanel } from "./billing-panel";
 import { AlertsPanel } from "./alerts-panel";
+import { AiAppsPanel } from "./ai-apps-panel";
 import { DateField } from "@/components/app/fields";
 import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
@@ -154,7 +155,7 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
 
       {section === "vaktarar" && <AlertsPanel />}
 
-      {section === "tengingar" && <IntegrationsPanel apiKeys={data.apiKeys} onNewKey={() => setKeyModal(true)} />}
+      {section === "tengingar" && <><IntegrationsPanel apiKeys={data.apiKeys} onNewKey={() => setKeyModal(true)} /><AiAppsPanel /></>}
 
       {section === "reglur" && (<>
       <div className="card" style={{ marginBottom: 16 }}>

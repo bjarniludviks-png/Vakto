@@ -29,6 +29,7 @@ export function PrivacyBody() {
         <li>Push-tilkynningar: auðkenni tækis (push subscription) ef starfsmaður kveikir á tilkynningum.</li>
         <li>VAKTO-appið (iPhone og Android) vinnur sömu gögn og vefurinn. Appið biður aðeins um aðgang að myndum þegar notandi velur mynd til að senda, og að staðsetningu aðeins við stimplun ef vinnuveitandi krefst þess.</li>
         <li>VAKTO AI: þegar stjórnandi eða vaktstjóri spyr aðstoðarmanninn eru spurningin og þau rekstrargögn sem þarf til að svara (t.d. vaktir, tímar, launakostnaður og nöfn starfsfólks) send til gervigreindarþjónustu. Samtöl stjórnandans eru vistuð svo hann geti opnað þau aftur og getur hann eytt þeim hvenær sem er.</li>
+        <li>Tengd forrit: ef eigandi fyrirtækis leyfir það getur stjórnandi eða vaktstjóri tengt eigið gervigreindarforrit (t.d. Claude eða ChatGPT) við VAKTO. Forritið fær þá lesaðgang að sömu rekstrargögnum og VAKTO AI (vaktir, tímar, launakostnaður, velta og nöfn starfsfólks) þegar notandinn spyr það, en aldrei kennitölur, bankareikninga eða heimilisföng, og getur engu breytt. Gögnin fara til fyrirtækisins sem rekur forritið og um þau gilda skilmálar þess; það er ekki vinnsluaðili VAKTO. Tengingin er skráð í aðgerðaskrá og má aftengja hvenær sem er í Stillingum.</li>
         <li>Tilkynnt efni: ef notandi tilkynnir skilaboð eða færslu er tilkynningin, útdráttur úr efninu og hver tilkynnti vistað og sýnt stjórnendum fyrirtækisins.</li>
       </ul>
       <ul><li>Staðsetning við stimplun: aðeins ef vinnuveitandi kveikir á staðsetningarkröfu. Þá er staðsetning símans skráð einu sinni þegar stimplað er inn og út, til að staðfesta að starfsmaður sé á vinnustaðnum. Engin rakning fer fram á milli stimplana og ekki í bakgrunni.</li></ul>
@@ -41,6 +42,7 @@ export function PrivacyBody() {
         <li>Reikningagerð og bókhald: lagaskylda (6. gr. 1. mgr. c), m.a. bókhaldslög.</li>
         <li>Staðsetning við stimplun: lögmætir hagsmunir vinnuveitanda af því að staðfesta viðveru á vinnustað (6. gr. 1. mgr. f), samkvæmt fyrirmælum hans sem ábyrgðaraðila.</li>
         <li>VAKTO AI og aðrar gervigreindaraðgerðir (tillögur að vaktaplani, lestur kjarasamnings, drög að samningsákvæðum, skýrslur): efndir samnings; unnið aðeins þegar stjórnandi biður um það.</li>
+        <li>Tengd forrit: efndir samnings; virkt aðeins þegar eigandi fyrirtækisins (ábyrgðaraðili) hefur leyft það og stjórnandi tengt forritið sjálfur.</li>
         <li>Spjallið á heimasíðunni: lögmætir hagsmunir af því að svara fyrirspurnum. Samtöl eru send til gervigreindarþjónustu (sjá kafla 5) og geymd í allt að 12 mánuði.</li>
         <li>Greining á notkun opna vefsins og mæling á árangri auglýsinga (Google Analytics, Meta Pixel): samþykki (6. gr. 1. mgr. a), sem má draga til baka hvenær sem er.</li>
         <li>Tölvupóstar um þjónustuna (t.d. plan birt, samningur bíður, prufa að renna út): efndir samnings. Við sendum ekki markaðspóst nema með samþykki.</li>
