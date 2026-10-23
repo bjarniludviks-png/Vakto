@@ -245,6 +245,7 @@ export const DICT: Dict = {
   "Sundurliðun per starfsmann": { is: "Sundurliðun per starfsmann", en: "Breakdown per employee", pl: "Zestawienie na pracownika" },
   "smelltu á röð til að sjá launaseðil": { is: "smelltu á röð til að sjá launaseðil", en: "click a row to see the payslip", pl: "kliknij wiersz, aby zobaczyć pasek wynagrodzenia" },
   "sundurliðun eftir mánuðum · færðu músina yfir súlu": { is: "sundurliðun eftir mánuðum · færðu músina yfir súlu", en: "by month · hover a bar", pl: "według miesięcy · najedź na słupek" },
+  "tímar í launakeyrslu dk Laun": { is: "tímar í launakeyrslu dk Laun", en: "hours for a dk Laun pay run", pl: "godziny do listy płac dk Laun" },
   "launaskrá fyrir DK bókhald": { is: "launaskrá fyrir DK bókhald", en: "payroll file for DK accounting", pl: "plik płacowy dla księgowości DK" },
   "Hver er á vakt, hvað var unnið og hvað frávikin kosta.": { is: "Hver er á vakt, hvað var unnið og hvað frávikin kosta.", en: "Who is on shift, what was worked and what deviations cost.", pl: "Kto jest na zmianie, co przepracowano i ile kosztują odchylenia." },
   "opnar of lengi": { is: "opnar of lengi", en: "open too long", pl: "otwarte zbyt długo" },

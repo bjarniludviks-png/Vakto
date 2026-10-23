@@ -7,6 +7,7 @@ import { useLang } from "@/components/app/lang";
 import { toast } from "@/components/app/toast";
 import { nf } from "@/lib/format";
 import { addRevenue, revokeApiKey } from "./actions";
+import { DkModal } from "./dk-modal";
 import {
   getTengingar, connectIntegration, connectPayday, syncNow, disconnectIntegration, setRevenueMode, saveMonthlyEstimate,
   relearnPattern, notifyInterest, type TengingarView, type RevenueMode,
@@ -22,7 +23,7 @@ const APPS: App[] = [
   { id: "dineout", name: "Dineout", logo: "/integrations/dineout.png", cat: ["pos", "book"], is: true, kind: "soon", sub: ["Kassakerfi og bókanir", "POS and bookings"], d: ["Velta og bókanir, gott fyrir veltuspá vaktaplansins.", "Revenue and bookings for the schedule forecast."] },
   { id: "businesscentral", name: "Business Central", logo: "bc", cat: ["acc", "pos"], is: true, kind: "connect", sub: ["Microsoft Dynamics 365 og LS Central", "Microsoft Dynamics 365 and LS Central"], d: ["Velta úr fjárhagnum (tekjureikningar) sótt sjálfkrafa á hverjum degi.", "Revenue from the general ledger (income accounts), fetched daily."] },
   { id: "payday", name: "Payday", logo: "/integrations/payday.png", cat: ["pay", "acc"], is: true, kind: "export", sub: ["Laun og bókhald", "Payroll and accounting"], d: ["Tímaskrá flutt út fyrir launakeyrslu í Payday.", "Timesheet export for payroll in Payday."] },
-  { id: "dk", name: "DK", logo: "/integrations/dk.png", cat: ["pay", "acc"], is: true, kind: "export", sub: ["Bókhald og laun", "Accounting and payroll"], d: ["Launaskrá flutt út fyrir DK.", "Payroll file export for DK."] },
+  { id: "dk", name: "DK", logo: "/integrations/dk.png", cat: ["pay", "acc"], is: true, kind: "export", sub: ["Bókhald og laun", "Accounting and payroll"], d: ["Tímar beint í launakeyrslu dk Laun, og velta úr bókhaldinu.", "Hours straight into a dk Laun pay run, and revenue from the books."] },
   { id: "regla", name: "Regla", logo: "/integrations/regla.png", cat: ["acc"], is: true, kind: "soon", sub: ["Bókhald", "Accounting"], d: ["Velta úr bókhaldinu.", "Revenue from your books."] },
   { id: "square", name: "Square", logo: "/integrations/square.svg", cat: ["pos"], is: false, kind: "soon", sub: ["Kassakerfi", "POS"], d: ["Algengt kassakerfi í Bandaríkjunum og Bretlandi.", "Common POS in the US and UK."] },
   { id: "lightspeed", name: "Lightspeed", logo: "/integrations/lightspeedhq.png", cat: ["pos"], is: false, kind: "soon", sub: ["Kassakerfi", "POS"], d: ["Veitingar og verslanir víða um heim.", "Restaurants and retail worldwide."] },
@@ -151,7 +152,7 @@ const PL: Record<string, string> = {
   "Payroll and accounting": "Płace i księgowość",
   "Timesheet export for payroll in Payday.": "Eksport ewidencji czasu do naliczania płac w Payday.",
   "Accounting and payroll": "Księgowość i płace",
-  "Payroll file export for DK.": "Eksport pliku płacowego do DK.",
+  "Hours straight into a dk Laun pay run, and revenue from the books.": "Godziny bezpośrednio do listy płac dk Laun i obrót z księgowości.",
   "Accounting": "Księgowość",
   "Revenue from your books.": "Obrót z Twojej księgowości.",
   "POS": "System kasowy",
@@ -187,6 +188,10 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
   const [connect, setConnect] = useState<App | null>(null);
   const [payday, setPayday] = useState(false);
   const [csv, setCsv] = useState(false);
+  const [dk, setDk] = useState(false);
+  // /stillingar?tab=tengingar&dk=1 (t.d. úr DK-útflutningi án launaliða) opnar DK-gluggann
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- slóðin er aðeins til í vafranum
+  useEffect(() => { if (new URLSearchParams(window.location.search).get("dk") === "1") setDk(true); }, []);
   const appsRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => getTengingar().then((r) => { setV(r); if (r.mode) setMode(r.mode); }), []);
@@ -289,6 +294,7 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
                     {a.kind === "soon" && <span className="tg-pill info">{L("Væntanlegt", "Coming soon")}</span>}
                     {a.kind === "connect" && <button className={`btn sm${c.length ? " ghost" : ""}`} onClick={() => setConnect(a)}>{c.length ? L("Bæta við", "Add another") : L("Tengja", "Connect")}</button>}
                     {a.kind === "apikey" && <button className="btn sm" onClick={onNewKey}>{L("Búa til lykil", "Create key")}</button>}
+                    {a.id === "dk" && <button className="btn sm" onClick={() => setDk(true)}>{L("Stilla", "Set up")}</button>}
                     {a.kind === "export" && a.id === "payday" && (v?.payday
                       ? <button className="btn ghost sm" style={{ color: "var(--bad)" }} onClick={async () => { await disconnectIntegration(v.payday!.id); toast(L("Payday aftengt", "Payday disconnected")); void load(); }}>{L("Aftengja", "Disconnect")}</button>
                       : <button className="btn sm" onClick={() => setPayday(true)}>{L("Tengja", "Connect")}</button>)}
@@ -329,6 +335,7 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
 
       {payday && <PaydayModal L={L} onClose={() => setPayday(false)} onDone={() => { setPayday(false); void load(); }} />}
       {connect && <ConnectModal app={connect} L={L} locations={v?.locations ?? []} onClose={() => setConnect(null)} onDone={() => { setConnect(null); setMode("system"); void load(); }} />}
+      {dk && <DkModal L={L} locations={v?.locations ?? []} onClose={() => setDk(false)} onDone={() => { setDk(false); void load(); }} />}
       {csv && <CsvModal L={L} locations={v?.locations ?? []} onClose={() => setCsv(false)} onDone={() => { setCsv(false); void load(); }} />}
     </div>
   );

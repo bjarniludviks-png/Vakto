@@ -68,11 +68,11 @@ export async function getTengingar(): Promise<TengingarView> {
 export async function connectIntegration(input: { provider: Provider; site: string; token?: string; key?: string; secret?: string; locationId?: string }): Promise<R & { total?: number }> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   const c = await ctxOf(); if ("error" in c) return { ok: false, error: c.error };
-  if (input.provider !== "shopify" && input.provider !== "woocommerce" && input.provider !== "businesscentral") return { ok: false, error: "Óþekkt kerfi" };
+  if (!["shopify", "woocommerce", "businesscentral", "dk"].includes(input.provider)) return { ok: false, error: "Óþekkt kerfi" };
   const site = normalizeSite(input.provider, input.site);
   if (!site) return { ok: false, error: input.provider === "shopify" ? "Sláðu inn slóðina sem endar á .myshopify.com" : input.provider === "businesscentral" ? "Athugaðu Tenant ID (GUID eða lén, t.d. fyrirtaeki.onmicrosoft.com) og heiti umhverfis" : "Sláðu inn slóð vefverslunarinnar (https://…)" };
-  const creds = input.provider === "shopify" ? { token: (input.token ?? "").trim() } : { key: (input.key ?? "").trim(), secret: (input.secret ?? "").trim() };
-  if (input.provider === "shopify" ? !creds.token : !creds.key || !creds.secret) return { ok: false, error: "Vantar lykil" };
+  const creds = input.provider === "shopify" || input.provider === "dk" ? { token: (input.token ?? "").trim() } : { key: (input.key ?? "").trim(), secret: (input.secret ?? "").trim() };
+  if (input.provider === "shopify" || input.provider === "dk" ? !creds.token : !creds.key || !creds.secret) return { ok: false, error: "Vantar lykil" };
   try { await testConnection(input.provider, site, creds); } catch (e) { return { ok: false, error: e instanceof Error ? e.message : "Tenging tókst ekki" }; }
   const { supabase, company, userId } = c;
   const { data, error } = await supabase.from("company_integrations").upsert({

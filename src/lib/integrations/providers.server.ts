@@ -5,7 +5,7 @@ import { assertNotDemo } from "@/lib/demo.server";
 // Tengingar við kerfi sem senda veltu. Hvert kerfi skilar heildarveltu á dag (án VSK) fyrir tímabil.
 // Lyklar eru dulkóðaðir með AES-256-GCM; lykillinn er leiddur af leyndarmáli þjónsins.
 
-export type Provider = "shopify" | "woocommerce" | "businesscentral";
+export type Provider = "shopify" | "woocommerce" | "businesscentral" | "dk";
 export type Creds = { token?: string; key?: string; secret?: string };
 
 const encKey = () => createHash("sha256").update(`${process.env.INTEGRATIONS_SECRET || process.env.SUPABASE_SERVICE_ROLE_KEY || "vakto"}:integrations`).digest();
@@ -25,6 +25,7 @@ export function decrypt(s: string): Creds {
 /** Slóð verslunar: aðeins https og opinber hýsilnöfn (engar IP-tölur eða innri net).
  *  Business Central: „tenant|umhverfi|fyrirtæki“ (hýsillinn er alltaf api.businesscentral.dynamics.com). */
 export function normalizeSite(provider: Provider, raw: string): string | null {
+  if (provider === "dk") return "dkplus.is"; // lykillinn ræður fyrirtækinu
   if (provider === "businesscentral") {
     const [tenant = "", env = "", company = ""] = raw.split("|").map((x) => x.trim());
     const okTenant = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenant) || /^[a-z0-9-]+(\.[a-z0-9-]+)+$/i.test(tenant);
@@ -154,7 +155,53 @@ async function bcDaily(site: string, c: Creds, fromISO: string): Promise<Map<str
   return out;
 }
 
+// ---------- DK (dkPlus REST API) ----------
+// Viðskiptavinurinn býr til aðgangslykil í dkPlus (Notandastillingar → stofna lykil, eitt fyrirtæki per lykil).
+// Velta = tekjufærslur í fjárhag: reikningar á bilinu sem samtölureikningurinn „REKSTRARTEKJUR“ vísar á
+// (íslenskur bókhaldslykill, oftast 1000..1990). Upphæðir án VSK; kredit er neikvætt í DK.
+const DK_API = "https://api.dkplus.is/api/v1";
+
+async function dkGet(path: string, token: string): Promise<{ data: unknown; next: string | null }> {
+  await assertNotDemo();
+  const res = await fetch(path.startsWith("http") ? path : `${DK_API}${path}`, { headers: { Authorization: `bearer ${token}`, Accept: "application/json" }, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(30000) })
+    .catch((e: unknown) => { throw new Error(e instanceof Error && e.name === "TimeoutError" ? "DK svaraði ekki í tæka tíð." : "Náði ekki sambandi við DK."); });
+  if (res.status === 400 || res.status === 401 || res.status === 403) throw new Error("DK samþykkti ekki lykilinn — athugaðu að hann sé réttur og tengdur réttu fyrirtæki í dkPlus.");
+  if (!res.ok) throw new Error(`DK svaraði með villu (${res.status}).`);
+  const next = res.headers.get("link")?.match(/<([^>]+)>;\s*rel=next/)?.[1] ?? null;
+  return { data: await res.json(), next };
+}
+
+/** Heiti fyrirtækisins sem lykillinn tilheyrir (prófar tenginguna). */
+export async function dkCompanyName(token: string): Promise<string> {
+  const { data } = await dkGet("/company", token);
+  return (data as { Information?: { Company?: { Name?: string } } }).Information?.Company?.Name ?? "";
+}
+
+async function dkDaily(c: Creds, fromISO: string): Promise<Map<string, number>> {
+  const token = c.token ?? "";
+  const { data: accData } = await dkGet("/generalledger/account", token);
+  const accounts = (accData as { Number: string; Name?: string; AccountType?: number; SumReference?: string }[]) ?? [];
+  const sum = accounts.find((a) => a.AccountType === 1 && /REKSTRARTEKJUR/i.test(a.Name ?? "") && /\d+\.\.\d+/.test(a.SumReference ?? ""));
+  const [lo, hi] = (sum?.SumReference ?? "1000..1999").split("..").map(Number);
+  const income = new Set(accounts.filter((a) => a.AccountType !== 1 && /^\d+$/.test(a.Number) && Number(a.Number) >= lo && Number(a.Number) <= hi).map((a) => a.Number));
+  if (!income.size) throw new Error("Engir tekjureikningar fundust í bókhaldslyklinum í DK.");
+  const out = new Map<string, number>();
+  let url: string | null = `/generalledger/transaction/page/1/1000?createdAfter=${fromISO}&include=Account,Amount,JournalDate`;
+  for (let i = 0; url && i < 200; i++) {
+    const { data, next } = await dkGet(url, token);
+    for (const t of (data as { Account: string; Amount: number; JournalDate: string }[]) ?? []) {
+      if (!income.has(t.Account)) continue;
+      const day = dayOf(t.JournalDate);
+      if (day < fromISO) continue;
+      out.set(day, (out.get(day) ?? 0) - Number(t.Amount ?? 0));
+    }
+    url = next;
+  }
+  return out;
+}
+
 export async function fetchDaily(provider: Provider, site: string, c: Creds, fromISO: string): Promise<Map<string, number>> {
+  if (provider === "dk") return dkDaily(c, fromISO);
   if (provider === "businesscentral") return bcDaily(site, c, fromISO);
   return provider === "shopify" ? shopifyDaily(site, c, fromISO) : wooDaily(site, c, fromISO);
 }
@@ -162,6 +209,7 @@ export async function fetchDaily(provider: Provider, site: string, c: Creds, fro
 /** Prófar tenginguna (ein lítil fyrirspurn) — kastar villu með skýrum skilaboðum ef hún virkar ekki. */
 export async function testConnection(provider: Provider, site: string, c: Creds): Promise<void> {
   if (provider === "businesscentral") { await bcCompany(site, c); return; }
+  if (provider === "dk") { await dkCompanyName(c.token ?? ""); return; }
   if (provider === "shopify") await getJson(`https://${site}/admin/api/2025-01/shop.json`, { "X-Shopify-Access-Token": c.token ?? "" });
   else await getJson(`${site}/wp-json/wc/v3/orders?per_page=1`, { Authorization: "Basic " + Buffer.from(`${c.key}:${c.secret}`).toString("base64") });
 }
