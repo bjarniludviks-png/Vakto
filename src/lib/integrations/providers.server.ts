@@ -155,6 +155,53 @@ async function bcDaily(site: string, c: Creds, fromISO: string): Promise<Map<str
   return out;
 }
 
+async function bcSend(method: "POST" | "DELETE", url: string, token: string, body?: unknown): Promise<Record<string, unknown>> {
+  const res = await fetch(url, {
+    method, cache: "no-store", redirect: "error", signal: AbortSignal.timeout(30000),
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json", ...(body ? { "Content-Type": "application/json" } : {}), ...(method === "DELETE" ? { "If-Match": "*" } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  }).catch(() => { throw new Error("Náði ekki sambandi við Business Central."); });
+  if (res.status === 401 || res.status === 403) throw new Error("Forritið má ekki skrifa í færslubækur í Business Central — gefðu því heimildasettið D365 ACCOUNTANTS (í stað D365 READ) undir Microsoft Entra Applications.");
+  const d = (await res.json().catch(() => ({}))) as Record<string, unknown> & { error?: { message?: string } };
+  if (!res.ok) throw new Error(`Business Central hafnaði færslunni: ${d.error?.message?.slice(0, 200) ?? res.status}`);
+  return d;
+}
+
+/** Bókhaldslykill fyrirtækisins í BC (bókanlegir reikningar) — fyrir val á reikningum í launabókun. */
+export async function bcAccountList(site: string, c: Creds): Promise<{ number: string; name: string }[]> {
+  const { token, base } = await bcCompany(site, c);
+  const out: { number: string; name: string }[] = [];
+  let url: string | null = `${base}/accounts?$filter=accountType eq 'Posting' and blocked eq false&$select=number,displayName`;
+  for (let i = 0; url && i < 20; i++) {
+    const d = await bcGet(url, token);
+    for (const a of (d.value ?? []) as { number: string; displayName: string }[]) out.push({ number: a.number, name: a.displayName });
+    url = (d["@odata.nextLink"] as string | undefined) ?? null;
+  }
+  return out;
+}
+
+/** Setur launabókun í færslubók (General Journal) í BC. Ekki bókað sjálfkrafa — bókarinn fer yfir og bókar.
+ *  Ósendar línur með sama fylgiskjalsnúmeri eru leystar af hólmi; þegar bókað tímabil er ekki sent aftur. */
+export async function bcPostPayroll(site: string, c: Creds, j: { batch: string; postingDate: string; documentNumber: string; description: string; lines: { account: string; amount: number; label: string }[] }): Promise<{ batch: string; replaced: number }> {
+  const { token, base } = await bcCompany(site, c);
+  const q = (s: string) => s.replace(/'/g, "''");
+  const posted = await bcGet(`${base}/generalLedgerEntries?$filter=documentNumber eq '${q(j.documentNumber)}'&$top=1&$select=entryNumber`, token);
+  if (((posted.value ?? []) as unknown[]).length) throw new Error(`Laun tímabilsins eru þegar bókuð í Business Central (fylgiskjal ${j.documentNumber}).`);
+  const code = j.batch.toUpperCase();
+  let journal = ((await bcGet(`${base}/journals?$filter=code eq '${q(code)}'&$select=id,code`, token)).value as { id: string }[] | undefined)?.[0];
+  if (!journal) journal = (await bcSend("POST", `${base}/journals`, token, { code, displayName: "Laun frá VAKTO" })) as { id: string };
+  const jl = `${base}/journals(${journal.id})/journalLines`;
+  const old = ((await bcGet(`${jl}?$filter=documentNumber eq '${q(j.documentNumber)}'&$select=id`, token)).value ?? []) as { id: string }[];
+  for (const o of old) await bcSend("DELETE", `${jl}(${o.id})`, token);
+  for (const l of j.lines) {
+    await bcSend("POST", jl, token, {
+      accountType: "G/L Account", accountNumber: l.account, postingDate: j.postingDate,
+      documentNumber: j.documentNumber, description: `${j.description} · ${l.label}`.slice(0, 100), amount: l.amount,
+    });
+  }
+  return { batch: code, replaced: old.length };
+}
+
 // ---------- DK (dkPlus REST API) ----------
 // Viðskiptavinurinn býr til aðgangslykil í dkPlus (Notandastillingar → stofna lykil, eitt fyrirtæki per lykil).
 // Velta = tekjufærslur í fjárhag: reikningar á bilinu sem samtölureikningurinn „REKSTRARTEKJUR“ vísar á
