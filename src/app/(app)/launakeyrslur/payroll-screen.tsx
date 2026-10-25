@@ -10,7 +10,7 @@ import { useLang } from "@/components/app/lang";
 import { PayslipModal, type PayslipData } from "@/components/app/payslip-modal";
 import { EmptyState } from "@/components/app/empty-state";
 import type { PayrollView } from "./payroll.server";
-import { runPayroll, getPayrollPeriod, getPayrollHistory, getPaydayStatus, getPaydayItemNames, sendToPayday, type PeriodPayroll, type PayrollHistory } from "./actions";
+import { runPayroll, getPayrollPeriod, getPayrollHistory, getPaydayStatus, getPaydayItemNames, sendToPayday, getBcStatus, sendToBc, type PeriodPayroll, type PayrollHistory } from "./actions";
 import { Av } from "@/components/app/avatar";
 
 const PH_COLORS = ["#1f9d6b", "#d4a24c", "#e9700f", "#1f9e9e", "#c3c7d3"];
@@ -84,8 +84,11 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1, no
   const [showZero, setShowZero] = useState(false);
   const [off, setOff] = useState<Set<string>>(new Set());
   const [pdConn, setPdConn] = useState(false);
+  const [bcConn, setBcConn] = useState(false);
+  const [bcBusy, setBcBusy] = useState(false);
   const [pdBusy, setPdBusy] = useState(false);
   useEffect(() => { if (view.live) getPaydayStatus().then((r) => setPdConn(r.connected)).catch(() => {}); }, [view.live]);
+  useEffect(() => { if (view.live) getBcStatus().then((r) => setBcConn(r.connected)).catch(() => {}); }, [view.live]);
   const [kind, setKind] = useState<"all" | "hourly" | "monthly">("all");
   const [period, setPeriod] = useState("this");
   const thisMonth = payRange("this", "", "", periodStart);
@@ -147,6 +150,18 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1, no
     setPdBusy(false);
     if (!r.ok) { toast(r.error ?? "Tókst ekki"); return; }
     toast(`${t("Tímaskrá send í Payday")} — ${r.count} ${t("starfsmenn")}${r.skipped?.length ? ` · ${t("kennitölu vantar hjá")} ${r.skipped.join(", ")}` : ""}`);
+  }
+  async function sendaBc() {
+    if (partial && !picked.length) { toast(t("Enginn starfsmaður er valinn")); return; }
+    setBcBusy(true);
+    const r = await sendToBc(range.from, range.to, partial ? picked.map((x) => x.id!) : undefined, kind);
+    setBcBusy(false);
+    if (!r.ok) {
+      toast(r.error ?? "Tókst ekki");
+      if (r.needsSetup) window.location.href = "/stillingar?tab=tengingar&bc=1";
+      return;
+    }
+    toast(`${t("Launabókun send í Business Central")} — ${t("færslubók")} ${r.batch} · ${r.doc}`);
   }
   async function keyra() {
     if (partial && !picked.length) { toast(t("Enginn starfsmaður er valinn")); return; }
@@ -342,6 +357,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1, no
                 <span>{t("Álagsliðirnir eiga aðeins að vera álagið sjálft (t.d. 33% af dagvinnutaxta), ekki fullur taxti, því sömu tímar eru líka taldir í Dagvinnu. Annars er tvígreitt.")}</span>
               </div>
             )}
+            {bcConn && <div className="db2-it"><span className="pr-logo"><img src="/integrations/businesscentral.svg" alt="" /></span><span className="db2-tx"><b>Business Central</b><span>{t("launabókun í færslubók, bókarinn fer yfir og bókar")}</span></span><button className="btn sm" disabled={bcBusy} onClick={sendaBc}>{bcBusy ? t("Sendi…") : t("Senda í BC")}</button></div>}
             <div className="db2-it"><span className="pr-logo"><img src="/integrations/dk.png" alt="" /></span><span className="db2-tx"><b>DK</b><span>{t("tímar í launakeyrslu dk Laun")}</span></span><button className="btn ghost sm" onClick={() => download("dk")}>{t("Sækja")}</button></div>
             <div className="db2-it"><span className="pr-logo xl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="2.5" /><path d="M3.5 9h17M3.5 14.5h17M9.5 3.5v17" /></svg></span><span className="db2-tx"><b>Excel</b><span>{t("sundurliðun per starfsmann")}</span></span><button className="btn ghost sm" onClick={() => download("excel")}>{t("Sækja")}</button></div>
           </div>

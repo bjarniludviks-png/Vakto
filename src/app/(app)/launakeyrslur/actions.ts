@@ -421,3 +421,56 @@ export async function sendToPayday(from: string, to: string, onlyIds?: string[])
     return { ok: false, error: "Sending í Payday tókst ekki — reyndu aftur." };
   }
 }
+
+export async function getBcStatus(): Promise<{ connected: boolean }> {
+  if (!isSupabaseConfigured()) return { connected: false };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { connected: false };
+    const { data } = await supabase.from("company_integrations").select("id").eq("company_id", ctx.company).eq("provider", "businesscentral").maybeSingle();
+    return { connected: !!data };
+  } catch { return { connected: false }; }
+}
+
+/** Launabókun tímabilsins í færslubók í Business Central (samantekt per bókhaldsreikning, ekki bókuð sjálfkrafa).
+ *  onlyIds: aðeins hakaðir starfsmenn — fá eigið fylgiskjalsnúmer svo hópar skrifi ekki yfir hvorn annan. */
+export async function sendToBc(from: string, to: string, onlyIds?: string[], group?: "all" | "hourly" | "monthly"): Promise<{ ok: boolean; error?: string; count?: number; batch?: string; doc?: string; needsSetup?: boolean }> {
+  if (await demoBlocked()) return demoResult();
+  { const pb = await planBlock("payroll"); if (pb) return { ok: false, error: pb }; }
+  if (!isSupabaseConfigured()) return { ok: false, error: "Ekki tengt" };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data: integ } = await supabase.from("company_integrations").select("id, site, secret_enc").eq("company_id", ctx.company).eq("provider", "businesscentral").maybeSingle();
+    if (!integ?.secret_enc) return { ok: false, error: "Business Central er ekki tengt — tengdu það í Stillingum → Tengingar." };
+    const { createAdminClient } = await import("@/lib/supabase/admin");
+    const { data: co } = await createAdminClient().from("companies").select("bc_payaccounts").eq("id", ctx.company).maybeSingle();
+    const [{ getExportLines }, { decrypt, bcPostPayroll }, { bcPayrollLines, bcMissingAccounts }] = await Promise.all([
+      import("@/lib/payroll-export.server"), import("@/lib/integrations/providers.server"), import("@/lib/integrations/bc-payroll"),
+    ]);
+    const acc = (co?.bc_payaccounts ?? {}) as import("@/lib/integrations/bc-payroll").BcPayAccounts;
+    const got = await getExportLines(from, to);
+    if (!got.live) return { ok: false, error: "Engin gögn á tímabilinu" };
+    const lines = got.lines.filter((l) => !onlyIds?.length || onlyIds.includes(l.employeeId)).filter((l) => l.gross > 0 || l.net > 0);
+    if (!lines.length) return { ok: false, error: "Engin laun á tímabilinu" };
+    if (bcMissingAccounts(lines, acc).length) return { ok: false, needsSetup: true, error: "Veldu bókhaldsreikninga fyrir launabókun í Stillingum → Tengingar → Business Central." };
+    const ymd = (s: string) => s.slice(2).replace(/-/g, "");
+    const doc = `VK-${ymd(from)}-${ymd(to)}${onlyIds?.length ? (group === "monthly" ? "F" : group === "hourly" ? "T" : "V") : ""}`;
+    const dm = (s: string) => `${Number(s.slice(8, 10))}.${Number(s.slice(5, 7))}.`;
+    const r = await bcPostPayroll(integ.site as string, decrypt(integ.secret_enc as string), {
+      batch: acc.batch || "VAKTO", postingDate: to, documentNumber: doc, description: `Laun ${dm(from)}–${dm(to)}${to.slice(0, 4)}`,
+      lines: bcPayrollLines(lines, acc),
+    }).catch(async (e: unknown) => {
+      const msg = e instanceof Error ? e.message : "Sending tókst ekki";
+      await supabase.from("company_integrations").update({ last_error: msg.slice(0, 300) }).eq("id", integ.id);
+      throw e;
+    });
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "payroll.bc", entity: "company_integrations", entityId: integ.id as string, detail: `Launabókun send í Business Central (${from}–${to}, ${doc}) — ${lines.length} starfsmenn` });
+    return { ok: true, count: lines.length, batch: r.batch, doc };
+  } catch (e) {
+    console.error("[bc] payroll", e);
+    return { ok: false, error: userError(e, "Sending í Business Central tókst ekki — reyndu aftur.") };
+  }
+}

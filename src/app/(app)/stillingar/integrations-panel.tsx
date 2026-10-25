@@ -8,6 +8,7 @@ import { toast } from "@/components/app/toast";
 import { nf } from "@/lib/format";
 import { addRevenue, revokeApiKey } from "./actions";
 import { DkModal } from "./dk-modal";
+import { BcPayModal } from "./bc-pay-modal";
 import {
   getTengingar, connectIntegration, connectPayday, syncNow, disconnectIntegration, setRevenueMode, saveMonthlyEstimate,
   relearnPattern, notifyInterest, type TengingarView, type RevenueMode,
@@ -21,7 +22,7 @@ const APPS: App[] = [
   { id: "inventra", name: "INVENTRA", logo: "inventra", cat: ["pos"], is: true, kind: "apikey", sub: ["Framleiðsla og sala", "Production and sales"], d: ["Systurkerfi VAKTO. Velta send beint með lykli.", "VAKTO's sister system. Revenue sent with a key."] },
   { id: "noona", name: "Noona", logo: "/integrations/noona.png", cat: ["pos", "book"], is: true, kind: "soon", sub: ["Kassakerfi og bókanir (áður SalesCloud)", "POS and bookings (formerly SalesCloud)"], d: ["Velta úr kassanum og bókanir næstu daga fyrir veltuspá.", "POS revenue and upcoming bookings for the forecast."] },
   { id: "dineout", name: "Dineout", logo: "/integrations/dineout.png", cat: ["pos", "book"], is: true, kind: "soon", sub: ["Kassakerfi og bókanir", "POS and bookings"], d: ["Velta og bókanir, gott fyrir veltuspá vaktaplansins.", "Revenue and bookings for the schedule forecast."] },
-  { id: "businesscentral", name: "Business Central", logo: "bc", cat: ["acc", "pos"], is: true, kind: "connect", sub: ["Microsoft Dynamics 365 og LS Central", "Microsoft Dynamics 365 and LS Central"], d: ["Velta úr fjárhagnum (tekjureikningar) sótt sjálfkrafa á hverjum degi.", "Revenue from the general ledger (income accounts), fetched daily."] },
+  { id: "businesscentral", name: "Business Central", logo: "/integrations/businesscentral.svg", cat: ["acc", "pay", "pos"], is: true, kind: "connect", sub: ["Microsoft Dynamics 365 og LS Central", "Microsoft Dynamics 365 and LS Central"], d: ["Velta úr fjárhagnum sótt daglega, og launabókun send í færslubók.", "Revenue from the general ledger fetched daily, and payroll entries sent to a journal."] },
   { id: "payday", name: "Payday", logo: "/integrations/payday.png", cat: ["pay", "acc"], is: true, kind: "export", sub: ["Laun og bókhald", "Payroll and accounting"], d: ["Tímaskrá flutt út fyrir launakeyrslu í Payday.", "Timesheet export for payroll in Payday."] },
   { id: "dk", name: "DK", logo: "/integrations/dk.png", cat: ["pay", "acc"], is: true, kind: "export", sub: ["Bókhald og laun", "Accounting and payroll"], d: ["Tímar beint í launakeyrslu dk Laun, og velta úr bókhaldinu.", "Hours straight into a dk Laun pay run, and revenue from the books."] },
   { id: "regla", name: "Regla", logo: "/integrations/regla.png", cat: ["acc"], is: true, kind: "soon", sub: ["Bókhald", "Accounting"], d: ["Velta úr bókhaldinu.", "Revenue from your books."] },
@@ -39,7 +40,6 @@ const ORDER = [1, 2, 3, 4, 5, 6, 0];
 
 function Logo({ app, size = 40 }: { app: { logo: string; name: string }; size?: number }) {
   if (app.logo === "inventra") return <span className="tg-logo" style={{ width: size, height: size }}><span className="tg-inv"><i style={{ height: 8 }} /><i style={{ height: 12 }} /><i style={{ height: 16 }} /></span></span>;
-  if (app.logo === "bc") return <span className="tg-logo" style={{ width: size, height: size }}><svg viewBox="0 0 24 24" width={size - 16} height={size - 16} aria-hidden="true"><rect x="2" y="2" width="20" height="20" rx="5" fill="#0b8a7a" /><text x="12" y="16" textAnchor="middle" fontSize="9.5" fontWeight="700" fill="#fff" fontFamily="inherit">BC</text></svg></span>;
   if (app.logo === "zap") return <span className="tg-logo" style={{ width: size, height: size }}><svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="#ff4f00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z" /></svg></span>;
   // eslint-disable-next-line @next/next/no-img-element
   return <span className="tg-logo" style={{ width: size, height: size }}><img src={app.logo} alt="" width={size - 14} height={size - 14} /></span>;
@@ -189,9 +189,10 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
   const [payday, setPayday] = useState(false);
   const [csv, setCsv] = useState(false);
   const [dk, setDk] = useState(false);
+  const [bcPay, setBcPay] = useState(false);
   // /stillingar?tab=tengingar&dk=1 (t.d. úr DK-útflutningi án launaliða) opnar DK-gluggann
   // eslint-disable-next-line react-hooks/set-state-in-effect -- slóðin er aðeins til í vafranum
-  useEffect(() => { if (new URLSearchParams(window.location.search).get("dk") === "1") setDk(true); }, []);
+  useEffect(() => { const q = new URLSearchParams(window.location.search); if (q.get("dk") === "1") setDk(true); if (q.get("bc") === "1") setBcPay(true); }, []);
   const appsRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => getTengingar().then((r) => { setV(r); if (r.mode) setMode(r.mode); }), []);
@@ -237,6 +238,7 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
                   <div className="tg-conn-n"><span>{L("Velta í gær", "Revenue yesterday")}</span><b>{i.lastAmount != null ? `${nf(i.lastAmount)} kr` : "—"}</b></div>
                   <div className="tg-small">{L("Síðast sótt", "Last fetched")} {fmtTime(i.lastSync)} · {L("sótt sjálfkrafa daglega", "fetched automatically every day")}</div>
                   <div className="tg-btns">
+                    {i.provider === "businesscentral" && <button className="btn ghost sm" onClick={() => setBcPay(true)}>{L("Launabókun", "Payroll posting")}</button>}
                     <button className="btn ghost sm" onClick={async () => { const r = await syncNow(i.id); toast(r.ok ? L("Velta sótt", "Revenue fetched") : (r.error ?? "Villa"), r.ok ? "ok" : "error"); void load(); }}>{L("Sækja núna", "Fetch now")}</button>
                     <button className="btn ghost sm" style={{ color: "var(--bad)" }} onClick={async () => { await disconnectIntegration(i.id); toast(L("Aftengt", "Disconnected")); void load(); }}>{L("Aftengja", "Disconnect")}</button>
                   </div>
@@ -335,6 +337,7 @@ export function IntegrationsPanel({ apiKeys, onNewKey }: { apiKeys: { id: string
 
       {payday && <PaydayModal L={L} onClose={() => setPayday(false)} onDone={() => { setPayday(false); void load(); }} />}
       {connect && <ConnectModal app={connect} L={L} locations={v?.locations ?? []} onClose={() => setConnect(null)} onDone={() => { setConnect(null); setMode("system"); void load(); }} />}
+      {bcPay && <BcPayModal L={L} onClose={() => setBcPay(false)} />}
       {dk && <DkModal L={L} locations={v?.locations ?? []} onClose={() => setDk(false)} onDone={() => { setDk(false); void load(); }} />}
       {csv && <CsvModal L={L} locations={v?.locations ?? []} onClose={() => setCsv(false)} onDone={() => { setCsv(false); void load(); }} />}
     </div>
@@ -428,7 +431,7 @@ function ConnectModal({ app, L, locations, onClose, onDone }: { app: App; L: Lf;
   const steps = bc
     ? [L("Í Azure (Microsoft Entra ID): App registrations → New registration, nefndu það VAKTO. Afritaðu Application (client) ID og Directory (tenant) ID.", "In Azure (Microsoft Entra ID): App registrations → New registration, name it VAKTO. Copy the Application (client) ID and Directory (tenant) ID."),
        L("API permissions → Add → Dynamics 365 Business Central → Application permissions → API.ReadWrite.All → Grant admin consent. Svo Certificates & secrets → New client secret.", "API permissions → Add → Dynamics 365 Business Central → Application permissions → API.ReadWrite.All → Grant admin consent. Then Certificates & secrets → New client secret."),
-       L("Í Business Central: leitaðu að „Microsoft Entra Applications“ → New, settu inn Client ID, State: Enabled og heimildasettið D365 READ. VAKTO les þá aðeins, getur engu breytt.", "In Business Central: search for “Microsoft Entra Applications” → New, enter the Client ID, State: Enabled and the permission set D365 READ. VAKTO can then only read, never change anything.")]
+       L("Í Business Central: leitaðu að „Microsoft Entra Applications“ → New, settu inn Client ID, State: Enabled og heimildasettið D365 READ (bara velta) eða D365 ACCOUNTANTS (velta + launabókun í færslubók, sem bókarinn bókar sjálfur).", "In Business Central: search for “Microsoft Entra Applications” → New, enter the Client ID, State: Enabled and the permission set D365 READ (revenue only) or D365 ACCOUNTANTS (revenue + payroll entries in a journal, which your bookkeeper posts).")]
     : shop
     ? [L("Í Shopify: Settings → Apps and sales channels → Develop apps → Create an app (nefndu hana VAKTO).", "In Shopify: Settings → Apps and sales channels → Develop apps → Create an app (name it VAKTO)."),
        L("Configure Admin API scopes: hakaðu við read_orders og vistaðu. Smelltu svo á Install app.", "Configure Admin API scopes: tick read_orders and save. Then click Install app."),
