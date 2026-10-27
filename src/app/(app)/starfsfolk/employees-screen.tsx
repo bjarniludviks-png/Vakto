@@ -9,7 +9,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "@/lib/contract-pdf";
-import { updateEmployee, uploadDocument, importEmployees, inviteEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow, getContractProgress, syncContractStatus, openSignedContractPdf, resendContract, restoreContract, listEmployeePayslips, type EmployeePayslip, type ContractProgress, type EmployeeContractState } from "./actions";
+import { updateEmployee, uploadDocument, importEmployees, inviteEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, getExtraDepartments, setExtraDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow, getContractProgress, syncContractStatus, openSignedContractPdf, resendContract, restoreContract, listEmployeePayslips, type EmployeePayslip, type ContractProgress, type EmployeeContractState } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField, BankField } from "@/components/app/fields";
@@ -775,6 +775,49 @@ function EmployeePayslips({ employeeId }: { employeeId: string }) {
   );
 }
 
+/** Aðrar deildir sem starfsmaðurinn vinnur líka í (0094) — vistast strax eins og Umsjón deilda. */
+function ExtraDepts({ e }: { e: Employee }) {
+  const { t } = useLang();
+  const [all, setAll] = useState<string[]>([]);
+  const [sel, setSel] = useState<string[]>([]);
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    let live = true;
+    Promise.all([getCompanyDepartments(), getExtraDepartments(e.id)]).then(([a, s]) => {
+      if (!live) return;
+      setAll(a); setSel(s); setReady(true);
+    });
+    return () => { live = false; };
+  }, [e.id]);
+  const others = all.filter((d) => d !== e.department);
+  function toggle(name: string) {
+    const next = sel.includes(name) ? sel.filter((d) => d !== name) : [...sel, name];
+    setSel(next);
+    setExtraDepartments(e.id, next).then((r) => toast(r.ok ? (r.demo ? "Vistað (demo — tengdu Supabase)" : t("Deildir vistaðar")) : (r.error ?? "Villa")));
+  }
+  if (ready && others.length === 0) return null;
+  return (
+    <>
+      <Sec>{t("Vinnur líka í")}</Sec>
+      <p className="muted" style={{ fontSize: 11.5, margin: "2px 0 8px" }}>
+        {t("Starfsmaður sem vinnur í fleiri en einni deild birtist undir þeim öllum í vaktaplaninu. Aðaldeildin ræður launum og skýrslum.")}
+      </p>
+      {!ready ? <p className="muted" style={{ fontSize: 12 }}>{t("Hleð…")}</p>
+        : <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {others.map((d) => {
+              const on = sel.includes(d);
+              return (
+                <button type="button" key={d} onClick={() => toggle(d)}
+                  style={{ ...FLD, padding: "6px 12px", cursor: "pointer", fontWeight: 600, fontSize: 12.5,
+                    background: on ? "var(--brand)" : "#fff", color: on ? "#fff" : "var(--ink2)",
+                    borderColor: on ? "var(--brand)" : "var(--line)" }}>{d}</button>
+              );
+            })}
+          </div>}
+    </>
+  );
+}
+
 /** Assign which departments a shift-lead/manager oversees (migration 0025). */
 function DeptOversight({ e }: { e: Employee }) {
   const { t } = useLang();
@@ -841,6 +884,7 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
           </label>
         )); })()}
 
+        <ExtraDepts e={e} />
         {e.role === "manager" && <DeptOversight e={e} />}
       </>
     );
