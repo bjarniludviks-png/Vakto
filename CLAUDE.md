@@ -460,6 +460,19 @@
 - Stillingar → Tengingar → „Tengd forrit“ (`stillingar/ai-apps-panel.tsx`, `ai-apps-actions.ts`). Innskráning varðveitir
   `?next=/oauth/…` (middleware + login-form).
 
+## Réttindi: orlof, veikindi, veikindi barna (27. okt. 2026, migration 0096 á staging; prod við release)
+- **Reglurnar:** `src/lib/entitlements.ts` (hreint, vísar í grein): SGS/Efling og SA 2024–2028 gr. 4.1 (orlof: 24 d / 10,17 %;
+  22 ára + 6 mán. → 25 / 10,64; 5 ár → 28 / 12,07; 10 ár → 30 / 13,04), gr. 8.1 (veikindi: 2 d/mán á 1. ári, svo 1/2/3/4 mán.
+  eftir 1/2/3/5 ár), gr. 8.5.1 (veikindi barna: 2 d/mán fyrstu 6 mán., svo 12 d á 12 mán.). VR/LÍV: 25 eftir 6 mán. + 22 ára,
+  28 eftir 4 ár, 30 eftir 6 ár; veikindi 2/4/6 mán. eftir 1/5/10 ár. Lesið úr samningstexta SGS (PDF) og vr.is 27.10.2026.
+  `familyFor(union)` → null fyrir félög sem ekki eru komin inn (Matvís, iðnaðarmenn…) — ENGIN ágiskun.
+  Fæðingardagur úr kennitölu (`birthDateFromKennitala`), starfsaldur frá `hire_date`.
+- `src/lib/rights.server.ts` `getRights()` — staða per starfsmann (orlofsréttur + eftirstöðvar, veikindi/veikindi barna síðustu
+  12 mán. á móti rétti, fjarvistir, næsta breyting). Starfsfólk → Frí (`starfsfolk/rights-panel.tsx`), Innsýn → Tímar & mæting
+  (`innsyn/rights-card.tsx`). Aðgerðir í `starfsfolk/rights-actions.ts`: `registerAbsence` (samþykkt strax, valfrjálst: vaktir
+  verða lausar vaktir; push til stjórnenda þegar veikindaréttur er búinn/80 %), `deleteAbsence`, `applyOrlofPct`.
+- **0096:** `leave_type` += `veikindi_barns` (sér réttur, gengur ekki á veikindarétt), `leave_requests.note`.
+- Orlofsprósenta breytist EKKI sjálfkrafa — kerfið sýnir þegar skráð % er lægra en rétturinn og stjórnandi uppfærir með einum smelli.
 ## Vaktaplan: mánaðartafla + starfsmenn eftir id (27. okt. 2026, migration 0094 á staging; prod við release)
 - **Vaktir tengjast starfsmanni eftir id.** Gridið sendir `empRef(e)` (= id) í `employeeName`; þjónninn finnur hann með
   `pickEmployee` (id, annars nafn sem passar við NÁKVÆMLEGA einn). Áður tók „byrjar á“-samsvörun fyrsta nafnið og vaktir
