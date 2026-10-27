@@ -9,7 +9,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "@/lib/contract-pdf";
-import { updateEmployee, uploadDocument, importEmployees, inviteEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow, getContractProgress, syncContractStatus, openSignedContractPdf, resendContract, type ContractProgress, type EmployeeContractState } from "./actions";
+import { updateEmployee, uploadDocument, importEmployees, inviteEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow, getContractProgress, syncContractStatus, openSignedContractPdf, resendContract, restoreContract, type ContractProgress, type EmployeeContractState } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField, BankField } from "@/components/app/fields";
@@ -999,9 +999,30 @@ function ContractTab({ employeeId, contractor = false }: { employeeId: string; c
     load();
   }
   async function remove(c: ContractRow) {
-    if (!window.confirm(t("Eyða þessum samningi? (Starfsmaðurinn sjálfur eyðist EKKI.)"))) return;
+    const q = c.status === "signed"
+      ? t("Eyða undirrituðum samningi? Samningurinn og undirritunarskráin hverfa úr kerfinu (undirritað PDF í Skjöl stendur eftir). Ef hann á bara ekki lengur við er betra að óvirkja hann.")
+      : t("Eyða þessum samningi? (Starfsmaðurinn sjálfur eyðist EKKI.)");
+    if (!window.confirm(q)) return;
     const res = await deleteContract(c.id);
     toast(res.ok ? t("Samningi eytt") : (res.error ?? "Villa"));
+    load();
+  }
+  async function deactivate(c: ContractRow) {
+    if (!window.confirm(t("Óvirkja samninginn? Hann helst í skránni merktur ógildur og hægt er að virkja hann aftur."))) return;
+    const res = await setContractStatus(c.id, "void");
+    toast(res.ok ? t("Samningur óvirkjaður") : (res.error ?? "Villa"), res.ok ? "ok" : "error");
+    load();
+  }
+  async function restore(c: ContractRow) {
+    const res = await restoreContract(c.id);
+    toast(res.ok ? t("Samningur virkjaður aftur") : (res.error ?? "Villa"), res.ok ? "ok" : "error");
+    load();
+  }
+  async function resend(c: ContractRow) {
+    setBusy(true);
+    const res = await resendContract(employeeId, c.id);
+    setBusy(false);
+    toast(res.ok ? t("Boð sent aftur á starfsmanninn") : (res.error ?? "Villa"), res.ok ? "ok" : "error");
     load();
   }
 
@@ -1029,16 +1050,27 @@ function ContractTab({ employeeId, contractor = false }: { employeeId: string; c
             <div className="ctr-act">
               <button className="btn ghost sm" type="button" onClick={async () => downloadContractPdf(c.title, c.content, c.status === "draft" ? [] : await getContractSignatures(c.id))}>PDF</button>
               {c.status === "draft" && <button className="btn sm" type="button" onClick={() => mark(c, "sent")}>{t("Undirrita & senda")}</button>}
+              {c.status === "sent" && <button className="btn ghost sm" type="button" disabled={busy} onClick={() => resend(c)}>{t("Senda boð aftur")}</button>}
               {c.status !== "signed" && c.status !== "void" && <button className="btn ghost sm" type="button" title={t("Ef samningurinn var undirritaður á pappír")} onClick={() => mark(c, "signed")}>{t("Merkja undirritað")}</button>}
             </div>
-            {c.status !== "signed" && (
-              <RowMenu label={t("Fleiri aðgerðir")}>
-                <button type="button" className="danger" onClick={() => remove(c)}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
-                  {t("Eyða samningi")}
+            <RowMenu label={t("Fleiri aðgerðir")}>
+              {(c.status === "sent" || c.status === "signed") && (
+                <button type="button" onClick={() => deactivate(c)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M5.6 5.6l12.8 12.8" /></svg>
+                  {t("Óvirkja samning")}
                 </button>
-              </RowMenu>
-            )}
+              )}
+              {c.status === "void" && (
+                <button type="button" onClick={() => restore(c)}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5" /></svg>
+                  {t("Virkja aftur")}
+                </button>
+              )}
+              <button type="button" className="danger" onClick={() => remove(c)}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" /></svg>
+                {t("Eyða samningi")}
+              </button>
+            </RowMenu>
           </div>
         ))}
       </div>
@@ -1151,7 +1183,7 @@ function ContractProgressCard({ c, p, employeeId, newestOpen, onChanged }: {
         {c.status === "sent" && newestOpen && employerDone && !ended && (
           <button className="btn ghost sm" type="button" disabled={!!busy} onClick={async () => {
             setBusy("resend");
-            const r = await resendContract(employeeId);
+            const r = await resendContract(employeeId, c.id);
             setBusy("");
             toast(r.ok ? t("Boð sent aftur á starfsmanninn") : (r.error ?? "Villa"), r.ok ? "ok" : "error");
             onChanged();
