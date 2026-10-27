@@ -71,7 +71,10 @@ export async function switchCompany(companyId: string): Promise<{ ok: boolean; e
     const admin = createAdminClient();
     const { data: mem } = await admin.from("company_members").select("role").eq("user_id", user.id).eq("company_id", companyId).maybeSingle();
     if (!mem) return { ok: false, error: "Þú ert ekki með aðgang að þessu félagi" };
-    const { error } = await admin.from("users").update({ company_id: companyId, role: mem.role }).eq("id", user.id);
+    // Aðgangur stjórnanda er per fyrirtæki (0095) — fylgir með. Þolir að dálkinn vanti.
+    const mp = await admin.from("company_members").select("permissions").eq("user_id", user.id).eq("company_id", companyId).maybeSingle();
+    const perms = mp.error ? {} : { permissions: mp.data?.permissions ?? null };
+    const { error } = await admin.from("users").update({ company_id: companyId, role: mem.role, ...perms }).eq("id", user.id);
     if (error) return { ok: false, error: userError(error) };
     revalidatePath("/", "layout");
     return { ok: true };

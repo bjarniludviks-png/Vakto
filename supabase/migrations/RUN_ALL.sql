@@ -1664,3 +1664,38 @@ end $$;
 
 -- search_path fest (advisor: function_search_path_mutable)
 alter function public.geo_distance_m(double precision, double precision, double precision, double precision) set search_path = public;
+
+-- ===== 0095_user_permissions.sql =====
+-- 0095 — Aðgangur stjórnenda per notanda (eigandinn velur). Run after 0093 (0094 frátekin annarri grein).
+-- owner = allt; manager = sjálfgefið allt nema launakeyrslur; employee/contractor = ekkert. Sjá 0095_user_permissions.sql.
+alter table public.users add column if not exists permissions jsonb;
+alter table public.company_members add column if not exists permissions jsonb;
+
+create or replace function public.has_perm(p_area text)
+returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce((
+    select case u.role
+      when 'owner' then true
+      when 'manager' then coalesce(
+        case when jsonb_typeof(u.permissions -> p_area) = 'boolean' then (u.permissions ->> p_area)::boolean end,
+        p_area in ('maelabord', 'vaktaplan', 'timaskraning', 'starfsfolk', 'innsyn', 'stillingar')
+      )
+      else false
+    end
+    from public.users u where u.id = auth.uid()
+  ), false);
+$$;
+revoke execute on function public.has_perm(text) from public, anon;
+grant execute on function public.has_perm(text) to authenticated, service_role;
+
+drop policy if exists payroll_runs_owner on public.payroll_runs;
+drop policy if exists payroll_runs_access on public.payroll_runs;
+create policy payroll_runs_access on public.payroll_runs for all
+  using (company_id = public.auth_company_id() and public.has_perm('launakeyrslur'))
+  with check (company_id = public.auth_company_id() and public.has_perm('launakeyrslur'));
+
+drop policy if exists payroll_lines_owner on public.payroll_lines;
+drop policy if exists payroll_lines_access on public.payroll_lines;
+create policy payroll_lines_access on public.payroll_lines for all
+  using (exists (select 1 from public.payroll_runs r where r.id = run_id and r.company_id = public.auth_company_id() and public.has_perm('launakeyrslur')))
+  with check (exists (select 1 from public.payroll_runs r where r.id = run_id and r.company_id = public.auth_company_id() and public.has_perm('launakeyrslur')));

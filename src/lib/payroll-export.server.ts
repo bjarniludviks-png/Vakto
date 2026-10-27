@@ -6,6 +6,7 @@ import { resolveRuleSet, resolveUppbot } from "@/lib/payrules";
 import { DEMO_EMPLOYEES, type Employee } from "@/lib/employees";
 import { getEmployees } from "@/lib/employees.server";
 import { allRows } from "@/lib/supabase/all-rows";
+import { hasPerm } from "@/lib/access.server";
 
 // Launalínur + tímar flokkaðir fyrir launakerfi (Payday/DK/Excel). Notað af útflutnings-
 // endapunktinum og beinni sendingu í Payday, svo báðar leiðir skili nákvæmlega sömu tölum.
@@ -33,8 +34,8 @@ export async function getExportLines(from?: string, to?: string): Promise<{ line
     const { data: profile } = user
       ? await supabase.from("users").select("company_id, role").eq("id", user.id).maybeSingle()
       : { data: null };
-    // Laun allra starfsmanna: aðeins stjórnendur og vaktstjórar.
-    if (!profile?.company_id || (profile.role !== "owner" && profile.role !== "manager")) return { lines: [], kt: {}, hours, monthly, live: true, denied: true };
+    // Laun allra starfsmanna: eigandi eða stjórnandi með aðgang að Launakeyrslum (0095).
+    if (!profile?.company_id || !(await hasPerm("launakeyrslur", supabase))) return { lines: [], kt: {}, hours, monthly, live: true, denied: true };
     const company = profile.company_id as string;
     const { data: emps } = company
       ? await supabase.from("employees").select("id, full_name, kennitala, pay_type, rate, employment_ratio, union_agreement, role, hire_date").eq("company_id", company).neq("role", "contractor")

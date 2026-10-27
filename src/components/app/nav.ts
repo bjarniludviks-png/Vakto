@@ -1,3 +1,5 @@
+import { areaOf, resolveAccess } from "@/lib/user-permissions";
+
 export type Role = "owner" | "manager" | "employee" | "contractor";
 
 export type NavItem = {
@@ -53,11 +55,18 @@ export const FOOT_ITEMS: NavItem[] = [
   { slug: "help", href: "/hjalp", label: "Hjálp", roles: ALL, icon: "help" },
 ];
 
-export function visibleFor(role: Role) {
+/** Atriði sem hlutverkið sér. Stjórnandi: stjórnendasvæðin fara eftir users.permissions (0095),
+ * sama regla og canAccess() í middleware — null = sjálfgefið fyrir hlutverkið. */
+export function visibleFor(role: Role, perms?: unknown) {
+  const access = role === "manager" ? resolveAccess(role, perms) : null;
+  const shows = (i: NavItem) => {
+    const area = access ? areaOf(i.href) : null;
+    return access && area ? access[area] : i.roles.includes(role);
+  };
   const groups = NAV_GROUPS.map((g) => ({
     title: g.title,
-    items: g.items.filter((i) => i.roles.includes(role)),
+    items: g.items.filter(shows),
   })).filter((g) => g.items.length > 0);
-  const foot = FOOT_ITEMS.filter((i) => i.roles.includes(role));
+  const foot = FOOT_ITEMS.filter(shows);
   return { groups, foot };
 }

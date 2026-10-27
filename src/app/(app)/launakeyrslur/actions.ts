@@ -17,6 +17,7 @@ import { userError } from "@/lib/user-error";
 import { allRows } from "@/lib/supabase/all-rows";
 import { planBlock } from "@/lib/plan.server";
 import { ytdFor, ytdRowFrom, type YtdRow } from "@/lib/payslip-ytd";
+import { hasPerm } from "@/lib/access.server";
 
 export type RunResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
 export type ContractorBill = { id: string; name: string; av: string; c: string; hours: number; amount: number; monthly: boolean };
@@ -32,6 +33,9 @@ async function companyOf(supabase: Awaited<ReturnType<typeof createClient>>) {
   const { data: profile } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
   const company = profile?.company_id as string | undefined;
   if (!company) return { error: "Fyrirtæki fannst ekki" as const };
+  // Allar aðgerðir hér snerta laun allra — sama aðgangur og síðan sjálf (eigandi eða stjórnandi
+  // sem eigandinn hefur veitt „Launakeyrslur", 0095). RLS á payroll_* framfylgir því líka.
+  if (!(await hasPerm("launakeyrslur", supabase))) return { error: "Þú hefur ekki aðgang að launakeyrslum" as const };
   return { userId: user.id, company };
 }
 
@@ -325,7 +329,7 @@ export async function getPayrollHistory(year: number): Promise<PayrollHistory> {
     if (!user) return { live: false, months: emptyMonths() };
     const { data: prof } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
     const company = prof?.company_id as string | undefined;
-    if (!company) return { live: false, months: emptyMonths() };
+    if (!company || !(await hasPerm("launakeyrslur", supabase))) return { live: false, months: emptyMonths() };
     const { data: runs } = await supabase.from("payroll_runs")
       .select("id, period_start")
       .eq("company_id", company)
