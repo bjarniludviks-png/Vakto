@@ -3,11 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureDefaultShiftTypes } from "@/lib/provision";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees, } from "@/lib/employees.server";
-import { initials } from "@/lib/employees";
+import { planEmployees } from "./roster.server";
 import { dec1 } from "@/lib/format";
 import { allRows } from "@/lib/supabase/all-rows";
 
-export type Emp4 = [string, string, string, string]; // initials, first name, dept, color
+// initials, birtingarnafn, aðaldeild, litur, starfsmanns-id, aðrar deildir („A|B“)
+export type Emp4 = [string, string, string, string, string?, string?];
 export type ShiftTypeView = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
 export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; cellTypes: Record<string, string>; types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string; todayISO: string; targets: number[]; unavail: Record<string, number[]> };
 
@@ -33,8 +34,9 @@ function codeForStart(start: string | null): string {
 export async function getSchedule(): Promise<ScheduleInitial | null> {
   if (!isSupabaseConfigured()) return null;
   try {
-    const { employees, live } = await getEmployees();
-    if (!live) return null;
+    const { live: anyLive } = await getEmployees();
+    if (!anyLive) return null;
+    const { list: employees } = await planEmployees();
 
     const today = new Date();
     const todayISO = isoOf(today);
@@ -48,7 +50,7 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
     const company = profile?.company_id as string | undefined;
 
     const rowOf = (e: (typeof employees)[number]): Emp4 => [
-      initials(e.fullName), e.fullName.split(/\s+/)[0], e.department ?? "", e.avatarColor,
+      e.init, e.name, e.dept, e.color, e.id, e.depts.filter((d) => d !== e.dept).join("|"),
     ];
 
     // shift types
@@ -101,29 +103,13 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
       if (Array.isArray(st?.staffing_targets)) targets = (st!.staffing_targets as number[]).slice(0, 7);
     }
 
-    // Partition: employees WITH a shift this week are "on the plan" (grid rows);
-    // the rest go to the pool. This way, removing someone from the plan (which
-    // deletes their shifts) keeps them off the grid on refresh instead of
-    // reappearing as an empty row — and they stay reachable via "Bæta á plan".
-    const emp: Emp4[] = [];
-    const gridOut: string[][] = [];
-    const timesOut: Record<string, { start: string; end: string }> = {};
-    const cellTypesOut: Record<string, string> = {};
+    // Allt virkt starfsfólk er alltaf í planinu. Áður fóru þeir sem áttu enga vakt í vikunni í
+    // „pottinn“ um leið og ein vakt var komin — hjá 44 manna hóteli hvarf þá nánast allt starfsfólkið.
+    const emp: Emp4[] = employees.map(rowOf);
+    const gridOut = grid, timesOut = times, cellTypesOut = cellTypesMap;
     const pool: Emp4[] = [];
-    // Empty week (no shifts yet) → show the whole roster so scheduling can begin.
-    const anyShift = grid.some((row) => row.some((s) => s !== "off"));
-    employees.forEach((e, i) => {
-      if (!anyShift || grid[i].some((s) => s !== "off")) {
-        const nr = emp.length;
-        emp.push(rowOf(e));
-        gridOut.push(grid[i]);
-        grid[i].forEach((_, c) => { const k = `${i}:${c}`; if (times[k]) timesOut[`${nr}:${c}`] = times[k]; if (cellTypesMap[k]) cellTypesOut[`${nr}:${c}`] = cellTypesMap[k]; });
-      } else {
-        pool.push(rowOf(e));
-      }
-    });
-
-    const fte = dec1(employees.reduce((a, e) => a + e.employmentRatio, 0) / 100);
+    const { employees: all } = await getEmployees();
+    const fte = dec1(all.filter((e) => e.status !== "inactive").reduce((a, e) => a + e.employmentRatio, 0) / 100);
     const unavail = await getWeekUnavail(WEEK_DATES);
     return { emp, grid: gridOut, times: timesOut, cellTypes: cellTypesOut, types, pool, fte, company: companyName, todayISO, targets, unavail };
   } catch {
@@ -144,7 +130,7 @@ export async function getWeekUnavail(weekDates: string[]): Promise<Record<string
     if (!company) return {};
     const { data: av } = await supabase
       .from("availability")
-      .select("available, weekdays, from_date, to_date, employees(full_name)")
+      .select("available, weekdays, employee_id, from_date, to_date, employees(full_name)")
       .eq("company_id", company).eq("available", false);
     const out: Record<string, number[]> = {};
     for (const a of av ?? []) {
@@ -157,7 +143,8 @@ export async function getWeekUnavail(weekDates: string[]): Promise<Record<string
         if (!inRange) continue;
         const wd = (a.weekdays ?? []) as number[];
         if (wd.length === 0 || wd.includes(c)) {
-          if (!(out[name] ?? []).includes(c)) (out[name] ??= []).push(c);
+          // Lykill bæði fornafn (AI-aðstoðin) og starfsmanns-id (planið — fornöfn geta verið eins).
+          for (const k of [name, a.employee_id as string | null]) if (k && !(out[k] ?? []).includes(c)) (out[k] ??= []).push(c);
         }
       }
     }

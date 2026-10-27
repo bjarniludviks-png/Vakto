@@ -8,19 +8,41 @@ import { logAudit } from "@/lib/audit";
 import { notifyEmployee, notifyEmployees } from "@/lib/push";
 import { sendSchedulePublishedEmail, sendLeaveDecisionEmail } from "@/lib/email";
 import { getEmployees } from "@/lib/employees.server";
-import { initials as empInitials } from "@/lib/employees";
 import { getWeekUnavail } from "./schedule.server";
+import { planEmployees, type PlanEmp } from "./roster.server";
 import { getWeekBudget as laborWeekBudget, type WeekBudget } from "@/lib/labor";
 import { userError } from "@/lib/user-error";
 import { allRows } from "@/lib/supabase/all-rows";
 
 export type ShiftInput = {
-  employeeName: string; // first name as shown in the grid
+  employeeName: string; // starfsmanns-id (helst) eða nafn eins og það birtist í planinu
   date: string; // YYYY-MM-DD
   startTime: string; // HH:MM
   endTime: string; // HH:MM
   shiftTypeName: string;
 };
+const NO_EMP = "Starfsmaður fannst ekki — eða fleiri en einn með sama nafni. Opnaðu vaktina aftur og reyndu á ný.";
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/** Finna starfsmann eftir id eða nafni. Nafn verður að passa við NÁKVÆMLEGA einn — áður tók
+ * fyrsta „byrjar á“ samsvörun og vaktir lentu á röngum manni þegar tveir hétu „Jan“. */
+function pickEmployee(emps: { id: unknown; full_name: unknown }[] | null | undefined, ref: string): string | undefined {
+  const list = (emps ?? []).map((e) => ({ id: e.id as string, full: ((e.full_name as string) ?? "").trim().toLowerCase() }));
+  const r = (ref ?? "").trim().toLowerCase();
+  if (!r) return undefined;
+  if (UUID_RE.test(r)) return list.find((e) => e.id === r)?.id;
+  const one = (xs: typeof list) => (xs.length === 1 ? xs[0].id : undefined);
+  return one(list.filter((e) => e.full === r))
+    ?? one(list.filter((e) => e.full.split(/\s+/)[0] === r))
+    ?? one(list.filter((e) => e.full.startsWith(r)));
+}
+/** Vaktategund eftir heiti — nákvæm samsvörun fyrst („Dagvakt“ á ekki að verða „Dagvakt helgi“). */
+function pickType(types: { id: unknown; name: unknown }[] | null | undefined, name: string): string | undefined {
+  const n = (name ?? "").trim().toLowerCase();
+  if (!n) return undefined;
+  const list = (types ?? []).map((t) => ({ id: t.id as string, nm: ((t.name as string) ?? "").toLowerCase() }));
+  return list.find((t) => t.nm === n)?.id ?? list.find((t) => t.nm.startsWith(n))?.id;
+}
+
 export type PublishResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
 
 export async function publishSchedule(shifts: ShiftInput[]): Promise<PublishResult> {
@@ -41,9 +63,9 @@ export async function publishSchedule(shifts: ShiftInput[]): Promise<PublishResu
     const { data: types } = await supabase
       .from("shift_types").select("id, name").eq("company_id", company);
     const empId = (name: string) =>
-      emps?.find((e) => (e.full_name as string).toLowerCase().startsWith(name.toLowerCase()))?.id as string | undefined;
+      pickEmployee(emps, name);
     const typeId = (name: string) =>
-      types?.find((t) => (t.name as string).toLowerCase().startsWith(name.toLowerCase()))?.id as string | undefined;
+      pickType(types, name);
 
     const dates = [...new Set(shifts.map((s) => s.date))];
     if (dates.length) {
@@ -112,13 +134,13 @@ export async function getWeekBudget(monISO: string): Promise<WeekBudget | null> 
   }
 }
 
-export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][]; times: Record<string, { start: string; end: string }>; cellTypes?: Record<string, string>; names?: string[]; inits?: string[]; unavail?: Record<string, number[]> }> {
+export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][]; times: Record<string, { start: string; end: string }>; cellTypes?: Record<string, string>; names?: string[]; inits?: string[]; ids?: string[]; unavail?: Record<string, number[]> }> {
   if (!isSupabaseConfigured()) return { ok: false, grid: [], times: {} };
   try {
     const supabase = await createClient();
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return { ok: false, grid: [], times: {} };
-    const { employees, live } = await getEmployees();
+    const { live, list: employees } = await planEmployees();
     if (!live) return { ok: false, grid: [], times: {} };
 
     const [y, m, d] = fromISO.split("-").map(Number);
@@ -147,10 +169,11 @@ export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; gri
     }
     // The client's grid rows may be a SUBSET of the full roster (only staff on
     // the plan) — return names so it can remap rows instead of assuming order.
-    const names = employees.map((e) => e.fullName.split(/\s+/)[0]);
-    const inits = employees.map((e) => empInitials(e.fullName));
+    const names = employees.map((e) => e.name);
+    const inits = employees.map((e) => e.init);
+    const ids = employees.map((e) => e.id);
     const unavail = await getWeekUnavail(dates);
-    return { ok: true, grid, times, cellTypes, names, inits, unavail };
+    return { ok: true, grid, times, cellTypes, names, inits, ids, unavail };
   } catch {
     return { ok: false, grid: [], times: {} };
   }
@@ -206,9 +229,9 @@ export async function saveShift(input: Omit<ShiftInput, "date"> & { date?: strin
       .from("employees").select("id, full_name").eq("company_id", ctx.company);
     const { data: types } = await supabase
       .from("shift_types").select("id, name").eq("company_id", ctx.company);
-    const employee_id = emps?.find((e) => (e.full_name as string).toLowerCase().startsWith(input.employeeName.toLowerCase()))?.id as string | undefined;
-    if (!employee_id) return { ok: false, error: "Starfsmaður fannst ekki" };
-    const shift_type_id = types?.find((t) => (t.name as string).toLowerCase().startsWith(input.shiftTypeName.toLowerCase()))?.id as string | undefined;
+    const employee_id = pickEmployee(emps, input.employeeName);
+    if (!employee_id) return { ok: false, error: NO_EMP };
+    const shift_type_id = pickType(types, input.shiftTypeName);
     const shiftDate = input.date || new Date().toISOString().slice(0, 10);
     // One shift per employee per day cell — replace any existing one.
     await supabase.from("shifts").delete()
@@ -265,8 +288,8 @@ export async function deleteShift(input: { employeeName: string; dateISO: string
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { data: emps } = await supabase
       .from("employees").select("id, full_name").eq("company_id", ctx.company);
-    const employee_id = emps?.find((e) => (e.full_name as string).toLowerCase().startsWith(input.employeeName.toLowerCase()))?.id as string | undefined;
-    if (!employee_id) return { ok: false, error: "Starfsmaður fannst ekki" };
+    const employee_id = pickEmployee(emps, input.employeeName);
+    if (!employee_id) return { ok: false, error: NO_EMP };
     const { error } = await supabase
       .from("shifts").delete()
       .eq("company_id", ctx.company).eq("employee_id", employee_id).eq("date", input.dateISO);
@@ -281,7 +304,7 @@ export async function deleteShift(input: { employeeName: string; dateISO: string
   }
 }
 
-export type ExportRow = { name: string; first: string; dept: string; date: string; start: string; end: string; type?: string };
+export type ExportRow = { name: string; first: string; dept: string; date: string; start: string; end: string; type?: string; employeeId?: string };
 
 /** Real shift rows (with actual times) in a date range — for PDF export. */
 export async function getShiftsInRange(fromISO: string, toISO: string): Promise<{ ok: boolean; rows: ExportRow[] }> {
@@ -300,7 +323,7 @@ export async function getShiftsInRange(fromISO: string, toISO: string): Promise<
     const rows: ExportRow[] = (shifts ?? []).map((s) => {
       const m = meta.get(s.employee_id as string);
       return {
-        name: m?.full ?? "?", first: m?.first ?? "?", dept: m?.dept ?? "",
+        name: m?.full ?? "?", first: m?.first ?? "?", dept: m?.dept ?? "", employeeId: (s.employee_id as string | null) ?? undefined,
         date: s.date as string,
         start: ((s.start_time as string) ?? "").slice(0, 5),
         end: ((s.end_time as string) ?? "").slice(0, 5),
@@ -310,6 +333,122 @@ export async function getShiftsInRange(fromISO: string, toISO: string): Promise<
     return { ok: true, rows };
   } catch {
     return { ok: false, rows: [] };
+  }
+}
+
+export type PlanShift = { id: string; employeeId: string; date: string; start: string; end: string; type: string | null };
+export type PlanLeave = { employeeId: string; from: string; to: string; type: string };
+
+/** Mánaðarplanið: allt virkt starfsfólk + vaktir og samþykkt frí á tímabilinu, allt eftir id. */
+export async function getPlan(fromISO: string, toISO: string): Promise<{ ok: boolean; employees: PlanEmp[]; shifts: PlanShift[]; leave: PlanLeave[] }> {
+  const empty = { ok: false, employees: [], shifts: [], leave: [] };
+  if (!isSupabaseConfigured() || !ISO_RE.test(fromISO) || !ISO_RE.test(toISO)) return empty;
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return empty;
+    const { live, list } = await planEmployees();
+    if (!live) return empty;
+    const { data: rows } = await allRows((a, b) => supabase
+      .from("shifts").select("id, employee_id, date, start_time, end_time, shift_types(name)")
+      .eq("company_id", ctx.company).not("employee_id", "is", null).gte("date", fromISO).lte("date", toISO)
+      .order("date").order("start_time").order("id").range(a, b));
+    const shifts: PlanShift[] = (rows ?? []).map((s) => ({
+      id: s.id as string, employeeId: s.employee_id as string, date: s.date as string,
+      start: ((s.start_time as string) ?? "").slice(0, 5), end: ((s.end_time as string) ?? "").slice(0, 5),
+      type: ((s.shift_types as unknown as { name?: string } | null)?.name) ?? null,
+    }));
+    const { data: lv } = await supabase.from("leave_requests").select("employee_id, from_date, to_date, type")
+      .eq("company_id", ctx.company).eq("status", "approved").lte("from_date", toISO).gte("to_date", fromISO);
+    const leave: PlanLeave[] = (lv ?? []).map((l) => ({ employeeId: l.employee_id as string, from: l.from_date as string, to: l.to_date as string, type: (l.type as string) ?? "" }));
+    return { ok: true, employees: list, shifts, leave };
+  } catch (e) {
+    console.error("getPlan", e);
+    return empty;
+  }
+}
+
+const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Afrita vaktir dag fyrir dag: `pairs` = [frá, til]. Notað fyrir „afrita síðasta mánuð“ og „endurtaka
+ * viku út mánuðinn“. overwrite = eyða vöktum sem fyrir eru á markdögum (aðeins hjá `employeeIds` ef gefið);
+ * annars bætast vaktir aðeins þar sem starfsmaðurinn er ekki þegar á vakt. Aldrei vakt ofan á samþykkt frí. */
+export async function copyShifts(input: { pairs: [string, string][]; employeeIds?: string[]; overwrite: boolean }): Promise<{ ok: boolean; demo?: boolean; count?: number; skippedLeave?: number; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  if (!isSupabaseConfigured()) return { ok: true, demo: true, count: 0 };
+  const pairs = (input.pairs ?? []).filter(([a, b]) => ISO_RE.test(a) && ISO_RE.test(b) && a !== b).slice(0, 93);
+  if (!pairs.length) return { ok: false, error: "Engir dagar til að afrita" };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const only = input.employeeIds?.length ? new Set(input.employeeIds) : null;
+    const src = [...new Set(pairs.map((p) => p[0]))], dst = [...new Set(pairs.map((p) => p[1]))];
+    const { data: srcRows } = await allRows((a, b) => supabase.from("shifts")
+      .select("employee_id, date, start_time, end_time, shift_type_id")
+      .eq("company_id", ctx.company).not("employee_id", "is", null).in("date", src).order("id").range(a, b));
+    const { data: dstRows } = await allRows((a, b) => supabase.from("shifts")
+      .select("id, employee_id, date").eq("company_id", ctx.company).not("employee_id", "is", null).in("date", dst).order("id").range(a, b));
+    const { data: lv } = await supabase.from("leave_requests").select("employee_id, from_date, to_date")
+      .eq("company_id", ctx.company).eq("status", "approved").lte("from_date", dst.reduce((a, b) => (a > b ? a : b))).gte("to_date", dst.reduce((a, b) => (a < b ? a : b)));
+    const onLeave = (eid: string, d: string) => (lv ?? []).some((l) => l.employee_id === eid && (l.from_date as string) <= d && (l.to_date as string) >= d);
+    const taken = new Set((dstRows ?? []).filter((r) => !only || only.has(r.employee_id as string)).map((r) => `${r.employee_id}|${r.date}`));
+    const toOf = new Map<string, string[]>();
+    for (const [a, b] of pairs) (toOf.get(a) ?? toOf.set(a, []).get(a)!).push(b);
+    let skippedLeave = 0;
+    const rows: Record<string, unknown>[] = [];
+    for (const s of srcRows ?? []) {
+      const eid = s.employee_id as string;
+      if (only && !only.has(eid)) continue;
+      for (const d of toOf.get(s.date as string) ?? []) {
+        if (!input.overwrite && taken.has(`${eid}|${d}`)) continue;
+        if (onLeave(eid, d)) { skippedLeave++; continue; }
+        rows.push({ company_id: ctx.company, employee_id: eid, shift_type_id: s.shift_type_id ?? null, date: d,
+          start_time: s.start_time, end_time: s.end_time, status: "published", published: true });
+      }
+    }
+    if (input.overwrite) {
+      const ids = (dstRows ?? []).filter((r) => !only || only.has(r.employee_id as string)).map((r) => r.id as string);
+      for (let i = 0; i < ids.length; i += 200) {
+        const { error } = await supabase.from("shifts").delete().in("id", ids.slice(i, i + 200));
+        if (error) return { ok: false, error: userError(error) };
+      }
+    }
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error } = await supabase.from("shifts").insert(rows.slice(i, i + 500));
+      if (error) return { ok: false, error: userError(error) };
+    }
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "schedule.copy", entity: "shifts", detail: `Vaktir afritaðar — ${rows.length} vaktir á ${dst.length} daga (${dst[0]}…)`,
+    });
+    revalidatePath("/vaktaplan");
+    return { ok: true, count: rows.length, skippedLeave };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
+/** Eyða vöktum á dögum — aðeins hjá `employeeIds` ef gefið (t.d. deildin sem er síuð). Lausar vaktir haldast. */
+export async function clearShifts(input: { dates: string[]; employeeIds?: string[] }): Promise<{ ok: boolean; demo?: boolean; count?: number; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  if (!isSupabaseConfigured()) return { ok: true, demo: true, count: 0 };
+  const dates = (input.dates ?? []).filter((d) => ISO_RE.test(d)).slice(0, 93);
+  if (!dates.length) return { ok: false, error: "Engar dagsetningar" };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    let q = supabase.from("shifts").delete().eq("company_id", ctx.company).not("employee_id", "is", null).in("date", dates);
+    if (input.employeeIds?.length) q = q.in("employee_id", input.employeeIds);
+    const { data: gone, error } = await q.select("id");
+    if (error) return { ok: false, error: userError(error) };
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "schedule.clear", entity: "shifts", detail: `Vaktir hreinsaðar — ${gone?.length ?? 0} vaktir (${dates[0]}…${dates[dates.length - 1]})`,
+    });
+    revalidatePath("/vaktaplan");
+    return { ok: true, count: gone?.length ?? 0 };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
   }
 }
 
@@ -552,7 +691,7 @@ export async function getShiftTasks(employeeName: string, dateISO: string): Prom
     if ("error" in ctx) return { ok: false, tasks: [] };
     const { data: emps } = await supabase
       .from("employees").select("id, full_name").eq("company_id", ctx.company);
-    const eid = emps?.find((e) => (e.full_name as string).toLowerCase().startsWith(employeeName.toLowerCase()))?.id;
+    const eid = pickEmployee(emps, employeeName);
     if (!eid) return { ok: false, tasks: [] };
     const { data } = await supabase
       .from("shift_tasks").select("id, title, done")
@@ -574,8 +713,8 @@ export async function saveShiftTasks(employeeName: string, dateISO: string, titl
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { data: emps } = await supabase
       .from("employees").select("id, full_name").eq("company_id", ctx.company);
-    const eid = emps?.find((e) => (e.full_name as string).toLowerCase().startsWith(employeeName.toLowerCase()))?.id;
-    if (!eid) return { ok: false, error: "Starfsmaður fannst ekki" };
+    const eid = pickEmployee(emps, employeeName);
+    if (!eid) return { ok: false, error: NO_EMP };
     const clean = titles.map((s) => s.trim()).filter(Boolean);
     const { data: existing } = await supabase
       .from("shift_tasks").select("id, title").eq("employee_id", eid).eq("date", dateISO);
