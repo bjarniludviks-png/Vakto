@@ -16,7 +16,9 @@ import { employerSign, metaFrom, notifyContractEmployee, resendTaktikalInvite, s
 import { taktikalEnabled } from "@/lib/taktikal.server";
 import type { SignatureRecord } from "@/lib/contract-pdf";
 import { userError } from "@/lib/user-error";
-import type { PaySettings } from "@/lib/paysettings";
+import { resolvePay, type PaySettings } from "@/lib/paysettings";
+import { resolveOrlof } from "@/lib/payrules";
+import type { PayslipDetail } from "@/lib/doc-pdf";
 import { normKennitala } from "@/lib/staff-import";
 import { employeeBlock } from "@/lib/plan.server";
 
@@ -1437,5 +1439,49 @@ export async function inviteEmployees(ids?: string[]): Promise<InviteEmployeesRe
     return { ok: true, sent, linked, failed };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
+/** Allir launaseðlar starfsmanns úr vistuðum launakeyrslum VAKTO (nýjast fyrst) — Laun-flipinn.
+ *  Sama sundurliðun og launaseðill keyrslunnar; taxti/hlutföll eru núverandi stillingar starfsmanns. */
+export type EmployeePayslip = { runId: string; status: string; d: PayslipDetail };
+export async function listEmployeePayslips(employeeId: string): Promise<EmployeePayslip[]> {
+  if (!isSupabaseConfigured() || (employeeId.startsWith("e") && employeeId.length <= 3)) return [];
+  try {
+    const supabase = await createClient();
+    const company = await companyId(supabase);
+    if (!company) return [];
+    const [{ data: lines }, { data: emp }, { data: co }] = await Promise.all([
+      supabase.from("payroll_lines").select("*, payroll_runs!inner(id, company_id, period_start, period_end, status)")
+        .eq("employee_id", employeeId).eq("payroll_runs.company_id", company),
+      supabase.from("employees").select("*, positions(name)").eq("id", employeeId).eq("company_id", company).maybeSingle(),
+      supabase.from("companies").select("name, kennitala").eq("id", company).maybeSingle(),
+    ]);
+    if (!lines?.length || !emp) return [];
+    const pay = resolvePay(emp.pay_settings as Partial<PaySettings> | null);
+    const pos = (Array.isArray(emp.positions) ? emp.positions[0] : emp.positions) as { name?: string } | null;
+    const nice = (iso: string) => { const [y, m, d] = iso.split("-").map(Number); return `${d}.${m}.${y}`; };
+    return lines.map((l) => {
+      const r = (Array.isArray(l.payroll_runs) ? l.payroll_runs[0] : l.payroll_runs) as { id: string; period_start: string; period_end: string; status: string };
+      const n = (k: string) => Number((l as Record<string, unknown>)[k] ?? 0);
+      return {
+        runId: r.id, status: r.status,
+        d: {
+          name: emp.full_name as string, kennitala: (emp.kennitala as string) ?? null, title: (emp.title as string) || pos?.name || null,
+          union: (emp.union_agreement as string) ?? null, bankAccount: (emp.bank_account as string) ?? null,
+          company: (co?.name as string) ?? "", companyKt: (co?.kennitala as string) ?? null,
+          period: `${nice(r.period_start)} – ${nice(r.period_end)}`, from: r.period_start, to: r.period_end,
+          payType: emp.pay_type === "monthly" ? "monthly" : "hourly", rate: Number(emp.rate) || 0,
+          hours: n("hours"), dayPay: n("day_pay"), premiums: n("premiums"), overtime: n("overtime"), uppbot: n("uppbot"),
+          gross: n("gross"), pension: n("pension"), unionFee: n("union_fee"), withholding: n("withholding"), net: n("net"),
+          orlof: n("orlof"), orlofToBank: n("orlof_to_bank"), extraPension: n("extra_pension"), allowanceUsed: n("allowance_used"),
+          benefits: n("benefits"), benefitsInKind: n("benefits_in_kind"), benefitsFree: n("benefits_free"),
+          pensionPct: pay.pensionPct, extraPensionPct: pay.extraPensionPct, unionFeePct: pay.unionFeePct,
+          orlofPct: resolveOrlof(emp.orlof as never).pct,
+        } satisfies PayslipDetail,
+      };
+    }).sort((a, b) => b.d.from.localeCompare(a.d.from));
+  } catch {
+    return [];
   }
 }
