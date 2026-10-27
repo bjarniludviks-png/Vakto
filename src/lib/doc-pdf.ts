@@ -6,6 +6,7 @@
 import type { jsPDF } from "jspdf";
 import { drawVaktoLogo } from "@/lib/pdf-logo";
 import { nf, dec1 } from "@/lib/format";
+import { taxBeforeAllowance } from "@/lib/paysettings";
 import { WO_ACTION, type WoSnapshot, type WoLogEntry } from "@/lib/work-overview";
 
 type RGB = [number, number, number];
@@ -31,7 +32,10 @@ export type PayslipDetail = {
   orlof?: number; orlofToBank?: number; extraPension?: number; allowanceUsed?: number;
   benefits?: number; benefitsInKind?: number; benefitsFree?: number;
   pensionPct?: number; extraPensionPct?: number; unionFeePct?: number; orlofPct?: number;
+  /** Frá áramótum, til og með þessu tímabili (vistaðar launakeyrslur ársins). */
+  ytd?: PayslipYtd;
 };
+export type PayslipYtd = Partial<Record<"hours" | "dayPay" | "premiums" | "overtime" | "uppbot" | "orlof" | "benefits" | "gross" | "pension" | "extraPension" | "unionFee" | "withholding" | "net", number>>;
 const pctTxt = (n?: number) => (n == null ? "" : ` (${String(Math.round(n * 100) / 100).replace(".", ",")}%)`);
 
 type Doc = jsPDF;
@@ -140,13 +144,20 @@ function kit(doc: Doc) {
   };
 
   /** Upphæðalína: lýsing (+ grá skýring) vinstra megin, upphæð hægra megin. */
-  const amountRows = (x: number, y: number, w: number, rows: { label: string; hint?: string; amount: string; strong?: boolean; tone?: "good" | "neg" }[]) => {
+  /** ytdCols: tveir dálkar („Tímabil“ og „Frá áramótum“) — r.ytd fer í þann hægri. */
+  const amountRows = (x: number, y: number, w: number, rows: { label: string; hint?: string; amount: string; ytd?: string; strong?: boolean; tone?: "good" | "neg" }[], ytdCols = false, head = true) => {
     let yy = y;
+    const ax = ytdCols ? x + w - 110 : x + w;
+    if (ytdCols && head) {
+      font("medium", 7.3, MUT); doc.text("Tímabil", ax, yy + 6, { align: "right" }); doc.text("Frá áramótum", x + w, yy + 6, { align: "right" });
+      yy += 14;
+    }
     for (const r of rows) {
       if (r.strong) { doc.setDrawColor(...RULE); doc.setLineWidth(0.8); doc.line(x, yy + 1, x + w, yy + 1); yy += 6; }
       font(r.strong ? "bold" : "normal", r.strong ? 10.5 : 9.6, INK); doc.text(r.label, x, yy + 10);
       font(r.strong ? "bold" : "medium", r.strong ? 10.5 : 9.6, r.tone === "good" ? GOOD : r.tone === "neg" ? INK2 : INK);
-      doc.text(r.amount, x + w, yy + 10, { align: "right" });
+      doc.text(r.amount, ax, yy + 10, { align: "right" });
+      if (ytdCols && r.ytd) { font(r.strong ? "bold" : "normal", r.strong ? 10.5 : 9.6, MUT); doc.text(r.ytd, x + w, yy + 10, { align: "right" }); }
       yy += 15;
       if (r.hint) { font("italic", 8, MUT); doc.text(r.hint, x, yy + 3); yy += 11; }
       yy += 4;
@@ -208,43 +219,51 @@ export async function buildPayslipPdf(d: PayslipDetail): Promise<Doc> {
     ["Bankareikningur · Bank account", d.bankAccount ?? ""], ["Tímabil · Period", `${isoNice(d.from)} – ${isoNice(d.to)}`],
   ]));
 
+  // Frá áramótum (ef til) — annar dálkur við hverja upphæð, eins og á launaseðlum úr Payday/DK.
+  const Y = d.ytd, yc = !!Y && !empty;
+  const yv = (key: keyof PayslipYtd, neg = false) => (yc && Y?.[key] != null ? (neg && Y[key] ? `−${kr(Y[key]!)}` : kr(Y[key] ?? 0)) : undefined);
+  type AR = { label: string; hint?: string; amount: string; ytd?: string; strong?: boolean; tone?: "good" | "neg" };
+
   k.section(2, "Laun", "Earnings", 90, (x, y, w) => {
     let h = 0;
     if (empty) h += k.note(x, y, w, "Engar vinnustundir eru skráðar á tímabilinu og engin laun voru greidd.", "No working hours were recorded in the period and no pay was issued.") + 10;
-    const rows: { label: string; hint?: string; amount: string; strong?: boolean; tone?: "good" | "neg" }[] = [];
-    if (d.payType === "monthly") rows.push({ label: "Mánaðarlaun", hint: "Monthly salary", amount: kr(d.dayPay) });
-    else rows.push({ label: "Tímakaup", hint: `${dec1(d.hours)} klst. × ${kr(d.rate)} · hourly pay`, amount: kr(d.dayPay) });
-    if (d.premiums) rows.push({ label: "Álag (kvöld, helgar, stórhátíðir)", hint: "Shift premiums", amount: kr(d.premiums) });
-    if (d.overtime) rows.push({ label: "Yfirvinnuálag", hint: "Overtime premium", amount: kr(d.overtime) });
-    if (d.uppbot) rows.push({ label: "Desember-/orlofsuppbót", hint: "Holiday bonus", amount: kr(d.uppbot) });
-    if (d.orlof) rows.push({ label: `Orlof${pctTxt(d.orlofPct)}`, hint: "Holiday pay", amount: kr(d.orlof) });
-    if (d.benefits) rows.push({ label: "Hlunnindi og styrkir", hint: "Benefits & allowances", amount: kr(d.benefits) });
-    rows.push({ label: "Brúttólaun · Gross pay", amount: kr(d.gross), strong: true });
-    return h + k.amountRows(x, y + h, w, rows);
+    const rows: AR[] = [];
+    if (d.payType === "monthly") rows.push({ label: "Mánaðarlaun", hint: "Monthly salary", amount: kr(d.dayPay), ytd: yv("dayPay") });
+    else rows.push({ label: "Tímakaup", hint: `${dec1(d.hours)} klst. × ${kr(d.rate)} · hourly pay${yc && Y?.hours != null ? ` · ${dec1(Y.hours)} klst. á árinu` : ""}`, amount: kr(d.dayPay), ytd: yv("dayPay") });
+    if (d.premiums || Y?.premiums) rows.push({ label: "Álag (kvöld, helgar, stórhátíðir)", hint: "Shift premiums", amount: kr(d.premiums), ytd: yv("premiums") });
+    if (d.overtime || Y?.overtime) rows.push({ label: "Yfirvinnuálag", hint: "Overtime premium", amount: kr(d.overtime), ytd: yv("overtime") });
+    if (d.uppbot || Y?.uppbot) rows.push({ label: "Desember-/orlofsuppbót", hint: "Holiday bonus", amount: kr(d.uppbot), ytd: yv("uppbot") });
+    if (d.orlof || Y?.orlof) rows.push({ label: `Orlof${pctTxt(d.orlofPct)}`, hint: "Holiday pay", amount: kr(d.orlof ?? 0), ytd: yv("orlof") });
+    if (d.benefits || Y?.benefits) rows.push({ label: "Hlunnindi og styrkir", hint: "Benefits & allowances", amount: kr(d.benefits ?? 0), ytd: yv("benefits") });
+    rows.push({ label: "Brúttólaun · Gross pay", amount: kr(d.gross), ytd: yv("gross"), strong: true });
+    return h + k.amountRows(x, y + h, w, rows, yc);
   });
 
+  // Sundurliðun staðgreiðslu: skattstofn → skattur í þrepum → persónuafsláttur (nýttur) → staðgreiðsla.
+  const year = Number(d.from.slice(0, 4));
+  const taxable = Math.max(0, d.gross - d.pension - (d.extraPension ?? 0));
+  const taxBefore = Math.round(taxBeforeAllowance(taxable, year));
+  const allowance = Math.max(0, taxBefore - d.withholding);
+  const taxHint = taxable > 0
+    ? `Skattstofn ${kr(taxable)} · skattur ${kr(taxBefore)} − persónuafsláttur ${kr(allowance)}`
+    : "Income tax withheld";
+
   k.section(3, "Frádráttur", "Deductions", 90, (x, y, w) => k.amountRows(x, y, w, [
-    { label: `Lífeyrissjóður${pctTxt(d.pensionPct ?? 4)}`, hint: "Pension fund", amount: d.pension ? `−${kr(d.pension)}` : kr(0), tone: "neg" as const },
-    ...(d.extraPension ? [{ label: `Viðbótarlífeyrissparnaður${pctTxt(d.extraPensionPct)}`, hint: "Private pension", amount: `−${kr(d.extraPension)}`, tone: "neg" as const }] : []),
-    { label: `Félagsgjald${pctTxt(d.unionFeePct)}`, hint: "Union fee", amount: unionFee ? `−${kr(unionFee)}` : kr(0), tone: "neg" as const },
-    { label: "Staðgreiðsla (eftir persónuafslátt)", hint: "Income tax withheld (after personal allowance)", amount: d.withholding ? `−${kr(d.withholding)}` : kr(0), tone: "neg" as const },
+    { label: `Lífeyrissjóður${pctTxt(d.pensionPct ?? 4)}`, hint: "Pension fund", amount: d.pension ? `−${kr(d.pension)}` : kr(0), ytd: yv("pension", true), tone: "neg" as const },
+    ...(d.extraPension || Y?.extraPension ? [{ label: `Viðbótarlífeyrissparnaður${pctTxt(d.extraPensionPct)}`, hint: "Private pension", amount: d.extraPension ? `−${kr(d.extraPension)}` : kr(0), ytd: yv("extraPension", true), tone: "neg" as const }] : []),
+    { label: `Félagsgjald${pctTxt(d.unionFeePct)}`, hint: "Union fee", amount: unionFee ? `−${kr(unionFee)}` : kr(0), ytd: yv("unionFee", true), tone: "neg" as const },
+    { label: "Staðgreiðsla", hint: taxHint, amount: d.withholding ? `−${kr(d.withholding)}` : kr(0), ytd: yv("withholding", true), tone: "neg" as const },
     ...(d.benefitsInKind ? [{ label: "Hlunnindi í fríðu (ekki greidd út)", hint: "Benefits in kind", amount: `−${kr(d.benefitsInKind)}`, tone: "neg" as const }] : []),
     ...(d.orlofToBank ? [{ label: "Orlof lagt inn á orlofsreikning", hint: "Holiday pay to holiday account", amount: `−${kr(d.orlofToBank)}`, tone: "neg" as const }] : []),
-    { label: "Frádráttur samtals · Total deductions", amount: deductions ? `−${kr(deductions)}` : kr(0), strong: true },
-  ]));
+    { label: "Frádráttur samtals · Total deductions", amount: deductions ? `−${kr(deductions)}` : kr(0), ytd: yc && Y ? `−${kr((Y.pension ?? 0) + (Y.extraPension ?? 0) + (Y.unionFee ?? 0) + (Y.withholding ?? 0))}` : undefined, strong: true },
+  ], yc, false));
 
   k.section(4, "Útborgað", "Net pay", 50, (x, y, w) => k.amountRows(x, y, w, [
     ...(d.benefitsFree ? [{ label: "Undanþegið staðgreiðslu (t.d. dagpeningar)", hint: "Tax-exempt allowances", amount: kr(d.benefitsFree) }] : []),
-    { label: "Útborgað á reikning · Paid to account", amount: kr(d.net), strong: true, tone: "good" },
-  ]));
+    { label: `Útborgað á reikning${d.bankAccount ? ` ${d.bankAccount}` : ""}`, hint: "Paid to account", amount: kr(d.net), ytd: yv("net"), strong: true, tone: "good" },
+  ], yc, false));
 
-  k.ensure(40);
-  k.font("italic", 7.8, MUT);
-  const fine = k.wrap("Reiknað í VAKTO út frá samþykktum vinnustundum, launareglum fyrirtækisins og skattþrepum ársins. Endanlegur launaseðill kemur úr launakerfi fyrirtækisins. · Calculated in VAKTO from approved hours, the company's pay rules and this year's tax brackets.", k.CW);
-  fine.forEach((l, i) => doc.text(l, k.M, k.state.y + i * 10));
-
-  k.state.y += k.note(k.M, k.state.y + 6, k.CW, "Staðgreiðsla er reiknuð í skattþrepum með persónuafslætti skv. skattkorti; lífeyrir og félagsgjöld skv. stillingum starfsmanns. Endanlegur launaseðill kemur úr launakerfi vinnuveitanda.", "Tax uses the brackets and personal allowance per the tax card; pension and union fees per the employee's settings. The final payslip is issued by the employer's payroll system.") + 10;
-  k.footer(`Launaseðill (áætlun) · ${d.name}`);
+  k.footer(`Launaseðill · ${d.name}`);
   return doc;
 }
 

@@ -19,6 +19,7 @@ import { userError } from "@/lib/user-error";
 import { resolvePay, type PaySettings } from "@/lib/paysettings";
 import { resolveOrlof } from "@/lib/payrules";
 import type { PayslipDetail } from "@/lib/doc-pdf";
+import { ytdFor, ytdRowFrom } from "@/lib/payslip-ytd";
 import { normKennitala } from "@/lib/staff-import";
 import { employeeBlock } from "@/lib/plan.server";
 
@@ -1452,7 +1453,7 @@ export async function listEmployeePayslips(employeeId: string): Promise<Employee
     const company = await companyId(supabase);
     if (!company) return [];
     const [{ data: lines }, { data: emp }, { data: co }] = await Promise.all([
-      supabase.from("payroll_lines").select("*, payroll_runs!inner(id, company_id, period_start, period_end, status)")
+      supabase.from("payroll_lines").select("*, payroll_runs!inner(id, company_id, period_start, period_end, status, created_at)")
         .eq("employee_id", employeeId).eq("payroll_runs.company_id", company),
       supabase.from("employees").select("*, positions(name)").eq("id", employeeId).eq("company_id", company).maybeSingle(),
       supabase.from("companies").select("name, kennitala").eq("id", company).maybeSingle(),
@@ -1461,8 +1462,11 @@ export async function listEmployeePayslips(employeeId: string): Promise<Employee
     const pay = resolvePay(emp.pay_settings as Partial<PaySettings> | null);
     const pos = (Array.isArray(emp.positions) ? emp.positions[0] : emp.positions) as { name?: string } | null;
     const nice = (iso: string) => { const [y, m, d] = iso.split("-").map(Number); return `${d}.${m}.${y}`; };
+    type Run = { id: string; period_start: string; period_end: string; status: string; created_at: string };
+    const runOf = (l: Record<string, unknown>) => (Array.isArray(l.payroll_runs) ? l.payroll_runs[0] : l.payroll_runs) as Run;
+    const ytdRows = lines.map((l) => ytdRowFrom(l, runOf(l)));
     return lines.map((l) => {
-      const r = (Array.isArray(l.payroll_runs) ? l.payroll_runs[0] : l.payroll_runs) as { id: string; period_start: string; period_end: string; status: string };
+      const r = runOf(l);
       const n = (k: string) => Number((l as Record<string, unknown>)[k] ?? 0);
       return {
         runId: r.id, status: r.status,
@@ -1478,6 +1482,7 @@ export async function listEmployeePayslips(employeeId: string): Promise<Employee
           benefits: n("benefits"), benefitsInKind: n("benefits_in_kind"), benefitsFree: n("benefits_free"),
           pensionPct: pay.pensionPct, extraPensionPct: pay.extraPensionPct, unionFeePct: pay.unionFeePct,
           orlofPct: resolveOrlof(emp.orlof as never).pct,
+          ytd: ytdFor(ytdRows, employeeId, r.period_start),
         } satisfies PayslipDetail,
       };
     }).sort((a, b) => b.d.from.localeCompare(a.d.from));
