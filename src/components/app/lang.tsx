@@ -9,6 +9,22 @@ type Dict = Record<string, { is: string; en: string; vi?: string; pl?: string }>
 
 // App-shell chrome strings. Per-screen content can adopt useLang() incrementally.
 export const DICT: Dict = {
+  // Aðgangur stjórnenda per notanda (Stillingar → Notendur, 0095)
+  "Aðgangur": { is: "Aðgangur", en: "Access", vi: "Quyền truy cập", pl: "Dostęp" },
+  "Fullur aðgangur": { is: "Fullur aðgangur", en: "Full access", vi: "Toàn quyền", pl: "Pełny dostęp" },
+  "Sjálfgefið": { is: "Sjálfgefið", en: "Default", vi: "Mặc định", pl: "Domyślne" },
+  "sérsniðinn aðgangur": { is: "sérsniðinn aðgangur", en: "custom access", vi: "quyền tùy chỉnh", pl: "dostęp niestandardowy" },
+  "Aðgangur vistaður": { is: "Aðgangur vistaður", en: "Access saved", vi: "Đã lưu quyền truy cập", pl: "Dostęp zapisany" },
+  "Engin valin = sér allar deildir.": { is: "Engin valin = sér allar deildir.", en: "None selected = sees all departments.", vi: "Không chọn = xem tất cả bộ phận.", pl: "Brak wyboru = widzi wszystkie działy." },
+  "Fullur aðgangur = allt sem eigandi sér nema áskrift, greiðslukort og stjórnun eigenda.": { is: "Fullur aðgangur = allt sem eigandi sér nema áskrift, greiðslukort og stjórnun eigenda.", en: "Full access = everything the owner sees except subscription, payment card and managing owners.", vi: "Toàn quyền = mọi thứ chủ sở hữu thấy, trừ gói đăng ký, thẻ thanh toán và quản lý chủ sở hữu.", pl: "Pełny dostęp = wszystko, co widzi właściciel, poza subskrypcją, kartą płatniczą i zarządzaniem właścicielami." },
+  "Veldu hvaða hluta kerfisins þessi stjórnandi má opna. Breytingin tekur gildi strax.": { is: "Veldu hvaða hluta kerfisins þessi stjórnandi má opna. Breytingin tekur gildi strax.", en: "Choose which parts of the system this manager may open. The change takes effect immediately.", vi: "Chọn những phần của hệ thống mà người quản lý này được mở. Thay đổi có hiệu lực ngay.", pl: "Wybierz, które części systemu ten kierownik może otwierać. Zmiana obowiązuje od razu." },
+  "laun % af veltu og yfirlit dagsins": { is: "laun % af veltu og yfirlit dagsins", en: "labor % of revenue and today's overview", vi: "% lương trên doanh thu và tổng quan hôm nay", pl: "% płac w przychodach i przegląd dnia" },
+  "búa til og birta vaktir": { is: "búa til og birta vaktir", en: "create and publish shifts", vi: "tạo và công bố ca làm", pl: "tworzenie i publikowanie zmian" },
+  "stimplanir og samþykkt tíma": { is: "stimplanir og samþykkt tíma", en: "clock-ins and approving hours", vi: "chấm công và duyệt giờ", pl: "odbicia i zatwierdzanie godzin" },
+  "laun allra, launakeyrslur og útflutningur": { is: "laun allra, launakeyrslur og útflutningur", en: "everyone's pay, payroll runs and export", vi: "lương của mọi người, kỳ lương và xuất dữ liệu", pl: "płace wszystkich, listy płac i eksport" },
+  "prófílar, samningar og skjöl": { is: "prófílar, samningar og skjöl", en: "profiles, contracts and documents", vi: "hồ sơ, hợp đồng và tài liệu", pl: "profile, umowy i dokumenty" },
+  "skýrslur og frammistaða": { is: "skýrslur og frammistaða", en: "reports and performance", vi: "báo cáo và hiệu suất", pl: "raporty i wyniki" },
+  "staðir, reglur og tengingar (ekki áskrift)": { is: "staðir, reglur og tengingar (ekki áskrift)", en: "locations, rules and integrations (not subscription)", vi: "địa điểm, quy tắc và kết nối (không gồm gói đăng ký)", pl: "lokalizacje, zasady i integracje (bez subskrypcji)" },
   // Samningsstaða / Taktikal-samstilling
   "Staða undirritunar": { is: "Staða undirritunar", en: "Signing status", vi: "Trạng thái ký", pl: "Status podpisu" },
   "Fyrirtækið hefur undirritað": { is: "Fyrirtækið hefur undirritað", en: "The company has signed", vi: "Công ty đã ký", pl: "Firma podpisała" },

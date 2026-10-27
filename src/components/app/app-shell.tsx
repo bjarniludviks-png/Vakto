@@ -30,6 +30,8 @@ export type Account = {
   /** Secret kiosk token (companies.kiosk_token) — the account menu's kiosk link. */
   kioskToken?: string;
   role: Role;
+  /** users.permissions (0095) — aðgangur stjórnanda per svæði; null = sjálfgefið. */
+  permissions?: unknown;
   /** SaaS-owner super-admin (email allowlist) — shows the VAKTO Admin menu entry. */
   vaktoAdmin?: boolean;
   /** Opna demo-fyrirtækið (DEMO_COMPANY_ID) — demo-rönd, útskráning aðeins þessarar lotu. */
@@ -112,7 +114,9 @@ export default function AppShell({
   }
 
   const ident = role === account.role ? account : ROLE_IDENTITY[role];
-  const { groups, foot } = visibleFor(role);
+  // Forskoðun eiganda „sem annað hlutverk" sýnir sjálfgefinn aðgang þess hlutverks.
+  const perms = role === account.role ? account.permissions : null;
+  const { groups, foot } = visibleFor(role, perms);
 
   function switchRole(r: Role) {
     setRoleState(r);
@@ -229,7 +233,7 @@ export default function AppShell({
             <button className="menu-btn" onClick={() => setNavOpen(true)}>
               <Icon name="menu" />
             </button>
-            <TopSearch role={role} />
+            <TopSearch role={role} perms={perms} />
             <div className="tactions">
               <button
                 className="ticon"

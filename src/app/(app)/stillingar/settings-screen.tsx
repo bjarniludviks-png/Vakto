@@ -13,9 +13,11 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, aiContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, saveCompanyLimits, setEsignProvider, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit } from "./actions";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, aiContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, savePayPeriodStart, saveCompanyLimits, setEsignProvider, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit, saveUserAccess } from "./actions";
+import { getOverseenDepartments } from "../starfsfolk/actions";
+import { AREAS, FULL_ACCESS, MANAGER_DEFAULTS, resolveAccess, type Area } from "@/lib/user-permissions";
 import dynamic from "next/dynamic";
-import type { SettingsData, CompanyInfo, GeofenceMode } from "./settings.server";
+import type { SettingsData, CompanyInfo, GeofenceMode, UserRow } from "./settings.server";
 import type { AgreementResult, AgreementSource } from "@/lib/ai/agreement";
 import type { TermsDraft } from "@/lib/ai/terms";
 
@@ -64,6 +66,8 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
   const [tplModal, setTplModal] = useState<RuleTemplate | "new" | null>(null);
   const [deptEdit, setDeptEdit] = useState<{ id: string; name: string; location: string; staff: number; color: string | null; members: string[] } | null>(null);
   const [rowEdit, setRowEdit] = useState<EditRow | null>(null);
+  const [accessUser, setAccessUser] = useState<UserRow | null>(null);
+  const isOwner = data.viewerRole === "owner";
   // Gamlar slóðir (?s=velta, launareglur) vísa á nýju flipana.
   const LEGACY: Record<string, string> = { velta: "tengingar", launareglur: "reglur" };
   const [section, setSection] = useState<string>((initialSection && (LEGACY[initialSection] ?? initialSection)) ?? (initialModal === "revenue" || initialModal === "avgrevenue" ? "tengingar" : "fyrirtaeki"));
@@ -243,8 +247,11 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
           {data.users.map((u, i) => (
             <div className="it" key={u.name + i}>
               <div className="ic info" style={u.role === "manager" ? { background: "#ece9fd", color: "#8b7bff" } : undefined}>{u.initials}</div>
-              <div className="tx"><b>{u.name}</b><span>{u.email}</span></div>
+              <div className="tx"><b>{u.name}</b><span>{u.email}{u.role === "manager" && u.permissions ? ` · ${t("sérsniðinn aðgangur")}` : ""}</span></div>
               <span className={`tag ${u.role === "owner" ? "info" : "mut"}`}>{t(ROLE_LABEL[u.role] ?? "role:employee")}</span>
+              {isOwner && u.role === "manager" && u.id && (
+                <button className="btn sm ghost" style={{ marginLeft: 8 }} onClick={() => setAccessUser(u)}>{t("Aðgangur")}</button>
+              )}
             </div>
           ))}
         </div>
@@ -255,7 +262,8 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
 
       </div>
 
-      {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} locations={data.locations.map((l) => l.name)} />}
+      {modal && <SettingsFormModal modal={modal} onClose={() => setModal(null)} locations={data.locations.map((l) => l.name)} isOwner={isOwner} />}
+      {accessUser && <AccessModal user={accessUser} departments={Array.from(new Set(data.departments.map((d) => d.name)))} onClose={() => setAccessUser(null)} onSaved={() => { setAccessUser(null); router.refresh(); }} />}
       {deptEdit && <DeptEditModal dept={deptEdit} onClose={() => setDeptEdit(null)} />}
       {rowEdit && <RowEditModal row={rowEdit} onClose={() => setRowEdit(null)} />}
       {keyModal && <ApiKeyModal onClose={() => setKeyModal(false)} />}
@@ -450,7 +458,88 @@ function CompanyCard({ info }: { info: CompanyInfo | null }) {
   );
 }
 
-function SettingsFormModal({ modal, onClose, locations = [] }: { modal: Exclude<SettingsModal, null>; onClose: () => void; locations?: string[] }) {
+/** Aðgangur stjórnanda per svæði (0095) — gátreitir, „Fullur aðgangur" og „Sjálfgefið".
+ * Notað bæði í Aðgangur-glugganum og í boði nýs vaktstjóra. */
+function AccessToggles({ value, onChange }: { value: Record<Area, boolean>; onChange: (v: Record<Area, boolean>) => void }) {
+  const { t } = useLang();
+  const full = AREAS.every((a) => value[a.key]);
+  return (
+    <>
+      <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+        <button type="button" className={`btn sm${full ? "" : " ghost"}`} onClick={() => onChange({ ...FULL_ACCESS })}>{t("Fullur aðgangur")}</button>
+        <button type="button" className="btn sm ghost" onClick={() => onChange({ ...MANAGER_DEFAULTS })}>{t("Sjálfgefið")}</button>
+      </div>
+      <p className="muted" style={{ fontSize: 11.5, margin: "0 0 8px" }}>
+        {t("Fullur aðgangur = allt sem eigandi sér nema áskrift, greiðslukort og stjórnun eigenda.")}
+      </p>
+      {AREAS.map((a) => (
+        <label className="statline" key={a.key} style={{ cursor: "pointer" }}>
+          <span className="k">{t(a.label)} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t(a.hint)}</span></span>
+          <input type="checkbox" checked={value[a.key]} onChange={(e) => onChange({ ...value, [a.key]: e.target.checked })}
+            style={{ width: 18, height: 18, accentColor: "var(--brand)" }} />
+        </label>
+      ))}
+    </>
+  );
+}
+
+function AccessModal({ user, departments, onClose, onSaved }: { user: UserRow; departments: string[]; onClose: () => void; onSaved: () => void }) {
+  const { t } = useLang();
+  const [value, setValue] = useState<Record<Area, boolean>>(() => resolveAccess("manager", user.permissions));
+  const [depts, setDepts] = useState<string[] | null>(user.employeeId ? null : []);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!user.employeeId) return;
+    let live = true;
+    getOverseenDepartments(user.employeeId).then((d) => { if (live) setDepts(d); });
+    return () => { live = false; };
+  }, [user.employeeId]);
+  async function save() {
+    if (!user.id) return;
+    setBusy(true); setError(null);
+    const res = await saveUserAccess({ userId: user.id, permissions: value, departments: user.employeeId && depts ? depts : null });
+    setBusy(false);
+    if (!res.ok) { setError(res.error ?? t("Tókst ekki")); return; }
+    toast(res.demo ? t("Vistað") + " (demo)" : t("Aðgangur vistaður"));
+    onSaved();
+  }
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal">
+        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Aðgangur")} · {user.name}</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="mb">
+          <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>{t("Veldu hvaða hluta kerfisins þessi stjórnandi má opna. Breytingin tekur gildi strax.")}</p>
+          <AccessToggles value={value} onChange={setValue} />
+          {user.employeeId && departments.length > 0 && <>
+            <div className="hr" />
+            <div style={{ fontWeight: 700, fontSize: 13, margin: "6px 0 4px" }}>{t("Umsjón deilda")}</div>
+            <p className="muted" style={{ fontSize: 11.5, margin: "0 0 8px" }}>{t("Engin valin = sér allar deildir.")}</p>
+            {depts === null ? <p className="muted" style={{ fontSize: 12 }}>{t("Hleð…")}</p> : (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {departments.map((d) => {
+                  const on = depts.includes(d);
+                  return (
+                    <button type="button" key={d} className={`btn sm${on ? "" : " ghost"}`}
+                      onClick={() => setDepts(on ? depts.filter((x) => x !== d) : [...depts, d])}>{d}</button>
+                  );
+                })}
+              </div>
+            )}
+          </>}
+          {error && <p style={{ color: "var(--bad)", fontSize: 12.5, marginTop: 8 }}>{error}</p>}
+          <div style={{ display: "flex", gap: 9, marginTop: 18 }}>
+            <button className="btn" disabled={busy} onClick={save}>{t("Vista")}</button>
+            <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsFormModal({ modal, onClose, locations = [], isOwner = false }: { modal: Exclude<SettingsModal, null>; onClose: () => void; locations?: string[]; isOwner?: boolean }) {
   const { t } = useLang();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -459,6 +548,7 @@ function SettingsFormModal({ modal, onClose, locations = [] }: { modal: Exclude<
   const [rate, setRate] = useState("2.900");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("Starfsmaður");
+  const [invPerms, setInvPerms] = useState<Record<Area, boolean>>({ ...MANAGER_DEFAULTS });
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [week, setWeek] = useState<string[]>(["", "", "", "", "", "", ""]); // by getDay 0..6
@@ -480,7 +570,7 @@ function SettingsFormModal({ modal, onClose, locations = [] }: { modal: Exclude<
     if (modal === "location") res = await addLocation({ name });
     else if (modal === "department") res = await addDepartment({ name, locationName: dept, color: deptColor });
     else if (modal === "position") res = await addPosition({ name, baseRate: rate });
-    else if (modal === "invite") res = await inviteUser({ email, role });
+    else if (modal === "invite") res = await inviteUser({ email, role, permissions: isOwner && role === "Vaktstjóri" ? invPerms : null });
     else if (modal === "revenue") res = await addRevenue({ amount, date });
     else if (modal === "avgrevenue") res = await setWeekdayRevenue(Object.fromEntries(week.map((v, d) => [String(d), Number((v || "0").replace(/[^\d]/g, "")) || 0])));
     setBusy(false);
@@ -528,9 +618,14 @@ function SettingsFormModal({ modal, onClose, locations = [] }: { modal: Exclude<
             <div className="field"><label>{t("Netfang")}</label><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="netfang@fyrirtaeki.is" autoFocus /></div>
             <div className="field"><label>{t("Hlutverk (aðgangur)")}</label>
               <select value={role} onChange={(e) => setRole(e.target.value)}>
-                <option>{t("Starfsmaður")}</option><option>{t("Vaktstjóri")}</option><option>{t("Stjórnandi")}</option><option>{t("Verktaki")}</option>
+                <option value="Starfsmaður">{t("Starfsmaður")}</option><option value="Vaktstjóri">{t("Vaktstjóri")}</option>
+                {isOwner && <option value="Stjórnandi">{t("Stjórnandi")}</option>}<option value="Verktaki">{t("Verktaki")}</option>
               </select>
             </div>
+            {isOwner && role === "Vaktstjóri" && <>
+              <div style={{ fontWeight: 700, fontSize: 13, margin: "10px 0 6px" }}>{t("Aðgangur")}</div>
+              <AccessToggles value={invPerms} onChange={setInvPerms} />
+            </>}
           </>}
           {modal === "revenue" && <>
             <p className="muted" style={{ fontSize: 12.5, marginBottom: 12 }}>{t("Sláðu inn veltu dagsins (eða tímabils) til að reikna laun% án Inventra.")}</p>

@@ -230,9 +230,16 @@ export async function updateSession(request: NextRequest) {
 
     // SAFE default: unknown role = employee (least privilege), never owner.
     const role = (profile?.role as Role) ?? "employee";
-    if (!canAccess(role, pathname)) {
+    // Aðgangur stjórnanda per svæði (0095). Sér lestur svo villa (dálkur ekki til fyrir migration)
+    // felli ekki hlutverkið — þá gilda sjálfgefnar heimildir hlutverksins.
+    let perms: unknown = null;
+    if (role === "manager") {
+      const { data: p } = await supabase.from("users").select("permissions").eq("id", user.id).maybeSingle();
+      perms = p?.permissions ?? null;
+    }
+    if (!canAccess(role, pathname, perms)) {
       const dest = request.nextUrl.clone();
-      dest.pathname = homeFor(role);
+      dest.pathname = homeFor(role, perms);
       return NextResponse.redirect(dest);
     }
   }

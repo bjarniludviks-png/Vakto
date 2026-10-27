@@ -57,8 +57,16 @@ async function getAccount(): Promise<Account & { country: string }> {
       const kt = await supabase.from("companies").select("kiosk_token").eq("id", companyId).maybeSingle();
       if (!kt.error && kt.data?.kiosk_token) kioskToken = kt.data.kiosk_token as string;
     }
+    // Aðgangur stjórnanda per svæði (0095) — hliðarstikan felur það sem hann má ekki opna.
+    // Þolir að dálkurinn vanti (null = sjálfgefið fyrir hlutverkið).
+    let permissions: unknown = null;
+    if (profile?.role === "manager") {
+      const pr = await supabase.from("users").select("permissions").eq("id", user.id).maybeSingle();
+      if (!pr.error) permissions = pr.data?.permissions ?? null;
+    }
     return {
       initials: initials(name),
+      permissions,
       name,
       company: comp?.name ?? "VAKTO",
       companyId,
