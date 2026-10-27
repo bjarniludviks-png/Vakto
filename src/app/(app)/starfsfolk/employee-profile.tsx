@@ -69,7 +69,8 @@ export default function EmployeeProfile({ employee, banner, action }: { employee
       ? Object.fromEntries(PERM_FIELDS.map((f) => [f.key, fd.has(`perm_${f.key}`)]))
       : undefined;
     const res = await updateEmployee(e.id, {
-      rate: g("rate"), employmentRatio: g("employmentRatio"), union, payType: g("payType"), payRule, permissions,
+      rate: g("rate"), employmentRatio: g("employmentRatio"),
+      ratioVariable: fd.has("ratioVariableForm") ? fd.has("ratioVariable") : undefined, union, payType: g("payType"), payRule, permissions,
       monthlyHours: g("monthlyHours"),
       // Vinna tab (only present when that tab is open — undefined otherwise)
       position: fd.has("position") ? (fd.get("position") as string) : undefined,

@@ -13,6 +13,7 @@ export type Employee = {
   rate: number;
   monthlyHours?: number | null;
   employmentRatio: number;
+  ratioVariable?: boolean; // tímavinna eftir vaktaplani (0093) — employmentRatio er þá viðmið
   union: string | null;
   status: string;
   avatarColor: string;

@@ -399,6 +399,7 @@ export type UpdateEmployeeInput = {
   bankAccount?: string;
   rate?: string;
   employmentRatio?: string;
+  ratioVariable?: boolean;
   union?: string;
   payType?: string;
   monthlyHours?: string;
@@ -595,6 +596,10 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
       }
     }
     if (input.contractType !== undefined) uni.contract_type = input.contractType;
+    if (input.ratioVariable !== undefined) {
+      const { error: rvErr } = await supabase.from("employees").update({ ratio_variable: input.ratioVariable }).eq("id", id);
+      if (rvErr) console.error("updateEmployee ratio_variable", rvErr.message); // fyrir 0093
+    }
     if (input.schedulePattern !== undefined) uni.schedule_pattern = input.schedulePattern ? { kind: input.schedulePattern } : null;
     if (Object.keys(uni).length) {
       await supabase.from("employees").update(uni).eq("id", id).then(() => {});
@@ -843,7 +848,12 @@ function contractMarkdown(e: Record<string, unknown>, c: Record<string, unknown>
   const parts = full.split(/\s+/);
   const first = parts[0] ?? "";
   const last = parts.slice(1).join(" ");
-  const ratio = Number(e.employment_ratio) || 100;
+  const ratio = Number(e.employment_ratio) || 0; // autt → skyldureitur, aldrei sjálfgefið „fullt starf“
+  const variable = e.ratio_variable === true;
+  const hrs = e.monthly_hours ? String(e.monthly_hours).replace(".", ",") : "";
+  const ratioText = variable
+    ? `Breytilegt – tímavinna eftir vaktaplani${hrs ? `, að meðaltali um ${hrs} klst. á mánuði` : ratio > 0 && ratio < 100 ? `, viðmið um ${ratio}% starf` : ""} / Variable – hourly work according to the shift schedule${hrs ? `, on average about ${hrs} hours per month` : ratio > 0 && ratio < 100 ? `, approx. ${ratio}% position` : ""}`
+    : !ratio ? "" : ratio >= 100 ? "Fullt starf 100% / Full position 100%" : `Hlutastarf ${ratio}% / Part time ${ratio}%`;
   const monthly = e.pay_type === "monthly";
   const temporary = extras.contractType === "temporary";
   const pattern = ((e.schedule_pattern as { kind?: string } | null)?.kind) ?? "";
@@ -869,7 +879,7 @@ ${req("Skírnarnafn / First name", first)}${req("Eftirnafn / Surname", last)}${r
 ## Starfssvið / Field of work
 ${req("Starfsheiti og stutt lýsing á starfi / Job designation and short description", e.title || extras.positionName)}${req("Vinnustaður / Place of work", place)}${opt("Vinna á mismunandi vinnustöðum / Work at more than one place", "Nei / No")}
 ## Vinnutími / Working time
-${req("Starfshlutfall / Work ratio", ratio >= 100 ? "Fullt starf 100% / Full position 100%" : `Hlutastarf ${ratio}% / Part time ${ratio}%`)}${req("Fyrirkomulag / Arrangement", dayWork ? "Dagvinna / Daytime work" : "Vaktavinna / Shift work")}${opt("Vinnustundir á mánuði / Hours per month", e.monthly_hours ? String(e.monthly_hours).replace(".", ",") : "")}${opt("Annað / Other information", "Vaktir eru birtar í vaktaplani VAKTO. / Shifts are published in the VAKTO schedule.")}
+${req("Starfshlutfall / Work ratio", ratioText)}${req("Fyrirkomulag / Arrangement", dayWork ? "Dagvinna / Daytime work" : "Vaktavinna / Shift work")}${opt("Vinnustundir á mánuði / Hours per month", e.monthly_hours ? String(e.monthly_hours).replace(".", ",") : "")}${opt("Annað / Other information", "Vaktir eru birtar í vaktaplani VAKTO. / Shifts are published in the VAKTO schedule.")}
 ## Ráðningartími / Length of engagement
 ${req("Ráðning / Engagement", temporary ? "Tímabundin / Temporary" : "Ótímabundin / Unlimited")}${req("Fyrsti starfsdagur / Starting date", dmy(e.hire_date))}${temporary ? req("Til / To", "") : ""}
 ## Laun / Wages
@@ -1050,7 +1060,7 @@ export async function setContractStatus(
       const WHERE: Record<string, string> = {
         "Heimili á Íslandi": "flipinn Persónulegt", "Kennitala eða fæðingardagur": "flipinn Persónulegt",
         "Starfsheiti og stutt lýsing á starfi": "starf í flipanum Vinna", "Vinnustaður": "staður í flipanum Vinna",
-        "Lífeyrissjóður": "flipinn Laun", "Kjarasamningur": "flipinn Laun", "Stéttarfélag": "flipinn Laun",
+        "Starfshlutfall": "flipinn Laun", "Lífeyrissjóður": "flipinn Laun", "Kjarasamningur": "flipinn Laun", "Stéttarfélag": "flipinn Laun",
         "Heimilisfang": "flipinn Persónulegt", "Kennitala": "flipinn Persónulegt", "Lýsing á verki": "starf í flipanum Vinna",
         "Upphaf": "upphafsdagur í flipanum Vinna", "Tímagjald án VSK": "taxti í flipanum Laun", "Fast mánaðargjald án VSK": "flipinn Laun",
       };
