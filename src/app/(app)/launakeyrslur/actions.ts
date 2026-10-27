@@ -16,6 +16,7 @@ import type { PayrollView } from "./payroll.server";
 import { userError } from "@/lib/user-error";
 import { allRows } from "@/lib/supabase/all-rows";
 import { planBlock } from "@/lib/plan.server";
+import { ytdFor, ytdRowFrom, type YtdRow } from "@/lib/payslip-ytd";
 
 export type RunResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
 export type ContractorBill = { id: string; name: string; av: string; c: string; hours: number; amount: number; monthly: boolean };
@@ -105,6 +106,14 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
     const t = sumTotals(lines);
     const shownHours = (l: PayLine) => (empOf(l.employeeId)?.payType === "monthly" ? Math.round((worked.get(l.employeeId) ?? 0) * 10) / 10 : l.hours);
     const { data: co } = await supabase.from("companies").select("name, kennitala").eq("id", ctx.company).maybeSingle();
+    // Frá áramótum: vistaðar keyrslur ársins á undan þessu tímabili + lína tímabilsins.
+    let ytdRows: YtdRow[] = [];
+    {
+      const yr = from.slice(0, 4);
+      const { data: yl } = await supabase.from("payroll_lines").select("*, payroll_runs!inner(company_id, period_start, period_end, created_at)")
+        .eq("payroll_runs.company_id", ctx.company).gte("payroll_runs.period_start", `${yr}-01-01`).lt("payroll_runs.period_start", from);
+      ytdRows = (yl ?? []).map((l) => ytdRowFrom(l, (Array.isArray(l.payroll_runs) ? l.payroll_runs[0] : l.payroll_runs) as { period_start: string; period_end: string; created_at: string }));
+    }
     const empOf = (id: string) => employees.find((e) => e.id === id);
     // Verktakar: samþykktir tímar × tímagjald (eða fast mánaðargjald) = áætlaður reikningur, án VSK.
     const cons = employees.filter((e) => e.role === "contractor" && e.status !== "inactive");
@@ -139,6 +148,10 @@ export async function getPayrollPeriod(from: string, to: string): Promise<Period
             benefits: l.benefits, benefitsInKind: l.benefitsInKind, benefitsFree: l.benefitsFree,
             pensionPct: resolvePay(e?.pay).pensionPct, extraPensionPct: resolvePay(e?.pay).extraPensionPct,
             unionFeePct: resolvePay(e?.pay).unionFeePct, orlofPct: resolveOrlof(e?.orlof).pct,
+            ytd: ytdFor(ytdRows, l.employeeId, from, {
+              hours: l.hours, dayPay: l.dayPay, premiums: l.premiums, overtime: l.overtime, uppbot: l.uppbot, orlof: l.orlof, benefits: l.benefits,
+              gross: l.gross, pension: l.pension, extraPension: l.extraPension, unionFee: l.union, withholding: l.withholding, net: l.net,
+            }),
           },
         };
       }),

@@ -73,7 +73,7 @@ export function PayslipModal({ data, onClose }: { data: PayslipData; onClose: ()
           <div className="hr" />
           <Row label={t("Útborgað")} v={`${data.net} kr`} strong />
           </>)}
-          <p className="ps-note">{t("Reiknað í VAKTO eftir skattþrepum ársins, skattkorti og stillingum starfsmanns. Endanlegur launaseðill kemur úr launakerfinu.")}</p>
+          <p className="ps-note">{t("Reiknað í VAKTO eftir skattþrepum ársins, skattkorti og stillingum starfsmanns.")}</p>
           <div style={{ display: "flex", gap: 9, marginTop: 18 }}>
             <AsyncButton className="btn" onClick={async () => {
               try {
