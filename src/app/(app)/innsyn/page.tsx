@@ -8,6 +8,9 @@ import { getTimeBank, type TimeBank } from "../skyrslur/timebank.server";
 import { getMyScope, scopeRows } from "@/lib/scope.server";
 import { getAbsence } from "@/lib/absence.server";
 import { getSickRate } from "@/lib/sickrate.server";
+import { getRights } from "@/lib/rights.server";
+import { createClient } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/config";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const iso = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -16,9 +19,10 @@ export default async function InnsynPage({ searchParams }: { searchParams: Promi
   const { tab } = await searchParams;
   const to = new Date(); to.setHours(0, 0, 0, 0);
   const from = new Date(to); from.setDate(from.getDate() - 55);
-  const [{ empty }, perf, staffing, history, { insights }, att, timebank, scope, absence, sick] = await Promise.all([
+  const [{ empty }, perf, staffing, history, { insights }, att, timebank, scope, absence, sick, rights] = await Promise.all([
     getCompanyData(), getPerformance(), getStaffingPattern(iso(from), iso(to)), getPerfHistory(12), getInsights(),
     getWeekAttendance(), getTimeBank(), getMyScope(), getAbsence(), getSickRate("month"),
+    isSupabaseConfigured() ? createClient().then((sb) => getRights(sb)).catch(() => []) : Promise.resolve([]),
   ]);
   const d = scope.departments;
   const owner = scope.role === "owner";
@@ -30,6 +34,7 @@ export default async function InnsynPage({ searchParams }: { searchParams: Promi
       perf={{ live: perf.live, perf, staffing, history, insights }}
       absence={{ ...absence, rows: scopeRows(d, absence.rows) }}
       sick={sick}
+      rights={scopeRows(d, rights)}
       reports={{ live: att.live, rows: scopeRows(d, att.rows), timebank: { ...timebank, rows: scopeRows(d, timebank.rows) } as TimeBank }}
     />
   );

@@ -10,6 +10,7 @@ import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "@/lib/contract-pdf";
 import { updateEmployee, uploadDocument, importEmployees, inviteEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow, getContractProgress, syncContractStatus, openSignedContractPdf, resendContract, restoreContract, listEmployeePayslips, type EmployeePayslip, type ContractProgress, type EmployeeContractState } from "./actions";
+import { RightsPanel } from "./rights-panel";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField, BankField } from "@/components/app/fields";
@@ -950,10 +951,8 @@ function FriTab({ e }: { e: Employee }) {
         ))}
         <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("Heildaryfirlit allra starfsmanna er í Innsýn → Tímar & mæting. Jöfnun fer fram í launakeyrslu.")}</p>
       </>}
-      <Sec>{t("Orlof & frí")}</Sec>
-      <Stat k={t("Áunninn orlofsréttur")} v="—" />
-      <Stat k={t("Frí tekið 2026")} v="—" />
-      <p className="muted" style={{ fontSize: 12 }}>{t("Orlofsyfirlit byggist á launakeyrslum ársins.")}</p>
+      <Sec>{t("Orlof, veikindi & fjarvistir")}</Sec>
+      <RightsPanel employeeId={e.id} />
     </>
   );
 }
