@@ -13,6 +13,7 @@ import { taktikalEnabled } from "@/lib/taktikal.server";
 import { currentUserIsDemo, demoBlocked, demoResult } from "@/lib/demo.server";
 import { modelFor } from "@/lib/ai/models";
 import { demoAiGate } from "@/lib/ai/ai-plan.server";
+import { AREAS, MANAGER_DEFAULTS, resolveAccess, sanitizePerms, type UserPerms } from "@/lib/user-permissions";
 
 export type SyncResult = { ok: boolean; demo?: boolean; amount?: number; error?: string };
 export type SettingsResult = { ok: boolean; demo?: boolean; error?: string };
@@ -604,7 +605,7 @@ export async function savePayRule(
 }
 
 /** Invite a teammate by email (admin auth invite) and link them to the company. */
-export async function inviteUser(input: { email: string; role: string }): Promise<SettingsResult> {
+export async function inviteUser(input: { email: string; role: string; permissions?: UserPerms | null }): Promise<SettingsResult> {
   if (await demoBlocked()) return demoResult();
   if (!input.email?.trim()) return { ok: false, error: "Netfang vantar" };
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
@@ -612,10 +613,78 @@ export async function inviteUser(input: { email: string; role: string }): Promis
     const supabase = await createClient();
     const ctx = await companyCtx(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    const inv = await inviteToCompany(ctx.company, input.email, input.role);
+    // Aðeins stjórnendur bjóða; aðeins eigandi býður eiganda eða velur aðgang stjórnanda (0095).
+    const { data: me } = await supabase.from("users").select("role").eq("id", ctx.userId).maybeSingle();
+    if (me?.role !== "owner" && me?.role !== "manager") return { ok: false, error: "Aðeins stjórnendur geta boðið notendum" };
+    const role = roleFromLabel(input.role);
+    if (role === "owner" && me.role !== "owner") return { ok: false, error: "Aðeins eigandi getur boðið öðrum eiganda" };
+    const perms = me.role === "owner" && role === "manager" && input.permissions ? sanitizePerms(input.permissions) : null;
+    const inv = await inviteToCompany(ctx.company, input.email, input.role, perms);
     if (!inv.ok) return { ok: false, error: inv.error };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "user.invite", entity: "user", detail: `Notanda boðið — ${input.email.trim()} (${roleFromLabel(input.role)})`,
+    });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
+// ============================================================
+// Aðgangur stjórnenda per notanda (0095). Aðeins eigandi sama fyrirtækis breytir — skrif í users
+// fara um service-role (0076: innskráðir skrifa ekki í users), eftir að kallandi er sannreyndur.
+// ============================================================
+
+export async function saveUserAccess(input: { userId: string; permissions: UserPerms; departments?: string[] | null }): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult();
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data: me } = await supabase.from("users").select("role").eq("id", ctx.userId).maybeSingle();
+    if (me?.role !== "owner") return { ok: false, error: "Aðeins eigandi getur breytt aðgangi" };
+    if (input.userId === ctx.userId) return { ok: false, error: "Þú getur ekki breytt eigin aðgangi" };
+
+    const admin = createAdminClient();
+    // Markið verður að vera stjórnandi Í ÞESSU fyrirtæki (virkt fyrirtæki eða aðild).
+    const { data: target } = await admin.from("users").select("id, full_name, email, role, company_id, permissions").eq("id", input.userId).maybeSingle();
+    const { data: mem } = await admin.from("company_members").select("role").eq("user_id", input.userId).eq("company_id", ctx.company).maybeSingle();
+    const activeHere = target?.company_id === ctx.company;
+    const roleHere = activeHere ? target?.role : mem?.role;
+    if (!target || (!activeHere && !mem)) return { ok: false, error: "Notandi fannst ekki" };
+    if (roleHere !== "manager") return { ok: false, error: "Aðgangi er aðeins stýrt fyrir stjórnendur" };
+
+    // Óbreytt frá sjálfgefnu = null (svo framtíðarbreytingar á sjálfgefnu gildi nái til hans).
+    const clean = sanitizePerms(input.permissions);
+    const next = resolveAccess("manager", clean);
+    const isDefault = AREAS.every((a) => next[a.key] === MANAGER_DEFAULTS[a.key]);
+    const stored = isDefault ? null : next;
+
+    const m = await admin.from("company_members").update({ permissions: stored }).eq("user_id", input.userId).eq("company_id", ctx.company);
+    if (m.error) return dbFail("saveUserAccess.members", m.error);
+    if (activeHere) {
+      const u = await admin.from("users").update({ permissions: stored }).eq("id", input.userId).eq("company_id", ctx.company);
+      if (u.error) return dbFail("saveUserAccess.users", u.error);
+    }
+
+    // Deildaumsjón (0025) — á starfsmannaprófílnum sem er tengdur aðganginum. Tómt = allar deildir.
+    let deptNote = "";
+    if (input.departments) {
+      const { data: emp } = await admin.from("employees").select("id").eq("company_id", ctx.company).eq("user_id", input.userId).maybeSingle();
+      if (emp) {
+        const names = Array.from(new Set(input.departments.map((d) => d.trim()).filter(Boolean)));
+        const e = await admin.from("employees").update({ oversees_departments: names }).eq("id", emp.id);
+        if (!e.error) deptNote = names.length ? ` · deildir: ${names.join(", ")}` : " · deildir: allar";
+      }
+    }
+
+    const prev = resolveAccess("manager", target.permissions);
+    const diff = AREAS.filter((a) => prev[a.key] !== next[a.key]).map((a) => `${next[a.key] ? "+" : "−"} ${a.label}`);
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "user.permissions", entity: "user", entityId: input.userId,
+      detail: `Aðgangur uppfærður — ${(target.full_name as string) || (target.email as string) || "notandi"}: ${diff.length ? diff.join(", ") : "óbreytt"}${deptNote}`,
     });
     revalidatePath("/stillingar");
     return { ok: true };

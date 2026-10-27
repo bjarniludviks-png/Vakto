@@ -699,6 +699,43 @@ export async function getCompanyDepartments(): Promise<string[]> {
   }
 }
 
+/** Aðrar deildir sem starfsmaðurinn vinnur líka í (0094) — aðaldeildin er department_id. */
+export async function getExtraDepartments(employeeId: string): Promise<string[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.from("employees").select("extra_departments").eq("id", employeeId).maybeSingle();
+    return (data?.extra_departments as string[] | null) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Vista aðrar deildir starfsmanns — hann birtist þá líka undir þeim í vaktaplaninu. */
+export async function setExtraDepartments(employeeId: string, names: string[]): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  if (employeeId.startsWith("e") && employeeId.length <= 3) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const company = await companyId(supabase);
+    if (!company) return { ok: false, error: "Fyrirtæki fannst ekki" };
+    const clean = [...new Set(names.map((n) => n.trim()).filter(Boolean))].slice(0, 20);
+    const { error } = await supabase.from("employees").update({ extra_departments: clean }).eq("id", employeeId).eq("company_id", company);
+    if (error) return { ok: false, error: userError(error) };
+    const { data: { user } } = await supabase.auth.getUser();
+    await logAudit(supabase, company, user?.id ?? null, {
+      action: "employee.update", entity: "employee", entityId: employeeId,
+      detail: clean.length ? `Vinnur líka í: ${clean.join(", ")}` : "Engar aðrar deildir",
+    });
+    revalidatePath("/starfsfolk");
+    revalidatePath("/vaktaplan");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
 /** The departments a manager oversees (empty = all). */
 export async function getOverseenDepartments(employeeId: string): Promise<string[]> {
   if (!isSupabaseConfigured()) return [];

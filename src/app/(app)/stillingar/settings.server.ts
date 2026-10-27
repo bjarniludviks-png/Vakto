@@ -12,7 +12,13 @@ import { planInvoice } from "@/lib/invoice-calc";
 export type LocationRow = { id?: string; name: string; staff: number; timezone: string; lat?: number | null; lng?: number | null; radius?: number };
 export type GeofenceMode = "off" | "flag" | "block";
 export type PositionRow = { id?: string; name: string; staff: number; baseRate: string; rawRate?: number };
-export type UserRow = { name: string; initials: string; role: string; email: string };
+export type UserRow = { name: string; initials: string; role: string; email: string;
+  /** users.id — Aðgangur-glugginn (aðeins eigandi). */
+  id?: string;
+  /** users.permissions (0095) — null = sjálfgefið fyrir hlutverkið. */
+  permissions?: Record<string, boolean> | null;
+  /** Starfsmannaprófíll tengdur aðganginum (deildaumsjón stjórnanda). */
+  employeeId?: string | null };
 export type CompanyInfo = { name: string; kennitala: string; address: string; postalCode?: string; city?: string; phone: string; email: string; feedPostPolicy?: "everyone" | "managers"; payPeriodStart?: number; plan?: string | null; trialEndsAt?: string | null; billingStatus?: string | null; accessEndsAt?: string | null; laborTarget?: number; leaveCap?: number | null; esignProvider?: "vakto" | "taktikal"; taktikalAvailable?: boolean };
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
 export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
@@ -23,7 +29,7 @@ export type InvoiceView = { id: string; periodStart: string; periodEnd: string; 
 export type AiView = { used: number; included: number; packs: number; limit: number; packEnabled: boolean; packCap: number };
 /** Áskriftarleið og áætlun (virkir þennan mánuð) fyrir Áskrift-spjaldið. */
 export type PricingView = { plan: PlanId; legacyUntil: string | null; legacyApplies: boolean; units: number; estimateTotal: number; estimateNet: number; interval: BillingInterval; paidYearUntil: string | null; nextDue: string | null; yearFeeTotal: number };
-export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; kioskToken: string | null; company: CompanyInfo | null; live: boolean; geofenceMode?: GeofenceMode; card?: CardView | null; invoices?: InvoiceView[]; pricing?: PricingView | null; ai?: AiView | null };
+export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; viewerRole?: string; kioskToken: string | null; company: CompanyInfo | null; live: boolean; geofenceMode?: GeofenceMode; card?: CardView | null; invoices?: InvoiceView[]; pricing?: PricingView | null; ai?: AiView | null };
 
 const DEMO: SettingsData = {
   departments: [
@@ -62,10 +68,11 @@ export async function getSettingsData(): Promise<SettingsData> {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const { data: profile } = user
-      ? await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle()
+      ? await supabase.from("users").select("company_id, role").eq("id", user.id).maybeSingle()
       : { data: null };
     const company = profile?.company_id as string | undefined;
     if (!company) return DEMO;
+    const viewerRole = (profile?.role as string) ?? "employee";
 
     const countBy = (key: "location" | "position") => (name: string) =>
       employees.filter((e) => e[key] === name).length;
@@ -73,9 +80,20 @@ export async function getSettingsData(): Promise<SettingsData> {
     const [{ data: locs }, { data: pos }, { data: usrs }, compRes] = await Promise.all([
       supabase.from("locations").select("id, name, timezone").eq("company_id", company).order("name"),
       supabase.from("positions").select("id, name, base_rate").eq("company_id", company).order("name"),
-      supabase.from("users").select("full_name, email, role").eq("company_id", company).order("role"),
+      supabase.from("users").select("id, full_name, email, role").eq("company_id", company).order("role"),
       supabase.from("companies").select("name, kennitala, address, phone, email").eq("id", company).maybeSingle(),
     ]);
+    // Aðgangur stjórnenda (0095) + tengdur starfsmannaprófíll — aðeins fyrir eigandann; þolir að dálkinn vanti.
+    const permsOf = new Map<string, Record<string, boolean> | null>();
+    const empOf = new Map<string, string>();
+    if (viewerRole === "owner") {
+      const [pr, er] = await Promise.all([
+        supabase.from("users").select("id, permissions").eq("company_id", company),
+        supabase.from("employees").select("id, user_id").eq("company_id", company).not("user_id", "is", null),
+      ]);
+      if (!pr.error) for (const r of pr.data ?? []) permsOf.set(r.id as string, (r.permissions as Record<string, boolean> | null) ?? null);
+      if (!er.error) for (const r of er.data ?? []) empOf.set(r.user_id as string, r.id as string);
+    }
     // API connections (tolerant of a not-yet-run 0029 migration).
     // Departments live under locations (0001 schema) — join for the company.
     // color column arrives with migration 0038 — tolerant retry without it.
@@ -200,9 +218,13 @@ export async function getSettingsData(): Promise<SettingsData> {
         initials: ini((u.full_name as string) || (u.email as string) || "VK"),
         role: (u.role as string) ?? "employee",
         email: (u.email as string) ?? "",
+        id: u.id as string,
+        permissions: permsOf.get(u.id as string) ?? null,
+        employeeId: empOf.get(u.id as string) ?? null,
       })),
       apiKeys,
       companyId: company,
+      viewerRole,
       kioskToken, card, invoices, pricing, ai, geofenceMode,
       company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", postalCode, city, phone: c.phone ?? "", email: c.email ?? "", feedPostPolicy, payPeriodStart: ppd, plan, trialEndsAt, billingStatus, accessEndsAt, laborTarget, leaveCap, esignProvider, taktikalAvailable },
       live: true,

@@ -473,3 +473,14 @@
   verða lausar vaktir; push til stjórnenda þegar veikindaréttur er búinn/80 %), `deleteAbsence`, `applyOrlofPct`.
 - **0096:** `leave_type` += `veikindi_barns` (sér réttur, gengur ekki á veikindarétt), `leave_requests.note`.
 - Orlofsprósenta breytist EKKI sjálfkrafa — kerfið sýnir þegar skráð % er lægra en rétturinn og stjórnandi uppfærir með einum smelli.
+## Vaktaplan: mánaðartafla + starfsmenn eftir id (27. okt. 2026, migration 0094 á staging; prod við release)
+- **Vaktir tengjast starfsmanni eftir id.** Gridið sendir `empRef(e)` (= id) í `employeeName`; þjónninn finnur hann með
+  `pickEmployee` (id, annars nafn sem passar við NÁKVÆMLEGA einn). Áður tók „byrjar á“-samsvörun fyrsta nafnið og vaktir
+  gátu lent á röngum manni. Birtingarnöfn úr `planEmployees()` (`vaktaplan/roster.server.ts`): fornafn, „Jan K.“ ef tvö eins.
+- Vikuplanið sýnir ALLT virkt starfsfólk (áður hvarf fólk án vaktar í „pottinn“ um leið og ein vakt var komin).
+- **Mánuður → Tafla** (`vaktaplan/month-roster.tsx`): starfsfólk × dagar, „Mála“ með vaktategund/strokleðri, hægrismellur
+  afritar, „Afrita síðasta mánuð“ (sami vikudagur), „Endurtaka viku út mánuðinn“, „Hreinsa mánuðinn“ — aðeins fyrir
+  sýnilegt starfsfólk og aldrei ofan á samþykkt frí (`getPlan`/`copyShifts`/`clearShifts`). Gamla sýnin er „Dagatal“.
+  Heilskjár (`.sched-full`, Esc lokar) í viku- og mánaðarsýn.
+- **Deildir:** síað á fleiri en eina deild; `employees.extra_departments text[]` (0094, heiti eins og `oversees_departments`)
+  = aðrar deildir sem starfsmaður vinnur í (Starfsfólk → Vinna → „Vinnur líka í“). Aðaldeildin ræður launum og skýrslum.

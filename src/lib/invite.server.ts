@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { emailConfigured, sendInviteEmail } from "@/lib/email";
 import { userError } from "@/lib/user-error";
 import { demoBlocked, DEMO_BLOCKED } from "@/lib/demo.server";
+import type { UserPerms } from "@/lib/user-permissions";
 
 /** Íslensk hlutverkaheiti (eins og í formunum) → users.role. */
 export const INVITE_ROLE: Record<string, string> = {
@@ -24,7 +25,7 @@ export type InviteResult = {
 /** Býður netfangi í fyrirtækið (eða tengir aðgang sem er þegar til) og tengir
  * starfsmannaprófílinn með sama netfangi við aðganginn. Notað bæði úr
  * Stillingar → Notendur og þegar starfsmaður er stofnaður með netfangi. */
-export async function inviteToCompany(companyId: string, emailRaw: string, roleLabel: string): Promise<InviteResult> {
+export async function inviteToCompany(companyId: string, emailRaw: string, roleLabel: string, permissions?: UserPerms | null): Promise<InviteResult> {
   const emailAddr = emailRaw.trim();
   if (!emailAddr) return { ok: false, sent: false, error: "Netfang vantar" };
   if (await demoBlocked(companyId)) return { ok: false, sent: false, error: DEMO_BLOCKED };
@@ -66,6 +67,12 @@ export async function inviteToCompany(companyId: string, emailRaw: string, roleL
     if (userId) {
       // Aðild (0023) svo notandinn geti skipt yfir á þetta fyrirtæki.
       await admin.from("company_members").upsert({ user_id: userId, company_id: companyId, role });
+      // Aðgangur stjórnanda valinn í boðinu (0095) — aðeins eigandi sendir hann (sjá inviteUser).
+      // Sér uppfærslur svo boðið sjálft takist þó dálkurinn vanti.
+      if (role === "manager" && permissions) {
+        await admin.from("company_members").update({ permissions }).eq("user_id", userId).eq("company_id", companyId);
+        await admin.from("users").update({ permissions }).eq("id", userId).eq("company_id", companyId);
+      }
       // Tengja aðganginn við starfsmannaprófílinn (sama netfang) → Mitt svæði, stimplanir, app.
       const { data: emp } = await admin.from("employees")
         .select("id").eq("company_id", companyId).is("user_id", null)

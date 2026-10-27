@@ -345,7 +345,7 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       // Fornöfn verða að vera einkvæm — annars getur plan_week ekki vitað hver er hver.
       const seen = new Map<string, number>(); for (const e of staff) seen.set(first(e.fullName), (seen.get(first(e.fullName)) ?? 0) + 1);
       const unavail: Record<string, string[]> = {};
-      for (const [k, days] of Object.entries((wk as { unavail?: Record<string, number[]> }).unavail ?? {})) unavail[k] = days.map((d) => dates[d]).filter(Boolean);
+      for (const [k, days] of Object.entries((wk as { unavail?: Record<string, number[]> }).unavail ?? {})) if (!/^[0-9a-f-]{36}$/.test(k)) unavail[k] = days.map((d) => dates[d]).filter(Boolean);
       // Þjappað form (pípu-strengir, tómum sviðum sleppt): helmingi færri tákn en hlutir — styttir lestur líkansins.
       const approvedLeave = ((leave.data ?? []) as unknown as { from_date: string; to_date: string; type: string; employees: { full_name?: string } | { full_name?: string }[] | null }[]).map((l) => `${first((Array.isArray(l.employees) ? l.employees[0] : l.employees)?.full_name ?? "")}|${l.from_date}|${l.to_date}|${l.type}`);
       const pendingLeave = (reqs?.pendingLeave ?? []).map((l) => `${l.name}|${l.days.map((d) => dates[d]).join(",")}|${l.type}`);

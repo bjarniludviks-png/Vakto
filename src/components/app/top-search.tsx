@@ -11,7 +11,7 @@ type Result = { kind: "page" | "emp"; label: string; sub: string; href: string; 
 
 /** Functional topbar search: pages (role-filtered nav) + employees. Type to filter,
  * Enter/click to navigate, Esc/blur to close. */
-export function TopSearch({ role }: { role: Role }) {
+export function TopSearch({ role, perms }: { role: Role; perms?: unknown }) {
   const { t } = useLang();
   const router = useRouter();
   const [q, setQ] = useState("");
@@ -34,7 +34,7 @@ export function TopSearch({ role }: { role: Role }) {
   }, []);
 
   const pages: Result[] = (() => {
-    const { groups, foot } = visibleFor(role);
+    const { groups, foot } = visibleFor(role, perms);
     const items = [...groups.flatMap((g) => g.items), ...foot];
     return items.map((i) => ({ kind: "page" as const, label: t("nav:" + i.slug), sub: t("Síða"), href: i.href, icon: i.icon }));
   })();
