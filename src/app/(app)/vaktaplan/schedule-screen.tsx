@@ -28,7 +28,7 @@ type AiShift = { employee: string; day: number; start: string; end: string };
 /** Framvinda „Biðja AI“: hvaða stig og hve margar vaktir eru komnar. */
 type AiStage = { stage: "read" | "think" | "write"; shifts: number };
 type AiProposal = { summary: string; items: AiItem[]; laborPct: string; shifts?: AiShift[]; blocked?: { employee: string; day: number }[]; live: boolean; error?: string };
-type MonthBlock = { name: string; time: string; hrs: number; type: string; ref: string };
+type MonthBlock = { name: string; time: string; hrs: number; type: string; ref: string; tn?: string }; // tn = heiti vaktategundar
 
 const COST_HR = 3752, BASE_HRS = 116;
 const SH: Record<string, ShiftDef> = {
@@ -118,11 +118,11 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const todayISO = initial?.todayISO ?? DEMO_TODAY;
   const [cur, setCur] = useState(() => parseISO(initial?.todayISO ?? DEMO_TODAY)); // anchor day
   const [sel, setSel] = useState<{ r: number; c: number }>({ r: 0, c: 0 });
-  const [monthShifts, setMonthShifts] = useState<Record<string, { first: string; start: string; end: string; ref: string }[]>>({});
+  const [monthShifts, setMonthShifts] = useState<Record<string, { first: string; start: string; end: string; ref: string; tn?: string }[]>>({});
   const [monthVer, setMonthVer] = useState(0);
   const [dayModal, setDayModal] = useState<Date | null>(null);
-  const monthDragRef = useRef<{ first: string; ref: string; start: string; end: string; fromISO: string } | null>(null);
-  const [monthClip, setMonthClip] = useState<{ first: string; ref: string; start: string; end: string } | null>(null);
+  const monthDragRef = useRef<{ first: string; ref: string; start: string; end: string; fromISO: string; tn?: string } | null>(null);
+  const [monthClip, setMonthClip] = useState<{ first: string; ref: string; start: string; end: string; tn?: string } | null>(null);
   const [drag, setDrag] = useState<{ r: number; c: number } | null>(null);
   // Copied shift: code + real times, so pasting preserves them and saves.
   const [clip, setClip] = useState<{ code: string; start?: string; end?: string; type?: string } | null>(null);
@@ -340,10 +340,10 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     let cancelled = false;
     getShiftsInRange(from, to).then((res) => {
       if (cancelled || !res.ok) return;
-      const map: Record<string, { first: string; start: string; end: string; ref: string }[]> = {};
+      const map: Record<string, { first: string; start: string; end: string; ref: string; tn?: string }[]> = {};
       // Birtingarnafn úr planinu (aðgreinir tvo „Jan“); id notað í aðgerðum.
       const nameOf = new Map([...emp, ...pool].filter((x) => x[4]).map((x) => [x[4]!, x[1]]));
-      for (const row of res.rows) (map[row.date] ??= []).push({ first: (row.employeeId && nameOf.get(row.employeeId)) || row.first, start: row.start, end: row.end, ref: row.employeeId || row.first });
+      for (const row of res.rows) (map[row.date] ??= []).push({ first: (row.employeeId && nameOf.get(row.employeeId)) || row.first, start: row.start, end: row.end, ref: row.employeeId || row.first, tn: row.type });
       setMonthShifts(map);
     });
     return () => { cancelled = true; };
@@ -455,7 +455,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
             date: fmtISO(weekDays[c]),
             startTime: tt ? tt.start : `${a.padStart(2, "0")}:00`,
             endTime: tt ? tt.end : `${b.padStart(2, "0")}:00`,
-            shiftTypeName: cellTypes[ckey(r, c)] || o.s || "Dagvakt",
+            shiftTypeName: cellTypes[ckey(r, c)] || typeGuessFor(tt ? tt.start : `${a.padStart(2, "0")}:00`, tt ? tt.end : `${b.padStart(2, "0")}:00`),
           });
         }
       });
@@ -544,7 +544,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     for (const s of shifts) { const r = rowOf(s.employee); if (r >= 0) touched.add(r); }
     const ng = grid.map((row) => [...row]);
     const nt = { ...cellTimes };
-    touched.forEach((r) => { ng[r] = ng[r].map(() => "off"); weekDays.forEach((_, c) => delete nt[ckey(r, c)]); });
+    const nty = { ...cellTypes };
+    touched.forEach((r) => { ng[r] = ng[r].map(() => "off"); weekDays.forEach((_, c) => { delete nt[ckey(r, c)]; delete nty[ckey(r, c)]; }); });
     // Dagar með samþykkt frí sem AI reyndi að manna: engin vakt þar, líka ef hún var fyrir í planinu.
     for (const b of blocked) { const r = rowOf(b.employee); if (r >= 0) { ng[r][b.day] = "off"; delete nt[ckey(r, b.day)]; } }
     let applied = 0;
@@ -556,7 +557,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       nt[ckey(r, s.day)] = { start, end };
       applied++;
     }
-    setGrid(ng); setCellTimes(nt);
+    setGrid(ng); setCellTimes(nt); setCellTypes(nty);
     // Publish from the NEW grid (state is async — build the payload directly).
     const payload: ShiftInput[] = [];
     emp.forEach((e, r) => {
@@ -569,7 +570,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
           date: fmtISO(weekDays[c]),
           startTime: tt ? tt.start : `${a.padStart(2, "0")}:00`,
           endTime: tt ? tt.end : `${b.padStart(2, "0")}:00`,
-          shiftTypeName: SH[code].s || "Dagvakt",
+          shiftTypeName: nty[ckey(r, c)] || typeGuessFor(tt ? tt.start : `${a.padStart(2, "0")}:00`, tt ? tt.end : `${b.padStart(2, "0")}:00`),
         });
       });
     });
@@ -615,6 +616,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   function saveCell(r: number, c: number, start: string, end: string, typeName: string) {
     setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = codeForStart(start); return ng; });
     setCellTimes((m) => ({ ...m, [ckey(r, c)]: { start, end } }));
+    // Valin tegund helst á reitnum (annars litaði gridið eftir tíma og sýndi aðra tegund).
+    const known = types.some((x) => x.nm === typeName);
+    setCellTypes((m) => { const n = { ...m }; if (known) n[ckey(r, c)] = typeName; else delete n[ckey(r, c)]; return n; });
     setModal(null);
     if (liveCompany) {
       saveShift({ employeeName: empRef(emp[r]), date: fmtISO(weekDays[c]), startTime: start, endTime: end, shiftTypeName: typeName })
@@ -636,6 +640,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   function delCell(r: number, c: number) {
     setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = "off"; return ng; });
     setCellTimes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
+    setCellTypes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
     setModal(null);
     if (liveCompany) {
       deleteShift({ employeeName: empRef(emp[r]), dateISO: fmtISO(weekDays[c]) })
@@ -652,16 +657,18 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     setPool((p) => [...p, emp[r]]);
     setEmp((e) => e.filter((_, i) => i !== r));
     setGrid((g) => g.filter((_, i) => i !== r));
-    // Reindex per-cell times after the removed row.
-    setCellTimes((m) => {
-      const n: Record<string, { start: string; end: string }> = {};
+    // Reindex per-cell times + types after the removed row (types hliðruðust áður á næsta mann).
+    const reindex = <T,>(m: Record<string, T>) => {
+      const n: Record<string, T> = {};
       Object.entries(m).forEach(([k, v]) => {
         const [rr, cc] = k.split(":").map(Number);
         if (rr === r) return;
         n[`${rr > r ? rr - 1 : rr}:${cc}`] = v;
       });
       return n;
-    });
+    };
+    setCellTimes((m) => reindex(m));
+    setCellTypes((m) => reindex(m));
     toast(nm + " fjarlægð(ur) af plani");
   }
   function pickEmp(i: number) {
@@ -688,27 +695,32 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   function monthBlocks(iso: string, wd: number) {
     if (liveCompany) {
       return (monthShifts[iso] ?? []).slice().sort((a, b) => a.start.localeCompare(b.start))
-        .map((s) => ({ name: s.first, ref: s.ref, time: `${s.start.slice(0, 5)}–${s.end.slice(0, 5)}`, hrs: hrsBetween(s.start, s.end), type: SH[codeForStart(s.start)].c }));
+        .map((s) => ({ name: s.first, ref: s.ref, tn: s.tn, time: `${s.start.slice(0, 5)}–${s.end.slice(0, 5)}`, hrs: hrsBetween(s.start, s.end), type: SH[codeForStart(s.start)].c }));
     }
     const out: MonthBlock[] = [];
-    vis.forEach((r) => { const s = grid[r]?.[wd]; if (s && s !== "off") { const tt = timeOf(r, wd); out.push({ name: emp[r][1], ref: empRef(emp[r]), time: tt ? `${tt.start}–${tt.end}` : SH[s].l, hrs: cellHrs(r, wd, s), type: SH[s].c }); } });
+    vis.forEach((r) => { const s = grid[r]?.[wd]; if (s && s !== "off") { const tt = timeOf(r, wd); out.push({ name: emp[r][1], ref: empRef(emp[r]), tn: cellTypes[ckey(r, wd)], time: tt ? `${tt.start}–${tt.end}` : SH[s].l, hrs: cellHrs(r, wd, s), type: SH[s].c }); } });
     return out;
   }
 
   // Entries (with real times) for one day — used by the month popup editor.
   const norm = (x: string) => (x.length === 2 ? x + ":00" : x.slice(0, 5));
-  function entriesFor(date: Date): { first: string; ref: string; start: string; end: string }[] {
+  function entriesFor(date: Date): { first: string; ref: string; start: string; end: string; tn?: string }[] {
     const iso = fmtISO(date);
-    if (liveCompany) return (monthShifts[iso] ?? []).map((x) => ({ first: x.first, ref: x.ref, start: norm(x.start), end: norm(x.end) }));
+    if (liveCompany) return (monthShifts[iso] ?? []).map((x) => ({ first: x.first, ref: x.ref, tn: x.tn, start: norm(x.start), end: norm(x.end) }));
     return monthBlocks(iso, (date.getDay() + 6) % 7).map((b) => {
       const [a, z] = b.time.split("–");
-      return { first: b.name, ref: b.ref, start: norm(a ?? "08:00"), end: norm(z ?? "16:00") };
+      return { first: b.name, ref: b.ref, tn: b.tn, start: norm(a ?? "08:00"), end: norm(z ?? "16:00") };
     });
   }
-  const typeGuessFor = (start: string) => types.find((x) => x.t.startsWith(start))?.nm ?? types[0]?.nm ?? "Dagvakt";
+  // Vaktategund út frá tímum — aðeins ef tímarnir passa NÁKVÆMLEGA við eina tegund (annars engin tegund,
+  // svo vaktin fái ekki rangt heiti/álag). Áður var giskað á fyrstu tegundina eða út frá „Kvöld“ o.s.frv.
+  const typeGuessFor = (start: string, end?: string) => {
+    const hit = types.filter((x) => { const [a, z] = (x.t || "").split("–").map((v) => v?.trim().slice(0, 5)); return a === start.slice(0, 5) && (!end || z === end.slice(0, 5)); });
+    return hit.length === 1 ? hit[0].nm : "";
+  };
   async function pasteMonthShift(toISO: string) {
     if (!monthClip) return;
-    const res = await saveShift({ employeeName: monthClip.ref, date: toISO, startTime: monthClip.start, endTime: monthClip.end, shiftTypeName: typeGuessFor(monthClip.start) });
+    const res = await saveShift({ employeeName: monthClip.ref, date: toISO, startTime: monthClip.start, endTime: monthClip.end, shiftTypeName: monthClip.tn || typeGuessFor(monthClip.start, monthClip.end) });
     if (!res.ok) { toast(res.error ?? "Villa"); return; }
     setMonthVer((v) => v + 1);
     toast(res.demo ? t("Vakt límd (demo)") : t("Vakt límd"));
@@ -717,7 +729,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   async function moveMonthShift(toISO: string) {
     const d = monthDragRef.current; monthDragRef.current = null;
     if (!d || d.fromISO === toISO) return;
-    const r1 = await saveShift({ employeeName: d.ref, date: toISO, startTime: d.start, endTime: d.end, shiftTypeName: typeGuessFor(d.start) });
+    const r1 = await saveShift({ employeeName: d.ref, date: toISO, startTime: d.start, endTime: d.end, shiftTypeName: d.tn || typeGuessFor(d.start, d.end) });
     if (!r1.ok) { toast(r1.error ?? "Villa"); return; }
     if (!r1.demo) await deleteShift({ employeeName: d.ref, dateISO: d.fromISO });
     setMonthVer((v) => v + 1);
@@ -1055,7 +1067,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
             void saveShift({ employeeName: b.ref, date: iso, startTime: norm(a ?? "08:00"), endTime: norm(z ?? "16:00"), shiftTypeName: ty.nm })
               .then((res) => { setMonthVer((v) => v + 1); toast(res.ok ? t("Vaktategund breytt") : (res.error ?? "Villa")); });
           } })),
-          { label: t("Afrita"), act: () => { const [a, z] = b.time.split("–"); setMonthClip({ first: b.name, ref: b.ref, start: norm(a ?? "08:00"), end: norm(z ?? "16:00") }); toast(t("Vakt afrituð — smelltu á daga til að líma")); } },
+          { label: t("Afrita"), act: () => { const [a, z] = b.time.split("–"); setMonthClip({ first: b.name, ref: b.ref, tn: b.tn, start: norm(a ?? "08:00"), end: norm(z ?? "16:00") }); toast(t("Vakt afrituð — smelltu á daga til að líma")); } },
           ...(monthClip ? [{ label: t("Líma hér"), act: () => { void pasteMonthShift(iso); } }] : []),
           { label: t("Eyða vakt"), danger: true, act: () => {
             if (!liveCompany) { toast("Vakt eydd (demo)"); return; }
@@ -1066,7 +1078,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
           { label: t("Ný vakt"), act: () => setDayModal(d) },
           ...(monthClip ? [{ label: t("Líma hér"), act: () => { void pasteMonthShift(fmtISO(d)); } }] : []),
         ])}
-        onDragBlock={(b, iso) => { const [a, z] = b.time.split("–"); monthDragRef.current = { first: b.name, ref: b.ref, start: norm(a ?? "08:00"), end: norm(z ?? "16:00"), fromISO: iso }; }}
+        onDragBlock={(b, iso) => { const [a, z] = b.time.split("–"); monthDragRef.current = { first: b.name, ref: b.ref, tn: b.tn, start: norm(a ?? "08:00"), end: norm(z ?? "16:00"), fromISO: iso }; }}
         onDropDay={(iso) => moveMonthShift(iso)} />}
       {dayModal && <MonthShiftModal date={dayModal} entries={entriesFor(dayModal)} names={[...emp, ...pool].map((x) => ({ ref: empRef(x), name: x[1] }))} types={types}
         onClose={() => setDayModal(null)} onChanged={() => setMonthVer((v) => v + 1)}
@@ -1162,7 +1174,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
           </div>
         </>
       )}
-      {modal === "shift" && <ShiftEditModal types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end, type: cellTypes[ckey(sel.r, sel.c)] }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
+      {modal === "shift" && <ShiftEditModal cellType={(r, c) => cellTypes[ckey(r, c)] ?? ""} types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end, type: cellTypes[ckey(sel.r, sel.c)] }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
       {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} names={emp.map((e) => e[1])} depts={[...new Set(emp.map((e) => e[2]).filter(Boolean))]} />}
       {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} stage={aiStage} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={approveAiProposal} />}
     </div>
@@ -1299,7 +1311,7 @@ function MonthView({ monthDate, todayISO, blocks, onEdit, onCtxBlock, onCtxDay, 
 
 /** Month-view popup: the day's shifts inline-editable + add a new one. */
 function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOpenDayView }: {
-  date: Date; entries: { first: string; ref: string; start: string; end: string }[]; names: { ref: string; name: string }[]; types: ShiftType[];
+  date: Date; entries: { first: string; ref: string; start: string; end: string; tn?: string }[]; names: { ref: string; name: string }[]; types: ShiftType[];
   onClose: () => void; onChanged: () => void; onOpenDayView: () => void;
 }) {
   const { t: tr } = useLang();
@@ -1311,7 +1323,11 @@ function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOp
   const [nStart, setNStart] = useState(t0[0]?.slice(0, 5) ?? "08:00");
   const [nEnd, setNEnd] = useState(t0[1]?.slice(0, 5) ?? "16:00");
   const [busy, setBusy] = useState(false);
-  const typeOf = (start: string) => types.find((x) => x.t.startsWith(start))?.nm ?? types[0]?.nm ?? "Dagvakt";
+  // Tegund aðeins ef tímar passa nákvæmlega við eina tegund — annars engin (ekki rangt álag).
+  const typeOf = (start: string, end: string) => {
+    const hit = types.filter((x) => { const [a, z] = (x.t || "").split("–").map((v) => v?.trim().slice(0, 5)); return a === start && z === end; });
+    return hit.length === 1 ? hit[0].nm : "";
+  };
   const DN = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
   const title = `${tr(DN[(date.getDay() + 6) % 7])} ${date.getDate()}. ${tr(MONTHS_IS[date.getMonth()])}`;
 
@@ -1319,7 +1335,7 @@ function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOp
     const r = rows[i];
     if (r.start >= r.end) { toast("Lok verða að vera eftir upphaf"); return; }
     setBusy(true);
-    const res = await saveShift({ employeeName: r.ref, date: iso, startTime: r.start, endTime: r.end, shiftTypeName: typeOf(r.start) });
+    const res = await saveShift({ employeeName: r.ref, date: iso, startTime: r.start, endTime: r.end, shiftTypeName: r.tn || typeOf(r.start, r.end) });
     setBusy(false);
     toast(res.ok ? (res.demo ? "Vistað (demo)" : tr("Vakt vistuð")) : (res.error ?? "Villa"));
     if (res.ok) onChanged();
@@ -1336,7 +1352,7 @@ function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOp
     if (!nName) return;
     if (nStart >= nEnd) { toast("Lok verða að vera eftir upphaf"); return; }
     setBusy(true);
-    const res = await saveShift({ employeeName: nName, date: iso, startTime: nStart, endTime: nEnd, shiftTypeName: typeOf(nStart) });
+    const res = await saveShift({ employeeName: nName, date: iso, startTime: nStart, endTime: nEnd, shiftTypeName: typeOf(nStart, nEnd) });
     setBusy(false);
     toast(res.ok ? (res.demo ? "Vistað (demo)" : tr("Vakt vistuð")) : (res.error ?? "Villa"));
     if (res.ok) onChanged();
@@ -1489,9 +1505,10 @@ function StaffNeedModal({ targets, onClose, onSave }: { targets: number[]; onClo
 }
 
 function ShiftEditModal({
-  types, emp, weekDays, sel, gridCode, timeOf, onSave, onDelete, onClose, onCopy, onTypes,
+  types, emp, weekDays, sel, gridCode, timeOf, cellType, onSave, onDelete, onClose, onCopy, onTypes,
 }: {
   types: ShiftType[]; emp: Emp[]; weekDays: Date[]; sel: { r: number; c: number };
+  cellType: (r: number, c: number) => string;
   gridCode: (r: number, c: number) => string;
   timeOf: (r: number, c: number) => { start: string; end: string } | undefined;
   onSave: (r: number, c: number, start: string, end: string, typeName: string) => void;
@@ -1502,9 +1519,15 @@ function ShiftEditModal({
   const [ri, setRi] = useState(sel.r < emp.length ? sel.r : 0);
   const [ci, setCi] = useState(sel.c);
   const tt0 = timeOf(sel.r, sel.c);
-  const [type, setType] = useState(types[0]?.nm ?? "Dagvakt");
-  const [start, setStart] = useState(tt0?.start ?? "08:00");
-  const [end, setEnd] = useState(tt0?.end ?? "16:00");
+  // Tegund vaktarinnar sem er breytt (áður alltaf fyrsta tegundin → vistun skipti um tegund).
+  // Ný vakt: fyrsta tegund með föstum tíma, og tímar hennar.
+  const firstTimed = types.find((x) => /^\d{2}:\d{2}/.test(x.t ?? ""));
+  const timesOf = (x?: ShiftType) => { const [a, b] = (x?.t ?? "").split("–").map((v) => v?.trim().slice(0, 5)); return a && b ? [a, b] : null; };
+  const existingType = cellType(sel.r, sel.c);
+  const guessed = tt0 ? types.find((x) => { const tm = timesOf(x); return tm && tm[0] === tt0.start && tm[1] === tt0.end; })?.nm : undefined;
+  const [type, setType] = useState(existingType || guessed || (tt0 ? "Sérsniðin vakt" : firstTimed?.nm ?? types[0]?.nm ?? "Dagvakt"));
+  const [start, setStart] = useState(tt0?.start ?? timesOf(firstTimed)?.[0] ?? "08:00");
+  const [end, setEnd] = useState(tt0?.end ?? timesOf(firstTimed)?.[1] ?? "16:00");
   const filled = gridCode(ri, ci) !== "off";
   const DNAMES = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
   // Checklist for this employee+day (Sling-parity "shift tasks").
