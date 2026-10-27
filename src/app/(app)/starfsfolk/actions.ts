@@ -973,13 +973,36 @@ export async function deleteContract(id: string): Promise<ActionResult> {
     const supabase = await createClient();
     const { data: c } = await supabase.from("contracts").select("company_id, title, status").eq("id", id).maybeSingle();
     if (!c) return { ok: false, error: "Samningur fannst ekki" };
-    if (c.status === "signed") return { ok: false, error: "Undirritaðum samningi verður ekki eytt — merktu hann ógildan (void) og gerðu nýjan." };
+    // Undirritaðan samning má líka eyða (undirritað PDF í Skjöl starfsmannsins stendur eftir); skráð í atvikaskrá.
     const { error } = await supabase.from("contracts").delete().eq("id", id);
     if (error) return { ok: false, error: userError(error) };
     const { data: { user } } = await supabase.auth.getUser();
     await logAudit(supabase, c.company_id as string, user?.id ?? null, {
-      action: "contract.delete", entity: "contracts", entityId: id, detail: `Samningi eytt — ${c.title}`,
+      action: "contract.delete", entity: "contracts", entityId: id, detail: `Samningi eytt — ${c.title}${c.status === "signed" ? " (var undirritaður)" : ""}`,
     });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
+/** Virkja ógiltan samning aftur: undirritaður áður → „undirritað“, annars aftur í drög. */
+export async function restoreContract(id: string): Promise<ActionResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const { data: c } = await supabase.from("contracts").select("company_id, title, status, signed_at").eq("id", id).maybeSingle();
+    if (!c) return { ok: false, error: "Samningur fannst ekki" };
+    if (c.status !== "void") return { ok: false, error: "Samningurinn er ekki óvirkur" };
+    const status = c.signed_at ? "signed" : "draft";
+    const { error } = await supabase.from("contracts").update({ status, ...(status === "draft" ? { sent_at: null } : {}) }).eq("id", id);
+    if (error) return { ok: false, error: userError(error) };
+    const { data: { user } } = await supabase.auth.getUser();
+    await logAudit(supabase, c.company_id as string, user?.id ?? null, {
+      action: "contract.restore", entity: "contracts", entityId: id, detail: `Samningur virkjaður aftur — ${c.title}`,
+    });
+    revalidatePath("/starfsfolk");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
@@ -1040,6 +1063,13 @@ export async function setContractStatus(
     const { data: row, error } = await supabase.from("contracts").update(patch).eq("id", id)
       .select("employee_id, employees(full_name, email), companies(name)").maybeSingle();
     if (error) return { ok: false, error: userError(error) };
+    if (status === "void") {
+      const { data: c } = await supabase.from("contracts").select("company_id, title").eq("id", id).maybeSingle();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (c) await logAudit(supabase, c.company_id as string, user?.id ?? null, {
+        action: "contract.void", entity: "contracts", entityId: id, detail: `Samningur óvirkjaður — ${c.title}`,
+      });
+    }
     // Taktikal: stofna undirritunarferli (vinnuveitandi skrifar fyrst með rafrænum skilríkjum).
     if (status === "sent" && row && useTaktikal && signer) {
       const { data: { user } } = await supabase.auth.getUser();
@@ -1087,7 +1117,7 @@ export async function setContractStatus(
 /** Sendir undirritunarbeiðni samnings aftur á skráð netfang starfsmanns (VAKTO AI: resend_contract).
  *  Nýjasti óundirritaði samningurinn: „sendur“ → boðið endursent (sama póstur / sama Taktikal-ferli, engin ný
  *  undirskrift); „drög“ → venjuleg sending (setContractStatus: undirritun fyrirtækis + póstur). Undirritaður → villa. */
-export async function resendContract(employeeId: string): Promise<ActionResult & { signedAt?: string }> {
+export async function resendContract(employeeId: string, contractId?: string): Promise<ActionResult & { signedAt?: string }> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   if (await demoBlocked()) return demoResult(); // opið demo: enginn póstur / Taktikal (sjá líka þröskuldana)
@@ -1099,7 +1129,9 @@ export async function resendContract(employeeId: string): Promise<ActionResult &
       .select("id, title, status, signed_at, signed_via, employees(full_name, email), companies(name)")
       .eq("employee_id", employeeId).eq("company_id", company).neq("status", "void").order("created_at", { ascending: false });
     if (error) return { ok: false, error: userError(error) };
-    const open = (rows ?? []).find((r) => r.status === "sent") ?? (rows ?? []).find((r) => r.status === "draft");
+    const open = contractId
+      ? (rows ?? []).find((r) => r.id === contractId && (r.status === "sent" || r.status === "draft"))
+      : (rows ?? []).find((r) => r.status === "sent") ?? (rows ?? []).find((r) => r.status === "draft");
     if (!open) {
       const signed = (rows ?? []).find((r) => r.status === "signed");
       if (signed) return { ok: false, signedAt: String(signed.signed_at ?? "").slice(0, 10), error: `Samningurinn er þegar undirritaður${signed.signed_at ? ` (${String(signed.signed_at).slice(0, 10)})` : ""} — undirritað afrit er í skjalasafni starfsmannsins.` };
