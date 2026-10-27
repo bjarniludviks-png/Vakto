@@ -63,6 +63,9 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
     let ex = await supabase.from("employees").select("id, address, next_of_kin, postal_code, city, hire_date");
     if (ex.error) ex = await supabase.from("employees").select("id, address, next_of_kin, hire_date") as typeof ex; // fyrir 0060
     const extra = new Map((ex.error ? [] : ex.data ?? []).map((x) => [x.id as string, x as Extra]));
+    // Breytilegt starfshlutfall (0093) — sér fyrirspurn svo listinn virki þótt migration vanti.
+    const rv = await supabase.from("employees").select("id, ratio_variable").eq("ratio_variable", true);
+    const variable = new Set((rv.error ? [] : rv.data ?? []).map((x) => x.id as string));
     // Launaliðir (0081) + orlof (0021): sér fyrirspurn svo listinn virki þótt migration vanti.
     const paq = await supabase.from("employees").select("id, pay_settings, orlof, benefits");
     const payOf = new Map((paq.error ? [] : paq.data ?? []).map((x) => [x.id as string, x as { pay_settings: Partial<PaySettings> | null; orlof: Partial<OrlofSet> | null; benefits: Employee["benefits"] }]));
@@ -93,6 +96,7 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
       rate: Number(r.rate),
       monthlyHours: r.monthly_hours != null ? Number(r.monthly_hours) : null,
       employmentRatio: Number(r.employment_ratio),
+      ratioVariable: variable.has(r.id),
       union: r.union_agreement,
       status: r.status,
       avatarColor: r.avatar_color ?? colorFor(r.id),

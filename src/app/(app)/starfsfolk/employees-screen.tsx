@@ -377,6 +377,7 @@ function LaunTab({ e }: { e: Employee }) {
   const [payType, setPayType] = useState<"Tímakaup" | "Mánaðarlaun">(e.payType === "monthly" ? "Mánaðarlaun" : "Tímakaup");
   const [rate, setRate] = useState<number>(e.rate);
   const [ratio, setRatio] = useState<number>(e.employmentRatio);
+  const [ratioVar, setRatioVar] = useState<boolean>(!!e.ratioVariable);
   const [monthlyHrs, setMonthlyHrs] = useState<number>(e.monthlyHours || DEFAULT_MONTHLY_HOURS);
   // Switching pay type converts the rate both ways (hlutfall applies on top),
   // so picking "Mánaðarlaun" lands on the computed salary from taxti × tímar.
@@ -554,14 +555,23 @@ function LaunTab({ e }: { e: Employee }) {
         </span>
       </div>
       <div className="statline">
-        <span className="k">Starfshlutfall</span>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-          <input name="employmentRatio" type="number" min={0} value={ratio}
-            onChange={(ev) => setRatio(Math.max(0, Number(ev.target.value) || 0))}
-            style={{ ...FLD, width: 72, textAlign: "right" }} />
-          <span className="muted">%</span>
+        <span className="k">Starfshlutfall{ratioVar && <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}> · viðmið</span>}</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
+          <input type="hidden" name="ratioVariableForm" value="1" />
+          <label className="muted" style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 12.5, cursor: "pointer" }}
+            title="Tímavinna eftir vaktaplani — samningurinn segir „Breytilegt“ í stað fasts hlutfalls">
+            <input type="checkbox" name="ratioVariable" checked={ratioVar} onChange={(ev) => setRatioVar(ev.target.checked)} />
+            Breytilegt (tímavinna)
+          </label>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <input name="employmentRatio" type="number" min={0} value={ratio}
+              onChange={(ev) => setRatio(Math.max(0, Number(ev.target.value) || 0))}
+              style={{ ...FLD, width: 72, textAlign: "right" }} />
+            <span className="muted">%</span>
+          </span>
         </span>
       </div>
+      {ratioVar && <p className="muted" style={{ fontSize: 11.5, margin: "4px 0 0" }}>Ráðningarsamningurinn segir „Breytilegt – tímavinna eftir vaktaplani“{e.monthlyHours ? ` með meðaltali um ${String(e.monthlyHours).replace(".", ",")} klst./mán.` : ratio > 0 && ratio < 100 ? ` með viðmiði um ${ratio}%` : ""}. Hlutfallið er notað sem viðmið í áætlunum.</p>}
       <div className="statline">
         <span className="k muted">{isMonthly ? "≈ Tímakaup" : "≈ Grunnlaun (100%)"} <span style={{ fontWeight: 400, fontSize: 11.5 }}>· afleitt</span></span>
         <b className="muted">{isMonthly ? `${nf(hourly)} kr/klst` : `${nf(baseMonthly)} kr/mán`}</b>
