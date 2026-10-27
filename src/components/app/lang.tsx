@@ -582,6 +582,10 @@ export const DICT: Dict = {
 
   // shared words
   "klst": { is: "klst", en: "hrs", vi: "giờ", pl: "godz." },
+  "Launaseðlar": { is: "Launaseðlar", en: "Payslips", vi: "Phiếu lương", pl: "Paski płacowe" },
+  "brúttó": { is: "brúttó", en: "gross", vi: "tổng", pl: "brutto" },
+  "útborgað": { is: "útborgað", en: "net", vi: "thực nhận", pl: "netto" },
+  "Engir launaseðlar enn — þeir birtast hér eftir hverja launakeyrslu í VAKTO.": { is: "Engir launaseðlar enn — þeir birtast hér eftir hverja launakeyrslu í VAKTO.", en: "No payslips yet — they appear here after each payroll run in VAKTO.", vi: "Chưa có phiếu lương — phiếu sẽ xuất hiện ở đây sau mỗi kỳ tính lương trong VAKTO.", pl: "Brak pasków płacowych — pojawią się tu po każdym naliczeniu wynagrodzeń w VAKTO." },
   "stig": { is: "stig", en: "pts", vi: "điểm", pl: "pkt" },
   "Vika": { is: "Vika", en: "Week", vi: "Tuần", pl: "Tydzień" },
   "Dagur": { is: "Dagur", en: "Day", vi: "Ngày", pl: "Dzień" },

@@ -9,7 +9,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "@/lib/contract-pdf";
-import { updateEmployee, uploadDocument, importEmployees, inviteEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow, getContractProgress, syncContractStatus, openSignedContractPdf, resendContract, restoreContract, type ContractProgress, type EmployeeContractState } from "./actions";
+import { updateEmployee, uploadDocument, importEmployees, inviteEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow, getContractProgress, syncContractStatus, openSignedContractPdf, resendContract, restoreContract, listEmployeePayslips, type EmployeePayslip, type ContractProgress, type EmployeeContractState } from "./actions";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField, BankField } from "@/components/app/fields";
@@ -20,6 +20,7 @@ import { ContractView, ContractEditor } from "@/components/app/contract-view";
 import { LeavingPill } from "./termination/banner";
 import type { LeavingInfo } from "@/lib/termination";
 import { Av } from "@/components/app/avatar";
+import { PayslipModal } from "@/components/app/payslip-modal";
 import { PaySettingsCard } from "./pay-settings";
 import { computeLine } from "@/lib/payroll";
 import { ORLOF_DAYS, orlofPctForDays, orlofDaysForPct } from "@/lib/paysettings";
@@ -724,6 +725,42 @@ function LaunTab({ e }: { e: Employee }) {
       <Stat k="Brúttólaun" v={kr(pay.gross)} />
       <Stat k="Útborgað (áætl.)" v={kr(pay.net)} vColor="var(--good)" />
       <Stat k="Kostnaður þinn (m. byrði)" v={kr(pay.cost)} strong />
+
+      <EmployeePayslips employeeId={e.id} />
+    </>
+  );
+}
+
+/** Launaseðlar úr öllum vistuðum launakeyrslum VAKTO — skoða eða sækja PDF. */
+function EmployeePayslips({ employeeId }: { employeeId: string }) {
+  const { t } = useLang();
+  const [slips, setSlips] = useState<EmployeePayslip[] | null>(null);
+  const [open, setOpen] = useState<EmployeePayslip | null>(null);
+  useEffect(() => { let alive = true; listEmployeePayslips(employeeId).then((r) => alive && setSlips(r)).catch(() => alive && setSlips([])); return () => { alive = false; }; }, [employeeId]);
+  return (
+    <>
+      <Sec>{t("Launaseðlar")}</Sec>
+      {slips === null ? <p className="muted" style={{ fontSize: 12 }}>{t("Hleð…")}</p>
+        : slips.length === 0 ? <p className="muted" style={{ fontSize: 12.5 }}>{t("Engir launaseðlar enn — þeir birtast hér eftir hverja launakeyrslu í VAKTO.")}</p>
+        : <div className="docs">
+            {slips.map((s) => (
+              <div className="ctr" key={s.runId}>
+                <svg className="ctr-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /></svg>
+                <div className="ctr-main">
+                  <button type="button" className="ctr-title" onClick={() => setOpen(s)}>{s.d.period}</button>
+                  <div className="ctr-meta">
+                    <span className="dl">{num1(s.d.hours)} {t("klst")} · {t("brúttó")} {kr(s.d.gross)} · {t("útborgað")} {kr(s.d.net)}</span>
+                  </div>
+                </div>
+                <div className="ctr-act">
+                  <button className="btn ghost sm" type="button" onClick={async () => {
+                    try { const { downloadPayslipPdf } = await import("@/lib/doc-pdf"); await downloadPayslipPdf(s.d); } catch { toast(t("Villa við útflutning")); }
+                  }}>PDF</button>
+                </div>
+              </div>
+            ))}
+          </div>}
+      {open && <PayslipModal data={{ name: open.d.name, period: open.d.period, hours: num1(open.d.hours), gross: nf(open.d.gross), withholding: nf(open.d.withholding), pension: nf(open.d.pension), net: nf(open.d.net), d: open.d }} onClose={() => setOpen(null)} />}
     </>
   );
 }
