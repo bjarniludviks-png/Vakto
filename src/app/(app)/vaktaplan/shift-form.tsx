@@ -106,17 +106,17 @@ export function ShiftSheet({ title, onClose, children }: { title: string; onClos
 }
 
 /** „Mála“-stikan: vaktategund eða strokleður valið, svo smellt á reiti. Sama í viku og mánuði. */
-export function PaintTools({ types, tool, setTool }: { types: ShiftType[]; tool: PaintTool; setTool: (t: PaintTool) => void }) {
+export function PaintTools({ types, tool, setTool, onTypes }: { types: ShiftType[]; tool: PaintTool; setTool: (t: PaintTool) => void; onTypes?: () => void }) {
   const { t } = useLang();
   return (
     <>
-      <div className="mr-tools">
+      <div className="mr-tools compact">
         <span className="mr-lbl">{t("Mála")}:</span>
         {types.map((ty) => {
           const on = tool?.kind === "type" && tool.ty.nm === ty.nm;
           return (
             <button key={ty.nm} type="button" className={`mr-tool${on ? " on" : ""}`} onClick={() => setTool(on ? null : { kind: "type", ty })}
-              style={{ background: ty.bg, borderColor: on ? ty.fg : ty.bd, color: ty.fg }} title={ty.t || t("Enginn fastur tími")}>
+              style={{ background: ty.bg, borderColor: on ? ty.fg : ty.bd, color: ty.fg }} title={[ty.t || t("Enginn fastur tími"), ty.prem && ty.prem !== "Dagvinna" ? t(ty.prem) : ""].filter(Boolean).join(" · ")}>
               {t(ty.nm)}{ty.t && ty.t !== "–" ? <small>{ty.t.replace(/:00/g, "")}</small> : null}
             </button>
           );
@@ -124,6 +124,9 @@ export function PaintTools({ types, tool, setTool }: { types: ShiftType[]; tool:
         <button type="button" className={`mr-tool erase${tool?.kind === "erase" ? " on" : ""}`} onClick={() => setTool(tool?.kind === "erase" ? null : { kind: "erase" })}>
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 20H9L4 15a2 2 0 0 1 0-3l8-8a2 2 0 0 1 3 0l5 5a2 2 0 0 1 0 3l-8 8" /></svg>{t("Strokleður")}
         </button>
+        {onTypes && <button type="button" className="mr-tool add" onClick={onTypes} title={t("Búa til eða breyta vaktategundum")}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 5v14M5 12h14" /></svg>{t("Vaktategund")}
+        </button>}
       </div>
       {/* Leiðbeining fljótandi neðst — lína ofan við töfluna ýtti henni niður og smellir lentu á röngum reit. */}
       {tool && (
