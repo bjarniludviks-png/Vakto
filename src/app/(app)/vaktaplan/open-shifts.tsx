@@ -14,7 +14,7 @@ const SHORT = ["sun", "mán", "þri", "mið", "fim", "fös", "lau"];
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const label = (dateISO: string) => { const d = new Date(`${dateISO}T12:00:00`); return `${SHORT[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}`; };
 
-export default function OpenShifts({ weekDays, types, todayISO }: { weekDays: Date[]; types: { nm: string; t: string }[]; todayISO: string }) {
+export default function OpenShifts({ weekDays, types, todayISO, refresh = 0 }: { weekDays: Date[]; types: { nm: string; t: string }[]; todayISO: string; /** Hækkar þegar beiðni losar vakt — sækja listann aftur. */ refresh?: number }) {
   const { t } = useLang();
   const from = iso(weekDays[0]), to = iso(weekDays[6]);
   const [list, setList] = useState<OpenShift[]>([]);
@@ -25,7 +25,7 @@ export default function OpenShifts({ weekDays, types, todayISO }: { weekDays: Da
     if (r.ok) setList(r.shifts);
   }, [from, to]);
   // eslint-disable-next-line react-hooks/set-state-in-effect -- sækir lausar vaktir þegar vikan breytist
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); }, [load, refresh]);
 
   const pending = list.reduce((n, s) => n + s.claims.length, 0);
 

@@ -606,19 +606,33 @@ export async function updateLeaveRequest(id: string, approved: boolean): Promise
     const status = approved ? "approved" : "rejected";
     const { data: updated, error } = await supabase
       .from("leave_requests").update({ status }).eq("id", id).eq("company_id", ctx.company)
-      .select("employee_id, employees(full_name, email)").maybeSingle();
+      .select("employee_id, type, from_date, to_date, employees(full_name, email)").maybeSingle();
     if (error) return { ok: false, error: userError(error) };
+    // Veikindi samþykkt (t.d. tilkynnt af vakt í appinu): vaktir starfsmannsins þá daga verða lausar vaktir
+    // og starfsfólk fær tilkynningu — sama og „Tilkynnti veikindi“ í Vaktaplani.
+    let freed = 0;
+    const sickType = updated?.type === "veikindi" || updated?.type === "veikindi_barns";
+    if (approved && sickType && updated?.employee_id) {
+      const { data: fr } = await supabase.from("shifts")
+        .update({ employee_id: null, note: `Laus vegna fjarvistar (${updated.type === "veikindi" ? "veikindi" : "veikindi barns"})` })
+        .eq("company_id", ctx.company).eq("employee_id", updated.employee_id as string)
+        .gte("date", updated.from_date as string).lte("date", updated.to_date as string).select("id");
+      freed = fr?.length ?? 0;
+      if (freed && (updated.to_date as string) >= new Date().toISOString().slice(0, 10)) {
+        void notifyEmployees(ctx.company, { title: freed > 1 ? "Lausar vaktir" : "Laus vakt", body: `${freed > 1 ? `${freed} vaktir` : "Vakt"} laus vegna forfalla. Sæktu um í appinu.`, url: "/mitt-svaedi", tag: "open-shift" });
+      }
+    }
     // Notify the employee (best-effort): push + email.
     const decEmp = (Array.isArray(updated?.employees) ? updated?.employees[0] : updated?.employees) as { full_name?: string; email?: string } | null;
     if (decEmp?.email) void sendLeaveDecisionEmail(decEmp.email, decEmp.full_name ?? "", approved);
     void notifyEmployee(updated?.employee_id as string | undefined, {
-      title: approved ? "Frí samþykkt" : "Frí hafnað",
-      body: approved ? "Frí-beiðnin þín var samþykkt." : "Frí-beiðninni þinni var hafnað.",
+      title: sickType ? (approved ? "Veikindi skráð" : "Veikindatilkynningu hafnað") : approved ? "Frí samþykkt" : "Frí hafnað",
+      body: sickType ? (approved ? "Vaktstjóri skráði veikindin. Láttu þér batna!" : "Hafðu samband við vaktstjóra.") : approved ? "Frí-beiðnin þín var samþykkt." : "Frí-beiðninni þinni var hafnað.",
       url: "/mitt-svaedi",
     });
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "leave.decide", entity: "leave_request", entityId: id,
-      detail: approved ? "Frí-beiðni samþykkt" : "Frí-beiðni hafnað",
+      detail: `${sickType ? "Veikindi" : "Frí-beiðni"} ${approved ? "samþykkt" : "hafnað"}${freed ? ` · ${freed} ${freed === 1 ? "vakt varð laus" : "vaktir urðu lausar"}` : ""}`,
     });
     revalidatePath("/vaktaplan");
     return { ok: true };
@@ -627,8 +641,17 @@ export async function updateLeaveRequest(id: string, approved: boolean): Promise
   }
 }
 
-/** Manager approves a shift swap. */
+/** Vaktstjóri samþykkir vaktaskipti / beiðni um að losna við vakt:
+ *  • beiðni tengd vakt án mótaðila („Get ekki tekið vaktina“, „Bjóða vaktina“) → vaktin verður laus vakt, starfsfólk fær push;
+ *  • tvær vaktir (requester ↔ requestee) → starfsmönnum víxlað;
+ *  • eldri textabeiðnir (engin vakt) → aðeins merktar samþykktar. Beiðandinn fær tilkynningu. */
 export async function approveShiftSwap(id: string): Promise<DecisionResult> {
+  return decideShiftSwap(id, true);
+}
+export async function rejectShiftSwap(id: string): Promise<DecisionResult> {
+  return decideShiftSwap(id, false);
+}
+async function decideShiftSwap(id: string, approved: boolean): Promise<DecisionResult> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -636,12 +659,33 @@ export async function approveShiftSwap(id: string): Promise<DecisionResult> {
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { data: swap, error } = await supabase
-      .from("shift_swaps").update({ status: "approved" }).eq("id", id).eq("company_id", ctx.company)
-      .select("employee_id").maybeSingle();
+      .from("shift_swaps").update({ status: approved ? "approved" : "rejected" }).eq("id", id).eq("company_id", ctx.company).eq("status", "pending")
+      .select("requester_id, requestee_id, requester_shift_id, requestee_shift_id").maybeSingle();
     if (error) return { ok: false, error: userError(error) };
-    void notifyEmployee(swap?.employee_id as string | undefined, { title: "Vaktaskipti samþykkt", body: "Beiðni þín um vaktaskipti var samþykkt.", url: "/mitt-svaedi" });
+    if (!swap) return { ok: false, error: "Beiðnin fannst ekki eða hefur þegar verið afgreidd" };
+    let what = "";
+    if (approved && swap.requester_shift_id && !swap.requestee_id) {
+      const { data: sh } = await supabase.from("shifts").update({ employee_id: null, note: "Laus vakt — starfsmaður losaði vaktina" })
+        .eq("id", swap.requester_shift_id as string).eq("company_id", ctx.company).eq("employee_id", swap.requester_id as string)
+        .select("date").maybeSingle();
+      if (sh) {
+        what = " · vaktin varð laus";
+        if ((sh.date as string) >= new Date().toISOString().slice(0, 10)) {
+          void notifyEmployees(ctx.company, { title: "Laus vakt", body: `Vakt ${sh.date} er laus. Sæktu um í appinu.`, url: "/mitt-svaedi", tag: "open-shift" });
+        }
+      }
+    } else if (approved && swap.requester_shift_id && swap.requestee_id && swap.requestee_shift_id) {
+      await supabase.from("shifts").update({ employee_id: swap.requestee_id }).eq("id", swap.requester_shift_id as string).eq("company_id", ctx.company);
+      await supabase.from("shifts").update({ employee_id: swap.requester_id }).eq("id", swap.requestee_shift_id as string).eq("company_id", ctx.company);
+      what = " · vöktum víxlað";
+    }
+    void notifyEmployee(swap.requester_id as string, {
+      title: approved ? "Beiðni samþykkt" : "Beiðni hafnað",
+      body: approved ? (what.includes("laus") ? "Vaktstjóri samþykkti — vaktin er nú laus vakt og þú ert laus við hana." : "Vaktstjóri samþykkti beiðnina þína.") : "Vaktstjóri hafnaði beiðninni — vaktin er áfram þín.",
+      url: "/mitt-svaedi",
+    });
     await logAudit(supabase, ctx.company, ctx.userId, {
-      action: "swap.approve", entity: "shift_swap", entityId: id, detail: "Vaktaskipti samþykkt",
+      action: approved ? "swap.approve" : "swap.reject", entity: "shift_swap", entityId: id, detail: `Vaktabeiðni ${approved ? "samþykkt" : "hafnað"}${what}`,
     });
     revalidatePath("/vaktaplan");
     return { ok: true };

@@ -29,12 +29,27 @@ export async function POST(req: Request) {
   if (kind === "leave_request" || kind === "swap_request") {
     const table = kind === "leave_request" ? "leave_requests" : "shift_swaps";
     const owner = kind === "leave_request" ? "employee_id" : "requester_id";
-    const { data: row } = await admin.from(table).select(`company_id, ${owner}, status`).eq("id", id).maybeSingle();
+    const cols = kind === "leave_request" ? "company_id, employee_id, status, type, from_date" : "company_id, requester_id, status, requester_shift_id, requestee_id";
+    const { data: row } = await admin.from(table).select(cols).eq("id", id).maybeSingle();
     const r = row as Record<string, string> | null;
     if (!r || !me || r[owner] !== me.id || r.status !== "pending") return NextResponse.json({ ok: false }, { status: 403 });
-    after(() => notifyManagers(r.company_id, kind === "leave_request"
-      ? { title: "Ný frí-beiðni", body: "Starfsmaður sótti um frí — samþykktu eða hafnaðu.", url: "/vaktaplan", tag: "requests" }
-      : { title: "Beiðni um vaktaskipti", body: "Starfsmaður óskaði eftir vaktaskiptum.", url: "/vaktaplan", tag: "requests" }));
+    // Skýr skilaboð: hver, hvað og hvaða dag — veikindi af vakt eru brýn.
+    const { data: emp } = await admin.from("employees").select("full_name").eq("id", r[owner]).maybeSingle();
+    const first = String(emp?.full_name ?? "Starfsmaður").split(" ")[0];
+    const dm = (iso?: string) => { if (!iso) return ""; const d = new Date(`${iso}T12:00:00`); return `${["sun", "mán", "þri", "mið", "fim", "fös", "lau"][d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}.`; };
+    let payload: { title: string; body: string; url: string; tag: string };
+    if (kind === "leave_request" && (r.type === "veikindi" || r.type === "veikindi_barns")) {
+      payload = { title: r.type === "veikindi" ? "Tilkynnti veikindi" : "Veikt barn", body: `${first} getur ekki mætt ${dm(r.from_date)}. Samþykktu og vaktin verður laus vakt.`, url: "/vaktaplan", tag: "requests" };
+    } else if (kind === "leave_request") {
+      payload = { title: "Ný frí-beiðni", body: `${first} sótti um frí — samþykktu eða hafnaðu.`, url: "/vaktaplan", tag: "requests" };
+    } else {
+      let when = "";
+      if (r.requester_shift_id) { const { data: sh } = await admin.from("shifts").select("date").eq("id", r.requester_shift_id).maybeSingle(); when = sh?.date ? ` ${dm(sh.date as string)}` : ""; }
+      payload = r.requester_shift_id && !r.requestee_id
+        ? { title: "Vill losna við vakt", body: `${first} getur ekki tekið vaktina${when}. Samþykktu og hún verður laus vakt.`, url: "/vaktaplan", tag: "requests" }
+        : { title: "Beiðni um vaktaskipti", body: `${first} óskaði eftir vaktaskiptum${when}.`, url: "/vaktaplan", tag: "requests" };
+    }
+    after(() => notifyManagers(r.company_id, payload));
     return NextResponse.json({ ok: true });
   }
 
