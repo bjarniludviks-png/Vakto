@@ -54,6 +54,8 @@ export default function RootLayout({
   return (
     <html lang="is">
       <head>
+        <link rel="preload" href="/fonts/GeneralSans-Regular.otf" as="font" type="font/otf" crossOrigin="anonymous" />
+        <link rel="preload" href="/fonts/GeneralSans-Semibold.otf" as="font" type="font/otf" crossOrigin="anonymous" />
         {/* Legacy iOS flag — required for standalone + startup images (Next only
             emits the newer mobile-web-app-capable). */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
