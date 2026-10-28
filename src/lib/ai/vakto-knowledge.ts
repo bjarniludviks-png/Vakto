@@ -28,7 +28,7 @@ export const VAKTO_KNOWLEDGE = `
 ## Hvað VAKTO er
 - Vefkerfi (virkar í vafra, líka í síma) fyrir veitingastaði, kaffihús, verslanir, hótel, bakarí og keðjur.
 - Eitt af einföldustu vaktakerfunum: vaktaplan, stimpilklukka, laun — og það sem hin kerfin gera ekki.
-- Starfsmanna-app: Android-appið er komið í Google Play (https://play.google.com/store/apps/details?id=is.vakto.app). iPhone-appið er væntanlegt í App Store; þangað til virkar vakto.is í vafra símans.
+- Starfsmanna-app: komið í App Store (https://apps.apple.com/is/app/vakto/id6820559063) og Google Play (https://play.google.com/store/apps/details?id=is.vakto.app). Leitaðu að „VAKTO“. Innskráning með sama netfangi og lykilorði og á vakto.is.
 - Íslenska, enska, víetnamska og pólska (hver notandi velur undir hnattartákninu).
 
 ## Grunnurinn (allt sem hin kerfin gera líka)

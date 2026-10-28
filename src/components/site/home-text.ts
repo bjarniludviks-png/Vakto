@@ -24,9 +24,9 @@ const is = {
   darkH: "Fallegt í birtu. Líka á næturvaktinni.", darkP: "Kerfið fylgir stillingu tækisins. Dragðu til að bera saman.",
   cmpAria: "Bera saman ljóst og dökkt", cmpLight: "Vaktaplan í ljósu þema", cmpDark: "Vaktaplan í dökku þema",
   appAlt: "Appið í dökku þema: á vakt", appH: "Starfsfólkið fær appið.",
-  storePlay: "Sækja á Google Play", storeApple: "App Store", storeSoon: "væntanlegt",
+  storePlay: "Sækja á Google Play", storeApple: "Sækja í App Store", storeSoon: "",
   appP: "Vaktirnar, stimplun, áætluð laun, orlofsstaða, frí og vaktaskipti. Og spjall og fréttaveita fyrir allan hópinn.",
-  appTicks: ["Android í dag, iPhone væntanlegt", "Íslenska, enska og víetnamska", "Tilkynning þegar planið breytist"],
+  appTicks: ["iPhone og Android", "Íslenska, enska, pólska og víetnamska", "Tilkynning þegar planið breytist"],
   feedAlt: "Fréttaveita í appinu",
   showH: "Kynntu þér VAKTO.", showRole: "glærusýning", slideRole: "glæra", of: "af", slideN: "Glæra", pause: "Gera hlé", play: "Spila",
   slides: [
@@ -103,9 +103,9 @@ const en: typeof is = {
   darkH: "Beautiful in daylight. And on the night shift.", darkP: "VAKTO follows your device setting. Drag to compare.",
   cmpAria: "Compare light and dark", cmpLight: "Schedule in light mode", cmpDark: "Schedule in dark mode",
   appAlt: "The app in dark mode: on shift", appH: "Your staff get the app.",
-  storePlay: "Get it on Google Play", storeApple: "App Store", storeSoon: "coming soon",
+  storePlay: "Get it on Google Play", storeApple: "Download on the App Store", storeSoon: "",
   appP: "Their shifts, clock-in, estimated pay, holiday balance, time off and shift swaps. Plus chat and a news feed for the whole team.",
-  appTicks: ["Android today, iPhone coming soon", "Icelandic, English and Vietnamese", "A notification when the schedule changes"],
+  appTicks: ["iPhone and Android", "Icelandic, English, Polish and Vietnamese", "A notification when the schedule changes"],
   feedAlt: "News feed in the app",
   showH: "Get to know VAKTO.", showRole: "slideshow", slideRole: "slide", of: "of", slideN: "Slide", pause: "Pause", play: "Play",
   slides: [

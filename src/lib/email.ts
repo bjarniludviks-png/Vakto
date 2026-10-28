@@ -1,4 +1,5 @@
 import "server-only";
+import { APP_STORE_URL, PLAY_STORE_URL } from "@/lib/app-links";
 
 // Transactional email via Resend (REST API — no SDK dependency). Sends are a
 // no-op (logged) until RESEND_API_KEY + EMAIL_FROM are set, so the app works
@@ -216,9 +217,9 @@ export async function sendInviteEmail(to: string, company: string, roleLabel: st
     html: template({
       preheader: `${company} bauð þér aðgang að VAKTO.`,
       heading: "Þér var boðið í VAKTO",
-      body: `<b>${company}</b> bauð þér aðgang að VAKTO sem <b>${roleLabel}</b>. Þar sérðu vaktirnar þínar, stimplar þig inn og út, sækir um frí og spjallar við teymið, í símanum eða tölvunni. Smelltu á hnappinn til að virkja aðganginn og velja lykilorð.<br><br>Með Android-síma geturðu svo sótt <a href=\"https://play.google.com/store/apps/details?id=is.vakto.app\" style=\"color:#e9700f;font-weight:600\">VAKTO-appið í Google Play</a>. iPhone-appið er væntanlegt, þangað til notarðu vakto.is í vafranum.`,
+      body: `<b>${company}</b> bauð þér aðgang að VAKTO sem <b>${roleLabel}</b>. Þar sérðu vaktirnar þínar, stimplar þig inn og út, sækir um frí og spjallar við teymið, í símanum eða tölvunni. Smelltu á hnappinn til að virkja aðganginn og velja lykilorð.<br><br>Sæktu svo VAKTO-appið í <a href=\"${APP_STORE_URL}\" style=\"color:#e9700f;font-weight:600\">App Store</a> (iPhone) eða <a href=\"${PLAY_STORE_URL}\" style=\"color:#e9700f;font-weight:600\">Google Play</a> (Android) og skráðu þig inn með sama netfangi og lykilorði.`,
       headingEn: "You've been invited to VAKTO",
-      bodyEn: `<b>${company}</b> invited you to VAKTO (${roleLabel}). See your shifts, clock in and out, request time off and chat with your team, on your phone or computer. Click to activate your account and choose a password.<br><br>On Android you can then get the <a href=\"https://play.google.com/store/apps/details?id=is.vakto.app\" style=\"color:#e9700f;font-weight:600\">VAKTO app on Google Play</a>. The iPhone app is coming soon; until then, use vakto.is in your browser.`,
+      bodyEn: `<b>${company}</b> invited you to VAKTO (${roleLabel}). See your shifts, clock in and out, request time off and chat with your team, on your phone or computer. Click to activate your account and choose a password.<br><br>Then get the VAKTO app from the <a href=\"${APP_STORE_URL}\" style=\"color:#e9700f;font-weight:600\">App Store</a> (iPhone) or <a href=\"${PLAY_STORE_URL}\" style=\"color:#e9700f;font-weight:600\">Google Play</a> (Android) and sign in with the same email and password.`,
       ctaLabel: "Virkja aðganginn minn",
       ctaLabelEn: "Activate my account",
       ctaHref: link,
