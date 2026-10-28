@@ -510,3 +510,7 @@
 - PDF: `buildContractPdf(…, { brand })` og `buildPayslipPdf(d, brand)`. Niðurhal í vafra sækir útlitið sjálft
   (`branding-client.ts` → `getMyPdfBrand`); þjónninn (rafræn undirritun, starfslok) sendir `pdfBrandFor(companyId)`.
 - Stillingar → Fyrirtæki → „Útlit skjala“ (`stillingar/branding-card.tsx`), aðeins eigandi breytir. Fóturinn heldur VAKTO-merkinu.
+- **Eitt vaktaform (28. okt. 2026):** `vaktaplan/shift-form.tsx` — `ShiftForm` (vaktategund sem hnappar, upphaf/lok, verkefni,
+  „Tilkynnti veikindi“, Vista/Afrita/Eyða), `ShiftSheet` (gluggi; blað neðan frá undir 640px) og `PaintTools` („Mála“ +
+  strokleður). Notað í vikusýn (`ShiftEditModal`), dagsýn (smellur á vakt opnar hana), mánaðartöflu (`CellEditor`) og dagatali
+  (`MonthShiftModal`). Breyttu forminu þar, ekki í hverri sýn fyrir sig.

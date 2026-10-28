@@ -4,17 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { dec1 } from "@/lib/format";
-import { TimeField } from "@/components/app/fields";
 import { getPlan, saveShift, deleteShift, copyShifts, clearShifts, type PlanShift, type PlanLeave } from "./actions";
 import type { PlanEmp } from "./roster.server";
-import { SickOnShift } from "./sick-on-shift";
+import { ShiftForm, ShiftSheet, PaintTools, typeTimes, defaultsFor, type ShiftType, type PaintTool } from "./shift-form";
 
 // Mánaðarplan sem starfsmannatafla: starfsfólk í röðum, dagar mánaðarins í dálkum.
 // Allt eftir starfsmanns-id (ekki nafni) og vistast strax. „Mála“-hamur: veldu vaktategund
 // og smelltu á reiti — þannig er mánuðurinn mannaður á nokkrum mínútum.
 
-type ShiftType = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
-type Tool = { kind: "type"; ty: ShiftType } | { kind: "clip"; start: string; end: string; type: string | null } | { kind: "erase" } | null;
+type Tool = PaintTool;
 
 const DAYS = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
 const MONTHS_IS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
@@ -27,10 +25,6 @@ const hrs = (a: string, b: string) => {
   return Math.round((d / 60) * 100) / 100;
 };
 const short = (t: string) => (t.endsWith(":00") ? t.slice(0, 2) : t);
-const typeTimes = (ty: ShiftType): [string, string] | null => {
-  const [a, b] = (ty.t || "").split("–").map((x) => x?.trim().slice(0, 5));
-  return a && b && /^\d{2}:\d{2}$/.test(a) && /^\d{2}:\d{2}$/.test(b) ? [a, b] : null;
-};
 
 export default function MonthRoster({ month, todayISO, types, deptSel, scopeDepts, onOpenDay, onTotals, full, onToggleFull }: {
   month: Date; todayISO: string; types: ShiftType[]; deptSel: string[]; scopeDepts: string[];
@@ -173,28 +167,7 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
   return (
     <div className={`card mroster-card${full ? " full" : ""}`} style={{ marginTop: full ? 0 : 16 }}>
       <div className="mr-bar">
-        <div className="mr-tools">
-          <span className="mr-lbl">{t("Mála")}:</span>
-          {types.map((ty) => {
-            const on = tool?.kind === "type" && tool.ty.nm === ty.nm;
-            return (
-              <button key={ty.nm} type="button" className={`mr-tool${on ? " on" : ""}`} onClick={() => setTool(on ? null : { kind: "type", ty })}
-                style={{ background: ty.bg, borderColor: on ? ty.fg : ty.bd, color: ty.fg }} title={ty.t || t("Enginn fastur tími")}>
-                {t(ty.nm)}{ty.t && ty.t !== "–" ? <small>{ty.t.replace(/:00/g, "")}</small> : null}
-              </button>
-            );
-          })}
-          <button type="button" className={`mr-tool erase${tool?.kind === "erase" ? " on" : ""}`} onClick={() => setTool(tool?.kind === "erase" ? null : { kind: "erase" })}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 20H9L4 15a2 2 0 0 1 0-3l8-8a2 2 0 0 1 3 0l5 5a2 2 0 0 1 0 3l-8 8" /></svg>{t("Strokleður")}
-          </button>
-        </div>
-        {/* Leiðbeining fljótandi neðst — lína ofan við töfluna ýtti henni niður og smellir lentu á röngum reit. */}
-        {tool && (
-          <div className="mr-hint">
-            {tool.kind === "erase" ? t("Smelltu á vaktir til að eyða þeim.") : tool.kind === "clip" ? `${t("Smelltu á reiti til að líma")} ${tool.start}–${tool.end}.` : `${t("Smelltu á reiti til að setja")} ${t(tool.ty.nm)}.`}
-            {" "}<a onClick={() => setTool(null)}>{t("Hætta")} (Esc)</a>
-          </div>
-        )}
+        <PaintTools types={types} tool={tool} setTool={setTool} />
         <div className="mr-right">
           <div style={{ position: "relative" }}>
             <button className="btn ghost sm" disabled={busy} onClick={() => setMenu((v) => !v)}>
@@ -309,42 +282,15 @@ function CellEditor({ emp, date, shift, types, leave, monthName, onClose, onSave
   onClose: () => void; onSave: (start: string, end: string, type: string | null) => void; onDelete: () => void; onCopy: () => void;
 }) {
   const { t } = useLang();
-  const first = types.find((x) => typeTimes(x));
-  const [type, setType] = useState<string>(shift?.type ?? first?.nm ?? "");
-  const [start, setStart] = useState(shift?.start ?? typeTimes(first ?? types[0] ?? { nm: "", t: "", prem: "", bg: "", bd: "", fg: "" })?.[0] ?? "08:00");
-  const [end, setEnd] = useState(shift?.end ?? typeTimes(first ?? types[0] ?? { nm: "", t: "", prem: "", bg: "", bd: "", fg: "" })?.[1] ?? "16:00");
   const d = new Date(`${date}T12:00:00`);
   const DN = ["Sunnudagur", "Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur"];
-  function pick(ty: ShiftType) { setType(ty.nm); const tt = typeTimes(ty); if (tt) { setStart(tt[0]); setEnd(tt[1]); } }
+  const init = shift ? { type: shift.type ?? "", start: shift.start, end: shift.end } : defaultsFor(types);
   return (
-    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="mbg" onClick={onClose} />
-      <div className="modal" style={{ maxWidth: 440 }}>
-        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{emp.full} · {t(DN[d.getDay()])} {d.getDate()}. {monthName}</div><button className="x" onClick={onClose}>✕</button></div>
-        <div className="mb">
-          {shift && onSick && !leave && <SickOnShift employeeId={emp.id} name={emp.full} dateISO={date} onDone={onSick} />}
-          {leave && <p style={{ fontSize: 12.5, color: "var(--warn)", fontWeight: 600, marginBottom: 10 }}>{t("ATH: samþykkt frí þennan dag")} ({t(LEAVE_LBL[leave.type] ?? "Frí")})</p>}
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-            {types.map((ty) => (
-              <button key={ty.nm} type="button" className={`mr-tool${type === ty.nm ? " on" : ""}`} onClick={() => pick(ty)}
-                style={{ background: ty.bg, borderColor: type === ty.nm ? ty.fg : ty.bd, color: ty.fg }}>
-                {t(ty.nm)}{ty.t && ty.t !== "–" ? <small>{ty.t.replace(/:00/g, "")}</small> : null}
-              </button>
-            ))}
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <div className="field" style={{ flex: 1 }}><label>{t("Upphaf")}</label><TimeField value={start} onChange={setStart} style={{ width: "100%" }} /></div>
-            <div className="field" style={{ flex: 1 }}><label>{t("Lok")}</label><TimeField value={end} onChange={setEnd} style={{ width: "100%" }} /></div>
-          </div>
-          <p className="muted" style={{ fontSize: 11.5, margin: "-4px 0 10px" }}>{dec1(hrs(start, end))} {t("klst")}{end <= start ? ` · ${t("endar daginn eftir")}` : ""}</p>
-          <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
-            <button className="btn" onClick={() => { if (start === end) { toast(t("Upphaf og lok mega ekki vera eins")); return; } onSave(start, end, type || null); }}>{t("Vista")}</button>
-            {shift && <button className="btn ghost" onClick={onCopy}>{t("Afrita")}</button>}
-            {shift && <button className="btn ghost" style={{ color: "var(--bad)" }} onClick={onDelete}>{t("Eyða vakt")}</button>}
-            <button className="btn ghost" onClick={onClose}>{t("Loka")}</button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <ShiftSheet title={`${emp.full} · ${t(DN[d.getDay()])} ${d.getDate()}. ${monthName}`} onClose={onClose}>
+      <ShiftForm types={types} initial={init} isEdit={!!shift}
+        notice={leave ? `${t("ATH: samþykkt frí þennan dag")} (${t(LEAVE_LBL[leave.type] ?? "Frí")})` : null}
+        sick={onSick && !leave ? { employeeId: emp.id, name: emp.full, dateISO: date, onDone: onSick } : null}
+        onSave={(st, en, ty) => onSave(st, en, ty || null)} onDelete={onDelete} onCopy={onCopy} onClose={onClose} />
+    </ShiftSheet>
   );
 }

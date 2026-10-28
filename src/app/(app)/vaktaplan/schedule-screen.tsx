@@ -13,7 +13,7 @@ import type { ReqItem } from "./requests.server";
 import type { ScheduleInitial } from "./schedule.server";
 import type { WeekBudget } from "@/lib/labor";
 import OpenShifts from "./open-shifts";
-import { SickOnShift } from "./sick-on-shift";
+import { ShiftForm, ShiftSheet, PaintTools, typeTimes, defaultsFor, type PaintTool } from "./shift-form";
 import MonthRoster from "./month-roster";
 import { isNdjson, readNdjson, type ScheduleEvent } from "@/lib/ai/stream";
 
@@ -127,6 +127,14 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [drag, setDrag] = useState<{ r: number; c: number } | null>(null);
   // Copied shift: code + real times, so pasting preserves them and saves.
   const [clip, setClip] = useState<{ code: string; start?: string; end?: string; type?: string } | null>(null);
+  // „Mála“ eins og í mánaðartöflunni: vaktategund eða strokleður valið, svo smellt á reiti.
+  const [paint, setPaint] = useState<PaintTool>(null);
+  useEffect(() => {
+    if (!paint) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setPaint(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [paint]);
   // Company departments for the filter (live sync with Settings).
   const [deptList, setDeptList] = useState<string[]>(initial ? [] : ["Eldhús", "Sal", "Stjórnun"]);
   const [deptColors, setDeptColors] = useState<Record<string, string>>({});
@@ -595,6 +603,12 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     setDrag(null);
   }
   function cellClick(r: number, c: number) {
+    if (paint?.kind === "erase") { if ((grid[r]?.[c] ?? "off") !== "off") delCell(r, c); return; }
+    if (paint?.kind === "type") {
+      const tt = typeTimes(paint.ty);
+      if (tt) { saveCell(r, c, tt[0], tt[1], paint.ty.nm); return; }
+      if ((grid[r]?.[c] ?? "off") !== "off") { assignType(r, c, paint.ty.nm); return; } // tegund án fasts tíma: aðeins litur/álag
+    }
     if (clip !== null) {
       setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = clip.code; return ng; });
       if (clip.code !== "off" && clip.start && clip.end) {
@@ -935,7 +949,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
 
       {view === "Vika" && (
         <div>
-          <div className="sgrid-wrap" style={{ marginTop: 16 }}>
+          <div className="mr-bar week-paint" style={{ marginTop: 16 }}><PaintTools types={types} tool={paint} setTool={(x) => { setPaint(x); if (x) setClip(null); }} /></div>
+          <div className="sgrid-wrap" style={{ marginTop: 10 }}>
             <table className="sgrid">
               <thead>
                 <tr>
@@ -1043,7 +1058,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         </div>
       )}
 
-      {view === "Dagur" && <DayView day={cur} col={curCol} rows={colShifts(curCol)} need={targets[curCol] ?? 0} onAdd={openNewShift} onCtx={(x, ev) => {
+      {view === "Dagur" && <DayView day={cur} col={curCol} rows={colShifts(curCol)} need={targets[curCol] ?? 0} onAdd={openNewShift}
+        onEdit={(x) => { const r = emp.findIndex((e) => e[1] === x.n); if (r >= 0) { setSel({ r, c: curCol }); setModal("shift"); } }}
+        onCtx={(x, ev) => {
         const r = emp.findIndex((e) => e[1] === x.n);
         if (r < 0) return;
         const code = grid[r]?.[curCol] ?? "off";
@@ -1191,7 +1208,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
 
 type DayRow = { i: string; n: string; c: string; dep: string; l: string; h: number; type: string; start: number };
 
-function DayView({ day, col, rows, onAdd, onCtx, need = 0 }: { day: Date; col: number; rows: DayRow[]; onAdd: () => void; onCtx: (x: DayRow, ev: React.MouseEvent) => void; need?: number }) {
+function DayView({ day, col, rows, onAdd, onEdit, onCtx, need = 0 }: { day: Date; col: number; rows: DayRow[]; onAdd: () => void; onEdit: (x: DayRow) => void; onCtx: (x: DayRow, ev: React.MouseEvent) => void; need?: number }) {
   const { t } = useLang();
   const tot = rows.reduce((a, x) => a + x.h, 0);
   // Parse "08:00–16:00" / "08–16" labels into fractional hours.
@@ -1249,7 +1266,7 @@ function DayView({ day, col, rows, onAdd, onCtx, need = 0 }: { day: Date; col: n
                         <div
                           className={`dtl-bar ${x.type}`}
                           style={{ left: `${pct(x.span.s)}%`, width: `${Math.max(4, pct(x.span.e) - pct(x.span.s))}%` }}
-                          onClick={onAdd}
+                          onClick={() => onEdit(x)}
                           onContextMenu={(ev) => onCtx(x, ev)}
                           title={`${x.n} · ${x.l} · ${t("hægrismelltu fyrir aðgerðir")}`}
                         >
@@ -1326,10 +1343,6 @@ function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOp
   const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   const [rows, setRows] = useState(entries);
   useEffect(() => { setRows(entries); }, [entries]); // eslint-disable-line react-hooks/set-state-in-effect -- nýjar færslur utan frá
-  const [nName, setNName] = useState(names[0]?.ref ?? "");
-  const t0 = (types[0]?.t ?? "08:00–16:00").split("–");
-  const [nStart, setNStart] = useState(t0[0]?.slice(0, 5) ?? "08:00");
-  const [nEnd, setNEnd] = useState(t0[1]?.slice(0, 5) ?? "16:00");
   const [busy, setBusy] = useState(false);
   // Tegund aðeins ef tímar passa nákvæmlega við eina tegund — annars engin (ekki rangt álag).
   const typeOf = (start: string, end: string) => {
@@ -1339,56 +1352,58 @@ function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOp
   const DN = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
   const title = `${tr(DN[(date.getDay() + 6) % 7])} ${date.getDate()}. ${tr(MONTHS_IS[date.getMonth()])}`;
 
-  async function saveRow(i: number) {
-    const r = rows[i];
-    if (r.start >= r.end) { toast("Lok verða að vera eftir upphaf"); return; }
+  // Sama vaktaform og í öðrum sýnum: smellt á vakt (eða „Ný vakt“) opnar ShiftForm.
+  const [editing, setEditing] = useState<{ i: number | null; ref: string } | null>(null);
+  async function save(ref: string, start: string, end: string, type: string) {
     setBusy(true);
-    const res = await saveShift({ employeeName: r.ref, date: iso, startTime: r.start, endTime: r.end, shiftTypeName: r.tn || typeOf(r.start, r.end) });
+    const res = await saveShift({ employeeName: ref, date: iso, startTime: start, endTime: end, shiftTypeName: type || typeOf(start, end) });
     setBusy(false);
     toast(res.ok ? (res.demo ? "Vistað (demo)" : tr("Vakt vistuð")) : (res.error ?? "Villa"));
-    if (res.ok) onChanged();
+    if (res.ok) { setEditing(null); onChanged(); }
   }
-  async function delRow(i: number) {
+  async function del(i: number) {
     const r = rows[i];
     setBusy(true);
     const res = await deleteShift({ employeeName: r.ref, dateISO: iso });
     setBusy(false);
     toast(res.ok ? (res.demo ? "Eytt (demo)" : tr("Vakt eytt")) : (res.error ?? "Villa"));
-    if (res.ok) { setRows((rs) => rs.filter((_, j) => j !== i)); onChanged(); }
+    if (res.ok) { setRows((rs) => rs.filter((_, j) => j !== i)); setEditing(null); onChanged(); }
   }
-  async function addRow() {
-    if (!nName) return;
-    if (nStart >= nEnd) { toast("Lok verða að vera eftir upphaf"); return; }
-    setBusy(true);
-    const res = await saveShift({ employeeName: nName, date: iso, startTime: nStart, endTime: nEnd, shiftTypeName: typeOf(nStart, nEnd) });
-    setBusy(false);
-    toast(res.ok ? (res.demo ? "Vistað (demo)" : tr("Vakt vistuð")) : (res.error ?? "Villa"));
-    if (res.ok) onChanged();
+
+  if (editing) {
+    const r = editing.i != null ? rows[editing.i] : null;
+    return (
+      <ShiftSheet title={`${r ? r.first : tr("Ný vakt")} · ${title}`} onClose={() => setEditing(null)}>
+        <ShiftForm types={types} isEdit={!!r} onClose={() => setEditing(null)}
+          initial={r ? { type: r.tn || typeOf(r.start, r.end), start: r.start, end: r.end } : defaultsFor(types)}
+          head={!r ? (
+            <div className="field"><label>{tr("Starfsmaður")}</label>
+              <select value={editing.ref} onChange={(e) => setEditing({ i: null, ref: e.target.value })}>
+                {names.map((n) => <option key={n.ref} value={n.ref}>{n.name}</option>)}
+              </select>
+            </div>
+          ) : undefined}
+          onSave={(st, en, ty) => save(r ? r.ref : editing.ref, st, en, ty)}
+          onDelete={editing.i != null ? () => del(editing.i!) : undefined} />
+      </ShiftSheet>
+    );
   }
 
   return (
     <Modal onClose={onClose} title={title}>
-      {rows.length === 0 && <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>{tr("Engar vaktir þennan dag — bættu við hér fyrir neðan.")}</p>}
-      {rows.map((r, i) => (
-        <div key={`${r.first}-${i}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--line2)" }}>
-          <b style={{ flex: 1, fontSize: 13.5 }}>{r.first}</b>
-          <TimeField value={r.start} onChange={(v) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, start: v } : x)))} style={{ width: 76 }} />
-          <span className="muted">–</span>
-          <TimeField value={r.end} onChange={(v) => setRows((rs) => rs.map((x, j) => (j === i ? { ...x, end: v } : x)))} style={{ width: 76 }} />
-          <button className="btn ghost sm" disabled={busy} onClick={() => saveRow(i)}>{tr("Vista")}</button>
-          <button className="x" title={tr("Eyða vakt")} disabled={busy} onClick={() => delRow(i)}>✕</button>
-        </div>
-      ))}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12 }}>
-        <select value={nName} onChange={(e) => setNName(e.target.value)} style={{ flex: 1 }}>
-          {names.map((n) => <option key={n.ref} value={n.ref}>{n.name}</option>)}
-        </select>
-        <TimeField value={nStart} onChange={setNStart} style={{ width: 76 }} />
-        <span className="muted">–</span>
-        <TimeField value={nEnd} onChange={setNEnd} style={{ width: 76 }} />
-        <button className="btn sm" disabled={busy} onClick={addRow}>{tr("Bæta við")}</button>
-      </div>
-      <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
+      {rows.length === 0 && <p className="muted" style={{ fontSize: 13, marginBottom: 10 }}>{tr("Engar vaktir þennan dag.")}</p>}
+      {rows.map((r, i) => {
+        const ty = types.find((x) => x.nm === (r.tn || typeOf(r.start, r.end)));
+        return (
+          <button type="button" key={`${r.first}-${i}`} className="sf-row" disabled={busy} onClick={() => setEditing({ i, ref: r.ref })}>
+            <b>{r.first}</b>
+            {ty && <span className="mr-tool" style={{ background: ty.bg, borderColor: ty.bd, color: ty.fg, padding: "2px 9px", fontSize: 11.5 }}>{tr(ty.nm)}</span>}
+            <span className="muted" style={{ marginLeft: "auto", fontVariantNumeric: "tabular-nums" }}>{r.start}–{r.end}</span>
+          </button>
+        );
+      })}
+      <div style={{ display: "flex", gap: 9, marginTop: 14, flexWrap: "wrap" }}>
+        <button className="btn" disabled={busy || !names.length} onClick={() => setEditing({ i: null, ref: names[0]?.ref ?? "" })}>{tr("+ Ný vakt")}</button>
         <button className="btn ghost" onClick={onOpenDayView}>{tr("Opna dagsýn")}</button>
         <button className="btn ghost" onClick={onClose}>{tr("Loka")}</button>
       </div>
@@ -1525,22 +1540,18 @@ function ShiftEditModal({
   onDelete: (r: number, c: number) => void;
   onClose: () => void; onCopy: () => void; onTypes: () => void;
 }) {
+  // Sama vaktaform og í mánaðartöflunni (shift-form.tsx); hér bætist við val á starfsmanni/degi og verkefni.
   const { t: tr } = useLang();
   const [ri, setRi] = useState(sel.r < emp.length ? sel.r : 0);
   const [ci, setCi] = useState(sel.c);
   const tt0 = timeOf(sel.r, sel.c);
   // Tegund vaktarinnar sem er breytt (áður alltaf fyrsta tegundin → vistun skipti um tegund).
-  // Ný vakt: fyrsta tegund með föstum tíma, og tímar hennar.
-  const firstTimed = types.find((x) => /^\d{2}:\d{2}/.test(x.t ?? ""));
-  const timesOf = (x?: ShiftType) => { const [a, b] = (x?.t ?? "").split("–").map((v) => v?.trim().slice(0, 5)); return a && b ? [a, b] : null; };
   const existingType = cellType(sel.r, sel.c);
-  const guessed = tt0 ? types.find((x) => { const tm = timesOf(x); return tm && tm[0] === tt0.start && tm[1] === tt0.end; })?.nm : undefined;
-  const [type, setType] = useState(existingType || guessed || (tt0 ? "Sérsniðin vakt" : firstTimed?.nm ?? types[0]?.nm ?? "Dagvakt"));
-  const [start, setStart] = useState(tt0?.start ?? timesOf(firstTimed)?.[0] ?? "08:00");
-  const [end, setEnd] = useState(tt0?.end ?? timesOf(firstTimed)?.[1] ?? "16:00");
+  const guessed = tt0 ? types.find((x) => { const tm = typeTimes(x); return tm && tm[0] === tt0.start && tm[1] === tt0.end; })?.nm : undefined;
+  const init = tt0 ? { type: existingType || guessed || "", start: tt0.start, end: tt0.end } : defaultsFor(types);
   const filled = gridCode(ri, ci) !== "off";
   const DNAMES = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
-  // Checklist for this employee+day (Sling-parity "shift tasks").
+  // Verkefni vaktarinnar (starfsmaður hakar við í Mitt svæði).
   const [tasks, setTasks] = useState<string[]>([]);
   const [newTask, setNewTask] = useState("");
   const dateISOOf = (c: number) => {
@@ -1556,48 +1567,42 @@ function ShiftEditModal({
     const all = newTask.trim() ? [...tasks, newTask.trim()] : tasks;
     await saveShiftTasks(emp[ri] ? empRef(emp[ri]) : "", dateISOOf(ci), all);
   }
+  const addTask = () => { if (newTask.trim()) { setTasks((ts) => [...ts, newTask.trim()]); setNewTask(""); } };
+  const d = weekDays[ci];
   return (
-    <Modal onClose={onClose} title={filled ? tr("Breyta vakt") : tr("Ný vakt")}>
-      <div style={{ display: "flex", gap: 10 }}>
-        <div className="field" style={{ flex: 1.4 }}><label>{tr("Starfsmaður")}</label>
-          <select value={ri} onChange={(e) => setRi(Number(e.target.value))}>{emp.map((x, i) => <option key={i} value={i}>{x[1]}</option>)}</select>
-        </div>
-        <div className="field" style={{ flex: 1 }}><label>{tr("Dagur")}</label>
-          <select value={ci} onChange={(e) => setCi(Number(e.target.value))}>{weekDays.map((d, i) => <option key={i} value={i}>{tr(DNAMES[i]).slice(0, 3)} {d.getDate()}.{d.getMonth() + 1}</option>)}</select>
-        </div>
-      </div>
-      <div className="field"><label>{tr("Vaktategund")}</label><select value={type} onChange={(e) => { setType(e.target.value); const ty = types.find((t) => t.nm === e.target.value); if (ty) { const [a, b] = ty.t.split("–"); if (a && b) { setStart(a.trim().slice(0, 5)); setEnd(b.trim().slice(0, 5)); } } }}>{types.map((t) => <option key={t.nm} value={t.nm}>{tr(t.nm)} · {t.t}</option>)}<option value="Sérsniðin vakt">{tr("Sérsniðin vakt")}</option></select></div>
-      <div style={{ display: "flex", gap: 10 }}>
-        <div className="field" style={{ flex: 1 }}><label>{tr("Upphaf")}</label><TimeField value={start} onChange={setStart} style={{ width: "100%" }} /></div>
-        <div className="field" style={{ flex: 1 }}><label>{tr("Lok")}</label><TimeField value={end} onChange={setEnd} style={{ width: "100%" }} /></div>
-      </div>
-      <p className="muted" style={{ fontSize: 11.5, margin: "-6px 0 8px" }}>{tr("Veldu tilbúna vaktategund eða stilltu tíma sjálf/ur. Vantar tegund?")} <a onClick={() => { onClose(); onTypes(); }} style={{ color: "var(--brand)", fontWeight: 600, cursor: "pointer" }}>{tr("Búa til vaktategund")}</a></p>
-      <div className="field">
-        <label>{tr("Verkefni vaktarinnar")}</label>
-        {tasks.map((title, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 13.5 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--ink3)" strokeWidth="2"><path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" /></svg>
-            <span style={{ flex: 1 }}>{title}</span>
-            <button className="x" style={{ fontSize: 12 }} onClick={() => setTasks((ts) => ts.filter((_, j) => j !== i))}>✕</button>
+    <ShiftSheet title={`${filled ? tr("Breyta vakt") : tr("Ný vakt")} · ${emp[ri]?.[1] ?? ""} · ${tr(DNAMES[ci]).slice(0, 3)} ${d.getDate()}.${d.getMonth() + 1}.`} onClose={onClose}>
+      <ShiftForm types={types} initial={init} isEdit={filled} onTypes={onTypes} onClose={onClose}
+        head={
+          <div style={{ display: "flex", gap: 10 }}>
+            <div className="field" style={{ flex: 1.4 }}><label>{tr("Starfsmaður")}</label>
+              <select value={ri} onChange={(e) => setRi(Number(e.target.value))}>{emp.map((x, i) => <option key={i} value={i}>{x[1]}</option>)}</select>
+            </div>
+            <div className="field" style={{ flex: 1 }}><label>{tr("Dagur")}</label>
+              <select value={ci} onChange={(e) => setCi(Number(e.target.value))}>{weekDays.map((dd, i) => <option key={i} value={i}>{tr(DNAMES[i]).slice(0, 3)} {dd.getDate()}.{dd.getMonth() + 1}</option>)}</select>
+            </div>
           </div>
-        ))}
-        <div style={{ display: "flex", gap: 8 }}>
-          <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder={tr("t.d. Opna kassa, fylla á sósur…")}
-            onKeyDown={(e) => { if (e.key === "Enter" && newTask.trim()) { setTasks((ts) => [...ts, newTask.trim()]); setNewTask(""); } }} style={{ flex: 1 }} />
-          <button className="btn ghost sm" onClick={() => { if (newTask.trim()) { setTasks((ts) => [...ts, newTask.trim()]); setNewTask(""); } }}>{tr("Bæta við")}</button>
-        </div>
-        <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>{tr("Starfsmaðurinn hakar við verkefnin í Mitt svæði á vaktinni.")}</p>
-      </div>
-      {filled && onSick && emp[ri]?.[4] && <SickOnShift employeeId={emp[ri][4]!} name={emp[ri][1]} dateISO={dateISOOf(ci)} onDone={() => onSick(ri, ci)} />}
-      <div style={{ display: "flex", gap: 9, marginTop: 8, flexWrap: "wrap" }}>
-        <button className="btn" onClick={async () => { if (start >= end) { toast("Lok verða að vera eftir upphaf"); return; } await persistTasks(); onSave(ri, ci, start, end, type); }}>{tr("Vista")}</button>
-        {filled && <button className="btn ghost" style={{ color: "var(--bad)", borderColor: "var(--bad-soft, #f3c7c0)" }} onClick={() => onDelete(ri, ci)}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13" /></svg>{tr("Eyða vakt")}
-        </button>}
-        <button className="btn ghost" onClick={onCopy}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M4 16V5a1 1 0 0 1 1-1h11" /></svg>{tr("Afrita")}</button>
-        <button className="btn ghost" onClick={onClose}>{tr("Loka")}</button>
-      </div>
-    </Modal>
+        }
+        sick={onSick && emp[ri]?.[4] ? { employeeId: emp[ri][4]!, name: emp[ri][1], dateISO: dateISOOf(ci), onDone: () => onSick(ri, ci) } : null}
+        extra={
+          <details className="sf-tasks" open={tasks.length > 0}>
+            <summary>{tr("Verkefni vaktarinnar")}{tasks.length ? ` (${tasks.length})` : ""}</summary>
+            {tasks.map((title, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0", fontSize: 13.5 }}>
+                <span style={{ flex: 1 }}>{title}</span>
+                <button className="x" style={{ fontSize: 12 }} onClick={() => setTasks((ts) => ts.filter((_, j) => j !== i))} aria-label={tr("Eyða")}>✕</button>
+              </div>
+            ))}
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <input value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder={tr("t.d. Opna kassa, fylla á sósur…")}
+                onKeyDown={(e) => { if (e.key === "Enter") addTask(); }} style={{ flex: 1, minWidth: 0 }} />
+              <button className="btn ghost sm" type="button" onClick={addTask}>{tr("Bæta við")}</button>
+            </div>
+            <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>{tr("Starfsmaðurinn hakar við verkefnin í Mitt svæði á vaktinni.")}</p>
+          </details>
+        }
+        onSave={async (start, end, type) => { await persistTasks(); onSave(ri, ci, start, end, type); }}
+        onDelete={() => onDelete(ri, ci)} onCopy={onCopy} />
+    </ShiftSheet>
   );
 }
 
