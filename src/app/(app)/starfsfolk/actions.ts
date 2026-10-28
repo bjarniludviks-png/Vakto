@@ -9,6 +9,7 @@ import { nf } from "@/lib/format";
 import { templateToPayRule, type RuleSet as TplRuleSet } from "@/lib/rules";
 import { getTimeBank } from "../skyrslur/timebank.server";
 import { sendContractEmail } from "@/lib/email";
+import { sanitizePerms, type UserPerms } from "@/lib/user-permissions";
 import { inviteToCompany } from "@/lib/invite.server";
 import type { CustomRules } from "@/lib/payrules";
 import { headers } from "next/headers";
@@ -17,7 +18,7 @@ import { taktikalEnabled } from "@/lib/taktikal.server";
 import type { SignatureRecord } from "@/lib/contract-pdf";
 import { userError } from "@/lib/user-error";
 import { resolvePay, type PaySettings } from "@/lib/paysettings";
-import { resolveOrlof } from "@/lib/payrules";
+import { resolveOrlof, UNION_PRESETS } from "@/lib/payrules";
 import type { PayslipDetail } from "@/lib/doc-pdf";
 import { ytdFor, ytdRowFrom } from "@/lib/payslip-ytd";
 import { normKennitala } from "@/lib/staff-import";
@@ -47,6 +48,12 @@ export type NewEmployeeInput = {
   ruleTemplateId?: string;
   contractType?: string;
   schedulePattern?: string; // SchedulePattern.kind
+  /** Staðall sem félagið er reiknað eftir (lykill í UNION_PRESETS) — t.d. VSFK → „Efling – veitingar/SGS“. */
+  payAgreement?: string;
+  /** Starfsaldur (mánuðir) fyrir ráðningardag sem telst með í réttindum (0097). */
+  priorServiceMonths?: number;
+  /** Aðgangur vaktstjóra (aðeins eigandi getur valið). */
+  permissions?: UserPerms | null;
 };
 
 export type ActionResult = { ok: boolean; demo?: boolean; error?: string; id?: string; invited?: boolean; inviteError?: string;
@@ -123,6 +130,11 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
     if (!company) return { ok: false, error: "Fyrirtæki fannst ekki — tengdu reikninginn." };
     const eb = await employeeBlock(company); // Frítt: mest 5 starfsmenn (0089)
     if (eb) return { ok: false, error: eb };
+    // Aðeins eigandi býr til eiganda eða velur aðgang vaktstjóra.
+    const { data: { user: me } } = await supabase.auth.getUser();
+    const { data: meRow } = me ? await supabase.from("users").select("role").eq("id", me.id).maybeSingle() : { data: null };
+    const callerOwner = meRow?.role === "owner";
+    if (roleEnum(input.role) === "owner" && !callerOwner) return { ok: false, error: "Aðeins eigandi getur gert annan að eiganda" };
     let tplRes = await resolveUnionTemplate(supabase, company, input.union);
     if (!tplRes.payRule && input.ruleTemplateId)
       tplRes = await resolveUnionTemplate(supabase, company, `tpl:${input.ruleTemplateId}`);
@@ -149,7 +161,7 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
       rate: num(input.rate, 2900),
       employment_ratio: num(input.employmentRatio, 100),
       union_agreement: tplRes.union || "Efling",
-      ...(tplRes.payRule ? { pay_rule: tplRes.payRule } : {}),
+      ...(tplRes.payRule ? { pay_rule: tplRes.payRule } : input.payAgreement && UNION_PRESETS[input.payAgreement] ? { pay_rule: { agreement: input.payAgreement } } : {}),
       monthly_hours: input.monthlyHours ? num(input.monthlyHours, 0) || null : null,
       hire_date: input.hireDate || null,
       status: "active" as const,
@@ -177,6 +189,12 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
       }).eq("id", created.id);
       if (adErr) console.error("createEmployee address", adErr.message);
     }
+    // Starfsaldur sem telst með (0097) — sér uppfærsla svo stofnun virki þótt migration vanti.
+    const prior = Math.max(0, Math.min(600, Math.round(Number(input.priorServiceMonths) || 0)));
+    if (created?.id && prior) {
+      const { error: psErr } = await supabase.from("employees").update({ prior_service_months: prior }).eq("id", created.id);
+      if (psErr) console.error("createEmployee prior_service_months", psErr.message);
+    }
 
     const { data: { user } } = await supabase.auth.getUser();
     await logAudit(supabase, company, user?.id ?? null, {
@@ -185,7 +203,7 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
     // „Stofna & senda boð“: netfang → boð í VAKTO (eða tenging við aðgang sem er til).
     let invited = false, inviteError: string | undefined;
     if (input.email?.trim()) {
-      const inv = await inviteToCompany(company, input.email, input.role ?? "Starfsmaður");
+      const inv = await inviteToCompany(company, input.email, input.role ?? "Starfsmaður", callerOwner ? sanitizePerms(input.permissions ?? null) : null);
       invited = inv.ok && inv.sent;
       if (!inv.ok) inviteError = inv.error;
     }
@@ -411,6 +429,10 @@ export type UpdateEmployeeInput = {
   department?: string;
   location?: string;
   hireDate?: string;
+  /** Starfsaldur (mánuðir) fyrir ráðningardag sem telst með í réttindum (0097). */
+  priorServiceMonths?: number;
+  /** Staðall sem félagið er reiknað eftir; "" = sjálfvirkt út frá félaginu. Hunsað með „Eigin reglur“. */
+  payAgreement?: string;
   payRule?: CustomRules | null;
   permissions?: Record<string, boolean> | null;
   benefits?: { name: string; type: string; amount: number }[] | null;
@@ -610,6 +632,17 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
     // Custom pay-rule set — best-effort (ignored before migration 0013).
     if (input.payRule !== undefined) {
       await supabase.from("employees").update({ pay_rule: input.payRule }).eq("id", id);
+    } else if (input.payAgreement !== undefined) {
+      // Staðall fyrir félag sem er ekki sjálft staðall: geymt í pay_rule.agreement, annað í pay_rule óhreyft.
+      const { data: cur } = await supabase.from("employees").select("pay_rule").eq("id", id).maybeSingle();
+      const pr = { ...((cur?.pay_rule as Record<string, unknown> | null) ?? {}) };
+      if (input.payAgreement && UNION_PRESETS[input.payAgreement]) pr.agreement = input.payAgreement; else delete pr.agreement;
+      await supabase.from("employees").update({ pay_rule: Object.keys(pr).length ? pr : null }).eq("id", id);
+    }
+    if (input.priorServiceMonths !== undefined) {
+      const m = Math.max(0, Math.min(600, Math.round(Number(input.priorServiceMonths) || 0)));
+      const { error: psErr } = await supabase.from("employees").update({ prior_service_months: m }).eq("id", id);
+      if (psErr) console.error("updateEmployee prior_service_months", psErr.message); // fyrir 0097
     }
     // Permissions + benefits — best-effort (ignored before migration 0016).
     if (input.permissions !== undefined) await supabase.from("employees").update({ permissions: input.permissions }).eq("id", id);
@@ -635,7 +668,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
 
 const DEMO_DEPARTMENTS = ["Eldhús", "Sal", "Stjórnun"];
 
-export type CompanyOptions = { departments: string[]; positions: string[]; locations: string[] };
+export type CompanyOptions = { departments: string[]; positions: string[]; locations: string[]; isOwner?: boolean };
 
 /** Department name → color (for schedule/staff labels). Empty when 0038 hasn't run. */
 export async function getDepartmentColors(): Promise<Record<string, string>> {
@@ -670,7 +703,10 @@ export async function getCompanyOptions(): Promise<CompanyOptions> {
       supabase.from("locations").select("name").eq("company_id", company).order("name"),
     ]);
     const uniq = (xs: (string | null)[]) => Array.from(new Set(xs.filter(Boolean))) as string[];
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: me } = user ? await supabase.from("users").select("role").eq("id", user.id).maybeSingle() : { data: null };
     return {
+      isOwner: me?.role === "owner",
       departments: uniq((deps.data ?? []).map((d) => d.name as string)),
       positions: uniq((pos.data ?? []).map((d) => d.name as string)),
       locations: uniq((locs.data ?? []).map((d) => d.name as string)),

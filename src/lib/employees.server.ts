@@ -66,6 +66,9 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
     // Breytilegt starfshlutfall (0093) — sér fyrirspurn svo listinn virki þótt migration vanti.
     const rv = await supabase.from("employees").select("id, ratio_variable").eq("ratio_variable", true);
     const variable = new Set((rv.error ? [] : rv.data ?? []).map((x) => x.id as string));
+    // Starfsaldur sem telst með fyrir ráðningardag + skráningardagur (0097) — þolir að migration vanti.
+    const psq = await supabase.from("employees").select("id, prior_service_months, created_at");
+    const prior = new Map((psq.error ? [] : psq.data ?? []).map((x) => [x.id as string, { m: Number(x.prior_service_months) || 0, c: String(x.created_at ?? "").slice(0, 10) }]));
     // Launaliðir (0081) + orlof (0021): sér fyrirspurn svo listinn virki þótt migration vanti.
     const paq = await supabase.from("employees").select("id, pay_settings, orlof, benefits");
     const payOf = new Map((paq.error ? [] : paq.data ?? []).map((x) => [x.id as string, x as { pay_settings: Partial<PaySettings> | null; orlof: Partial<OrlofSet> | null; benefits: Employee["benefits"] }]));
@@ -86,6 +89,8 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
       postalCode: extra.get(r.id)?.postal_code ?? null,
       city: extra.get(r.id)?.city ?? null,
       hireDate: extra.get(r.id)?.hire_date ?? null,
+      priorServiceMonths: prior.get(r.id)?.m ?? 0,
+      createdOn: prior.get(r.id)?.c || null,
       id: r.id,
       fullName: r.full_name,
       title: r.title,

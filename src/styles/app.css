@@ -2027,3 +2027,9 @@ html.dark .mroster .sh{background:#23264a;color:#c7ccff}
   .mroster .nm{min-width:110px;max-width:130px}
   .db2x.sched-full{padding:10px}
 }
+/* Hlutverkaspjöld í gluggum (Bjóða notanda, Breyta aðgangi) */
+.modal.wide{max-width:680px}
+.modal .ne-roles{grid-template-columns:repeat(2,minmax(0,1fr))}
+.acc-head{display:flex;align-items:center;gap:12px}
+.acc-head .av{width:40px;height:40px;border-radius:12px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
+.acc-head small{display:block;color:var(--ink3);font-size:12px;font-weight:500}

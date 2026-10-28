@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
 import { userError } from "@/lib/user-error";
-import { notifyManagers } from "@/lib/push";
+import { notifyEmployees, notifyManagers } from "@/lib/push";
 import { getRights, type EmployeeRights } from "@/lib/rights.server";
 
 // Réttindi og fjarvistir á starfsmannaspjaldi: lesa stöðu, skrá veikindi/frí, uppfæra orlofsprósentu.
@@ -59,6 +59,12 @@ export async function registerAbsence(input: { employeeId: string; type: Absence
       const { data } = await supabase.from("shifts").update({ employee_id: null, note: `Laus vegna fjarvistar (${LBL[input.type].toLowerCase()})` })
         .eq("company_id", company).eq("employee_id", emp.id).gte("date", input.from).lte("date", input.to).select("id");
       freed = data?.length ?? 0;
+      // Laus vakt í dag eða síðar → starfsfólk fær tilkynningu og getur sótt um (sama og „Laus vakt“ í Vaktaplani).
+      const today = new Date().toISOString().slice(0, 10);
+      if (freed && input.to >= today) {
+        const d = (iso: string) => { const [, m, dd] = iso.split("-"); return `${+dd}.${+m}.`; };
+        void notifyEmployees(company, { title: freed > 1 ? "Lausar vaktir" : "Laus vakt", body: `${d(input.from)}${input.to !== input.from ? `–${d(input.to)}` : ""} · ${freed > 1 ? `${freed} vaktir` : "vakt"} laus vegna forfalla. Sæktu um í appinu.`, url: "/mitt-svaedi", tag: "open-shift" });
+      }
     }
     await logAudit(supabase, company, userId, {
       action: "leave.register", entity: "employee", entityId: emp.id as string,

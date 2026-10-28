@@ -19,6 +19,9 @@ export type EmployeeRights = {
   union: string | null;
   agreement: AgreementInfo | null;
   hireDate: string | null;
+  priorServiceMonths: number;
+  /** Ráðningardagur vantar, eða er sami dagur og skráningin í VAKTO (líklega látinn standa á „í dag“). */
+  hireSuspect: "missing" | "same-as-created" | null;
   birthKnown: boolean;
   orlof: { right: OrlofRight | null; balance: OrlofBalance | null; pctSet: number; pctBehind: boolean };
   sick: { right: SickRight | null; used: number; over: boolean; near: boolean };
@@ -35,10 +38,16 @@ export async function getRights(supabase: SupabaseClient, employeeIds?: string[]
   // Skráð veikindi fram í tímann (t.d. út vikuna) teljast strax með.
   const horizon = addMonths(today, 3);
   let eq = supabase.from("employees")
-    .select("id, full_name, union_agreement, kennitala, hire_date, orlof, status, departments(name)")
+    .select("id, full_name, union_agreement, kennitala, hire_date, orlof, status, prior_service_months, created_at, departments(name)")
     .neq("status", "inactive");
   if (employeeIds?.length) eq = eq.in("id", employeeIds);
-  const { data: emps, error } = await eq.order("full_name");
+  let res = await eq.order("full_name");
+  if (res.error && /prior_service_months|created_at/.test(res.error.message)) { // fyrir 0097
+    let q2 = supabase.from("employees").select("id, full_name, union_agreement, kennitala, hire_date, orlof, status, departments(name)").neq("status", "inactive");
+    if (employeeIds?.length) q2 = q2.in("id", employeeIds);
+    res = (await q2.order("full_name")) as unknown as typeof res;
+  }
+  const { data: emps, error } = res;
   if (error || !emps?.length) return [];
   const ids = emps.map((e) => e.id as string);
   const leaveQ = (cols: string) => supabase.from("leave_requests").select(cols)
@@ -52,15 +61,19 @@ export async function getRights(supabase: SupabaseClient, employeeIds?: string[]
     const union = (e.union_agreement as string | null) ?? null;
     const fam = familyFor(union);
     const hire = (e.hire_date as string | null) ?? null;
+    const priorM = Math.max(0, Number((e as { prior_service_months?: number }).prior_service_months) || 0);
+    // Starfsaldur telur frá ráðningardegi mínus starfsaldur sem telst með (t.d. fyrri ráðning hjá fyrirtækinu).
+    const start = hire ? addMonths(hire, -priorM) : null;
+    const createdOn = String((e as { created_at?: string }).created_at ?? "").slice(0, 10);
     const birth = birthDateFromKennitala(e.kennitala as string | null);
     const mine = (leaves ?? []).filter((l) => l.employee_id === id);
     const approved = mine.filter((l) => l.status === "approved");
     const used = (type: string) => approved.filter((l) => l.type === type)
       .reduce((a, l) => a + workdaysIn(l.from_date as string, l.to_date as string, since, horizon), 0);
     const pctSet = Number((e.orlof as { pct?: number } | null)?.pct) || 10.17;
-    const oRight = fam ? orlofRight({ family: fam, hireDate: hire, birth, asOf: today }) : null;
-    const sRight = fam ? sickRight({ family: fam, hireDate: hire, asOf: today }) : null;
-    const cRight = childSickRight({ hireDate: hire, asOf: today });
+    const oRight = fam ? orlofRight({ family: fam, hireDate: start, birth, asOf: today }) : null;
+    const sRight = fam ? sickRight({ family: fam, hireDate: start, asOf: today }) : null;
+    const cRight = childSickRight({ hireDate: start, asOf: today });
     const sickUsed = used("veikindi"), childUsed = used("veikindi_barns");
     const next: { date: string; text: string }[] = [];
     if (oRight?.next) next.push({ date: oRight.next.from, text: `Orlof hækkar í ${oRight.next.days} daga (${String(oRight.next.pct).replace(".", ",")} %)` });
@@ -73,6 +86,8 @@ export async function getRights(supabase: SupabaseClient, employeeIds?: string[]
       union,
       agreement: fam ? AGREEMENTS[fam] : null,
       hireDate: hire,
+      priorServiceMonths: priorM,
+      hireSuspect: !hire ? "missing" : createdOn && hire === createdOn ? "same-as-created" : null,
       birthKnown: !!birth,
       orlof: { right: oRight, balance: balances.get(id) ?? null, pctSet, pctBehind: !!oRight && pctSet + 0.001 < oRight.now.pct },
       sick: { right: sRight, used: sickUsed, over: !!sRight && sickUsed > sRight.days, near: !!sRight && sRight.days > 0 && sickUsed >= sRight.days * 0.8 },

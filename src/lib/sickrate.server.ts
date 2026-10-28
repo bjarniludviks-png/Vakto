@@ -11,7 +11,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getEmployees } from "@/lib/employees.server";
-import { getPayPeriodStart } from "@/lib/pay-period.server";
+import { getPayPeriod } from "@/lib/pay-period.server";
 import { getMyScope } from "@/lib/scope.server";
 import { daysIn, lastRanges, todayISO, type Gran } from "@/lib/periods";
 
@@ -30,7 +30,7 @@ export async function getSickRate(gran: Gran = "month", count = SICK_COUNT[gran]
   const empty: SickRate = { live: false, gran, startDay: 1, company: "", buckets: [] };
   if (!isSupabaseConfigured()) return empty;
   try {
-    const [{ employees, live }, startDay, scope] = await Promise.all([getEmployees(), getPayPeriodStart(), getMyScope()]);
+    const [{ employees, live }, startDay, scope] = await Promise.all([getEmployees(), getPayPeriod(), getMyScope()]);
     if (!live) return empty;
     if (scope.role !== "owner" && scope.role !== "manager") return { ...empty, startDay };
     const supabase = await createClient();

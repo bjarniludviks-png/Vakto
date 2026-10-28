@@ -11,7 +11,8 @@ import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "@/lib/contract-pdf";
 import { updateEmployee, uploadDocument, importEmployees, inviteEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, getExtraDepartments, setExtraDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow, getContractProgress, syncContractStatus, openSignedContractPdf, resendContract, restoreContract, listEmployeePayslips, type EmployeePayslip, type ContractProgress, type EmployeeContractState } from "./actions";
 import { RightsPanel } from "./rights-panel";
-import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
+import { AgreementSummary } from "@/components/app/agreement-summary";
+import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, hasIgnoredCustomRules, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
 import { PERM_FIELDS, resolvePerms, BENEFIT_PRESETS, BENEFIT_NAMES, benefitPreset, isTaxable, type Benefit } from "@/lib/permissions";
 import { TimeField, DateField, BankField } from "@/components/app/fields";
 import { useCountry } from "@/components/app/country";
@@ -358,7 +359,9 @@ function LaunTab({ e }: { e: Employee }) {
   const isTpl = union.startsWith("tpl:");
   const custom = union === CUSTOM_UNION || isTpl;
   const [rules, setRules] = useState<RuleSet>(resolveRuleSet(CUSTOM_UNION, e.payRule));
-  const shown = custom ? rules : (UNION_PRESETS[union] ?? UNION_PRESETS["Efling"]);
+  const [agreement, setAgreement] = useState<string>(e.payRule?.agreement ?? "");
+  const shown = custom ? rules : resolveRuleSet(union, agreement ? { agreement } : null);
+  const ignoredCustom = !custom && hasIgnoredCustomRules(union, e.payRule);
   // Custom overtime thresholds + user-defined premium bands (0 = off for monthly).
   const [otWeekly, setOtWeekly] = useState<number>(e.payRule?.otWeekly ?? DEFAULT_OT_WEEKLY);
   const [otMonthly, setOtMonthly] = useState<number>(e.payRule?.otMonthly ?? 0);
@@ -483,6 +486,7 @@ function LaunTab({ e }: { e: Employee }) {
           <select name="union" value={union} onChange={(ev) => {
             const v = ev.target.value;
             setUnion(v);
+            setAgreement("");
             if (v.startsWith("tpl:")) {
               const tp = tpls.find((x) => `tpl:${x.id}` === v);
               if (tp) {
@@ -521,6 +525,15 @@ function LaunTab({ e }: { e: Employee }) {
         // International mode: no union presets — always the standardized rule engine.
         <input type="hidden" name="union" value={CUSTOM_UNION} />
       )}
+      {isIS && !custom && <>
+        <input type="hidden" name="payAgreement" value={agreement} />
+        <AgreementSummary union={union} agreement={agreement} onAgreement={setAgreement} hireDate={e.hireDate ?? null} priorMonths={e.priorServiceMonths ?? 0} kennitala={e.kennitala ?? null} />
+        {ignoredCustom && (
+          <p style={{ fontSize: 12, color: "var(--warn)", margin: "6px 0 0", lineHeight: 1.5 }}>
+            Á spjaldinu eru vistaðar eigin álagsreglur sem eru <b>ekki notaðar</b> — launin reiknast eftir staðlinum hér að ofan. Veldu „Eigin reglur“ ef þær eiga að gilda.
+          </p>
+        )}
+      </>}
       <div className="statline">
         <span className="k">Lífeyrissjóður <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· á launaseðil & samning</span></span>
         <Autocomplete value={pension} onChange={setPension} onCommit={savePension} suggestions={PENSION_FUNDS}
@@ -915,6 +928,11 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
         {fld("Kennitala", "pKennitala", e.kennitala, "000000-0000", { inputMode: "numeric" })}
         <div className="emp-fld"><label>Ráðningardagur</label><DateField full name="pHireDate" defaultValue={e.hireDate ?? ""} /></div>
       </div>
+      <div className="emp-row2">
+        <div className="emp-fld"><label>Starfsaldur sem telst með · ár</label><input name="pPriorY" inputMode="numeric" defaultValue={e.priorServiceMonths ? String(Math.floor(e.priorServiceMonths / 12)) : ""} placeholder="0" /></div>
+        <div className="emp-fld"><label>· mánuðir</label><input name="pPriorM" inputMode="numeric" defaultValue={e.priorServiceMonths ? String(e.priorServiceMonths % 12) : ""} placeholder="0" /></div>
+      </div>
+      <p className="muted" style={{ fontSize: 11.5, margin: "-4px 0 8px" }}>Fyrri starfstími sem telst með í orlofs- og veikindarétti, t.d. fyrri ráðning hjá ykkur. Réttindi telja frá ráðningardegi mínus þennan tíma.</p>
 
       <Sec>Heimilisfang</Sec>
       {fld("Heimilisfang", "pAddress", e.address, "Gata og húsnúmer")}

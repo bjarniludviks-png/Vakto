@@ -14,6 +14,8 @@ const pct = (n: number) => String(n).replace(".", ",");
 export function RightsCard({ rows }: { rows: EmployeeRights[] }) {
   const { t } = useLang();
   if (!rows.length) return null;
+  const missing = rows.filter((r) => r.hireSuspect === "missing");
+  const same = rows.filter((r) => r.hireSuspect === "same-as-created");
   const flagged = rows.filter((r) => r.sick.over || r.child.over || r.orlof.pctBehind).length;
   const sorted = [...rows].sort((a, b) =>
     Number(b.sick.over || b.child.over || b.orlof.pctBehind) - Number(a.sick.over || a.child.over || a.orlof.pctBehind)
@@ -25,6 +27,14 @@ export function RightsCard({ rows }: { rows: EmployeeRights[] }) {
         <div className="cs">{t("orlof, veikindi og veikindi barna á síðustu 12 mánuðum skv. kjarasamningi")}{flagged ? ` · ${flagged} ${t("þarf að skoða")}` : ""}</div>
       </div></div>
       <div className="cb">
+        {(missing.length > 0 || same.length > 0) && (
+          <div className="rc-hire" style={{ border: "1px solid var(--line)", borderLeft: "3px solid var(--warn)", borderRadius: 10, padding: "10px 12px", marginBottom: 12, fontSize: 12.5, lineHeight: 1.55 }}>
+            <b>{t("Athugaðu ráðningardaga")}</b> — {t("réttindi telja frá ráðningardegi, svo rangur dagur vanmetur orlof og veikindarétt.")}
+            {missing.length > 0 && <div>{t("Vantar ráðningardag")}: {missing.map((r, i) => <span key={r.id}>{i ? ", " : ""}<Link href={`/starfsfolk/${r.id}`} style={{ color: "inherit", textDecoration: "underline" }}>{r.name}</Link></span>)}</div>}
+            {same.length > 0 && <div>{t("Sami dagur og skráning í VAKTO — er það rétt?")}: {same.map((r, i) => <span key={r.id}>{i ? ", " : ""}<Link href={`/starfsfolk/${r.id}`} style={{ color: "inherit", textDecoration: "underline" }}>{r.name}</Link></span>)}</div>}
+            <div className="muted">{t("Leiðrétt á spjaldinu → Persónulegt → Ráðningardagur. Fyrri starfstími sem telst með er skráður undir „Starfsaldur sem telst með“.")}</div>
+          </div>
+        )}
         <div className="tbl"><table>
           <thead><tr>
             <th>{t("Starfsmaður")}</th><th>{t("Deild")}</th>

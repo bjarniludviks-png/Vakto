@@ -1,4 +1,5 @@
 // Pure pay-rule types + defaults — safe to import from Client Components.
+import { familyFor } from "@/lib/entitlements";
 // ⚠️ These percentages are the STANDARD Icelandic structure but are UNCONFIRMED
 // placeholders. They MUST be verified against the real agreement (Efling / VR /
 // SGS …) before being used on real pay. The DB (pay_rules) stores per-company
@@ -64,6 +65,9 @@ export type CustomRules = RuleSet & {
   otWeekly?: number;  // klst/viku áður en yfirvinna tekur við (default 40)
   otMonthly?: number; // klst/mánuði áður en yfirvinna tekur við (0/ósett = óvirkt)
   bands?: Band[];
+  /** Staðall (lykill í UNION_PRESETS) sem stjórnandi valdi fyrir félag sem er ekki sjálft staðall,
+   *  t.d. VSFK → „Efling – veitingar/SGS“. Geymt í employees.pay_rule; gildir ekki með „Eigin reglur“. */
+  agreement?: string;
 };
 export const DEFAULT_OT_WEEKLY = 40;
 export const DEFAULT_MONTHLY_HOURS = 173.33;
@@ -86,11 +90,46 @@ export const UNION_PRESETS: Record<string, RuleSet> = {
 };
 export const ZERO_RULESET: RuleSet = { eve: 0, weekend: 0, overtime: 0, holiday: 0, night: 0 };
 
+/** Staðallinn sem gildir fyrir félag (ekki „Eigin reglur“): val stjórnanda (custom.agreement), félagið
+ *  sjálft ef það er staðall, annars eftir samningsfjölskyldu — SGS-félög (VSFK, Eining-Iðja, AFL …) fá
+ *  greiðasölustaðalinn, VR/LÍV-félög VR. Óþekkt félag → almenni Eflingarstaðallinn (eins og áður). */
+export function agreementFor(union: string | null | undefined, custom?: Partial<CustomRules> | null): string {
+  if (custom?.agreement && UNION_PRESETS[custom.agreement]) return custom.agreement;
+  const u = union ?? "";
+  if (UNION_PRESETS[u]) return u;
+  const fam = familyFor(u);
+  if (fam === "sa-sgs") return "Efling – veitingar/SGS";
+  if (fam === "sa-vr") return "VR";
+  return "Efling";
+}
+
 /** Effective rule set: union preset, or the employee's custom set (incl. custom
  * overtime thresholds + premium bands when "Eigin reglur" is selected). */
 export function resolveRuleSet(union: string | null | undefined, custom?: Partial<CustomRules> | null): CustomRules {
   if (union === CUSTOM_UNION) return { ...ZERO_RULESET, ...(custom ?? {}) };
-  return UNION_PRESETS[union ?? ""] ?? UNION_PRESETS["Efling"];
+  return UNION_PRESETS[agreementFor(union, custom)];
+}
+
+/** Er vistað sett af eigin reglum sem gildir EKKI (félag er staðall)? — svo spjaldið geti sagt það. */
+export function hasIgnoredCustomRules(union: string | null | undefined, custom?: Partial<CustomRules> | null): boolean {
+  if (!custom || union === CUSTOM_UNION || (union ?? "").startsWith("tpl:")) return false;
+  const preset = UNION_PRESETS[agreementFor(union, custom)];
+  return (["eve", "weekend", "overtime", "holiday", "night"] as const)
+    .some((k) => typeof custom[k] === "number" && Math.abs((custom[k] as number) - preset[k]) > 0.05);
+}
+
+// ---------- yfirvinna: per viku eða meðaltal yfir launatímabilið ----------
+// Vaktavinna (t.d. greiðasölusamningur SGS–SA gr. 3.2.4): yfirvinna er það sem fer umfram 40 klst. á viku
+// AÐ MEÐALTALI yfir vaktaskrána. companies.ot_mode = "period" reiknar meðaltalið yfir launatímabilið:
+// mörkin = vikumörk × dagar/7, og vikumörkin sjálf falla niður. "week" (sjálfgefið) = hver almanaksvika sér.
+export type OtMode = "week" | "period";
+export function withOtMode(rules: CustomRules, mode: OtMode | null | undefined, from: string, to: string): CustomRules {
+  if (mode !== "period" || !from || !to) return rules;
+  const days = Math.round((Date.parse(to.slice(0, 10)) - Date.parse(from.slice(0, 10))) / 86400000) + 1;
+  if (!(days > 0)) return rules;
+  const weekly = rules.otWeekly && rules.otWeekly > 0 ? rules.otWeekly : DEFAULT_OT_WEEKLY;
+  const avg = Math.round(weekly * days / 7 * 100) / 100;
+  return { ...rules, otWeekly: Number.POSITIVE_INFINITY, otMonthly: rules.otMonthly && rules.otMonthly > 0 ? Math.min(rules.otMonthly, avg) : avg };
 }
 
 // ---------- desember- & orlofsuppbót (kjarasamningsbundnar árlegar greiðslur) ----------

@@ -13,16 +13,15 @@ import { nf } from "@/lib/format";
 import { CONTRACT_TYPES, SCHEDULE_PATTERNS, type RuleTemplate } from "@/lib/rules";
 import { listRuleTemplates } from "../stillingar/actions";
 import { createEmployee, uploadDocument, getCompanyOptions } from "./actions";
+import { RolePicker, ROLE_CARDS } from "@/components/app/role-picker";
+import { AccessToggles } from "@/components/app/access-toggles";
+import { AgreementSummary } from "@/components/app/agreement-summary";
+import { MANAGER_DEFAULTS, type Area } from "@/lib/user-permissions";
 
 type Role = "employee" | "manager" | "owner" | "contractor";
 // createEmployee les hlutverkið út frá upphafi merkisins (sjá ROLE_MAP í actions.ts).
 const ROLE_LABEL: Record<Role, string> = { employee: "Starfsmaður", manager: "Vaktstjóri", owner: "Stjórnandi", contractor: "Verktaki" };
-const ROLES: { key: Role; title: string; en: string; pl: string; desc: string; icon: React.ReactNode }[] = [
-  { key: "employee", en: "Employee", pl: "Pracownik", title: "Starfsmaður", desc: "Appið: vaktir, stimpilklukka, spjall og laun", icon: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></> },
-  { key: "manager", en: "Shift manager", pl: "Kierownik zmiany", title: "Vaktstjóri", desc: "Vaktaplan, tímaskráning og starfsfólk", icon: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20a6.5 6.5 0 0 1 13 0" /><path d="m16 11 2 2 4-4" /></> },
-  { key: "owner", en: "Admin", pl: "Administrator", title: "Stjórnandi", desc: "Fullur aðgangur, líka laun og stillingar", icon: <><path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6z" /><path d="m9 12 2 2 4-4" /></> },
-  { key: "contractor", en: "Contractor", pl: "Wykonawca", title: "Verktaki", desc: "Sendir reikning. Engin staðgreiðsla eða orlof", icon: <><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M3 13h18" /></> },
-];
+const ROLES = ROLE_CARDS;
 
 function detectDocType(name: string): string {
   const n = name.toLowerCase();
@@ -37,7 +36,6 @@ const readAsDataUrl = (f: File) => new Promise<string>((resolve, reject) => {
   r.onerror = () => reject(r.error);
   r.readAsDataURL(f);
 });
-const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
 function Card({ n, title, sub, children, id }: { n: number; title: string; sub?: string; children: React.ReactNode; id: string }) {
   return (
@@ -65,7 +63,7 @@ export default function NewEmployee() {
   const [docs, setDocs] = useState<{ name: string; meta: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [opts, setOpts] = useState<{ departments: string[]; positions: string[]; locations: string[] }>({ departments: [], positions: [], locations: [] });
+  const [opts, setOpts] = useState<{ departments: string[]; positions: string[]; locations: string[]; isOwner?: boolean }>({ departments: [], positions: [], locations: [] });
   const [tpls, setTpls] = useState<RuleTemplate[]>([]);
   const [role, setRole] = useState<Role>("employee");
   const [name, setName] = useState("");
@@ -76,8 +74,15 @@ export default function NewEmployee() {
   const [rate, setRate] = useState("");
   const [union, setUnion] = useState("Efling");
   const [pension, setPension] = useState("");
-  const [hireDate] = useState(todayISO);
+  const [hireDate, setHireDate] = useState("");
+  const [priorY, setPriorY] = useState("");
+  const [priorM, setPriorM] = useState("");
+  const [agreement, setAgreement] = useState("");
+  const [kt, setKt] = useState("");
+  const [perms, setPerms] = useState<Record<Area, boolean>>({ ...MANAGER_DEFAULTS });
+  const priorMonths = (Number(priorY.replace(",", ".")) || 0) * 12 + (Number(priorM) || 0);
   const contractor = role === "contractor";
+  const isOwner = opts.isOwner !== false; // demo/óþekkt: sýna allt — þjónninn ræður samt
   const monthly = payType === "Mánaðarlaun";
 
   useEffect(() => {
@@ -106,6 +111,7 @@ export default function NewEmployee() {
     const fd = new FormData(ev.currentTarget);
     const g = (k: string) => (fd.get(k) as string | null)?.trim() || undefined;
     if (!name.trim()) { setError(t("Skráðu fullt nafn")); document.getElementById("ne-1")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    if (!contractor && !hireDate) { setError(t("Settu ráðningardag — orlofs- og veikindaréttur telur frá honum")); document.getElementById("ne-3")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     if (!rate.replace(/\D/g, "")) { setError(contractor ? t("Skráðu tímagjald eða mánaðargjald") : t("Skráðu tímakaup eða mánaðarlaun")); document.getElementById("ne-4")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     setBusy(true);
     setError(null);
@@ -116,6 +122,9 @@ export default function NewEmployee() {
       employmentRatio: contractor ? undefined : g("employmentRatio"), monthlyHours: contractor ? undefined : g("monthlyHours"),
       payType, rate, union: contractor ? undefined : union || undefined, pensionFund: contractor ? undefined : pension || undefined,
       ruleTemplateId: contractor ? undefined : g("ruleTemplateId"), contractType: contractor ? "contractor" : g("contractType"), schedulePattern: g("schedulePattern"),
+      payAgreement: contractor ? undefined : agreement || undefined,
+      priorServiceMonths: contractor ? undefined : Math.round(priorMonths),
+      permissions: role === "manager" ? perms : undefined,
     });
     if (!res.ok) { setBusy(false); setError(res.error ?? t("Tókst ekki að stofna")); return; }
     if (res.id && staged.current.length) {
@@ -151,7 +160,7 @@ export default function NewEmployee() {
           <Card n={1} id="ne-1" title={t("Persónuupplýsingar")} sub={t("Fara á launaseðil og samning")}>
             <div className="ne-row">
               <Fld label={L("Fullt nafn", "Full name", "Imię i nazwisko")} span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Jón Jónsson" autoFocus autoComplete="off" /></Fld>
-              <Fld label={L("Kennitala", "ID number (kennitala)", "Numer identyfikacyjny (kennitala)")}><input name="kennitala" placeholder="000000-0000" inputMode="numeric" /></Fld>
+              <Fld label={L("Kennitala", "ID number (kennitala)", "Numer identyfikacyjny (kennitala)")}><input name="kennitala" value={kt} onChange={(e) => setKt(e.target.value)} placeholder="000000-0000" inputMode="numeric" /></Fld>
               <Fld label={L("Sími", "Phone", "Telefon")}><input name="phone" placeholder="+354 ..." inputMode="tel" /></Fld>
               <Fld label={L("Netfang", "Email", "E-mail")} hint={t("boð í appið fer hingað")} span><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="nafn@dæmi.is" /></Fld>
               <Fld label={t("Heimilisfang")} span><input name="address" placeholder={t("Gata og húsnúmer")} /></Fld>
@@ -162,14 +171,16 @@ export default function NewEmployee() {
           </Card>
 
           <Card n={2} id="ne-2" title={t("Hlutverk")} sub={t("Ræður hvað viðkomandi sér í VAKTO")}>
-            <div className="ne-roles" role="radiogroup">
-              {ROLES.map((r) => (
-                <button type="button" role="radio" aria-checked={role === r.key} key={r.key} className={`ne-role${role === r.key ? " on" : ""}`} onClick={() => setRole(r.key)}>
-                  <span className="ne-ri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{r.icon}</svg></span>
-                  <b>{L(r.title, r.en, r.pl)}</b><span>{t(r.desc)}</span>
-                </button>
-              ))}
-            </div>
+            <RolePicker value={role} onChange={setRole} allowOwner={isOwner} />
+            {role === "manager" && isOwner && (
+              <div className="ne-access" style={{ marginTop: 14 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>{t("Aðgangur vaktstjóra")}</div>
+                <AccessToggles value={perms} onChange={setPerms} />
+              </div>
+            )}
+            <p className="ne-note">{email.trim()
+              ? <>{t("Boð verður sent á")} <b>{email.trim()}</b> — {t("viðkomandi býr til lykilorð og skráir sig inn í appið eða á vakto.is.")}</>
+              : t("Skráðu netfang í skrefi 1 til að gera viðkomandi að notanda — án þess fær hann engan aðgang (má bæta við síðar).")}</p>
           </Card>
 
           <Card n={3} id="ne-3" title={t("Starf")} sub={t("Hvar og hvernig viðkomandi vinnur")}>
@@ -192,7 +203,15 @@ export default function NewEmployee() {
                   {!opts.locations.length && <option value="">{t("— enginn staður skráður —")}</option>}
                 </select>
               </Fld>
-              <Fld label={contractor ? t("Upphaf verks") : t("Ráðningardagur")}><DateField name="hireDate" defaultValue={hireDate} full /></Fld>
+              <Fld label={contractor ? t("Upphaf verks") : t("Ráðningardagur")} hint={contractor ? undefined : t("fyrsti starfsdagur — réttindi telja frá honum")}><DateField name="hireDate" value={hireDate} onChange={setHireDate} full /></Fld>
+              {!contractor && (
+                <Fld label={t("Starfsaldur sem telst með")} hint={t("t.d. fyrri ráðning hjá ykkur")}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <div className="ne-suf"><input value={priorY} onChange={(e) => setPriorY(e.target.value.replace(/[^\d,]/g, ""))} placeholder="0" inputMode="numeric" /><span>{t("ár")}</span></div>
+                    <div className="ne-suf"><input value={priorM} onChange={(e) => setPriorM(e.target.value.replace(/\D/g, ""))} placeholder="0" inputMode="numeric" /><span>{t("mán.")}</span></div>
+                  </div>
+                </Fld>
+              )}
               {!contractor && <>
                 <Fld label={t("Ráðningarform")}>
                   <select name="contractType" defaultValue="fulltime">
@@ -234,10 +253,11 @@ export default function NewEmployee() {
                 <div className="ne-suf big"><input value={rate} onChange={(e) => { const d = e.target.value.replace(/\D/g, ""); setRate(d ? nf(Number(d)) : ""); }} placeholder={monthly ? "650.000" : "3.100"} inputMode="numeric" /><span>{unit}</span></div>
               </Fld>
               {!contractor && <>
-                <Fld label={t("Stéttarfélag / kjarasamningur")}><Autocomplete value={union} onChange={setUnion} suggestions={UNIONS} placeholder={t("Byrjaðu að skrifa…")} style={{ display: "block" }} /></Fld>
+                <Fld label={t("Stéttarfélag / kjarasamningur")}><Autocomplete value={union} onChange={(v) => { setUnion(v); setAgreement(""); }} suggestions={UNIONS} placeholder={t("Byrjaðu að skrifa…")} style={{ display: "block" }} /></Fld>
                 <Fld label={t("Lífeyrissjóður")}><Autocomplete value={pension} onChange={setPension} suggestions={PENSION_FUNDS} placeholder={t("Byrjaðu að skrifa…")} style={{ display: "block" }} /></Fld>
               </>}
             </div>
+            {!contractor && <AgreementSummary union={union} agreement={agreement} onAgreement={setAgreement} hireDate={hireDate || null} priorMonths={priorMonths} kennitala={kt} />}
             <p className="ne-note">{contractor
               ? t("Verktaki sér sjálfur um skatta og lífeyri, svo stéttarfélag, lífeyrissjóður og orlof eiga ekki við.")
               : t("Álög, yfirvinna og orlof reiknast eftir kjarasamningnum. Þú getur fínstillt reglurnar á spjaldi starfsmannsins.")}</p>
@@ -268,7 +288,7 @@ export default function NewEmployee() {
           <div className="db2-card ne-sum">
             <div className="ne-who">
               <span className="ne-av">{name.trim() ? initials(name) : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>}</span>
-              <div><b>{name.trim() || t("Nýr starfsmaður")}</b><span>{L(ROLE_LABEL[role], ROLES.find((r) => r.key === role)!.en, ROLES.find((r) => r.key === role)!.pl)}{position ? ` · ${position}` : ""}</span></div>
+              <div><b>{name.trim() || t("Nýr starfsmaður")}</b><span>{L(ROLES.find((r) => r.key === role)!.title, ROLES.find((r) => r.key === role)!.en, ROLES.find((r) => r.key === role)!.pl)}{position ? ` · ${position}` : ""}</span></div>
             </div>
             <ol className="ne-steps">
               {steps.map((s) => (

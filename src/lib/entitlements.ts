@@ -33,6 +33,9 @@ export const AGREEMENTS: Record<RightsFamily, AgreementInfo> = {
 const SGS_UNIONS = [
   "efling", "sgs", "afl", "eining-iðja", "framsýn", "báran", "drífandi", "aldan", "verkalýðsfélag akraness",
   "verkalýðsfélag vestfirðinga", "verkalýðsfélag suðurlands", "hlíf", "stéttarfélag vesturlands", "starfsgreina",
+  // Önnur aðildarfélög SGS
+  "verkalýðs- og sjómannafélag keflavíkur", "vsfk", "verkalýðs- og sjómannafélag sandgerðis", "verkalýðsfélag grindavíkur",
+  "verkalýðsfélag þórshafnar", "stéttarfélagið samstaða", "verkalýðsfélagið hvöt", "verkalýðsfélag snæfellinga",
 ];
 const VR_UNIONS = ["vr", "félag verslunar- og skrifstofufólks", "lív", "landssamband íslenskra verzlunarmanna"];
 

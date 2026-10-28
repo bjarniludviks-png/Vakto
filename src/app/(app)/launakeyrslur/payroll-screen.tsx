@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { PeriodPicker } from "@/components/app/period-picker";
 import { dec1, nf } from "@/lib/format";
+import { payPeriodOf, shiftPayPeriod, payPeriodName, type PayPeriodInput } from "@/lib/periods";
 import { getSettleCandidates, type SettleCandidate } from "./actions";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
@@ -60,25 +61,17 @@ const BASE = [4.8, 5.8, 3.9, 5.7, 5.6, 4.46, 4.7, 3.4, 6.7, 6.3, 5.2, 5.4];
 const PAY = BASE.map((b) => [b, b * 0.22, b * 0.2, b * 0.12, b * 0.08]);
 
 const PRESETS: { k: string; label: string }[] = [
-  { k: "this", label: "Þessi mánuður" }, { k: "last", label: "Síðasti mánuður" }, { k: "custom", label: "Sérsniðið" },
+  { k: "this", label: "Þetta tímabil" }, { k: "last", label: "Síðasta tímabil" }, { k: "custom", label: "Sérsniðið" },
 ];
 const isoD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-function payRange(k: string, cf: string, ct: string, startDay = 1): { from: string; to: string } {
+/** Tímabil eftir stillingu fyrirtækisins (Stillingar → Launatímabil): þetta, síðasta eða sérsniðið. */
+function payRange(k: string, cf: string, ct: string, cfg: PayPeriodInput = 1): { from: string; to: string } {
   if (k === "custom") return { from: cf, to: ct };
-  const t = new Date();
-  const d = Math.min(28, Math.max(1, startDay));
-  let from: Date;
-  if (d === 1) {
-    from = new Date(t.getFullYear(), t.getMonth() - (k === "last" ? 1 : 0), 1);
-  } else {
-    from = t.getDate() >= d ? new Date(t.getFullYear(), t.getMonth(), d) : new Date(t.getFullYear(), t.getMonth() - 1, d);
-    if (k === "last") from = new Date(from.getFullYear(), from.getMonth() - 1, d);
-  }
-  const to = d === 1 ? new Date(from.getFullYear(), from.getMonth() + 1, 0) : new Date(from.getFullYear(), from.getMonth() + 1, d - 1);
-  return { from: isoD(from), to: isoD(to) };
+  const cur = payPeriodOf(isoD(new Date()), cfg);
+  return k === "last" ? shiftPayPeriod(cur.from, cfg, -1) : cur;
 }
 
-export default function PayrollScreen({ view, empty = false, periodStart = 1, notice }: { view: PayrollView; empty?: boolean; periodStart?: number; notice?: React.ReactNode }) {
+export default function PayrollScreen({ view, empty = false, periodStart = 1, notice }: { view: PayrollView; empty?: boolean; periodStart?: PayPeriodInput; notice?: React.ReactNode }) {
   const { t } = useLang();
   const [slip, setSlip] = useState<PayslipData | null>(null);
   const [showZero, setShowZero] = useState(false);
@@ -199,7 +192,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1, no
   return (
     <div className="db2">
       <div className="db2-top">
-        <div><h1>{t("Launakeyrslur")}</h1><div className="db2-sub">{t("Launatímabil")} · {periodLabel}</div></div>
+        <div><h1>{t("Launakeyrslur")}</h1><div className="db2-sub">{t("Launatímabil")} · {periodLabel} · <a href="/stillingar?tab=reglur" style={{ color: "inherit", textDecoration: "underline" }} title={t("Breyta launatímabili")}>{t(payPeriodName(periodStart))}</a></div></div>
         <div className="db2-period">
           <div className="db2-seg" role="tablist">
             {PRESETS.filter((p) => p.k !== "custom").map((p) => (

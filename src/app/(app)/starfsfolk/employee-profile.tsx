@@ -85,6 +85,8 @@ export default function EmployeeProfile({ employee, banner, action }: { employee
       postalCode: fd.has("pPostal") ? (fd.get("pPostal") as string) : undefined,
       city: fd.has("pCity") ? (fd.get("pCity") as string) : undefined,
       hireDate: fd.has("pHireDate") ? ((fd.get("pHireDate") as string) || undefined) : undefined,
+      priorServiceMonths: fd.has("pPriorY") ? (Number(fd.get("pPriorY")) || 0) * 12 + (Number(fd.get("pPriorM")) || 0) : undefined,
+      payAgreement: fd.has("payAgreement") && union !== CUSTOM_UNION ? (fd.get("payAgreement") as string) : undefined,
       nextOfKin: fd.has("pNextOfKin") ? (fd.get("pNextOfKin") as string) : undefined,
     });
     setSaving(false);

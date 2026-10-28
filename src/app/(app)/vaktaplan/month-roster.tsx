@@ -7,6 +7,7 @@ import { dec1 } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
 import { getPlan, saveShift, deleteShift, copyShifts, clearShifts, type PlanShift, type PlanLeave } from "./actions";
 import type { PlanEmp } from "./roster.server";
+import { SickOnShift } from "./sick-on-shift";
 
 // Mánaðarplan sem starfsmannatafla: starfsfólk í röðum, dagar mánaðarins í dálkum.
 // Allt eftir starfsmanns-id (ekki nafni) og vistast strax. „Mála“-hamur: veldu vaktategund
@@ -295,14 +296,16 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
           onClose={() => setEdit(null)}
           onSave={async (st, en, ty) => { setEdit(null); if (await put(edit.emp, edit.date, st, en, ty)) toast(t("Vakt vistuð")); }}
           onDelete={async () => { setEdit(null); await drop(edit.emp, edit.date); toast(t("Vakt eydd")); }}
+          onSick={() => { setEdit(null); setVer((v) => v + 1); }}
           onCopy={() => { if (editShift) { setTool({ kind: "clip", start: editShift.start, end: editShift.end, type: editShift.type }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } setEdit(null); }} />
       )}
     </div>
   );
 }
 
-function CellEditor({ emp, date, shift, types, leave, monthName, onClose, onSave, onDelete, onCopy }: {
+function CellEditor({ emp, date, shift, types, leave, monthName, onClose, onSave, onDelete, onCopy, onSick }: {
   emp: PlanEmp; date: string; shift: PlanShift | null; types: ShiftType[]; leave?: PlanLeave; monthName: string;
+  onSick?: () => void;
   onClose: () => void; onSave: (start: string, end: string, type: string | null) => void; onDelete: () => void; onCopy: () => void;
 }) {
   const { t } = useLang();
@@ -319,6 +322,7 @@ function CellEditor({ emp, date, shift, types, leave, monthName, onClose, onSave
       <div className="modal" style={{ maxWidth: 440 }}>
         <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{emp.full} · {t(DN[d.getDay()])} {d.getDate()}. {monthName}</div><button className="x" onClick={onClose}>✕</button></div>
         <div className="mb">
+          {shift && onSick && !leave && <SickOnShift employeeId={emp.id} name={emp.full} dateISO={date} onDone={onSick} />}
           {leave && <p style={{ fontSize: 12.5, color: "var(--warn)", fontWeight: 600, marginBottom: 10 }}>{t("ATH: samþykkt frí þennan dag")} ({t(LEAVE_LBL[leave.type] ?? "Frí")})</p>}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
             {types.map((ty) => (

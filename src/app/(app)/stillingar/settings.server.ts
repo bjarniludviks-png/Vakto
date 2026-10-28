@@ -15,6 +15,8 @@ export type PositionRow = { id?: string; name: string; staff: number; baseRate: 
 export type UserRow = { name: string; initials: string; role: string; email: string;
   /** users.id — Aðgangur-glugginn (aðeins eigandi). */
   id?: string;
+  /** Innskráði notandinn sjálfur — eigin aðgangi er ekki breytt. */
+  me?: boolean;
   /** users.permissions (0095) — null = sjálfgefið fyrir hlutverkið. */
   permissions?: Record<string, boolean> | null;
   /** Starfsmannaprófíll tengdur aðganginum (deildaumsjón stjórnanda). */
@@ -219,6 +221,7 @@ export async function getSettingsData(): Promise<SettingsData> {
         role: (u.role as string) ?? "employee",
         email: (u.email as string) ?? "",
         id: u.id as string,
+        me: u.id === user?.id,
         permissions: permsOf.get(u.id as string) ?? null,
         employeeId: empOf.get(u.id as string) ?? null,
       })),

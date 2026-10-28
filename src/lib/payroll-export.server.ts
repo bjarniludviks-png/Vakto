@@ -2,11 +2,12 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { computeLine, computeFromPunches, hourBuckets, computeUppbot, uppbotForMonth, uppbotMonths, type PayLine } from "@/lib/payroll";
-import { resolveRuleSet, resolveUppbot } from "@/lib/payrules";
+import { resolveRuleSet, withOtMode, resolveUppbot } from "@/lib/payrules";
 import { DEMO_EMPLOYEES, type Employee } from "@/lib/employees";
 import { getEmployees } from "@/lib/employees.server";
 import { allRows } from "@/lib/supabase/all-rows";
 import { hasPerm } from "@/lib/access.server";
+import { companyPaySetup } from "@/lib/pay-period.server";
 
 // Launalínur + tímar flokkaðir fyrir launakerfi (Payday/DK/Excel). Notað af útflutnings-
 // endapunktinum og beinni sendingu í Payday, svo báðar leiðir skili nákvæmlega sömu tölum.
@@ -65,13 +66,14 @@ export async function getExportLines(from?: string, to?: string): Promise<{ line
         if (!byEmp.has(p.employee_id)) byEmp.set(p.employee_id, []);
         byEmp.get(p.employee_id)!.push({ clockIn: p.clock_in, clockOut: p.clock_out });
       }
+      const { otMode } = await companyPaySetup(supabase, company);
       const ruleMap = new Map<string, never>();
       const pr = await supabase.from("employees").select("id, pay_rule").eq("company_id", company);
       if (!pr.error) for (const r of pr.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never));
       const lines = emps
         .filter((e) => (byEmp.get(e.id as string)?.length ?? 0) > 0 || e.pay_type === "monthly")
         .map((e) => {
-          const rules = resolveRuleSet(e.union_agreement as string, ruleMap.get(e.id as string));
+          const rules = withOtMode(resolveRuleSet(e.union_agreement as string, ruleMap.get(e.id as string)), otMode, from ?? "", to ?? "");
           const group = byEmp.get(e.id as string) ?? [];
           // Sama regla og launavélin: dagvinna, yfirvinna og álagstímar per prósentu.
           // Fastlaunafólk fær laun óháð tímum — engir álagsliðir þar.

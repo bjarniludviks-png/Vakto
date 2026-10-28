@@ -14,26 +14,75 @@ const MONTHS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júl
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);
 
-/** Launatímabilið sem dagsetningin fellur í. startDay 1 = almanaksmánuður. */
-export function payPeriodOf(date: string, startDay = 1): { from: string; to: string } {
-  const d = Math.min(28, Math.max(1, Math.round(startDay) || 1));
+/** Launatímabil fyrirtækis (companies.pay_period, 0097). Tala = gamla pay_period_start (1 = almanaksmánuður).
+ *  month: upphafsdagur 1–28 · semimonth: 1.–15. og 16.–mánaðarloka · biweekly/weekly: 14/7 dagar frá `anchor`. */
+export type PayPeriodCfg =
+  | { kind: "month"; startDay?: number }
+  | { kind: "semimonth" }
+  | { kind: "biweekly"; anchor: string }
+  | { kind: "weekly"; anchor: string };
+export type PayPeriodInput = number | PayPeriodCfg | null | undefined;
+
+const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
+/** Hreinsar stillingu úr grunni/formi; allt ógilt → almanaksmánuður (eða gamli upphafsdagurinn). */
+export function normalizePayPeriod(p: unknown, legacyStartDay = 1): PayPeriodCfg {
+  const sd = (n: unknown) => Math.min(28, Math.max(1, Math.round(Number(n)) || 1));
+  if (typeof p === "number") return { kind: "month", startDay: sd(p) };
+  const o = (p && typeof p === "object" ? p : {}) as { kind?: string; startDay?: number; anchor?: string };
+  if (o.kind === "semimonth") return { kind: "semimonth" };
+  if ((o.kind === "biweekly" || o.kind === "weekly") && typeof o.anchor === "string" && ISO_RE.test(o.anchor)) return { kind: o.kind, anchor: o.anchor };
+  if (o.kind === "month") return { kind: "month", startDay: sd(o.startDay) };
+  return { kind: "month", startDay: sd(legacyStartDay) };
+}
+
+const dayNum = (s: string) => Math.round(Date.parse(`${s}T00:00:00Z`) / 86400000);
+const fromDayNum = (n: number) => new Date(n * 86400000).toISOString().slice(0, 10);
+
+/** Launatímabilið sem dagsetningin fellur í. Tala = upphafsdagur mánaðar (1 = almanaksmánuður). */
+export function payPeriodOf(date: string, period: PayPeriodInput = 1): { from: string; to: string } {
+  const cfg = normalizePayPeriod(period ?? 1);
   const [y, m, day] = date.split("-").map(Number);
+  if (cfg.kind === "semimonth") return day <= 15 ? { from: iso(y, m - 1, 1), to: iso(y, m - 1, 15) } : { from: iso(y, m - 1, 16), to: iso(y, m, 0) };
+  if (cfg.kind === "weekly" || cfg.kind === "biweekly") {
+    const len = cfg.kind === "weekly" ? 7 : 14;
+    const a = dayNum(cfg.anchor), d = dayNum(date);
+    const start = a + Math.floor((d - a) / len) * len;
+    return { from: fromDayNum(start), to: fromDayNum(start + len - 1) };
+  }
+  const d = cfg.startDay ?? 1;
   if (d === 1) return { from: iso(y, m - 1, 1), to: iso(y, m, 0) };
   const m0 = day >= d ? m - 1 : m - 2;
   return { from: iso(y, m0, d), to: iso(y, m0 + 1, d - 1) };
 }
 
 /** Síðasta LOKNA launatímabil (sjálfgefið fyrir vinnuyfirlit). */
-export function lastPayPeriod(startDay = 1, today = todayISO()): { from: string; to: string } {
-  const cur = payPeriodOf(today, startDay);
-  const [y, m, d] = cur.from.split("-").map(Number);
-  return payPeriodOf(iso(y, m - 1, d - 1), startDay);
+export function lastPayPeriod(period: PayPeriodInput = 1, today = todayISO()): { from: string; to: string } {
+  return shiftPayPeriod(payPeriodOf(today, period).from, period, -1);
 }
 
 /** Færa launatímabil um n tímabil (−1 = fyrra). */
-export function shiftPayPeriod(from: string, startDay: number, n: number): { from: string; to: string } {
+export function shiftPayPeriod(from: string, period: PayPeriodInput, n: number): { from: string; to: string } {
+  const cfg = normalizePayPeriod(period ?? 1);
+  if (cfg.kind === "weekly" || cfg.kind === "biweekly") {
+    const len = cfg.kind === "weekly" ? 7 : 14;
+    return payPeriodOf(fromDayNum(dayNum(payPeriodOf(from, cfg).from) + n * len), cfg);
+  }
+  if (cfg.kind === "semimonth") {
+    let cur = payPeriodOf(from, cfg);
+    for (let i = 0; i < Math.abs(n); i++) cur = payPeriodOf(fromDayNum(n < 0 ? dayNum(cur.from) - 1 : dayNum(cur.to) + 1), cfg);
+    return cur;
+  }
   const [y, m, d] = from.split("-").map(Number);
-  return payPeriodOf(iso(y, m - 1 + n, d), startDay);
+  return payPeriodOf(iso(y, m - 1 + n, d), cfg);
+}
+
+/** Heiti stillingarinnar, t.d. „Mánaðarlega frá 21.“ */
+export function payPeriodName(period: PayPeriodInput): string {
+  const cfg = normalizePayPeriod(period ?? 1);
+  if (cfg.kind === "semimonth") return "Hálfsmánaðarlega (1.–15. og 16.–mánaðarloka)";
+  if (cfg.kind === "weekly") return "Vikulega";
+  if (cfg.kind === "biweekly") return "Á tveggja vikna fresti";
+  return (cfg.startDay ?? 1) === 1 ? "Almanaksmánuður" : `Mánaðarlega frá ${cfg.startDay}.`;
 }
 
 export function rangeLabel(gran: Gran, from: string, to: string): string {
@@ -57,7 +106,7 @@ export function shortLabel(gran: Gran, from: string): string {
 }
 
 /** `count` síðustu tímabil af gerðinni `gran`, elsta fyrst, endar á tímabilinu sem `end` er í. */
-export function lastRanges(gran: Gran, count: number, startDay = 1, end = todayISO()): Range[] {
+export function lastRanges(gran: Gran, count: number, startDay: PayPeriodInput = 1, end = todayISO()): Range[] {
   const out: Range[] = [];
   const [y, m] = end.split("-").map(Number);
   for (let i = count - 1; i >= 0; i--) {
