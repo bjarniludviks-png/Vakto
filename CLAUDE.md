@@ -502,3 +502,11 @@
   employees). Aðeins eigandi getur stofnað eiganda eða valið aðgang vaktstjóra.
 - **Veikindi á vakt:** `vaktaplan/sick-on-shift.tsx` í vaktaglugga (vika) og reit (mánuður) → `registerAbsence` (vaktin verður laus,
   starfsfólk fær push, stjórnendur viðvörun við 80 %/umfram veikindarétt).
+
+## Útlit skjala: litur + merki (28. okt. 2026, migration 0098 á staging; prod við release)
+- `companies.branding` = `{ tone, logo_path }`. Tónarnir (ljósgult sjálfgefið, ljósrautt, -blátt, -grænt, -fjólublátt, -grátt)
+  eru í `src/lib/branding.ts` (`TONES`, `pdfTone`, `drawHeaderLogo`) — fáir af ásettu ráði. Merkið (PNG/JPG ≤ 600 KB) liggur í
+  einkafötunni `documents` undir `branding/<fyrirtæki>/` og er sótt með þjónustulykli (`branding.server.ts`, `pdfBrandFor`).
+- PDF: `buildContractPdf(…, { brand })` og `buildPayslipPdf(d, brand)`. Niðurhal í vafra sækir útlitið sjálft
+  (`branding-client.ts` → `getMyPdfBrand`); þjónninn (rafræn undirritun, starfslok) sendir `pdfBrandFor(companyId)`.
+- Stillingar → Fyrirtæki → „Útlit skjala“ (`stillingar/branding-card.tsx`), aðeins eigandi breytir. Fóturinn heldur VAKTO-merkinu.

@@ -1,6 +1,7 @@
 "use client";
 
 import { PaySetupRows } from "./pay-setup";
+import { BrandingCard } from "./branding-card";
 import { AccessToggles } from "@/components/app/access-toggles";
 import { RolePicker, type RoleKey } from "@/components/app/role-picker";
 
@@ -95,6 +96,7 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
         <CompanyCard info={data.company} />
         <CompanyDocsCard />
       </div>
+      <BrandingCard />
       <div className="card" style={{ marginTop: 16 }}>
         <div className="ch"><div><div className="ct">{t("Fréttaveita")}</div><div className="cs">{t("Tilkynningar og fréttir til starfsfólksins")}</div></div></div>
         <div className="cb">

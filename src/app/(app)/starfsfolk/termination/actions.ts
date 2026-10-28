@@ -4,6 +4,7 @@
 // Allar skrifaðgerðir stöðvast í opna demoinu (demoBlocked + RLS 0087). Allt er skráð í audit_log.
 // VAKTO skráir það sem vinnuveitandinn velur — orðalag er hlutlaust og ekki lögfræðiráðgjöf.
 
+import { pdfBrandFor } from "@/lib/branding.server";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
@@ -235,7 +236,7 @@ export async function createTermination(input: CreateTerminationInput): Promise<
       }
     } else if (input.documentMode === "send") {
       const content = buildLetter({ ...letterInput, signed: false });
-      const doc = await buildContractPdf(content, [], { noSignatures: true });
+      const doc = await buildContractPdf(content, [], { noSignatures: true, brand: await pdfBrandFor(ctx.company) });
       const bytes = Buffer.from(doc.output("arraybuffer"));
       const safe = String(emp.full_name).normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "_");
       const ascii = title.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/ð/g, "d").replace(/þ/g, "th").replace(/æ/g, "ae").replace(/[^A-Za-z0-9]+/g, "_");
