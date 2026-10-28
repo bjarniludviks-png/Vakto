@@ -3,7 +3,7 @@ import React, { useCallback, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
 import { View, Pressable, Alert } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { IdCard, FolderOpen, Gauge, FileText, FileCheck, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight } from "lucide-react-native";
+import { IdCard, FolderOpen, Gauge, FileText, FileCheck, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight, HeartPulse } from "lucide-react-native";
 import { Screen, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, List, Row, IconBox, Eyebrow, Bar, Pill, iconColor } from "../../src/components/ui";
 import { colors, useTheme } from "../../src/theme";
@@ -69,6 +69,7 @@ export default function Eg() {
 
       <List>
         {manager ? <Row icon={<IconBox tone="brand"><Gauge color={iconColor("brand")} size={19} /></IconBox>} title={tr("Mælaborð")} sub={tr("Velta, laun, tímar og beiðnir")} onPress={() => router.push("/maelabord")} /> : null}
+        <Row icon={<IconBox tone="good"><HeartPulse color={iconColor("good")} size={19} /></IconBox>} title={tr("Réttindin mín")} sub={tr("Orlof, veikindadagar og frí")} onPress={() => router.push("/rettindi")} />
         <Row icon={<IconBox tone="brand"><IdCard color={iconColor("brand")} size={19} /></IconBox>} title="Starfsmannaskírteini" sub="Sýna eða bæta í Wallet" onPress={() => router.push("/skirteini")} />
         <Row icon={<IconBox tone="info"><FolderOpen color={iconColor("info")} size={19} /></IconBox>} title="Skjöl" sub="Ráðningarsamningur, HACCP, handbækur" onPress={() => router.push("/skjol")} />
         <Row icon={<IconBox tone="brand"><FileCheck color={iconColor("brand")} size={19} /></IconBox>} title="Vinnuyfirlit" sub="Staðfestu tímana þína fyrir tímabilið" onPress={() => router.push("/vinnuyfirlit")} />
