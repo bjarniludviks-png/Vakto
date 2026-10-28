@@ -1,10 +1,15 @@
-/* General Sans — VAKTO brand font (Fontshare). Must precede other imports. */
-@import url("https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap");
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
+
+/* General Sans — VAKTO brand font (Fontshare, ITF Free Font License), hýst hjá okkur í public/fonts.
+   Áður @import frá api.fontshare.com, en framleiðslu-buildið henti þeirri línu út svo vakto.is sýndi kerfisletrið. */
+@font-face{font-family:"General Sans";src:url("/fonts/GeneralSans-Regular.otf") format("opentype");font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:"General Sans";src:url("/fonts/GeneralSans-Medium.otf") format("opentype");font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:"General Sans";src:url("/fonts/GeneralSans-Semibold.otf") format("opentype");font-weight:600;font-style:normal;font-display:swap}
+@font-face{font-family:"General Sans";src:url("/fonts/GeneralSans-Bold.otf") format("opentype");font-weight:700;font-style:normal;font-display:swap}
 
 /* ============================================================
    VAKTO design tokens — single source of truth (brief §2).
