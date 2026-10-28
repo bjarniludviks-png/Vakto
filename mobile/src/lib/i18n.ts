@@ -30,6 +30,9 @@ export function useLang(): Lang {
 
 type E = [string, string, string]; // [en, vi, pl]
 const D: Record<string, E> = {
+  "Taka mynd": ["Take photo", "Chụp ảnh", "Zrób zdjęcie"],
+  "Velja mynd": ["Choose photo", "Chọn ảnh", "Wybierz zdjęcie"],
+  "Breyta mynd": ["Change photo", "Đổi ảnh", "Zmień zdjęcie"],
   "Virk(ur) núna": ["Active now", "Đang hoạt động", "Aktywny(a) teraz"],
   "Virk(ur) í dag": ["Active today", "Hoạt động hôm nay", "Aktywny(a) dziś"],
   "Virk(ur) í gær": ["Active yesterday", "Hoạt động hôm qua", "Aktywny(a) wczoraj"],

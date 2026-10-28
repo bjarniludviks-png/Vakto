@@ -1,12 +1,14 @@
-// Prófíllinn minn — sími, netfang, bankareikningur (self-service breytingar).
+// Prófíllinn minn — mynd, sími, netfang, bankareikningur (self-service breytingar).
 import React, { useEffect, useState } from "react";
 import { tr } from "../src/lib/i18n";
-import { View, TextInput } from "react-native";
+import { View, TextInput, Pressable } from "react-native";
+import * as ImagePicker from "expo-image-picker";
+import { Camera, Images } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
-import { Card, Txt, Muted, Btn, SectionTitle } from "../src/components/ui";
+import { Card, Txt, Muted, Btn, SectionTitle, Avatar } from "../src/components/ui";
 import { colors, radius, font, useTheme } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
-import { updateMyProfile } from "../src/lib/api/requests";
+import { updateMyProfile, uploadMyPhoto } from "../src/lib/api/requests";
 
 const inputStyle = () => ({
   borderWidth: 1,
@@ -28,6 +30,9 @@ export default function Profill() {
   const [bank, setBank] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoMsg, setPhotoMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (me) {
@@ -36,6 +41,25 @@ export default function Profill() {
       setBank(me.bankAccount ?? "");
     }
   }, [me]);
+
+  async function choosePhoto(camera: boolean) {
+    if (!me || photoBusy) return;
+    setPhotoMsg(null);
+    if (camera) {
+      const perm = await ImagePicker.requestCameraPermissionsAsync();
+      if (!perm.granted) { setPhotoMsg(tr("Leyfðu aðgang að myndavél í stillingum símans")); return; }
+    }
+    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 0.6 };
+    const r = camera ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
+    const a = r.canceled ? null : r.assets[0];
+    if (!a) return;
+    setPhotoBusy(true);
+    const up = await uploadMyPhoto(me, a.uri, a.mimeType === "image/png" ? "image/png" : "image/jpeg");
+    setPhotoBusy(false);
+    if (!up.ok || !up.url) { setPhotoMsg(up.error ?? tr("Mynd hlóðst ekki upp")); return; }
+    setPhoto(up.url);
+    reload();
+  }
 
   async function save() {
     if (!me) return;
@@ -49,6 +73,18 @@ export default function Profill() {
 
   return (
     <Screen title="Prófíllinn minn" back>
+      {me ? (
+        <Card style={{ alignItems: "center", gap: 12 }}>
+          <Pressable onPress={() => choosePhoto(false)} accessibilityLabel={tr("Breyta mynd")} style={{ opacity: photoBusy ? 0.5 : 1 }}>
+            <Avatar name={me.fullName} size={96} color={me.avatarColor} photo={photo ?? me.photoUrl} />
+          </Pressable>
+          <View style={{ flexDirection: "row", gap: 8 }}>
+            <Btn title="Taka mynd" variant="soft" size="sm" icon={<Camera color={colors.ink} size={16} />} disabled={photoBusy} onPress={() => choosePhoto(true)} />
+            <Btn title="Velja mynd" variant="soft" size="sm" icon={<Images color={colors.ink} size={16} />} loading={photoBusy} onPress={() => choosePhoto(false)} />
+          </View>
+          {photoMsg ? <Txt size={13} color={colors.bad}>{photoMsg}</Txt> : null}
+        </Card>
+      ) : null}
       <Card style={{ gap: 12 }}>
         <SectionTitle>Upplýsingarnar mínar</SectionTitle>
         <Field label="Símanúmer">
