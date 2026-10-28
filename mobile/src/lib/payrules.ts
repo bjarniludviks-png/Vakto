@@ -3,6 +3,7 @@
 // placeholders. They MUST be verified against the real agreement (Efling / VR /
 // SGS …) before being used on real pay. The DB (pay_rules) stores per-company
 // overrides + a `confirmed` flag set when a manager verifies a rate.
+import { familyFor } from "./entitlements";
 
 export type PayRuleKind = "premium" | "overtime" | "holiday";
 export type PayRule = {
@@ -64,6 +65,8 @@ export type CustomRules = RuleSet & {
   otWeekly?: number;  // klst/viku áður en yfirvinna tekur við (default 40)
   otMonthly?: number; // klst/mánuði áður en yfirvinna tekur við (0/ósett = óvirkt)
   bands?: Band[];
+  /** Staðall valinn fyrir félag sem er ekki sjálft staðall (sama og vefurinn, employees.pay_rule.agreement). */
+  agreement?: string;
 };
 export const DEFAULT_OT_WEEKLY = 40;
 export const DEFAULT_MONTHLY_HOURS = 173.33;
@@ -90,7 +93,18 @@ export const ZERO_RULESET: RuleSet = { eve: 0, weekend: 0, overtime: 0, holiday:
  * overtime thresholds + premium bands when "Eigin reglur" is selected). */
 export function resolveRuleSet(union: string | null | undefined, custom?: Partial<CustomRules> | null): CustomRules {
   if (union === CUSTOM_UNION) return { ...ZERO_RULESET, ...(custom ?? {}) };
-  return UNION_PRESETS[union ?? ""] ?? UNION_PRESETS["Efling"];
+  return UNION_PRESETS[agreementFor(union, custom)];
+}
+
+/** Sama regla og vefurinn (src/lib/payrules.ts): val stjórnanda, félagið ef staðall, SGS-félög → SGS-veitingar, VR-félög → VR. */
+export function agreementFor(union: string | null | undefined, custom?: Partial<CustomRules> | null): string {
+  if (custom?.agreement && UNION_PRESETS[custom.agreement]) return custom.agreement;
+  const u = union ?? "";
+  if (UNION_PRESETS[u]) return u;
+  const fam = familyFor(u);
+  if (fam === "sa-sgs") return "Efling – veitingar/SGS";
+  if (fam === "sa-vr") return "VR";
+  return "Efling";
 }
 
 // ---------- desember- & orlofsuppbót (kjarasamningsbundnar árlegar greiðslur) ----------

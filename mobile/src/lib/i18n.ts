@@ -30,6 +30,37 @@ export function useLang(): Lang {
 
 type E = [string, string, string]; // [en, vi, pl]
 const D: Record<string, E> = {
+  // Réttindin mín (okt. 2026)
+  "Áunnið {x} d.": ["Earned {x} d", "Tích lũy {x} ngày", "Nabyte {x} dni"],
+  "Tekið {x} d.": ["Taken {x} d", "Đã dùng {x} ngày", "Wykorzystane {x} dni"],
+  "í bið {x}": ["pending {x}", "chờ {x}", "oczekuje {x}"],
+  "Orlofsárið hófst {x}": ["Holiday year started {x}", "Năm nghỉ phép bắt đầu {x}", "Rok urlopowy rozpoczął się {x}"],
+  "Hækkar í {n} daga ({x} %) {x}": ["Rises to {n} days ({x} %) {x}", "Tăng lên {n} ngày ({x} %) {x}", "Wzrośnie do {n} dni ({x} %) {x}"],
+  "Frí tekið á orlofsárinu: {x} dagar": ["Leave taken this holiday year: {x} days", "Đã nghỉ trong năm phép: {x} ngày", "Wykorzystany urlop w roku: {x} dni"],
+  "vantar — talaðu við yfirmann": ["missing — ask your manager", "thiếu — hỏi quản lý", "brak — zapytaj przełożonego"],
+  "Fyrri starfstími sem telst með": ["Credited earlier service", "Thâm niên trước được tính", "Zaliczony wcześniejszy staż"],
+  "Veikindaréttur fyrir þitt félag er ekki kominn inn í VAKTO.": ["Sick-leave rights for your union are not in VAKTO yet.", "Quyền nghỉ ốm cho công đoàn của bạn chưa có trong VAKTO.", "Prawa chorobowe dla Twojego związku nie są jeszcze w VAKTO."],
+  "Réttindin mín": ["My entitlements", "Quyền lợi của tôi", "Moje uprawnienia"],
+  "Orlof, veikindadagar og frí": ["Holiday, sick days and leave", "Nghỉ phép, ngày ốm và nghỉ", "Urlop, dni chorobowe i wolne"],
+  "Réttindin mín: orlof og veikindi": ["My entitlements: holiday and sick leave", "Quyền lợi: nghỉ phép và ốm", "Moje uprawnienia: urlop i choroba"],
+  "orlofsdagar eftir": ["holiday days left", "ngày phép còn lại", "dni urlopu do wykorzystania"],
+  "Veikindi síðustu 12 mánuði": ["Sick days, last 12 months", "Ngày ốm 12 tháng qua", "Choroba w ostatnich 12 miesiącach"],
+  "Veikindi barna": ["Child sick days", "Con ốm", "Choroba dziecka"],
+  "Umfram rétt": ["Over entitlement", "Vượt quyền lợi", "Ponad uprawnienia"],
+  "Að klárast": ["Running low", "Sắp hết", "Kończy się"],
+  "Í lagi": ["OK", "Ổn", "W porządku"],
+  "af {x} dögum notaðir": ["of {x} days used", "trên {x} ngày đã dùng", "z {x} dni wykorzystano"],
+  "Réttur": ["Entitlement", "Quyền lợi", "Uprawnienie"],
+  "Kjarasamningur": ["Collective agreement", "Thỏa ước lao động", "Układ zbiorowy"],
+  "Ráðin(n)": ["Hired", "Ngày vào làm", "Zatrudniony(a)"],
+  "Næsta breyting": ["Next change", "Thay đổi tiếp theo", "Następna zmiana"],
+  "Fjarvistir síðustu 12 mánuði": ["Absences, last 12 months", "Vắng mặt 12 tháng qua", "Nieobecności w ostatnich 12 miesiącach"],
+  "Sæki réttindin…": ["Loading entitlements…", "Đang tải…", "Wczytywanie…"],
+  "Launin mín": ["My pay", "Lương của tôi", "Moje wynagrodzenie"],
+  "Reiknað eftir kjarasamningnum þínum og starfsaldri. Veikindadagar eru virkir dagar. Ef eitthvað stemmir ekki, talaðu við yfirmanninn þinn.": ["Calculated from your collective agreement and length of service. Sick days are working days. If something looks wrong, talk to your manager.", "Tính theo thỏa ước lao động và thâm niên của bạn. Ngày ốm là ngày làm việc. Nếu có gì sai, hãy nói với quản lý.", "Obliczone na podstawie układu zbiorowego i stażu. Dni chorobowe to dni robocze. Jeśli coś się nie zgadza, porozmawiaj z przełożonym."],
+  "Orlofið er greitt út með hverjum launum, svo engin dagastaða safnast hér.": ["Holiday pay is paid out with every payslip, so no day balance builds up here.", "Tiền phép được trả cùng mỗi kỳ lương, nên không có số ngày tích lũy.", "Wynagrodzenie urlopowe jest wypłacane z każdą wypłatą, więc nie gromadzi się tu saldo dni."],
+  "Orlofið er lagt inn á orlofsreikning með hverjum launum.": ["Holiday pay goes to a holiday account with every payslip.", "Tiền phép được chuyển vào tài khoản phép mỗi kỳ lương.", "Wynagrodzenie urlopowe trafia na konto urlopowe z każdą wypłatą."],
+
   // Eyða aðgangi (Apple 5.1.1(v))
   "Eyða aðgangi": ["Delete account", "Xóa tài khoản", "Usuń konto"],
   "Aðganginum þínum verður lokað strax og þú skráð(ur) út.": ["Your account will be closed immediately and you will be signed out.", "Tài khoản của bạn sẽ bị đóng ngay lập tức và bạn sẽ bị đăng xuất.", "Twoje konto zostanie natychmiast zamknięte, a Ty zostaniesz wylogowany/a."],

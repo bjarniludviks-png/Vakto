@@ -3,7 +3,7 @@ import React, { useCallback, useState } from "react";
 import { tr, trf } from "../src/lib/i18n";
 import { View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { FolderOpen } from "lucide-react-native";
+import { FolderOpen, HeartPulse } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
 import { Card, Txt, Muted, Eyebrow, Bar, Btn, Pill } from "../src/components/ui";
 import { colors, useTheme } from "../src/theme";
@@ -117,6 +117,7 @@ export default function Laun() {
           ? trf("Reiknað eftir {x} á tímakaupi {n} kr. Endanlegur launaseðill kemur úr launakeyrslunni.", me.union ? trf("kjarasamningi {x}", me.union) : tr("reglum fyrirtækisins"), kr(me.rate).replace(" kr", ""))
           : "Mánaðarlaun. Endanlegur launaseðill kemur úr launakeyrslunni."}
       </Muted>
+      {!me?.contractor ? <Btn title="Réttindin mín: orlof og veikindi" variant="ghost" icon={<HeartPulse color={colors.ink} size={17} />} onPress={() => router.push("/rettindi")} /> : null}
       <Btn title="Launaseðlar og skjöl" variant="ghost" icon={<FolderOpen color={colors.ink} size={17} />} onPress={() => router.push("/skjol")} />
     </Screen>
   );
