@@ -13,6 +13,7 @@ import "server-only";
 // Öll skrif fara gegnum þjónustulykil eftir að kallandinn hefur verið staðfestur —
 // starfsmaður getur ekki merkt samning undirritaðan beint (0058 tók þá reglu út).
 
+import { pdfBrandFor } from "@/lib/branding.server";
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { demoBlocked, demoResult } from "@/lib/demo.server";
@@ -187,7 +188,7 @@ async function deliverSignedCopy(contractId: string) {
   const emp = (Array.isArray(c.employees) ? c.employees[0] : c.employees) as { full_name?: string; email?: string } | null;
   const co = (Array.isArray(c.companies) ? c.companies[0] : c.companies) as { name?: string } | null;
   const sigs = await getSignatures(contractId);
-  const doc = await buildContractPdf(c.content as string, sigs);
+  const doc = await buildContractPdf(c.content as string, sigs, { brand: await pdfBrandFor(c.company_id as string) });
   const bytes = Buffer.from(doc.output("arraybuffer"));
   const safeName = (emp?.full_name ?? "starfsmadur").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "_");
   const dn = docNames(c.title as string);
@@ -242,7 +243,7 @@ export async function startTaktikalSigning(
     return { ok: true, employerUrl: existing.employer_url as string };
   }
 
-  const doc = await buildContractPdf(c.content as string, [], { stampStrip: true });
+  const doc = await buildContractPdf(c.content as string, [], { stampStrip: true, brand: await pdfBrandFor(c.company_id as string) });
   const pdfBase64 = Buffer.from(doc.output("arraybuffer")).toString("base64");
   const safe = (emp.full_name ?? "starfsmadur").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^\w]+/g, "_");
   const proc = await createSigningProcess({

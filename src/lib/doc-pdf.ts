@@ -5,6 +5,8 @@
 // Keyrir í vafra; jsPDF og letrið hlaðin með dynamic import.
 import type { jsPDF } from "jspdf";
 import { drawVaktoLogo } from "@/lib/pdf-logo";
+import { drawHeaderLogo, pdfTone, type PdfBrand } from "@/lib/branding";
+import { loadMyPdfBrand } from "@/lib/branding-client";
 import { nf, dec1 } from "@/lib/format";
 import { taxBeforeAllowance } from "@/lib/paysettings";
 import { WO_ACTION, type WoSnapshot, type WoLogEntry } from "@/lib/work-overview";
@@ -13,12 +15,9 @@ type RGB = [number, number, number];
 const INK: RGB = [23, 23, 28];
 const INK2: RGB = [61, 58, 54];
 const MUT: RGB = [138, 138, 148];
-const WARM: RGB = [251, 246, 240];
-const WARM_MUT: RGB = [138, 122, 104];
 const RULE: RGB = [236, 233, 228];
 const GOOD: RGB = [24, 140, 92];
 const WARN: RGB = [196, 98, 10];
-const NOTE_BG: RGB = [253, 245, 236];
 
 /** Allt sem launaseðill þarf — tölur úr launaútreikningi VAKTO (computeFromPunches). */
 export type PayslipDetail = {
@@ -60,7 +59,10 @@ async function newDoc() {
 }
 
 /** Sameiginlegt útlit: haus, kaflar, fótur. */
-function kit(doc: Doc) {
+function kit(doc: Doc, brand?: PdfBrand | null) {
+  // Litatónn og merki fyrirtækisins (Stillingar → Útlit skjala); sjálfgefið ljósgult + VAKTO-merkið.
+  const TN = pdfTone(brand);
+  const WARM = TN.bg, WARM_MUT = TN.mut, NOTE_BG = TN.note;
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const M = 44, CW = W - M * 2, BOTTOM = H - 64;
@@ -95,7 +97,7 @@ function kit(doc: Doc) {
     const headH = 34 + 38 + 15 + 20 + sIs.length * 13.5 + sEn.length * 12 + 14 + tileH + 26;
     doc.setFillColor(...WARM); doc.rect(0, 0, W, headH, "F");
     let y = 34;
-    drawVaktoLogo(doc, M, y + 1.5, 17);
+    drawHeaderLogo(doc, brand, M, y + 1.5);
     font("normal", 8, WARM_MUT); doc.text("vakto.is", W - M, y + 1.5, { align: "right" });
     y += 38;
     font("bold", 23, INK); doc.text(titleIs, M, y);
@@ -195,9 +197,9 @@ function kit(doc: Doc) {
 const kr = (n: number) => `${nf(Math.round(n))} kr`;
 
 /** Launaseðill. Sýnir AÐEINS raunverulegar tölur úr útreikningnum (engin gervi-skipting). */
-export async function buildPayslipPdf(d: PayslipDetail): Promise<Doc> {
+export async function buildPayslipPdf(d: PayslipDetail, brand?: PdfBrand | null): Promise<Doc> {
   const doc = await newDoc();
-  const k = kit(doc);
+  const k = kit(doc, brand);
   const unionFee = d.unionFee;
   const deductions = d.pension + (d.extraPension ?? 0) + unionFee + d.withholding + (d.orlofToBank ?? 0) + (d.benefitsInKind ?? 0);
   const empty = d.hours <= 0 && d.gross <= 0;
@@ -268,7 +270,7 @@ export async function buildPayslipPdf(d: PayslipDetail): Promise<Doc> {
 }
 
 export async function downloadPayslipPdf(d: PayslipDetail) {
-  const doc = await buildPayslipPdf(d);
+  const doc = await buildPayslipPdf(d, await loadMyPdfBrand());
   doc.save(`Launasedill_${ascii(d.name)}_${d.from}_${d.to}.pdf`);
 }
 

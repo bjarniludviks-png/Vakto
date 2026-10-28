@@ -6,14 +6,14 @@
 // jsPDF og letrið eru hlaðin inn með dynamic import.
 import type { jsPDF } from "jspdf";
 import { drawVaktoLogo } from "@/lib/pdf-logo";
+import { drawHeaderLogo, pdfTone, type PdfBrand } from "@/lib/branding";
+import { loadMyPdfBrand } from "@/lib/branding-client";
 
 type RGB = [number, number, number];
 const ORANGE: RGB = [233, 112, 15];
 const INK: RGB = [23, 23, 28];
 const INK2: RGB = [61, 58, 54];
 const MUT: RGB = [138, 138, 148];
-const WARM: RGB = [251, 246, 240];
-const WARM_MUT: RGB = [138, 122, 104];
 const RULE: RGB = [236, 233, 228];
 const MISSING_BG: RGB = [253, 241, 226];
 const MISSING_FG: RGB = [196, 98, 10];
@@ -207,7 +207,7 @@ const METHOD: Record<string, string> = {
 };
 
 export async function downloadContractPdf(title: string, content: string, signatures: SignatureRecord[] = []) {
-  const doc = await buildContractPdf(content, signatures);
+  const doc = await buildContractPdf(content, signatures, { brand: await loadMyPdfBrand() });
   // ASCII-skráarnafn: íslenskir stafir brenglast í sumum símum („Ra%CC%81%C3%B0…“).
   const ascii = title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ð/g, "d").replace(/Ð/g, "D").replace(/þ/g, "th").replace(/Þ/g, "Th").replace(/æ/g, "ae").replace(/Æ/g, "Ae")
     .replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
@@ -216,7 +216,10 @@ export async function downloadContractPdf(title: string, content: string, signat
 
 /** `stampStrip`: Taktikal setur undirskriftarstimpla sína neðst á síðustu síðu (BottomLastPage) —
  *  þá er beltið haldið auðu, fóturinn færður upp og undirskriftarlínum skipt út fyrir tilvísun. */
-export async function buildContractPdf(content: string, signatures: SignatureRecord[] = [], opts: { stampStrip?: boolean; primary?: "is" | "en"; noSignatures?: boolean } = {}): Promise<jsPDF> {
+export async function buildContractPdf(content: string, signatures: SignatureRecord[] = [], opts: { stampStrip?: boolean; primary?: "is" | "en"; noSignatures?: boolean; brand?: PdfBrand | null } = {}): Promise<jsPDF> {
+  // Litatónn og merki fyrirtækisins (Stillingar → Útlit skjala); sjálfgefið ljósgult + VAKTO-merkið.
+  const TN = pdfTone(opts.brand);
+  const WARM = TN.bg, WARM_MUT = TN.mut;
   const { jsPDF } = await import("jspdf");
   const fonts = await import("./fonts/general-sans");
   const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -290,7 +293,7 @@ export async function buildContractPdf(content: string, signatures: SignatureRec
     const headH = 34 + 20 + 30 + 14 + (sIs.length ? sIs.length * 13.5 + sEn.length * 12 + 14 : 0) + tileH + 4 + 24;
     doc.setFillColor(...WARM); doc.rect(0, 0, W, headH, "F");
     y = 34;
-    drawVaktoLogo(doc, M, y + 1.5, 17);
+    drawHeaderLogo(doc, opts.brand, M, y + 1.5);
     font("normal", 8, WARM_MUT); doc.text("vakto.is", W - M, y + 1.5, { align: "right" });
     y += 38;
     font("bold", 23, INK); doc.text(tIs || "Ráðningarsamningur", M, y);
