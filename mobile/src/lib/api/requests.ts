@@ -33,15 +33,32 @@ export async function submitLeaveRequest(
   return { ok: true };
 }
 
-export async function requestShiftSwap(me: Me, note: string): Promise<Result> {
+/** Beiðni um að losna við vakt / bjóða hana. Með `shiftId` verður vaktin laus vakt þegar vaktstjóri samþykkir. */
+export async function requestShiftSwap(me: Me, note: string, shiftId?: string): Promise<Result> {
   const { data, error } = await supabase.from("shift_swaps").insert({
     company_id: me.companyId,
     requester_id: me.empId,
+    ...(shiftId ? { requester_shift_id: shiftId } : {}),
     note,
     status: "pending",
   }).select("id").single();
   if (error) return { ok: false, error: error.message };
   void notifyServer("swap_request", data.id as string);
+  return { ok: true };
+}
+
+/** Veik(ur) eða veikt barn á vakt: veikindabeiðni þann dag til vaktstjóra (push strax). Við samþykki skráist
+ *  veikindadagurinn á móti réttinum og vaktin verður laus vakt (vefurinn: updateLeaveRequest). */
+export async function reportSickForShift(me: Me, input: { date: string; type: "veikindi" | "veikindi_barns"; note: string }): Promise<Result> {
+  const row = { company_id: me.companyId, employee_id: me.empId, type: input.type, from_date: input.date, to_date: input.date, status: "pending", note: input.note || null };
+  let res = await supabase.from("leave_requests").insert(row).select("id").single();
+  if (res.error && /note|veikindi_barns/.test(res.error.message)) {
+    // Eldri gagnagrunnur (fyrir 0096): engin athugasemd og engin „veikindi barns“-tegund.
+    const { note: _n, ...rest } = row; void _n;
+    res = await supabase.from("leave_requests").insert({ ...rest, type: "veikindi" }).select("id").single();
+  }
+  if (res.error) return { ok: false, error: leaveError(res.error.message) };
+  void notifyServer("leave_request", res.data.id as string);
   return { ok: true };
 }
 

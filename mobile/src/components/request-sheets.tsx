@@ -5,7 +5,7 @@ import { View, TextInput, Pressable } from "react-native";
 import { Sheet, Btn, Txt, Muted, useToast, Seg } from "./ui";
 import { colors, radius, font } from "../theme";
 import { useMe } from "../lib/me-context";
-import { submitLeaveRequest, requestShiftSwap } from "../lib/api/requests";
+import { submitLeaveRequest, requestShiftSwap, reportSickForShift } from "../lib/api/requests";
 import { supabase } from "../lib/supabase";
 import { iso } from "../lib/api/me";
 import { getMyOrlof } from "../lib/api/orlof";
@@ -88,7 +88,7 @@ export function LeaveSheet({ open, onClose, onDone }: { open: boolean; onClose: 
   );
 }
 
-export function OfferSheet({ open, onClose, onDone, shiftLabel }: { open: boolean; onClose: () => void; onDone?: () => void; shiftLabel?: string }) {
+export function OfferSheet({ open, onClose, onDone, shiftLabel, shiftId }: { open: boolean; onClose: () => void; onDone?: () => void; shiftLabel?: string; shiftId?: string }) {
   const { me } = useMe();
   const toast = useToast();
   const [note, setNote] = useState("");
@@ -97,10 +97,10 @@ export function OfferSheet({ open, onClose, onDone, shiftLabel }: { open: boolea
   async function send() {
     if (!me || !note.trim()) return;
     setBusy(true);
-    const r = await requestShiftSwap(me, note.trim());
+    const r = await requestShiftSwap(me, note.trim(), shiftId);
     setBusy(false);
     if (!r.ok) { toast(r.error ?? "Tókst ekki"); return; }
-    toast("Sent — vaktstjóri og samstarfsfólk sjá boðið");
+    toast(tr("Sent — þegar vaktstjóri samþykkir verður vaktin laus vakt"));
     onClose(); onDone?.();
   }
   return (
@@ -145,25 +145,33 @@ export function CorrectionSheet({ open, onClose, onDone, date: initDate }: { ope
   );
 }
 
-export function CantSheet({ open, onClose, onDone, shiftLabel }: { open: boolean; onClose: () => void; onDone?: () => void; shiftLabel: string }) {
+export function CantSheet({ open, onClose, onDone, shiftLabel, shiftId, date }: { open: boolean; onClose: () => void; onDone?: () => void; shiftLabel: string; shiftId?: string; date?: string }) {
   const { me } = useMe();
   const toast = useToast();
+  const [why, setWhy] = useState<"veikindi" | "veikindi_barns" | "annad">("veikindi");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  useEffect(() => { if (open) { setWhy("veikindi"); setReason(""); } }, [open]);
   async function send() {
     if (!me) return;
     setBusy(true);
-    const r = await requestShiftSwap(me, `Forföll: get ekki mætt ${shiftLabel}${reason.trim() ? ` — ${reason.trim()}` : ""}`);
+    // Veikindi → veikindabeiðni þann dag (telst á móti veikindarétti). Annað → beiðni um að losna við vaktina.
+    const r = why !== "annad" && date
+      ? await reportSickForShift(me, { date, type: why, note: `Á vakt ${shiftLabel}${reason.trim() ? ` — ${reason.trim()}` : ""}` })
+      : await requestShiftSwap(me, `Get ekki mætt ${shiftLabel}${reason.trim() ? ` — ${reason.trim()}` : ""}`, shiftId);
     setBusy(false);
     if (!r.ok) { toast(r.error ?? "Tókst ekki"); return; }
-    toast("Tilkynnt — vaktstjóri fær skilaboð núna");
+    toast(tr("Tilkynnt — vaktstjóri fær skilaboð núna"));
     onClose(); onDone?.();
   }
   return (
     <Sheet open={open} onClose={onClose} title="Get ekki mætt">
-      <Muted>Vaktstjóri fær tilkynningu strax og getur sett vaktina í „Lausar vaktir“.</Muted>
-      <Field label="Ástæða"><TextInput style={[inputStyle(), { minHeight: 70, textAlignVertical: "top" }]} multiline value={reason} onChangeText={setReason} placeholder={tr("Veik(ur)…")} placeholderTextColor={colors.ink3} /></Field>
-      <Btn title="Tilkynna forföll" size="lg" variant="danger" loading={busy} onPress={send} />
+      <Seg<"veikindi" | "veikindi_barns" | "annad"> value={why} onChange={(v) => setWhy(v)} items={[{ id: "veikindi", label: tr("Ég er veik(ur)") }, { id: "veikindi_barns", label: tr("Veikt barn") }, { id: "annad", label: tr("Annað") }]} />
+      <Muted>{why === "annad"
+        ? tr("Vaktstjóri fær tilkynningu strax. Þegar hann samþykkir verður vaktin laus vakt sem aðrir geta sótt um.")
+        : tr("Vaktstjóri fær tilkynningu strax. Þegar hann samþykkir skráist veikindadagurinn og vaktin verður laus vakt.")}</Muted>
+      <Field label="Skýring (valfrjálst)"><TextInput style={[inputStyle(), { minHeight: 70, textAlignVertical: "top" }]} multiline value={reason} onChangeText={setReason} placeholder={why === "annad" ? tr("t.d. komst ekki úr bænum…") : tr("t.d. hiti síðan í nótt")} placeholderTextColor={colors.ink3} /></Field>
+      <Btn title={why === "annad" ? "Biðja um að losna við vaktina" : "Tilkynna veikindi"} size="lg" variant="danger" loading={busy} onPress={send} />
     </Sheet>
   );
 }

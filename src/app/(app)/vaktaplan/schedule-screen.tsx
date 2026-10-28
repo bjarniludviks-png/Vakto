@@ -5,7 +5,7 @@ import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { nf, dec1, krCompact } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
-import { publishSchedule, updateLeaveRequest, approveShiftSwap, saveShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, getWeekBudget, type ShiftInput } from "./actions";
+import { publishSchedule, updateLeaveRequest, approveShiftSwap, rejectShiftSwap, saveShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, getWeekBudget, type ShiftInput } from "./actions";
 import { getCompanyDepartments, getDepartmentColors } from "../starfsfolk/actions";
 import { getDashboardPeriod } from "../maelabord/actions";
 import { buildSchedulePdf, type PdfShift } from "./pdf";
@@ -440,15 +440,23 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const planColor = planPct == null ? "" : planPct <= laborTarget ? "good" : planPct <= laborTarget + 3 ? "warn" : "bad";
   const budgetCap = budget && budget.revenue > 0 ? Math.round((budget.revenue * laborTarget) / 100) : null;
 
+  /** Samþykkt beiðni getur losað vaktir (veikindi, „losa vakt“) — sækja vikuna aftur svo gridið sýni það. */
+  const [openVer, setOpenVer] = useState(0);
+  function reloadWeek() {
+    if (liveCompany) getWeekShifts(weekMonISO).then((res) => { if (res?.ok) applyWeek(res); }).catch(() => {});
+    setOpenVer((v) => v + 1);
+  }
   async function decideLeave(id: string | null, approved: boolean) {
     if (!id) { toast(approved ? "Samþykkt" : "Hafnað"); return; }
     const res = await updateLeaveRequest(id, approved);
     toast(res.ok ? (approved ? "Samþykkt" : "Hafnað") : (res.error ?? "Villa"));
+    if (res.ok && approved) reloadWeek();
   }
-  async function decideSwap(id: string | null) {
-    if (!id) { toast("Samþykkt"); return; }
-    const res = await approveShiftSwap(id);
-    toast(res.ok ? "Samþykkt" : (res.error ?? "Villa"));
+  async function decideSwap(id: string | null, approved = true) {
+    if (!id) { toast(approved ? "Samþykkt" : "Hafnað"); return; }
+    const res = approved ? await approveShiftSwap(id) : await rejectShiftSwap(id);
+    toast(res.ok ? (approved ? "Samþykkt" : "Hafnað") : (res.error ?? "Villa"));
+    if (res.ok && approved) reloadWeek();
   }
 
   function buildShiftPayload(): ShiftInput[] {
@@ -1157,7 +1165,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                 <button className="btn sm" onClick={() => decideLeave(r.id, true)}>{t("Samþykkja")}</button>
                 <button className="btn ghost sm" style={{ marginLeft: 8 }} onClick={() => decideLeave(r.id, false)}>{t("Hafna")}</button>
               </>}
-              {r.kind === "swap" && <button className="btn sm" onClick={() => decideSwap(r.id)}>{t("Samþykkja")}</button>}
+              {r.kind === "swap" && <><button className="btn sm" onClick={() => decideSwap(r.id)}>{t("Samþykkja")}</button><button className="btn ghost sm" onClick={() => decideSwap(r.id, false)}>{t("Hafna")}</button></>}
               {r.kind === "avail" && <span className="tag mut">{t("skráð")}</span>}
             </div>
           ))}
@@ -1166,7 +1174,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       </div>
       )}
 
-      {liveCompany && <OpenShifts weekDays={weekDays} types={types.map((x) => ({ nm: x.nm, t: x.t }))} todayISO={todayISO} />}
+      {liveCompany && <OpenShifts weekDays={weekDays} types={types.map((x) => ({ nm: x.nm, t: x.t }))} todayISO={todayISO} refresh={openVer} />}
       </>}
 
       {modal === "staff" && <StaffNeedModal targets={targets} onClose={() => setModal(null)} onSave={(ts) => { setTargets(ts); setModal(null); setStaffingTargets(ts).then((r) => toast(r.ok ? "Mönnunarþörf vistuð" : (r.error ?? "Villa"))); }} />}

@@ -203,8 +203,8 @@ export default function VaktScreen() {
           {!open && s.empName ? <Row icon={<MessageCircle color={colors.ink2} size={19} />} title={mine ? "Opna spjall" : trf("Skilaboð til {x}", s.empName.split(/\s+/)[0])} chevron={false} last onPress={() => { setSheet(null); if (mine) router.push("/spjall"); else message(); }} /> : null}
         </View>
       </Sheet>
-      <OfferSheet open={sheet === "offer"} onClose={() => setSheet(null)} onDone={() => router.back()} shiftLabel={label} />
-      <CantSheet open={sheet === "cant"} onClose={() => setSheet(null)} onDone={() => router.back()} shiftLabel={label} />
+      <OfferSheet open={sheet === "offer"} onClose={() => setSheet(null)} onDone={() => router.back()} shiftLabel={label} shiftId={s?.id} />
+      <CantSheet open={sheet === "cant"} onClose={() => setSheet(null)} onDone={() => router.back()} shiftLabel={label} shiftId={s?.id} date={s?.date} />
     </Screen>
   );
 }
