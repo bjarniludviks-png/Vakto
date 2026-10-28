@@ -1,5 +1,7 @@
 // Spjallþráður — realtime, skilaboð flokkuð eftir sendanda, viðbrögð með
 // löngu ýti, „séð af“, svar í þræði, skrifar-vísir.
+import { presenceLabel, type CoworkerStatus } from "../../src/lib/presence";
+import { coworkerStatus } from "../../src/lib/api/presence";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
 import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions, Modal } from "react-native";
@@ -49,6 +51,24 @@ export default function Thread() {
   const [typing, setTyping] = useState<string | null>(null);
   const [members, setMembers] = useState(0);
   const [isGroup, setIsGroup] = useState(true);
+  // Bein skilaboð: „á vakt“ / virk(ur) viðmælandans (0099); smellur á hausinn opnar prófílinn hans.
+  const [peer, setPeer] = useState<CoworkerStatus | null>(null);
+  const peerLabel = presenceLabel(peer);
+  useEffect(() => {
+    if (isGroup || !id || !me) return;
+    let live = true;
+    const load = async () => {
+      const { data: mem } = await supabase.from("channel_members").select("user_id").eq("channel_id", id);
+      const { data: au } = await supabase.auth.getUser();
+      const other = (mem ?? []).map((m) => m.user_id as string).find((u) => u !== au.user?.id);
+      if (!other) return;
+      const st = await coworkerStatus([other]);
+      if (live) setPeer(st[other] ?? null);
+    };
+    void load();
+    const iv = setInterval(load, 60_000);
+    return () => { live = false; clearInterval(iv); };
+  }, [isGroup, id, me]);
   const [info, setInfo] = useState(false);
   const [muted, setMuted] = useState(false);
   const [memberList, setMemberList] = useState<Person[]>([]);
@@ -289,11 +309,11 @@ export default function Thread() {
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.panel }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 8, paddingTop: insets.top + 4, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.line2, backgroundColor: colors.panel }}>
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel={tr("Til baka")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }}><ChevronLeft color={colors.brand} size={28} /></Pressable>
-        <Pressable onPress={openInfo} style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+        <Pressable onPress={() => { if (!isGroup && peer?.employeeId) router.push(`/starfsmadur/${peer.employeeId}`); else openInfo(); }} style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
         {kind === "general" ? <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={18} /></View> : <Avatar name={name ?? "?"} size={36} color={isGroup ? colors.info : undefined} />}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt weight="bold" size={15} numberOfLines={1}>{name ?? "Spjall"}</Txt>
-          <Muted size={12}>{typing ? trf("{x} skrifar…", typing) : isGroup ? (muted ? trf("{n} meðlimir · þaggað", members || "—") : trf("{n} meðlimir", members || "—")) : muted ? "Einkaspjall · þaggað" : "Einkaspjall"}</Muted>
+          <Muted size={12}>{typing ? trf("{x} skrifar…", typing) : isGroup ? (muted ? trf("{n} meðlimir · þaggað", members || "—") : trf("{n} meðlimir", members || "—")) : peerLabel.text ? tr(peerLabel.text) : muted ? "Einkaspjall · þaggað" : "Einkaspjall"}</Muted>
         </View>
         </Pressable>
         <Pressable onPress={openInfo} hitSlop={10} accessibilityLabel={tr("Upplýsingar")} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}><Info color={colors.brand} size={24} /></Pressable>

@@ -30,6 +30,14 @@ export function useLang(): Lang {
 
 type E = [string, string, string]; // [en, vi, pl]
 const D: Record<string, E> = {
+  "Virk(ur) núna": ["Active now", "Đang hoạt động", "Aktywny(a) teraz"],
+  "Virk(ur) í dag": ["Active today", "Hoạt động hôm nay", "Aktywny(a) dziś"],
+  "Virk(ur) í gær": ["Active yesterday", "Hoạt động hôm qua", "Aktywny(a) wczoraj"],
+  "Sýna þegar ég er virk(ur)": ["Show when I'm active", "Hiển thị khi tôi đang hoạt động", "Pokazuj, gdy jestem aktywny(a)"],
+  "Sýna símanúmerið mitt": ["Show my phone number", "Hiển thị số điện thoại của tôi", "Pokazuj mój numer telefonu"],
+  "Slökkt = þú sérð ekki heldur virkni annarra": ["Off = you don't see others' activity either", "Tắt = bạn cũng không thấy hoạt động của người khác", "Wyłączone = nie widzisz też aktywności innych"],
+  "Samstarfsfólk getur hringt úr prófílnum þínum": ["Coworkers can call you from your profile", "Đồng nghiệp có thể gọi bạn từ hồ sơ", "Współpracownicy mogą dzwonić z Twojego profilu"],
+  "Í SPJALLI": ["IN CHAT", "TRONG TRÒ CHUYỆN", "W CZACIE"],
   // Réttindin mín (okt. 2026)
   "Áunnið {x} d.": ["Earned {x} d", "Tích lũy {x} ngày", "Nabyte {x} dni"],
   "Tekið {x} d.": ["Taken {x} d", "Đã dùng {x} ngày", "Wykorzystane {x} dni"],

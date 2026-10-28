@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
-import { View, ActivityIndicator } from "react-native";
+import { View, ActivityIndicator, AppState } from "react-native";
+import { touchPresence } from "../src/lib/api/presence";
 import { AuthProvider, useAuth } from "../src/lib/auth";
 import { MeProvider } from "../src/lib/me-context";
 import { ToastProvider } from "../src/components/ui";
@@ -21,6 +22,13 @@ function Gate({ children }: { children: React.ReactNode }) {
   // Grunnurinn framfylgir þessu sjálfur (RLS) — hér er bara réttur skjár valinn.
   const [access, setAccess] = useState<"active" | "readonly" | "closed" | null>(null);
   const uid = session?.user.id;
+  // „Virk(ur) núna“ í spjalli (0099): merkja virkni þegar appið er opnað eða kemur aftur í forgrunn.
+  useEffect(() => {
+    if (!uid) return;
+    void touchPresence();
+    const sub = AppState.addEventListener("change", (s) => { if (s === "active") void touchPresence(); });
+    return () => sub.remove();
+  }, [uid]);
   useEffect(() => {
     if (!uid) { setAccess(null); return; }
     let live = true;

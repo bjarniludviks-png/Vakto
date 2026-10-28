@@ -1,5 +1,6 @@
 "use client";
 
+import { PrivacyToggles } from "./privacy-toggles";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "@/components/app/toast";
 import { useRouter } from "next/navigation";
@@ -738,6 +739,7 @@ function Profile({ photo, setPhoto, my, initials }: { photo: string | null; setP
             : <select><option>Efling</option><option>VR</option><option>SGS</option></select>}
         </div>
         {p && <p className="muted" style={{ fontSize: 11.5, margin: "2px 0 10px" }}>{t("Staða, deild og kjarasamningur eru skráð af stjórnanda — hafðu samband ef eitthvað er rangt.")}</p>}
+        {p && <PrivacyToggles />}
         <button className="btn sm" style={{ width: "100%", justifyContent: "center" }} disabled={busy} onClick={save}>{t("Vista breytingar")}</button>
       </div></div>
       <WalletButtons />

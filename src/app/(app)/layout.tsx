@@ -1,4 +1,5 @@
 import "@/styles/app.css";
+import { PresencePing } from "@/components/app/presence-ping";
 import AppShell, { type Account } from "@/components/app/app-shell";
 import PullToRefresh from "@/components/app/pull-to-refresh";
 import { LangProvider } from "@/components/app/lang";
@@ -101,6 +102,7 @@ export default async function AppLayout({
     <LangProvider>
       <CountryProvider value={country}>
         <PullToRefresh />
+        <PresencePing />
         <PhotoProvider photos={photos}><AppShell account={{ ...account, vaktoAdmin }}>{children}</AppShell></PhotoProvider>
       </CountryProvider>
     </LangProvider>

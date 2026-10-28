@@ -9,6 +9,19 @@ type Dict = Record<string, { is: string; en: string; vi?: string; pl?: string }>
 
 // App-shell chrome strings. Per-screen content can adopt useLang() incrementally.
 export const DICT: Dict = {
+  "Virk(ur) núna": { is: "Virk(ur) núna", en: "Active now" },
+  "Virk(ur) í dag": { is: "Virk(ur) í dag", en: "Active today" },
+  "Virk(ur) í gær": { is: "Virk(ur) í gær", en: "Active yesterday" },
+  "Sýna þegar ég er virk(ur)": { is: "Sýna þegar ég er virk(ur)", en: "Show when I'm active" },
+  "Sýna símanúmerið mitt": { is: "Sýna símanúmerið mitt", en: "Show my phone number" },
+  "slökkt = þú sérð ekki heldur virkni annarra": { is: "slökkt = þú sérð ekki heldur virkni annarra", en: "off = you don't see others' activity either" },
+  "samstarfsfólk getur hringt úr prófílnum þínum": { is: "samstarfsfólk getur hringt úr prófílnum þínum", en: "coworkers can call you from your profile" },
+  "Í spjalli": { is: "Í spjalli", en: "In chat" },
+  "Næstu vaktir": { is: "Næstu vaktir", en: "Upcoming shifts" },
+  "Engar birtar vaktir á næstunni.": { is: "Engar birtar vaktir á næstunni.", en: "No published shifts coming up." },
+  "Hringja": { is: "Hringja", en: "Call" },
+  "Sjá prófíl": { is: "Sjá prófíl", en: "View profile" },
+  "Prófíll fannst ekki.": { is: "Prófíll fannst ekki.", en: "Profile not found." },
   // Launatímabil, kjarasamningar, aðgangur, veikindi á vakt (okt. 2026)
   "Síðasta tímabil": { is: "Síðasta tímabil", en: "Last period" },
   "Breyta launatímabili": { is: "Breyta launatímabili", en: "Change pay period" },
