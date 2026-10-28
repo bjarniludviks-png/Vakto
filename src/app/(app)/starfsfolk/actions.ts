@@ -73,10 +73,19 @@ function roleEnum(label: string): string {
   const key = Object.keys(ROLE_MAP).find((k) => label.startsWith(k));
   return key ? ROLE_MAP[key] : "employee";
 }
+/** Íslensk tala: „2.855“ = 2855, „173,33“ = 173,33, „1.234,5“ = 1234,5. Áður voru ÖLL tákn nema tölustafir
+ *  fjarlægð, svo „173,33“ vistaðist sem 17333 (vinnustundir á mánuði). */
 function num(s: string | undefined, fallback = 0): number {
   if (!s) return fallback;
-  const n = Number(s.replace(/[^\d]/g, ""));
+  const t = s.replace(/\s|kr|klst|%/gi, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".").replace(/[^\d.]/g, "");
+  const n = Number(t);
   return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+/** Vinnustundir á mánuði: 1–400 klst., annars ekkert (ekki vista augljóslega rangt gildi). */
+function hoursPerMonth(s: string | undefined): number | null {
+  const n = num(s, 0);
+  return n > 0 && n <= 400 ? Math.round(n * 100) / 100 : null;
 }
 
 async function companyId(
@@ -162,7 +171,7 @@ export async function createEmployee(input: NewEmployeeInput): Promise<ActionRes
       employment_ratio: num(input.employmentRatio, 100),
       union_agreement: tplRes.union || "Efling",
       ...(tplRes.payRule ? { pay_rule: tplRes.payRule } : input.payAgreement && UNION_PRESETS[input.payAgreement] ? { pay_rule: { agreement: input.payAgreement } } : {}),
-      monthly_hours: input.monthlyHours ? num(input.monthlyHours, 0) || null : null,
+      monthly_hours: input.monthlyHours ? hoursPerMonth(input.monthlyHours) : null,
       hire_date: input.hireDate || null,
       status: "active" as const,
     };
@@ -594,7 +603,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
       if (tplRes2.payRule) patch.pay_rule = tplRes2.payRule;
     }
     if (input.payType) patch.pay_type = input.payType === "Mánaðarlaun" ? "monthly" : "hourly";
-    if (input.monthlyHours !== undefined) patch.monthly_hours = num(input.monthlyHours, 0) || null;
+    if (input.monthlyHours !== undefined) patch.monthly_hours = hoursPerMonth(input.monthlyHours);
     if (input.pensionFund !== undefined) patch.pension_fund = input.pensionFund || null;
     if (input.hireDate) patch.hire_date = input.hireDate;
     if (input.position !== undefined) patch.position_id = await lookupId(supabase, "positions", input.position, companyU);
