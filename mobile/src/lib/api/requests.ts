@@ -110,6 +110,22 @@ export async function updateMyProfile(
   return error ? { ok: false, error: error.message } : { ok: true };
 }
 
+/** Prófílmynd: hlaðið í `avatars/<fyrirtæki>/<starfsmaður>/` (RLS: eigin mappa) og vistað í employees.photo_url. */
+export async function uploadMyPhoto(me: Me, uri: string, mime: string): Promise<Result & { url?: string }> {
+  try {
+    const buf = await (await fetch(uri)).arrayBuffer();
+    const ext = mime === "image/png" ? "png" : "jpg";
+    const path = `${me.companyId}/${me.empId}/photo-${Date.now()}.${ext}`;
+    const up = await supabase.storage.from("avatars").upload(path, buf, { contentType: mime, upsert: true });
+    if (up.error) return { ok: false, error: up.error.message };
+    const url = supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+    const { error } = await supabase.from("employees").update({ photo_url: url }).eq("id", me.empId);
+    return error ? { ok: false, error: error.message } : { ok: true, url };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Villa" };
+  }
+}
+
 export type MyRequest = {
   id: string;
   kind: "leave" | "swap";
