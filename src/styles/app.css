@@ -2033,3 +2033,25 @@ html.dark .mroster .sh{background:#23264a;color:#c7ccff}
 .acc-head{display:flex;align-items:center;gap:12px}
 .acc-head .av{width:40px;height:40px;border-radius:12px;background:var(--brand-soft);color:var(--brand);display:grid;place-items:center;font-weight:700;font-size:14px;flex:none}
 .acc-head small{display:block;color:var(--ink3);font-size:12px;font-weight:500}
+/* Sameiginlegt vaktaform (vaktaplan/shift-form.tsx) — sama í dag-, viku- og mánaðarsýn. */
+.sf-lbl{font-size:12px;font-weight:650;color:var(--ink3);margin:0 0 6px}
+.sf-types{display:flex;flex-wrap:wrap;gap:6px}
+.sf-types .mr-tool{min-height:34px}
+.sf-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:10px}
+.sf-tasks{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:0 0 10px}
+.sf-tasks summary{cursor:pointer;font-size:13px;font-weight:650;color:var(--ink2)}
+.sf-row{display:flex;align-items:center;gap:8px;width:100%;padding:10px 4px;border:0;border-bottom:1px solid var(--line2);background:none;font:inherit;font-size:13.5px;color:var(--ink);text-align:left;cursor:pointer}
+.sf-row:hover{background:var(--line2)}
+.modal.shift-sheet{max-width:480px}
+.week-paint{padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--panel)}
+@media (max-width:640px){
+  /* Í síma: vaktaform opnast sem blað neðan frá, hnappar fylla breiddina og eru nógu stórir fyrir fingur. */
+  .mwrap.shift-wrap{align-items:flex-end;padding:0}
+  .modal.shift-sheet{max-width:none;width:100%;border-radius:18px 18px 0 0;max-height:92vh;padding-bottom:env(safe-area-inset-bottom,0px)}
+  .sf-actions .btn{flex:1 1 auto;justify-content:center;min-height:44px}
+  .sf-types .mr-tool{min-height:40px;font-size:13px}
+  .mr-tools{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px;scrollbar-width:none}
+  .mr-tools::-webkit-scrollbar{display:none}
+  .mr-tools .mr-tool{flex:none}
+  .mr-hint{white-space:normal;width:calc(100% - 32px);text-align:center;bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+}
