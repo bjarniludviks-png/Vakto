@@ -26,9 +26,11 @@ const hrs = (a: string, b: string) => {
 };
 const short = (t: string) => (t.endsWith(":00") ? t.slice(0, 2) : t);
 
-export default function MonthRoster({ month, todayISO, types, deptSel, scopeDepts, onOpenDay, onTotals, full, onToggleFull }: {
+export default function MonthRoster({ month, todayISO, types, deptSel, scopeDepts, onOpenDay, onTotals, full, onToggleFull, onTypes }: {
   month: Date; todayISO: string; types: ShiftType[]; deptSel: string[]; scopeDepts: string[];
   onOpenDay: (d: Date) => void; onTotals: (x: { hrs: number; shifts: number }) => void; full: boolean; onToggleFull: () => void;
+  /** Opnar vaktategundaglugga Vaktaplansins. */
+  onTypes?: () => void;
 }) {
   const { t } = useLang();
   const y = month.getFullYear(), m = month.getMonth();
@@ -167,7 +169,7 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
   return (
     <div className={`card mroster-card${full ? " full" : ""}`} style={{ marginTop: full ? 0 : 16 }}>
       <div className="mr-bar">
-        <PaintTools types={types} tool={tool} setTool={setTool} />
+        <PaintTools types={types} tool={tool} setTool={setTool} onTypes={onTypes} />
         <div className="mr-right">
           <div style={{ position: "relative" }}>
             <button className="btn ghost sm" disabled={busy} onClick={() => setMenu((v) => !v)}>

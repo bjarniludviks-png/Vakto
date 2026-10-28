@@ -949,8 +949,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
 
       {view === "Vika" && (
         <div>
-          <div className="mr-bar week-paint" style={{ marginTop: 16 }}><PaintTools types={types} tool={paint} setTool={(x) => { setPaint(x); if (x) setClip(null); }} /></div>
-          <div className="sgrid-wrap" style={{ marginTop: 10 }}>
+          <div className="week-paint"><PaintTools types={types} tool={paint} setTool={(x) => { setPaint(x); if (x) setClip(null); }} onTypes={() => setModal("types")} /></div>
+          <div className="sgrid-wrap" style={{ marginTop: 8 }}>
             <table className="sgrid">
               <thead>
                 <tr>
@@ -1041,20 +1041,6 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
               </tbody>
             </table>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 12, fontSize: 12.5, color: "var(--ink2)" }}>
-            <div style={{ display: "flex", gap: 15, flexWrap: "wrap", alignItems: "center" }}>
-              {types.map((ty) => (
-                <span key={ty.nm} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  <i style={{ width: 11, height: 11, borderRadius: 3, background: ty.bg, border: `1px solid ${ty.bd}` }} />
-                  {t(ty.nm)}{ty.prem && ty.prem !== "Dagvinna" && <span className="muted" style={{ fontSize: 11 }}> ({t(ty.prem)})</span>}
-                </span>
-              ))}
-            </div>
-            <button className="btn ghost sm" style={{ padding: "5px 10px", fontSize: 12 }} onClick={() => setModal("types")}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>{t("Vaktategundir")}
-            </button>
-            <span className="muted">{t("Dragðu vaktir milli reita — kostnaður uppfærist strax.")}</span>
-          </div>
         </div>
       )}
 
@@ -1081,7 +1067,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       {view === "Mánuður" && liveCompany && monthMode === "tafla" && (
         <MonthRoster month={cur} todayISO={todayISO} types={types} deptSel={depts} scopeDepts={scopeDepts}
           onOpenDay={(d) => { setCur(d); setView("Dagur"); setFull(false); }} onTotals={setMonthTot}
-          full={full} onToggleFull={() => setFull((v) => !v)} />
+          full={full} onToggleFull={() => setFull((v) => !v)} onTypes={() => setModal("types")} />
       )}
       {view === "Mánuður" && (!liveCompany || monthMode === "dagatal") && <MonthView monthDate={cur} todayISO={todayISO} blocks={monthBlocks}
         onEdit={(d) => { if (monthClip) { void pasteMonthShift(fmtISO(d)); } else setDayModal(d); }}
