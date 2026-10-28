@@ -1,6 +1,6 @@
 import OverviewScreen from "./overview-screen";
 import { listWorkOverviews } from "./actions";
-import { getPayPeriodStart } from "@/lib/pay-period.server";
+import { getPayPeriod } from "@/lib/pay-period.server";
 import { lastPayPeriod } from "@/lib/periods";
 import { currentPlan } from "@/lib/plan.server";
 import { planAllows } from "@/lib/plan-features";
@@ -12,7 +12,7 @@ export default async function VinnuyfirlitPage({ searchParams }: { searchParams:
   const plan = await currentPlan(); // áskriftarleið (0089)
   if (plan && !planAllows(plan, "work_overview")) return <UpgradePrompt feature="work_overview" />;
   const sp = await searchParams;
-  const startDay = await getPayPeriodStart();
+  const startDay = await getPayPeriod();
   const def = lastPayPeriod(startDay);
   const custom = okDate(sp.from) && okDate(sp.to) && sp.to! >= sp.from!;
   const from = custom ? sp.from! : def.from;

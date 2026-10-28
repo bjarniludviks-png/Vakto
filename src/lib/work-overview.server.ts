@@ -7,7 +7,8 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getEmployees } from "@/lib/employees.server";
 import { periodPayLine, hourBuckets } from "@/lib/payroll";
-import { resolveRuleSet } from "@/lib/payrules";
+import { resolveRuleSet, withOtMode } from "@/lib/payrules";
+import { companyPaySetup } from "@/lib/pay-period.server";
 import { daysIn } from "@/lib/periods";
 import type { WoDay, WoSnapshot, WoRow, WoStatus, WoLogEntry } from "@/lib/work-overview";
 
@@ -58,6 +59,7 @@ export async function buildSnapshots(supabase: SupabaseClient, company: string, 
   const pBy = byEmp(punches);
   const sBy = byEmp((shiftRes.data ?? []) as { employee_id: string | null; date: string; start_time: string | null; end_time: string | null }[]);
   const lBy = byEmp((leaveRes.data ?? []) as { employee_id: string; type: string; from_date: string; to_date: string }[]);
+  const { otMode } = await companyPaySetup(supabase, company); // yfirvinna per viku / meðaltal (0097)
   const allDays = daysIn(from, to);
   const now = new Date().toISOString();
 
@@ -92,9 +94,9 @@ export async function buildSnapshots(supabase: SupabaseClient, company: string, 
       }
       const pp = ps.map((p) => ({ clockIn: p.clock_in, clockOut: p.clock_out }));
       const rule = rules.get(e.id) ?? null;
-      const line = periodPayLine(e, pp, rule, from);
+      const line = periodPayLine(e, pp, rule, from, { mode: otMode, to });
       const monthly = e.payType === "monthly";
-      const b = monthly ? { dagvinna: 0, yfirvinna: 0, alag: {} as Record<number, number> } : hourBuckets(pp, resolveRuleSet(e.union, rule));
+      const b = monthly ? { dagvinna: 0, yfirvinna: 0, alag: {} as Record<number, number> } : hourBuckets(pp, withOtMode(resolveRuleSet(e.union, rule), otMode, from, to));
       const planned = r2(days.reduce((a, d) => a + d.planned, 0));
       const worked = r2(days.reduce((a, d) => a + d.worked, 0));
       const weekday = (d: string) => { const w = new Date(`${d}T12:00:00Z`).getUTCDay(); return w !== 0 && w !== 6; };

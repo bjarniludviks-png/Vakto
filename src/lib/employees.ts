@@ -26,6 +26,10 @@ export type Employee = {
   city?: string | null;
   nextOfKin?: string | null;
   hireDate?: string | null;
+  /** Starfsaldur (mánuðir) fyrir ráðningardag sem telst með í orlofs- og veikindarétti (0097). */
+  priorServiceMonths?: number;
+  /** Dagurinn sem starfsmaðurinn var skráður í VAKTO — ráðningardagur sami dagur er líklega rangur. */
+  createdOn?: string | null;
   role: string;
   hasAccount?: boolean;  // tengdur innskráningaraðgangi (app / Mitt svæði)
   payRule?: CustomRules | null;

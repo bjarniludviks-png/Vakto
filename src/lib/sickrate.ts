@@ -1,9 +1,9 @@
 // Veikindahlutfall — gerðir og hrein föll (vefur, útflutningur og AI). Útreikningur: sickrate.server.ts.
-import type { Gran } from "@/lib/periods";
+import type { Gran, PayPeriodInput } from "@/lib/periods";
 
 export type SickRow = { id: string; name: string; dept: string; planned: number; sick: number; sickDays: number; occurrences: number };
 export type SickBucket = { key: string; label: string; short: string; from: string; to: string; planned: number; sick: number; rate: number | null; sickDays: number; occurrences: number; rows: SickRow[] };
-export type SickRate = { live: boolean; gran: Gran; startDay: number; company: string; buckets: SickBucket[] };
+export type SickRate = { live: boolean; gran: Gran; startDay: PayPeriodInput; company: string; buckets: SickBucket[] };
 
 export const SICK_COUNT: Record<Gran, number> = { period: 12, month: 12, quarter: 8, year: 4 };
 const r1 = (n: number) => Math.round(n * 10) / 10;

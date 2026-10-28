@@ -2,7 +2,7 @@
 // run (persistence), the Payday/Excel export, and the labor% metric.
 import type { Employee } from "@/lib/employees";
 import type { RuleSet, CustomRules, Band, OrlofSet } from "@/lib/payrules";
-import { resolveOrlof, resolveRuleSet, resolveUppbot } from "@/lib/payrules";
+import { resolveOrlof, resolveRuleSet, resolveUppbot, withOtMode, type OtMode } from "@/lib/payrules";
 import { resolvePay, taxBeforeAllowance, taxYear, type PaySettings } from "@/lib/paysettings";
 
 export const PERSONAL_ALLOWANCE = taxYear(new Date().getFullYear()).allowance; // persónuafsláttur kr/mán
@@ -354,9 +354,11 @@ export function periodPayLine(
   punches: { clockIn: string; clockOut: string }[],
   payRule: Partial<CustomRules> | null | undefined,
   from: string,
+  /** Yfirvinna að meðaltali yfir tímabilið (companies.ot_mode = "period") — þarf þá `to`. */
+  ot?: { mode?: OtMode | null; to?: string },
 ): PayLine {
   const year = Number(from.slice(0, 4));
   const kind = uppbotForMonth(Number(from.slice(5, 7)));
   const ub = kind ? computeUppbot(resolveUppbot(e.union, null, year)[kind], e.employmentRatio, uppbotMonths(kind, year, e.hireDate)) : 0;
-  return computeFromPunches(e, punches, resolveRuleSet(e.union, payRule), ub);
+  return computeFromPunches(e, punches, withOtMode(resolveRuleSet(e.union, payRule), ot?.mode, from, ot?.to ?? ""), ub);
 }

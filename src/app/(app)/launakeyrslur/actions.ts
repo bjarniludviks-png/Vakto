@@ -1,5 +1,6 @@
 "use server";
 
+import { companyPaySetup } from "@/lib/pay-period.server";
 import { demoBlocked, demoResult } from "@/lib/demo.server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
@@ -69,6 +70,8 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
     byEmp.get(p.employee_id)!.push({ clockIn: p.clock_in, clockOut: p.clock_out });
   }
 
+  // Yfirvinna per viku eða að meðaltali yfir tímabilið (companies.ot_mode, 0097).
+  const { otMode } = await companyPaySetup(supabase, company);
   // Per-employee custom pay-rule overrides (tolerant — null before migration 0013).
   const ruleMap = new Map<string, { eve: number; weekend: number; overtime: number; holiday: number; night: number } | null>();
   const pr = await supabase.from("employees").select("id, pay_rule").eq("company_id", company);
@@ -88,7 +91,7 @@ async function approvedLines(supabase: Awaited<ReturnType<typeof createClient>>,
     // Verktakar senda reikning — þeir fara hvorki í launakeyrslu né launaútflutning.
     .filter((e) => e.role !== "contractor")
     .filter((e) => (byEmp.get(e.id)?.length ?? 0) > 0 || (!goneBefore(e.id) && (e.payType === "monthly" || e.status !== "inactive")))
-    .map((e) => periodPayLine(e, byEmp.get(e.id) ?? [], ruleMap.get(e.id), from));
+    .map((e) => periodPayLine(e, byEmp.get(e.id) ?? [], ruleMap.get(e.id), from, { mode: otMode, to }));
   // Raunverulega samþykktir tímar per starfsmann (fastlaunafólk fær laun óháð þeim, en taflan sýnir þá).
   const worked = new Map<string, number>();
   for (const p of punches) worked.set(p.employee_id, (worked.get(p.employee_id) ?? 0) + Math.max(0, (Date.parse(p.clock_out) - Date.parse(p.clock_in)) / 3.6e6));

@@ -636,7 +636,12 @@ export async function inviteUser(input: { email: string; role: string; permissio
 // fara um service-role (0076: innskráðir skrifa ekki í users), eftir að kallandi er sannreyndur.
 // ============================================================
 
-export async function saveUserAccess(input: { userId: string; permissions: UserPerms; departments?: string[] | null }): Promise<SettingsResult> {
+const ROLES_ALLOWED = ["owner", "manager", "employee", "contractor"] as const;
+type UserRoleKey = (typeof ROLES_ALLOWED)[number];
+const ROLE_NAME: Record<UserRoleKey, string> = { owner: "Stjórnandi (eigandi)", manager: "Vaktstjóri", employee: "Starfsmaður", contractor: "Verktaki" };
+
+/** Eigandi breytir hlutverki og/eða aðgangi hvaða notanda sem er í fyrirtækinu (ekki eigin). */
+export async function saveUserAccess(input: { userId: string; permissions: UserPerms; departments?: string[] | null; role?: UserRoleKey }): Promise<SettingsResult> {
   if (await demoBlocked()) return demoResult();
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -654,13 +659,27 @@ export async function saveUserAccess(input: { userId: string; permissions: UserP
     const activeHere = target?.company_id === ctx.company;
     const roleHere = activeHere ? target?.role : mem?.role;
     if (!target || (!activeHere && !mem)) return { ok: false, error: "Notandi fannst ekki" };
-    if (roleHere !== "manager") return { ok: false, error: "Aðgangi er aðeins stýrt fyrir stjórnendur" };
+    const newRole: UserRoleKey = input.role && (ROLES_ALLOWED as readonly string[]).includes(input.role) ? input.role : (roleHere as UserRoleKey);
+    if (!(ROLES_ALLOWED as readonly string[]).includes(newRole)) return { ok: false, error: "Ógilt hlutverk" };
 
-    // Óbreytt frá sjálfgefnu = null (svo framtíðarbreytingar á sjálfgefnu gildi nái til hans).
+    // Hlutverk: company_members + users (ef virkt fyrirtæki) + tengdur starfsmaður, svo aðgangur og listar haldist í takt.
+    let roleNote = "";
+    if (newRole !== roleHere) {
+      const rm = await admin.from("company_members").update({ role: newRole }).eq("user_id", input.userId).eq("company_id", ctx.company);
+      if (rm.error) return dbFail("saveUserAccess.role.members", rm.error);
+      if (activeHere) {
+        const ru = await admin.from("users").update({ role: newRole }).eq("id", input.userId).eq("company_id", ctx.company);
+        if (ru.error) return dbFail("saveUserAccess.role.users", ru.error);
+      }
+      await admin.from("employees").update({ role: newRole }).eq("company_id", ctx.company).eq("user_id", input.userId);
+      roleNote = ` · hlutverk: ${ROLE_NAME[(roleHere as UserRoleKey)] ?? roleHere} → ${ROLE_NAME[newRole]}`;
+    }
+
+    // Aðgangsrofar gilda aðeins um vaktstjóra. Óbreytt frá sjálfgefnu = null (svo framtíðarbreytingar nái til hans).
     const clean = sanitizePerms(input.permissions);
     const next = resolveAccess("manager", clean);
     const isDefault = AREAS.every((a) => next[a.key] === MANAGER_DEFAULTS[a.key]);
-    const stored = isDefault ? null : next;
+    const stored = newRole !== "manager" || isDefault ? null : next;
 
     const m = await admin.from("company_members").update({ permissions: stored }).eq("user_id", input.userId).eq("company_id", ctx.company);
     if (m.error) return dbFail("saveUserAccess.members", m.error);
@@ -671,7 +690,7 @@ export async function saveUserAccess(input: { userId: string; permissions: UserP
 
     // Deildaumsjón (0025) — á starfsmannaprófílnum sem er tengdur aðganginum. Tómt = allar deildir.
     let deptNote = "";
-    if (input.departments) {
+    if (input.departments && newRole === "manager") {
       const { data: emp } = await admin.from("employees").select("id").eq("company_id", ctx.company).eq("user_id", input.userId).maybeSingle();
       if (emp) {
         const names = Array.from(new Set(input.departments.map((d) => d.trim()).filter(Boolean)));
@@ -681,10 +700,10 @@ export async function saveUserAccess(input: { userId: string; permissions: UserP
     }
 
     const prev = resolveAccess("manager", target.permissions);
-    const diff = AREAS.filter((a) => prev[a.key] !== next[a.key]).map((a) => `${next[a.key] ? "+" : "−"} ${a.label}`);
+    const diff = newRole === "manager" ? AREAS.filter((a) => prev[a.key] !== next[a.key]).map((a) => `${next[a.key] ? "+" : "−"} ${a.label}`) : [];
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "user.permissions", entity: "user", entityId: input.userId,
-      detail: `Aðgangur uppfærður — ${(target.full_name as string) || (target.email as string) || "notandi"}: ${diff.length ? diff.join(", ") : "óbreytt"}${deptNote}`,
+      detail: `Aðgangur uppfærður — ${(target.full_name as string) || (target.email as string) || "notandi"}: ${diff.length ? diff.join(", ") : roleNote ? "" : "óbreytt"}${roleNote}${deptNote}`,
     });
     revalidatePath("/stillingar");
     return { ok: true };

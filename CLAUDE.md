@@ -484,3 +484,21 @@
   Heilskjár (`.sched-full`, Esc lokar) í viku- og mánaðarsýn.
 - **Deildir:** síað á fleiri en eina deild; `employees.extra_departments text[]` (0094, heiti eins og `oversees_departments`)
   = aðrar deildir sem starfsmaður vinnur í (Starfsfólk → Vinna → „Vinnur líka í“). Aðaldeildin ræður launum og skýrslum.
+
+## Kjarasamningar, launatímabil, aðgangur og veikindi á vakt (28. okt. 2026, migration 0097 á staging; prod við release)
+- **Staðall eftir félagi:** `agreementFor(union, payRule)` í `payrules.ts` — val stjórnanda (`pay_rule.agreement`), félagið ef það er
+  staðall, annars SGS-félög (VSFK, Eining-Iðja, AFL …, `familyFor`) → „Efling – veitingar/SGS“, VR/LÍV → „VR“, óþekkt → „Efling“.
+  `resolveRuleSet` notar það, svo launakeyrsla, Payday-útflutningur og vinnuyfirlit fylgja sömu reglu. Vistaðar eigin reglur gilda
+  AÐEINS með „Eigin reglur“; spjaldið varar við (`hasIgnoredCustomRules`). `components/app/agreement-summary.tsx` sýnir álag,
+  orlof og veikindarétt um leið og félag er valið (Nýr starfsmaður + spjald → Laun).
+- **Yfirvinna:** `companies.ot_mode` 'week' (sjálfgefið) | 'period' = 40 klst/viku að meðaltali yfir launatímabilið
+  (`withOtMode`, greiðasölusamningur gr. 3.2.4). **Launatímabil:** `companies.pay_period` jsonb — month(startDay 1–28) |
+  semimonth | biweekly/weekly (anchor). `lib/periods.ts` (`payPeriodOf`/`shiftPayPeriod`/`normalizePayPeriod`) tekur tölu (gamla
+  `pay_period_start`) eða stillingu; `companyPaySetup()` í `pay-period.server.ts`. Stillingar → Reglur og laun (`stillingar/pay-setup.tsx`).
+- **Starfsaldur:** `employees.prior_service_months` — réttindi telja frá `hire_date` mínus þetta. Ráðningardagur er skyldureitur við
+  stofnun (ekki lengur „í dag“ sjálfgefið); Innsýn → Réttindi varar við vantandi ráðningardegi eða degi = skráningardegi.
+- **Hlutverk og aðgangur:** `components/app/role-picker.tsx` (spjöld) + `access-toggles.tsx` í Nýr starfsmaður, Bjóða notanda og
+  Notendur → „Breyta aðgangi“ (eigandi breytir hlutverki ALLRA nema sín; `saveUserAccess` uppfærir users, company_members og
+  employees). Aðeins eigandi getur stofnað eiganda eða valið aðgang vaktstjóra.
+- **Veikindi á vakt:** `vaktaplan/sick-on-shift.tsx` í vaktaglugga (vika) og reit (mánuður) → `registerAbsence` (vaktin verður laus,
+  starfsfólk fær push, stjórnendur viðvörun við 80 %/umfram veikindarétt).

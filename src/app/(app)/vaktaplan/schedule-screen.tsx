@@ -13,6 +13,7 @@ import type { ReqItem } from "./requests.server";
 import type { ScheduleInitial } from "./schedule.server";
 import type { WeekBudget } from "@/lib/labor";
 import OpenShifts from "./open-shifts";
+import { SickOnShift } from "./sick-on-shift";
 import MonthRoster from "./month-roster";
 import { isNdjson, readNdjson, type ScheduleEvent } from "@/lib/ai/stream";
 
@@ -647,6 +648,13 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         .then((res) => toast(res.ok ? "Vakt eydd" : (res.error ?? "Villa")));
     } else toast("Vakt eydd (demo)");
   }
+  /** Veikindi skráð á vaktina: hún er orðin laus vakt á þjóninum (registerAbsence) — tökum hana úr gridinu. */
+  function sickCell(r: number, c: number) {
+    setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = "off"; return ng; });
+    setCellTimes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
+    setCellTypes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
+    setModal(null);
+  }
   function removeEmpRow(r: number) {
     const nm = emp[r][1];
     // Persist: delete the employee's shifts for the visible week so they don't
@@ -1174,7 +1182,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
           </div>
         </>
       )}
-      {modal === "shift" && <ShiftEditModal cellType={(r, c) => cellTypes[ckey(r, c)] ?? ""} types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end, type: cellTypes[ckey(sel.r, sel.c)] }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
+      {modal === "shift" && <ShiftEditModal cellType={(r, c) => cellTypes[ckey(r, c)] ?? ""} types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onSick={liveCompany ? sickCell : undefined} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end, type: cellTypes[ckey(sel.r, sel.c)] }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
       {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} names={emp.map((e) => e[1])} depts={[...new Set(emp.map((e) => e[2]).filter(Boolean))]} />}
       {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} stage={aiStage} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={approveAiProposal} />}
     </div>
@@ -1505,8 +1513,10 @@ function StaffNeedModal({ targets, onClose, onSave }: { targets: number[]; onClo
 }
 
 function ShiftEditModal({
-  types, emp, weekDays, sel, gridCode, timeOf, cellType, onSave, onDelete, onClose, onCopy, onTypes,
+  types, emp, weekDays, sel, gridCode, timeOf, cellType, onSave, onDelete, onSick, onClose, onCopy, onTypes,
 }: {
+  /** Veikindi tilkynnt: vaktin verður laus og fjarvist skráð (aðeins lifandi fyrirtæki). */
+  onSick?: (r: number, c: number) => void;
   types: ShiftType[]; emp: Emp[]; weekDays: Date[]; sel: { r: number; c: number };
   cellType: (r: number, c: number) => string;
   gridCode: (r: number, c: number) => string;
@@ -1578,6 +1588,7 @@ function ShiftEditModal({
         </div>
         <p className="muted" style={{ fontSize: 11, marginTop: 4 }}>{tr("Starfsmaðurinn hakar við verkefnin í Mitt svæði á vaktinni.")}</p>
       </div>
+      {filled && onSick && emp[ri]?.[4] && <SickOnShift employeeId={emp[ri][4]!} name={emp[ri][1]} dateISO={dateISOOf(ci)} onDone={() => onSick(ri, ci)} />}
       <div style={{ display: "flex", gap: 9, marginTop: 8, flexWrap: "wrap" }}>
         <button className="btn" onClick={async () => { if (start >= end) { toast("Lok verða að vera eftir upphaf"); return; } await persistTasks(); onSave(ri, ci, start, end, type); }}>{tr("Vista")}</button>
         {filled && <button className="btn ghost" style={{ color: "var(--bad)", borderColor: "var(--bad-soft, #f3c7c0)" }} onClick={() => onDelete(ri, ci)}>

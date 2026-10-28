@@ -11,13 +11,13 @@ import { toast } from "@/components/app/toast";
 import { AsyncButton } from "@/components/app/async-button";
 import { WorkOverviewView, WoStatusPill } from "@/components/app/work-overview-view";
 import { dec1, nf } from "@/lib/format";
-import { shiftPayPeriod } from "@/lib/periods";
+import { shiftPayPeriod, type PayPeriodInput } from "@/lib/periods";
 import type { WoRow, WoStatus } from "@/lib/work-overview";
 import { generateWorkOverviews, sendWorkOverviews, finalizeWorkOverview, workOverviewPdfUrl, type WoList } from "./actions";
 
 const niceISO = (s: string) => { const [y, m, d] = s.split("-").map(Number); return `${d}.${m}.${y}`; };
 
-export default function OverviewScreen({ from, to, startDay, list }: { from: string; to: string; startDay: number; list: WoList }) {
+export default function OverviewScreen({ from, to, startDay, list }: { from: string; to: string; startDay: PayPeriodInput; list: WoList }) {
   const { t } = useLang();
   const router = useRouter();
   const [sel, setSel] = useState<Set<string>>(new Set());
