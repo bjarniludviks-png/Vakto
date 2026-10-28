@@ -1,9 +1,10 @@
 // Stillingar — tilkynningar, prófíll, lykilorð, um appið.
+import { getMyPrivacy, setMyPrivacy } from "../src/lib/api/presence";
 import React, { useEffect, useState } from "react";
 import { tr, trf, useLang, setLang, LANGS } from "../src/lib/i18n";
 import { View, Switch, Linking, Pressable, Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { Bell, BellOff, UserRound, KeyRound, LifeBuoy, FileText, CalendarPlus, Ban, Trash2, Mail } from "lucide-react-native";
+import { Bell, BellOff, UserRound, KeyRound, LifeBuoy, FileText, CalendarPlus, Ban, Trash2, Mail, Eye, Phone } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
 import { List, Row, IconBox, Muted, useToast, Txt, Seg, Sheet, Btn } from "../src/components/ui";
 import { colors, useTheme, setThemeMode } from "../src/theme";
@@ -47,6 +48,15 @@ export default function Stillingar() {
   }
   const [blockedN, setBlockedN] = useState(0);
   useEffect(() => { blockedUsers(true).then((b) => setBlockedN(b.size)).catch(() => {}); }, []);
+  // Í spjalli (0099): sýna virkni og símanúmer samstarfsfólki.
+  const [priv, setPriv] = useState<{ showPresence: boolean; showPhone: boolean } | null>(null);
+  useEffect(() => { if (me?.empId) getMyPrivacy(me.empId).then(setPriv).catch(() => {}); }, [me?.empId]);
+  async function flipPriv(k: "showPresence" | "showPhone") {
+    if (!priv || !me) return;
+    const next = { ...priv, [k]: !priv[k] };
+    setPriv(next);
+    if (!(await setMyPrivacy(me.empId, k === "showPresence" ? { show_presence: next.showPresence } : { show_phone: next.showPhone }))) { setPriv(priv); toast("Tókst ekki að vista"); }
+  }
   async function resetPw() {
     if (!me?.email) { toast("Ekkert netfang skráð"); return; }
     const { error } = await supabase.auth.resetPasswordForEmail(me.email, { redirectTo: "https://www.vakto.is/nytt-lykilord" });
@@ -109,6 +119,13 @@ export default function Stillingar() {
           <Muted size={12}>{mode === "system" ? trf("Fylgir stillingu símans (núna {x}).", tr(dark ? "dökkt" : "ljóst")) : mode === "dark" ? "Dökkt þema alltaf." : "Ljóst þema alltaf."}</Muted>
         </View>
       </List>
+      {priv ? <>
+        <Muted style={{ paddingHorizontal: 2 }}>{tr("Í SPJALLI")}</Muted>
+        <List>
+          <Row icon={<IconBox tone="good"><Eye color={colors.good} size={19} /></IconBox>} title="Sýna þegar ég er virk(ur)" sub="Slökkt = þú sérð ekki heldur virkni annarra" right={<Switch value={priv.showPresence} onValueChange={() => flipPriv("showPresence")} trackColor={{ true: colors.good, false: colors.line }} thumbColor="#fff" />} />
+          <Row icon={<IconBox><Phone color={colors.ink2} size={19} /></IconBox>} title="Sýna símanúmerið mitt" sub="Samstarfsfólk getur hringt úr prófílnum þínum" right={<Switch value={priv.showPhone} onValueChange={() => flipPriv("showPhone")} trackColor={{ true: colors.good, false: colors.line }} thumbColor="#fff" />} last />
+        </List>
+      </> : null}
       <Muted style={{ paddingHorizontal: 2 }}>AÐGANGUR</Muted>
       <List>
         <Row icon={<IconBox><UserRound color={colors.ink2} size={19} /></IconBox>} title="Prófíll" sub="Sími, netfang, bankareikningur, mynd" onPress={() => router.push("/profill")} />

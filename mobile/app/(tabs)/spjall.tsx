@@ -1,4 +1,6 @@
 // Spjall — samtalalisti í Messenger-stíl: leit, ólesið-sía, nýtt einka- eða hópspjall.
+import { presenceLabel, type CoworkerStatus } from "../../src/lib/presence";
+import { coworkerStatus } from "../../src/lib/api/presence";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
 import { View, Pressable, ScrollView, RefreshControl, TextInput } from "react-native";
@@ -25,7 +27,13 @@ function when(ts: string | null): string {
 }
 
 /** Mynd samtals: einkaspjall = manneskjan, # Almennt = brand-hringur, hópur = hópmynd eða upphafsstafir. */
-function ConvAvatar({ c, size }: { c: Conversation; size: number }) {
+function ConvAvatar({ c, size, dot }: { c: Conversation; size: number; dot?: "shift" | "online" | null }) {
+  if (dot) return (
+    <View style={{ width: size, height: size }}>
+      <ConvAvatar c={c} size={size} />
+      <View style={{ position: "absolute", right: 0, bottom: 0, width: size * 0.26, height: size * 0.26, borderRadius: size, borderWidth: 2, borderColor: colors.bg, backgroundColor: dot === "shift" ? colors.brand : colors.good }} />
+    </View>
+  );
   if (c.kind === "general") {
     return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={Math.round(size * 0.44)} /></View>;
   }
@@ -38,6 +46,16 @@ export default function Spjall() {
   const router = useRouter();
   const toast = useToast();
   const [convs, setConvs] = useState<Conversation[] | null>(null);
+  // „Á vakt“ (appelsínugult) / virk(ur) núna (grænt) á myndum í beinum skilaboðum (0099).
+  const [pres, setPres] = useState<Record<string, CoworkerStatus>>({});
+  const peerKey = (convs ?? []).map((c) => c.other?.userId).filter(Boolean).sort().join(",");
+  useEffect(() => {
+    if (!peerKey) return;
+    let live = true;
+    coworkerStatus(peerKey.split(",")).then((m) => { if (live) setPres(m); }).catch(() => {});
+    return () => { live = false; };
+  }, [peerKey]);
+  const dotOf = (c: Conversation) => { const l = presenceLabel(c.other ? pres[c.other.userId] : null); return l.dot ? (l.tone === "shift" ? "shift" : "online") : null; };
   const [refreshing, setRefreshing] = useState(false);
   const [muted, setMuted] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState<string | null>(null);
@@ -131,7 +149,7 @@ export default function Spjall() {
               return (
                 <Pressable key={c.id} onPress={() => router.push(`/spjall/${c.id}?name=${encodeURIComponent(c.name)}`)} accessibilityLabel={c.name} style={({ pressed }) => ({ width: 66, alignItems: "center", gap: 6, opacity: pressed ? 0.7 : 1 })}>
                   <View>
-                    <ConvAvatar c={c} size={60} />
+                    <ConvAvatar c={c} size={60} dot={dotOf(c)} />
                     {un ? <View style={{ position: "absolute", right: 0, bottom: 2, width: 16, height: 16, borderRadius: 8, backgroundColor: colors.brand, borderWidth: 3, borderColor: colors.panel }} /> : null}
                   </View>
                   <Txt size={12.5} weight={un ? "semibold" : "regular"} color={un ? colors.ink : colors.ink2} numberOfLines={1} style={{ maxWidth: 66, textAlign: "center" }}>{c.kind === "dm" ? c.name.split(/\s+/)[0] : c.name}</Txt>
@@ -177,7 +195,7 @@ export default function Spjall() {
               onPress={() => router.push(`/spjall/${c.id}?name=${encodeURIComponent(c.name)}`)}
               style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 8, minHeight: 72, backgroundColor: pressed ? colors.panel2 : colors.panel })}
             >
-              <ConvAvatar c={c} size={56} />
+              <ConvAvatar c={c} size={56} dot={dotOf(c)} />
               <View style={{ flex: 1, minWidth: 0 }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
                   <Txt weight={un ? "bold" : "semibold"} size={16} numberOfLines={1} style={{ flexShrink: 1 }}>{c.name}</Txt>

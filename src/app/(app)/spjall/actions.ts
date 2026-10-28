@@ -11,6 +11,8 @@ import { userError } from "@/lib/user-error";
 
 export type Conversation = {
   id: string; name: string; kind: string; av: string; color: string; last: string; lastAt: string | null; dm: boolean; photo: string | null;
+  /** Bein skilaboð: notandi viðmælandans (staða „á vakt“/virk(ur) og prófíll). */
+  peerId?: string | null;
   /** Unread messages from others (server-side, `channel_reads`). */
   unread: number;
   /** Kind of the last message ('text' | 'image' | 'audio' | 'file') and whether I sent it. */
@@ -198,6 +200,7 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
       return {
         id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: colorOf(first),
         last: lastByCh.get(c.id) ?? "", lastAt: lastAtByCh.get(c.id) ?? null, dm, photo: dm ? (others[0]?.photo ?? null) : (c.photo_url ?? null),
+        peerId: dm ? (others[0]?.id ?? null) : null,
         unread: unread[c.id] ?? 0, sortAt: lastAtByCh.get(c.id) ?? c.created_at ?? "",
         lastKind: lastMeta.get(c.id)?.kind ?? null, lastMine: lastMeta.get(c.id)?.mine ?? false,
       };

@@ -514,3 +514,12 @@
   „Tilkynnti veikindi“, Vista/Afrita/Eyða), `ShiftSheet` (gluggi; blað neðan frá undir 640px) og `PaintTools` („Mála“ +
   strokleður). Notað í vikusýn (`ShiftEditModal`), dagsýn (smellur á vakt opnar hana), mánaðartöflu (`CellEditor`) og dagatali
   (`MonthShiftModal`). Breyttu forminu þar, ekki í hverri sýn fyrir sig.
+
+## „Á vakt“ / virk(ur) í spjalli + léttur prófíll (28. okt. 2026, migration 0099 á staging; prod við release)
+- `employees.last_active_at` (aðeins `touch_presence()`, mest á 2 mín. fresti: vefur `PresencePing` í (app)/layout, app við
+  forgrunn), `show_presence`, `show_phone` (starfsmaður breytir sjálfur — bætt í `allowed` í guard_employee_self_update).
+- `coworker_status(user_ids)` (security definer, eigið fyrirtæki): gróf virkni ('now'/'today'/'yesterday'/'days:N', aðeins ef
+  BÁÐIR leyfa), `on_shift` (opin stimplun eða birt vakt núna), `shift_end`, `next_start`. Aldrei nákvæmur tími.
+- `coworkers`-sýnin sýnir síma aðeins ef `show_phone`. Texti: `src/lib/presence.ts` (`presenceLabel`; afrit í mobile).
+- Vefur: punktur á mynd + staða í haus beinna skilaboða; smellur opnar `spjall/profile-modal.tsx` (engin laun/kt).
+  Stillingar í Mitt svæði → Prófíll (`mitt-svaedi/privacy-toggles.tsx`). App: sama í spjalli, `starfsmadur/[id]`, Stillingar.

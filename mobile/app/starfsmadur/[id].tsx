@@ -11,6 +11,8 @@ import { useMe } from "../../src/lib/me-context";
 import { supabase } from "../../src/lib/supabase";
 import { startDM } from "../../src/lib/api/chat";
 import { iso, mondayOf } from "../../src/lib/api/me";
+import { presenceLabel, type CoworkerStatus } from "../../src/lib/presence";
+import { coworkerStatus } from "../../src/lib/api/presence";
 
 const DAY_L = ["Sun", "Mán", "Þri", "Mið", "Fim", "Fös", "Lau"];
 
@@ -21,6 +23,8 @@ export default function Starfsmadur() {
   const router = useRouter();
   const toast = useToast();
   const [e, setE] = useState<{ name: string; role: string | null; dept: string | null; color: string | null; photo: string | null; phone: string | null; userId: string | null } | null>(null);
+  const [status, setStatus] = useState<CoworkerStatus | null>(null);
+  const st = presenceLabel(status);
   const [shifts, setShifts] = useState<{ date: string; start: string; end: string }[]>([]);
 
   useFocusEffect(useCallback(() => {
@@ -30,6 +34,7 @@ export default function Starfsmadur() {
       const pos = (Array.isArray(data.positions) ? data.positions[0] : data.positions) as { name?: string } | null;
       const dep = (Array.isArray(data.departments) ? data.departments[0] : data.departments) as { name?: string } | null;
       setE({ name: data.full_name, role: data.title ?? pos?.name ?? null, dept: dep?.name ?? null, color: data.avatar_color, photo: data.photo_url, phone: data.phone, userId: data.user_id });
+      if (data.user_id) coworkerStatus([data.user_id as string]).then((m) => setStatus(m[data.user_id as string] ?? null)).catch(() => {});
     });
     const mon = mondayOf(new Date()); const sun = new Date(mon); sun.setDate(sun.getDate() + 13);
     supabase.from("shifts").select("date, start_time, end_time").eq("employee_id", id).gte("date", iso(mon)).lte("date", iso(sun)).order("date").then(({ data }) => setShifts((data ?? []).filter((s) => s.start_time).map((s) => ({ date: s.date, start: s.start_time.slice(0, 5), end: (s.end_time ?? "").slice(0, 5) }))));
@@ -51,6 +56,7 @@ export default function Starfsmadur() {
             <View style={{ flex: 1 }}>
               <Txt weight="bold" size={20} style={{ letterSpacing: -0.4 }}>{e.name}</Txt>
               <Muted>{[e.role, e.dept].filter(Boolean).join(" · ") || "Starfsmaður"}</Muted>
+              {st.text ? <Txt size={13} weight="semibold" color={st.tone === "shift" ? colors.brand : st.tone === "online" ? colors.good : colors.ink3} style={{ marginTop: 2 }}>{tr(st.text)}</Txt> : null}
             </View>
           </View>
           <View style={{ flexDirection: "row", gap: 10 }}>

@@ -1,5 +1,8 @@
 "use client";
 
+import { presenceLabel, type CoworkerStatus } from "@/lib/presence";
+import { getCoworkerStatus } from "./presence-actions";
+import { ProfileModal } from "./profile-modal";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/app/page-header";
@@ -159,6 +162,19 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const [emoji, setEmoji] = useState(false);
   const [rec, setRec] = useState(false);
   const [modal, setModal] = useState<null | "new" | "group" | "info">(null);
+  // „Á vakt“ / virk(ur) hjá viðmælendum í beinum skilaboðum (0099) og léttur prófíll.
+  const [presence, setPresence] = useState<Record<string, CoworkerStatus>>({});
+  const [profileUser, setProfileUser] = useState<string | null>(null);
+  const peerKey = convs.map((c) => c.peerId).filter(Boolean).sort().join(",");
+  useEffect(() => {
+    if (!peerKey) return;
+    let live = true;
+    const load = () => getCoworkerStatus(peerKey.split(",")).then((m) => { if (live) setPresence(m); }).catch(() => {});
+    load();
+    const iv = window.setInterval(load, 60_000);
+    return () => { live = false; window.clearInterval(iv); };
+  }, [peerKey]);
+  const presOf = (c: Conversation) => (c.peerId ? presenceLabel(presence[c.peerId]) : null);
   const [people, setPeople] = useState<Person[]>([]);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [reactFor, setReactFor] = useState<string | null>(null);
@@ -661,7 +677,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const shown = convs.filter((c) => !q || c.name.toLowerCase().includes(q));
   const aiShown = ai.enabled && (!q || "vakto ai".includes(q) || q.includes("ai"));
   // Ekkert fest nema VAKTO AI — samtölin koma raðað eftir nýjustu virkni.
-  const subtitleOf = (c: Conversation) => c.dm ? t("Bein skilaboð") : c.kind === "general" ? t("Allt starfsfólkið") : t("Grúppa");
+  const subtitleOf = (c: Conversation) => c.dm ? (presOf(c)?.text ? t(presOf(c)!.text) : t("Bein skilaboð")) : c.kind === "general" ? t("Allt starfsfólkið") : t("Grúppa");
   const nameOf = (c: Conversation) => (c.kind === "general" ? "# " + c.name : c.name);
   const aiLast = [...aiChat.msgs].reverse().find((m) => m.content.trim());
 
@@ -683,7 +699,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     return (
       <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}${un ? " un" : ""}`} onClick={() => open(c)} role="button" tabIndex={0}
         onKeyDown={(e) => { if (e.key === "Enter") open(c); }} title={un ? `${c.unread} ${t("ólesin")}` : undefined}>
-        <ConvAvatar c={c} size={phone ? 56 : 44} />
+        <span className="pr-wrap"><ConvAvatar c={c} size={phone ? 56 : 44} />{presOf(c)?.dot && <i className={`pr-dot ${presOf(c)!.tone}`} aria-label={t(presOf(c)!.text)} />}</span>
         <div className="tx">
           <div className="tl">
             <b>{nameOf(c)}</b>
@@ -822,8 +838,10 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
             <>
               <div className="msgr-head">
                 <button className="iconbtn mob-back" onClick={closeThread} aria-label={t("Til baka")}>{phone ? I.backL : I.back}</button>
-                <ConvAvatar c={active} size={phone ? 36 : 40} />
-                <div className="msgr-title" onClick={toggleSide} title={t("Upplýsingar")}>
+                <span className="pr-wrap" onClick={() => { if (active.dm && active.peerId) setProfileUser(active.peerId); }} style={{ cursor: active.dm && active.peerId ? "pointer" : undefined }}>
+                  <ConvAvatar c={active} size={phone ? 36 : 40} />{presOf(active)?.dot && <i className={`pr-dot ${presOf(active)!.tone}`} />}
+                </span>
+                <div className="msgr-title" onClick={() => { if (active.dm && active.peerId) setProfileUser(active.peerId); else toggleSide(); }} title={active.dm ? t("Sjá prófíl") : t("Upplýsingar")}>
                   <b>{nameOf(active)}</b>
                   <span>{typingText && phone ? typingText : `${subtitleOf(active)}${phone && memberCount ? ` · ${memberCount}` : ""}`}</span>
                 </div>
@@ -1023,6 +1041,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
       </div>
 
       {(modal === "new" || modal === "group") && <NewChatModal group={modal === "group"} onClose={() => setModal(null)} onDone={(id) => { setModal(null); void openById(id); }} />}
+      {profileUser && <ProfileModal userId={profileUser} onClose={() => setProfileUser(null)} onMessage={() => setProfileUser(null)} />}
       {modal === "info" && active && <InfoModal conv={active} onClose={() => setModal(null)} onLeft={() => { setModal(null); setActive(null); reloadConvs(); }} onChanged={() => { reloadConvs(); setInfoVer((v) => v + 1); }} />}
       {viewer && <ImageViewer url={viewer} onClose={() => setViewer(null)} />}
     </>
