@@ -699,7 +699,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     return (
       <div key={c.id} className={`conv${active?.id === c.id ? " on" : ""}${un ? " un" : ""}`} onClick={() => open(c)} role="button" tabIndex={0}
         onKeyDown={(e) => { if (e.key === "Enter") open(c); }} title={un ? `${c.unread} ${t("ólesin")}` : undefined}>
-        <span className="pr-wrap"><ConvAvatar c={c} size={phone ? 56 : 44} />{presOf(c)?.dot && <i className={`pr-dot ${presOf(c)!.tone}`} aria-label={t(presOf(c)!.text)} />}</span>
+        <span className="pr-wrap"><ConvAvatar c={c} size={phone ? 56 : 44} />{presOf(c)?.dot && <i className={`pr-dot pr-${presOf(c)!.tone}`} aria-label={t(presOf(c)!.text)} />}</span>
         <div className="tx">
           <div className="tl">
             <b>{nameOf(c)}</b>
@@ -839,7 +839,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
               <div className="msgr-head">
                 <button className="iconbtn mob-back" onClick={closeThread} aria-label={t("Til baka")}>{phone ? I.backL : I.back}</button>
                 <span className="pr-wrap" onClick={() => { if (active.dm && active.peerId) setProfileUser(active.peerId); }} style={{ cursor: active.dm && active.peerId ? "pointer" : undefined }}>
-                  <ConvAvatar c={active} size={phone ? 36 : 40} />{presOf(active)?.dot && <i className={`pr-dot ${presOf(active)!.tone}`} />}
+                  <ConvAvatar c={active} size={phone ? 36 : 40} />{presOf(active)?.dot && <i className={`pr-dot pr-${presOf(active)!.tone}`} />}
                 </span>
                 <div className="msgr-title" onClick={() => { if (active.dm && active.peerId) setProfileUser(active.peerId); else toggleSide(); }} title={active.dm ? t("Sjá prófíl") : t("Upplýsingar")}>
                   <b>{nameOf(active)}</b>

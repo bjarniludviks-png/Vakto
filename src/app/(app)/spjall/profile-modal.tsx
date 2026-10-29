@@ -30,12 +30,12 @@ export function ProfileModal({ userId, onClose, onMessage }: { userId: string; o
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={p.photo} alt="" />
                     : <span style={{ background: p.color ?? "var(--brand)" }}>{ini(p.name)}</span>}
-                  {st.dot && <i className={`pr-dot ${st.tone}`} aria-hidden="true" />}
+                  {st.dot && <i className={`pr-dot pr-${st.tone}`} aria-hidden="true" />}
                 </span>
                 <div style={{ minWidth: 0 }}>
                   <div className="cwp-name">{p.name}</div>
                   <div className="muted" style={{ fontSize: 13 }}>{[p.title, p.department].filter(Boolean).join(" · ")}</div>
-                  {st.text && <div className={`cwp-st ${st.tone}`}>{t(st.text)}</div>}
+                  {st.text && <div className={`cwp-st pr-${st.tone}`}>{t(st.text)}</div>}
                 </div>
               </div>
               <div className="sf-actions" style={{ marginTop: 14 }}>
