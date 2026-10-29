@@ -4,6 +4,7 @@ import type { RealtimeChannel } from "@supabase/supabase-js";
 import { tr, trf } from "../../../src/lib/i18n";
 import { supabase } from "../supabase";
 import type { Me } from "./me";
+import { colorFor } from "../avatar";
 
 export type Person = {
   userId: string; name: string; color: string | null; photo: string | null; role: string | null; dept: string | null;
@@ -41,14 +42,14 @@ export type ChatMessage = {
   reactions: { emoji: string; count: number; mine: boolean }[];
   replyTo: { sender: string; body: string } | null;
 };
-export type ChannelRead = { userId: string; name: string; lastReadAt: string };
+export type ChannelRead = { userId: string; name: string; lastReadAt: string; color: string | null; photo: string | null };
 
 let peopleCache: { companyId: string; at: number; map: Map<string, Person> } | null = null;
 export async function peopleMap(companyId: string, force = false): Promise<Map<string, Person>> {
   if (!force && peopleCache && peopleCache.companyId === companyId && Date.now() - peopleCache.at < 60000) return peopleCache.map;
   const { data } = await supabase
     .from("coworkers")
-    .select("user_id, full_name, avatar_color, photo_url, title, status, department_id, location_id, positions(name), departments(name), locations(name)")
+    .select("id, user_id, full_name, avatar_color, photo_url, title, status, department_id, location_id, positions(name), departments(name), locations(name)")
     .eq("company_id", companyId)
     .not("user_id", "is", null);
   const m = new Map<string, Person>();
@@ -57,7 +58,7 @@ export async function peopleMap(companyId: string, force = false): Promise<Map<s
     const dep = (Array.isArray(r.departments) ? r.departments[0] : r.departments) as { name?: string } | null;
     const loc = (Array.isArray(r.locations) ? r.locations[0] : r.locations) as { name?: string } | null;
     m.set(r.user_id as string, {
-      userId: r.user_id as string, name: r.full_name, color: r.avatar_color, photo: r.photo_url, role: r.title ?? pos?.name ?? null, dept: dep?.name ?? null,
+      userId: r.user_id as string, name: r.full_name, color: (r.avatar_color as string | null) ?? colorFor(r.id as string), photo: r.photo_url, role: r.title ?? pos?.name ?? null, dept: dep?.name ?? null,
       deptId: r.department_id ?? null, locId: r.location_id ?? null, loc: loc?.name ?? null, active: r.status !== "inactive",
     });
   }
@@ -162,7 +163,7 @@ export async function listConversations(me: Me): Promise<Conversation[]> {
       lastFrom: last ? (last.from === myId ? tr("Þú") : (people.get(last.from)?.name.split(/\s+/)[0] ?? null)) : null,
       unread: unread[c.id] ?? 0,
       photo: c.kind === "dm" ? (other?.photo ?? null) : (c.photo_url ?? null),
-      color: c.kind === "dm" ? (other?.color ?? null) : null,
+      color: c.kind === "dm" ? (other?.color ?? null) : colorFor(c.id),
       members: c.kind === "general" ? people.size : mem.length,
       other,
     };
@@ -214,7 +215,7 @@ export async function listMessages(me: Me, channelId: string, before?: MessageCu
       replyTo: rt ? { sender: (people.get(rt.sender_id)?.name ?? "Notandi").split(/\s+/)[0], body: rt.body ?? "" } : null,
     };
   });
-  const readsOut: ChannelRead[] = (reads ?? []).filter((r) => r.user_id !== myId).map((r) => ({ userId: r.user_id, name: people.get(r.user_id)?.name ?? "", lastReadAt: r.last_read_at }));
+  const readsOut: ChannelRead[] = (reads ?? []).filter((r) => r.user_id !== myId).map((r) => ({ userId: r.user_id, name: people.get(r.user_id)?.name ?? "", lastReadAt: r.last_read_at, color: people.get(r.user_id)?.color ?? null, photo: people.get(r.user_id)?.photo ?? null }));
   return { messages, reads: readsOut, hasMore };
 }
 

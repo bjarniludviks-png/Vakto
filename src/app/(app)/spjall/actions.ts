@@ -6,6 +6,7 @@ import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { initials } from "@/lib/employees";
+import { colorFor } from "@/lib/avatar";
 import { notifyEmployee, sendPushToUser } from "@/lib/push";
 import { userError } from "@/lib/user-error";
 
@@ -29,14 +30,16 @@ export type ChatMessage = {
   createdAt: string;
   replyTo: { sender: string; body: string } | null;
   photo: string | null;
+  /** Litur upphafsstafa-hrings sendanda (sami og á starfsmannasíðum). */
+  color?: string;
 };
 export type Person = { userId: string; name: string; av: string; color: string; photo: string | null };
 /** Flýtival í hópavali: „Allir í <deild>“ / „Allir á <stað>“ — fólk með aðgang (ekki ég). */
 export type TeamPick = { key: string; kind: "dept" | "loc"; name: string; people: Person[] };
 export type Members = { members: Person[]; adminId: string | null; meId: string };
 
-const PALETTE = ["#5b50e6", "#18a06a", "#1fb6a6", "#e0533f", "#0891b2", "#ca8a04", "#9333ea", "#e11d48"];
-const colorOf = (s: string) => PALETTE[[...s].reduce((a, c) => a + c.charCodeAt(0), 0) % PALETTE.length];
+// Sami litur og á starfsmannasíðum/í appinu: valinn litur starfsmanns, annars fastur litur út frá auðkenni.
+const FALLBACK = "#5b50e6";
 const hhmm = (iso: string) => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
 
 async function ctxOf(supabase: Awaited<ReturnType<typeof createClient>>) {
@@ -48,11 +51,13 @@ async function ctxOf(supabase: Awaited<ReturnType<typeof createClient>>) {
   return { userId: user.id, company };
 }
 
-/** user_id → {name, photo} from employees — names fall back here when a users
- * row is missing (invited accounts may carry the email), photos only live here. */
-async function empNameMap(supabase: Awaited<ReturnType<typeof createClient>>, company: string): Promise<Map<string, { name: string; photo: string | null }>> {
-  const { data } = await supabase.from("coworkers").select("user_id, full_name, photo_url").eq("company_id", company).not("user_id", "is", null);
-  return new Map((data ?? []).map((e) => [e.user_id as string, { name: e.full_name as string, photo: (e.photo_url as string | null) ?? null }]));
+const empColor = (e: { id?: unknown; avatar_color?: unknown }) => (e.avatar_color as string | null) ?? (e.id ? colorFor(String(e.id)) : FALLBACK);
+
+/** user_id → {name, photo, color} from employees — names fall back here when a users
+ * row is missing (invited accounts may carry the email), photos and colors only live here. */
+async function empNameMap(supabase: Awaited<ReturnType<typeof createClient>>, company: string): Promise<Map<string, { name: string; photo: string | null; color: string }>> {
+  const { data } = await supabase.from("coworkers").select("id, user_id, full_name, photo_url, avatar_color").eq("company_id", company).not("user_id", "is", null);
+  return new Map((data ?? []).map((e) => [e.user_id as string, { name: e.full_name as string, photo: (e.photo_url as string | null) ?? null, color: empColor(e) }]));
 }
 
 type Sb = Awaited<ReturnType<typeof createClient>>;
@@ -157,12 +162,12 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
       empNameMap(supabase, ctx.company),
       unreadMap(supabase),
     ]);
-    const memByCh = new Map<string, { id: string; name: string; photo: string | null }[]>();
+    const memByCh = new Map<string, { id: string; name: string; photo: string | null; color: string }[]>();
     for (const m of mems ?? []) {
       const u = (Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null;
       if (!memByCh.has(m.channel_id as string)) memByCh.set(m.channel_id as string, []);
       const info = emps.get(m.user_id as string);
-      memByCh.get(m.channel_id as string)!.push({ id: m.user_id as string, name: info?.name ?? u?.full_name ?? "?", photo: info?.photo ?? null });
+      memByCh.get(m.channel_id as string)!.push({ id: m.user_id as string, name: info?.name ?? u?.full_name ?? "?", photo: info?.photo ?? null, color: info?.color ?? FALLBACK });
     }
     // Only channels the user actually belongs to — eldra „Almennt“ nær til alls fyrirtækisins.
     // Without this, a left/deleted group would linger in everyone's list.
@@ -196,9 +201,8 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
       const name = c.kind === "general" ? "Almennt"
         : dm ? (others[0]?.name ?? "Bein skilaboð")
           : c.name;
-      const first = name.split(/\s+/)[0];
       return {
-        id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: colorOf(first),
+        id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: dm ? (others[0]?.color ?? FALLBACK) : colorFor(c.id),
         last: lastByCh.get(c.id) ?? "", lastAt: lastAtByCh.get(c.id) ?? null, dm, photo: dm ? (others[0]?.photo ?? null) : (c.photo_url ?? null),
         peerId: dm ? (others[0]?.id ?? null) : null,
         unread: unread[c.id] ?? 0, sortAt: lastAtByCh.get(c.id) ?? c.created_at ?? "",
@@ -222,12 +226,12 @@ export async function searchPeople(q: string): Promise<Person[]> {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return [];
-    let query = supabase.from("coworkers").select("user_id, full_name, photo_url").eq("company_id", ctx.company).not("user_id", "is", null).limit(40);
+    let query = supabase.from("coworkers").select("id, user_id, full_name, photo_url, avatar_color").eq("company_id", ctx.company).not("user_id", "is", null).limit(40);
     if (q.trim()) query = query.ilike("full_name", `%${q.trim()}%`);
     const { data } = await query;
     return (data ?? [])
       .filter((e) => e.user_id && e.user_id !== ctx.userId)
-      .map((e) => ({ userId: e.user_id as string, name: e.full_name as string, av: initials(e.full_name as string), color: colorOf((e.full_name as string).split(/\s+/)[0]), photo: (e.photo_url as string | null) ?? null }));
+      .map((e) => ({ userId: e.user_id as string, name: e.full_name as string, av: initials(e.full_name as string), color: empColor(e), photo: (e.photo_url as string | null) ?? null }));
   } catch {
     return [];
   }
@@ -240,7 +244,7 @@ export async function listTeamPicks(): Promise<TeamPick[]> {
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return [];
-    const { data } = await supabase.from("coworkers").select("user_id, full_name, photo_url, status, department_id, location_id, departments(name), locations(name)")
+    const { data } = await supabase.from("coworkers").select("id, user_id, full_name, photo_url, avatar_color, status, department_id, location_id, departments(name), locations(name)")
       .eq("company_id", ctx.company).not("user_id", "is", null);
     const by = new Map<string, TeamPick>();
     for (const e of data ?? []) {
@@ -248,7 +252,7 @@ export async function listTeamPicks(): Promise<TeamPick[]> {
       const dep = (Array.isArray(e.departments) ? e.departments[0] : e.departments) as { name?: string } | null;
       const loc = (Array.isArray(e.locations) ? e.locations[0] : e.locations) as { name?: string } | null;
       const full = e.full_name as string;
-      const person: Person = { userId: e.user_id as string, name: full, av: initials(full), color: colorOf(full.split(/\s+/)[0]), photo: (e.photo_url as string | null) ?? null };
+      const person: Person = { userId: e.user_id as string, name: full, av: initials(full), color: empColor(e), photo: (e.photo_url as string | null) ?? null };
       const add = (key: string, kind: TeamPick["kind"], name?: string) => {
         if (!name) return;
         const t = by.get(key) ?? { key, kind, name, people: [] };
@@ -326,7 +330,7 @@ export async function listMembers(channelId: string): Promise<Members> {
       const u = (Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null;
       const info = emps.get(m.user_id as string);
       const name = info?.name ?? u?.full_name ?? "?";
-      return { userId: m.user_id as string, name, av: initials(name), color: colorOf(name.split(/\s+/)[0]), photo: info?.photo ?? null };
+      return { userId: m.user_id as string, name, av: initials(name), color: info?.color ?? FALLBACK, photo: info?.photo ?? null };
     });
     return { members, adminId: (ch?.created_by as string) ?? null, meId: ctx.userId };
   } catch {
@@ -459,6 +463,7 @@ export async function listMessages(channelId: string, before?: MessageCursor | n
         reactions: (reactByMsg.get(m.id as string) ?? []).sort((a, b) => b.count - a.count),
         replyTo: rt ? { sender: senderOf(rt), body: rt.kind === "image" ? "📷 Mynd" : rt.kind === "audio" ? "🎤 Talskilaboð" : ((rt.body as string) ?? "") } : null,
         photo: emps.get(m.sender_id as string)?.photo ?? null,
+        color: emps.get(m.sender_id as string)?.color,
       };
     });
     return { ok: true, messages, reads: await readsP, hasMore };
@@ -734,7 +739,7 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
         audience: audName(r.audience_kind, r.audience_id),
         av: system ? "VK" : initials(name),
         photo: system ? null : (empNames.get(String(r.sender_id))?.photo ?? null),
-        color: system ? "#e9700f" : colorOf(name.split(/\s+/)[0] || name),
+        color: system ? "#e9700f" : (empNames.get(String(r.sender_id))?.color ?? FALLBACK),
         pinned: !!r.pinned, system,
         me: r.sender_id === ctx.userId,
         body: r.body as string, at: hhmm(r.created_at as string) + " · " + new Date(r.created_at as string).toLocaleDateString("de-DE").replace(/\./g, "."), atISO: String(r.created_at),
@@ -743,7 +748,7 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
         myReaction: (pLikes.find((l) => l.user_id === ctx.userId)?.reaction as string) ?? null,
         comments: (comments ?? []).filter((cm) => cm.post_id === r.id).map((cm) => {
           const cn = nameOf(cm.users, cm.sender_id);
-          return { id: cm.id as string, sender: cn, av: initials(cn), color: colorOf(cn.split(/\s+/)[0] || cn), body: cm.body as string, at: hhmm(cm.created_at as string), atISO: String(cm.created_at), photo: empNames.get(String(cm.sender_id))?.photo ?? null, parentId: ("parent_id" in cm ? (cm.parent_id as string | null) : null) ?? null };
+          return { id: cm.id as string, sender: cn, av: initials(cn), color: empNames.get(String(cm.sender_id))?.color ?? FALLBACK, body: cm.body as string, at: hhmm(cm.created_at as string), atISO: String(cm.created_at), photo: empNames.get(String(cm.sender_id))?.photo ?? null, parentId: ("parent_id" in cm ? (cm.parent_id as string | null) : null) ?? null };
         }),
       };
     });
