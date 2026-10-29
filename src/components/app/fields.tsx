@@ -6,6 +6,7 @@
 // only the display differs (24h clock, DD.MM.ÁÁÁÁ dates, dark-mode friendly).
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
@@ -82,12 +83,29 @@ export function DateField({ value, defaultValue, name, onChange, style, min, max
   const [text, setText] = useState(isoToDisplay(value ?? defaultValue ?? ""));
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
+  const pop = useRef<HTMLDivElement>(null);
+  // Dagatalið er teiknað í document.body (fixed) svo gluggar með overflow skeri það ekki;
+  // opnast upp á við ef ekki er pláss fyrir neðan reitinn.
+  const [pos, setPos] = useState<React.CSSProperties | null>(null);
   useEffect(() => { if (controlled) { setIso(value ?? ""); setText(isoToDisplay(value ?? "")); } }, [value, controlled]);
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e: MouseEvent) => { if (wrap.current && !wrap.current.contains(e.target as Node)) setOpen(false); };
+    const place = () => {
+      const r = wrap.current?.getBoundingClientRect();
+      if (!r) return;
+      const H = 290, W = 232, vh = window.innerHeight;
+      const left = Math.max(8, Math.min(r.left, window.innerWidth - W - 8));
+      setPos(vh - r.bottom < H + 8 && r.top > vh - r.bottom ? { left, bottom: vh - r.top + 4 } : { left, top: r.bottom + 4 });
+    };
+    place();
+    const onDoc = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!wrap.current?.contains(t) && !pop.current?.contains(t)) setOpen(false);
+    };
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
+    return () => { setPos(null); document.removeEventListener("mousedown", onDoc); window.removeEventListener("scroll", place, true); window.removeEventListener("resize", place); };
   }, [open]);
 
   function set(nextIso: string) { setIso(nextIso); setText(isoToDisplay(nextIso)); onChange?.(nextIso); }
@@ -118,8 +136,8 @@ export function DateField({ value, defaultValue, name, onChange, style, min, max
         style={{ marginLeft: -30, width: 26, background: "none", border: "none", color: "var(--ink3)", cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>
       </button>
-      {open && (
-        <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 50, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, boxShadow: "var(--shadow-card)", padding: 10, width: 232 }}>
+      {open && pos && createPortal(
+        <div ref={pop} style={{ position: "fixed", ...pos, zIndex: 200, background: "var(--panel)", border: "1px solid var(--line)", borderRadius: 10, boxShadow: "var(--shadow-card)", padding: 10, width: 232 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
             <button type="button" onClick={() => { const m = viewM - 1; if (m < 0) { setViewM(11); setViewY(viewY - 1); } else setViewM(m); }} style={navBtn}>‹</button>
             <b style={{ fontSize: 12.5 }}>{MONTHS_IS[viewM]} {viewY}</b>
@@ -136,7 +154,8 @@ export function DateField({ value, defaultValue, name, onChange, style, min, max
               </button>
             ))}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </span>
   );
