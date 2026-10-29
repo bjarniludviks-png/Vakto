@@ -2064,15 +2064,15 @@ html.dark .mroster .sh{background:#23264a;color:#c7ccff}
 /* „Á vakt“ / virk(ur) punktur á mynd og léttur prófíll samstarfsmanns (0099). */
 .pr-wrap{position:relative;display:inline-flex;flex:none}
 .pr-dot{position:absolute;right:0;bottom:0;width:12px;height:12px;border-radius:50%;border:2px solid var(--panel);background:var(--good)}
-.pr-dot.shift{background:var(--brand)}
+.pr-dot.pr-shift{background:var(--brand)}
 .cwp-head{display:flex;gap:14px;align-items:center}
 .cwp-av{position:relative;width:64px;height:64px;flex:none}
 .cwp-av img,.cwp-av>span{width:64px;height:64px;border-radius:50%;object-fit:cover;display:grid;place-items:center;color:#fff;font-weight:700;font-size:22px}
 .cwp-av .pr-dot{width:16px;height:16px}
 .cwp-name{font-size:19px;font-weight:750;line-height:1.2}
 .cwp-st{font-size:13px;font-weight:650;margin-top:4px;color:var(--good)}
-.cwp-st.shift{color:var(--brand)}
-.cwp-st.idle{color:var(--ink3);font-weight:500}
+.cwp-st.pr-shift{color:var(--brand)}
+.cwp-st.pr-idle{color:var(--ink3);font-weight:500}
 .cwp-shifts{display:flex;flex-direction:column}
 .cwp-shift{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line2);font-size:13.5px;font-variant-numeric:tabular-nums}
 .cwp-shift:last-child{border-bottom:0}
