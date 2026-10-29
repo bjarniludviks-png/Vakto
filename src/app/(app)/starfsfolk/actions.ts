@@ -11,6 +11,7 @@ import { getTimeBank } from "../skyrslur/timebank.server";
 import { sendContractEmail } from "@/lib/email";
 import { sanitizePerms, type UserPerms } from "@/lib/user-permissions";
 import { inviteToCompany } from "@/lib/invite.server";
+import { accessStatus, changeLoginEmail, managerContext, sendAccessLink, type AccessResult } from "@/lib/login-access.server";
 import type { CustomRules } from "@/lib/payrules";
 import { headers } from "next/headers";
 import { employerSign, metaFrom, notifyContractEmployee, resendTaktikalInvite, signedPdfPath, startTaktikalSigning, syncTaktikalContract, type TaktikalSyncResult } from "@/lib/esign.server";
@@ -1571,4 +1572,45 @@ export async function listEmployeePayslips(employeeId: string): Promise<Employee
   } catch {
     return [];
   }
+}
+
+/** Innskráningaraðgangur starfsmanns (Vinna-flipinn): hvort hann hafi skráð sig inn og á hvaða netfangi. */
+export async function getEmployeeAccess(employeeId: string): Promise<{ signedIn: boolean; email: string | null } | null> {
+  if (!isSupabaseConfigured()) return null;
+  const ctx = await managerContext();
+  if (!ctx.ok) return null;
+  const supabase = await createClient();
+  const { data: emp } = await supabase.from("employees").select("user_id").eq("id", employeeId).eq("company_id", ctx.company).maybeSingle();
+  if (!emp?.user_id) return null;
+  const st = await accessStatus(ctx.company, ctx.callerRole, emp.user_id as string);
+  return st && { signedIn: st.signedIn, email: st.email };
+}
+
+/** Senda boð aftur / innskráningartengil á starfsmann sem er með aðgang. */
+export async function resendEmployeeAccess(employeeId: string): Promise<AccessResult> {
+  if (await demoBlocked()) return demoResult();
+  const ctx = await managerContext();
+  if (!ctx.ok) return ctx;
+  const supabase = await createClient();
+  const { data: emp } = await supabase.from("employees").select("user_id, full_name").eq("id", employeeId).eq("company_id", ctx.company).maybeSingle();
+  if (!emp?.user_id) return { ok: false, error: "Starfsmaðurinn er ekki með aðgang" };
+  const r = await sendAccessLink(ctx.company, ctx.callerRole, emp.user_id as string);
+  if (r.ok) await logAudit(supabase, ctx.company, ctx.callerId, { action: "employee.access_link", entity: "employee", entityId: employeeId, detail: `${r.kind === "invite" ? "Boð sent aftur" : "Innskráningartengill sendur"} — ${emp.full_name ?? ""}` });
+  return r;
+}
+
+/** Færa innskráningu starfsmanns á nýtt netfang og senda tengil þangað. */
+export async function changeEmployeeLoginEmail(employeeId: string, email: string): Promise<AccessResult> {
+  if (await demoBlocked()) return demoResult();
+  const ctx = await managerContext();
+  if (!ctx.ok) return ctx;
+  const supabase = await createClient();
+  const { data: emp } = await supabase.from("employees").select("user_id, full_name").eq("id", employeeId).eq("company_id", ctx.company).maybeSingle();
+  if (!emp?.user_id) return { ok: false, error: "Starfsmaðurinn er ekki með aðgang" };
+  const r = await changeLoginEmail(ctx.company, ctx.callerRole, emp.user_id as string, email);
+  if (r.ok) {
+    await logAudit(supabase, ctx.company, ctx.callerId, { action: "employee.login_email", entity: "employee", entityId: employeeId, detail: `Innskráningarnetfangi breytt — ${emp.full_name ?? ""}` });
+    revalidatePath("/starfsfolk");
+  }
+  return r;
 }

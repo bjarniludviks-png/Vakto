@@ -7,6 +7,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { logAudit } from "@/lib/audit";
 import { nf } from "@/lib/format";
 import { inviteToCompany, roleFromLabel } from "@/lib/invite.server";
+import { accessStatus, changeLoginEmail, managerContext, sendAccessLink, type AccessResult } from "@/lib/login-access.server";
 import { draftContractTerms, type TermsDraft } from "@/lib/ai/terms";
 import { strictSchema, stripUnset } from "@/lib/ai/schema";
 import { taktikalEnabled } from "@/lib/taktikal.server";
@@ -1269,4 +1270,36 @@ async function setCanceled(cancel: boolean): Promise<SettingsResult & { endsAt?:
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
   }
+}
+
+/** Stillingar → Notendur: innskráningarstaða notanda (hefur skráð sig inn eða ekki). */
+export async function getUserAccess(userId: string): Promise<{ signedIn: boolean; email: string | null } | null> {
+  if (!isSupabaseConfigured()) return null;
+  const ctx = await managerContext();
+  if (!ctx.ok) return null;
+  const st = await accessStatus(ctx.company, ctx.callerRole, userId);
+  return st && { signedIn: st.signedIn, email: st.email };
+}
+
+/** Stillingar → Notendur: senda boð aftur / innskráningartengil. */
+export async function resendUserAccess(userId: string): Promise<AccessResult> {
+  if (await demoBlocked()) return demoResult();
+  const ctx = await managerContext();
+  if (!ctx.ok) return ctx;
+  const r = await sendAccessLink(ctx.company, ctx.callerRole, userId);
+  if (r.ok) await logAudit(await createClient(), ctx.company, ctx.callerId, { action: "user.access_link", entity: "user", entityId: userId, detail: `${r.kind === "invite" ? "Boð sent aftur" : "Innskráningartengill sendur"} — ${r.sentTo}` });
+  return r;
+}
+
+/** Stillingar → Notendur: færa innskráningu á nýtt netfang. */
+export async function changeUserLoginEmail(userId: string, email: string): Promise<AccessResult> {
+  if (await demoBlocked()) return demoResult();
+  const ctx = await managerContext();
+  if (!ctx.ok) return ctx;
+  const r = await changeLoginEmail(ctx.company, ctx.callerRole, userId, email);
+  if (r.ok) {
+    await logAudit(await createClient(), ctx.company, ctx.callerId, { action: "user.login_email", entity: "user", entityId: userId, detail: `Innskráningarnetfangi breytt — ${email.trim()}` });
+    revalidatePath("/stillingar");
+  }
+  return r;
 }
