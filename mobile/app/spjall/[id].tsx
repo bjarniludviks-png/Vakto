@@ -7,7 +7,7 @@ import { tr, trf } from "../../src/lib/i18n";
 import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions, Modal } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronLeft, ChevronRight, Send, X, Download, Hash, CornerUpLeft, Trash2, Flag, Ban, Image as ImageIcon, Camera, CirclePlus, Info, BellOff, Bell, FileText, Images, LogOut } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, Send, X, Download, Hash, CornerUpLeft, Trash2, Flag, Ban, Image as ImageIcon, Camera, CirclePlus, Info, BellOff, Bell, FileText, Images, LogOut, Pencil } from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { Linking, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
@@ -18,7 +18,7 @@ import { Txt, Muted, Avatar, Sheet, Row, useToast } from "../../src/components/u
 import { uploadImage } from "../../src/lib/api/feed";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, markChannelRead, type Attachment, setReaction, deleteMessage, subscribeChat, typingChannel, peopleMap, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
+import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, subscribeChat, typingChannel, peopleMap, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
 import { supabase } from "../../src/lib/supabase";
 import { isMuted, toggleMute } from "../../src/lib/mute";
 import { reportContent, blockUser, blockedUsers } from "../../src/lib/api/moderation";
@@ -38,7 +38,10 @@ function dayLabel(iso: string): string {
 
 export default function Thread() {
   useTheme();
-  const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
+  const { id, name: nameParam } = useLocalSearchParams<{ id: string; name?: string }>();
+  // Heiti hóps má breyta í upplýsingablaðinu — því staðbundið ástand en ekki bara slóðarbreyta.
+  const [name, setName] = useState(nameParam);
+  const [renaming, setRenaming] = useState<string | null>(null);
   const { me } = useMe();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -91,6 +94,15 @@ export default function Thread() {
     setUploading(false);
     if (!res.ok) toast(res.error ?? "Tókst ekki að senda"); else load();
   }
+  async function saveName() {
+    if (!id || renaming === null) return;
+    const nm = renaming.trim();
+    if (!nm || nm === name) { setRenaming(null); return; }
+    const r = await renameChannel(id, nm);
+    if (!r.ok) { toast(r.error ?? "Tókst ekki"); return; }
+    setName(nm); setRenaming(null); toast("Heiti breytt");
+  }
+
   function leave() {
     if (!id) return;
     Alert.alert(tr("Yfirgefa spjall"), tr("Þú hættir að fá skilaboð úr þessu spjalli."), [{ text: tr("Hætta við"), style: "cancel" }, { text: tr("Yfirgefa"), style: "destructive", onPress: async () => { const r = await leaveChannel(id); if (!r.ok) { toast(r.error ?? "Tókst ekki"); return; } setInfo(false); router.back(); } }]);
@@ -228,8 +240,9 @@ export default function Thread() {
   useFocusEffect(useCallback(() => {
     load();
     if (id) isMuted(id).then(setMuted);
-    supabase.from("channels").select("kind").eq("id", id).maybeSingle().then(async ({ data }) => {
+    supabase.from("channels").select("kind, name").eq("id", id).maybeSingle().then(async ({ data }) => {
       setIsGroup(data?.kind !== "dm"); setKind((data?.kind as string) ?? "group");
+      if (data?.kind === "group" && data.name) setName(data.name as string);
       if (data?.kind === "general" && me) { const { count } = await supabase.from("coworkers").select("id", { count: "exact", head: true }).eq("company_id", me.companyId).not("user_id", "is", null); setMembers(count ?? 0); }
       else { const { count } = await supabase.from("channel_members").select("user_id", { count: "exact", head: true }).eq("channel_id", id); setMembers(count ?? 0); }
     });
@@ -446,6 +459,18 @@ export default function Thread() {
             onPress={async () => { if (!id) return; const m = await toggleMute(id); setMuted(m); }} />
         </View>
         <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
+          {kind === "group" ? (renaming === null
+            ? <Row icon={<Pencil color={colors.ink2} size={19} />} title="Breyta heiti" sub={name ?? ""} chevron={false} onPress={() => setRenaming(name ?? "")} />
+            : (
+              <View style={{ padding: 14, gap: 10, borderBottomWidth: 1, borderBottomColor: colors.line2 }}>
+                <TextInput value={renaming} onChangeText={setRenaming} autoFocus maxLength={60} placeholder={tr("Heiti hóps")} placeholderTextColor={colors.ink3} returnKeyType="done" onSubmitEditing={saveName}
+                  style={{ fontFamily: font.medium, fontSize: 16, color: colors.ink, borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10 }} />
+                <View style={{ flexDirection: "row", gap: 8, justifyContent: "flex-end" }}>
+                  <Pressable onPress={() => setRenaming(null)} style={{ paddingHorizontal: 14, paddingVertical: 9 }}><Txt weight="semibold" color={colors.ink2}>{tr("Hætta við")}</Txt></Pressable>
+                  <Pressable onPress={saveName} style={{ backgroundColor: colors.brand, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9 }}><Txt weight="semibold" color="#fff">{tr("Vista")}</Txt></Pressable>
+                </View>
+              </View>
+            )) : null}
           <Row icon={<Images color={colors.ink2} size={19} />} title="Myndir og skjöl" sub="Allt sem hefur verið sent í spjallinu" onPress={openMedia} last={kind === "general"} />
           {kind !== "general" ? <Row icon={<LogOut color={colors.bad} size={19} />} title="Yfirgefa spjall" danger chevron={false} onPress={leave} last /> : null}
         </View>

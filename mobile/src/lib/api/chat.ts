@@ -327,6 +327,15 @@ export async function leaveChannel(channelId: string): Promise<{ ok: boolean; er
   return error ? { ok: false, error: error.message } : { ok: true };
 }
 
+/** Breyta heiti hóps (allir meðlimir — RLS channels_member_update). */
+export async function renameChannel(channelId: string, name: string): Promise<{ ok: boolean; error?: string }> {
+  const nm = name.trim();
+  if (!nm) return { ok: false, error: "Sláðu inn heiti" };
+  const { data, error } = await supabase.from("channels").update({ name: nm }).eq("id", channelId).eq("kind", "group").select("id");
+  if (error) return { ok: false, error: error.message };
+  return data?.length ? { ok: true } : { ok: false, error: "Ekki tókst að breyta heiti" };
+}
+
 /** Stofna hópspjall með nafni og meðlimum. */
 export async function createGroup(me: Me, name: string, memberUserIds: string[]): Promise<{ ok: boolean; id?: string; error?: string }> {
   const { data: auth } = await supabase.auth.getUser();
