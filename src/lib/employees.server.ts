@@ -69,9 +69,10 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
     // Starfsaldur sem telst með fyrir ráðningardag + skráningardagur (0097) — þolir að migration vanti.
     const psq = await supabase.from("employees").select("id, prior_service_months, created_at");
     const prior = new Map((psq.error ? [] : psq.data ?? []).map((x) => [x.id as string, { m: Number(x.prior_service_months) || 0, c: String(x.created_at ?? "").slice(0, 10) }]));
-    // Launaliðir (0081) + orlof (0021): sér fyrirspurn svo listinn virki þótt migration vanti.
-    const paq = await supabase.from("employees").select("id, pay_settings, orlof, benefits");
-    const payOf = new Map((paq.error ? [] : paq.data ?? []).map((x) => [x.id as string, x as { pay_settings: Partial<PaySettings> | null; orlof: Partial<OrlofSet> | null; benefits: Employee["benefits"] }]));
+    // Launaliðir (0081) + orlof (0021) + aðgangur að Mitt svæði: sér fyrirspurn svo listinn virki þótt migration vanti.
+    // permissions verður að koma með — annars sýna hökin alltaf „allt á“ og næsta vistun Vinna-flipans skrifar yfir.
+    const paq = await supabase.from("employees").select("id, pay_settings, orlof, benefits, permissions");
+    const payOf = new Map((paq.error ? [] : paq.data ?? []).map((x) => [x.id as string, x as { pay_settings: Partial<PaySettings> | null; orlof: Partial<OrlofSet> | null; benefits: Employee["benefits"]; permissions: Employee["permissions"] }]));
     let coDefaults: Partial<PaySettings> | null = null;
     if (!paq.error) {
       const { data: me } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
@@ -84,6 +85,7 @@ export const getEmployees = cache(async (): Promise<{ employees: Employee[]; liv
       pay: { ...(coDefaults ?? {}), ...(payOf.get(r.id)?.pay_settings ?? {}) },
       orlof: payOf.get(r.id)?.orlof ?? (coDefaults as { orlof?: Partial<OrlofSet> } | null)?.orlof ?? null,
       benefits: payOf.get(r.id)?.benefits ?? null,
+      permissions: payOf.get(r.id)?.permissions ?? null,
       address: extra.get(r.id)?.address ?? null,
       nextOfKin: extra.get(r.id)?.next_of_kin ?? null,
       postalCode: extra.get(r.id)?.postal_code ?? null,
