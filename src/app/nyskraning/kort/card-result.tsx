@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { hasCardOnFile, startCardSetup } from "../actions";
 import { VaktoLogo } from "@/components/brand/vakto-logo";
+import { createClient } from "@/lib/supabase/client";
 
 export default function CardResult({ cancelled, required = false }: { cancelled: boolean; required?: boolean }) {
   const [card, setCard] = useState<{ last4: string | null; brand: string | null } | null>(null);
@@ -30,6 +31,12 @@ export default function CardResult({ cancelled, required = false }: { cancelled:
     if (r.ok && r.url) window.location.assign(r.url); else if (r.ok && r.skip) window.location.assign("/maelabord"); else setBusy(false);
   }
 
+  // Án korts kemst maður hvergi annað — leið út svo hægt sé að skrá sig inn með öðrum aðgangi.
+  async function signOut() {
+    try { await createClient().auth.signOut(); } catch { /* ignore */ }
+    window.location.href = "/login";
+  }
+
   const brand = card?.brand === "VI" ? "Visa" : card?.brand === "MC" ? "Mastercard" : card?.brand ?? "Kort";
   return (
     <div className="form">
@@ -40,6 +47,7 @@ export default function CardResult({ cancelled, required = false }: { cancelled:
           <div className="sub">Prufan er frí í 14 daga og ekkert er dregið fyrr en hún er búin — en kortið þarf að vera skráð áður en kerfið opnast. Það er geymt hjá Straumi (Kvika), VAKTO geymir aldrei kortanúmer.</div>
           <button className="btn" onClick={retry} disabled={busy}>{busy ? "Opna greiðslusíðu…" : "Skrá kort"}</button>
           <div className="foot"><a href="mailto:hallo@vakto.is">Spurningar? hallo@vakto.is</a></div>
+          <div className="foot"><a onClick={signOut} style={{ cursor: "pointer" }}>Skrá út / nota annan aðgang</a></div>
         </>
       ) : cancelled ? (
         <>
@@ -47,6 +55,7 @@ export default function CardResult({ cancelled, required = false }: { cancelled:
           <div className="sub">Aðgangurinn opnast þegar kortið er skráð. Ekkert er dregið fyrr en 14 daga prufan er búin.</div>
           <button className="btn" onClick={retry} disabled={busy}>{busy ? "Opna…" : "Skrá kort núna"}</button>
           <div className="foot"><a href="mailto:hallo@vakto.is">Spurningar? hallo@vakto.is</a></div>
+          <div className="foot"><a onClick={signOut} style={{ cursor: "pointer" }}>Skrá út / nota annan aðgang</a></div>
         </>
       ) : card ? (
         <>

@@ -14,7 +14,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
-import { Txt, Muted, Avatar, Sheet, Row, useToast } from "../../src/components/ui";
+import { Txt, Muted, Avatar, Sheet, Row, useToast, colorFor } from "../../src/components/ui";
 import { uploadImage } from "../../src/lib/api/feed";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
@@ -54,6 +54,8 @@ export default function Thread() {
   const [typing, setTyping] = useState<string | null>(null);
   const [members, setMembers] = useState(0);
   const [isGroup, setIsGroup] = useState(true);
+  // Mynd/litur í hausnum — sama og í spjalllistanum (profílmynd viðmælanda eða grúppumynd).
+  const [head, setHead] = useState<{ photo: string | null; color: string | null }>({ photo: null, color: null });
   // Bein skilaboð: „á vakt“ / virk(ur) viðmælandans (0099); smellur á hausinn opnar prófílinn hans.
   const [peer, setPeer] = useState<CoworkerStatus | null>(null);
   const peerLabel = presenceLabel(peer);
@@ -240,13 +242,20 @@ export default function Thread() {
   useFocusEffect(useCallback(() => {
     load();
     if (id) isMuted(id).then(setMuted);
-    supabase.from("channels").select("kind, name").eq("id", id).maybeSingle().then(async ({ data }) => {
+    supabase.from("channels").select("kind, name, photo_url").eq("id", id).maybeSingle().then(async ({ data }) => {
       setIsGroup(data?.kind !== "dm"); setKind((data?.kind as string) ?? "group");
       if (data?.kind === "group" && data.name) setName(data.name as string);
+      if (data?.kind === "group") setHead({ photo: (data.photo_url as string | null) ?? null, color: colorFor(id) });
+      if (data?.kind === "dm" && me) {
+        const [{ data: mem }, { data: au }, people] = await Promise.all([supabase.from("channel_members").select("user_id").eq("channel_id", id), supabase.auth.getUser(), peopleMap(me.companyId)]);
+        const other = (mem ?? []).map((m) => m.user_id as string).find((u) => u !== au.user?.id);
+        const p = other ? people.get(other) : undefined;
+        if (p) { setHead({ photo: p.photo, color: p.color }); if (!nameParam) setName(p.name); }
+      }
       if (data?.kind === "general" && me) { const { count } = await supabase.from("coworkers").select("id", { count: "exact", head: true }).eq("company_id", me.companyId).not("user_id", "is", null); setMembers(count ?? 0); }
       else { const { count } = await supabase.from("channel_members").select("user_id", { count: "exact", head: true }).eq("channel_id", id); setMembers(count ?? 0); }
     });
-  }, [load, id, me]));
+  }, [load, id, me, nameParam]));
 
   // realtime: nýtt skilaboð → mála strax, endurhlaða svo til að fá nöfn/viðbrögð
   useEffect(() => {
@@ -323,7 +332,7 @@ export default function Thread() {
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 8, paddingTop: insets.top + 4, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.line2, backgroundColor: colors.panel }}>
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel={tr("Til baka")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }}><ChevronLeft color={colors.brand} size={28} /></Pressable>
         <Pressable onPress={() => { if (!isGroup && peer?.employeeId) router.push(`/starfsmadur/${peer.employeeId}`); else openInfo(); }} style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-        {kind === "general" ? <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={18} /></View> : <Avatar name={name ?? "?"} size={36} color={isGroup ? colors.info : undefined} />}
+        {kind === "general" ? <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={18} /></View> : <Avatar name={name ?? "?"} size={36} color={head.color} photo={head.photo} />}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt weight="bold" size={15} numberOfLines={1}>{name ?? "Spjall"}</Txt>
           <Muted size={12}>{typing ? trf("{x} skrifar…", typing) : isGroup ? (muted ? trf("{n} meðlimir · þaggað", members || "—") : trf("{n} meðlimir", members || "—")) : peerLabel.text ? tr(peerLabel.text) : muted ? "Einkaspjall · þaggað" : "Einkaspjall"}</Muted>
@@ -346,7 +355,7 @@ export default function Thread() {
         ListHeaderComponent={
           <View style={{ gap: 6, width: W - 28 }}>
             {typing ? <View style={{ alignSelf: "flex-start", marginLeft: 34, backgroundColor: colors.bubbleThem, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 }}><Muted size={13}>•••</Muted></View> : null}
-            {seenBy.length ? <View style={{ flexDirection: "row", alignSelf: "flex-end", gap: 2, marginTop: 4 }}>{seenBy.slice(0, 5).map((r) => <Avatar key={r.userId} name={r.name} size={16} />)}</View> : null}
+            {seenBy.length ? <View style={{ flexDirection: "row", alignSelf: "flex-end", gap: 2, marginTop: 4 }}>{seenBy.slice(0, 5).map((r) => <Avatar key={r.userId} name={r.name} size={16} color={r.color} photo={r.photo} />)}</View> : null}
           </View>
         }
         ListFooterComponent={more && msgs.length ? (

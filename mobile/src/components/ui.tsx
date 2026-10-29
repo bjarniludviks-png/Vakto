@@ -1,6 +1,7 @@
 // Shared VAKTO UI primitives — mirror the approved app prototype (cards, rows,
 // pills, sheet, segmented control, hero, toast).
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { colorFor } from "../lib/avatar";
 import {
   Text,
   TextProps,
@@ -157,12 +158,7 @@ export function initials(name: string): string {
   return first.slice(0, 2).toUpperCase();
 }
 
-const AV_COLORS = ["#e9700f", "#1f9d6b", "#2f6fe4", "#b45cc9", "#bf8f3a", "#0891b2", "#e0533f", "#8b7bff", "#16a34a", "#ca8a04"];
-export function colorFor(name: string): string {
-  let h = 0;
-  for (const ch of name || "") h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return AV_COLORS[h % AV_COLORS.length];
-}
+export { colorFor };
 
 export function Avatar({
   name,

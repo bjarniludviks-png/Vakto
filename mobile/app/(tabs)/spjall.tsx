@@ -37,7 +37,7 @@ function ConvAvatar({ c, size, dot }: { c: Conversation; size: number; dot?: "sh
   if (c.kind === "general") {
     return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={Math.round(size * 0.44)} /></View>;
   }
-  return <Avatar name={c.name} size={size} color={c.kind === "dm" ? c.color : colors.info} photo={c.photo} />;
+  return <Avatar name={c.name} size={size} color={c.color} photo={c.photo} />;
 }
 
 export default function Spjall() {

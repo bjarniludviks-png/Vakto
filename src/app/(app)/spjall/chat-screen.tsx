@@ -462,7 +462,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
               sender: mine ? "Ég" : (known?.sender ?? (conv?.dm ? conv.name.split(/\s+/)[0] : "…")),
               body: row.body ?? "", at: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
               kind: row.kind ?? "text", url: row.attachment_url ?? null, reactions: [],
-              createdAt: row.created_at ?? d.toISOString(), replyTo: null, photo: known?.photo ?? null,
+              createdAt: row.created_at ?? d.toISOString(), replyTo: null, photo: known?.photo ?? null, color: known?.color,
             }];
           });
           scheduleReload(row.channel_id);
@@ -870,7 +870,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                           // eslint-disable-next-line @next/next/no-img-element
                           <img className="avt-img" src={m.photo} alt="" style={{ width: phone ? 28 : 30, height: phone ? 28 : 30 }} />
                         ) : (
-                          <span className="avt" style={{ background: "var(--brand-soft)", color: "var(--brand)", width: phone ? 28 : 30, height: phone ? 28 : 30, fontSize: phone ? 10.5 : 11, fontWeight: 700 }}>
+                          <span className="avt" style={{ background: m.color ?? "var(--brand-soft)", color: m.color ? "#fff" : "var(--brand)", width: phone ? 28 : 30, height: phone ? 28 : 30, fontSize: phone ? 10.5 : 11, fontWeight: 700 }}>
                             {m.sender.slice(0, 2).toUpperCase()}
                           </span>
                         )}
