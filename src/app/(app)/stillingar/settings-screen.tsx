@@ -19,7 +19,8 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, aiContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, saveCompanyLimits, setEsignProvider, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit, saveUserAccess } from "./actions";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, aiContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, saveCompanyLimits, setEsignProvider, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit, saveUserAccess, getUserAccess, resendUserAccess, changeUserLoginEmail } from "./actions";
+import { LoginAccess } from "@/components/app/login-access";
 import { getOverseenDepartments } from "../starfsfolk/actions";
 import { MANAGER_DEFAULTS, resolveAccess, type Area } from "@/lib/user-permissions";
 import dynamic from "next/dynamic";
@@ -73,6 +74,7 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
   const [deptEdit, setDeptEdit] = useState<{ id: string; name: string; location: string; staff: number; color: string | null; members: string[] } | null>(null);
   const [rowEdit, setRowEdit] = useState<EditRow | null>(null);
   const [accessUser, setAccessUser] = useState<UserRow | null>(null);
+  const [loginUser, setLoginUser] = useState<string | null>(null);
   const isOwner = data.viewerRole === "owner";
   // Gamlar slóðir (?s=velta, launareglur) vísa á nýju flipana.
   const LEGACY: Record<string, string> = { velta: "tengingar", launareglur: "reglur" };
@@ -243,12 +245,20 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
         <div className="ch"><div className="ct">{t("Notendur & aðgangur")}</div><button className="btn sm" onClick={() => setModal("invite")}>{t("+ Bjóða notanda")}</button></div>
         <div className="cb att">
           {data.users.map((u, i) => (
-            <div className="it" key={u.name + i}>
+            <div className="it" key={u.name + i} style={{ flexWrap: "wrap" }}>
               <div className="ic info" style={u.role === "manager" ? { background: "#ece9fd", color: "#8b7bff" } : undefined}>{u.initials}</div>
               <div className="tx"><b>{u.name}</b><span>{u.email}{u.role === "manager" && u.permissions ? ` · ${t("sérsniðinn aðgangur")}` : ""}</span></div>
               <span className={`tag ${u.role === "owner" ? "info" : "mut"}`}>{t(ROLE_LABEL[u.role] ?? "role:employee")}</span>
+              {u.id && !u.me && (
+                <button className="btn sm ghost" style={{ marginLeft: 8 }} onClick={() => setLoginUser(loginUser === u.id ? null : u.id!)}>{t("Innskráning")}</button>
+              )}
               {isOwner && u.id && !u.me && (
                 <button className="btn sm ghost" style={{ marginLeft: 8 }} onClick={() => setAccessUser(u)}>{t("Breyta aðgangi")}</button>
+              )}
+              {loginUser && loginUser === u.id && (
+                <div style={{ flexBasis: "100%", paddingTop: 6 }}>
+                  <LoginAccess load={() => getUserAccess(u.id!)} resend={() => resendUserAccess(u.id!)} changeEmail={(m) => changeUserLoginEmail(u.id!, m)} />
+                </div>
               )}
             </div>
           ))}

@@ -8,7 +8,7 @@ import { useLang } from "@/components/app/lang";
 import { initials, type Employee } from "@/lib/employees";
 import { CUSTOM_UNION } from "@/lib/payrules";
 import { PERM_FIELDS } from "@/lib/permissions";
-import { updateEmployee, setEmployeeStatus, uploadEmployeePhoto } from "./actions";
+import { updateEmployee, setEmployeeStatus, uploadEmployeePhoto, changeEmployeeLoginEmail } from "./actions";
 import { ProfileTabBody, profileTabsFor, type ProfileTab } from "./employees-screen";
 import { Av } from "@/components/app/avatar";
 
@@ -89,9 +89,17 @@ export default function EmployeeProfile({ employee, banner, action }: { employee
       payAgreement: fd.has("payAgreement") && union !== CUSTOM_UNION ? (fd.get("payAgreement") as string) : undefined,
       nextOfKin: fd.has("pNextOfKin") ? (fd.get("pNextOfKin") as string) : undefined,
     });
+    // Nýtt netfang á starfsmanni með aðgang: bjóða að færa innskráninguna líka (annars skráir hann sig inn með gamla).
+    const newEmail = fd.has("pEmail") ? ((fd.get("pEmail") as string) || "").trim() : "";
+    let moved: { ok: boolean; error?: string; sentTo?: string } | null = null;
+    if (res.ok && !res.demo && e.hasAccount && newEmail && newEmail.toLowerCase() !== (e.email ?? "").trim().toLowerCase()
+      && window.confirm(`Færa innskráningu ${e.fullName} líka á ${newEmail}? Tengill til að velja lykilorð verður sendur þangað.`)) {
+      moved = await changeEmployeeLoginEmail(e.id, newEmail);
+    }
     setSaving(false);
     if (res.ok) setDirty(false);
-    toast(res.demo ? "Vistað (demo — tengdu Supabase)" : res.ok ? "Vistað" : (res.error ?? "Villa"));
+    toast(res.demo ? "Vistað (demo — tengdu Supabase)" : !res.ok ? (res.error ?? "Villa")
+      : moved ? (moved.ok ? `Vistað — innskráning færð á ${newEmail}` : `Vistað, en innskráning ekki færð: ${moved.error ?? "villa"}`) : "Vistað");
     router.refresh();
   }
 

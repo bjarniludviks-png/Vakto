@@ -9,7 +9,7 @@ import { initials, type Employee } from "@/lib/employees";
 import { kr, nf, dec1 as num1 } from "@/lib/format";
 import { useLang } from "@/components/app/lang";
 import { downloadContractPdf } from "@/lib/contract-pdf";
-import { updateEmployee, uploadDocument, importEmployees, inviteEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, getExtraDepartments, setExtraDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow, getContractProgress, syncContractStatus, openSignedContractPdf, resendContract, restoreContract, listEmployeePayslips, type EmployeePayslip, type ContractProgress, type EmployeeContractState } from "./actions";
+import { updateEmployee, uploadDocument, importEmployees, inviteEmployees, getEmployeePayRule, getEmployeeExtras, getEmployeeOrlof, getEmployeePension, getDocuments, getDocumentSignedUrl, getCompanyDepartments, getCompanyOptions, getEmployeeTimebank, getOverseenDepartments, getExtraDepartments, setExtraDepartments, type EmployeeTimebank, setOverseenDepartments, deleteEmployee, generateContract, listContracts, setContractStatus, deleteContract, updateContractContent, getContractSignatures, taktikalEmployerLink, type ContractRow, getContractProgress, syncContractStatus, openSignedContractPdf, resendContract, restoreContract, listEmployeePayslips, getEmployeeAccess, resendEmployeeAccess, changeEmployeeLoginEmail, type EmployeePayslip, type ContractProgress, type EmployeeContractState } from "./actions";
 import { RightsPanel } from "./rights-panel";
 import { AgreementSummary } from "@/components/app/agreement-summary";
 import { RULE_FIELDS, UNION_PRESETS, CUSTOM_UNION, resolveRuleSet, hasIgnoredCustomRules, resolveUppbot, DEFAULT_OT_WEEKLY, DEFAULT_MONTHLY_HOURS, DEFAULT_ORLOF, ORLOF_MODES, type RuleSet, type Band } from "@/lib/payrules";
@@ -20,6 +20,7 @@ import { templateToPayRule, type RuleTemplate } from "@/lib/rules";
 import { listRuleTemplates } from "../stillingar/actions";
 import { ContractView, ContractEditor } from "@/components/app/contract-view";
 import { LeavingPill } from "./termination/banner";
+import { LoginAccess } from "@/components/app/login-access";
 import type { LeavingInfo } from "@/lib/termination";
 import { Av } from "@/components/app/avatar";
 import { PayslipModal } from "@/components/app/payslip-modal";
@@ -1489,7 +1490,7 @@ function AccessLine({ e }: { e: Employee }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
-  if (e.hasAccount) return <div className="statline"><span className="k">{t("Innskráning")}</span><span className="db2-pill good">{t("Virkur aðgangur")}</span></div>;
+  if (e.hasAccount) return <LoginAccess load={() => getEmployeeAccess(e.id)} resend={() => resendEmployeeAccess(e.id)} changeEmail={(m) => changeEmployeeLoginEmail(e.id, m)} />;
   return (
     <div className="statline">
       <span className="k">{t("Innskráning")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {e.email ? t("hefur ekki fengið boð í appið") : t("skráðu netfang til að senda boð")}</span></span>
