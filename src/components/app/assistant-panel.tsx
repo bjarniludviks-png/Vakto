@@ -3,7 +3,7 @@
 // VAKTO AI — spjall í horninu (stjórnendur og vaktstjórar). Rökfræðin og birtingin eru sameiginleg
 // með VAKTO AI-samtalinu í Spjallrásum (assistant-chat.tsx). Á /spjall er hnappurinn falinn því
 // VAKTO AI er þar fest efst í samtalalistanum; samtalið sjálft fylgir á milli (sessionStorage).
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AssistantComposer, AssistantHistoryList, AssistantMessages, Spark, useAssistantChat } from "./assistant-chat";
 
@@ -20,6 +20,8 @@ function FloatingAssistant({ demo }: { demo: boolean }) {
   const [wide, setWide] = useState(false);
   const chat = useAssistantChat({ demo });
   const { s, msgs, history } = chat;
+  const chatRef = useRef(chat);
+  useEffect(() => { chatRef.current = chat; });
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -30,6 +32,18 @@ function FloatingAssistant({ demo }: { demo: boolean }) {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
   useEffect(() => { if (open) chat.focus(); }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Aðrar síður (t.d. Hjálp) opna VAKTO AI með window-atburðinum „vakto-ai:open“, valfrjálst með spurningu
+  // (detail.q). data-vakto-ai á <html> segir þeim að aðstoðarmaðurinn sé til staðar fyrir þennan notanda.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const q = (e as CustomEvent<{ q?: string } | undefined>).detail?.q?.trim();
+      setOpen(true);
+      if (q) void chatRef.current.send(q);
+    };
+    document.documentElement.dataset.vaktoAi = "1";
+    window.addEventListener("vakto-ai:open", onOpen);
+    return () => { delete document.documentElement.dataset.vaktoAi; window.removeEventListener("vakto-ai:open", onOpen); };
+  }, []);
 
   return (
     <>
