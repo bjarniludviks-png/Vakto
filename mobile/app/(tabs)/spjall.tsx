@@ -37,6 +37,16 @@ function ConvAvatar({ c, size, dot }: { c: Conversation; size: number; dot?: "sh
   if (c.kind === "general") {
     return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={Math.round(size * 0.44)} /></View>;
   }
+  if (c.faces.length === 2) {
+    // tvær skarandi myndir: síðasti sendandi framar, neðst til vinstri
+    const f = Math.round(size * 0.68);
+    return (
+      <View style={{ width: size, height: size }}>
+        <View style={{ position: "absolute", right: 0, top: 0 }}><Avatar name={c.faces[1].name} size={f} color={c.faces[1].color} photo={c.faces[1].photo} /></View>
+        <View style={{ position: "absolute", left: 0, bottom: 0, borderRadius: f, borderWidth: 2, borderColor: colors.panel }}><Avatar name={c.faces[0].name} size={f} color={c.faces[0].color} photo={c.faces[0].photo} /></View>
+      </View>
+    );
+  }
   return <Avatar name={c.name} size={size} color={c.color} photo={c.photo} />;
 }
 
@@ -93,8 +103,22 @@ export default function Spjall() {
     return list;
   }, [convs, onlyUnread, search, muted]);
   const unreadTotal = (convs ?? []).filter((c) => c.unread > 0 && !muted.has(c.id)).length;
-  // nýjustu samtölin (listinn kemur raðaður eftir virkni — ekkert fest)
+  // nýjustu samtölin — aðeins varaleið fyrir efstu röðina ef enginn er á vakt eða nýlega virk(ur)
   const pins = useMemo(() => (convs ?? []).slice(0, 8), [convs]);
+  // Efsta röðin (eins og „Active“ í Messenger): á vakt núna → virk(ur) núna → í dag → í gær → síðustu dagar.
+  // Fólk sem hefur falið virkni sína (show_presence) og er ekki á vakt kemur ekki fram.
+  const [active, setActive] = useState<{ p: Person; s: CoworkerStatus }[]>([]);
+  const loadActive = useCallback(async () => {
+    if (!me) return;
+    try {
+      const all = await listPeople(me);
+      const st = await coworkerStatus(all.slice(0, 300).map((p) => p.userId));
+      const rank = (x: CoworkerStatus) => x.onShift ? 0 : x.active === "now" ? 1 : x.active === "today" ? 2 : x.active === "yesterday" ? 3 : x.active?.startsWith("days:") ? 3 + Number(x.active.slice(5)) : 99;
+      setActive(all.map((p) => ({ p, s: st[p.userId] })).filter((x) => x.s && rank(x.s) <= 10)
+        .sort((a, b) => rank(a.s) - rank(b.s) || a.p.name.localeCompare(b.p.name, "is")).slice(0, 15));
+    } catch { /* efsta röðin fellur þá á nýjustu samtölin */ }
+  }, [me]);
+  useFocusEffect(useCallback(() => { loadActive(); }, [loadActive]));
   // flýtival í hópavali: „+ Allir í <deild>“ / „+ Allir á <stað>“
   const teams = useMemo(() => teamPicks(people), [people]);
   const fallbackName = useMemo(() => defaultGroupName(people.filter((p) => sel.has(p.userId)).map((p) => p.name)), [people, sel]);
@@ -136,7 +160,30 @@ export default function Spjall() {
           {search ? <Pressable onPress={() => setSearch(null)} hitSlop={8} accessibilityLabel={tr("Hreinsa")}><X color={colors.ink3} size={18} /></Pressable> : null}
         </View>
         {/* hringir: nýjustu samtölin (eins og efsta röðin í Messenger) */}
-        {pins.length && !search ? (
+        {active.length && !search ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}>
+            {ai ? (
+              <Pressable onPress={() => router.push("/vakto-ai")} accessibilityLabel="VAKTO AI" style={({ pressed }) => ({ width: 66, alignItems: "center", gap: 6, opacity: pressed ? 0.7 : 1 })}>
+                <AiAvatar size={60} />
+                <Txt size={12.5} color={colors.ink2} numberOfLines={1} style={{ maxWidth: 66, textAlign: "center" }}>VAKTO AI</Txt>
+              </Pressable>
+            ) : null}
+            {active.map(({ p, s: st }) => {
+              const l = presenceLabel(st);
+              const conv = (convs ?? []).find((c) => c.kind === "dm" && c.other?.userId === p.userId);
+              const un = !!conv && conv.unread > 0 && !muted.has(conv.id);
+              return (
+                <Pressable key={p.userId} onPress={() => conv ? router.push(`/spjall/${conv.id}?name=${encodeURIComponent(conv.name)}`) : dm(p)} accessibilityLabel={`${p.name}${l.text ? `, ${l.text}` : ""}`} style={({ pressed }) => ({ width: 66, alignItems: "center", gap: 6, opacity: pressed ? 0.7 : 1 })}>
+                  <View>
+                    <Avatar name={p.name} size={60} color={p.color} photo={p.photo} />
+                    {l.dot ? <View style={{ position: "absolute", right: 0, bottom: 0, width: 16, height: 16, borderRadius: 8, borderWidth: 2, borderColor: colors.panel, backgroundColor: l.tone === "shift" ? colors.brand : colors.good }} /> : null}
+                  </View>
+                  <Txt size={12.5} weight={un ? "semibold" : "regular"} color={un ? colors.ink : colors.ink2} numberOfLines={1} style={{ maxWidth: 66, textAlign: "center" }}>{p.name.split(/\s+/)[0]}</Txt>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : pins.length && !search ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 14 }}>
             {ai ? (
               <Pressable onPress={() => router.push("/vakto-ai")} accessibilityLabel="VAKTO AI" style={({ pressed }) => ({ width: 66, alignItems: "center", gap: 6, opacity: pressed ? 0.7 : 1 })}>

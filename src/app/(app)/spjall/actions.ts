@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { initials } from "@/lib/employees";
 import { colorFor } from "@/lib/avatar";
-import { notifyEmployee, sendPushToUser } from "@/lib/push";
+import { notifyEmployee } from "@/lib/push";
+import { pushChatMessage } from "@/lib/chat-push.server";
 import { userError } from "@/lib/user-error";
 
 export type Conversation = {
@@ -542,20 +543,7 @@ export async function sendChatMessage(channelId: string, body: string, kind: "te
     if (error) return { ok: false, error: userError(error) };
     // Push to the other channel members AFTER the response is sent — the sender
     // never waits for the member lookup or the push provider.
-    after(async () => {
-      try {
-        const [{ data: mems }, { data: ch }, emps] = await Promise.all([
-          supabase.from("channel_members").select("user_id").eq("channel_id", channelId).limit(50),
-          supabase.from("channels").select("name, kind").eq("id", channelId).maybeSingle(),
-          empNameMap(supabase, ctx.company),
-        ]);
-        const sender = (emps.get(ctx.userId)?.name ?? "").split(/\s+/)[0] || "Ný skilaboð";
-        const title = ch?.kind === "group" && ch.name ? `${sender} · ${ch.name}` : sender;
-        const preview = kind === "text" ? text.slice(0, 90) : kind === "image" ? "📷 Mynd" : "🎤 Talskilaboð";
-        await Promise.all((mems ?? []).filter((m) => m.user_id !== ctx.userId)
-          .map((m) => sendPushToUser(m.user_id as string, { title, body: preview, url: "/spjall", tag: `chat-${channelId}` })));
-      } catch { /* push is best-effort */ }
-    });
+    if (inserted?.id) { const mid = inserted.id; after(() => pushChatMessage(mid)); }
     return { ok: true, id: inserted?.id };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
