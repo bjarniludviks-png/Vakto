@@ -1,7 +1,7 @@
 // Starfsmaður — prófíll samstarfsmanns: vaktir vikunnar, skilaboð, hringja.
 import React, { useCallback, useState } from "react";
 import { tr } from "../../src/lib/i18n";
-import { View, Linking } from "react-native";
+import { View, Linking, Pressable } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { MessageCircle, Phone } from "lucide-react-native";
 import { Screen } from "../../src/components/screen";
@@ -13,6 +13,7 @@ import { startDM } from "../../src/lib/api/chat";
 import { iso, mondayOf } from "../../src/lib/api/me";
 import { presenceLabel, type CoworkerStatus } from "../../src/lib/presence";
 import { coworkerStatus } from "../../src/lib/api/presence";
+import { ImageViewer } from "../../src/components/image-viewer";
 
 const DAY_L = ["Sun", "Mán", "Þri", "Mið", "Fim", "Fös", "Lau"];
 
@@ -24,6 +25,7 @@ export default function Starfsmadur() {
   const toast = useToast();
   const [e, setE] = useState<{ name: string; role: string | null; dept: string | null; color: string | null; photo: string | null; phone: string | null; userId: string | null } | null>(null);
   const [status, setStatus] = useState<CoworkerStatus | null>(null);
+  const [big, setBig] = useState<string | null>(null);
   const st = presenceLabel(status);
   const [shifts, setShifts] = useState<{ date: string; start: string; end: string }[]>([]);
 
@@ -52,7 +54,10 @@ export default function Starfsmadur() {
       {e ? (
         <>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 2 }}>
-            <Avatar name={e.name} size={56} color={e.color} photo={e.photo} />
+            {/* smellt á prófílmynd → stór mynd (aðeins ef mynd er til) */}
+            <Pressable onPress={() => e.photo && setBig(e.photo)} disabled={!e.photo} accessibilityLabel={tr("Skoða mynd")}>
+              <Avatar name={e.name} size={56} color={e.color} photo={e.photo} />
+            </Pressable>
             <View style={{ flex: 1 }}>
               <Txt weight="bold" size={20} style={{ letterSpacing: -0.4 }}>{e.name}</Txt>
               <Muted>{[e.role, e.dept].filter(Boolean).join(" · ") || "Starfsmaður"}</Muted>
@@ -70,6 +75,7 @@ export default function Starfsmadur() {
           </Card>
         </>
       ) : null}
+      <ImageViewer url={big} onClose={() => setBig(null)} save={false} />
     </Screen>
   );
 }
