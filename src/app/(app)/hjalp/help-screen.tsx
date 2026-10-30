@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { PageHeader } from "@/components/app/page-header";
 import { useLang } from "@/components/app/lang";
+import { Spark } from "@/components/app/assistant-chat";
 
 type L = { is: string; en: string; pl?: string; vi?: string };
 // vi/pl falla á ensku ef þýðingu vantar.
 const tx = (lang: string, v: L) => (lang === "is" ? v.is : lang === "pl" ? v.pl ?? v.en : lang === "vi" ? v.vi ?? v.en : v.en);
 const ic = (d: string) => <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">{d.split("|").map((p, i) => <path key={i} d={p} />)}</svg>;
 
-type Guide = { id: string; icon: React.ReactNode; title: L; intro: L; img: string; steps: L[] };
+type Guide = { id: string; icon: React.ReactNode; title: L; intro: L; img?: string; steps: L[] };
 
 const GUIDES: Guide[] = [
   {
@@ -43,13 +44,15 @@ const GUIDES: Guide[] = [
   {
     id: "vakto-ai", icon: ic("M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3Z|M18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8Z"), img: "/help/ai.png",
     title: { is: "VAKTO AI", en: "VAKTO AI", pl: "VAKTO AI" },
-    intro: { is: "Aðstoðarmaður fyrir stjórnendur og vaktstjóra. Opnaðu hann með „✦ VAKTO AI“ neðst í horninu eða ⌘J og spurðu á mannamáli. Hann svarar með raunverulegum tölum úr kerfinu.", en: "An assistant for managers and shift leads. Open it with \"✦ VAKTO AI\" in the bottom corner or ⌘J and ask in plain language. It answers with real figures from the system.", pl: "Asystent dla kierowników i brygadzistów. Otwórz go przyciskiem „✦ VAKTO AI” w dolnym rogu lub ⌘J i pytaj zwykłym językiem. Odpowiada prawdziwymi danymi z systemu." },
+    intro: { is: "Aðstoðarmaður fyrir stjórnendur og vaktstjóra. Opnaðu hann með „VAKTO AI“ neðst í horninu eða ⌘J, eða í appinu efst í Spjalli, og spurðu á mannamáli. Hann svarar með raunverulegum tölum úr kerfinu og kann líka á VAKTO, svo þú getur spurt hann hvernig á að gera hlutina.", en: "An assistant for managers and shift leads. Open it with \"VAKTO AI\" in the bottom corner or ⌘J, or at the top of Chat in the app, and ask in plain language. It answers with real figures from the system and also knows VAKTO, so you can ask it how to do things.", pl: "Asystent dla kierowników i brygadzistów. Otwórz go przyciskiem „VAKTO AI” w dolnym rogu lub ⌘J albo na górze Czatu w aplikacji i pytaj zwykłym językiem. Odpowiada prawdziwymi danymi z systemu i zna VAKTO, więc możesz go też zapytać, jak coś zrobić." },
     steps: [
       { is: "Spurðu um reksturinn: „Hvernig er laun % af veltu þessa vikuna?“, „Hver er á vakt núna?“ eða „Hvaða beiðnir bíða?“.", en: "Ask about the business: \"What's labor % of revenue this week?\", \"Who is on shift now?\" or \"Which requests are waiting?\".", pl: "Pytaj o firmę: „Jaki jest udział kosztów pracy w obrocie w tym tygodniu?”, „Kto jest teraz na zmianie?” lub „Jakie wnioski czekają?”." },
       { is: "Berðu saman tímabil: „Berðu saman október og september“ eða „sama vika í fyrra“. Þú færð breytingu í krónum og %, helstu ástæður og hvaða deildir eða starfsmenn breyttust mest. Hann sýnir líka þróun per mánuð eða viku og keyrð laun úr launakeyrslum.", en: "Compare periods: \"Compare October with September\" or \"the same week last year\". You get the change in kr and %, the main reasons and which departments or employees changed most. It also shows trends by month or week and paid wages from payroll runs.", pl: "Porównuj okresy: „Porównaj październik z wrześniem” lub „ten sam tydzień w zeszłym roku”. Dostajesz zmianę w kr i %, główne przyczyny oraz działy lub osoby, które zmieniły się najbardziej. Pokazuje też trendy miesięczne lub tygodniowe i wypłacone wynagrodzenia z list płac." },
+      { is: "Spurðu hvernig: „Hvernig bý ég til lausa vakt?“, „Hvernig skrái ég veikindi?“ eða „Hvar breyti ég launatímabilinu?“. Hann útskýrir skrefin og getur oft gert verkið fyrir þig.", en: "Ask how: \"How do I create an open shift?\", \"How do I register sick leave?\" or \"Where do I change the pay period?\". It explains the steps and can often do the job for you.", pl: "Zapytaj jak: „Jak utworzyć wolną zmianę?”, „Jak zarejestrować zwolnienie lekarskie?” lub „Gdzie zmienić okres rozliczeniowy?”. Wyjaśnia kroki i często może zrobić to za Ciebie." },
       { is: "Settu upp viku: „Settu upp næstu viku, allir með einn frídag“. Hann virðir óframboð, frí og hvíldartíma og leggur til heilt vaktaplan.", en: "Plan a week: \"Set up next week, everyone gets one day off\". It respects unavailability, leave and rest time and proposes a whole schedule.", pl: "Zaplanuj tydzień: „Ustaw przyszły tydzień, każdy ma jeden dzień wolny”. Uwzględnia niedostępność, urlopy i czas odpoczynku i proponuje cały grafik." },
       { is: "Breytingar eru alltaf tillögur: ekkert gerist fyrr en þú ýtir á „Staðfesta“. Samtöl vistast undir klukkutákninu og stækka-táknið gerir gluggann stærri.", en: "Changes are always proposals: nothing happens until you press \"Confirm\". Conversations are saved under the clock icon, and the expand icon makes the window bigger.", pl: "Zmiany to zawsze propozycje: nic się nie dzieje, dopóki nie naciśniesz „Potwierdź”. Rozmowy zapisują się pod ikoną zegara, a ikona powiększenia powiększa okno." },
-      { is: "25 spurningar á mánuði fylgja áskriftinni. Viðbót fyrir allt að 500 spurningar kostar 1.990 kr/mán og er kveikt á í Stillingar → Áskrift.", en: "25 questions a month come with the subscription. An add-on for up to 500 questions costs 1,990 kr/month and is turned on in Settings → Subscription.", pl: "25 pytań miesięcznie jest w cenie subskrypcji. Dodatek do 500 pytań kosztuje 1990 kr/mies. i włącza się go w Ustawienia → Subskrypcja." },
+      { is: "Spurningar fylgja áskriftarleiðinni: 25 á mánuði í Grunni, 100 í Vexti og 300 í Rekstri. Þurfirðu fleiri kveikirðu á AI-pökkum í Stillingar → Áskrift (50 spurningar á 1.490 kr) og setur hámark á mánuði.", en: "Questions come with your plan: 25 a month on Grunnur, 100 on Vöxtur and 300 on Rekstur. If you need more, turn on AI packs in Settings → Subscription (50 questions for 1,490 kr) and set a monthly cap.", pl: "Pytania są w cenie planu: 25 miesięcznie w Grunnur, 100 w Vöxtur i 300 w Rekstur. Jeśli potrzebujesz więcej, włącz pakiety AI w Ustawienia → Subskrypcja (50 pytań za 1490 kr) i ustaw miesięczny limit." },
+      { is: "Tengd forrit: eigandi getur leyft Claude, ChatGPT o.fl. að lesa gögn fyrirtækisins (aðeins lestur, engar kennitölur eða bankaupplýsingar) í Stillingar → Tengingar → Tengd forrit.", en: "Connected apps: an owner can let Claude, ChatGPT etc. read the company's data (read-only, no ID numbers or bank details) in Settings → Integrations → Connected apps.", pl: "Połączone aplikacje: właściciel może pozwolić Claude, ChatGPT itp. czytać dane firmy (tylko odczyt, bez numerów identyfikacyjnych i danych bankowych) w Ustawienia → Integracje → Połączone aplikacje." },
     ],
   },
   {
@@ -61,6 +64,9 @@ const GUIDES: Guide[] = [
       { is: "„Afrita síðustu viku“ sparar tíma þegar vikurnar eru líkar. Vaktategundir (dagvakt, kvöldvakt o.fl.) stillirðu undir „Skilgreindar vaktategundir“.", en: "\"Copy last week\" saves time when weeks are similar. Set up shift types (day, evening etc.) under \"Shift types\".", pl: "„Kopiuj poprzedni tydzień” oszczędza czas, gdy tygodnie są podobne. Rodzaje zmian (dzienna, wieczorna itp.) ustawiasz w „Rodzaje zmian”." },
       { is: "Efst sérðu heildartíma, launakostnað og laun % af veltuspá. Ef planið fer yfir launaáætlunina sérðu það strax í krónum, áður en þú birtir.", en: "At the top you see total hours, labor cost and labor % of forecast revenue. If the plan goes over budget you see it in krónur right away, before you publish.", pl: "U góry widzisz łączne godziny, koszty pracy i ich udział w prognozowanym obrocie. Jeśli grafik przekracza budżet, od razu widzisz to w koronach, zanim go opublikujesz." },
       { is: "„Gervigreind (AI) bestun“ gerir tillögu út frá mönnunarþörf og veltuspá. Þú ferð yfir hana og samþykkir áður en nokkuð breytist.", en: "\"AI optimize\" proposes a plan from staffing needs and the revenue forecast. You review and approve it before anything changes.", pl: "„Optymalizacja AI” proponuje grafik na podstawie zapotrzebowania na personel i prognozy obrotu. Przeglądasz go i zatwierdzasz, zanim cokolwiek się zmieni." },
+      { is: "Mánuður → Tafla: starfsfólk í línum og dagar í dálkum. Veldu „Mála“ og vaktategund og smelltu á reiti, eða notaðu „Afrita síðasta mánuð“, „Endurtaka viku“ og „Hreinsa mánuðinn“. Samþykkt frí er aldrei málað yfir.", en: "Month → Table: staff in rows and days in columns. Choose \"Paint\" and a shift type and click cells, or use \"Copy last month\", \"Repeat week\" and \"Clear month\". Approved leave is never painted over.", pl: "Miesiąc → Tabela: pracownicy w wierszach, dni w kolumnach. Wybierz „Maluj” i rodzaj zmiany i klikaj komórki albo użyj „Kopiuj poprzedni miesiąc”, „Powtórz tydzień” i „Wyczyść miesiąc”. Zatwierdzony urlop nigdy nie jest zamalowywany." },
+      { is: "Lausar vaktir: í spjaldinu „Lausar vaktir“ stofnarðu vakt án starfsmanns. Starfsfólkið fær tilkynningu og sækir um í appinu, og þú ýtir á „Úthluta“.", en: "Open shifts: in the \"Open shifts\" card you create a shift without an employee. Staff get a notification and apply in the app, and you press \"Assign\".", pl: "Wolne zmiany: w karcie „Wolne zmiany” tworzysz zmianę bez pracownika. Pracownicy dostają powiadomienie i zgłaszają się w aplikacji, a Ty naciskasz „Przydziel”." },
+      { is: "Veikindi á vakt: opnaðu vaktina og veldu „Tilkynnti veikindi“. Fjarvistin skráist, vaktin verður laus vakt og starfsfólkið fær tilkynningu.", en: "Sick on shift: open the shift and choose \"Called in sick\". The absence is recorded, the shift becomes an open shift and staff are notified.", pl: "Choroba na zmianie: otwórz zmianę i wybierz „Called in sick”. Nieobecność zostaje zapisana, zmiana staje się wolna, a pracownicy dostają powiadomienie." },
       { is: "Smelltu „Gefa út vaktaplan“ þegar planið er klárt. Starfsfólkið sér vaktirnar sínar í appinu og fær tilkynningu.", en: "Click \"Publish schedule\" when it's ready. Staff see their shifts in the app and get a notification.", pl: "Kliknij „Opublikuj grafik”, gdy jest gotowy. Pracownicy widzą swoje zmiany w aplikacji i dostają powiadomienie." },
     ],
   },
@@ -73,6 +79,7 @@ const GUIDES: Guide[] = [
       { is: "„Plan og unnið per starfsmann“ sýnir plan, unna tíma, frávik og kostnað frávika, með samtölu neðst. Starfsfólk án skráningar á tímabilinu er falið þar til þú smellir á „Sýna“.", en: "\"Planned and worked per employee\" shows plan, hours worked, deviation and its cost, with a total at the bottom. Staff without entries in the period are hidden until you click \"Show\".", pl: "„Zaplanowane i przepracowane na pracownika” pokazuje grafik, przepracowane godziny, odchylenie i jego koszt, z sumą na dole. Pracownicy bez wpisów w okresie są ukryci, dopóki nie klikniesz „Pokaż”." },
       { is: "Hakaðu við starfsmenn og smelltu „Samþykkja valda“, eða smelltu á starfsmann til að fara yfir hverja stimplun. Aðeins samþykktir tímar fara í launin.", en: "Tick employees and click \"Approve selected\", or click someone to review each punch. Only approved hours go into payroll.", pl: "Zaznacz pracowników i kliknij „Zatwierdź wybranych” albo kliknij pracownika, aby przejrzeć każde odbicie. Do wynagrodzeń trafiają tylko zatwierdzone godziny." },
       { is: "Leiðréttingabeiðnir frá starfsfólki birtast fyrir ofan listann. Samþykktu þær eða hafnaðu.", en: "Correction requests from staff appear above the list. Approve or reject them.", pl: "Wnioski pracowników o korektę pojawiają się nad listą. Zatwierdź je lub odrzuć." },
+      { is: "Vinnuyfirlit: „Vinnuyfirlit“ → „Búa til yfirlit fyrir alla“ gerir yfirlit launatímabilsins fyrir hvern starfsmann. Sendu þau til staðfestingar. Starfsmaðurinn staðfestir í appinu eða gerir athugasemd, og þegar þú staðfestir vistast PDF í skjölum hans.", en: "Work overviews: \"Work overview\" → \"Create overviews for everyone\" builds the pay period's overview for each employee. Send them for confirmation. The employee confirms in the app or adds a comment, and when you confirm, a PDF is saved in their documents.", pl: "Zestawienia pracy: „Zestawienie pracy” → „Utwórz zestawienia dla wszystkich” tworzy zestawienie okresu rozliczeniowego dla każdego pracownika. Wyślij je do potwierdzenia. Pracownik potwierdza w aplikacji lub dodaje uwagę, a gdy Ty potwierdzisz, PDF zapisuje się w jego dokumentach." },
       { is: "„Stimpla inn starfsmann“ skráir stimplun handvirkt, t.d. ef síminn var rafmagnslaus.", en: "\"Clock in employee\" records a punch manually, e.g. if a phone ran out of battery.", pl: "„Odbij wejście pracownika” rejestruje odbicie ręcznie, np. gdy rozładował się telefon." },
     ],
   },
@@ -87,7 +94,20 @@ const GUIDES: Guide[] = [
       { is: "Á Laun-flipanum stillirðu taxta, starfshlutfall og kjarasamning. Álög og yfirvinna koma úr samningnum, eða þú velur „Eigin reglur“ og smíðar þínar eigin.", en: "On the Pay tab you set the rate, employment ratio and agreement. Premiums and overtime come from the agreement, or you choose \"Custom rules\" and build your own.", pl: "Na karcie Wynagrodzenie ustawiasz stawkę, wymiar etatu i układ zbiorowy. Dodatki i nadgodziny wynikają z układu albo wybierasz „Własne zasady” i tworzysz swoje." },
       { is: "Launaliðir á Laun-flipanum: skattkort (nýting persónuafsláttar, maka og uppsafnaður), lífeyrissjóður, viðbótarlífeyrissparnaður, stéttarfélag og sjóðir, og orlof: greitt út með launum, lagt inn á orlofsreikning eða safnast upp, með prósentu eftir orlofsdögum. Tómir reitir nota sjálfgefin gildi fyrirtækisins úr Stillingar → Reglur og laun.", en: "Pay items on the Pay tab: tax card (personal allowance use, spouse's and accumulated), pension fund, private pension, union and funds, and holiday pay: paid out with wages, paid into a holiday account or accrued, with a percentage from holiday days. Empty fields use the company defaults from Settings → Rules and pay.", pl: "Składniki płacy na karcie Wynagrodzenie: karta podatkowa (wykorzystanie ulgi osobistej, małżonka i skumulowanej), fundusz emerytalny, dodatkowe oszczędności emerytalne, związek zawodowy i fundusze oraz urlop: wypłacany z pensją, wpłacany na konto urlopowe lub narastający, z procentem zależnym od dni urlopu. Puste pola używają domyślnych wartości firmy z Ustawienia → Zasady i płace." },
       { is: "Desember- og orlofsuppbót greiðast sjálfkrafa í réttum mánuði. Hlunnindum, t.d. ökutækjastyrk, bætirðu við neðst.", en: "December and holiday bonuses are paid automatically in the right month. Add benefits, e.g. a vehicle allowance, at the bottom.", pl: "Dodatek grudniowy i urlopowy są wypłacane automatycznie we właściwym miesiącu. Świadczenia, np. dodatek samochodowy, dodajesz na dole." },
+      { is: "Starfslok: „Ljúka ráðningu“ í prófíl starfsmannsins leiðir þig í fjórum skrefum (ástæða, dagsetningar, skjal, áhrif). Eftir síðasta dag sér starfsmaðurinn aðeins skjölin sín og samninga.", en: "Ending employment: \"End employment\" in the employee's profile guides you through four steps (reason, dates, document, effects). After the last day the employee only sees their documents and contracts.", pl: "Zakończenie zatrudnienia: „Zakończ zatrudnienie” w profilu pracownika prowadzi przez cztery kroki (powód, daty, dokument, skutki). Po ostatnim dniu pracownik widzi tylko swoje dokumenty i umowy." },
       { is: "„Vista“ neðst geymir breytingar á öllum flipum í einu.", en: "\"Save\" at the bottom stores changes on every tab at once.", pl: "„Zapisz” na dole zachowuje zmiany na wszystkich kartach naraz." },
+    ],
+  },
+  {
+    id: "rettindi", icon: ic("M8 2v4M16 2v4|M3 9h18|M3 5h18v16H3z|M9 15l2 2 4-4"),
+    title: { is: "Orlof, veikindi & fjarvistir", en: "Holiday, sick leave & absences", pl: "Urlop, choroba i nieobecności" },
+    intro: { is: "VAKTO reiknar orlofsrétt og veikindarétt hvers starfsmanns eftir kjarasamningi og starfsaldri og heldur utan um fjarvistir.", en: "VAKTO calculates each employee's holiday and sick-leave entitlement from the collective agreement and length of service, and keeps track of absences.", pl: "VAKTO oblicza prawo do urlopu i zwolnienia chorobowego każdego pracownika na podstawie układu zbiorowego i stażu pracy oraz prowadzi ewidencję nieobecności." },
+    steps: [
+      { is: "Opnaðu starfsmann → Frí. Þar sést orlofsréttur og hvað er eftir, veikindi og veikindi barna síðustu 12 mánuði á móti rétti, og hvenær rétturinn breytist næst.", en: "Open an employee → Off duty. You see holiday entitlement and what's left, sick days and child-sick days over the last 12 months against the entitlement, and when it changes next.", pl: "Otwórz pracownika → Wolne. Widać prawo do urlopu i ile zostało, dni choroby i opieki nad chorym dzieckiem z ostatnich 12 miesięcy względem uprawnień oraz kiedy uprawnienie zmieni się następnym razem." },
+      { is: "Rétturinn fylgir félaginu sem er valið á Laun-flipanum (SGS-félög eins og Efling, og VR/LÍV). Ráðningardagur þarf að vera réttur. Starfsaldur hjá fyrri vinnuveitanda skráirðu sem fyrri starfsaldur.", en: "The entitlement follows the union chosen on the Pay tab (SGS unions such as Efling, and VR/LÍV). The hire date must be correct. Service with a previous employer is entered as prior service.", pl: "Uprawnienia zależą od związku wybranego na karcie Wynagrodzenie (związki SGS, np. Efling, oraz VR/LÍV). Data zatrudnienia musi być poprawna. Staż u poprzedniego pracodawcy wpisujesz jako wcześniejszy staż." },
+      { is: "„+ Skrá fjarvist“ skráir veikindi, veikindi barns eða frí strax. Þú getur látið vaktir þeirra daga verða lausar vaktir. Stjórnendur fá tilkynningu þegar 80 % veikindaréttar eru nýtt.", en: "\"+ Register absence\" records sickness, a sick child or leave right away. You can turn that day's shifts into open shifts. Managers are notified when 80% of the sick-leave entitlement is used.", pl: "„+ Zarejestruj nieobecność” od razu zapisuje chorobę, chorobę dziecka lub urlop. Zmiany z tych dni możesz zamienić w wolne zmiany. Kierownicy dostają powiadomienie, gdy wykorzystano 80% prawa do zwolnienia chorobowego." },
+      { is: "Ef skráð orlofsprósenta er lægri en rétturinn sýnir kerfið það og þú uppfærir með einum smelli. Prósentan breytist aldrei sjálfkrafa.", en: "If the recorded holiday percentage is lower than the entitlement, the system shows it and you update it with one click. The percentage never changes automatically.", pl: "Jeśli zapisany procent urlopowy jest niższy niż uprawnienie, system to pokazuje, a Ty aktualizujesz go jednym kliknięciem. Procent nigdy nie zmienia się automatycznie." },
+      { is: "Yfirlit yfir allt starfsfólkið er í Innsýn → Tímar & mæting, ásamt veikindahlutfalli.", en: "An overview of all staff is in Insights → Hours & attendance, along with the sickness rate.", pl: "Przegląd wszystkich pracowników jest w Analizy → Godziny i obecność, razem ze wskaźnikiem absencji chorobowej." },
     ],
   },
   {
@@ -142,7 +162,9 @@ const GUIDES: Guide[] = [
     intro: { is: "Samskipti vinnustaðarins á einum stað, í sama appi og vaktirnar. Enginn þarf að gefa upp símanúmerið sitt.", en: "Workplace communication in one place, in the same app as the shifts. Nobody has to share their phone number.", pl: "Komunikacja w miejscu pracy w jednym miejscu, w tej samej aplikacji co zmiany. Nikt nie musi podawać swojego numeru telefonu." },
     steps: [
       { is: "Rás er fyrir allt starfsfólkið og fyrir hverja deild og starfsstöð. Þú getur líka stofnað hóp eða sent einkaskilaboð.", en: "There's a channel for all staff and one for each department and location. You can also create a group or send a direct message.", pl: "Jest kanał dla wszystkich pracowników oraz dla każdego działu i lokalizacji. Możesz też utworzyć grupę lub wysłać wiadomość prywatną." },
-      { is: "Svaraðu skilaboðum í þræði, bregstu við þeim og sendu myndir. Ólesin skilaboð eru merkt.", en: "Reply in threads, react to messages and send pictures. Unread messages are marked.", pl: "Odpowiadaj w wątkach, reaguj na wiadomości i wysyłaj zdjęcia. Nieprzeczytane wiadomości są oznaczone." },
+      { is: "Svaraðu skilaboðum í þræði, bregstu við þeim og sendu myndir og skjöl. „Sent“ birtist undir skilaboðunum þínum og mynd þeirra sem hafa lesið. Lína merkir hvar ólesnu skilaboðin byrja.", en: "Reply in threads, react to messages and send pictures and files. \"Sent\" shows under your message, then the photos of those who have read it. A line marks where unread messages start.", pl: "Odpowiadaj w wątkach, reaguj na wiadomości i wysyłaj zdjęcia i pliki. Pod Twoją wiadomością widać „Wysłano”, a potem zdjęcia osób, które ją przeczytały. Linia oznacza, gdzie zaczynają się nieprzeczytane wiadomości." },
+      { is: "Í appinu: haltu inni á samtali til að lesa það án þess að merkja það lesið. Smelltu á tilkynningu til að opna samtalið beint. Símtalstáknið í einkaspjalli hringir í viðkomandi ef hann sýnir símanúmerið sitt.", en: "In the app: press and hold a conversation to read it without marking it read. Tap a notification to open the conversation directly. The phone icon in a direct chat calls the person if they show their number.", pl: "W aplikacji: przytrzymaj rozmowę, aby ją przeczytać bez oznaczania jako przeczytanej. Stuknij powiadomienie, aby otworzyć rozmowę od razu. Ikona telefonu w czacie prywatnym dzwoni do tej osoby, jeśli pokazuje swój numer." },
+      { is: "Appelsínugulur punktur = á vakt núna, grænn = virk(ur) núna. Efst í Spjalli í appinu eru þeir sem eru á vakt eða nýlega virkir. Hver og einn ræður hvort virkni og símanúmer sjást (Mitt svæði → Prófíll, í appinu Stillingar).", en: "Orange dot = on shift now, green = active now. At the top of Chat in the app are those on shift or recently active. Everyone decides whether their activity and phone number are shown (My area → Profile, in the app Settings).", pl: "Pomarańczowa kropka = teraz na zmianie, zielona = teraz aktywny. Na górze Czatu w aplikacji są osoby na zmianie lub niedawno aktywne. Każdy decyduje, czy jego aktywność i numer telefonu są widoczne (Moja strefa → Profil, w aplikacji Ustawienia)." },
       { is: "Fréttaveitan er fyrir tilkynningar. Festar færslur birtast efst og starfsfólk getur líkað við og skrifað athugasemdir.", en: "The news feed is for announcements. Pinned posts appear at the top and staff can like and comment.", pl: "Aktualności służą do ogłoszeń. Przypięte wpisy są na górze, a pracownicy mogą je polubić i komentować." },
       { is: "Hverjir mega birta í fréttaveitunni stillirðu í Stillingar → Fyrirtæki.", en: "Choose who can post in the feed in Settings → Company.", pl: "Kto może publikować w aktualnościach, ustawiasz w Ustawienia → Firma." },
     ],
@@ -152,9 +174,9 @@ const GUIDES: Guide[] = [
     title: { is: "Stillingar", en: "Settings", pl: "Ustawienia" },
     intro: { is: "Stillingarnar skiptast í sex flipa.", en: "Settings are split into six tabs.", pl: "Ustawienia są podzielone na sześć kart." },
     steps: [
-      { is: "Fyrirtæki: nafn, kennitala og heimilisfang, skjalasafn fyrirtækisins (t.d. starfsmannahandbók) og hverjir mega birta í fréttaveitu.", en: "Company: name, ID number and address, company documents (e.g. the staff handbook) and who can post in the feed.", pl: "Firma: nazwa, numer identyfikacyjny i adres, dokumenty firmy (np. regulamin dla pracowników) oraz kto może publikować w aktualnościach." },
+      { is: "Fyrirtæki: nafn, kennitala og heimilisfang, skjalasafn fyrirtækisins (t.d. starfsmannahandbók), hverjir mega birta í fréttaveitu og „Útlit skjala“ (litur og merki á samningum og launaseðlum).", en: "Company: name, ID number and address, company documents (e.g. the staff handbook), who can post in the feed and \"Document style\" (colour and logo on contracts and payslips).", pl: "Firma: nazwa, numer identyfikacyjny i adres, dokumenty firmy (np. regulamin dla pracowników), kto może publikować w aktualnościach oraz „Wygląd dokumentów” (kolor i logo na umowach i paskach wynagrodzeń)." },
       { is: "Staðir og teymi: starfsstöðvar, starfsheiti og deildir, staðsetning við stimplun, kiosk-stimpilklukka og push-tilkynningar.", en: "Locations and teams: locations, job titles and departments, location check at clock-in, the kiosk time clock and push notifications.", pl: "Lokalizacje i zespoły: lokalizacje, stanowiska i działy, weryfikacja lokalizacji przy odbiciu, rejestrator czasu (kiosk) i powiadomienia push." },
-      { is: "Reglur og laun: laun % markmið, reglusniðmát, hámark í fríi sama dag, launatímabil og sérákvæði í ráðningarsamninga.", en: "Rules and pay: labor % target, rule templates, max on leave the same day, pay periods and special contract terms.", pl: "Zasady i wynagrodzenia: cel kosztów pracy w %, szablony zasad, limit osób na urlopie jednego dnia, okresy rozliczeniowe i postanowienia szczególne w umowach." },
+      { is: "Reglur og laun: laun % markmið, reglusniðmát, hámark í fríi sama dag, launatímabil (mánaðarlega frá völdum degi, hálfsmánaðarlega, á tveggja vikna fresti eða vikulega), hvort yfirvinna miðast við 40 klst. á viku eða meðaltal tímabilsins, og sérákvæði í ráðningarsamninga.", en: "Rules and pay: labor % target, rule templates, max on leave the same day, pay periods and special contract terms.", pl: "Zasady i wynagrodzenia: cel kosztów pracy w %, szablony zasad, limit osób na urlopie jednego dnia, okresy rozliczeniowe i postanowienia szczególne w umowach." },
       { is: "Tengingar: hvaðan veltan kemur, sölukerfi eins og Shopify og WooCommerce, og útflutningur í Payday og DK.", en: "Integrations: where revenue comes from, sales systems like Shopify and WooCommerce, and exports to Payday and DK.", pl: "Integracje: skąd pochodzi obrót, systemy sprzedaży takie jak Shopify i WooCommerce oraz eksport do Payday i DK." },
       { is: "Notendur og Áskrift: bjóða notendum, sjá verð, kort og reikninga.", en: "Users and Subscription: invite users, see price, card and invoices.", pl: "Użytkownicy i Subskrypcja: zapraszanie użytkowników, cena, karta i faktury." },
     ],
@@ -210,6 +232,7 @@ const GUIDES: Guide[] = [
 ];
 
 const FAQ: { q: L; a: L }[] = [
+  { q: { is: "Get ég spurt VAKTO AI hvernig kerfið virkar?", en: "Can I ask VAKTO AI how the system works?", pl: "Czy mogę zapytać VAKTO AI, jak działa system?" }, a: { is: "Já. VAKTO AI kann á kerfið og svarar líka spurningum eins og „hvernig sendi ég vinnuyfirlit?“. Hann er fyrir stjórnendur og vaktstjóra: „VAKTO AI“ neðst í horninu, ⌘J, eða efst í Spjalli í appinu.", en: "Yes. VAKTO AI knows the system and also answers questions like \"how do I send work overviews?\". It's for managers and shift leads: \"VAKTO AI\" in the bottom corner, ⌘J, or at the top of Chat in the app.", pl: "Tak. VAKTO AI zna system i odpowiada też na pytania typu „jak wysłać zestawienia pracy?”. Jest dla kierowników i brygadzistów: „VAKTO AI” w dolnym rogu, ⌘J lub na górze Czatu w aplikacji." } },
   { q: { is: "Hvað er „laun af tekjum“ (laun%)?", en: "What is labor % of revenue?", pl: "Czym jest udział kosztów pracy w obrocie (%)?" }, a: { is: "Launakostnaður (með launatengdum gjöldum) deilt með veltu. Lægra er betra — VAKTO litakóðar það á mælaborðinu.", en: "Labor cost (incl. on-costs) divided by revenue. Lower is better — VAKTO color-codes it on the dashboard.", pl: "Koszty pracy (wraz z narzutami) podzielone przez obrót. Im niżej, tym lepiej — VAKTO oznacza to kolorami na pulpicie." } },
   { q: { is: "Hver sér hvað?", en: "Who sees what?", pl: "Kto co widzi?" }, a: { is: "Stjórnandi sér allt; vaktstjóri sér vaktir/tíma/starfsfólk/skýrslur; starfsmaður og verktaki sjá sitt svæði og spjall. Þú stýrir nánar per starfsmann á Vinna-flipanum.", en: "Owner sees everything; manager sees scheduling/time/staff/reports; employee and contractor see their own area and chat. You fine-tune per employee on the Work tab.", pl: "Administrator widzi wszystko; kierownik zmiany widzi grafik/czas pracy/pracowników/raporty; pracownik i wykonawca widzą swoją strefę i czat. Szczegóły ustawiasz dla każdego pracownika na karcie Praca." } },
   { q: { is: "Virkar AI-vaktaplanið?", en: "Does AI scheduling work?", pl: "Czy grafik AI działa?" }, a: { is: "Já — „Gervigreind (AI) bestun“ býr til tillögu sem þú samþykkir áður en hún birtist.", en: "Yes — \"AI optimize\" proposes a plan you approve before it's published.", pl: "Tak — „Optymalizacja AI” proponuje grafik, który zatwierdzasz przed publikacją." } },
@@ -219,8 +242,23 @@ const FAQ: { q: L; a: L }[] = [
   { q: { is: "Hvernig fær starfsfólkið aðgang?", en: "How do staff get access?", pl: "Jak pracownicy uzyskują dostęp?" }, a: { is: "Starfsmaður sem er skráður með netfangi fær boð í pósti, velur sér lykilorð og fær Mitt svæði og appið. Eftir Excel-innlestur sendirðu boðin með „Senda boð í appið“ í Starfsfólk. Í prófíl hvers og eins sérðu hvort hann er með virkan aðgang.", en: "An employee added with an email gets an invite, picks a password and gets My area and the app. After an Excel import you send the invites with \"Send app invites\" in Staff. Each profile shows whether the person has an active account.", pl: "Pracownik dodany z adresem e-mail dostaje zaproszenie, wybiera hasło i otrzymuje Moją strefę oraz aplikację. Po imporcie z Excela wysyłasz zaproszenia przyciskiem „Wyślij zaproszenia do aplikacji” w Pracownicy. W profilu każdej osoby widać, czy ma aktywne konto." } },
 ];
 
+// Dæmi um spurningar til VAKTO AI efst á síðunni (um notkun kerfisins og reksturinn).
+const AI_EXAMPLES: L[] = [
+  { is: "Hvernig bý ég til lausa vakt?", en: "How do I create an open shift?", pl: "Jak utworzyć wolną zmianę?" },
+  { is: "Hvernig skrái ég veikindi?", en: "How do I register sick leave?", pl: "Jak zarejestrować chorobę?" },
+  { is: "Hvernig sendi ég vinnuyfirlit til staðfestingar?", en: "How do I send work overviews for confirmation?", pl: "Jak wysłać zestawienia pracy do potwierdzenia?" },
+  { is: "Hvernig er laun % af veltu þessa vikuna?", en: "What's labor % of revenue this week?", pl: "Jaki jest udział kosztów pracy w obrocie w tym tygodniu?" },
+];
+
+/** Opnar VAKTO AI-gluggann (assistant-panel.tsx hlustar), valfrjálst með spurningu. */
+const askAi = (q?: string) => window.dispatchEvent(new CustomEvent("vakto-ai:open", { detail: { q } }));
+
 export default function HelpScreen() {
   const { lang } = useLang();
+  // VAKTO AI er aðeins fyrir stjórnendur og vaktstjóra; glugginn merkir <html data-vakto-ai> þegar hann er til.
+  const [hasAi, setHasAi] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setHasAi(document.documentElement.dataset.vaktoAi === "1"), 0); return () => clearTimeout(t); }, []);
+  const [aiQ, setAiQ] = useState("");
   const [active, setActive] = useState(GUIDES[0].id);
   const [q, setQ] = useState("");
   const norm = (sr: string) => sr.toLowerCase();
@@ -248,18 +286,47 @@ export default function HelpScreen() {
         </aside>
 
         <main className="emp-main" style={{ maxWidth: 780 }}>
+          {hasAi && (
+            <div className="card" style={{ marginBottom: 16, borderColor: "var(--brand-soft)" }}>
+              <div className="cb">
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span className="vai-badge"><Spark /></span>
+                  <div>
+                    <b style={{ fontSize: 15 }}>{tx(lang, { is: "Spurðu VAKTO AI", en: "Ask VAKTO AI", pl: "Zapytaj VAKTO AI" })}</b>
+                    <div className="muted" style={{ fontSize: 13 }}>{tx(lang, { is: "Hann kann á kerfið og þekkir tölurnar ykkar. Spurðu hvernig á að gera hlutina eða biddu hann að gera þá.", en: "It knows the system and your numbers. Ask how to do things, or ask it to do them.", pl: "Zna system i Wasze liczby. Zapytaj, jak coś zrobić, albo poproś, żeby to zrobił." })}</div>
+                  </div>
+                </div>
+                <form onSubmit={(e) => { e.preventDefault(); askAi(aiQ); setAiQ(""); }} style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  <input value={aiQ} onChange={(e) => setAiQ(e.target.value)} placeholder={tx(lang, { is: "T.d. hvernig breyti ég launatímabilinu?", en: "E.g. how do I change the pay period?", pl: "Np. jak zmienić okres rozliczeniowy?" })}
+                    style={{ flex: 1, minWidth: 0, border: "1px solid var(--line)", borderRadius: 10, padding: "9px 12px", font: "inherit", fontSize: 13.5, background: "var(--panel)", color: "var(--ink)" }} />
+                  <button className="btn" type="submit">{tx(lang, { is: "Spyrja", en: "Ask", pl: "Zapytaj" })}</button>
+                </form>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+                  {AI_EXAMPLES.map((ex, i) => <button key={i} type="button" className="btn ghost sm" onClick={() => askAi(tx(lang, ex))}>{tx(lang, ex)}</button>)}
+                </div>
+              </div>
+            </div>
+          )}
           <div className="card">
             <div className="cb">
               <h2 style={{ fontSize: 20, fontWeight: 700, letterSpacing: "-.02em" }}>{tx(lang, g.title)}</h2>
               <p className="muted" style={{ fontSize: 14, lineHeight: 1.55, margin: "6px 0 0" }}>{tx(lang, g.intro)}</p>
-              <div className="help-shot">
-                <Image src={g.img} alt={tx(lang, g.title)} width={1280} height={800} style={{ width: "100%", height: "auto" }} />
-              </div>
+              {g.img ? (
+                <div className="help-shot">
+                  <Image src={g.img} alt={tx(lang, g.title)} width={1280} height={800} style={{ width: "100%", height: "auto" }} />
+                </div>
+              ) : null}
               <ol className="help-steps">
                 {g.steps.map((s, i) => (
                   <li key={i}><span className="n">{i + 1}</span><span>{tx(lang, s)}</span></li>
                 ))}
               </ol>
+              {hasAi && (
+                <button type="button" className="btn ghost sm" style={{ marginTop: 14 }} onClick={() => askAi(tx(lang, { is: `Útskýrðu „${g.title.is}“ í VAKTO fyrir mér, skref fyrir skref.`, en: `Explain "${g.title.en}" in VAKTO to me, step by step.`, pl: `Wyjaśnij mi krok po kroku „${g.title.pl ?? g.title.en}” w VAKTO.` }))}>
+                  <span className="vai-badge" style={{ width: 20, height: 20, borderRadius: 6 }}><Spark /></span>
+                  {tx(lang, { is: "Spyrja VAKTO AI um þetta", en: "Ask VAKTO AI about this", pl: "Zapytaj VAKTO AI o to" })}
+                </button>
+              )}
             </div>
           </div>
 
