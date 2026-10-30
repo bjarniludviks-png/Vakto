@@ -2,7 +2,7 @@
   "expo": {
     "name": "VAKTO",
     "slug": "vakto",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "scheme": "vakto",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -17,7 +17,8 @@
         "NSPhotoLibraryUsageDescription": "VAKTO notar myndasafnið til að velja prófílmynd og senda myndir í spjalli.",
         "NSCameraUsageDescription": "VAKTO notar myndavélina til að taka prófílmynd og senda myndir í spjalli.",
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "VAKTO skráir staðsetningu einu sinni þegar þú stimplar þig inn og út, ef vinnustaðurinn hefur kveikt á því. Engin rakning þess á milli."
+        "NSLocationWhenInUseUsageDescription": "VAKTO skráir staðsetningu einu sinni þegar þú stimplar þig inn og út, ef vinnustaðurinn hefur kveikt á því. Engin rakning þess á milli.",
+        "NSMicrophoneUsageDescription": "VAKTO notar hljóðnemann aðeins þegar þú tekur upp talskilaboð í spjalli."
       }
     },
     "android": {
@@ -30,7 +31,6 @@
       },
       "predictiveBackGestureEnabled": false,
       "blockedPermissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.READ_MEDIA_VIDEO"
       ]
     },
@@ -73,6 +73,14 @@
           "isIosBackgroundLocationEnabled": false,
           "isAndroidBackgroundLocationEnabled": false,
           "isAndroidForegroundServiceEnabled": false
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "VAKTO notar hljóðnemann aðeins þegar þú tekur upp talskilaboð í spjalli.",
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
         }
       ]
     ],
