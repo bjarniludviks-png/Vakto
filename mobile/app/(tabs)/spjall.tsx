@@ -10,8 +10,8 @@ import { Header, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, Sheet, Empty, Row, Btn, Seg, useToast } from "../../src/components/ui";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listConversations, listPeople, startDM, createGroup, subscribeChat, teamPicks, defaultGroupName, type Conversation, type Person } from "../../src/lib/api/chat";
-import { getMuted, onMuteChange, getDnd, dndLabel } from "../../src/lib/mute";
+import { listConversations, listPeople, startDM, createGroup, subscribeChat, teamPicks, defaultGroupName, listMessages, type Conversation, type Person, type ChatMessage } from "../../src/lib/api/chat";
+import { getMuted, onMuteChange, getDnd, dndLabel, toggleMute } from "../../src/lib/mute";
 import { isManager } from "../../src/lib/api/ops";
 import { AiAvatar } from "../../src/components/ai-avatar";
 
@@ -62,8 +62,10 @@ export default function Spjall() {
   useEffect(() => {
     if (!peerKey) return;
     let live = true;
-    coworkerStatus(peerKey.split(",")).then((m) => { if (live) setPres(m); }).catch(() => {});
-    return () => { live = false; };
+    const get = () => coworkerStatus(peerKey.split(",")).then((m) => { if (live) setPres(m); }).catch(() => {});
+    void get();
+    const iv = setInterval(get, 60_000); // punktarnir fylgja stöðunni án þess að endurhlaða
+    return () => { live = false; clearInterval(iv); };
   }, [peerKey]);
   const dotOf = (c: Conversation) => { const l = presenceLabel(c.other ? pres[c.other.userId] : null); return l.dot ? (l.tone === "shift" ? "shift" : "online") : null; };
   const [refreshing, setRefreshing] = useState(false);
@@ -118,10 +120,21 @@ export default function Spjall() {
         .sort((a, b) => rank(a.s) - rank(b.s) || a.p.name.localeCompare(b.p.name, "is")).slice(0, 15));
     } catch { /* efsta röðin fellur þá á nýjustu samtölin */ }
   }, [me]);
-  useFocusEffect(useCallback(() => { loadActive(); }, [loadActive]));
+  useFocusEffect(useCallback(() => { loadActive(); const iv = setInterval(loadActive, 60_000); return () => clearInterval(iv); }, [loadActive]));
   // flýtival í hópavali: „+ Allir í <deild>“ / „+ Allir á <stað>“
   const teams = useMemo(() => teamPicks(people), [people]);
   const fallbackName = useMemo(() => defaultGroupName(people.filter((p) => sel.has(p.userId)).map((p) => p.name)), [people, sel]);
+
+  // Forskoðun (haldið inni á samtali, eins og í Messenger): lesa nýjustu skilaboðin án þess að opna
+  // þráðinn — listMessages merkir EKKI lesið, svo sendandinn sér ekki „séð“ og ólesið helst.
+  const [peek, setPeek] = useState<Conversation | null>(null);
+  const [peekMsgs, setPeekMsgs] = useState<ChatMessage[] | null>(null);
+  async function openPeek(c: Conversation) {
+    if (!me) return;
+    setPeek(c); setPeekMsgs(null);
+    try { const r = await listMessages(me, c.id); setPeekMsgs(r.messages.slice(-25)); } catch { setPeekMsgs([]); }
+  }
+  const peekBody = (m: ChatMessage) => m.kind === "image" ? tr("Mynd") : m.kind === "audio" ? tr("Talskilaboð") : m.kind === "file" ? (m.body || tr("Skjal")) : m.body;
 
   async function openNew(mode: "dm" | "group") {
     if (!me) return;
@@ -240,6 +253,7 @@ export default function Spjall() {
             <Pressable
               key={c.id}
               onPress={() => router.push(`/spjall/${c.id}?name=${encodeURIComponent(c.name)}`)}
+              onLongPress={() => openPeek(c)} delayLongPress={350}
               style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingVertical: 8, minHeight: 72, backgroundColor: pressed ? colors.panel2 : colors.panel })}
             >
               <ConvAvatar c={c} size={56} dot={dotOf(c)} />
@@ -316,6 +330,29 @@ export default function Spjall() {
             <Btn title="Stofna hóp" size="lg" loading={busy} disabled={sel.size === 0} onPress={makeGroup} />
           </>
         ) : null}
+      </Sheet>
+
+      <Sheet open={!!peek} onClose={() => setPeek(null)} title={peek?.name}>
+        <Muted size={12} style={{ textAlign: "center", marginBottom: 10 }}>{tr("Ekki merkt sem lesið")}</Muted>
+        <View style={{ gap: 6, paddingBottom: 6 }}>
+          {peekMsgs === null ? <Muted style={{ padding: 14, textAlign: "center" }}>…</Muted> : null}
+          {peekMsgs?.length === 0 ? <Muted style={{ padding: 14, textAlign: "center" }}>{tr("Engin skilaboð enn")}</Muted> : null}
+          {(peekMsgs ?? []).map((m, i, arr) => {
+            const showName = !m.me && peek?.kind !== "dm" && arr[i - 1]?.senderId !== m.senderId;
+            return (
+              <View key={m.id} style={{ alignSelf: m.me ? "flex-end" : "flex-start", maxWidth: "82%" }}>
+                {showName ? <Txt size={11.5} color={colors.ink3} style={{ marginLeft: 4, marginBottom: 2 }}>{m.sender}</Txt> : null}
+                <View style={{ backgroundColor: m.me ? colors.brand : colors.bubbleThem, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 7 }}>
+                  <Txt size={15} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 20 }}>{peekBody(m)}</Txt>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+        <View style={{ flexDirection: "row", gap: 10, marginTop: 14 }}>
+          <Btn title={tr("Opna spjall")} style={{ flex: 1 }} onPress={() => { const c = peek; setPeek(null); if (c) router.push(`/spjall/${c.id}?name=${encodeURIComponent(c.name)}`); }} />
+          <Btn title={peek && muted.has(peek.id) ? tr("Kveikja á tilkynningum") : tr("Þagga")} variant="ghost" style={{ flex: 1 }} onPress={async () => { if (peek) { await toggleMute(peek.id); setPeek(null); } }} />
+        </View>
       </Sheet>
     </View>
   );

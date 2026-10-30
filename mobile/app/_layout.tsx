@@ -22,12 +22,14 @@ function Gate({ children }: { children: React.ReactNode }) {
   // Grunnurinn framfylgir þessu sjálfur (RLS) — hér er bara réttur skjár valinn.
   const [access, setAccess] = useState<"active" | "readonly" | "closed" | null>(null);
   const uid = session?.user.id;
-  // „Virk(ur) núna“ í spjalli (0099): merkja virkni þegar appið er opnað eða kemur aftur í forgrunn.
+  // „Virk(ur) núna“ í spjalli (0099): merkja virkni þegar appið er opnað, kemur í forgrunn og á meðan það er opið.
   useEffect(() => {
     if (!uid) return;
     void touchPresence();
     const sub = AppState.addEventListener("change", (s) => { if (s === "active") void touchPresence(); });
-    return () => sub.remove();
+    // meðan appið er opið: halda „virk(ur) núna“ (gildir 5 mín.) — touchPresence sjálft er mest á 2 mín. fresti
+    const iv = setInterval(() => { if (AppState.currentState === "active") void touchPresence(); }, 60_000);
+    return () => { sub.remove(); clearInterval(iv); };
   }, [uid]);
   useEffect(() => {
     if (!uid) { setAccess(null); return; }
