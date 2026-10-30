@@ -4,10 +4,11 @@ import { presenceLabel, type CoworkerStatus } from "../../src/lib/presence";
 import { coworkerStatus } from "../../src/lib/api/presence";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
+import { setOpenChannel } from "../../src/lib/push";
 import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions, Modal } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronLeft, ChevronRight, Send, X, Download, Hash, CornerUpLeft, Trash2, Flag, Ban, Image as ImageIcon, Camera, CirclePlus, Info, BellOff, Bell, FileText, Images, LogOut, Pencil } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, Send, X, Download, Hash, CornerUpLeft, Trash2, Flag, Ban, Image as ImageIcon, Camera, CirclePlus, Info, BellOff, Bell, FileText, Images, LogOut, Pencil, Phone } from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { Linking, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
@@ -26,7 +27,7 @@ import type { Person } from "../../src/lib/api/chat";
 
 const EMOJI = ["❤️", "👍", "😂", "🙏", "🔥", "👀"];
 
-type RowItem = { key: string; kind: "sep"; label: string } | { key: string; kind: "msg"; m: ChatMessage; first: boolean; last: boolean; showSender: boolean };
+type RowItem = { key: string; kind: "sep"; label: string; unread?: boolean } | { key: string; kind: "msg"; m: ChatMessage; first: boolean; last: boolean; showSender: boolean };
 
 function dayLabel(iso: string): string {
   const d = new Date(iso), now = new Date();
@@ -47,6 +48,11 @@ export default function Thread() {
   const insets = useSafeAreaInsets();
   const [msgs, setMsgs] = useState<ChatMessage[]>([]);
   const [reads, setReads] = useState<ChannelRead[]>([]);
+  // „Ólesin skilaboð“ (eins og Messenger): fyrstu ólesnu skilaboðin þegar þráðurinn var opnaður
+  const [unreadFrom, setUnreadFrom] = useState<string | null>(null);
+  const unreadSet = useRef(false);
+  useEffect(() => { unreadSet.current = false; setUnreadFrom(null); }, [id]);
+  useFocusEffect(useCallback(() => { setOpenChannel(id ?? null); return () => setOpenChannel(null); }, [id]));
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [sel, setSel] = useState<ChatMessage | null>(null);
@@ -58,6 +64,8 @@ export default function Thread() {
   const [head, setHead] = useState<{ photo: string | null; color: string | null }>({ photo: null, color: null });
   // Bein skilaboð: „á vakt“ / virk(ur) viðmælandans (0099); smellur á hausinn opnar prófílinn hans.
   const [peer, setPeer] = useState<CoworkerStatus | null>(null);
+  // símanúmer viðmælanda (coworkers sýnir það aðeins ef hann leyfir, show_phone) → símtalstákn í haus
+  const [peerPhone, setPeerPhone] = useState<string | null>(null);
   const peerLabel = presenceLabel(peer);
   useEffect(() => {
     if (isGroup || !id || !me) return;
@@ -67,6 +75,8 @@ export default function Thread() {
       const { data: au } = await supabase.auth.getUser();
       const other = (mem ?? []).map((m) => m.user_id as string).find((u) => u !== au.user?.id);
       if (!other) return;
+      if (me) supabase.from("coworkers").select("phone").eq("company_id", me.companyId).eq("user_id", other).maybeSingle()
+        .then(({ data }) => { if (live) setPeerPhone((data?.phone as string | null)?.trim() || null); }, () => {});
       const st = await coworkerStatus([other]);
       if (live) setPeer(st[other] ?? null);
     };
@@ -212,6 +222,11 @@ export default function Thread() {
       return [...older, ...fresh];
     });
     setReads(r.reads);
+    if (!unreadSet.current) {
+      unreadSet.current = true;
+      const firstUnread = r.myReadAt ? fresh.find((m) => !m.me && m.createdAt > r.myReadAt!) : null;
+      setUnreadFrom(firstUnread?.id ?? null);
+    }
     markChannelRead(id).catch(() => {});
   }, [me, id]);
 
@@ -314,6 +329,7 @@ export default function Thread() {
     msgs.forEach((m, i) => {
       const day = new Date(m.createdAt).toDateString();
       if (day !== prevDay) { out.push({ key: "sep-" + day, kind: "sep", label: dayLabel(m.createdAt) }); prevDay = day; }
+      if (m.id === unreadFrom) out.push({ key: "unread", kind: "sep", label: tr("Ólesin skilaboð"), unread: true });
       const prev = msgs[i - 1], next = msgs[i + 1];
       const sameDayPrev = prev && new Date(prev.createdAt).toDateString() === day;
       const first = !prev || prev.senderId !== m.senderId || !sameDayPrev || new Date(m.createdAt).getTime() - new Date(prev.createdAt).getTime() > 10 * 60000;
@@ -321,7 +337,7 @@ export default function Thread() {
       out.push({ key: m.id, kind: "msg", m, first, last, showSender: first && !m.me && isGroup });
     });
     return out.reverse(); // öfugur listi: nýjast fyrst
-  }, [msgs, isGroup]);
+  }, [msgs, isGroup, unreadFrom]);
 
   // „séð af“: aðrir sem hafa lesið eftir mín síðustu skilaboð
   const lastMine = [...msgs].reverse().find((m) => m.me);
@@ -338,6 +354,7 @@ export default function Thread() {
           <Muted size={12}>{typing ? trf("{x} skrifar…", typing) : isGroup ? (muted ? trf("{n} meðlimir · þaggað", members || "—") : trf("{n} meðlimir", members || "—")) : peerLabel.text ? tr(peerLabel.text) : muted ? "Einkaspjall · þaggað" : "Einkaspjall"}</Muted>
         </View>
         </Pressable>
+        {!isGroup && peerPhone ? <Pressable onPress={() => Linking.openURL(`tel:${peerPhone.replace(/[^\d+]/g, "")}`)} hitSlop={10} accessibilityLabel={tr("Hringja")} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}><Phone color={colors.brand} size={22} /></Pressable> : null}
         <Pressable onPress={openInfo} hitSlop={10} accessibilityLabel={tr("Upplýsingar")} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}><Info color={colors.brand} size={24} /></Pressable>
       </View>
 
@@ -366,7 +383,13 @@ export default function Thread() {
           </View>
         ) : null}
         renderItem={({ item }) =>
-          item.kind === "sep" ? (
+          item.kind === "sep" && item.unread ? (
+            <View style={{ width: W - 28, flexDirection: "row", alignItems: "center", gap: 10, marginTop: 14, marginBottom: 6 }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.brand, opacity: 0.45 }} />
+              <Txt weight="semibold" size={12} color={colors.brand}>{item.label}</Txt>
+              <View style={{ flex: 1, height: 1, backgroundColor: colors.brand, opacity: 0.45 }} />
+            </View>
+          ) : item.kind === "sep" ? (
             <View style={{ width: W - 28, alignItems: "center" }}>
               <Txt weight="semibold" size={12} color={colors.ink3} style={{ marginTop: 16, marginBottom: 8 }}>{item.label}</Txt>
             </View>

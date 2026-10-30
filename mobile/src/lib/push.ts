@@ -9,8 +9,16 @@ import { supabase } from "./supabase";
 import type { Me } from "./api/me";
 import { getDnd } from "./mute";
 
+// Þráðurinn sem er opinn á skjánum: push fyrir hann birtist ekki sem borði (skilaboðin sjást þegar).
+let openChannel: string | null = null;
+export function setOpenChannel(id: string | null): void { openChannel = id; }
+
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: true }),
+  handleNotification: async (n) => {
+    const tag = (n.request.content.data as { tag?: unknown } | null)?.tag;
+    const here = !!openChannel && tag === `chat-${openChannel}`;
+    return { shouldShowBanner: !here, shouldShowList: !here, shouldPlaySound: !here, shouldSetBadge: true };
+  },
 });
 
 let registered: string | null = null;
@@ -72,7 +80,7 @@ export async function pushEnabled(): Promise<boolean> {
 
 /* Smellt á tilkynningu → réttur skjár. Þjónninn setur data.url (t.d. "/samningur?id=…", sjá
  * appUrl í src/lib/push.ts á vefnum). Aðeins leiðir sem eru til í appinu; annað opnar appið bara. */
-const APP_ROUTES = ["samningur", "skjol", "frettaveita"];
+const APP_ROUTES = ["samningur", "skjol", "frettaveita", "spjall"];
 const handled = new Set<string>();
 
 function routeOf(r: Notifications.NotificationResponse | null | undefined): string | null {

@@ -3,6 +3,7 @@
 import type { RealtimeChannel } from "@supabase/supabase-js";
 import { tr, trf } from "../../../src/lib/i18n";
 import { supabase } from "../supabase";
+import { notifyServer } from "./notify";
 import type { Me } from "./me";
 import { colorFor } from "../avatar";
 
@@ -24,6 +25,7 @@ export type Conversation = {
   color: string | null;
   members: number;
   other: Person | null; // DM
+  faces: Person[]; // hópur án myndar: tveir síðustu sem sendu (aðrir en ég), annars meðlimir — eins og á Facebook
 };
 
 export type ChatMessage = {
@@ -134,6 +136,11 @@ export async function listConversations(me: Me): Promise<Conversation[]> {
   ]);
   const lastBy = new Map<string, { body: string; kind: string; at: string; from: string }>();
   for (const m of msgs ?? []) if (!lastBy.has(m.channel_id)) lastBy.set(m.channel_id, { body: m.body, kind: m.kind, at: m.created_at, from: m.sender_id });
+  const sendersBy = new Map<string, string[]>(); // nýjast fyrst, einstök
+  for (const m of msgs ?? []) {
+    const l = sendersBy.get(m.channel_id) ?? [];
+    if (m.sender_id !== myId && !l.includes(m.sender_id) && l.length < 2) sendersBy.set(m.channel_id, [...l, m.sender_id]);
+  }
   const memBy = new Map<string, string[]>();
   for (const m of members ?? []) memBy.set(m.channel_id, [...(memBy.get(m.channel_id) ?? []), m.user_id]);
   // VAKTO stofnar engar rásir sjálft: eldri „Almennt“ og deildar-/staðarrásir eru venjuleg
@@ -166,6 +173,9 @@ export async function listConversations(me: Me): Promise<Conversation[]> {
       color: c.kind === "dm" ? (other?.color ?? null) : colorFor(c.id),
       members: c.kind === "general" ? people.size : mem.length,
       other,
+      faces: c.kind === "group" && !c.photo_url
+        ? [...new Set([...(sendersBy.get(c.id) ?? []), ...mem.filter((u) => u !== myId)])].slice(0, 2).map((u) => people.get(u)).filter((x): x is Person => !!x)
+        : [],
     };
   });
   // nýjasta virkni efst, ekkert fest (nýr tómur hópur raðast eftir stofndegi)
@@ -179,7 +189,7 @@ export type MessageCursor = { createdAt: string; id: string };
 
 /** Nýjasta síða þráðar — eða, með `before`, síðan á undan bendlinum — í tímaröð
  * (elst fyrst). `hasMore` = eldri skilaboð eru til. */
-export async function listMessages(me: Me, channelId: string, before?: MessageCursor | null): Promise<{ messages: ChatMessage[]; reads: ChannelRead[]; hasMore: boolean }> {
+export async function listMessages(me: Me, channelId: string, before?: MessageCursor | null): Promise<{ messages: ChatMessage[]; reads: ChannelRead[]; hasMore: boolean; myReadAt: string | null }> {
   // nýjast fyrst + limit (ein aukaröð segir hvort eldri séu til), svo snúið við;
   // bendill á (created_at, id) svo jafnir tímastimplar detta aldrei út
   let q = supabase.from("messages").select("id, sender_id, body, kind, attachment_url, created_at, reply_to, message_reactions(user_id, emoji)").eq("channel_id", channelId);
@@ -216,7 +226,9 @@ export async function listMessages(me: Me, channelId: string, before?: MessageCu
     };
   });
   const readsOut: ChannelRead[] = (reads ?? []).filter((r) => r.user_id !== myId).map((r) => ({ userId: r.user_id, name: people.get(r.user_id)?.name ?? "", lastReadAt: r.last_read_at, color: people.get(r.user_id)?.color ?? null, photo: people.get(r.user_id)?.photo ?? null }));
-  return { messages, reads: readsOut, hasMore };
+  // hvenær ég las síðast (fyrir „Ólesin skilaboð“-línuna) — lesið ÁÐUR en þráðurinn er merktur lesinn
+  const myReadAt = (reads ?? []).find((r) => r.user_id === myId)?.last_read_at ?? null;
+  return { messages, reads: readsOut, hasMore, myReadAt };
 }
 
 export async function sendChatMessage(me: Me, channelId: string, body: string, replyTo?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
@@ -225,6 +237,7 @@ export async function sendChatMessage(me: Me, channelId: string, body: string, r
   const { data, error } = await supabase.from("messages").insert({ company_id: me.companyId, channel_id: channelId, sender_id: auth.user.id, body, kind: "text", reply_to: replyTo ?? null }).select("id").single();
   if (error) return { ok: false, error: error.message };
   markChannelRead(channelId).catch(() => {});
+  if (data?.id) notifyServer("chat_message", data.id as string);
   return { ok: true, id: data?.id as string };
 }
 
@@ -279,9 +292,10 @@ export function typingChannel(channelId: string, onTyping: (p: { userId: string;
 export async function sendChatImage(me: Me, channelId: string, url: string): Promise<{ ok: boolean; error?: string }> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
-  const { error } = await supabase.from("messages").insert({ company_id: me.companyId, channel_id: channelId, sender_id: auth.user.id, body: "", kind: "image", attachment_url: url });
+  const { data, error } = await supabase.from("messages").insert({ company_id: me.companyId, channel_id: channelId, sender_id: auth.user.id, body: "", kind: "image", attachment_url: url  }).select("id").single();
   if (error) return { ok: false, error: error.message };
   markChannelRead(channelId).catch(() => {});
+  if (data?.id) notifyServer("chat_message", data.id as string);
   return { ok: true };
 }
 
@@ -304,9 +318,10 @@ export async function uploadChatFile(me: Me, uri: string, name: string, contentT
 export async function sendChatFile(me: Me, channelId: string, url: string, fileName: string): Promise<{ ok: boolean; error?: string }> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
-  const { error } = await supabase.from("messages").insert({ company_id: me.companyId, channel_id: channelId, sender_id: auth.user.id, body: fileName, kind: "file", attachment_url: url });
+  const { data, error } = await supabase.from("messages").insert({ company_id: me.companyId, channel_id: channelId, sender_id: auth.user.id, body: fileName, kind: "file", attachment_url: url  }).select("id").single();
   if (error) return { ok: false, error: error.message };
   markChannelRead(channelId).catch(() => {});
+  if (data?.id) notifyServer("chat_message", data.id as string);
   return { ok: true };
 }
 
