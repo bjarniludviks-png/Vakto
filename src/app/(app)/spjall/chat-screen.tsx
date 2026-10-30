@@ -633,16 +633,19 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     if (rec) { recRef.current?.stop(); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream);
+      // mp4/AAC þar sem vafrinn styður það (Safari, nýlegur Chrome) — iPhone-appið spilar ekki webm
+      const mime = ["audio/mp4", "audio/webm"].find((t) => typeof MediaRecorder.isTypeSupported === "function" && MediaRecorder.isTypeSupported(t));
+      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
       const chunks: BlobPart[] = [];
       mr.ondataavailable = (ev) => chunks.push(ev.data);
       mr.onstop = async () => {
         stream.getTracks().forEach((tr) => tr.stop());
         setRec(false);
-        const blob = new Blob(chunks, { type: "audio/webm" });
+        const type = (mr.mimeType || "audio/webm").split(";")[0];
+        const blob = new Blob(chunks, { type });
         const r = new FileReader();
         r.onload = async () => {
-          const up = await uploadChatMedia(r.result as string, "webm");
+          const up = await uploadChatMedia(r.result as string, type === "audio/mp4" ? "m4a" : "webm");
           if (up.ok && up.url) send("audio", up.url, "Talskilaboð"); else toast(up.error ?? "Tókst ekki");
         };
         r.readAsDataURL(blob);

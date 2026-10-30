@@ -5,6 +5,7 @@ import { coworkerStatus } from "../../src/lib/api/presence";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
 import { setOpenChannel } from "../../src/lib/push";
+import { MicButton, RecorderBar, AudioBubble, canRecordVoice } from "../../src/components/voice";
 import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions, Modal } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -19,7 +20,7 @@ import { Txt, Muted, Avatar, Sheet, Row, useToast, colorFor } from "../../src/co
 import { uploadImage } from "../../src/lib/api/feed";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, subscribeChat, typingChannel, peopleMap, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
+import { listMessages, sendChatMessage, sendChatImage, sendChatFile, sendChatAudio, uploadChatFile, listAttachments, leaveChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, subscribeChat, typingChannel, peopleMap, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
 import { supabase } from "../../src/lib/supabase";
 import { isMuted, toggleMute } from "../../src/lib/mute";
 import { reportContent, blockUser, blockedUsers } from "../../src/lib/api/moderation";
@@ -103,6 +104,18 @@ export default function Thread() {
     const up = await uploadChatFile(me, f.uri, f.name, f.mimeType ?? "application/octet-stream");
     if (!up.ok || !up.url) { setUploading(false); toast(up.error ?? "Skráin hlóðst ekki upp"); return; }
     const res = (f.mimeType ?? "").startsWith("image/") || IMG_RE.test(f.name) ? await sendChatImage(me, id, up.url) : await sendChatFile(me, id, up.url, f.name);
+    setUploading(false);
+    if (!res.ok) toast(res.error ?? "Tókst ekki að senda"); else load();
+  }
+  // talskilaboð: upptaka → .m4a í `chat` bucket → skilaboð af gerðinni audio
+  const [recording, setRecording] = useState(false);
+  async function sendVoice(uri: string) {
+    setRecording(false);
+    if (!me || !id) return;
+    setUploading(true);
+    const up = await uploadChatFile(me, uri, "talskilabod.m4a", "audio/mp4");
+    if (!up.ok || !up.url) { setUploading(false); toast(up.error ?? "Tókst ekki að senda"); return; }
+    const res = await sendChatAudio(me, id, up.url);
     setUploading(false);
     if (!res.ok) toast(res.error ?? "Tókst ekki að senda"); else load();
   }
@@ -413,6 +426,7 @@ export default function Thread() {
         </View>
       ) : null}
       <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2, paddingHorizontal: 8, paddingTop: 6, paddingBottom: kbOpen ? 8 : Math.max(8, insets.bottom), backgroundColor: colors.panel }}>
+        {recording ? <RecorderBar onDone={(uri) => sendVoice(uri)} onCancel={() => setRecording(false)} onError={(m) => toast(m)} /> : <>
         {compact ? (
           <Pressable onPress={() => setToolsOpen(true)} hitSlop={6} accessibilityLabel={tr("Fleiri valkostir")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }}>
             <ChevronRight color={colors.brand} size={24} />
@@ -434,9 +448,14 @@ export default function Thread() {
           style={{ flex: 1, backgroundColor: colors.panel2, borderRadius: 22, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, minHeight: 40, marginHorizontal: 4, marginBottom: 2, fontSize: 16, fontFamily: font.regular, color: colors.ink, maxHeight: 120 }}
           multiline value={text} onChangeText={(v) => { onType(v); if (!v) setToolsOpen(false); }} onFocus={() => setToolsOpen(false)} placeholder="Aa" placeholderTextColor={colors.ink3} blurOnSubmit={false}
         />
-        <Pressable onPress={send} disabled={!text.trim() || sending} accessibilityLabel={tr("Senda")} style={{ width: 40, height: 40, marginBottom: 2, borderRadius: 20, backgroundColor: text.trim() ? colors.brand : colors.line2, alignItems: "center", justifyContent: "center" }}>
-          <Send color={text.trim() ? "#fff" : colors.ink3} size={18} />
-        </Pressable>
+        {!text.trim() && canRecordVoice ? (
+          <MicButton disabled={uploading} onPress={() => { Keyboard.dismiss(); setRecording(true); }} />
+        ) : (
+          <Pressable onPress={send} disabled={!text.trim() || sending} accessibilityLabel={tr("Senda")} style={{ width: 40, height: 40, marginBottom: 2, borderRadius: 20, backgroundColor: text.trim() ? colors.brand : colors.line2, alignItems: "center", justifyContent: "center" }}>
+            <Send color={text.trim() ? "#fff" : colors.ink3} size={18} />
+          </Pressable>
+        )}
+        </>}
       </View>
 
       <Sheet open={!!sel} onClose={() => setSel(null)} scroll={false}>
@@ -565,7 +584,7 @@ function Bubble({ item, onLong, onImage }: { item: Extract<RowItem, { kind: "msg
               <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: m.me ? "rgba(255,255,255,.2)" : colors.panel, alignItems: "center", justifyContent: "center" }}><FileText color={m.me ? "#fff" : colors.ink2} size={18} /></View>
               <View style={{ flexShrink: 1 }}><Txt weight="bold" size={14} color={m.me ? "#fff" : colors.ink} numberOfLines={2}>{m.body || "Skjal"}</Txt><Txt size={11.5} color={m.me ? "rgba(255,255,255,.8)" : colors.ink3}>Ýttu til að opna</Txt></View>
             </Pressable>
-          ) : m.body ? <Txt size={16} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 21 }}>{m.body}</Txt> : null}
+          ) : m.kind === "audio" && m.url ? <AudioBubble url={m.url} me={m.me} /> : m.body ? <Txt size={16} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 21 }}>{m.body}</Txt> : null}
           {m.reactions.length ? (
             <View style={{ position: "absolute", bottom: -12, [m.me ? "left" : "right"]: 8, flexDirection: "row", backgroundColor: colors.panel, borderRadius: 999, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 6, paddingVertical: 1, gap: 3 }}>
               {m.reactions.map((x) => <Txt key={x.emoji} size={12}>{x.emoji}{x.count > 1 ? ` ${x.count}` : ""}</Txt>)}

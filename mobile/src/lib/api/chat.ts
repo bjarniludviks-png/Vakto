@@ -299,6 +299,17 @@ export async function sendChatImage(me: Me, channelId: string, url: string): Pro
   return { ok: true };
 }
 
+/** Senda talskilaboð (þegar hlaðið upp; kind "audio", body „Talskilaboð“ eins og vefurinn). */
+export async function sendChatAudio(me: Me, channelId: string, url: string): Promise<{ ok: boolean; error?: string }> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
+  const { data, error } = await supabase.from("messages").insert({ company_id: me.companyId, channel_id: channelId, sender_id: auth.user.id, body: "Talskilaboð", kind: "audio", attachment_url: url }).select("id").single();
+  if (error) return { ok: false, error: error.message };
+  markChannelRead(channelId).catch(() => {});
+  if (data?.id) notifyServer("chat_message", data.id as string);
+  return { ok: true };
+}
+
 /** Hlaða skrá (mynd/skjal) í `chat` bucket og skila opinberri slóð. */
 export async function uploadChatFile(me: Me, uri: string, name: string, contentType: string): Promise<{ ok: boolean; url?: string; error?: string }> {
   try {
