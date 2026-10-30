@@ -5,16 +5,15 @@ import { coworkerStatus } from "../../src/lib/api/presence";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
 import { setOpenChannel } from "../../src/lib/push";
-import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions, Modal } from "react-native";
+import { ImageViewer } from "../../src/components/image-viewer";
+import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronLeft, ChevronRight, Send, X, Download, Hash, CornerUpLeft, Trash2, Flag, Ban, Image as ImageIcon, Camera, CirclePlus, Info, BellOff, Bell, FileText, Images, LogOut, Pencil, Phone } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, Send, X, Hash, CornerUpLeft, Trash2, Flag, Ban, Image as ImageIcon, Camera, CirclePlus, Info, BellOff, Bell, FileText, Images, LogOut, Pencil, Phone } from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { Linking, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
-import { File, Paths } from "expo-file-system";
-import * as Sharing from "expo-sharing";
 import { Txt, Muted, Avatar, Sheet, Row, useToast, colorFor } from "../../src/components/ui";
 import { uploadImage } from "../../src/lib/api/feed";
 import { colors, font, useTheme } from "../../src/theme";
@@ -129,23 +128,7 @@ export default function Thread() {
   }
   const list = useRef<FlatList>(null);
   const [viewer, setViewer] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   /** Sækir myndina í skyndiminni og opnar deilingarblaðið („Vista mynd“ setur hana í Myndir). */
-  async function saveImage(url: string) {
-    if (saving) return;
-    setSaving(true);
-    try {
-      const name = url.split("?")[0].split("/").pop() || `vakto-${Date.now()}.jpg`;
-      const dest = new File(Paths.cache, name);
-      if (dest.exists) dest.delete();
-      const file = await File.downloadFileAsync(url, dest);
-      await Sharing.shareAsync(file.uri, { UTI: "public.image", mimeType: file.type || "image/jpeg" });
-    } catch {
-      toast(tr("Tókst ekki að vista mynd"));
-    } finally {
-      setSaving(false);
-    }
-  }
   // tímastimplar eru faldir hægra megin við skjáinn; strok til vinstri dregur þá inn (eins og í Messenger)
   const { width: W } = useWindowDimensions();
   const pull = useRef(new Animated.Value(0)).current;
@@ -529,19 +512,7 @@ export default function Thread() {
         )}
       </Sheet>
       {/* mynd í fullri stærð — opnast í appinu, ekki í vafra */}
-      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)} statusBarTranslucent>
-        <Pressable onPress={() => setViewer(null)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,.94)", justifyContent: "center" }}>
-          {viewer ? <Image source={{ uri: viewer }} style={{ width: "100%", height: "82%" }} contentFit="contain" /> : null}
-          <Pressable onPress={() => setViewer(null)} hitSlop={12} accessibilityLabel={tr("Loka")} style={{ position: "absolute", top: insets.top + 10, right: 16, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,.16)", alignItems: "center", justifyContent: "center" }}>
-            <X color="#fff" size={20} />
-          </Pressable>
-          {viewer ? (
-            <Pressable onPress={() => saveImage(viewer)} disabled={saving} hitSlop={12} accessibilityLabel={tr("Vista mynd")} style={{ position: "absolute", top: insets.top + 10, right: 64, width: 38, height: 38, borderRadius: 19, backgroundColor: "rgba(255,255,255,.16)", alignItems: "center", justifyContent: "center", opacity: saving ? 0.5 : 1 }}>
-              <Download color="#fff" size={19} />
-            </Pressable>
-          ) : null}
-        </Pressable>
-      </Modal>
+      <ImageViewer url={viewer} onClose={() => setViewer(null)} />
     </KeyboardAvoidingView>
   );
 }
