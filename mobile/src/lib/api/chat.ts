@@ -47,6 +47,13 @@ export type ChatMessage = {
 export type ChannelRead = { userId: string; name: string; lastReadAt: string; color: string | null; photo: string | null };
 
 let peopleCache: { companyId: string; at: number; map: Map<string, Person> } | null = null;
+/** Innskráður notandi úr lotunni í minni — ekkert netkall (getUser fer á þjóninn í hvert sinn og hægði á
+ * sendingu og „séð“). RLS sannreynir notandann hvort sem er. */
+export async function authUser(): Promise<{ data: { user: { id: string } | null } }> {
+  const { data } = await supabase.auth.getSession();
+  return { data: { user: data.session?.user ?? null } };
+}
+
 export async function peopleMap(companyId: string, force = false): Promise<Map<string, Person>> {
   if (!force && peopleCache && peopleCache.companyId === companyId && Date.now() - peopleCache.at < 60000) return peopleCache.map;
   const { data } = await supabase
@@ -68,7 +75,7 @@ export async function peopleMap(companyId: string, force = false): Promise<Map<s
   return m;
 }
 export async function listPeople(me: Me): Promise<Person[]> {
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await authUser();
   const m = await peopleMap(me.companyId, true);
   return [...m.values()].filter((p) => p.userId !== auth.user?.id).sort((a, b) => a.name.localeCompare(b.name));
 }
@@ -85,7 +92,7 @@ export async function getUnreadTotal(): Promise<number> {
   return Object.values(c).reduce((a, b) => a + b, 0);
 }
 export async function markChannelRead(channelId: string): Promise<void> {
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await authUser();
   if (!auth.user) return;
   await supabase.from("channel_reads").upsert({ channel_id: channelId, user_id: auth.user.id, last_read_at: new Date().toISOString() }, { onConflict: "channel_id,user_id" });
 }
@@ -121,7 +128,7 @@ export async function listConversations(me: Me): Promise<Conversation[]> {
   const chQ = (cols: string) => supabase.from("channels").select(cols).eq("company_id", me.companyId);
   const [chRes, { data: auth }, people, unread] = await Promise.all([
     chQ("id, name, kind, created_at, photo_url, auto_key"),
-    supabase.auth.getUser(),
+    authUser(),
     peopleMap(me.companyId),
     unreadCounts(),
   ]);
@@ -197,7 +204,7 @@ export async function listMessages(me: Me, channelId: string, before?: MessageCu
   const [{ data: rows }, people, { data: auth }, { data: reads }] = await Promise.all([
     q.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(CHAT_PAGE + 1),
     peopleMap(me.companyId),
-    supabase.auth.getUser(),
+    authUser(),
     before ? Promise.resolve({ data: [] as { user_id: string; last_read_at: string }[] }) : supabase.from("channel_reads").select("user_id, last_read_at").eq("channel_id", channelId),
   ]);
   const hasMore = (rows ?? []).length > CHAT_PAGE;
@@ -232,7 +239,7 @@ export async function listMessages(me: Me, channelId: string, before?: MessageCu
 }
 
 export async function sendChatMessage(me: Me, channelId: string, body: string, replyTo?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await authUser();
   if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
   const { data, error } = await supabase.from("messages").insert({ company_id: me.companyId, channel_id: channelId, sender_id: auth.user.id, body, kind: "text", reply_to: replyTo ?? null }).select("id").single();
   if (error) return { ok: false, error: error.message };
@@ -242,7 +249,7 @@ export async function sendChatMessage(me: Me, channelId: string, body: string, r
 }
 
 export async function setReaction(me: Me, messageId: string, emoji: string | null): Promise<void> {
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await authUser();
   if (!auth.user) return;
   if (!emoji) await supabase.from("message_reactions").delete().eq("message_id", messageId).eq("user_id", auth.user.id);
   else await supabase.from("message_reactions").upsert({ message_id: messageId, user_id: auth.user.id, company_id: me.companyId, emoji }, { onConflict: "message_id,user_id" });
@@ -254,7 +261,7 @@ export async function deleteMessage(messageId: string): Promise<void> {
 
 /** Finna eða stofna einkaspjall við annan notanda. */
 export async function startDM(me: Me, otherUserId: string): Promise<{ ok: boolean; id?: string; error?: string }> {
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await authUser();
   if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
   const myId = auth.user.id;
   const { data: dms } = await supabase.from("channels").select("id").eq("company_id", me.companyId).eq("kind", "dm");
@@ -272,11 +279,12 @@ export async function startDM(me: Me, otherUserId: string): Promise<{ ok: boolea
 }
 
 /** Realtime: ný skilaboð + lestrarstöður (RLS sér um afmörkun). */
-export function subscribeChat(onMessage: (row: { id: string; channel_id: string; sender_id: string; body: string; kind: string; created_at: string; attachment_url: string | null; reply_to: string | null }) => void, onReads?: () => void): RealtimeChannel {
+export type ReadRow = { channel_id: string; user_id: string; last_read_at: string };
+export function subscribeChat(onMessage: (row: { id: string; channel_id: string; sender_id: string; body: string; kind: string; created_at: string; attachment_url: string | null; reply_to: string | null }) => void, onReads?: (row: ReadRow | null) => void): RealtimeChannel {
   return supabase
     .channel("chat-live-" + Math.random().toString(36).slice(2, 8))
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (p) => onMessage(p.new as Parameters<typeof onMessage>[0]))
-    .on("postgres_changes", { event: "*", schema: "public", table: "channel_reads" }, () => onReads?.())
+    .on("postgres_changes", { event: "*", schema: "public", table: "channel_reads" }, (p) => onReads?.((p.new ?? null) as ReadRow | null))
     .subscribe();
 }
 
@@ -290,7 +298,7 @@ export function typingChannel(channelId: string, onTyping: (p: { userId: string;
 
 /** Senda mynd (þegar hlaðið upp í `chat` bucket). */
 export async function sendChatImage(me: Me, channelId: string, url: string): Promise<{ ok: boolean; error?: string }> {
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await authUser();
   if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
   const { data, error } = await supabase.from("messages").insert({ company_id: me.companyId, channel_id: channelId, sender_id: auth.user.id, body: "", kind: "image", attachment_url: url  }).select("id").single();
   if (error) return { ok: false, error: error.message };
@@ -316,7 +324,7 @@ export async function uploadChatFile(me: Me, uri: string, name: string, contentT
 
 /** Senda skjal (kind "file", body = skráarnafn). */
 export async function sendChatFile(me: Me, channelId: string, url: string, fileName: string): Promise<{ ok: boolean; error?: string }> {
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await authUser();
   if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
   const { data, error } = await supabase.from("messages").insert({ company_id: me.companyId, channel_id: channelId, sender_id: auth.user.id, body: fileName, kind: "file", attachment_url: url  }).select("id").single();
   if (error) return { ok: false, error: error.message };
@@ -337,7 +345,7 @@ export async function listAttachments(me: Me, channelId: string): Promise<Attach
 
 /** Yfirgefa hóp/einkaspjall (ekki eldra „Almennt“ — þar er aðild óbein). */
 export async function leaveChannel(channelId: string): Promise<{ ok: boolean; error?: string }> {
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await authUser();
   if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
   const { error } = await supabase.from("channel_members").delete().eq("channel_id", channelId).eq("user_id", auth.user.id);
   return error ? { ok: false, error: error.message } : { ok: true };
@@ -354,7 +362,7 @@ export async function renameChannel(channelId: string, name: string): Promise<{ 
 
 /** Stofna hópspjall með nafni og meðlimum. */
 export async function createGroup(me: Me, name: string, memberUserIds: string[]): Promise<{ ok: boolean; id?: string; error?: string }> {
-  const { data: auth } = await supabase.auth.getUser();
+  const { data: auth } = await authUser();
   if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
   const { data: ch, error } = await supabase.from("channels").insert({ company_id: me.companyId, name: name.trim(), kind: "group", created_by: auth.user.id }).select("id").single();
   if (error || !ch) return { ok: false, error: error?.message ?? "Villa" };

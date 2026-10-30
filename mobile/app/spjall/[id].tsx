@@ -19,7 +19,7 @@ import { Txt, Muted, Avatar, Sheet, Row, useToast, colorFor } from "../../src/co
 import { uploadImage } from "../../src/lib/api/feed";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, subscribeChat, typingChannel, peopleMap, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
+import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, subscribeChat, typingChannel, peopleMap, authUser, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
 import { supabase } from "../../src/lib/supabase";
 import { isMuted, toggleMute } from "../../src/lib/mute";
 import { reportContent, blockUser, blockedUsers } from "../../src/lib/api/moderation";
@@ -72,7 +72,7 @@ export default function Thread() {
     let live = true;
     const load = async () => {
       const { data: mem } = await supabase.from("channel_members").select("user_id").eq("channel_id", id);
-      const { data: au } = await supabase.auth.getUser();
+      const { data: au } = await authUser();
       const other = (mem ?? []).map((m) => m.user_id as string).find((u) => u !== au.user?.id);
       if (!other) return;
       if (me) supabase.from("coworkers").select("phone").eq("company_id", me.companyId).eq("user_id", other).maybeSingle()
@@ -262,7 +262,7 @@ export default function Thread() {
       if (data?.kind === "group" && data.name) setName(data.name as string);
       if (data?.kind === "group") setHead({ photo: (data.photo_url as string | null) ?? null, color: colorFor(id) });
       if (data?.kind === "dm" && me) {
-        const [{ data: mem }, { data: au }, people] = await Promise.all([supabase.from("channel_members").select("user_id").eq("channel_id", id), supabase.auth.getUser(), peopleMap(me.companyId)]);
+        const [{ data: mem }, { data: au }, people] = await Promise.all([supabase.from("channel_members").select("user_id").eq("channel_id", id), authUser(), peopleMap(me.companyId)]);
         const other = (mem ?? []).map((m) => m.user_id as string).find((u) => u !== au.user?.id);
         const p = other ? people.get(other) : undefined;
         if (p) { setHead({ photo: p.photo, color: p.color }); if (!nameParam) setName(p.name); }
@@ -279,7 +279,7 @@ export default function Thread() {
     const ch = subscribeChat(async (row) => {
       if (row.channel_id !== id) return;
       const people = await peopleMap(me.companyId);
-      const { data: auth } = await supabase.auth.getUser();
+      const { data: auth } = await authUser();
       const p = people.get(row.sender_id);
       const full = p?.name ?? "Notandi";
       setMsgs((cur) => cur.some((m) => m.id === row.id) ? cur : [...cur, {
@@ -288,9 +288,18 @@ export default function Thread() {
         kind: (row.kind ?? "text") as ChatMessage["kind"], url: row.attachment_url, reactions: [], replyTo: null,
       }]);
       setTyping(null);
+      // þráðurinn er opinn: merkja lesið STRAX svo sendandinn sjái „séð“ án tafar
+      if (row.sender_id !== auth.user?.id) markChannelRead(id).catch(() => {});
       if (t) clearTimeout(t);
-      t = setTimeout(load, 500);
-    }, () => { if (t) clearTimeout(t); t = setTimeout(load, 400); });
+      t = setTimeout(load, 1500);
+    }, async (r) => {
+      // einhver las: uppfæra „séð“ beint úr atburðinum — engin endurhleðsla á öllum þræðinum
+      if (!r || r.channel_id !== id) return;
+      const { data: auth } = await authUser();
+      if (r.user_id === auth.user?.id) return;
+      const p = (await peopleMap(me.companyId)).get(r.user_id);
+      setReads((cur) => [...cur.filter((x) => x.userId !== r.user_id), { userId: r.user_id, name: p?.name ?? "", lastReadAt: r.last_read_at, color: p?.color ?? null, photo: p?.photo ?? null }]);
+    });
     typingRef.current = typingChannel(id, (p) => { if (p.stop) setTyping(null); else { setTyping(p.name); setTimeout(() => setTyping((cur) => (cur === p.name ? null : cur)), 4000); } });
     const poll = setInterval(load, 15000);
     return () => { ch.unsubscribe(); typingRef.current?.unsubscribe(); clearInterval(poll); if (t) clearTimeout(t); };
@@ -342,6 +351,7 @@ export default function Thread() {
   // „séð af“: aðrir sem hafa lesið eftir mín síðustu skilaboð
   const lastMine = [...msgs].reverse().find((m) => m.me);
   const seenBy = lastMine ? reads.filter((r) => r.lastReadAt >= lastMine.createdAt) : [];
+  const lastIsMine = !!lastMine && msgs[msgs.length - 1]?.id === lastMine.id;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.panel }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
@@ -373,6 +383,8 @@ export default function Thread() {
           <View style={{ gap: 6, width: W - 28 }}>
             {typing ? <View style={{ alignSelf: "flex-start", marginLeft: 34, backgroundColor: colors.bubbleThem, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 }}><Muted size={13}>•••</Muted></View> : null}
             {seenBy.length ? <View style={{ flexDirection: "row", alignSelf: "flex-end", gap: 2, marginTop: 4 }}>{seenBy.slice(0, 5).map((r) => <Avatar key={r.userId} name={r.name} size={16} color={r.color} photo={r.photo} />)}</View> : null}
+            {/* eins og Messenger: „Sendi…“ → „Sent“ undir síðustu skilaboðunum mínum þar til einhver hefur séð þau */}
+            {lastIsMine && !seenBy.length ? <Txt size={11.5} color={colors.ink3} style={{ alignSelf: "flex-end", marginTop: 2, marginRight: 2 }}>{lastMine?.id.startsWith("tmp-") ? tr("Sendi…") : tr("Sent")}</Txt> : null}
           </View>
         }
         ListFooterComponent={more && msgs.length ? (
