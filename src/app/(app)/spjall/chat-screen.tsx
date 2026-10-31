@@ -86,6 +86,38 @@ function ImageViewer({ url, onClose }: { url: string; onClose: () => void }) {
   );
 }
 
+/** „Viðbrögð“: allir sem brugðust við skilaboðum, eftir emoji (eins og í Messenger). Ýtt á eigin línu fjarlægir. */
+function ReactionsModal({ m, onClose, onRemove }: { m: ChatMessage; onClose: () => void; onRemove: () => void }) {
+  const { t } = useLang();
+  const [tab, setTab] = useState<string | null>(null);
+  useEffect(() => { if (!m.reactions.length) onClose(); }, [m.reactions.length, onClose]);
+  const rows = m.reactions.filter((r) => !tab || r.emoji === tab).flatMap((r) => r.who.map((p) => ({ p, emoji: r.emoji })));
+  rows.sort((a, b) => Number(b.p.me) - Number(a.p.me) || a.p.name.localeCompare(b.p.name, "is"));
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal rwho" role="dialog" aria-label={t("Viðbrögð")}>
+        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Viðbrögð")}</div><button className="x" onClick={onClose}>✕</button></div>
+        {m.reactions.length > 1 && (
+          <div className="rwho-tabs">
+            <button className={!tab ? "on" : ""} onClick={() => setTab(null)}>{t("Öll")} <b>{m.reactions.reduce((a, r) => a + r.count, 0)}</b></button>
+            {m.reactions.map((r) => <button key={r.emoji} className={tab === r.emoji ? "on" : ""} onClick={() => setTab(r.emoji)}>{r.emoji} <b>{r.count}</b></button>)}
+          </div>
+        )}
+        <div className="rwho-list">
+          {rows.map(({ p, emoji }) => (
+            <button key={`${p.userId}-${emoji}`} disabled={!p.me} onClick={() => { onRemove(); onClose(); }}>
+              <PersonAvatar p={p} size={40} />
+              <span className="rwho-n"><b>{p.me ? `${p.name} (${t("Þú")})` : p.name}</b>{p.me && <small>{t("Ýttu til að fjarlægja")}</small>}</span>
+              <span className="rwho-e">{emoji}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PersonAvatar({ p, size }: { p: Person; size: number }) {
   if (p.photo) {
     // eslint-disable-next-line @next/next/no-img-element
@@ -200,6 +232,8 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const [memberCount, setMemberCount] = useState<number | null>(null);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [sheetFor, setSheetFor] = useState<ChatMessage | null>(null);
+  // „Viðbrögð“: hverjir settu hvaða emoji (ýtt á emoji-merkið undir skilaboðum)
+  const [whoFor, setWhoFor] = useState<ChatMessage | null>(null);
   const pressRef = useRef<{ t: ReturnType<typeof setTimeout> | null; x: number; y: number; fired?: boolean }>({ t: null, x: 0, y: 0 });
   const [viewer, setViewer] = useState<string | null>(null);
   const camRef = useRef<HTMLInputElement | null>(null);
@@ -639,10 +673,11 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     const r = await setMessageReaction(m.id, next);
     if (!r.ok) toast(r.error ?? "Tókst ekki");
     else patchMsg(m.id, (x) => {
-      let rs = x.reactions.map((y) => (y.mine ? { ...y, count: y.count - 1, mine: false } : y)).filter((y) => y.count > 0);
+      const meP = { userId: initial.meId, name: meName, av: meName.slice(0, 1).toUpperCase(), color: "#5b50e6", photo: null, me: true };
+      let rs = x.reactions.map((y) => (y.mine ? { ...y, count: y.count - 1, mine: false, who: y.who.filter((w) => !w.me) } : y)).filter((y) => y.count > 0);
       if (next) rs = rs.some((y) => y.emoji === next)
-        ? rs.map((y) => (y.emoji === next ? { ...y, count: y.count + 1, mine: true } : y))
-        : [...rs, { emoji: next, count: 1, mine: true }];
+        ? rs.map((y) => (y.emoji === next ? { ...y, count: y.count + 1, mine: true, who: [...y.who, meP] } : y))
+        : [...rs, { emoji: next, count: 1, mine: true, who: [meP] }];
       return { ...x, reactions: rs.sort((a, b) => b.count - a.count) };
     });
     loadMsgs(active?.id);
@@ -933,7 +968,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                         </span>
                       )}
                       {m.reactions.length > 0 && (
-                        <span className="mreacts" onClick={() => react(m, m.reactions[0].emoji)}>
+                        <span className="mreacts" role="button" title={t("Viðbrögð")} onClick={() => setWhoFor(m)}>
                           {m.reactions.map((r) => <span key={r.emoji}>{r.emoji}{r.count > 1 ? <b>{r.count}</b> : null}</span>)}
                         </span>
                       )}
@@ -1078,6 +1113,12 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
             </aside>
           </>
         )}
+
+        {whoFor && (() => {
+          // nýjasta útgáfa skilaboðanna (viðbrögð geta breyst meðan glugginn er opinn)
+          const m = msgs.find((x) => x.id === whoFor.id) ?? whoFor;
+          return <ReactionsModal m={m} onClose={() => setWhoFor(null)} onRemove={() => { const mine = m.reactions.find((r) => r.mine); if (mine) void react(m, mine.emoji); }} />;
+        })()}
 
         {/* sími: aðgerðablað eftir langt ýti á skilaboð */}
         {sheetFor && (

@@ -2108,3 +2108,19 @@ html.dark .mroster .sh{background:#23264a;color:#c7ccff}
 .iss-who a{color:inherit;text-decoration:none}
 .iss-who .muted{font-size:12.5px}
 .iss-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* Spjall: „Viðbrögð“ — hverjir settu emoji (eins og Messenger) */
+.modal.rwho{max-width:420px}
+.rwho-tabs{display:flex;gap:6px;padding:12px 18px 0;overflow-x:auto}
+.rwho-tabs button{border:0;background:none;font:inherit;font-size:14px;padding:6px 12px;border-radius:999px;color:var(--ink2);cursor:pointer;white-space:nowrap}
+.rwho-tabs button b{font-weight:650}
+.rwho-tabs button.on{background:var(--line2);color:var(--ink)}
+.rwho-list{padding:8px 10px 14px}
+.rwho-list button{display:flex;align-items:center;gap:12px;width:100%;padding:8px;border:0;background:none;font:inherit;text-align:left;border-radius:12px;color:var(--ink)}
+.rwho-list button:not(:disabled){cursor:pointer}
+.rwho-list button:not(:disabled):hover{background:var(--line2)}
+.rwho-list button:disabled{opacity:1}
+.rwho-n{flex:1;min-width:0;display:flex;flex-direction:column}
+.rwho-n b{font-weight:600;font-size:15px}
+.rwho-n small{font-size:12.5px;color:var(--ink3)}
+.rwho-e{font-size:24px;line-height:1}

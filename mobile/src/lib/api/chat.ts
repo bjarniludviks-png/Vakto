@@ -43,9 +43,12 @@ export type ChatMessage = {
   url: string | null;
   /** Sendandi breytti textanum (0100). */
   edited?: boolean;
-  reactions: { emoji: string; count: number; mine: boolean }[];
+  reactions: Reaction[];
   replyTo: { sender: string; body: string } | null;
 };
+/** Eitt emoji á skilaboðum og hverjir settu það („Viðbrögð“, eins og í Messenger). */
+export type ReactionWho = { userId: string; name: string; color: string | null; photo: string | null; me: boolean };
+export type Reaction = { emoji: string; count: number; mine: boolean; who: ReactionWho[] };
 export type ChannelRead = { userId: string; name: string; lastReadAt: string; color: string | null; photo: string | null };
 
 let peopleCache: { companyId: string; at: number; map: Map<string, Person> } | null = null;
@@ -230,14 +233,20 @@ export async function listMessages(me: Me, channelId: string, before?: MessageCu
     const p = people.get(m.sender_id);
     const full = p?.name ?? "Notandi";
     const rx = (m.message_reactions ?? []) as { user_id: string; emoji: string }[];
-    const counts = new Map<string, { count: number; mine: boolean }>();
-    for (const r of rx) { const c = counts.get(r.emoji) ?? { count: 0, mine: false }; c.count++; if (r.user_id === myId) c.mine = true; counts.set(r.emoji, c); }
+    const counts = new Map<string, Reaction>();
+    for (const r of rx) {
+      const c = counts.get(r.emoji) ?? { emoji: r.emoji, count: 0, mine: false, who: [] };
+      const pp = people.get(r.user_id);
+      c.count++; if (r.user_id === myId) c.mine = true;
+      c.who.push({ userId: r.user_id, name: pp?.name ?? "Notandi", color: pp?.color ?? null, photo: pp?.photo ?? null, me: r.user_id === myId });
+      counts.set(r.emoji, c);
+    }
     const rt = m.reply_to ? byId.get(m.reply_to) : null;
     return {
       id: m.id, senderId: m.sender_id, sender: full.split(/\s+/)[0], senderFull: full, color: p?.color ?? null, photo: p?.photo ?? null,
       me: m.sender_id === myId, body: m.body ?? "", at: new Date(m.created_at).toTimeString().slice(0, 5), createdAt: m.created_at,
       kind: (m.kind ?? "text") as ChatMessage["kind"], url: m.attachment_url, edited: !!m.edited_at,
-      reactions: [...counts.entries()].map(([emoji, c]) => ({ emoji, ...c })),
+      reactions: [...counts.values()],
       replyTo: rt ? { sender: (people.get(rt.sender_id)?.name ?? "Notandi").split(/\s+/)[0], body: rt.body ?? "" } : null,
     };
   });

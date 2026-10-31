@@ -27,7 +27,7 @@ export type ChannelRead = { userId: string; name: string; lastReadAt: string };
 export type UnreadCounts = { counts: Record<string, number>; total: number };
 export type ChatMessage = {
   id: string; sender: string; senderId: string; me: boolean; body: string; at: string; kind: string; url: string | null;
-  reactions: { emoji: string; count: number; mine: boolean }[];
+  reactions: Reaction[];
   createdAt: string;
   replyTo: { sender: string; body: string } | null;
   photo: string | null;
@@ -37,6 +37,8 @@ export type ChatMessage = {
   edited?: boolean;
 };
 export type Person = { userId: string; name: string; av: string; color: string; photo: string | null };
+/** Eitt emoji á skilaboðum og hverjir settu það (eins og „Reactions“ í Messenger). */
+export type Reaction = { emoji: string; count: number; mine: boolean; who: (Person & { me: boolean })[] };
 /** Flýtival í hópavali: „Allir í <deild>“ / „Allir á <stað>“ — fólk með aðgang (ekki ég). */
 export type TeamPick = { key: string; kind: "dept" | "loc"; name: string; people: Person[] };
 export type Members = { members: Person[]; adminId: string | null; meId: string };
@@ -422,19 +424,13 @@ export async function listMessages(channelId: string, before?: MessageCursor | n
     const data = rows.slice(0, CHAT_PAGE).reverse();
 
     // reactions (table arrives with 0042 — tolerate its absence)
-    const reactByMsg = new Map<string, { emoji: string; count: number; mine: boolean }[]>();
+    let reacts: { message_id: string; user_id: string; emoji: string }[] = [];
     try {
       const ids = data.map((m) => m.id as string);
-      const { data: reacts } = await supabase.from("message_reactions")
+      const { data: rx } = await supabase.from("message_reactions")
         .select("message_id, user_id, emoji")
         .in("message_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
-      for (const r of reacts ?? []) {
-        const list = reactByMsg.get(r.message_id as string) ?? [];
-        const hit = list.find((x) => x.emoji === r.emoji);
-        if (hit) { hit.count++; hit.mine = hit.mine || r.user_id === ctx.userId; }
-        else list.push({ emoji: r.emoji as string, count: 1, mine: r.user_id === ctx.userId });
-        reactByMsg.set(r.message_id as string, list);
-      }
+      reacts = (rx ?? []) as typeof reacts;
     } catch { /* pre-0042 */ }
 
     // employees carry both the real name (users.full_name may hold an email for
@@ -442,6 +438,17 @@ export async function listMessages(channelId: string, before?: MessageCursor | n
     const usersName = (m: (typeof data)[number]) =>
       ((Array.isArray(m.users) ? m.users[0] : m.users) as { full_name?: string } | null)?.full_name;
     const emps = await empNameMap(supabase, ctx.company);
+    const reactByMsg = new Map<string, Reaction[]>();
+    for (const r of reacts) {
+      const list = reactByMsg.get(r.message_id) ?? [];
+      const e = emps.get(r.user_id);
+      const name = e?.name ?? "Notandi";
+      const person = { userId: r.user_id, name, av: initials(name), color: e?.color ?? colorFor(r.user_id), photo: e?.photo ?? null, me: r.user_id === ctx.userId };
+      const hit = list.find((x) => x.emoji === r.emoji);
+      if (hit) { hit.count++; hit.mine = hit.mine || person.me; hit.who.push(person); }
+      else list.push({ emoji: r.emoji, count: 1, mine: person.me, who: [person] });
+      reactByMsg.set(r.message_id, list);
+    }
     const senderOf = (m: (typeof data)[number]) => {
       const u = usersName(m);
       const best = !u || u.includes("@") ? (emps.get(m.sender_id as string)?.name ?? u) : u;
