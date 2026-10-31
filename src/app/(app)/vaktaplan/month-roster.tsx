@@ -28,7 +28,7 @@ const short = (t: string) => (t.endsWith(":00") ? t.slice(0, 2) : t);
 
 export default function MonthRoster({ month, todayISO, types, deptSel, scopeDepts, onOpenDay, onTotals, full, onToggleFull, onTypes }: {
   month: Date; todayISO: string; types: ShiftType[]; deptSel: string[]; scopeDepts: string[];
-  onOpenDay: (d: Date) => void; onTotals: (x: { hrs: number; shifts: number }) => void; full: boolean; onToggleFull: () => void;
+  onOpenDay: (d: Date) => void; onTotals: (x: { hrs: number; shifts: number; list: { emp: string; date: string; start: string; end: string }[] }) => void; full: boolean; onToggleFull: () => void;
   /** Opnar vaktategundaglugga Vaktaplansins. */
   onTypes?: () => void;
 }) {
@@ -89,7 +89,10 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
   const visIds = useMemo(() => new Set(rows.map((r) => r.e.id)), [rows]);
   const visShifts = shifts.filter((s) => visIds.has(s.employeeId) && s.date >= from && s.date <= to);
   const totHrs = visShifts.reduce((a, s) => a + hrs(s.start, s.end), 0);
-  useEffect(() => { onTotals({ hrs: Math.round(totHrs * 10) / 10, shifts: visShifts.length }); }, [totHrs, visShifts.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Vaktirnar sjálfar fara upp líka svo kostnaður, álag og yfirvinna mánaðarins reiknist eins og í vikusýn.
+  useEffect(() => {
+    onTotals({ hrs: Math.round(totHrs * 10) / 10, shifts: visShifts.length, list: visShifts.map((s) => ({ emp: s.employeeId, date: s.date, start: s.start, end: s.end })) });
+  }, [totHrs, visShifts.length, shifts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Vista eina vakt (bjartsýn uppfærsla, bakfært ef þjónninn hafnar). */
   const put = useCallback(async (emp: PlanEmp, date: string, start: string, end: string, type: string | null) => {

@@ -214,22 +214,27 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
   const hasData = (r: AttRow) => r.actual > 0 || r.planned > 0;
   const emptyN = matched.filter((r) => !hasData(r)).length;
   const shown = showEmpty || search ? matched : matched.filter(hasData);
-  const tot = shown.reduce((a, r) => ({ planned: a.planned + r.planned, actual: a.actual + r.actual, dev: a.dev + r.deviation, cost: a.cost + (r.actCost - r.estCost) }), { planned: 0, actual: 0, dev: 0, cost: 0 });
-  const planned = shown.reduce((a, r) => a + r.planned, 0);
+  // Samanburður við plan sem er LOKIÐ: vakt sem stendur yfir (eða er fram undan) telst ekki fyrr en henni lýkur,
+  // eins og stimplun telst ekki fyrr en stimplað er út. Á liðnu tímabili er það allt planið.
+  const devOf = (r: AttRow) => Math.round((r.actual - r.plannedToDate) * 10) / 10;
+  const tot = shown.reduce((a, r) => ({ planned: a.planned + r.plannedToDate, actual: a.actual + r.actual, dev: a.dev + devOf(r), cost: a.cost + (r.actCost - r.estCostToDate) }), { planned: 0, actual: 0, dev: 0, cost: 0 });
+  const planned = shown.reduce((a, r) => a + r.plannedToDate, 0);
+  const planAll = shown.reduce((a, r) => a + r.planned, 0);
+  const longN = shown.reduce((a, r) => a + r.longPunches, 0);
   const actual = shown.reduce((a, r) => a + r.actual, 0);
-  const missing = shown.filter((r) => r.planned > 0 && r.actual === 0).length;
+  const missing = shown.filter((r) => r.plannedToDate > 0 && r.actual === 0).length;
   /** Sýnilegar raðir sem CSV (; og UTF-8 BOM svo Excel lesi íslenska stafi og kommutölur rétt). */
   function downloadCsv() {
     if (!shown.length) { toast(t("Ekkert til að sækja á þessu tímabili")); return; }
     const num = (n: number) => String(Math.round(n * 100) / 100).replace(".", ",");
     const cell = (v: string) => (/[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-    const lines = [["Starfsmaður", "Deild", "Áætlaðir tímar", "Unnir tímar", "Frávik (klst)", "Áætlaður kostnaður", "Raunkostnaður"].join(";"),
-      ...shown.map((r) => [cell(r.name), cell(r.dept ?? ""), num(r.planned), num(r.actual), num(r.deviation), String(Math.round(r.estCost)), String(Math.round(r.actCost))].join(";"))];
+    const lines = [["Starfsmaður", "Deild", "Áætlaðir tímar (lokið)", "Áætlaðir tímar (allt tímabilið)", "Unnir tímar", "Frávik (klst)", "Áætlaður kostnaður", "Raunkostnaður"].join(";"),
+      ...shown.map((r) => [cell(r.name), cell(r.dept ?? ""), num(r.plannedToDate), num(r.planned), num(r.actual), num(devOf(r)), String(Math.round(r.estCostToDate)), String(Math.round(r.actCost))].join(";"))];
     const url = URL.createObjectURL(new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
     const a = document.createElement("a"); a.href = url; a.download = "vakto-timaskraning.csv"; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
   }
-  const devCost = shown.reduce((a, r) => a + (r.actCost - r.estCost), 0);
+  const devCost = shown.reduce((a, r) => a + (r.actCost - r.estCostToDate), 0);
   const dev = actual - planned;
   const [nowMs, setNowMs] = useState(0);
   useEffect(() => {
@@ -273,7 +278,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
           <div className="db2-k">{t("Unnir tímar")}</div>
           <div className="db2-v">{dec1(actual)}<small>/ {dec1(planned)} {t("áætl.")}</small></div>
           <div className="db2-prog"><span style={{ width: `${planned > 0 ? Math.min(100, (actual / planned) * 100) : 0}%`, background: actual > planned + 0.05 ? "var(--bad)" : "var(--brand)" }} /></div>
-          <div className="db2-s">{planned > 0 ? `${Math.round((actual / planned) * 100)} % ${t("af plani til dagsins í dag")}` : t("Ekkert plan á tímabilinu")}</div>
+          <div className="db2-s">{planned > 0 ? `${Math.round((actual / planned) * 100)} % ${t("af plani til dagsins í dag")}` : planAll > 0 ? t("Engar vaktir búnar enn á tímabilinu") : t("Ekkert plan á tímabilinu")}</div>
         </section>
         <section className="db2-card db2-tile">
           <div className="db2-k">{t("Frávik frá plani")}</div>
@@ -282,8 +287,8 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
         </section>
         <section className="db2-card db2-tile">
           <div className="db2-k">{t("Þarf að skoða")}</div>
-          <div className="db2-v" style={{ color: missing + corrections.length > 0 ? "var(--warn)" : undefined }}>{missing + corrections.length}</div>
-          <div className="db2-s">{missing} {t("vantar stimplun")} · {corrections.length} {t("leiðréttingabeiðnir")}</div>
+          <div className="db2-v" style={{ color: missing + longN + corrections.length > 0 ? "var(--warn)" : undefined }}>{missing + longN + corrections.length}</div>
+          <div className="db2-s">{missing} {t("vantar stimplun")}{longN > 0 ? ` · ${longN} ${t("of langar stimplanir")}` : ""} · {corrections.length} {t("leiðréttingabeiðnir")}</div>
         </section>
       </div>
 
@@ -359,21 +364,23 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
             <tbody>
               {shown.length ? shown.map((r) => {
                 const longOpen = onNow.find((o) => o.employeeId === r.id && openH(o.since) > 12);
-                const bigDev = !longOpen && r.deviation > 4;
-                const dc = r.actCost - r.estCost;
-                const col = r.deviation > 0.05 ? "var(--bad)" : r.deviation < -0.05 ? "var(--good)" : undefined;
+                const dv = devOf(r);
+                const bigDev = !longOpen && dv > 4;
+                const dc = r.actCost - r.estCostToDate;
+                const col = dv > 0.05 ? "var(--bad)" : dv < -0.05 ? "var(--good)" : undefined;
                 return (
                 <tr key={r.id} className="db2-rowlink" onClick={() => router.push(`/timaskraning/${r.id}`)}>
                   <td onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={sel.has(r.id)} onChange={(e) => setSel((sv) => { const n = new Set(sv); if (e.target.checked) n.add(r.id); else n.delete(r.id); return n; })} />
                   </td>
                   <td><span className="db2-who"><Av id={r.id} c={r.c} av={r.av} /><span>{r.name}<small>{t(r.dept)}</small></span></span></td>
-                  <td className="r">{dec1(r.planned)}</td>
+                  <td className="r" title={r.planned > r.plannedToDate ? `${dec1(r.planned)} ${t("klst á plani alls á tímabilinu")}` : undefined}>{dec1(r.plannedToDate)}</td>
                   <td className="r">{dec1(r.actual)}</td>
-                  <td className="r" style={{ color: col }}>{r.deviation > 0 ? "+" : ""}{dec1(r.deviation)}</td>
+                  <td className="r" style={{ color: col }}>{dv > 0 ? "+" : ""}{dec1(dv)}</td>
                   <td className="r" style={{ color: col }}>{Math.abs(dc) >= 1 ? `${dc > 0 ? "+" : "−"}${krCompact(Math.abs(dc))}` : "–"}</td>
                   <td>
                     {longOpen ? <span className="db2-pill bad" title={t("Opin stimplun í meira en 12 klst — gleymt að stimpla út?")}>{t("Opin stimplun")}</span>
+                      : r.longPunches > 0 ? <span className="db2-pill bad" title={t("Stimplun lengri en 14 klst — líklega gleymd útstimplun. Opnaðu og leiðréttu.")}>{r.longPunches > 1 ? `${r.longPunches} ${t("of langar stimplanir")}` : t("Of löng stimplun")}</span>
                       : bigDev ? <span className="db2-pill warn" title={t("Frávik yfir 4 klst — skoðaðu stimplanirnar")}>{t("Mikið frávik")}</span>
                       : r.actual === 0 && r.planned === 0 ? <span className="db2-pill mut">{t("engin gögn")}</span>
                       : r.actual === 0 ? <span className="db2-pill warn">{t("Vantar stimplun")}</span>
