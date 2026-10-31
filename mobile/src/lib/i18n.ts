@@ -30,6 +30,18 @@ export function useLang(): Lang {
 
 type E = [string, string, string]; // [en, vi, pl]
 const D: Record<string, E> = {
+  // spjall: afrita, þýða, breyta (0100)
+  "Afrita texta": ["Copy text", "Sao chép văn bản", "Kopiuj tekst"],
+  "Haltu fingri á textanum til að velja og afrita hann.": ["Press and hold the text to select and copy it.", "Nhấn giữ văn bản để chọn và sao chép.", "Przytrzymaj tekst, aby go zaznaczyć i skopiować."],
+  "Þýða": ["Translate", "Dịch", "Przetłumacz"],
+  "VAKTO AI þýðir á þitt tungumál": ["VAKTO AI translates into your language", "VAKTO AI dịch sang ngôn ngữ của bạn", "VAKTO AI tłumaczy na Twój język"],
+  "Þýtt · Sýna frumtexta": ["Translated · Show original", "Đã dịch · Xem bản gốc", "Przetłumaczono · Pokaż oryginał"],
+  "Sýna þýðingu": ["Show translation", "Xem bản dịch", "Pokaż tłumaczenie"],
+  "Þýðing tókst ekki": ["Translation failed", "Dịch không thành công", "Tłumaczenie nie powiodło się"],
+  "Breyta texta": ["Edit", "Sửa", "Edytuj"],
+  "Breyta skilaboðum": ["Edit message", "Sửa tin nhắn", "Edytuj wiadomość"],
+  "Breytt": ["Edited", "Đã sửa", "Edytowano"],
+  "Ekki hægt að breyta þessum skilaboðum": ["This message can't be edited", "Không thể sửa tin nhắn này", "Nie można edytować tej wiadomości"],
   "Taka mynd": ["Take photo", "Chụp ảnh", "Zrób zdjęcie"],
   "Velja mynd": ["Choose photo", "Chọn ảnh", "Wybierz zdjęcie"],
   "Breyta mynd": ["Change photo", "Đổi ảnh", "Zmień zdjęcie"],

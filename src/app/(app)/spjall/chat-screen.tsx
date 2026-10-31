@@ -16,7 +16,7 @@ import {
 import {
   listConversations, listMessages, sendChatMessage, createGroup, startDM, searchPeople,
   listMembers, addMembers, removeMember, leaveChannel, uploadChatMedia,
-  renameChannel, setChannelPhoto, setMessageReaction, deleteMessage, listTeamPicks,
+  renameChannel, setChannelPhoto, setMessageReaction, deleteMessage, editMessage, listTeamPicks,
   markChannelRead, listChannelReads, listChatMedia, searchChannelMessages,
   type Conversation, type ChatMessage, type Person, type Members, type TeamPick, type ChannelRead, type ChatMedia, type ChatHit,
 } from "./actions";
@@ -132,6 +132,8 @@ const I = {
   leave: <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M15 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3M10 17l-5-5 5-5M5 12h11" /></svg>,
   reply: <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M9 17l-5-5 5-5" /><path d="M4 12h11a5 5 0 0 1 5 5v2" /></svg>,
   trash: <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" /></svg>,
+  translate: <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6" /></svg>,
+  edit: <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>,
   copy: <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15V5a2 2 0 0 1 2-2h10" /></svg>,
 };
 
@@ -149,7 +151,7 @@ const TYPING_EXPIRE = 4500;     // drop a typer we have not heard from in 4.5 s
 type Typer = { name: string; at: number };
 
 function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; embedded?: boolean; ai: AiAccess }) {
-  const { t } = useLang();
+  const { t, lang } = useLang();
   const router = useRouter();
   const [convs, setConvs] = useState<Conversation[]>(initial.items);
   const [active, setActive] = useState<Conversation | null>(initial.items[0] ?? null);
@@ -177,6 +179,11 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const presOf = (c: Conversation) => (c.peerId ? presenceLabel(presence[c.peerId]) : null);
   const [people, setPeople] = useState<Person[]>([]);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  // Breyta eigin skilaboðum (0100): textinn fer í reitinn og „Senda“ vistar breytinguna.
+  const [editing, setEditing] = useState<ChatMessage | null>(null);
+  // Þýðingar á tungumál notandans: id → texti (null = í vinnslu); orig = sýna frumtexta aftur.
+  const [trans, setTrans] = useState<Record<string, string | null>>({});
+  const [orig, setOrig] = useState<Record<string, boolean>>({});
   const [reactFor, setReactFor] = useState<string | null>(null);
   // VAKTO AI as a pinned conversation (thread column uses the shared assistant UI).
   const [aiOpen, setAiOpen] = useState(false);
@@ -470,6 +477,13 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
         }
         reloadConvs();
       })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload) => {
+        // breytt skilaboð (0100): nýr texti strax, eldri þýðing fellur út
+        const row = payload.new as { id: string; channel_id?: string; body?: string };
+        if (row.channel_id !== activeRef.current) return;
+        setMsgs((ms) => ms.map((m) => (m.id === row.id && row.body != null && m.body !== row.body ? { ...m, body: row.body, edited: true } : m)));
+        setTrans((x) => { if (!(row.id in x)) return x; const n = { ...x }; delete n[row.id]; return n; });
+      })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "channels" }, () => reloadConvs())
       .on("postgres_changes", { event: "*", schema: "public", table: "channel_reads" }, (payload) => {
         const row = (payload.new ?? payload.old) as { channel_id?: string; user_id?: string };
@@ -565,9 +579,34 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     if (atBottomRef.current) endRef.current?.scrollIntoView({ block: "end" });
   }, [msgs, typers]);
 
+  async function translate(m: ChatMessage) {
+    setOrig((o) => ({ ...o, [m.id]: false }));
+    if (trans[m.id]) return;
+    setTrans((x) => ({ ...x, [m.id]: null }));
+    const r = await fetch("/api/chat/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messageId: m.id, lang }) })
+      .then((x) => x.json() as Promise<{ ok?: boolean; text?: string; error?: string }>).catch(() => null);
+    if (r?.ok && r.text) setTrans((x) => ({ ...x, [m.id]: r.text! }));
+    else { setTrans((x) => { const n = { ...x }; delete n[m.id]; return n; }); toast(r?.error ?? t("Þýðing tókst ekki")); }
+  }
+
+  function startEdit(m: ChatMessage) {
+    setReplyTo(null); setEditing(m); setVal(m.body);
+    inputRef.current?.focus();
+  }
+
   async function send(kind: "text" | "image" | "audio" = "text", url?: string, body?: string) {
     const text = body ?? val;
     if (kind === "text" && !text.trim()) return;
+    if (kind === "text" && editing) {
+      const m = editing, next = text.trim();
+      setEditing(null); setVal("");
+      if (next === m.body) return;
+      setMsgs((ms) => ms.map((x) => (x.id === m.id ? { ...x, body: next, edited: true } : x)));
+      setTrans((x) => { const n = { ...x }; delete n[m.id]; return n; });
+      const r = await editMessage(m.id, next);
+      if (!r.ok) { setMsgs((ms) => ms.map((x) => (x.id === m.id ? { ...x, body: m.body, edited: m.edited } : x))); toast(r.error ?? t("Tókst ekki")); }
+      return;
+    }
     if (kind === "text") { setVal(""); setToolsOpen(false); }
     setEmoji(false);
     if (!active) return;
@@ -887,7 +926,12 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                         ? <a href={m.url!} target="_blank" rel="noreferrer" onClick={(e) => { if (pressRef.current.fired) e.preventDefault(); else openImage(e, m.url!, setViewer); }}><img src={m.url!} alt="" /></a>
                         : m.kind === "audio" && m.url ? <audio controls src={m.url} style={{ height: 36 }} />
                           : m.kind === "file" && m.url ? <a className="mfile" href={m.url} target="_blank" rel="noreferrer">{I.file}<span>{m.body || t("Skjal")}</span></a>
-                            : m.body}
+                            : (m.id in trans && !orig[m.id] ? (trans[m.id] ?? "…") : m.body)}
+                      {(m.edited || m.id in trans) && (
+                        <span className="medit" onClick={m.id in trans ? () => setOrig((o) => ({ ...o, [m.id]: !o[m.id] })) : undefined} style={{ display: "block", fontSize: 11.5, opacity: 0.75, marginTop: 3, cursor: m.id in trans ? "pointer" : undefined }}>
+                          {[m.edited ? t("Breytt") : null, m.id in trans ? (orig[m.id] ? t("Sýna þýðingu") : t("Þýtt · Sýna frumtexta")) : null].filter(Boolean).join(" · ")}
+                        </span>
+                      )}
                       {m.reactions.length > 0 && (
                         <span className="mreacts" onClick={() => react(m, m.reactions[0].emoji)}>
                           {m.reactions.map((r) => <span key={r.emoji}>{r.emoji}{r.count > 1 ? <b>{r.count}</b> : null}</span>)}
@@ -901,6 +945,16 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                       <button title={t("Svara")} onClick={() => { setReplyTo(m); setReactFor(null); }}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 17l-5-5 5-5" /><path d="M4 12h11a5 5 0 0 1 5 5v2" /></svg>
                       </button>
+                      {!m.me && m.kind === "text" && m.body && (
+                        <button title={t("Þýða")} onClick={() => void translate(m)}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 8l6 6M4 14l6-6 2-3M2 5h12M7 2h1M22 22l-5-10-5 10M14 18h6" /></svg>
+                        </button>
+                      )}
+                      {m.me && m.kind === "text" && !m.id.startsWith("tmp-") && (
+                        <button title={t("Breyta")} onClick={() => startEdit(m)}>
+                          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                        </button>
+                      )}
                       {m.me && (
                         <button title={t("Eyða")} onClick={() => unsend(m)}>
                           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" /></svg>
@@ -934,6 +988,15 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
               </div>
               {/* typing indicator — fixed height so the composer never jumps */}
               <div className="msgr-typing" aria-live="polite">{typingText}</div>
+              {editing && (
+                <div className="replybar">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
+                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+                    <b>{t("Breyta skilaboðum")}:</b> {editing.body}
+                  </span>
+                  <button className="iconbtn" onClick={() => { setEditing(null); setVal(""); }} style={{ width: 24, height: 24 }} aria-label={t("Loka")}>{I.close}</button>
+                </div>
+              )}
               {replyTo && (
                 <div className="replybar">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 17l-5-5 5-5" /><path d="M4 12h11a5 5 0 0 1 5 5v2" /></svg>
@@ -1029,6 +1092,12 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                 <button onClick={() => { setReplyTo(sheetFor); setSheetFor(null); inputRef.current?.focus(); }}>{I.reply}{t("Svara")}</button>
                 {sheetFor.kind === "text" && sheetFor.body && (
                   <button onClick={() => { void navigator.clipboard?.writeText(sheetFor.body).then(() => toast(t("Afritað"))).catch(() => {}); setSheetFor(null); }}>{I.copy}{t("Afrita")}</button>
+                )}
+                {!sheetFor.me && sheetFor.kind === "text" && sheetFor.body && (
+                  <button onClick={() => { const m = sheetFor; setSheetFor(null); void translate(m); }}>{I.translate}{t("Þýða")}</button>
+                )}
+                {sheetFor.me && sheetFor.kind === "text" && !sheetFor.id.startsWith("tmp-") && (
+                  <button onClick={() => { const m = sheetFor; setSheetFor(null); startEdit(m); }}>{I.edit}{t("Breyta")}</button>
                 )}
                 {sheetFor.me && !sheetFor.id.startsWith("tmp-") && (
                   <button className="danger" onClick={() => { const m = sheetFor; setSheetFor(null); void unsend(m); }}>{I.trash}{t("Eyða")}</button>
