@@ -14,13 +14,20 @@ import { applyForShift, listMyRequests, myOpenShiftClaims } from "../../src/lib/
 import { estimateShift } from "../../src/lib/api/pay";
 import { dec1, kr } from "../../src/lib/format";
 import { LeaveSheet } from "../../src/components/request-sheets";
+import { VerkList } from "../../src/components/verk-list";
 
 const DAY_L = ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"];
 const DAY_FULL = ["Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur", "Sunnudagur"];
 const MONTHS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
 type Tab = "mine" | "all" | "open";
 
-export default function Vaktir() {
+/** Verktakahamur (0102): flipinn sýnir Verk í stað vakta. */
+export default function VaktirTab() {
+  const { me } = useMe();
+  return me?.solo ? <VerkList inTab /> : <Vaktir />;
+}
+
+function Vaktir() {
   useTheme();
   const { me } = useMe();
   const router = useRouter();

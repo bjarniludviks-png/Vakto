@@ -36,6 +36,8 @@ export type Account = {
   vaktoAdmin?: boolean;
   /** Opna demo-fyrirtækið (DEMO_COMPANY_ID) — demo-rönd, útskráning aðeins þessarar lotu. */
   demo?: boolean;
+  /** Verktakahamur (companies.account_kind = 'solo', 0102) — valmyndin sýnir verk í stað vakta. */
+  solo?: boolean;
 };
 
 type MenuPos = { top: number; right: number } | null;
@@ -116,13 +118,13 @@ export default function AppShell({
   const ident = role === account.role ? account : ROLE_IDENTITY[role];
   // Forskoðun eiganda „sem annað hlutverk" sýnir sjálfgefinn aðgang þess hlutverks.
   const perms = role === account.role ? account.permissions : null;
-  const { groups, foot } = visibleFor(role, perms);
+  const { groups, foot } = visibleFor(role, perms, account.solo);
 
   function switchRole(r: Role) {
     setRoleState(r);
     setRoleModal(false);
     setMenu(null);
-    const allowed = visibleFor(r);
+    const allowed = visibleFor(r, null, account.solo);
     const first = allowed.groups[0]?.items[0]?.href ?? "/maelabord";
     const current = [...allowed.groups.flatMap((g) => g.items), ...allowed.foot].some((i) =>
       pathname.startsWith(i.href),

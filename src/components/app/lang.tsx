@@ -430,6 +430,7 @@ export const DICT: Dict = {
   "nav:dashboard": { is: "Mælaborð", en: "Dashboard", vi: "Bảng điều khiển", pl: "Pulpit" },
   "nav:schedule": { is: "Vaktaplan", en: "Schedule", vi: "Lịch làm việc", pl: "Grafik" },
   "nav:attendance": { is: "Tímaskráning", en: "Time tracking", vi: "Chấm công", pl: "Ewidencja czasu" },
+  "nav:jobs": { is: "Verk", en: "Jobs", vi: "Công việc", pl: "Zlecenia" },
   "nav:payroll": { is: "Launakeyrslur", en: "Payroll", vi: "Tính lương", pl: "Listy płac" },
   "nav:employees": { is: "Starfsfólk", en: "Employees", vi: "Nhân viên", pl: "Pracownicy" },
   "nav:reports": { is: "Skýrslur", en: "Reports", vi: "Báo cáo", pl: "Raporty" },
