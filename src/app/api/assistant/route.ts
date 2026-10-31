@@ -19,6 +19,34 @@ const DAYS_IS = ["sunnudagur", "mánudagur", "þriðjudagur", "miðvikudagur", "
 
 type Msg = { role: "user" | "assistant"; content: string };
 
+/** Síður sem vefleit VAKTO AI má lesa: stéttarfélög, SA, ríkissáttasemjari og opinberir vefir. */
+const WAGE_DOMAINS = ["efling.is", "sgs.is", "vr.is", "matvis.is", "sa.is", "asi.is", "rafis.is", "samidn.is", "fbm.is", "hlif.is", "framsyn.is", "afl.is", "vlfa.is", "bsrb.is", "bhm.is", "rikissattasemjari.is", "island.is", "stjornarradid.is"];
+
+/** Skráahýsingar þar sem stéttarfélögin geyma PDF-launatöflur (Efling: irp.cdn-website.com) — aðeins fyrir web_fetch. */
+const WAGE_FILE_HOSTS = ["irp.cdn-website.com"];
+
+/** Textakubbar svarsins: kubbar í röð (vefleit klýfur texta við tilvitnanir) límdir saman, annars málsgreinaskil. */
+function joinText(content: Anthropic.ContentBlock[]): string {
+  let out = "", prevText = false;
+  for (const b of content) {
+    if (b.type === "text") { out += prevText || !out ? b.text : `\n\n${b.text}`; prevText = true; }
+    else prevText = false;
+  }
+  return out.trim();
+}
+
+/** Heimildir úr vefleit sem svarið vitnar í (eða fann) — birtar sem tenglar neðst ef þær eru ekki þegar í textanum. */
+function withSources(text: string, content: Anthropic.ContentBlock[]): string {
+  const seen = new Map<string, string>();
+  for (const b of content) {
+    if (b.type !== "text" || !b.citations) continue;
+    for (const c of b.citations) if (c.type === "web_search_result_location" && c.url && !seen.has(c.url)) seen.set(c.url, c.title || new URL(c.url).hostname);
+  }
+  const extra = [...seen].filter(([url]) => !text.includes(url));
+  if (!extra.length) return text;
+  return `${text}\n\n**Heimildir:**\n${extra.slice(0, 4).map(([url, title]) => `- [${title.replace(/[[\]]/g, "")}](${url})`).join("\n")}`;
+}
+
 export async function POST(request: Request) {
   if (!process.env.ANTHROPIC_API_KEY) return NextResponse.json({ ok: false, error: "AI er ekki uppsett" }, { status: 503 });
   const supabase = await createClient();
@@ -59,6 +87,7 @@ Hlutverk þín:
 3. Setja upp heila viku: þegar beðið er um vaktaplan fyrir viku („settu upp næstu viku“, „allir vinni 36 tíma og fái einn frídag“), kallaðu fyrst á week_planning_context (nema það fylgi þegar spurningunni) og síðan á plan_week með ÖLLUM vöktum vikunnar í einni tillögu. Virtu óframboð og samþykkt frí (settu aldrei vakt á þá daga), ein vakt per starfsmann per dag, minnst 11 klst hvíld milli vakta, notaðu tíma úr vaktategundum fyrirtækisins þegar þær passa, haltu þig við mönnunarþörf og launamarkmið ef þau eru gefin, og dreifðu helgum sanngjarnt. Fastlaunafólk fær vaktir eins og aðrir. Skilyrði notandans eru reglur, ekki óskir: „allir fá tvo frídaga“ = hver starfsmaður í planinu fær nákvæmlega 5 vaktir (7 − 2); „alltaf þrír á vakt“ = nákvæmlega 3 vaktir á hverjum degi vikunnar. Teldu áður en þú leggur til og athugaðu að talan gangi upp. Ef beðið er um eina deild („í eldhúsinu“): notaðu aðeins starfsfólk þeirrar deildar (dept í staff, sjá departments) og settu department í plan_week — þá haldast vaktir annarra deilda. Ef skilyrðin ganga ekki upp (t.d. of fáir í deildinni, óframboð eða frí), segðu nákvæmlega hvað vantar og hvað þú gerðir í staðinn. Ef ósk notandans stangast á við óframboð eða frí, segðu frá því í svarinu í stað þess að brjóta á því. Ef week_planning_context skilar companyRules eru það vistaðar planreglur fyrirtækisins: virtu þær í hverju plani eins og skilyrði notandans, nema hann taki annað fram núna, og nefndu í notes ef regla gekk ekki upp. Ef notandinn biður þig að muna eitthvað um vaktaplan til frambúðar („mundu að…“, „alltaf…“, „aldrei…“) skaltu leggja til save_planning_rule (ein regla per kall); planning_rules sýnir vistaðar reglur og remove_planning_rule eyðir. Heill mánuður („settu upp nóvember“, „allan næsta mánuð“): kallaðu á month_planning_context og síðan plan_month með ÖLLUM vöktum mánaðarins í einni tillögu, sömu reglur og fyrir viku; yfirvinna er 40 klst á viku (mán–sun), dreifðu helgum sanngjarnt yfir mánuðinn. Lýstu planinu í notes-sviði plan_week/plan_month (á eftir shifts) í 3–6 punktum (tímar per mann, frídagar, áætlaður kostnaður og laun % ef veltuspá er til, og hvað gekk ekki upp) — ekki telja upp hverja vakt. notes er svarið sem notandinn sér; skrifaðu ekkert meira eftir að tillagan er skráð.
 4. Bera saman og greina: notaðu compare_periods þegar spurt er um breytingu milli tímabila („miðað við síðasta mánuð“, „sama tíma í fyrra“, „hvers vegna hækkaði launakostnaðurinn“), labor_trend fyrir þróun yfir marga mánuði eða vikur, og payroll_runs fyrir raunveruleg útborguð laun úr launakeyrslum. Gerðu skýran greinarmun: launakostnaður í labor_summary/compare_periods er reiknaður út frá stimpluðum tímum (sama og mælaborðið), en payroll_runs eru keyrð laun. Þegar þú berð saman: nefndu bæði tímabilin með dagsetningum, gefðu breytinguna í kr og %, og bentu á 2–3 helstu ástæður (t.d. fleiri tímar, yfirvinna, álag, ákveðnir starfsmenn eða deildir, minni velta). Ef veltu vantar á öðru tímabilinu, segðu það í stað þess að bera saman laun %.
 Frávik í tímaskráningu („farðu yfir frávik“, „hver gleymdi að stimpla sig út?“): notaðu timesheet_issues fyrir tímabilið, lýstu stuttlega hvað fannst og leggðu til lagfæringu fyrir hvert atriði: close_punch þegar fix er close (áætluð lok vaktar), annars ask_correction ef starfsmaðurinn er með aðgang (hasAccount); ef ekki, segðu að stjórnandi þurfi að leiðrétta sjálfur í Tímaskráningu. Mest 15 tillögur í einu; segðu ef fleiri bíða. Vaktarar og skýrslur: þegar notandinn vill láta vita af einhverju sjálfkrafa („láttu mig vita ef einhver fer yfir 180 tíma í mánuðinum“, „minntu mig ef laun % fer yfir 32 %“) notaðu create_alert; fyrir skýrslur á tímaáætlun („sendu mér yfirvinnuskýrslu alla mánudaga“) schedule_report; fyrir skýrslu strax í tölvupósti („sendu mér mætingarskýrslu síðasta mánaðar“) send_report_now með nákvæmum dagsetningum. Til að slökkva á eða eyða vaktara: list_alerts fyrst, svo toggle_alert eða delete_alert. Vaktarar eru metnir einu sinni á dag kl. 8 og skýrslur fara kl. 8 að morgni; ef beðið er um annan tíma, segðu að þær fari kl. 8. Tilkynningar fara á notandann sem biður um þær. Ef „einhver“ fer yfir tímamörk og ekki er tekið fram hvort planaðar vaktir eigi að teljast, settu includePlanned true og nefndu það.
+Laun og kjarasamningar („hvað eru laun starfsmanns í eldhúsi með 4 ára starfsaldur?“, „er Jón á réttum launum?“): leitaðu með web_search að gildandi launatöflu (og opnaðu töfluna/PDF-skjalið með web_fetch ef niðurstaðan sýnir ekki tölurnar; notaðu nýjustu töflu sem er í gildi í dag) á opinberri síðu stéttarfélagsins (t.d. efling.is, sgs.is, vr.is, matvis.is, sa.is, asi.is). Skrifaðu leitarorð á íslensku (t.d. „Efling launatafla veitinga- og gistihús 2026“). Veitinga- og gististaðir fylgja yfirleitt samningi SGS/Eflingar og SA um veitinga- og gistihús; matreiðslumenn Matvís; verslun og skrifstofa VR. Gefðu upphæðina (mánaðarlaun og tímakaup í dagvinnu ef það kemur fram), launaflokk/þrep, frá hvaða dagsetningu taflan gildir og heimildina sem markdown-tengil [heiti](slóð). Taktu fram að þetta séu lágmarkslaun samkvæmt samningi og að álag (kvöld, helgar, yfirvinna) bætist við. Ef starfsaldur eða starfsheiti ræður þrepi og það er óljóst, gefðu bilið og segðu hvað ræður. Aldrei giska á upphæð — finnist ekki gild tafla, segðu það og vísaðu á stéttarfélagið. Ef spurt er um ákveðinn starfsmann, notaðu staff_pay til að fá stéttarfélag, starfsheiti, starfsaldur og núverandi laun, og berðu saman við töfluna (segðu skýrt ef laun virðast undir lágmarki).
 5. Svara „hvernig geri ég…“ spurningum út frá upplýsingunum hér að neðan. Ef þú veist ekki svarið, vísaðu á hallo@vakto.is.
 
 Reglur: stutt og skýrt, punktalistar frekar en töflur, engin emoji. Upphæðir eins og „12.345 kr.“ og prósentur með kommu („27,6 %“). Breyttu afstæðum dagsetningum („næsta föstudag“, „síðasta vika“) í nákvæma dagsetningu og nefndu hana. Vikan byrjar á mánudegi. Ef eitthvað er óljóst, spurðu einnar spurningar í einu. Laun % af veltu: lægra er betra, miðað við markmið fyrirtækisins.
@@ -79,7 +108,12 @@ ${VAKTO_KNOWLEDGE}`;
   const run = async (send: (ev: AssistantEvent) => void): Promise<Record<string, unknown>> => {
     const client = new Anthropic();
     const all = [...READ_TOOLS, ...WRITE_TOOLS.filter((t) => canPlan || (t.name !== "plan_week" && t.name !== "plan_month"))];
-    const tools: Anthropic.Tool[] = all.map((t, i) => (i === all.length - 1 ? { ...t, cache_control: { type: "ephemeral" } } : t));
+    // Vefleit (server tool hjá Anthropic) eingöngu á síðum stéttarfélaga/vinnumarkaðar — fyrir launatöflur
+    // kjarasamninga. Demo (Haiku) fær grunnútgáfuna; síuð útgáfa (20260209) krefst Sonnet/Opus.
+    const webSearch = { type: demo ? "web_search_20250305" : "web_search_20260209", name: "web_search", max_uses: 3, allowed_domains: WAGE_DOMAINS } as unknown as Anthropic.ToolUnion;
+    // Opna síðu/PDF sem leitin fann (launatöflur eru oft í PDF eða undirsíðum). Ekki í demo.
+    const webFetch = { type: "web_fetch_20260209", name: "web_fetch", max_uses: 3, allowed_domains: [...WAGE_DOMAINS, ...WAGE_FILE_HOSTS], max_content_tokens: 30000 } as unknown as Anthropic.ToolUnion;
+    const tools: Anthropic.ToolUnion[] = [webSearch, ...(demo ? [] : [webFetch]), ...all.map((t, i) => (i === all.length - 1 ? { ...t, cache_control: { type: "ephemeral" as const } } : t))];
     const actions: PendingAction[] = [];
     const msgs: Anthropic.MessageParam[] = [...history];
     let reply = "";
@@ -110,6 +144,8 @@ ${VAKTO_KNOWLEDGE}`;
               const name = ev.content_block.name;
               blocks.set(ev.index, { name, json: "", sent: 0, notes: 0 });
               send({ t: "stage", stage: name === "plan_week" || name === "plan_month" ? "plan" : WRITE_NAMES.has(name) ? "write" : "read", tool: name });
+            } else if (ev.type === "content_block_start" && ev.content_block.type === "server_tool_use") {
+              send({ t: "stage", stage: "read", tool: ev.content_block.name === "web_fetch" ? "web_fetch" : "web_search" });
             } else if (ev.type === "content_block_delta") {
               if (ev.delta.type === "text_delta") send({ t: "text", d: ev.delta.text });
               else if (ev.delta.type === "input_json_delta") {
@@ -138,8 +174,10 @@ ${VAKTO_KNOWLEDGE}`;
           step--;
           continue;
         }
-        const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
-        if (res.stop_reason !== "tool_use") { reply = text; break; }
+        const text = joinText(res.content);
+        // Vefleit getur gert hlé á umferðinni (pause_turn): halda áfram með sama efni.
+        if (res.stop_reason === "pause_turn") { msgs.push({ role: "assistant", content: res.content }); reply = text; continue; }
+        if (res.stop_reason !== "tool_use") { reply = withSources(text, res.content); break; }
         msgs.push({ role: "assistant", content: res.content });
         const results: Anthropic.ToolResultBlockParam[] = [];
         for (const b of res.content) {

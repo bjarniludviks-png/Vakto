@@ -28,7 +28,7 @@ export const ASSISTANT_STRINGS = {
     chips: ["Hvernig er laun % af veltu þessa vikuna?", "Berðu saman launakostnað og tíma í þessum mánuði og síðasta", "Settu upp næstu viku: allir með einn frídag", "Hver er á vakt núna?", "Láttu mig vita ef einhver fer yfir 180 tíma í mánuðinum"],
     wide: "Stækka", narrow: "Minnka",
     note: "VAKTO AI getur gert mistök. Breytingar eru aðeins gerðar þegar þú staðfestir.",
-    st: { think: "Hugsa…", read: "Sæki gögn…", week_planning_context: "Les vaktaplan, starfsfólk og beiðnir…", shifts: "Les vaktaplanið…", pending_requests: "Les beiðnir…", who_is_on_now: "Athuga hver er á vakt…", labor: "Reikna laun og tíma…", write: "Undirbý tillögu…", summary: "Skrifa samantekt…" },
+    st: { think: "Hugsa…", web_search: "Fletti upp á vef stéttarfélaga…", web_fetch: "Les launatöflu…", read: "Sæki gögn…", week_planning_context: "Les vaktaplan, starfsfólk og beiðnir…", shifts: "Les vaktaplanið…", pending_requests: "Les beiðnir…", who_is_on_now: "Athuga hver er á vakt…", labor: "Reikna laun og tíma…", write: "Undirbý tillögu…", summary: "Skrifa samantekt…" },
     planning: (n: number, of?: number) => of ? `Raða vöktum… ${n} af ${of}` : `Raða vöktum… ${n}`, days: ["Mán", "Þri", "Mið", "Fim", "Fös", "Lau", "Sun"],
     upgrade: "Kveikja á VAKTO AI",
     signup: "Stofna fyrirtæki — 14 daga frí prufa", left: (n: number, of: number) => `${n} af ${of} spurningum eftir í demo`,
@@ -41,7 +41,7 @@ export const ASSISTANT_STRINGS = {
     chips: ["What's labor % of revenue this week?", "Compare labor cost and hours this month vs last month", "Plan next week: everyone gets one day off", "Who is on shift now?", "Tell me if anyone goes over 180 hours this month"],
     wide: "Expand", narrow: "Shrink",
     note: "VAKTO AI can make mistakes. Changes only happen when you confirm.",
-    st: { think: "Thinking…", read: "Fetching data…", week_planning_context: "Reading schedule, staff and requests…", shifts: "Reading the schedule…", pending_requests: "Reading requests…", who_is_on_now: "Checking who is on shift…", labor: "Calculating labor and hours…", write: "Preparing a proposal…", summary: "Writing a summary…" },
+    st: { think: "Thinking…", web_search: "Searching union websites…", web_fetch: "Reading the wage table…", read: "Fetching data…", week_planning_context: "Reading schedule, staff and requests…", shifts: "Reading the schedule…", pending_requests: "Reading requests…", who_is_on_now: "Checking who is on shift…", labor: "Calculating labor and hours…", write: "Preparing a proposal…", summary: "Writing a summary…" },
     planning: (n: number, of?: number) => of ? `Placing shifts… ${n} of ${of}` : `Placing shifts… ${n}`, days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
     upgrade: "Turn on VAKTO AI",
     signup: "Create your company — 14-day free trial", left: (n: number, of: number) => `${n} of ${of} questions left in the demo`,
@@ -54,7 +54,7 @@ export const ASSISTANT_STRINGS = {
     chips: ["Jaki jest w tym tygodniu udział kosztów pracy w obrocie?", "Porównaj koszty pracy i godziny w tym i poprzednim miesiącu", "Ułóż grafik na przyszły tydzień: każdy ma jeden dzień wolny", "Kto jest teraz na zmianie?", "Powiadom mnie, jeśli ktoś przekroczy 180 godzin w miesiącu"],
     wide: "Powiększ", narrow: "Zmniejsz",
     note: "VAKTO AI może się mylić. Zmiany są wprowadzane dopiero po Twoim zatwierdzeniu.",
-    st: { think: "Myślę…", read: "Pobieram dane…", week_planning_context: "Czytam grafik, pracowników i wnioski…", shifts: "Czytam grafik…", pending_requests: "Czytam wnioski…", who_is_on_now: "Sprawdzam, kto jest na zmianie…", labor: "Liczę koszty pracy i godziny…", write: "Przygotowuję propozycję…", summary: "Piszę podsumowanie…" },
+    st: { think: "Myślę…", web_search: "Szukam na stronach związków…", web_fetch: "Czytam tabelę płac…", read: "Pobieram dane…", week_planning_context: "Czytam grafik, pracowników i wnioski…", shifts: "Czytam grafik…", pending_requests: "Czytam wnioski…", who_is_on_now: "Sprawdzam, kto jest na zmianie…", labor: "Liczę koszty pracy i godziny…", write: "Przygotowuję propozycję…", summary: "Piszę podsumowanie…" },
     planning: (n: number, of?: number) => of ? `Układam zmiany… ${n} z ${of}` : `Układam zmiany… ${n}`, days: ["Pon", "Wt", "Śr", "Czw", "Pt", "Sob", "Nd"],
     upgrade: "Włącz VAKTO AI",
     signup: "Załóż firmę — 14 dni za darmo", left: (n: number, of: number) => `Pozostało ${n} z ${of} pytań w demo`,
@@ -67,7 +67,7 @@ export const ASSISTANT_STRINGS = {
     chips: ["Tỷ lệ chi phí lương trên doanh thu tuần này là bao nhiêu?", "So sánh chi phí lương và giờ làm tháng này với tháng trước", "Lập lịch tuần sau: mỗi người được nghỉ một ngày", "Ai đang trong ca làm?", "Báo cho tôi nếu ai đó vượt quá 180 giờ trong tháng"],
     wide: "Mở rộng", narrow: "Thu nhỏ",
     note: "VAKTO AI có thể mắc lỗi. Thay đổi chỉ được thực hiện khi bạn xác nhận.",
-    st: { think: "Đang suy nghĩ…", read: "Đang lấy dữ liệu…", week_planning_context: "Đang đọc lịch, nhân viên và yêu cầu…", shifts: "Đang đọc lịch làm việc…", pending_requests: "Đang đọc yêu cầu…", who_is_on_now: "Đang kiểm tra ai đang làm…", labor: "Đang tính chi phí lương và giờ làm…", write: "Đang chuẩn bị đề xuất…", summary: "Đang viết tóm tắt…" },
+    st: { think: "Đang suy nghĩ…", web_search: "Đang tra cứu trang công đoàn…", web_fetch: "Đang đọc bảng lương…", read: "Đang lấy dữ liệu…", week_planning_context: "Đang đọc lịch, nhân viên và yêu cầu…", shifts: "Đang đọc lịch làm việc…", pending_requests: "Đang đọc yêu cầu…", who_is_on_now: "Đang kiểm tra ai đang làm…", labor: "Đang tính chi phí lương và giờ làm…", write: "Đang chuẩn bị đề xuất…", summary: "Đang viết tóm tắt…" },
     planning: (n: number, of?: number) => of ? `Đang xếp ca… ${n}/${of}` : `Đang xếp ca… ${n}`, days: ["T2", "T3", "T4", "T5", "T6", "T7", "CN"],
     upgrade: "Bật VAKTO AI",
     signup: "Tạo công ty — dùng thử miễn phí 14 ngày", left: (n: number, of: number) => `Còn ${n}/${of} câu hỏi trong bản demo`,
@@ -75,7 +75,7 @@ export const ASSISTANT_STRINGS = {
 };
 export type AssistantStrings = (typeof ASSISTANT_STRINGS)["is"];
 
-/** **feitletrun**, línuskil og „- “ listar. */
+/** **feitletrun**, [tenglar](https://…), línuskil og „- “ listar. */
 function Rich({ text }: { text: string }) {
   const lines = text.split("\n");
   return (
@@ -84,8 +84,12 @@ function Rich({ text }: { text: string }) {
         // Fyrirsagnir („## …“) verða feitletruð lína.
         if (/^\s*#{1,6}\s+/.test(ln)) return <p key={i} className="vai-h"><b>{ln.replace(/^\s*#{1,6}\s+/, "").replace(/\*\*/g, "")}</b></p>;
         const li = /^\s*[-•*]\s+/.test(ln);
-        const parts = ln.replace(/^\s*[-•*]\s+/, "").split(/(\*\*[^*]+\*\*)/g);
-        const inner = parts.map((p, k) => (p.startsWith("**") && p.endsWith("**") ? <b key={k}>{p.slice(2, -2)}</b> : <Fragment key={k}>{p}</Fragment>));
+        const parts = ln.replace(/^\s*[-•*]\s+/, "").split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g);
+        const inner = parts.map((p, k) => {
+          if (p.startsWith("**") && p.endsWith("**")) return <b key={k}>{p.slice(2, -2)}</b>;
+          const a = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/.exec(p); // heimild úr vefleit
+          return a ? <a key={k} href={a[2]} target="_blank" rel="noreferrer">{a[1]}</a> : <Fragment key={k}>{p}</Fragment>;
+        });
         return li ? <div key={i} className="vai-li">{inner}</div> : ln.trim() ? <p key={i}>{inner}</p> : null;
       })}
     </>
