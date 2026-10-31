@@ -13,6 +13,7 @@ import { planEmployees, type PlanEmp } from "./roster.server";
 import { getWeekBudget as laborWeekBudget, type WeekBudget } from "@/lib/labor";
 import { userError } from "@/lib/user-error";
 import { allRows } from "@/lib/supabase/all-rows";
+import { normalizeRules, MAX_RULES, MAX_RULE_LEN, type PlanningRule } from "@/lib/planning-rules";
 
 export type ShiftInput = {
   employeeName: string; // starfsmanns-id (helst) eða nafn eins og það birtist í planinu
@@ -774,6 +775,87 @@ export async function saveShiftTasks(employeeName: string, dateISO: string, titl
       if (error) return { ok: false, error: userError(error) };
     }
     return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
+
+/* ── Planreglur fyrir AI-vaktaplan (0101) ─────────────────────────────────────────────── */
+
+async function rulesCtx() {
+  const supabase = await createClient();
+  const ctx = await companyOf(supabase);
+  if ("error" in ctx) return { error: ctx.error as string };
+  const { data: me } = await supabase.from("users").select("role").eq("id", ctx.userId).maybeSingle();
+  if (me?.role !== "owner" && me?.role !== "manager") return { error: "Aðeins stjórnendur og vaktstjórar sjá planreglur" };
+  const { data, error } = await supabase.from("companies").select("planning_rules").eq("id", ctx.company).maybeSingle();
+  if (error) return { error: "Planreglur eru ekki komnar í gagnagrunninn enn (0101)" };
+  return { supabase, ctx, rules: normalizeRules((data as { planning_rules?: unknown } | null)?.planning_rules) };
+}
+
+async function saveRules(supabase: Awaited<ReturnType<typeof createClient>>, company: string, rules: PlanningRule[]): Promise<DecisionResult> {
+  const { data, error } = await supabase.from("companies").update({ planning_rules: rules }).eq("id", company).select("id");
+  if (error || !data?.length) return { ok: false, error: "Tókst ekki að vista planreglurnar" };
+  revalidatePath("/vaktaplan");
+  return { ok: true };
+}
+
+export async function listPlanningRules(): Promise<{ ok: boolean; rules: PlanningRule[]; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true, rules: [] };
+  try {
+    const r = await rulesCtx();
+    if ("error" in r) return { ok: false, rules: [], error: r.error };
+    return { ok: true, rules: r.rules };
+  } catch (e) {
+    return { ok: false, rules: [], error: userError(e, "Villa") };
+  }
+}
+
+/** Ný regla (via = 'ai' þegar VAKTO AI vistar hana eftir staðfestingu notandans). */
+export async function addPlanningRule(text: string, via: "user" | "ai" = "user"): Promise<DecisionResult & { rule?: PlanningRule }> {
+  if (await demoBlocked()) return demoResult();
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  const t = text.trim().replace(/\s+/g, " ").slice(0, MAX_RULE_LEN);
+  if (t.length < 3) return { ok: false, error: "Skrifaðu regluna" };
+  try {
+    const r = await rulesCtx();
+    if ("error" in r) return { ok: false, error: r.error };
+    if (r.rules.length >= MAX_RULES) return { ok: false, error: `Mest ${MAX_RULES} reglur — eyddu gamalli reglu fyrst` };
+    if (r.rules.some((x) => x.text.toLowerCase() === t.toLowerCase())) return { ok: false, error: "Þessi regla er þegar vistuð" };
+    const rule: PlanningRule = { id: crypto.randomUUID(), text: t, active: true, createdAt: new Date().toISOString(), via };
+    const res = await saveRules(r.supabase, r.ctx.company, [...r.rules, rule]);
+    if (res.ok) await logAudit(r.supabase, r.ctx.company, r.ctx.userId, { action: "planning_rule.add", entity: "company", detail: t });
+    return res.ok ? { ...res, rule } : res;
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
+export async function setPlanningRuleActive(id: string, active: boolean): Promise<DecisionResult> {
+  if (await demoBlocked()) return demoResult();
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const r = await rulesCtx();
+    if ("error" in r) return { ok: false, error: r.error };
+    if (!r.rules.some((x) => x.id === id)) return { ok: false, error: "Reglan fannst ekki" };
+    return saveRules(r.supabase, r.ctx.company, r.rules.map((x) => (x.id === id ? { ...x, active } : x)));
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
+export async function deletePlanningRule(id: string): Promise<DecisionResult> {
+  if (await demoBlocked()) return demoResult();
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const r = await rulesCtx();
+    if ("error" in r) return { ok: false, error: r.error };
+    const gone = r.rules.find((x) => x.id === id);
+    if (!gone) return { ok: false, error: "Reglan fannst ekki" };
+    const res = await saveRules(r.supabase, r.ctx.company, r.rules.filter((x) => x.id !== id));
+    if (res.ok) await logAudit(r.supabase, r.ctx.company, r.ctx.userId, { action: "planning_rule.delete", entity: "company", detail: gone.text });
+    return res;
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
   }

@@ -14,6 +14,7 @@ import type { ScheduleInitial } from "./schedule.server";
 import type { WeekBudget } from "@/lib/labor";
 import OpenShifts from "./open-shifts";
 import { ShiftForm, ShiftSheet, PaintTools, typeTimes, defaultsFor, type PaintTool } from "./shift-form";
+import { PlanningRules } from "./planning-rules";
 import MonthRoster from "./month-roster";
 import { isNdjson, readNdjson, type ScheduleEvent } from "@/lib/ai/stream";
 
@@ -1262,7 +1263,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         </>
       )}
       {modal === "shift" && <ShiftEditModal cellType={(r, c) => cellTypes[ckey(r, c)] ?? ""} types={types} emp={emp} weekDays={weekDays} sel={sel} gridCode={(r, c) => grid[r]?.[c] ?? "off"} timeOf={timeOf} onSave={saveCell} onDelete={delCell} onSick={liveCompany ? sickCell : undefined} onClose={() => setModal(null)} onCopy={() => { if (sel) { const code = grid[sel.r]?.[sel.c] ?? "off"; const tt = timeOf(sel.r, sel.c); setClip({ code, start: tt?.start, end: tt?.end, type: cellTypes[ckey(sel.r, sel.c)] }); } setModal(null); toast(t("Vakt afrituð — smelltu á reiti til að líma")); }} onTypes={() => setModal("types")} />}
-      {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} names={emp.map((e) => e[1])} depts={[...new Set(emp.map((e) => e[2]).filter(Boolean))]} />}
+      {modal === "ai" && <AiPromptModal query={aiQuery} setQuery={setAiQuery} onClose={() => setModal(null)} onGen={() => runAi(aiQuery)} names={emp.map((e) => e[1])} depts={[...new Set(emp.map((e) => e[2]).filter(Boolean))]} live={liveCompany} />}
       {modal === "aiResult" && <AiResultModal query={aiQuery} proposal={aiProposal} loading={aiLoading} stage={aiStage} onClose={() => setModal(null)} onEdit={() => setModal("ai")} onApprove={approveAiProposal} />}
     </div>
   );
@@ -1689,7 +1690,7 @@ function ShiftEditModal({
   );
 }
 
-function AiPromptModal({ query, setQuery, onClose, onGen, names = [], depts = [] }: { query: string; setQuery: (s: string) => void; onClose: () => void; onGen: () => void; names?: string[]; depts?: string[] }) {
+function AiPromptModal({ query, setQuery, onClose, onGen, names = [], depts = [], live = false }: { query: string; setQuery: (s: string) => void; onClose: () => void; onGen: () => void; names?: string[]; depts?: string[]; live?: boolean }) {
   const { t: tr, lang } = useLang();
   const [listening, setListening] = useState(false);
   const recRef = useRef<{ stop: () => void } | null>(null);
@@ -1760,6 +1761,7 @@ function AiPromptModal({ query, setQuery, onClose, onGen, names = [], depts = []
       </div>
       {listening && <p className="muted" style={{ fontSize: 12, margin: "6px 0 0", color: "var(--bad)" }}>{tr("Hlusta… talaðu fyrirmælin og smelltu svo aftur á hljóðnemann.")}</p>}
       <div className="chips">{ex.map((c) => <button className="chip" key={c} onClick={() => setQuery(c)}>{c}</button>)}</div>
+      {live && <PlanningRules examples={names[0] ? [`${names[0]} vinnur aðeins morgunvaktir`] : []} />}
       <div style={{ display: "flex", gap: 9, marginTop: 14 }}>
         <button className="btn" onClick={onGen}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6Z" /></svg>{tr("Búa til með AI")}</button>
         <button className="btn ghost" onClick={onClose}>{tr("Hætta við")}</button>

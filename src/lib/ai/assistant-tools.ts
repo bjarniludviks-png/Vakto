@@ -16,6 +16,9 @@ import { getSickRate } from "@/lib/sickrate.server";
 import { byDept, pctOf, SICK_DEFINITION } from "@/lib/sickrate";
 import { getUpcomingLeavers } from "@/lib/terminations.server";
 import { REASON_LABEL } from "@/lib/termination";
+import { getPlanningRules } from "@/lib/planning-rules.server";
+import { addPlanningRule, deletePlanningRule } from "@/app/(app)/vaktaplan/actions";
+import { MAX_RULE_LEN } from "@/lib/planning-rules";
 
 // VAKTO AI — verkfæri. LESverkfæri keyra strax (sömu aðgerðir og skjáirnir nota, sama aðgangsstýring).
 // SKRIFverkfæri keyra ALDREI í líkaninu sjálfu: þau verða „tillaga" sem notandinn staðfestir með hnappi,
@@ -56,6 +59,11 @@ export const READ_TOOLS: Anthropic.Tool[] = [
     name: "week_planning_context",
     description: "Allt sem þarf til að setja upp vaktaplan fyrir heila viku: starfsfólk (deild, starfshlutfall, tímakaup/föst laun), núverandi vaktir vikunnar, hverjir eru ekki tiltækir hvaða daga (óframboð), samþykkt frí (aldrei vakt þá daga), frí-beiðnir í bið, framboð/óskir starfsfólks og vaktaskipti í bið, vaktategundir með tímum, mönnunarþörf per dag og launaáætlun (veltuspá, launamarkmið, kostnaður per klst). Kallaðu á þetta ÁÐUR en þú notar plan_week.",
     input_schema: { type: "object", properties: { monday: { type: "string", description: "Mánudagur vikunnar, YYYY-MM-DD" } }, required: ["monday"] },
+  },
+  {
+    name: "planning_rules",
+    description: "Vistaðar planreglur fyrirtækisins (fastar reglur fyrir vaktaplan, t.d. „Bach bara morgunvaktir“) með id, texta og hvort þær eru virkar. Virkar reglur fylgja líka week_planning_context (companyRules). Notaðu til að svara „hvaða reglur eru vistaðar?“ og áður en reglu er eytt.",
+    input_schema: { type: "object", properties: {} },
   },
   {
     name: "compare_periods",
@@ -161,6 +169,16 @@ export const WRITE_TOOLS: Anthropic.Tool[] = [
     },
     // Vaktirnar streymast jafnóðum (framvinda í spjallinu); inntakið er sannreynt í parseWeekPlan áður en nokkuð er gert.
     eager_input_streaming: true,
+  },
+  {
+    name: "save_planning_rule",
+    description: `LEGGJA TIL að vista fasta planreglu fyrirtækisins sem gildir í öllum framtíðarplönum (AI-vaktaplan í spjallinu og í Vaktaplani). Notaðu þegar notandinn biður þig að muna eitthvað um vaktaplan („mundu að Bach er bara á morgnana“, „alltaf 3 í eldhúsi um helgar“, „Anna vinnur aldrei sunnudaga“). Ein regla per kall, stutt og skýr setning með nafni/deild og tíma, mest ${MAX_RULE_LEN} stafir. EKKI fyrir einstakar vikur („Anna í fríi næsta föstudag“) — það er bara fyrir planið núna.`,
+    input_schema: { type: "object", properties: { text: { type: "string", description: "Reglan, t.d. „Bach Đuc Luu vinnur aðeins morgunvaktir (05:00–12:00)“" } }, required: ["text"] },
+  },
+  {
+    name: "remove_planning_rule",
+    description: "LEGGJA TIL að eyða vistaðri planreglu. Kallaðu fyrst á planning_rules til að fá id.",
+    input_schema: { type: "object", properties: { id: { type: "string" }, label: { type: "string", description: "Texti reglunnar (birtur notandanum)" } }, required: ["id"] },
   },
   {
     name: "create_open_shifts",
@@ -333,6 +351,7 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       const mon = str(input.monday), dates = weekDates(mon);
       if (new Date(`${mon}T12:00:00`).getDay() !== 1) return JSON.stringify({ error: `${mon} er ekki mánudagur` });
       const supabase = await createClient();
+      const rulesP = getPlanningRules(supabase);
       const [{ employees }, shifts, wk, budget, types, leave, co, reqs] = await Promise.all([
         getEmployees(), getShiftsInRange(dates[0], dates[6]), getWeekShifts(mon), getWeekBudget(mon),
         supabase.from("shift_types").select("name, start_time, end_time, premium_pct"),
@@ -366,6 +385,9 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       if (reqs?.pendingSwaps?.length) out.pendingSwaps = reqs.pendingSwaps;
       const targets = (co.data?.staffing_targets as number[] | null) ?? null;
       if (targets) out.staffingTargetsMonToSun = targets;
+      // Vistaðar planreglur (0101): gilda eins og skilyrði notandans nema hann taki annað fram.
+      const companyRules = (await rulesP).filter((r) => r.active).map((r) => r.text);
+      if (companyRules.length) out.companyRules = companyRules;
       if (budget) out.budget = { revenueForecast: budget.revenue, revenueSource: budget.revenueSource, laborTargetPct: budget.target, fixedSalaryCostKr: budget.fixed, avgCostPerHourKr: Math.round(budget.avgRate) };
       return JSON.stringify(out);
     }
@@ -422,6 +444,10 @@ export async function runReadTool(name: string, input: In): Promise<string> {
           sickEmployees: b.rows.filter((r) => r.sick > 0).map((r) => ({ name: r.name, dept: r.dept, sickDays: r.sickDays, occurrences: r.occurrences, sickHours: r.sick, ratePct: pctOf(r.sick, r.planned) })),
         })),
       });
+    }
+    if (name === "planning_rules") {
+      const rules = await getPlanningRules();
+      return JSON.stringify(rules.length ? rules.map((r) => ({ id: r.id, text: r.text, active: r.active })) : { rules: [], note: "Engar planreglur vistaðar" });
     }
     if (name === "pending_requests") {
       const r = await getPendingRequests();
@@ -496,6 +522,14 @@ export function describeWrite(name: string, input: In, lang: string): { ok: true
         ? `Email me the report "${REPORT_TITLE.en[rep]}" for ${shortDate(str(input.from))}–${shortDate(str(input.to))} (table + Excel)`
         : `Senda mér skýrsluna „${REPORT_TITLE.is[rep]}“ fyrir ${shortDate(str(input.from))}–${shortDate(str(input.to))} í tölvupósti (tafla + Excel)` };
     }
+    case "save_planning_rule": {
+      const t = str(input.text).trim();
+      if (t.length < 3) return { ok: false, error: "Vantar texta reglunnar" };
+      return { ok: true, summary: en ? `Save planning rule: "${t.slice(0, MAX_RULE_LEN)}" — applies to every future AI schedule` : `Vista planreglu: „${t.slice(0, MAX_RULE_LEN)}“ — gildir í öllum AI-vaktaplönum héðan í frá` };
+    }
+    case "remove_planning_rule":
+      if (!str(input.id)) return { ok: false, error: "Vantar id" };
+      return { ok: true, summary: `${en ? "Delete planning rule" : "Eyða planreglu"}: ${str(input.label) || str(input.id)}` };
     case "resend_contract":
       if (!who) return { ok: false, error: "Vantar starfsmann" };
       return { ok: true, summary: `${en ? "Resend contract for signature" : "Senda samning aftur til undirritunar"}: ${str(input.label) || who}` };
@@ -569,6 +603,10 @@ export async function executeWrite(name: string, input: In): Promise<{ ok: boole
       return deleteAlert(str(input.id));
     case "send_report_now":
       return sendReportNow({ report: str(input.report), from: str(input.from), to: str(input.to) });
+    case "save_planning_rule":
+      return addPlanningRule(str(input.text), "ai");
+    case "remove_planning_rule":
+      return deletePlanningRule(str(input.id));
     case "resend_contract": {
       const { employees } = await getEmployees();
       const hits = matchStaff(employees.filter((e) => e.status !== "inactive"), str(input.employee));
