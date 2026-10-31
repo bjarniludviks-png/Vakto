@@ -60,6 +60,9 @@ export default function Thread() {
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   // Afrita: textinn í blaði þar sem má velja hann (appið hefur ekki klemmuspjaldseiningu enn).
   const [copyOf, setCopyOf] = useState<ChatMessage | null>(null);
+  // „Viðbrögð“: hverjir settu hvaða emoji (ýtt á emoji-merkið undir skilaboðum)
+  const [whoFor, setWhoFor] = useState<string | null>(null);
+  const [whoTab, setWhoTab] = useState<string | null>(null);
   // Þýðingar á tungumál appsins: id → þýddur texti (null = í vinnslu); `orig` = sýna frumtexta aftur.
   const [trans, setTrans] = useState<Record<string, string | null>>({});
   const [orig, setOrig] = useState<Record<string, boolean>>({});
@@ -236,10 +239,11 @@ export default function Thread() {
   }
   function patchReaction(mid: string, emoji: string | null) {
     patchMsg(mid, (x) => {
-      let rs = x.reactions.map((y) => (y.mine ? { ...y, count: y.count - 1, mine: false } : y)).filter((y) => y.count > 0);
+      const meW = { userId: "me", name: me?.fullName ?? tr("Þú"), color: me?.avatarColor ?? null, photo: me?.photoUrl ?? null, me: true };
+      let rs = x.reactions.map((y) => (y.mine ? { ...y, count: y.count - 1, mine: false, who: y.who.filter((w) => !w.me) } : y)).filter((y) => y.count > 0);
       if (emoji) rs = rs.some((y) => y.emoji === emoji)
-        ? rs.map((y) => (y.emoji === emoji ? { ...y, count: y.count + 1, mine: true } : y))
-        : [...rs, { emoji, count: 1, mine: true }];
+        ? rs.map((y) => (y.emoji === emoji ? { ...y, count: y.count + 1, mine: true, who: [...y.who, meW] } : y))
+        : [...rs, { emoji, count: 1, mine: true, who: [meW] }];
       return { ...x, reactions: rs };
     });
   }
@@ -420,7 +424,7 @@ export default function Thread() {
             </View>
           ) : (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={{ width: W - 28 }}><Bubble item={item} onLong={() => setSel(item.m)} onImage={setViewer}
+              <View style={{ width: W - 28 }}><Bubble item={item} onLong={() => setSel(item.m)} onImage={setViewer} onReactions={() => { setWhoTab(null); setWhoFor(item.m.id); }}
                 translated={item.m.id in trans && !orig[item.m.id] ? (trans[item.m.id] ?? "…") : undefined}
                 onToggleOriginal={item.m.id in trans ? () => setOrig((cur) => ({ ...cur, [item.m.id]: !cur[item.m.id] })) : undefined}
                 showingOriginal={!!orig[item.m.id]} /></View>
@@ -495,6 +499,34 @@ export default function Thread() {
           {sel?.me ? <Row icon={<Trash2 color={colors.bad} size={19} />} title="Eyða skilaboðum" danger onPress={async () => { if (sel) { await deleteMessage(sel.id); patchMsg(sel.id, () => null); } setSel(null); load(); }} chevron={false} last /> : null}
         </View>
       </Sheet>
+      {(() => {
+        const wm = whoFor ? msgs.find((x) => x.id === whoFor) : undefined;
+        const rows = (wm?.reactions ?? []).filter((r) => !whoTab || r.emoji === whoTab).flatMap((r) => r.who.map((w) => ({ w, emoji: r.emoji })));
+        rows.sort((a, b) => Number(b.w.me) - Number(a.w.me) || a.w.name.localeCompare(b.w.name, "is"));
+        return (
+          <Sheet open={!!wm && wm.reactions.length > 0} onClose={() => setWhoFor(null)} title={tr("Viðbrögð")}>
+            {wm && wm.reactions.length > 1 ? (
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
+                {[null, ...wm.reactions.map((r) => r.emoji)].map((e) => (
+                  <Pressable key={e ?? "all"} onPress={() => setWhoTab(e)} style={{ backgroundColor: whoTab === e ? colors.line2 : "transparent", borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
+                    <Txt size={14} weight="semibold">{e ?? tr("Öll")} {e ? wm.reactions.find((r) => r.emoji === e)?.count : wm.reactions.reduce((a, r) => a + r.count, 0)}</Txt>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            {rows.map(({ w, emoji }) => (
+              <Pressable key={`${w.userId}-${emoji}`} disabled={!w.me} onPress={async () => { if (!me || !wm) return; const mid = wm.id; setWhoFor(null); await setReaction(me, mid, null); patchReaction(mid, null); load(); }} style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 }}>
+                <Avatar name={w.name} size={44} color={w.color} photo={w.photo} />
+                <View style={{ flex: 1 }}>
+                  <Txt size={16} weight="semibold">{w.name}</Txt>
+                  {w.me ? <Muted size={13}>{tr("Ýttu til að fjarlægja")}</Muted> : null}
+                </View>
+                <Txt size={26}>{emoji}</Txt>
+              </Pressable>
+            ))}
+          </Sheet>
+        );
+      })()}
       <Sheet open={!!copyOf} onClose={() => setCopyOf(null)} title={tr("Afrita texta")}>
         <Muted size={13} style={{ marginBottom: 10 }}>{tr("Haltu fingri á textanum til að velja og afrita hann.")}</Muted>
         <View style={{ backgroundColor: colors.panel2, borderRadius: 14, padding: 14 }}>
@@ -574,8 +606,8 @@ const TIME_W = 58;
 const IMG_RE = /\.(jpe?g|png|gif|webp|heic|heif)(\?|$)/i;
 const isImage = (m: ChatMessage) => !!m.url && (m.kind === "image" || (m.kind === "file" && (IMG_RE.test(m.url) || IMG_RE.test(m.body))));
 
-function Bubble({ item, onLong, onImage, translated, onToggleOriginal, showingOriginal }: {
-  item: Extract<RowItem, { kind: "msg" }>; onLong: () => void; onImage: (url: string) => void;
+function Bubble({ item, onLong, onImage, onReactions, translated, onToggleOriginal, showingOriginal }: {
+  item: Extract<RowItem, { kind: "msg" }>; onLong: () => void; onImage: (url: string) => void; onReactions: () => void;
   translated?: string; onToggleOriginal?: () => void; showingOriginal?: boolean;
 }) {
   const { m, first, last, showSender } = item;
@@ -585,9 +617,9 @@ function Bubble({ item, onLong, onImage, translated, onToggleOriginal, showingOr
     ? { borderTopLeftRadius: r, borderBottomLeftRadius: r, borderTopRightRadius: first ? r : s, borderBottomRightRadius: last ? r : s }
     : { borderTopRightRadius: r, borderBottomRightRadius: r, borderTopLeftRadius: first ? r : s, borderBottomLeftRadius: last ? r : s };
   return (
-    <View style={{ marginBottom: m.reactions.length ? 14 : last ? 8 : 2 }}>
+    <View style={{ marginBottom: last ? 8 : 2 }}>
       {showSender ? <Txt size={12} color={colors.ink3} style={{ marginLeft: 48, marginBottom: 3 }}>{m.senderFull}</Txt> : null}
-      <View style={{ flexDirection: m.me ? "row-reverse" : "row", alignItems: "flex-end", gap: 8, maxWidth: "82%", alignSelf: m.me ? "flex-end" : "flex-start" }}>
+      <View style={{ flexDirection: m.me ? "row-reverse" : "row", alignItems: "flex-end", gap: 8, maxWidth: "82%", alignSelf: m.me ? "flex-end" : "flex-start", paddingBottom: m.reactions.length ? 12 : 0 }}>
         {!m.me ? <View style={{ width: 28, opacity: last ? 1 : 0 }}><Avatar name={m.senderFull} size={28} color={m.color} photo={m.photo} /></View> : null}
         <Pressable onLongPress={onLong} delayLongPress={250} style={{ backgroundColor: m.me ? colors.brand : colors.bubbleThem, paddingHorizontal: img ? 4 : 13, paddingVertical: img ? 4 : 9, ...radius, position: "relative", flexShrink: 1 }}>
           {m.replyTo ? (
@@ -608,12 +640,13 @@ function Bubble({ item, onLong, onImage, translated, onToggleOriginal, showingOr
               {[m.edited ? tr("Breytt") : null, onToggleOriginal ? (showingOriginal ? tr("Sýna þýðingu") : tr("Þýtt · Sýna frumtexta")) : null].filter(Boolean).join(" · ")}
             </Txt>
           ) : null}
-          {m.reactions.length ? (
-            <View style={{ position: "absolute", bottom: -12, [m.me ? "left" : "right"]: 8, flexDirection: "row", backgroundColor: colors.panel, borderRadius: 999, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 6, paddingVertical: 1, gap: 3 }}>
-              {m.reactions.map((x) => <Txt key={x.emoji} size={12}>{x.emoji}{x.count > 1 ? ` ${x.count}` : ""}</Txt>)}
-            </View>
-          ) : null}
         </Pressable>
+        {/* utan við kúluna svo hægt sé að ýta á það (snerting utan marka foreldris skráist ekki) */}
+        {m.reactions.length ? (
+          <Pressable onPress={onReactions} hitSlop={8} accessibilityLabel={tr("Viðbrögð")} style={{ position: "absolute", bottom: 0, [m.me ? "left" : "right"]: 8, flexDirection: "row", backgroundColor: colors.panel, borderRadius: 999, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 6, paddingVertical: 1, gap: 3 }}>
+            {m.reactions.map((x) => <Txt key={x.emoji} size={12}>{x.emoji}{x.count > 1 ? ` ${x.count}` : ""}</Txt>)}
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
