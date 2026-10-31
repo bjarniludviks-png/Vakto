@@ -43,6 +43,11 @@ export const READ_TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: { from: DATE, to: DATE, weeks: { type: "number", description: "Fjöldi heilla vikna aftur í tímann (4–26), sjálfgefið 8" } } },
   },
   {
+    name: "staff_pay",
+    description: "Launakjör starfsfólks: starfsheiti, deild, tímakaup eða mánaðarlaun, starfshlutfall, stéttarfélag, ráðningardagur og starfsaldur í árum (að meðtöldum fyrri starfsaldri). Notaðu þegar spurt er um laun tiltekins starfsmanns eða hvort laun séu í samræmi við kjarasamning. name síar á nafn (valfrjálst).",
+    input_schema: { type: "object", properties: { name: { type: "string", description: "Nafn eða hluti nafns (valfrjálst)" } } },
+  },
+  {
     name: "who_is_on_now",
     description: "Hverjir eru stimplaðir inn núna (og síðan hvenær), og hverjir á plani dagsins hafa ekki mætt.",
     input_schema: { type: "object", properties: {} },
@@ -575,6 +580,22 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       const weeks = Math.min(26, Math.max(4, Math.round(Number(input.weeks) || 8)));
       const r = okDate(input.from) && okDate(input.to) ? { from: str(input.from), to: str(input.to) } : historyRange(today, weeks);
       return JSON.stringify(await getPlanningHistory(supabase, company, r.from, r.to));
+    }
+    if (name === "staff_pay") {
+      const { employees } = await getEmployees();
+      const q = str(input.name).trim().toLowerCase();
+      const now = Date.now();
+      const rows = employees
+        .filter((e) => e.status !== "inactive" && (!q || e.fullName.toLowerCase().includes(q)))
+        .map((e) => {
+          const months = (e.hireDate ? (now - new Date(`${e.hireDate}T12:00:00`).getTime()) / (30.44 * 864e5) : 0) + (e.priorServiceMonths ?? 0);
+          return {
+            name: e.fullName, title: e.title ?? e.position, department: e.department,
+            pay: e.payType === "hourly" ? `${e.rate} kr./klst.` : `${e.rate} kr./mán.`, employmentRatio: `${e.employmentRatio} %`,
+            union: e.union, hireDate: e.hireDate ?? null, tenureYears: e.hireDate || e.priorServiceMonths ? Math.round((months / 12) * 10) / 10 : null,
+          };
+        });
+      return JSON.stringify(rows.slice(0, 200));
     }
     if (name === "planning_rules") {
       const rules = await getPlanningRules();
