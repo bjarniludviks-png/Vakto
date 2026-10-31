@@ -1,7 +1,7 @@
 // Spjall — beint á Supabase (channels / channel_members / messages /
 // message_reactions / channel_reads) með realtime, eins og vefurinn.
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import { tr, trf } from "../../../src/lib/i18n";
+import { tr, trf, getLang } from "../../../src/lib/i18n";
 import { supabase } from "../supabase";
 import { notifyServer } from "./notify";
 import type { Me } from "./me";
@@ -41,6 +41,8 @@ export type ChatMessage = {
   createdAt: string;
   kind: "text" | "image" | "audio" | "file";
   url: string | null;
+  /** Sendandi breytti textanum (0100). */
+  edited?: boolean;
   reactions: { emoji: string; count: number; mine: boolean }[];
   replyTo: { sender: string; body: string } | null;
 };
@@ -199,10 +201,17 @@ export type MessageCursor = { createdAt: string; id: string };
 export async function listMessages(me: Me, channelId: string, before?: MessageCursor | null): Promise<{ messages: ChatMessage[]; reads: ChannelRead[]; hasMore: boolean; myReadAt: string | null }> {
   // nýjast fyrst + limit (ein aukaröð segir hvort eldri séu til), svo snúið við;
   // bendill á (created_at, id) svo jafnir tímastimplar detta aldrei út
-  let q = supabase.from("messages").select("id, sender_id, body, kind, attachment_url, created_at, reply_to, message_reactions(user_id, emoji)").eq("channel_id", channelId);
-  if (before) q = q.or(`created_at.lt."${before.createdAt}",and(created_at.eq."${before.createdAt}",id.lt.${before.id})`);
+  // edited_at kemur með 0100 — eldri grunnur svarar villu og þá er sótt án hans
+  type Row = { id: string; sender_id: string; body: string | null; kind: string | null; attachment_url: string | null; created_at: string; reply_to: string | null; edited_at?: string | null; message_reactions: { user_id: string; emoji: string }[] | null };
+  const page = async (withEdited: boolean): Promise<{ data: Row[] | null; error: unknown }> => {
+    const cols = "id, sender_id, body, kind, attachment_url, created_at, reply_to, message_reactions(user_id, emoji)" + (withEdited ? ", edited_at" : "");
+    let q = supabase.from("messages").select(cols as "*").eq("channel_id", channelId);
+    if (before) q = q.or(`created_at.lt."${before.createdAt}",and(created_at.eq."${before.createdAt}",id.lt.${before.id})`);
+    return (await q.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(CHAT_PAGE + 1)) as unknown as { data: Row[] | null; error: unknown };
+  };
+  const rowsP = page(true).then(async (r) => (r.error ? await page(false) : r));
   const [{ data: rows }, people, { data: auth }, { data: reads }] = await Promise.all([
-    q.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(CHAT_PAGE + 1),
+    rowsP,
     peopleMap(me.companyId),
     authUser(),
     before ? Promise.resolve({ data: [] as { user_id: string; last_read_at: string }[] }) : supabase.from("channel_reads").select("user_id, last_read_at").eq("channel_id", channelId),
@@ -227,7 +236,7 @@ export async function listMessages(me: Me, channelId: string, before?: MessageCu
     return {
       id: m.id, senderId: m.sender_id, sender: full.split(/\s+/)[0], senderFull: full, color: p?.color ?? null, photo: p?.photo ?? null,
       me: m.sender_id === myId, body: m.body ?? "", at: new Date(m.created_at).toTimeString().slice(0, 5), createdAt: m.created_at,
-      kind: (m.kind ?? "text") as ChatMessage["kind"], url: m.attachment_url,
+      kind: (m.kind ?? "text") as ChatMessage["kind"], url: m.attachment_url, edited: !!m.edited_at,
       reactions: [...counts.entries()].map(([emoji, c]) => ({ emoji, ...c })),
       replyTo: rt ? { sender: (people.get(rt.sender_id)?.name ?? "Notandi").split(/\s+/)[0], body: rt.body ?? "" } : null,
     };
@@ -255,6 +264,30 @@ export async function setReaction(me: Me, messageId: string, emoji: string | nul
   else await supabase.from("message_reactions").upsert({ message_id: messageId, user_id: auth.user.id, company_id: me.companyId, emoji }, { onConflict: "message_id,user_id" });
 }
 
+/** Breyta texta eigin skilaboða (0100: aðeins body, edited_at sett í grunninum). */
+export async function editMessage(messageId: string, body: string): Promise<{ ok: boolean; error?: string }> {
+  const { data, error } = await supabase.from("messages").update({ body }).eq("id", messageId).select("id");
+  if (error) return { ok: false, error: error.message };
+  return (data ?? []).length ? { ok: true } : { ok: false, error: tr("Ekki hægt að breyta þessum skilaboðum") };
+}
+
+const API = (process.env.EXPO_PUBLIC_API_URL ?? "https://www.vakto.is").replace(/\/$/, "");
+/** Þýðir skilaboð á tungumál appsins (VAKTO AI á vefnum, /api/app/chat/translate). */
+export async function translateMessage(messageId: string): Promise<{ ok: boolean; text?: string; error?: string }> {
+  const { data } = await supabase.auth.getSession();
+  const t = data.session?.access_token;
+  if (!t) return { ok: false, error: tr("Ekki innskráð(ur)") };
+  try {
+    const r = await fetch(`${API}/api/app/chat/translate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+      body: JSON.stringify({ messageId, lang: getLang() }),
+    });
+    const j = (await r.json()) as { ok?: boolean; text?: string; error?: string };
+    return j.ok && j.text ? { ok: true, text: j.text } : { ok: false, error: j.error ?? tr("Þýðing tókst ekki") };
+  } catch { return { ok: false, error: tr("Þýðing tókst ekki") }; }
+}
+
 export async function deleteMessage(messageId: string): Promise<void> {
   await supabase.from("messages").delete().eq("id", messageId);
 }
@@ -278,12 +311,13 @@ export async function startDM(me: Me, otherUserId: string): Promise<{ ok: boolea
   return { ok: true, id: ch.id as string };
 }
 
-/** Realtime: ný skilaboð + lestrarstöður (RLS sér um afmörkun). */
+/** Realtime: ný og breytt skilaboð + lestrarstöður (RLS sér um afmörkun). */
 export type ReadRow = { channel_id: string; user_id: string; last_read_at: string };
-export function subscribeChat(onMessage: (row: { id: string; channel_id: string; sender_id: string; body: string; kind: string; created_at: string; attachment_url: string | null; reply_to: string | null }) => void, onReads?: (row: ReadRow | null) => void): RealtimeChannel {
+export function subscribeChat(onMessage: (row: { id: string; channel_id: string; sender_id: string; body: string; kind: string; created_at: string; attachment_url: string | null; reply_to: string | null }) => void, onReads?: (row: ReadRow | null) => void, onEdit?: (row: { id: string; channel_id: string; body: string }) => void): RealtimeChannel {
   return supabase
     .channel("chat-live-" + Math.random().toString(36).slice(2, 8))
     .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (p) => onMessage(p.new as Parameters<typeof onMessage>[0]))
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (p) => onEdit?.(p.new as { id: string; channel_id: string; body: string }))
     .on("postgres_changes", { event: "*", schema: "public", table: "channel_reads" }, (p) => onReads?.((p.new ?? null) as ReadRow | null))
     .subscribe();
 }

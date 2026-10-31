@@ -6,10 +6,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { tr, trf } from "../../src/lib/i18n";
 import { setOpenChannel } from "../../src/lib/push";
 import { ImageViewer } from "../../src/components/image-viewer";
-import { View, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions } from "react-native";
+import { View, Text, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronLeft, ChevronRight, Send, X, Hash, CornerUpLeft, Trash2, Flag, Ban, Image as ImageIcon, Camera, CirclePlus, Info, BellOff, Bell, FileText, Images, LogOut, Pencil, Phone } from "lucide-react-native";
+import { ChevronLeft, ChevronRight, Send, X, Hash, CornerUpLeft, Trash2, Flag, Ban, Image as ImageIcon, Camera, CirclePlus, Info, BellOff, Bell, FileText, Images, LogOut, Pencil, Phone, Copy, Languages } from "lucide-react-native";
 import * as DocumentPicker from "expo-document-picker";
 import { Linking, Alert } from "react-native";
 import * as ImagePicker from "expo-image-picker";
@@ -18,7 +18,7 @@ import { Txt, Muted, Avatar, Sheet, Row, useToast, colorFor } from "../../src/co
 import { uploadImage } from "../../src/lib/api/feed";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, subscribeChat, typingChannel, peopleMap, authUser, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
+import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, editMessage, translateMessage, subscribeChat, typingChannel, peopleMap, authUser, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
 import { supabase } from "../../src/lib/supabase";
 import { isMuted, toggleMute } from "../../src/lib/mute";
 import { reportContent, blockUser, blockedUsers } from "../../src/lib/api/moderation";
@@ -56,6 +56,13 @@ export default function Thread() {
   const [sending, setSending] = useState(false);
   const [sel, setSel] = useState<ChatMessage | null>(null);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
+  // Breyta eigin skilaboðum (0100): textinn fer í innsláttarreitinn og „Senda“ vistar breytinguna.
+  const [editing, setEditing] = useState<ChatMessage | null>(null);
+  // Afrita: textinn í blaði þar sem má velja hann (appið hefur ekki klemmuspjaldseiningu enn).
+  const [copyOf, setCopyOf] = useState<ChatMessage | null>(null);
+  // Þýðingar á tungumál appsins: id → þýddur texti (null = í vinnslu); `orig` = sýna frumtexta aftur.
+  const [trans, setTrans] = useState<Record<string, string | null>>({});
+  const [orig, setOrig] = useState<Record<string, boolean>>({});
   const [typing, setTyping] = useState<string | null>(null);
   const [members, setMembers] = useState(0);
   const [isGroup, setIsGroup] = useState(true);
@@ -282,6 +289,11 @@ export default function Thread() {
       if (r.user_id === auth.user?.id) return;
       const p = (await peopleMap(me.companyId)).get(r.user_id);
       setReads((cur) => [...cur.filter((x) => x.userId !== r.user_id), { userId: r.user_id, name: p?.name ?? "", lastReadAt: r.last_read_at, color: p?.color ?? null, photo: p?.photo ?? null }]);
+    }, (e) => {
+      // breytt skilaboð: nýr texti strax og eldri þýðing fellur út
+      if (e.channel_id !== id) return;
+      setMsgs((cur) => cur.map((m) => (m.id === e.id && m.body !== e.body ? { ...m, body: e.body, edited: true } : m)));
+      setTrans((cur) => { if (!(e.id in cur)) return cur; const n = { ...cur }; delete n[e.id]; return n; });
     });
     typingRef.current = typingChannel(id, (p) => { if (p.stop) setTyping(null); else { setTyping(p.name); setTimeout(() => setTyping((cur) => (cur === p.name ? null : cur)), 4000); } });
     const poll = setInterval(load, 15000);
@@ -300,6 +312,15 @@ export default function Thread() {
   async function send() {
     const body = text.trim();
     if (!me || !id || !body || sending) return;
+    if (editing) {
+      const m = editing;
+      setEditing(null); setText("");
+      if (body === m.body) return;
+      patchMsg(m.id, (x) => ({ ...x, body, edited: true }));
+      const r = await editMessage(m.id, body);
+      if (!r.ok) { patchMsg(m.id, (x) => ({ ...x, body: m.body, edited: m.edited })); toast(r.error ?? "Tókst ekki"); }
+      return;
+    }
     setSending(true);
     setText("");
     const rt = replyTo; setReplyTo(null);
@@ -313,6 +334,15 @@ export default function Thread() {
     if (!r.ok) { setMsgs((cur) => cur.filter((m) => m.id !== tmp.id)); setText(body); return; }
     setMsgs((cur) => cur.map((m) => (m.id === tmp.id ? { ...m, id: r.id ?? m.id } : m)));
     typingRef.current?.send({ type: "broadcast", event: "typing", payload: { userId: me.empId, name: "", stop: true } });
+  }
+
+  async function translate(m: ChatMessage) {
+    setOrig((cur) => ({ ...cur, [m.id]: false }));
+    if (trans[m.id]) return;
+    setTrans((cur) => ({ ...cur, [m.id]: null }));
+    const r = await translateMessage(m.id);
+    if (r.ok && r.text) setTrans((cur) => ({ ...cur, [m.id]: r.text! }));
+    else { setTrans((cur) => { const n = { ...cur }; delete n[m.id]; return n; }); toast(r.error ?? "Þýðing tókst ekki"); }
   }
 
   const rows = useMemo<RowItem[]>(() => {
@@ -390,7 +420,10 @@ export default function Thread() {
             </View>
           ) : (
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={{ width: W - 28 }}><Bubble item={item} onLong={() => setSel(item.m)} onImage={setViewer} /></View>
+              <View style={{ width: W - 28 }}><Bubble item={item} onLong={() => setSel(item.m)} onImage={setViewer}
+                translated={item.m.id in trans && !orig[item.m.id] ? (trans[item.m.id] ?? "…") : undefined}
+                onToggleOriginal={item.m.id in trans ? () => setOrig((cur) => ({ ...cur, [item.m.id]: !cur[item.m.id] })) : undefined}
+                showingOriginal={!!orig[item.m.id]} /></View>
               <View style={{ width: TIME_W + 14, alignItems: "center", paddingBottom: item.last ? 8 : 2 }}>
                 <Txt size={11} color={colors.ink3} style={{ fontVariant: ["tabular-nums"] }}>{item.m.at}</Txt>
               </View>
@@ -400,6 +433,13 @@ export default function Thread() {
       />
       </Animated.View>
 
+      {editing ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: colors.panel, borderTopWidth: 1, borderTopColor: colors.line2 }}>
+          <Pencil color={colors.ink3} size={16} />
+          <View style={{ flex: 1 }}><Txt weight="bold" size={12} color={colors.brandDeep}>{tr("Breyta skilaboðum")}</Txt><Muted size={12}>{editing.body.slice(0, 80)}</Muted></View>
+          <Pressable onPress={() => { setEditing(null); setText(""); }} hitSlop={8}><X color={colors.ink3} size={18} /></Pressable>
+        </View>
+      ) : null}
       {replyTo ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: colors.panel, borderTopWidth: 1, borderTopColor: colors.line2 }}>
           <CornerUpLeft color={colors.ink3} size={16} />
@@ -446,12 +486,23 @@ export default function Thread() {
           })}
         </View>
         <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
-          <Row icon={<CornerUpLeft color={colors.ink2} size={19} />} title="Svara" onPress={() => { setReplyTo(sel); setSel(null); }} chevron={false} />
+          <Row icon={<CornerUpLeft color={colors.ink2} size={19} />} title="Svara" onPress={() => { setEditing(null); setReplyTo(sel); setSel(null); }} chevron={false} />
+          {sel?.body && sel.kind === "text" ? <Row icon={<Copy color={colors.ink2} size={19} />} title="Afrita texta" onPress={() => { setCopyOf(sel); setSel(null); }} chevron={false} /> : null}
+          {sel && !sel.me && sel.body && sel.kind === "text" ? <Row icon={<Languages color={colors.ink2} size={19} />} title="Þýða" sub="VAKTO AI þýðir á þitt tungumál" onPress={() => { const m = sel; setSel(null); void translate(m); }} chevron={false} /> : null}
+          {sel?.me && sel.kind === "text" && !sel.id.startsWith("tmp-") ? <Row icon={<Pencil color={colors.ink2} size={19} />} title="Breyta texta" onPress={() => { const m = sel; setSel(null); setReplyTo(null); setEditing(m); setText(m.body); }} chevron={false} /> : null}
           {sel && !sel.me ? <Row icon={<Flag color={colors.ink2} size={19} />} title="Tilkynna skilaboð" sub="Stjórnendur fá tilkynningu" onPress={async () => { if (!me || !sel) return; const r = await reportContent(me, "message", sel.id, sel.senderId, sel.body || (sel.kind === "image" ? "Mynd" : "Skjal")); setSel(null); toast(r.ok ? "Tilkynning send til stjórnenda" : (r.error ?? "Tókst ekki")); }} chevron={false} /> : null}
           {sel && !sel.me ? <Row icon={<Ban color={colors.bad} size={19} />} title={trf("Fela skilaboð frá {x}", sel.sender)} danger onPress={() => { const m = sel; setSel(null); Alert.alert(trf("Fela skilaboð frá {x}", m.sender), tr("Þú sérð ekki lengur skilaboð eða færslur frá viðkomandi. Þú getur opnað aftur í Stillingum."), [{ text: tr("Hætta við"), style: "cancel" }, { text: tr("Fela"), style: "destructive", onPress: async () => { if (await blockUser(m.senderId)) load(); } }]); }} chevron={false} last /> : null}
           {sel?.me ? <Row icon={<Trash2 color={colors.bad} size={19} />} title="Eyða skilaboðum" danger onPress={async () => { if (sel) { await deleteMessage(sel.id); patchMsg(sel.id, () => null); } setSel(null); load(); }} chevron={false} last /> : null}
         </View>
       </Sheet>
+      <Sheet open={!!copyOf} onClose={() => setCopyOf(null)} title={tr("Afrita texta")}>
+        <Muted size={13} style={{ marginBottom: 10 }}>{tr("Haltu fingri á textanum til að velja og afrita hann.")}</Muted>
+        <View style={{ backgroundColor: colors.panel2, borderRadius: 14, padding: 14 }}>
+          {/* kerfisletur: textinn getur verið á hvaða máli sem er (General Sans vantar t.d. víetnömsk tónmerki) */}
+          <Text selectable style={{ fontSize: 16, lineHeight: 22, color: colors.ink }}>{copyOf?.body ?? ""}</Text>
+        </View>
+      </Sheet>
+
       <Sheet open={info} onClose={() => { setInfo(false); setMedia(null); }}>
         {media !== null ? (
           <Pressable onPress={() => setMedia(null)} style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: -4 }}>
@@ -523,7 +574,10 @@ const TIME_W = 58;
 const IMG_RE = /\.(jpe?g|png|gif|webp|heic|heif)(\?|$)/i;
 const isImage = (m: ChatMessage) => !!m.url && (m.kind === "image" || (m.kind === "file" && (IMG_RE.test(m.url) || IMG_RE.test(m.body))));
 
-function Bubble({ item, onLong, onImage }: { item: Extract<RowItem, { kind: "msg" }>; onLong: () => void; onImage: (url: string) => void }) {
+function Bubble({ item, onLong, onImage, translated, onToggleOriginal, showingOriginal }: {
+  item: Extract<RowItem, { kind: "msg" }>; onLong: () => void; onImage: (url: string) => void;
+  translated?: string; onToggleOriginal?: () => void; showingOriginal?: boolean;
+}) {
   const { m, first, last, showSender } = item;
   const img = isImage(m);
   const r = 18, s = 6;
@@ -548,7 +602,12 @@ function Bubble({ item, onLong, onImage }: { item: Extract<RowItem, { kind: "msg
               <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: m.me ? "rgba(255,255,255,.2)" : colors.panel, alignItems: "center", justifyContent: "center" }}><FileText color={m.me ? "#fff" : colors.ink2} size={18} /></View>
               <View style={{ flexShrink: 1 }}><Txt weight="bold" size={14} color={m.me ? "#fff" : colors.ink} numberOfLines={2}>{m.body || "Skjal"}</Txt><Txt size={11.5} color={m.me ? "rgba(255,255,255,.8)" : colors.ink3}>Ýttu til að opna</Txt></View>
             </Pressable>
-          ) : m.body ? <Txt size={16} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 21 }}>{m.body}</Txt> : null}
+          ) : m.body ? <Txt size={16} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 21 }}>{translated ?? m.body}</Txt> : null}
+          {onToggleOriginal || m.edited ? (
+            <Txt onPress={onToggleOriginal} suppressHighlighting weight="medium" size={11.5} color={m.me ? "rgba(255,255,255,.8)" : colors.ink3} style={{ marginTop: 3 }}>
+              {[m.edited ? tr("Breytt") : null, onToggleOriginal ? (showingOriginal ? tr("Sýna þýðingu") : tr("Þýtt · Sýna frumtexta")) : null].filter(Boolean).join(" · ")}
+            </Txt>
+          ) : null}
           {m.reactions.length ? (
             <View style={{ position: "absolute", bottom: -12, [m.me ? "left" : "right"]: 8, flexDirection: "row", backgroundColor: colors.panel, borderRadius: 999, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 6, paddingVertical: 1, gap: 3 }}>
               {m.reactions.map((x) => <Txt key={x.emoji} size={12}>{x.emoji}{x.count > 1 ? ` ${x.count}` : ""}</Txt>)}

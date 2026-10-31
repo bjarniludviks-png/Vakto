@@ -33,6 +33,8 @@ export type ChatMessage = {
   photo: string | null;
   /** Litur upphafsstafa-hrings sendanda (sami og á starfsmannasíðum). */
   color?: string;
+  /** Sendandi breytti textanum (0100). */
+  edited?: boolean;
 };
 export type Person = { userId: string; name: string; av: string; color: string; photo: string | null };
 /** Flýtival í hópavali: „Allir í <deild>“ / „Allir á <stað>“ — fólk með aðgang (ekki ég). */
@@ -391,7 +393,7 @@ const CHAT_PAGE = 100;
 /** Cursor for "Sýna eldri skilaboð": the oldest message currently loaded. */
 export type MessageCursor = { createdAt: string; id: string };
 export type MessagesPage = { ok: boolean; messages: ChatMessage[]; reads: ChannelRead[]; hasMore: boolean };
-type MsgRow = { id: string; body: string | null; kind: string | null; attachment_url: string | null; created_at: string; sender_id: string; reply_to?: string | null; users: unknown };
+type MsgRow = { id: string; body: string | null; kind: string | null; attachment_url: string | null; created_at: string; sender_id: string; reply_to?: string | null; edited_at?: string | null; users: unknown };
 
 /** A thread's newest page — or, with `before`, the page right before that
  * cursor — returned oldest-first for display. `hasMore` = older ones exist. */
@@ -410,8 +412,9 @@ export async function listMessages(channelId: string, before?: MessageCursor | n
       if (before) q = q.or(`created_at.lt."${before.createdAt}",and(created_at.eq."${before.createdAt}",id.lt.${before.id})`);
       return q.order("created_at", { ascending: false }).order("id", { ascending: false }).limit(CHAT_PAGE + 1);
     };
-    // reply_to arrives with 0042 — fall back to the old shape before it runs
-    let res = await page("id, body, kind, attachment_url, created_at, sender_id, reply_to, users(full_name)");
+    // reply_to arrives with 0042, edited_at with 0100 — fall back to older shapes before they run
+    let res = await page("id, body, kind, attachment_url, created_at, sender_id, reply_to, edited_at, users(full_name)");
+    if (res.error) res = await page("id, body, kind, attachment_url, created_at, sender_id, reply_to, users(full_name)");
     if (res.error) res = await page("id, body, kind, attachment_url, created_at, sender_id, users(full_name)");
     if (res.error) console.error("listMessages:", res.error.message);
     const rows = (res.data ?? []) as unknown as MsgRow[];
@@ -465,6 +468,7 @@ export async function listMessages(channelId: string, before?: MessageCursor | n
         replyTo: rt ? { sender: senderOf(rt), body: rt.kind === "image" ? "📷 Mynd" : rt.kind === "audio" ? "🎤 Talskilaboð" : ((rt.body as string) ?? "") } : null,
         photo: emps.get(m.sender_id as string)?.photo ?? null,
         color: emps.get(m.sender_id as string)?.color,
+        edited: !!m.edited_at,
       };
     });
     return { ok: true, messages, reads: await readsP, hasMore };
@@ -571,6 +575,25 @@ export async function setMessageReaction(messageId: string, emoji: string | null
 }
 
 /** Unsend: delete your own message (RLS-enforced). */
+/** Breyta texta eigin textaskilaboða (0100: grunnurinn leyfir aðeins body og setur edited_at). */
+export async function editMessage(messageId: string, body: string): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  if (!isSupabaseConfigured()) return { ok: true };
+  const text = body.trim();
+  if (!text) return { ok: false, error: "Skilaboð mega ekki vera tóm" };
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data, error } = await supabase.from("messages").update({ body: text }).eq("id", messageId).eq("sender_id", ctx.userId).eq("kind", "text").select("id");
+    if (error) return { ok: false, error: userError(error) };
+    if (!data?.length) return { ok: false, error: "Ekki hægt að breyta þessum skilaboðum" };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
 export async function deleteMessage(messageId: string): Promise<{ ok: boolean; error?: string }> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true };
