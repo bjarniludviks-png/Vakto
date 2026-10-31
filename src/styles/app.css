@@ -2080,3 +2080,18 @@ html.dark .mroster .sh{background:#23264a;color:#c7ccff}
 .cwp-shifts{display:flex;flex-direction:column}
 .cwp-shift{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--line2);font-size:13.5px;font-variant-numeric:tabular-nums}
 .cwp-shift:last-child{border-bottom:0}
+
+/* Vaktaplan → AI-gluggi: planreglur (0101) */
+.prules{margin-top:16px;border:1px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--panel2,var(--bg))}
+.prules-h{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:13.5px}
+.prules-h .muted{font-size:12px}
+.prules ul{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
+.prules li{display:flex;align-items:flex-start;gap:9px;font-size:13px;line-height:1.4}
+.prules li input{margin-top:2px;accent-color:var(--brand);width:15px;height:15px;flex-shrink:0}
+.prules li span{flex:1}
+.prules li small{color:var(--ink3)}
+.prules li.off span{color:var(--ink3);text-decoration:line-through}
+.prules li button{border:none;background:none;color:var(--ink3);cursor:pointer;font-size:12px;padding:2px 4px}
+.prules li button:hover{color:var(--bad)}
+.prules-add{display:flex;gap:8px;margin-top:10px}
+.prules-add input{flex:1;min-width:0;font:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}

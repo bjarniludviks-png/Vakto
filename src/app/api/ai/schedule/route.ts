@@ -5,6 +5,8 @@ import { assistantUser, rateLimited } from "@/lib/ai/assistant-auth";
 import { aiGate } from "@/lib/ai/ai-plan.server";
 import { isDemoCompany } from "@/lib/demo.server";
 import { ndjsonStream, NDJSON_HEADERS, type ScheduleEvent } from "@/lib/ai/stream";
+import { getPlanningRules } from "@/lib/planning-rules.server";
+import { rulesForPrompt } from "@/lib/planning-rules";
 import { getPlanRequests, formatPlanRequests, guardLeaveShifts, weekDatesFrom, dayShortIS, type PlanRequests } from "@/lib/ai/plan-requests.server";
 
 // AI-tillaga að vaktaplani — aðeins stjórnendur og vaktstjórar, með sömu takmörkun og VAKTO AI.
@@ -45,10 +47,12 @@ export async function POST(request: Request) {
         console.error("[ai/schedule] requests", err instanceof Error ? err.message : err);
       }
     }
+    // Vistaðar planreglur fyrirtækisins (0101) gilda í hverju plani.
+    const rules = rulesForPrompt(await getPlanningRules(supabase, me.companyId));
     send({ t: "stage", stage: "think" });
     try {
       let last = "";
-      const proposal = await getAiScheduleProposal(prompt, context, lang, reqs ? formatPlanRequests(reqs) : "", { demo, companyId: me.companyId, userId: me.userId }, (p) => {
+      const proposal = await getAiScheduleProposal(prompt, rules ? `${context}\n\n${rules}` : context, lang, reqs ? formatPlanRequests(reqs) : "", { demo, companyId: me.companyId, userId: me.userId }, (p) => {
         const key = `${p.stage}:${p.shifts}`;
         if (key === last) return;
         if (p.stage !== last.split(":")[0]) send({ t: "stage", stage: p.stage });
