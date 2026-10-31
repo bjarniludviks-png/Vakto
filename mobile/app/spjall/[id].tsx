@@ -619,7 +619,9 @@ function Bubble({ item, onLong, onImage, onReactions, translated, onToggleOrigin
   return (
     <View style={{ marginBottom: last ? 8 : 2 }}>
       {showSender ? <Txt size={12} color={colors.ink3} style={{ marginLeft: 48, marginBottom: 3 }}>{m.senderFull}</Txt> : null}
-      <View style={{ flexDirection: m.me ? "row-reverse" : "row", alignItems: "flex-end", gap: 8, maxWidth: "82%", alignSelf: m.me ? "flex-end" : "flex-start", paddingBottom: m.reactions.length ? 12 : 0 }}>
+      {/* „Breytt“ fyrir ofan kúluna, eins og í Messenger */}
+      {m.edited ? <Txt size={11.5} color={colors.ink3} style={{ alignSelf: m.me ? "flex-end" : "flex-start", marginLeft: m.me ? 0 : 48, marginRight: m.me ? 6 : 0, marginTop: showSender ? 0 : 4, marginBottom: 2 }}>{tr("Breytt")}</Txt> : null}
+      <View style={{ flexDirection: m.me ? "row-reverse" : "row", alignItems: "flex-end", gap: 8, maxWidth: "82%", alignSelf: m.me ? "flex-end" : "flex-start", paddingBottom: m.reactions.length ? 15 : 0 }}>
         {!m.me ? <View style={{ width: 28, opacity: last ? 1 : 0 }}><Avatar name={m.senderFull} size={28} color={m.color} photo={m.photo} /></View> : null}
         <Pressable onLongPress={onLong} delayLongPress={250} style={{ backgroundColor: m.me ? colors.brand : colors.bubbleThem, paddingHorizontal: img ? 4 : 13, paddingVertical: img ? 4 : 9, ...radius, position: "relative", flexShrink: 1 }}>
           {m.replyTo ? (
@@ -635,16 +637,16 @@ function Bubble({ item, onLong, onImage, onReactions, translated, onToggleOrigin
               <View style={{ flexShrink: 1 }}><Txt weight="bold" size={14} color={m.me ? "#fff" : colors.ink} numberOfLines={2}>{m.body || "Skjal"}</Txt><Txt size={11.5} color={m.me ? "rgba(255,255,255,.8)" : colors.ink3}>Ýttu til að opna</Txt></View>
             </Pressable>
           ) : m.body ? <Txt size={16} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 21 }}>{translated ?? m.body}</Txt> : null}
-          {onToggleOriginal || m.edited ? (
+          {onToggleOriginal ? (
             <Txt onPress={onToggleOriginal} suppressHighlighting weight="medium" size={11.5} color={m.me ? "rgba(255,255,255,.8)" : colors.ink3} style={{ marginTop: 3 }}>
-              {[m.edited ? tr("Breytt") : null, onToggleOriginal ? (showingOriginal ? tr("Sýna þýðingu") : tr("Þýtt · Sýna frumtexta")) : null].filter(Boolean).join(" · ")}
+              {showingOriginal ? tr("Sýna þýðingu") : tr("Þýtt · Sýna frumtexta")}
             </Txt>
           ) : null}
         </Pressable>
         {/* utan við kúluna svo hægt sé að ýta á það (snerting utan marka foreldris skráist ekki) */}
         {m.reactions.length ? (
-          <Pressable onPress={onReactions} hitSlop={8} accessibilityLabel={tr("Viðbrögð")} style={{ position: "absolute", bottom: 0, [m.me ? "left" : "right"]: 8, flexDirection: "row", backgroundColor: colors.panel, borderRadius: 999, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 6, paddingVertical: 1, gap: 3 }}>
-            {m.reactions.map((x) => <Txt key={x.emoji} size={12}>{x.emoji}{x.count > 1 ? ` ${x.count}` : ""}</Txt>)}
+          <Pressable onPress={onReactions} hitSlop={8} accessibilityLabel={tr("Viðbrögð")} style={{ position: "absolute", bottom: 0, [m.me ? "left" : "right"]: 10, height: 20, flexDirection: "row", alignItems: "center", backgroundColor: colors.panel, borderRadius: 999, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 5, gap: 2 }}>
+            {m.reactions.map((x) => <Txt key={x.emoji} size={10.5} style={{ lineHeight: 14 }}>{x.emoji}{x.count > 1 ? ` ${x.count}` : ""}</Txt>)}
           </Pressable>
         ) : null}
       </View>

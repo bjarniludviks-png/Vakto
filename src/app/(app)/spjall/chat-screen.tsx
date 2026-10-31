@@ -937,6 +937,8 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                   <React.Fragment key={m.id}>
                   {g.sep && <div className="day-sep"><span>{dayLabel(m.createdAt)} {hhmm(m.createdAt)}</span></div>}
                   {!m.me && !active.dm && g.first && <div className="m-who">{m.sender}</div>}
+                  {/* „Breytt“ fyrir ofan kúluna, eins og í Messenger */}
+                  {m.edited && <div className={`m-edited${m.me ? " me" : ""}`}>{t("Breytt")}</div>}
                   <div data-mid={m.id} className={`mrow ${m.me ? "me" : "them"}${m.reactions.length ? " hasre" : ""}${g.first ? " g-first" : ""}${g.last ? " g-last" : " g-mid"}${flash === m.id ? " flash" : ""}`}>
                     {!m.me && (
                       <span className="m-ava" style={{ visibility: g.last ? "visible" : "hidden" }}>
@@ -962,9 +964,9 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                         : m.kind === "audio" && m.url ? <audio controls src={m.url} style={{ height: 36 }} />
                           : m.kind === "file" && m.url ? <a className="mfile" href={m.url} target="_blank" rel="noreferrer">{I.file}<span>{m.body || t("Skjal")}</span></a>
                             : (m.id in trans && !orig[m.id] ? (trans[m.id] ?? "…") : m.body)}
-                      {(m.edited || m.id in trans) && (
-                        <span className="medit" onClick={m.id in trans ? () => setOrig((o) => ({ ...o, [m.id]: !o[m.id] })) : undefined} style={{ display: "block", fontSize: 11.5, opacity: 0.75, marginTop: 3, cursor: m.id in trans ? "pointer" : undefined }}>
-                          {[m.edited ? t("Breytt") : null, m.id in trans ? (orig[m.id] ? t("Sýna þýðingu") : t("Þýtt · Sýna frumtexta")) : null].filter(Boolean).join(" · ")}
+                      {m.id in trans && (
+                        <span className="medit" onClick={() => setOrig((o) => ({ ...o, [m.id]: !o[m.id] }))} style={{ display: "block", fontSize: 11.5, opacity: 0.75, marginTop: 3, cursor: "pointer" }}>
+                          {orig[m.id] ? t("Sýna þýðingu") : t("Þýtt · Sýna frumtexta")}
                         </span>
                       )}
                       {m.reactions.length > 0 && (

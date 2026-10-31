@@ -1014,6 +1014,8 @@ html.dark .msgr{--msg-them:#262833}
 .msgr-head .iconbtn{color:var(--brand)}
 .msgr-head .iconbtn:hover,.msgr-head .iconbtn.on{background:var(--brand-soft)}
 .m-who{font-size:11.5px;color:var(--ink3);margin:8px 0 2px 51px;align-self:flex-start}
+.m-edited{font-size:11.5px;color:var(--ink3);margin:4px 0 2px 51px;align-self:flex-start}
+.m-edited.me{margin:4px 6px 2px 0;align-self:flex-end}
 .m-seen{align-self:flex-end;font-size:11px;color:var(--ink3);padding-right:4px;margin-top:2px}
 .mbub.media{background:none;padding:0}
 .mbub.media img{max-width:280px;border-radius:16px}
