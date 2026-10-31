@@ -1,8 +1,8 @@
 // Tímar — stimplanir mánaðarins og leiðréttingarbeiðni.
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { tr } from "../src/lib/i18n";
 import { View } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Screen } from "../src/components/screen";
 import { Card, Txt, Muted, Eyebrow, Btn, Pill } from "../src/components/ui";
 import { colors, useTheme } from "../src/theme";
@@ -19,6 +19,10 @@ export default function Timar() {
   const { me } = useMe();
   const [rows, setRows] = useState<PunchRow[]>([]);
   const [sheet, setSheet] = useState(false);
+  // Stjórnandi bað um leiðréttingu (tilkynning → /timar?leidretta=YYYY-MM-DD): formið opnast með deginum.
+  const { leidretta } = useLocalSearchParams<{ leidretta?: string }>();
+  const askDate = typeof leidretta === "string" && /^\d{4}-\d{2}-\d{2}$/.test(leidretta) ? leidretta : undefined;
+  useEffect(() => { if (askDate) setSheet(true); }, [askDate]);
   const [refreshing, setRefreshing] = useState(false);
   const load = useCallback(async () => {
     if (!me) return;
@@ -59,7 +63,7 @@ export default function Timar() {
       </Card>
       <Btn title="Biðja um leiðréttingu" variant="ghost" onPress={() => setSheet(true)} />
       <Muted size={12}>Gleymdirðu að stimpla? Sendu leiðréttingu og vaktstjóri samþykkir. Aðeins samþykktir tímar fara í laun.</Muted>
-      <CorrectionSheet open={sheet} onClose={() => setSheet(false)} onDone={load} />
+      <CorrectionSheet open={sheet} onClose={() => setSheet(false)} onDone={load} date={askDate} />
     </Screen>
   );
 }

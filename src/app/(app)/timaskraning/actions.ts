@@ -580,3 +580,41 @@ export async function getFenceSites(): Promise<FenceSite[]> {
     return [];
   }
 }
+
+/** Stjórnandi biður starfsmann um réttan tíma (gleymd stimplun, of löng stimplun …): skilaboð í beinu
+ *  spjalli (svo það sjáist og geymist) + tilkynning sem opnar leiðréttingarformið með dagsetningunni. */
+export async function askForCorrection(input: { employeeId: string; date: string; message: string }): Promise<ApproveResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  if (!isSupabaseConfigured()) return { ok: true };
+  const text = input.message.trim();
+  if (!text) return { ok: false, error: "Skrifaðu skilaboð" };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.date)) return { ok: false, error: "Ógild dagsetning" };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data: me } = await supabase.from("users").select("role").eq("id", ctx.userId).maybeSingle();
+    if (me?.role !== "owner" && me?.role !== "manager") return { ok: false, error: "Aðeins stjórnendur geta beðið um leiðréttingu" };
+    const { data: emp } = await supabase.from("employees").select("id, user_id, full_name").eq("id", input.employeeId).eq("company_id", ctx.company).maybeSingle();
+    if (!emp) return { ok: false, error: "Starfsmaður fannst ekki" };
+    if (!emp.user_id) return { ok: false, error: "Starfsmaðurinn er ekki með aðgang að VAKTO — bjóddu honum fyrst (Starfsfólk → Aðgangur)" };
+    const { startDM } = await import("@/app/(app)/spjall/actions");
+    const dm = await startDM(emp.user_id as string);
+    if (!dm.ok || !dm.id) return { ok: false, error: dm.error ?? "Tókst ekki að opna spjall" };
+    const { error } = await supabase.from("messages").insert({ company_id: ctx.company, channel_id: dm.id, sender_id: ctx.userId, body: text, kind: "text" });
+    if (error) return { ok: false, error: userError(error) };
+    const [y, m, d] = input.date.split("-").map(Number);
+    const { notifyEmployee } = await import("@/lib/push");
+    await notifyEmployee(emp.id as string, {
+      title: "Vantar réttan tíma",
+      body: `Sendu leiðréttingu fyrir ${d}.${m}.${y}`,
+      url: `/mitt-svaedi?leidretta=${input.date}`,
+      appUrl: `/timar?leidretta=${input.date}`,
+      tag: `leidretta-${input.date}`,
+    });
+    await logAudit(supabase, ctx.company, ctx.userId, { action: "correction.ask", entity: "employee", entityId: emp.id as string, detail: input.date });
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}

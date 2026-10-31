@@ -171,7 +171,19 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
   const [from, setFrom] = useState(init0.from);
   const [to, setTo] = useState(init0.to);
   const [search, setSearch] = useState("");
-  const [deptF, setDeptF] = useState("all");
+  // Valdar deildir (tómt = allar) haldast þegar farið er inn á starfsmann og til baka (sessionStorage í flipanum).
+  const [deptSel, setDeptSelState] = useState<string[]>([]);
+  function setDeptSel(v: string[]) {
+    setDeptSelState(v);
+    try { window.sessionStorage.setItem("vakto:timaskraning:depts", JSON.stringify(v)); } catch { /* lokað */ }
+  }
+  useEffect(() => {
+    try {
+      const v = JSON.parse(window.sessionStorage.getItem("vakto:timaskraning:depts") ?? "[]");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sessionStorage er aðeins til í vafranum
+      if (Array.isArray(v) && v.length) setDeptSelState(v.filter((x): x is string => typeof x === "string"));
+    } catch { /* lokað */ }
+  }, []);
   const [data, setData] = useState<AttRow[]>(initial);
   const [loading, setLoading] = useState(false);
   const [clockInOpen, setClockInOpen] = useState(false);
@@ -207,8 +219,8 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
   }
   function changeRange(f: string, tt: string) { setFrom(f); setTo(tt); if (f && tt && f <= tt) load(f, tt); }
 
-  const depts = ["all", ...Array.from(new Set(data.map((r) => r.dept).filter((d) => d && d !== "—")))];
-  const matched = data.filter((r) => (deptF === "all" || r.dept === deptF) && (!search || r.name.toLowerCase().includes(search.toLowerCase())));
+  const depts = Array.from(new Set(data.map((r) => r.dept).filter((d) => d && d !== "—"))).sort((a, b) => a.localeCompare(b, "is"));
+  const matched = data.filter((r) => (deptSel.length === 0 || deptSel.includes(r.dept)) && (!search || r.name.toLowerCase().includes(search.toLowerCase())));
   // Starfsmenn án plans og án stimplunar á tímabilinu eru faldir sjálfgefið (yfirlitið verður hreinna).
   const [showEmpty, setShowEmpty] = useState(false);
   const hasData = (r: AttRow) => r.actual > 0 || r.planned > 0;
@@ -262,7 +274,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
         period={period} onPeriod={changePeriod}
         from={from} to={to} onRange={changeRange}
         search={search} onSearch={setSearch}
-        filters={[{ value: deptF, onChange: setDeptF, options: depts.map((d) => ({ value: d, label: d === "all" ? "Allar deildir" : d })) }]}
+        multi={{ values: deptSel, onChange: setDeptSel, options: depts, allLabel: "Allar deildir", unit: "deildir" }}
         rangeLabel={`${niceISO(from)} – ${niceISO(to)}`}
         storageKey="timaskraning"
       />

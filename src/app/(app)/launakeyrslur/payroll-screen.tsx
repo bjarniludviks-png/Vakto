@@ -71,7 +71,7 @@ function payRange(k: string, cf: string, ct: string, cfg: PayPeriodInput = 1): {
   return k === "last" ? shiftPayPeriod(cur.from, cfg, -1) : cur;
 }
 
-export default function PayrollScreen({ view, empty = false, periodStart = 1, notice }: { view: PayrollView; empty?: boolean; periodStart?: PayPeriodInput; notice?: React.ReactNode }) {
+export default function PayrollScreen({ view, empty = false, periodStart = 1, notice, initialPeriod = null }: { view: PayrollView; empty?: boolean; periodStart?: PayPeriodInput; notice?: React.ReactNode; initialPeriod?: PeriodPayroll | null }) {
   const { t } = useLang();
   const [slip, setSlip] = useState<PayslipData | null>(null);
   const [showZero, setShowZero] = useState(false);
@@ -87,7 +87,7 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1, no
   const thisMonth = payRange("this", "", "", periodStart);
   const [cf, setCf] = useState(thisMonth.from);
   const [ct, setCt] = useState(thisMonth.to);
-  const [pp, setPp] = useState<PeriodPayroll | null>(null);
+  const [pp, setPp] = useState<PeriodPayroll | null>(initialPeriod);
   const [settleIds, setSettleIds] = useState<string[]>([]);
   const [tbModal, setTbModal] = useState(false);
 
@@ -102,6 +102,8 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1, no
   useEffect(() => {
     if (!view.live) return;
     if (period === "custom" && (!cf || !ct || cf > ct)) return;
+    // Þjónninn sendi þegar þetta tímabil — ekki sækja það aftur við opnun.
+    if (initialPeriod && initialPeriod.from === range.from && initialPeriod.to === range.to && pp === initialPeriod) return;
     let cancelled = false;
     getPayrollPeriod(range.from, range.to).then((r) => { if (!cancelled && r.live) setPp(r); });
     return () => { cancelled = true; };
