@@ -7,7 +7,7 @@ import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
-import { getEmployeePunches, adjustPunch, deletePunch, setPunchApproved, approveEmployeePunches, approvePunchList, type PunchRow, type MissedShift } from "../actions";
+import { getEmployeePunches, adjustPunch, deletePunch, setPunchApproved, approveEmployeePunches, approvePunchList, askForCorrection, type PunchRow, type MissedShift } from "../actions";
 import { PunchFlags, spanText } from "../punch-flags";
 import { exportTimeReportXlsx, exportTimeReportPdf } from "@/lib/export-report";
 import { AsyncButton } from "@/components/app/async-button";
@@ -35,6 +35,17 @@ export default function EmployeeTimesheet({ id, name, company, initial, initialM
   const [mig, setMig] = useState(needsMigration);
   const [loading, setLoading] = useState(false);
   const [edit, setEdit] = useState<PunchRow | null>(null);
+  // „Biðja um leiðréttingu“: skilaboð til starfsmanns (spjall + tilkynning sem opnar formið).
+  const [ask, setAsk] = useState<{ date: string; detail: string } | null>(null);
+  const first = (name || "").split(/\s+/)[0];
+  /** Gleymd útstimplun → ein smella: útstimplun sett á áætluð lok vaktarinnar. */
+  async function closeAtPlannedEnd(p: PunchRow) {
+    if (!p.sched) return;
+    const overnight = p.sched.end <= p.sched.start;
+    const outDate = overnight ? (() => { const d = new Date(`${p.date}T12:00:00`); d.setDate(d.getDate() + 1); return d.toISOString().slice(0, 10); })() : p.date;
+    const res = await adjustPunch(p.punchId, p.in, p.sched.end, { inDate: p.date, outDate });
+    if (res.ok) { toast(`${t("Útstimplun sett á")} ${p.sched.end}`); reload(); } else toast(res.error ?? "Villa");
+  }
   const [selP, setSelP] = useState<Set<string>>(new Set());
   const [nowMs, setNowMs] = useState(0);
   useEffect(() => { setNowMs(Date.now()); const id = setInterval(() => setNowMs(Date.now()), 30000); return () => clearInterval(id); }, []);
@@ -159,7 +170,10 @@ export default function EmployeeTimesheet({ id, name, company, initial, initialM
                 <b>{niceISO(it.m.date)}</b>
                 <span>{t("Áætluð vakt")} {it.m.start} – {it.m.end} · {dec1(it.m.hours)} {t("klst")} · {t("engin stimplun")}</span>
               </div>
-              <div className="itact"><span className="tag bad">{t("vantar stimplun")}</span></div>
+              <div className="itact">
+                <span className="tag bad">{t("vantar stimplun")}</span>
+                <button className="btn ghost sm" onClick={() => setAsk({ date: it.m.date, detail: `${t("áætluð vakt")} ${it.m.start}–${it.m.end}, ${t("engin stimplun")}` })}>{t("Biðja um leiðréttingu")}</button>
+              </div>
             </div>
           ) : (() => { const p = it.p; return (
             <div className="it" key={p.punchId}>
@@ -176,6 +190,12 @@ export default function EmployeeTimesheet({ id, name, company, initial, initialM
                 {p.open ? (p.flags.length ? null : <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("á vakt")}</span>)
                   : p.approved ? <span className="tag" style={{ background: "var(--good-soft)", color: "var(--good)" }}>{t("Samþykkt")}</span>
                     : <span className="tag" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>{t("Bíður")}</span>}
+                {p.sched && p.flags.some((f) => f.code === "long" || f.code === "open_long") && (
+                  <AsyncButton className="btn ghost sm" title={t("Setur útstimplun á lok áætlaðrar vaktar")} onClick={() => closeAtPlannedEnd(p)}>{t("Út kl.")} {p.sched.end}</AsyncButton>
+                )}
+                {p.flags.some((f) => f.kind === "bad") && (
+                  <button className="btn ghost sm" onClick={() => setAsk({ date: p.date, detail: `${t("stimplun")} ${spanText(p, t("opin"))}${p.sched ? `, ${t("áætl.")} ${p.sched.start}–${p.sched.end}` : ""}` })}>{t("Biðja um leiðréttingu")}</button>
+                )}
                 <button className="btn ghost sm" onClick={() => setEdit(p)}>{t("Leiðrétta")}</button>
                 {!p.open && (p.approved
                   ? <AsyncButton className="btn ghost sm" onClick={() => toggle(p)}>{t("Afturkalla")}</AsyncButton>
@@ -187,6 +207,37 @@ export default function EmployeeTimesheet({ id, name, company, initial, initialM
       </div>
 
       {edit && <PunchEditModal row={edit} onClose={() => setEdit(null)} onDone={() => { setEdit(null); reload(); }} />}
+      {ask && <AskCorrectionModal employeeId={id} first={first} date={ask.date} detail={ask.detail} onClose={() => setAsk(null)} />}
+    </div>
+  );
+}
+
+function AskCorrectionModal({ employeeId, first, date, detail, onClose }: { employeeId: string; first: string; date: string; detail: string; onClose: () => void }) {
+  const { t } = useLang();
+  const [msg, setMsg] = useState(`${t("Hæ")} ${first}, ${t("það vantar réttan tíma fyrir")} ${niceISO(date)} (${detail}). ${t("Viltu senda leiðréttingu í VAKTO — Tímar → Biðja um leiðréttingu? Takk!")}`);
+  const [busy, setBusy] = useState(false);
+  async function send() {
+    setBusy(true);
+    const res = await askForCorrection({ employeeId, date, message: msg });
+    setBusy(false);
+    if (res.ok) { toast(t("Beiðni send — starfsmaðurinn fær tilkynningu og skilaboð")); onClose(); } else toast(res.error ?? "Villa");
+  }
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal">
+        <div className="mh">
+          <div><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Biðja um leiðréttingu")}</div><div className="muted" style={{ fontSize: 12 }}>{t("Fer sem skilaboð í spjalli og tilkynning sem opnar leiðréttingarformið")}</div></div>
+          <button className="x" onClick={onClose}>✕</button>
+        </div>
+        <div className="mb">
+          <textarea value={msg} onChange={(e) => setMsg(e.target.value)} rows={5} style={{ width: "100%", font: "inherit", padding: 12, borderRadius: 12, border: "1px solid var(--line)", background: "var(--panel)", color: "var(--ink)", resize: "vertical" }} />
+          <div style={{ display: "flex", gap: 9, marginTop: 10 }}>
+            <button className="btn" disabled={busy || !msg.trim()} onClick={send}>{busy ? t("Sendi…") : t("Senda")}</button>
+            <button className="btn ghost" disabled={busy} onClick={onClose}>{t("Hætta við")}</button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

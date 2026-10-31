@@ -34,6 +34,11 @@ const NAV: [string, string, React.ReactNode][] = [
 export default function EmployeeScreen({ card, my: myProp }: { card?: StaffCard; my?: MyArea }) {
   const { t } = useLang();
   const [tab, setTab] = useState<string>("ov");
+  // Beiðni um leiðréttingu (?leidretta=…) opnast á Vaktir-flipanum, þar sem tímarnir og formið eru.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- slóðin er aðeins lesin í vafranum
+    if (new URLSearchParams(window.location.search).has("leidretta")) setTab("sh");
+  }, []);
   const [photo, setPhoto] = useState<string | null>(card?.photoUrl ?? null);
   // Signed-in user WITHOUT an employee profile (e.g. owner-only account): never
   // show demo data — synthesize an empty live state from the card instead.
@@ -515,6 +520,13 @@ function MyHours({ canRequest }: { canRequest: boolean }) {
   const [rows, setRows] = useState<MyPunchRow[]>([]);
   const [live, setLive] = useState(false);
   const [corr, setCorr] = useState<{ punchId?: string; date: string } | null>(null);
+  // Stjórnandi bað um leiðréttingu (tilkynning → /mitt-svaedi?leidretta=YYYY-MM-DD): formið opnast með deginum.
+  useEffect(() => {
+    if (!canRequest) return;
+    const d = new URLSearchParams(window.location.search).get("leidretta");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- slóðin er aðeins lesin í vafranum
+    if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) setCorr({ date: d });
+  }, [canRequest]);
 
   function load() {
     const now = new Date();
