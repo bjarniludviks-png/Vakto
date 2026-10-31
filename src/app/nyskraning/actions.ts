@@ -106,6 +106,11 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
       const tier = input.plan === "free" || input.plan === "grunnur" || input.plan === "verktaki" ? input.plan : "voxtur";
       const trialEnds = tier === "free" ? null : new Date(Date.now() + (promoDays(input.promo) ?? TRIAL_DAYS) * 86400000).toISOString();
       await admin.from("companies").update({ plan: tier, trial_ends_at: trialEnds, card_required: tier !== "free", ...(tier === "verktaki" ? { account_kind: "solo" } : {}), ...(isValidKennitala(input.kennitala ?? "") ? { kennitala: formatKennitala(input.kennitala!) } : {}), terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }).eq("id", prov.companyId);
+      // Verktaki (0102): eigandinn er sjálfur starfsmaðurinn — appið (Verk, spjall, AI) þarf starfsmannaröð.
+      if (tier === "verktaki") {
+        const { error: eErr } = await admin.from("employees").insert({ company_id: prov.companyId, user_id: userId, full_name: fullName, email, role: "owner", rate: 0, union_agreement: null });
+        if (eErr) console.error("[signup] verktaki employee", eErr.message);
+      }
     }
     await sendWelcomeEmail(email, fullName, companyName); // no-op until Resend is configured
     await sendSignupAlert({ company: companyName, name: fullName, email, country: input.country, companyId: prov.companyId, kennitala: isValidKennitala(input.kennitala ?? "") ? formatKennitala(input.kennitala!) : null, promo: promoDays(input.promo) ? input.promo!.trim().toUpperCase() : null }).catch((e) => console.error("[signup-alert]", e));

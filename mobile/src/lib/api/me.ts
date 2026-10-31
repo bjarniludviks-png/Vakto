@@ -26,6 +26,10 @@ export type Me = {
   rules: CustomRules;
   /** Verktaki: þóknun án álaga, yfirvinnu og orlofs. */
   contractor: boolean;
+  /** Hlutverk (owner/manager/employee/contractor). */
+  role: string;
+  /** Verktakahamur (companies.account_kind = 'solo', 0102): Verk í stað vakta. */
+  solo: boolean;
   /** Launaliðir (0081): eigin stillingar ofan á sjálfgildi fyrirtækisins — sami útreikningur og launakeyrslan. */
   pay: Partial<PaySettings>;
   orlof: Partial<OrlofSet> | null;
@@ -45,9 +49,10 @@ export async function getMe(): Promise<Me | null> {
     .maybeSingle();
   if (!e) return null;
   // Sér fyrirspurnir svo appið virki þótt dálkana (0081) vanti.
-  const [ext, co] = await Promise.all([
+  const [ext, co, ak] = await Promise.all([
     supabase.from("employees").select("pay_settings, orlof, benefits").eq("id", e.id).maybeSingle(),
     supabase.from("companies").select("pay_defaults").eq("id", e.company_id).maybeSingle(),
+    supabase.from("companies").select("account_kind").eq("id", e.company_id).maybeSingle(), // 0102 — þolir að dálkinn vanti
   ]);
   const x = (ext.error ? null : ext.data) as { pay_settings?: Partial<PaySettings> | null; orlof?: Partial<OrlofSet> | null; benefits?: Me["benefits"] } | null;
   const defaults = ((co.error ? null : co.data?.pay_defaults) ?? {}) as Partial<PaySettings>;
@@ -73,6 +78,8 @@ export async function getMe(): Promise<Me | null> {
       ? { eve: 0, weekend: 0, overtime: 0, holiday: 0, night: 0, otWeekly: 100000, bands: [] }
       : resolveRuleSet(e.union_agreement, (e.pay_rule as Partial<CustomRules> | null) ?? undefined),
     contractor: e.role === "contractor",
+    role: e.role ?? "employee",
+    solo: !ak.error && (ak.data as { account_kind?: string } | null)?.account_kind === "solo",
     pay: { ...defaults, ...(x?.pay_settings ?? {}) },
     orlof: x?.orlof ?? (defaults as { orlof?: Partial<OrlofSet> }).orlof ?? null,
     benefits: x?.benefits ?? null,

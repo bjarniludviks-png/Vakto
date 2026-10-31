@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { VaktoLogo } from "@/components/brand/vakto-logo";
-import { hrs, kr, VSK, VSK_REFUND_SHARE, type ReportSnapshot } from "@/lib/verk";
+import { hrs, isNum, kr, VSK, VSK_REFUND_SHARE, type ReportSnapshot } from "@/lib/verk";
 import { DecideForm } from "./decide-form";
 import "./samthykki.css";
 
@@ -44,7 +44,7 @@ export default async function ApprovalPage({ params }: { params: Promise<{ token
         </div>
         <div className="sam-kpis">
           <div><b>{hrs(t.hours)}</b><span>Vinna</span></div>
-          {t.km > 0 && <div><b>{t.km.toLocaleString("is-IS")} km</b><span>Akstur</span></div>}
+          {t.km > 0 && <div><b>{isNum(t.km)} km</b><span>Akstur</span></div>}
           <div><b>{kr(t.total)}</b><span>Samtals m. vsk.</span></div>
         </div>
         {onSite > 0 && <p className="sam-geo">Staðfest á verkstað með staðsetningu í {onSite} af {s.entries.length} skráningum.</p>}
@@ -60,7 +60,7 @@ export default async function ApprovalPage({ params }: { params: Promise<{ token
                 <tr key={i}>
                   <td>{d(e.date)}</td>
                   <td>{e.start}–{e.end}{e.onSite ? <span className="sam-pin" title="Á verkstað"> ●</span> : null}</td>
-                  <td className="r">{e.hours.toLocaleString("is-IS", { maximumFractionDigits: 2 })}</td>
+                  <td className="r">{isNum(e.hours, 2)}</td>
                   <td>{[e.note, e.km ? `${e.km} km` : null].filter(Boolean).join(" · ") || "—"}</td>
                 </tr>
               ))}
@@ -78,7 +78,7 @@ export default async function ApprovalPage({ params }: { params: Promise<{ token
               {s.items.map((it, i) => (
                 <tr key={i}>
                   <td>{d(it.date)}</td><td>{it.description}{it.kind === "expense" ? " (útlagt)" : ""}</td>
-                  <td className="r">{it.quantity.toLocaleString("is-IS")}</td><td className="r">{kr(it.unitPrice)}</td><td className="r">{kr(it.quantity * it.unitPrice)}</td>
+                  <td className="r">{isNum(it.quantity, 2)}</td><td className="r">{kr(it.unitPrice)}</td><td className="r">{kr(it.quantity * it.unitPrice)}</td>
                 </tr>
               ))}
             </tbody>

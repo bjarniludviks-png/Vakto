@@ -48,8 +48,15 @@ export function jobTotals(entries: Pick<JobEntry, "hours" | "km" | "billable">[]
   return { hours, km, labor, materials, expenses, net, vsk, total: net + vsk, refund: Math.round(labor * VSK * VSK_REFUND_SHARE) };
 }
 
-export const kr = (n: number) => `${Math.round(n).toLocaleString("is-IS")} kr.`;
-export const hrs = (n: number) => `${(Math.round(n * 10) / 10).toLocaleString("is-IS")} klst.`;
+// Íslensk talnasnið óháð staðfæringu vafrans (Chromium án is-IS gefur „76,000“).
+const thou = (s: string) => s.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+export const isNum = (n: number, decimals = 1) => {
+  const f = Math.pow(10, decimals), v = Math.round(Math.abs(n) * f) / f;
+  const [i, d] = String(v).split(".");
+  return `${n < 0 ? "−" : ""}${thou(i)}${d ? `,${d}` : ""}`;
+};
+export const kr = (n: number) => `${isNum(n, 0)} kr.`;
+export const hrs = (n: number) => `${isNum(n)} klst.`;
 
 /** Það sem viðskiptavinurinn sér og samþykkir — fryst þegar skýrslan er send. */
 export type ReportSnapshot = {

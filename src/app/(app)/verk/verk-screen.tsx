@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
-import { hrs, jobTotals, kr, type Client, type JobDetail } from "@/lib/verk";
+import { hrs, isNum, jobTotals, kr, type Client, type JobDetail } from "@/lib/verk";
 import {
   listJobs, getJob, saveClient, saveJob, setJobStatus, startTimer, stopTimer, addEntry, deleteEntry,
   addItem, deleteItem, addPhoto, deletePhoto, createReport,
@@ -225,7 +225,7 @@ function JobView({ id, companyId, clients, running, onBack, onChanged }: { id: s
         <div className="kpi"><div className="lab">Tímar</div><div className="val">{hrs(t.hours)}</div></div>
         <div className="kpi"><div className="lab">Vinna</div><div className="val">{kr(t.labor)}</div></div>
         <div className="kpi"><div className="lab">Efni og útlagt</div><div className="val">{kr(t.materials + t.expenses)}</div></div>
-        <div className="kpi"><div className="lab">Akstur</div><div className="val">{t.km.toLocaleString("is-IS")} km</div></div>
+        <div className="kpi"><div className="lab">Akstur</div><div className="val">{isNum(t.km)} km</div></div>
       </div>
 
       <div className="vk-tabs">
@@ -275,7 +275,7 @@ function JobView({ id, companyId, clients, running, onBack, onChanged }: { id: s
                 {job.items.map((i) => (
                   <tr key={i.id}>
                     <td>{dIS(i.date)}</td><td>{i.description}{i.kind === "expense" ? <span className="muted"> · útlagt</span> : null}</td>
-                    <td className="r">{i.quantity.toLocaleString("is-IS")} × {kr(i.unitPrice)}</td><td className="r"><b>{kr(i.quantity * i.unitPrice)}</b></td>
+                    <td className="r">{isNum(i.quantity, 2)} × {kr(i.unitPrice)}</td><td className="r"><b>{kr(i.quantity * i.unitPrice)}</b></td>
                     <td className="r"><button className="vk-x" onClick={async () => { if (window.confirm("Eyða?")) await after(await deleteItem(i.id)); }}>✕</button></td>
                   </tr>
                 ))}

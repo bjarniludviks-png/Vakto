@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Platform } from "react-native";
 import { Tabs } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
-import { House, CalendarDays, MessageCircle, Newspaper, UserRound } from "lucide-react-native";
+import { House, CalendarDays, MessageCircle, Newspaper, UserRound, Briefcase } from "lucide-react-native";
 import { colors, font, useTheme } from "../../src/theme";
 import { tr } from "../../src/lib/i18n";
 import { useMe } from "../../src/lib/me-context";
@@ -38,7 +38,7 @@ export default function TabLayout() {
     return (
       <NativeTabs tintColor={colors.brand} badgeBackgroundColor={colors.bad} labelStyle={{ fontFamily: font.semibold, fontSize: 10.5 }}>
         <T name="index"><T.Icon sf={{ default: "house", selected: "house.fill" }} /><T.Label>{tr("Heim")}</T.Label></T>
-        <T name="vaktir"><T.Icon sf="calendar" /><T.Label>{tr("Vaktir")}</T.Label></T>
+        <T name="vaktir"><T.Icon sf={me?.solo ? "briefcase" : "calendar"} /><T.Label>{tr(me?.solo ? "Verk" : "Vaktir")}</T.Label></T>
         <T name="spjall"><T.Icon sf={{ default: "bubble.left", selected: "bubble.left.fill" }} /><T.Label>{tr("Spjall")}</T.Label>{unread > 0 ? <T.Badge>{String(unread)}</T.Badge> : null}</T>
         <T name="frettir"><T.Icon sf={{ default: "newspaper", selected: "newspaper.fill" }} /><T.Label>{tr("Fréttir")}</T.Label></T>
         <T name="meira"><T.Icon sf={{ default: "person", selected: "person.fill" }} /><T.Label>{tr("Ég")}</T.Label></T>
@@ -59,7 +59,7 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: tr("Heim"), tabBarIcon: ({ color, size }) => <House color={color} size={size} /> }} />
-      <Tabs.Screen name="vaktir" options={{ title: tr("Vaktir"), tabBarIcon: ({ color, size }) => <CalendarDays color={color} size={size} /> }} />
+      <Tabs.Screen name="vaktir" options={{ title: tr(me?.solo ? "Verk" : "Vaktir"), tabBarIcon: ({ color, size }) => (me?.solo ? <Briefcase color={color} size={size} /> : <CalendarDays color={color} size={size} />) }} />
       <Tabs.Screen name="spjall" options={{ title: tr("Spjall"), tabBarIcon: ({ color, size }) => <MessageCircle color={color} size={size} />, tabBarBadge: unread > 0 ? unread : undefined }} />
       <Tabs.Screen name="frettir" options={{ title: tr("Fréttir"), tabBarIcon: ({ color, size }) => <Newspaper color={color} size={size} /> }} />
       <Tabs.Screen name="meira" options={{ title: tr("Ég"), tabBarIcon: ({ color, size }) => <UserRound color={color} size={size} /> }} />
