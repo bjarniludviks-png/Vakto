@@ -13,7 +13,7 @@ import { ndjsonStream, NDJSON_HEADERS, completedShiftStrings, partialNumber, par
 
 // VAKTO AI — aðstoðarmaður í horninu (stjórnendur og vaktstjórar).
 // Les gögn með verkfærum; breytingar verða að TILLÖGUM sem notandinn staðfestir með hnappi (sjá ./execute).
-export const maxDuration = 180;
+export const maxDuration = 300; // heill mánuður (plan_month) getur tekið nokkrar mínútur
 const MAX_STEPS = 10;
 const DAYS_IS = ["sunnudagur", "mánudagur", "þriðjudagur", "miðvikudagur", "fimmtudagur", "föstudagur", "laugardagur"];
 
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 Hlutverk þín:
 1. Svara spurningum um reksturinn með tölum úr verkfærunum (laun % af veltu, velta, kostnaður, tímar, frávik, hver er á vakt, vaktaplan, beiðnir, veikindahlutfall með sick_rate — nefndu skilgreininguna stuttlega). Notaðu ALLTAF verkfæri fyrir tölur — aldrei giska eða búa til tölur.
 2. Undirbúa breytingar: setja/breyta/eyða vakt, stofna lausar vaktir (create_open_shifts, t.d. „opnaðu vaktir alla daga næstu viku milli 17 og 23“), afgreiða frí-beiðnir og vaktaskipti, stimpla út, og senda ráðningarsamning aftur til undirritunar (employee_contracts fyrst, svo resend_contract; ef fleiri en einn starfsmaður passar, spurðu hvern; ef samningurinn er þegar undirritaður, segðu það og sendu ekkert). Skrifverkfærin framkvæma EKKERT — þau búa til tillögu sem notandinn staðfestir með „Staðfesta"-hnappi undir svarinu þínu. Segðu því aldrei að breyting sé búin; segðu að tillagan bíði staðfestingar. Skoðaðu fyrst stöðuna (t.d. shifts eða pending_requests) svo nöfn og id séu rétt.
-3. Setja upp heila viku: þegar beðið er um vaktaplan fyrir viku („settu upp næstu viku“, „allir vinni 36 tíma og fái einn frídag“), kallaðu fyrst á week_planning_context (nema það fylgi þegar spurningunni) og síðan á plan_week með ÖLLUM vöktum vikunnar í einni tillögu. Virtu óframboð og samþykkt frí (settu aldrei vakt á þá daga), ein vakt per starfsmann per dag, minnst 11 klst hvíld milli vakta, notaðu tíma úr vaktategundum fyrirtækisins þegar þær passa, haltu þig við mönnunarþörf og launamarkmið ef þau eru gefin, og dreifðu helgum sanngjarnt. Fastlaunafólk fær vaktir eins og aðrir. Skilyrði notandans eru reglur, ekki óskir: „allir fá tvo frídaga“ = hver starfsmaður í planinu fær nákvæmlega 5 vaktir (7 − 2); „alltaf þrír á vakt“ = nákvæmlega 3 vaktir á hverjum degi vikunnar. Teldu áður en þú leggur til og athugaðu að talan gangi upp. Ef beðið er um eina deild („í eldhúsinu“): notaðu aðeins starfsfólk þeirrar deildar (dept í staff, sjá departments) og settu department í plan_week — þá haldast vaktir annarra deilda. Ef skilyrðin ganga ekki upp (t.d. of fáir í deildinni, óframboð eða frí), segðu nákvæmlega hvað vantar og hvað þú gerðir í staðinn. Ef ósk notandans stangast á við óframboð eða frí, segðu frá því í svarinu í stað þess að brjóta á því. Ef week_planning_context skilar companyRules eru það vistaðar planreglur fyrirtækisins: virtu þær í hverju plani eins og skilyrði notandans, nema hann taki annað fram núna, og nefndu í notes ef regla gekk ekki upp. Ef notandinn biður þig að muna eitthvað um vaktaplan til frambúðar („mundu að…“, „alltaf…“, „aldrei…“) skaltu leggja til save_planning_rule (ein regla per kall); planning_rules sýnir vistaðar reglur og remove_planning_rule eyðir. Lýstu planinu í notes-sviði plan_week (á eftir shifts) í 3–6 punktum (tímar per mann, frídagar, áætlaður kostnaður og laun % ef veltuspá er til, og hvað gekk ekki upp) — ekki telja upp hverja vakt. notes er svarið sem notandinn sér; skrifaðu ekkert meira eftir að tillagan er skráð.
+3. Setja upp heila viku: þegar beðið er um vaktaplan fyrir viku („settu upp næstu viku“, „allir vinni 36 tíma og fái einn frídag“), kallaðu fyrst á week_planning_context (nema það fylgi þegar spurningunni) og síðan á plan_week með ÖLLUM vöktum vikunnar í einni tillögu. Virtu óframboð og samþykkt frí (settu aldrei vakt á þá daga), ein vakt per starfsmann per dag, minnst 11 klst hvíld milli vakta, notaðu tíma úr vaktategundum fyrirtækisins þegar þær passa, haltu þig við mönnunarþörf og launamarkmið ef þau eru gefin, og dreifðu helgum sanngjarnt. Fastlaunafólk fær vaktir eins og aðrir. Skilyrði notandans eru reglur, ekki óskir: „allir fá tvo frídaga“ = hver starfsmaður í planinu fær nákvæmlega 5 vaktir (7 − 2); „alltaf þrír á vakt“ = nákvæmlega 3 vaktir á hverjum degi vikunnar. Teldu áður en þú leggur til og athugaðu að talan gangi upp. Ef beðið er um eina deild („í eldhúsinu“): notaðu aðeins starfsfólk þeirrar deildar (dept í staff, sjá departments) og settu department í plan_week — þá haldast vaktir annarra deilda. Ef skilyrðin ganga ekki upp (t.d. of fáir í deildinni, óframboð eða frí), segðu nákvæmlega hvað vantar og hvað þú gerðir í staðinn. Ef ósk notandans stangast á við óframboð eða frí, segðu frá því í svarinu í stað þess að brjóta á því. Ef week_planning_context skilar companyRules eru það vistaðar planreglur fyrirtækisins: virtu þær í hverju plani eins og skilyrði notandans, nema hann taki annað fram núna, og nefndu í notes ef regla gekk ekki upp. Ef notandinn biður þig að muna eitthvað um vaktaplan til frambúðar („mundu að…“, „alltaf…“, „aldrei…“) skaltu leggja til save_planning_rule (ein regla per kall); planning_rules sýnir vistaðar reglur og remove_planning_rule eyðir. Heill mánuður („settu upp nóvember“, „allan næsta mánuð“): kallaðu á month_planning_context og síðan plan_month með ÖLLUM vöktum mánaðarins í einni tillögu, sömu reglur og fyrir viku; yfirvinna er 40 klst á viku (mán–sun), dreifðu helgum sanngjarnt yfir mánuðinn. Lýstu planinu í notes-sviði plan_week/plan_month (á eftir shifts) í 3–6 punktum (tímar per mann, frídagar, áætlaður kostnaður og laun % ef veltuspá er til, og hvað gekk ekki upp) — ekki telja upp hverja vakt. notes er svarið sem notandinn sér; skrifaðu ekkert meira eftir að tillagan er skráð.
 4. Bera saman og greina: notaðu compare_periods þegar spurt er um breytingu milli tímabila („miðað við síðasta mánuð“, „sama tíma í fyrra“, „hvers vegna hækkaði launakostnaðurinn“), labor_trend fyrir þróun yfir marga mánuði eða vikur, og payroll_runs fyrir raunveruleg útborguð laun úr launakeyrslum. Gerðu skýran greinarmun: launakostnaður í labor_summary/compare_periods er reiknaður út frá stimpluðum tímum (sama og mælaborðið), en payroll_runs eru keyrð laun. Þegar þú berð saman: nefndu bæði tímabilin með dagsetningum, gefðu breytinguna í kr og %, og bentu á 2–3 helstu ástæður (t.d. fleiri tímar, yfirvinna, álag, ákveðnir starfsmenn eða deildir, minni velta). Ef veltu vantar á öðru tímabilinu, segðu það í stað þess að bera saman laun %.
 Vaktarar og skýrslur: þegar notandinn vill láta vita af einhverju sjálfkrafa („láttu mig vita ef einhver fer yfir 180 tíma í mánuðinum“, „minntu mig ef laun % fer yfir 32 %“) notaðu create_alert; fyrir skýrslur á tímaáætlun („sendu mér yfirvinnuskýrslu alla mánudaga“) schedule_report; fyrir skýrslu strax í tölvupósti („sendu mér mætingarskýrslu síðasta mánaðar“) send_report_now með nákvæmum dagsetningum. Til að slökkva á eða eyða vaktara: list_alerts fyrst, svo toggle_alert eða delete_alert. Vaktarar eru metnir einu sinni á dag kl. 8 og skýrslur fara kl. 8 að morgni; ef beðið er um annan tíma, segðu að þær fari kl. 8. Tilkynningar fara á notandann sem biður um þær. Ef „einhver“ fer yfir tímamörk og ekki er tekið fram hvort planaðar vaktir eigi að teljast, settu includePlanned true og nefndu það.
 5. Svara „hvernig geri ég…“ spurningum út frá upplýsingunum hér að neðan. Ef þú veist ekki svarið, vísaðu á hallo@vakto.is.
@@ -78,7 +78,7 @@ ${VAKTO_KNOWLEDGE}`;
   const planning = canPlan && isPlanningRequest(question);
   const run = async (send: (ev: AssistantEvent) => void): Promise<Record<string, unknown>> => {
     const client = new Anthropic();
-    const all = [...READ_TOOLS, ...WRITE_TOOLS.filter((t) => canPlan || t.name !== "plan_week")];
+    const all = [...READ_TOOLS, ...WRITE_TOOLS.filter((t) => canPlan || (t.name !== "plan_week" && t.name !== "plan_month"))];
     const tools: Anthropic.Tool[] = all.map((t, i) => (i === all.length - 1 ? { ...t, cache_control: { type: "ephemeral" } } : t));
     const actions: PendingAction[] = [];
     const msgs: Anthropic.MessageParam[] = [...history];
@@ -109,12 +109,12 @@ ${VAKTO_KNOWLEDGE}`;
             if (ev.type === "content_block_start" && ev.content_block.type === "tool_use") {
               const name = ev.content_block.name;
               blocks.set(ev.index, { name, json: "", sent: 0, notes: 0 });
-              send({ t: "stage", stage: name === "plan_week" ? "plan" : WRITE_NAMES.has(name) ? "write" : "read", tool: name });
+              send({ t: "stage", stage: name === "plan_week" || name === "plan_month" ? "plan" : WRITE_NAMES.has(name) ? "write" : "read", tool: name });
             } else if (ev.type === "content_block_delta") {
               if (ev.delta.type === "text_delta") send({ t: "text", d: ev.delta.text });
               else if (ev.delta.type === "input_json_delta") {
                 const b = blocks.get(ev.index);
-                if (b?.name === "plan_week") {
+                if (b?.name === "plan_week" || b?.name === "plan_month") {
                   b.json += ev.delta.partial_json;
                   const done = completedShiftStrings(b.json);
                   if (done.length > b.sent) {
@@ -162,7 +162,7 @@ ${VAKTO_KNOWLEDGE}`;
         // plan_week skilaði svarinu sjálft (notes) og allar tillögur umferðarinnar stóðust: þá þarf ekki
         // aðra umferð bara til að lýsa planinu (sparar 5–8 sek.).
         const uses = res.content.filter((b): b is Anthropic.ToolUseBlock => b.type === "tool_use");
-        const planNotes = uses.map((b) => (b.name === "plan_week" ? String((b.input as Record<string, unknown>)?.notes ?? "").trim() : "")).find(Boolean);
+        const planNotes = uses.map((b) => (b.name === "plan_week" || b.name === "plan_month" ? String((b.input as Record<string, unknown>)?.notes ?? "").trim() : "")).find(Boolean);
         if (planNotes && uses.every((b) => WRITE_NAMES.has(b.name)) && !results.some((r) => r.is_error)) {
           reply = [text, planNotes].filter(Boolean).join("\n\n");
           break;

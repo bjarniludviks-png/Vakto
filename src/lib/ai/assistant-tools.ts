@@ -61,6 +61,11 @@ export const READ_TOOLS: Anthropic.Tool[] = [
     input_schema: { type: "object", properties: { monday: { type: "string", description: "Mánudagur vikunnar, YYYY-MM-DD" } }, required: ["monday"] },
   },
   {
+    name: "month_planning_context",
+    description: "Sama og week_planning_context en fyrir heilan almanaksmánuð (month = YYYY-MM): starfsfólk, núverandi vaktir mánaðarins, óframboð, samþykkt frí, beiðnir, vaktategundir, mönnunarþörf, planreglur og launaáætlun per viku. Kallaðu á þetta ÁÐUR en þú notar plan_month.",
+    input_schema: { type: "object", properties: { month: { type: "string", description: "YYYY-MM" } }, required: ["month"] },
+  },
+  {
     name: "planning_rules",
     description: "Vistaðar planreglur fyrirtækisins (fastar reglur fyrir vaktaplan, t.d. „Bach bara morgunvaktir“) með id, texta og hvort þær eru virkar. Virkar reglur fylgja líka week_planning_context (companyRules). Notaðu til að svara „hvaða reglur eru vistaðar?“ og áður en reglu er eytt.",
     input_schema: { type: "object", properties: {} },
@@ -171,6 +176,23 @@ export const WRITE_TOOLS: Anthropic.Tool[] = [
     eager_input_streaming: true,
   },
   {
+    name: "plan_month",
+    description: "LEGGJA TIL heilt vaktaplan fyrir einn almanaksmánuð (1. til síðasta dags) í einni tillögu. KEMUR Í STAÐ allra vakta starfsfólks í mánuðinum (lausar vaktir haldast): taktu því með ALLAR vaktir sem eiga að vera. Notaðu fyrir „settu upp nóvember“, „plan fyrir allan næsta mánuð“. Sömu reglur og plan_week; yfirvinna er 40 klst á viku (mán–sun). Fyrir eina viku notaðu plan_week.",
+    input_schema: {
+      type: "object",
+      properties: {
+        month: { type: "string", description: "YYYY-MM" },
+        department: { type: "string", description: "Valfrjálst: aðeins ein deild skipulögð — vaktir annarra deilda haldast óbreyttar." },
+        label: { type: "string", description: "Ein setning sem lýsir planinu" },
+        shiftCount: { type: "integer", description: "Fjöldi vakta í shifts. Skrifaðu hann Á UNDAN shifts." },
+        shifts: { type: "array", description: "Ein vakt per streng: \"Fornafn|YYYY-MM-DD|HH:MM|HH:MM\" (valfrjálst |vaktategund).", items: { type: "string" } },
+        notes: { type: "string", description: "Svarið til notandans, Á EFTIR shifts: 3–6 punktar — tímar per mann (á viku og í mánuðinum), frídagar, mönnun, áætlaður kostnaður, hvað gekk ekki upp. Ekki telja upp hverja vakt." },
+      },
+      required: ["month", "label", "shifts", "notes"],
+    },
+    eager_input_streaming: true,
+  },
+  {
     name: "save_planning_rule",
     description: `LEGGJA TIL að vista fasta planreglu fyrirtækisins sem gildir í öllum framtíðarplönum (AI-vaktaplan í spjallinu og í Vaktaplani). Notaðu þegar notandinn biður þig að muna eitthvað um vaktaplan („mundu að Bach er bara á morgnana“, „alltaf 3 í eldhúsi um helgar“, „Anna vinnur aldrei sunnudaga“). Ein regla per kall, stutt og skýr setning með nafni/deild og tíma, mest ${MAX_RULE_LEN} stafir. EKKI fyrir einstakar vikur („Anna í fríi næsta föstudag“) — það er bara fyrir planið núna.`,
     input_schema: { type: "object", properties: { text: { type: "string", description: "Reglan, t.d. „Bach Đuc Luu vinnur aðeins morgunvaktir (05:00–12:00)“" } }, required: ["text"] },
@@ -269,13 +291,39 @@ function weekDates(mon: string): string[] {
   return Array.from({ length: 7 }, (_, i) => { const dt = new Date(y, m - 1, d + i); return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`; });
 }
 type PlanShift = { employee: string; date: string; start: string; end: string; shiftType: string };
-/** Sannreynir vikuplan: mánudagur, vaktir innan vikunnar, ein vakt per starfsmann per dag. */
-function parseWeekPlan(input: In): { ok: true; mon: string; dates: string[]; shifts: PlanShift[] } | { ok: false; error: string } {
+/** Dagar almanaksmánaðar (month = YYYY-MM), eða null. */
+function monthDates(month: unknown): string[] | null {
+  const m = /^(\d{4})-(\d{2})$/.exec(str(month));
+  if (!m) return null;
+  const y = Number(m[1]), mo = Number(m[2]);
+  if (mo < 1 || mo > 12) return null;
+  const n = new Date(y, mo, 0).getDate();
+  return Array.from({ length: n }, (_, i) => `${m[1]}-${m[2]}-${String(i + 1).padStart(2, "0")}`);
+}
+/** Mánudagar allra vikna sem snerta dagana. */
+function mondaysOf(dates: string[]): string[] {
+  const out = new Set<string>();
+  for (const d of dates) { const x = new Date(`${d}T12:00:00`); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); out.add(`${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`); }
+  return [...out];
+}
+/** plan_week eða plan_month: dagarnir sem tillagan nær yfir. */
+function planDates(name: string, input: In): { ok: true; dates: string[] } | { ok: false; error: string } {
+  if (name === "plan_month") {
+    const d = monthDates(input.month);
+    return d ? { ok: true, dates: d } : { ok: false, error: "month verður að vera YYYY-MM" };
+  }
   if (!okDate(input.monday)) return { ok: false, error: "monday verður að vera YYYY-MM-DD" };
-  const mon = str(input.monday), dates = weekDates(mon);
+  const mon = str(input.monday);
   if (new Date(`${mon}T12:00:00`).getDay() !== 1) return { ok: false, error: `${mon} er ekki mánudagur` };
+  return { ok: true, dates: weekDates(mon) };
+}
+/** Sannreynir vikuplan (eða mánaðarplan): vaktir innan tímabilsins, ein vakt per starfsmann per dag. */
+function parseWeekPlan(input: In, name = "plan_week"): { ok: true; dates: string[]; shifts: PlanShift[] } | { ok: false; error: string } {
+  const pd = planDates(name, input);
+  if (!pd.ok) return pd;
+  const dates = pd.dates;
   if (!Array.isArray(input.shifts) || !input.shifts.length) return { ok: false, error: "Engar vaktir í planinu" };
-  if (input.shifts.length > 400) return { ok: false, error: "Of margar vaktir í einu plani" };
+  if (input.shifts.length > (name === "plan_month" ? 1500 : 400)) return { ok: false, error: "Of margar vaktir í einu plani" };
   const out: PlanShift[] = []; const seen = new Set<string>();
   for (const item of input.shifts as unknown[]) {
     // Strengur „Nafn|dags|byrjun|endir|tegund“ (þjappað form) eða hlutur með sömu sviðum.
@@ -283,13 +331,13 @@ function parseWeekPlan(input: In): { ok: true; mon: string; dates: string[]; shi
     const raw: In = parts ? { employee: parts[0], date: parts[1], start: parts[2], end: parts[3], shiftType: parts[4] ?? "" } : ((item ?? {}) as In);
     const who = str(raw.employee), date = str(raw.date);
     if (!who || !okDate(date) || !okTime(raw.start) || !okTime(raw.end)) return { ok: false, error: "Hver vakt þarf að vera \"Nafn|YYYY-MM-DD|HH:MM|HH:MM\"" };
-    if (!dates.includes(date)) return { ok: false, error: `Vakt ${date} er utan vikunnar ${dates[0]}–${dates[6]}` };
+    if (!dates.includes(date)) return { ok: false, error: `Vakt ${date} er utan tímabilsins ${dates[0]}–${dates[dates.length - 1]}` };
     const k = `${who.toLowerCase()}|${date}`;
     if (seen.has(k)) return { ok: false, error: `${who} er með tvær vaktir ${date} — aðeins ein vakt per dag` };
     seen.add(k);
     out.push({ employee: who, date, start: str(raw.start).padStart(5, "0"), end: str(raw.end).padStart(5, "0"), shiftType: str(raw.shiftType) });
   }
-  return { ok: true, mon, dates, shifts: out };
+  return { ok: true, dates, shifts: out };
 }
 const shortDate = (iso: string) => `${Number(iso.slice(8))}.${Number(iso.slice(5, 7))}.`;
 
@@ -445,6 +493,33 @@ export async function runReadTool(name: string, input: In): Promise<string> {
         })),
       });
     }
+    if (name === "month_planning_context") {
+      const dates = monthDates(input.month);
+      if (!dates) return JSON.stringify({ error: "month verður að vera YYYY-MM" });
+      // Vikusamhengi fyrir hverja viku sem snertir mánuðinn, sameinað og síað á daga mánaðarins.
+      const weeks = await Promise.all(mondaysOf(dates).map(async (monday) => ({ monday, ctx: JSON.parse(await runReadTool("week_planning_context", { monday })) as Record<string, unknown> })));
+      const bad = weeks.find((w) => w.ctx.error);
+      if (bad) return JSON.stringify({ error: bad.ctx.error });
+      const inMonth = (s: string) => dates.includes(s.split("|")[1] ?? "");
+      const uniq = (xs: string[]) => [...new Set(xs)];
+      const arr = (k: string) => weeks.flatMap((w) => (Array.isArray(w.ctx[k]) ? (w.ctx[k] as string[]) : []));
+      const first = weeks[0].ctx;
+      const unavailable: Record<string, string[]> = {};
+      for (const w of weeks) for (const [n, ds] of Object.entries((w.ctx.unavailable ?? {}) as Record<string, string[]>)) unavailable[n] = uniq([...(unavailable[n] ?? []), ...ds.filter((d) => dates.includes(d))]);
+      const out: Record<string, unknown> = {
+        format: first.format, month: str(input.month), days: dates,
+        weeksMonToSun: weeks.map((w) => w.monday),
+        staff: first.staff, departments: first.departments, shiftTypes: first.shiftTypes,
+        currentShifts: uniq(arr("currentShifts")).filter(inMonth),
+      };
+      if (Object.values(unavailable).some((x) => x.length)) out.unavailable = Object.fromEntries(Object.entries(unavailable).filter(([, x]) => x.length));
+      for (const k of ["approvedLeave", "pendingLeave", "preferredDays"]) { const v = uniq(arr(k)); if (v.length) out[k] = v; }
+      if (first.companyRules) out.companyRules = first.companyRules;
+      if (first.staffingTargetsMonToSun) out.staffingTargetsMonToSun = first.staffingTargetsMonToSun;
+      const budgets = weeks.filter((w) => w.ctx.budget).map((w) => ({ monday: w.monday, ...(w.ctx.budget as object) }));
+      if (budgets.length) out.budgetByWeek = budgets;
+      return JSON.stringify(out);
+    }
     if (name === "planning_rules") {
       const rules = await getPlanningRules();
       return JSON.stringify(rules.length ? rules.map((r) => ({ id: r.id, text: r.text, active: r.active })) : { rules: [], note: "Engar planreglur vistaðar" });
@@ -468,15 +543,18 @@ export function describeWrite(name: string, input: In, lang: string): { ok: true
   const en = lang === "en";
   const who = str(input.employee);
   switch (name) {
+    case "plan_month":
     case "plan_week": {
-      const p = parseWeekPlan(input);
+      const p = parseWeekPlan(input, name);
       if (!p.ok) return p;
+      const last = p.dates[p.dates.length - 1];
       const people = new Set(p.shifts.map((x) => x.employee.toLowerCase())).size;
       const hours = p.shifts.reduce((a, x) => { let h = (Number(x.end.slice(0, 2)) * 60 + Number(x.end.slice(3))) - (Number(x.start.slice(0, 2)) * 60 + Number(x.start.slice(3))); if (h <= 0) h += 1440; return a + h / 60; }, 0);
       const lbl = [str(input.department) && (en ? `Department: ${str(input.department)} (other departments unchanged).` : `Deild: ${str(input.department)} (aðrar deildir óbreyttar).`), str(input.label)].filter(Boolean).join(" ");
+      const month = name === "plan_month";
       return { ok: true, summary: en
-        ? `Publish week plan ${shortDate(p.dates[0])}–${shortDate(p.dates[6])}: ${p.shifts.length} shifts for ${people} people, ${Math.round(hours)} hrs. Replaces all shifts that week and notifies staff.${lbl ? ` ${lbl}` : ""}`
-        : `Birta vaktaplan ${shortDate(p.dates[0])}–${shortDate(p.dates[6])}: ${p.shifts.length} vaktir hjá ${people} starfsmönnum, ${Math.round(hours)} klst. Kemur í stað allra vakta vikunnar og starfsfólk fær tilkynningu.${lbl ? ` ${lbl}` : ""}` };
+        ? `Publish ${month ? "month" : "week"} plan ${shortDate(p.dates[0])}–${shortDate(last)}: ${p.shifts.length} shifts for ${people} people, ${Math.round(hours)} hrs. Replaces all staff shifts that ${month ? "month" : "week"} (open shifts stay) and notifies staff.${lbl ? ` ${lbl}` : ""}`
+        : `Birta vaktaplan ${shortDate(p.dates[0])}–${shortDate(last)}: ${p.shifts.length} vaktir hjá ${people} starfsmönnum, ${Math.round(hours)} klst. Kemur í stað allra vakta ${month ? "mánaðarins" : "vikunnar"} (lausar vaktir haldast) og starfsfólk fær tilkynningu.${lbl ? ` ${lbl}` : ""}` };
     }
     case "set_shift":
       if (!who || !okDate(input.date) || !okTime(input.start) || !okTime(input.end)) return { ok: false, error: "Vantar starfsmann, dagsetningu eða tíma (HH:MM)" };
@@ -540,8 +618,9 @@ export function describeWrite(name: string, input: In, lang: string): { ok: true
 /** Framkvæmir staðfesta aðgerð (kallað úr /api/assistant/execute eftir hlutverkaathugun). */
 export async function executeWrite(name: string, input: In): Promise<{ ok: boolean; error?: string }> {
   switch (name) {
+    case "plan_month":
     case "plan_week": {
-      const p = parseWeekPlan(input);
+      const p = parseWeekPlan(input, name);
       if (!p.ok) return p;
       // Öll nöfn verða að finnast ÁÐUR en nokkru er eytt (publishSchedule sleppir óþekktum nöfnum hljóðlaust).
       const { employees } = await getEmployees();
@@ -558,7 +637,7 @@ export async function executeWrite(name: string, input: In): Promise<{ ok: boole
       const dept = str(input.department).toLowerCase();
       if (dept) {
         const inPlan = new Set(p.shifts.map((x) => `${x.employee.toLowerCase()}|${x.date}`));
-        const cur = await getShiftsInRange(p.dates[0], p.dates[6]);
+        const cur = await getShiftsInRange(p.dates[0], p.dates[p.dates.length - 1]);
         if (!cur.ok) return { ok: false, error: "Tókst ekki að lesa núverandi vaktir vikunnar" };
         for (const r of cur.rows) {
           if (r.name === "?" || r.dept.toLowerCase() === dept) continue;

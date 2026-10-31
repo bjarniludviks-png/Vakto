@@ -708,10 +708,11 @@ export async function deleteWeekShifts(dates: string[]): Promise<{ ok: boolean; 
     const { data: profile } = await supabase.from("users").select("company_id").eq("id", user.id).maybeSingle();
     const company = profile?.company_id as string | undefined;
     if (!company) return { ok: false, error: "Fyrirtæki fannst ekki" };
+    // Lausar vaktir (employee_id null) haldast — þær eru ekki hluti af planinu sem kemur í staðinn.
     const { data: gone } = await supabase.from("shifts").select("id")
-      .eq("company_id", company).in("date", dates);
+      .eq("company_id", company).in("date", dates).not("employee_id", "is", null);
     const { error } = await supabase.from("shifts").delete()
-      .eq("company_id", company).in("date", dates);
+      .eq("company_id", company).in("date", dates).not("employee_id", "is", null);
     if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, company, user.id, {
       action: "schedule.clear", entity: "shifts", detail: `Vika hreinsuð — ${gone?.length ?? 0} vaktir (${dates[0]}…)`,
