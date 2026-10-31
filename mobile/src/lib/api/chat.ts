@@ -297,6 +297,40 @@ export async function translateMessage(messageId: string): Promise<{ ok: boolean
   } catch { return { ok: false, error: tr("Þýðing tókst ekki") }; }
 }
 
+/** Sjálfvirk þýðing (0103): þýðir mörg skilaboð í einu á tungumál appsins (vistað á þjóninum).
+ *  Skilar { id: texti } aðeins fyrir skilaboð sem eru á öðru máli. */
+export async function translateBatch(ids: string[]): Promise<Record<string, string>> {
+  if (!ids.length) return {};
+  const { data } = await supabase.auth.getSession();
+  const t = data.session?.access_token;
+  if (!t) return {};
+  try {
+    const r = await fetch(`${API}/api/app/chat/translate-batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+      body: JSON.stringify({ ids: ids.slice(-40), lang: getLang() }),
+    });
+    const j = (await r.json()) as { translations?: Record<string, string | null> };
+    return Object.fromEntries(Object.entries(j.translations ?? {}).filter((e): e is [string, string] => typeof e[1] === "string"));
+  } catch { return {}; }
+}
+
+/** 'on' | 'off' | null (null = kveikt ef appið er ekki á íslensku). */
+export async function getChatTranslate(): Promise<"on" | "off" | null> {
+  const { data: auth } = await authUser();
+  if (!auth.user) return null;
+  const { data, error } = await supabase.from("users").select("chat_translate").eq("id", auth.user.id).maybeSingle();
+  if (error) return null; // fyrir 0103
+  const v = (data as { chat_translate?: string } | null)?.chat_translate;
+  return v === "on" || v === "off" ? v : null;
+}
+
+export async function setChatTranslate(v: "on" | "off"): Promise<boolean> {
+  const { data: auth } = await authUser();
+  if (!auth.user) return false;
+  return !(await supabase.from("users").update({ chat_translate: v }).eq("id", auth.user.id)).error;
+}
+
 export async function deleteMessage(messageId: string): Promise<void> {
   await supabase.from("messages").delete().eq("id", messageId);
 }

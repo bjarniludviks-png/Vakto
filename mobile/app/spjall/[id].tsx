@@ -3,7 +3,7 @@
 import { presenceLabel, type CoworkerStatus } from "../../src/lib/presence";
 import { coworkerStatus } from "../../src/lib/api/presence";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { tr, trf } from "../../src/lib/i18n";
+import { tr, trf, getLang } from "../../src/lib/i18n";
 import { setOpenChannel } from "../../src/lib/push";
 import { ImageViewer } from "../../src/components/image-viewer";
 import { View, Text, TextInput, FlatList, KeyboardAvoidingView, Keyboard, Platform, Pressable, Animated, PanResponder, useWindowDimensions } from "react-native";
@@ -18,7 +18,7 @@ import { Txt, Muted, Avatar, Sheet, Row, useToast, colorFor } from "../../src/co
 import { uploadImage } from "../../src/lib/api/feed";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, editMessage, translateMessage, subscribeChat, typingChannel, peopleMap, authUser, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
+import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, editMessage, translateMessage, translateBatch, getChatTranslate, setChatTranslate, subscribeChat, typingChannel, peopleMap, authUser, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
 import { supabase } from "../../src/lib/supabase";
 import { isMuted, toggleMute } from "../../src/lib/mute";
 import { reportContent, blockUser, blockedUsers } from "../../src/lib/api/moderation";
@@ -66,6 +66,18 @@ export default function Thread() {
   // Þýðingar á tungumál appsins: id → þýddur texti (null = í vinnslu); `orig` = sýna frumtexta aftur.
   const [trans, setTrans] = useState<Record<string, string | null>>({});
   const [orig, setOrig] = useState<Record<string, boolean>>({});
+  // Sjálfvirk þýðing (0103): skilaboð frá öðrum á öðru máli birtast þýdd. null = kveikt ef appið er ekki á íslensku.
+  const [autoPref, setAutoPref] = useState<"on" | "off" | null>(null);
+  const autoOn = autoPref === "on" || (autoPref === null && getLang() !== "is");
+  const autoAsked = useRef(new Set<string>());
+  useEffect(() => { void getChatTranslate().then(setAutoPref); }, []);
+  useEffect(() => {
+    if (!autoOn) return;
+    const ids = msgs.filter((m) => !m.me && m.kind === "text" && m.body && !m.id.startsWith("tmp-") && !(m.id in trans) && !autoAsked.current.has(m.id)).map((m) => m.id);
+    if (!ids.length) return;
+    ids.forEach((x) => autoAsked.current.add(x));
+    void translateBatch(ids).then((got) => { if (Object.keys(got).length) setTrans((cur) => ({ ...cur, ...got })); });
+  }, [msgs, autoOn, trans]);
   const [typing, setTyping] = useState<string | null>(null);
   const [members, setMembers] = useState(0);
   const [isGroup, setIsGroup] = useState(true);
@@ -297,6 +309,7 @@ export default function Thread() {
       // breytt skilaboð: nýr texti strax og eldri þýðing fellur út
       if (e.channel_id !== id) return;
       setMsgs((cur) => cur.map((m) => (m.id === e.id && m.body !== e.body ? { ...m, body: e.body, edited: true } : m)));
+      autoAsked.current.delete(e.id);
       setTrans((cur) => { if (!(e.id in cur)) return cur; const n = { ...cur }; delete n[e.id]; return n; });
     });
     typingRef.current = typingChannel(id, (p) => { if (p.stop) setTyping(null); else { setTyping(p.name); setTimeout(() => setTyping((cur) => (cur === p.name ? null : cur)), 4000); } });
@@ -382,6 +395,7 @@ export default function Thread() {
         </View>
         </Pressable>
         {!isGroup && peerPhone ? <Pressable onPress={() => Linking.openURL(`tel:${peerPhone.replace(/[^\d+]/g, "")}`)} hitSlop={10} accessibilityLabel={tr("Hringja")} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}><Phone color={colors.brand} size={22} /></Pressable> : null}
+        <Pressable onPress={async () => { const next = autoOn ? "off" : "on"; setAutoPref(next); if (next === "off") { setTrans({}); setOrig({}); } toast(next === "on" ? tr("Sjálfvirk þýðing: kveikt") : tr("Sjálfvirk þýðing: slökkt")); await setChatTranslate(next); }} hitSlop={10} accessibilityLabel={tr("Sjálfvirk þýðing")} style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: autoOn ? colors.brandSoft : "transparent" }}><Languages color={autoOn ? colors.brand : colors.ink3} size={21} /></Pressable>
         <Pressable onPress={openInfo} hitSlop={10} accessibilityLabel={tr("Upplýsingar")} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}><Info color={colors.brand} size={24} /></Pressable>
       </View>
 
