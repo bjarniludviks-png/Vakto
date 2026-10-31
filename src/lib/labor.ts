@@ -341,6 +341,7 @@ export type WeekBudget = {
   revenue: number; revenueSource: RevenueSource; target: number;
   fixed: number;                    // kr — mánaðarlaunafólk, hlutfall vikunnar
   rates: Record<string, number>;    // "ÍN|Fornafn" → kr/klst (með launatengdum gjöldum)
+  ratesById: Record<string, number>; // starfsmanns-id → kr/klst (nöfn geta verið eins — id gengur fyrir)
   avgRate: number;                  // fyrir raðir sem finnast ekki
 };
 
@@ -360,6 +361,7 @@ export async function getWeekBudget(supabase: Db, companyId: string, monISO: str
   if (!ruleRes.error) for (const r of ruleRes.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never) ?? null);
   const share = monthShareOf(dateRange(monISO, sun));
   const rates: Record<string, number> = {};
+  const ratesById: Record<string, number> = {};
   let fixed = 0, sum = 0, n = 0;
   for (const r of empRes.data ?? []) {
     if ((r.status as string) === "inactive") continue;
@@ -377,8 +379,9 @@ export async function getWeekBudget(supabase: Db, companyId: string, monISO: str
     const per = l.hours > 0 ? l.cost / l.hours : 0;
     if (per > 0) {
       rates[`${initials(e.fullName)}|${e.fullName.split(/\s+/)[0]}`] = Math.round(per);
+      ratesById[e.id] = Math.round(per);
       sum += per; n++;
     }
   }
-  return { revenue: period.revenue, revenueSource: period.revenueSource, target, fixed: Math.round(fixed), rates, avgRate: n ? Math.round(sum / n) : 0 };
+  return { revenue: period.revenue, revenueSource: period.revenueSource, target, fixed: Math.round(fixed), rates, ratesById, avgRate: n ? Math.round(sum / n) : 0 };
 }

@@ -19,6 +19,11 @@ export type AttRow = {
   required: number; // monthly contracted hours (vinnuskylda)
   estCost: number;  // planned hours × hourly base × 1.302 (m. byrði)
   actCost: number;  // actual hours × hourly base × 1.302
+  /** Plan sem er LOKIÐ (vakt endaði fyrir „núna“) — sambærilegt við lokaðar stimplanir þegar
+   *  tímabilið nær fram í tímann. Á liðnu tímabili = planned. */
+  plannedToDate: number; estCostToDate: number;
+  /** Lokaðar stimplanir lengri en 14 klst (sama mörk og flaggið „Óvenju löng vakt“) — líklega gleymd útstimplun. */
+  longPunches: number;
 };
 export type WeekAttendance = { rows: AttRow[]; live: boolean };
 
@@ -51,26 +56,35 @@ export async function getWeekAttendance(fromISO?: string, toISO?: string): Promi
     if (!company) return { rows: [], live: false };
 
     const [{ data: shifts }, { data: punches }] = await Promise.all([
-      allRows((a, b) => supabase.from("shifts").select("id, employee_id, start_time, end_time")
+      allRows((a, b) => supabase.from("shifts").select("id, employee_id, date, start_time, end_time")
         .eq("company_id", company).gte("date", from).lte("date", to).order("id").range(a, b)),
       allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
         .eq("company_id", company).gte("clock_in", from).lte("clock_in", to + "T23:59:59").order("id").range(a, b)),
     ]);
 
+    // Ísland = UTC, svo dagsetning + klukkutími vaktar er bein UTC-stund.
+    const nowMs = Date.now();
     const planned = new Map<string, number>();
+    const plannedToDate = new Map<string, number>();
     for (const s of shifts ?? []) {
       const h = hoursBetween(s.start_time as string, s.end_time as string);
-      planned.set(s.employee_id as string, (planned.get(s.employee_id as string) ?? 0) + h);
+      const emp = s.employee_id as string;
+      planned.set(emp, (planned.get(emp) ?? 0) + h);
+      const start = Date.parse(`${s.date}T${String(s.start_time ?? "00:00").slice(0, 5)}:00Z`);
+      if (!Number.isNaN(start) && start + h * 3600000 <= nowMs) plannedToDate.set(emp, (plannedToDate.get(emp) ?? 0) + h);
     }
     const actual = new Map<string, number>();
+    const longPunches = new Map<string, number>();
     for (const p of punches ?? []) {
       if (!p.clock_out) continue;
       const h = (new Date(p.clock_out as string).getTime() - new Date(p.clock_in as string).getTime()) / 3600000;
       if (h > 0) actual.set(p.employee_id as string, (actual.get(p.employee_id as string) ?? 0) + h);
+      if (h > 14) longPunches.set(p.employee_id as string, (longPunches.get(p.employee_id as string) ?? 0) + 1);
     }
 
     const rows: AttRow[] = employees.map((e) => {
       const pl = Math.round((planned.get(e.id) ?? 0) * 10) / 10;
+      const ptd = Math.round((plannedToDate.get(e.id) ?? 0) * 10) / 10;
       const ac = Math.round((actual.get(e.id) ?? 0) * 10) / 10;
       // Hourly base: hourly staff use their rate; monthly staff rate ÷ 173,33.
       const hourly = e.payType === "monthly" ? (Number(e.rate) || 0) / 173.33 : (Number(e.rate) || 0);
@@ -81,6 +95,8 @@ export async function getWeekAttendance(fromISO?: string, toISO?: string): Promi
         required: Math.round((e.employmentRatio / 100) * 173.33),
         estCost: Math.round(pl * withLevies),
         actCost: Math.round(ac * withLevies),
+        plannedToDate: ptd, estCostToDate: Math.round(ptd * withLevies),
+        longPunches: longPunches.get(e.id) ?? 0,
       };
     });
     return { rows, live: true };

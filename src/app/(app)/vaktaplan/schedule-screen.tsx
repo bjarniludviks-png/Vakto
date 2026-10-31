@@ -114,7 +114,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [deptMenu, setDeptMenu] = useState(false);
   const [monthMode, setMonthMode] = useState<"tafla" | "dagatal">("tafla");
   const [full, setFull] = useState(false);
-  const [monthTot, setMonthTot] = useState<{ hrs: number; shifts: number }>({ hrs: 0, shifts: 0 });
+  type MonthShift = { emp: string; date: string; start: string; end: string };
+  const [monthTot, setMonthTot] = useState<{ hrs: number; shifts: number; list: MonthShift[] }>({ hrs: 0, shifts: 0, list: [] });
   const [view, setView] = useState<"Vika" | "Dagur" | "Mánuður">("Vika");
   const todayISO = initial?.todayISO ?? DEMO_TODAY;
   const [cur, setCur] = useState(() => parseISO(initial?.todayISO ?? DEMO_TODAY)); // anchor day
@@ -203,6 +204,15 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       const hod = ((x % 24) + 24) % 24;
       if (wd === 0 || wd === 6 || hod < 8 || hod >= 17) prem += 0.25;
     }
+    return prem;
+  };
+  /** Sama álagsregla fyrir vakt með dagsetningu (mánaðarsýn). */
+  const premiumOf = (dateISO: string, start: string, end: string): number => {
+    const [sh, sm] = start.split(":").map(Number), [eh, em] = end.split(":").map(Number);
+    const a = sh + (sm || 0) / 60; let b = eh + (em || 0) / 60; if (b <= a) b += 24;
+    const wd = new Date(`${dateISO}T12:00:00`).getDay();
+    let prem = 0;
+    for (let x = a; x < b; x += 0.25) { const hod = x % 24; if (wd === 0 || wd === 6 || hod < 8 || hod >= 17) prem += 0.25; }
     return prem;
   };
 
@@ -425,16 +435,54 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     getWeekBudget(weekMonISO).then((b) => { if (!cancelled) setBudget(b); }).catch(() => {});
     return () => { cancelled = true; };
   }, [weekMonISO, liveCompany]);
+  // kr/klst með launatengdum gjöldum úr launareglum hvers starfsmanns (getWeekBudget); id gengur fyrir nafni.
+  const rateOf = (e: Emp): number => (budget && ((e[4] ? budget.ratesById?.[e[4]] : undefined) ?? budget.rates[`${e[0]}|${e[1]}`] ?? budget.avgRate)) || COST_HR;
   const planCost = useMemo(() => {
     if (!budget) return null;
     let c = budget.fixed;
     emp.forEach((e, r) => {
-      const rate = budget.rates[`${e[0]}|${e[1]}`] ?? budget.avgRate ?? COST_HR;
+      const rate = rateOf(e);
       grid[r]?.forEach((s, col) => { if (s && s !== "off") c += cellHrs(r, col, s) * rate; });
     });
     return Math.round(c);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [budget, emp, grid, cellTimes]);
+  // Dagur: sama útreikningur og vikan, aðeins dálkur dagsins (mánaðarlaunafólk = sjöundi hluti vikunnar).
+  const dayCost = useMemo(() => {
+    if (!budget) return null;
+    let c = budget.fixed / 7;
+    vis.forEach((r) => { const s = grid[r]?.[curCol]; if (s && s !== "off") c += cellHrs(r, curCol, s) * rateOf(emp[r]); });
+    return Math.round(c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budget, vis, emp, grid, cellTimes, curCol]);
+  // Mánuður (lifandi fyrirtæki): raunverulegar vaktir mánaðarins — úr töflunni eða dagatalinu — í stað viku × 4,33.
+  const monthList = ((): MonthShift[] | null => {
+    if (!liveCompany || view !== "Mánuður") return null;
+    if (monthMode === "tafla") return monthTot.list;
+    const y = cur.getFullYear(), m = cur.getMonth();
+    const pre = `${y}-${String(m + 1).padStart(2, "0")}-`;
+    const visRefs = new Set(vis.map((r) => empRef(emp[r])));
+    const out: MonthShift[] = [];
+    for (const [d, list] of Object.entries(monthShifts)) if (d.startsWith(pre)) for (const x of list) if (visRefs.has(x.ref)) out.push({ emp: x.ref, date: d, start: x.start.slice(0, 5), end: x.end.slice(0, 5) });
+    return out;
+  })();
+  const monthFig = (() => {
+    if (!monthList) return null;
+    const byId = new Map(emp.map((e) => [empRef(e), e]));
+    const weekKey = (d: string) => { const x = new Date(`${d}T12:00:00`); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return fmtISO(x); };
+    let hrs = 0, premium = 0, var_ = 0;
+    const perWeek = new Map<string, number>();
+    for (const s of monthList) {
+      const h = hrsBetween(s.start, s.end);
+      hrs += h; premium += premiumOf(s.date, s.start, s.end);
+      const e = byId.get(s.emp); var_ += h * (e ? rateOf(e) : (budget?.avgRate || COST_HR));
+      const k = `${s.emp}|${weekKey(s.date)}`; perWeek.set(k, (perWeek.get(k) ?? 0) + h);
+    }
+    const overtime = [...perWeek.values()].reduce((a, h) => a + Math.max(0, h - 40), 0);
+    const days = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
+    const cost = budget ? Math.round(var_ + (budget.fixed * days) / 7) : null;
+    return { hrs: Math.round(hrs * 10) / 10, shifts: monthList.length, premium: Math.round(premium * 10) / 10, overtime: Math.round(overtime * 10) / 10, cost };
+  })();
   const laborTarget = budget?.target ?? 30;
   const planPct = budget && planCost != null && budget.revenue > 0 ? Math.round((planCost / budget.revenue) * 1000) / 10 : null;
   const planColor = planPct == null ? "" : planPct <= laborTarget ? "good" : planPct <= laborTarget + 3 ? "warn" : "bad";
@@ -922,16 +970,23 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       {/* Slim one-line summary so the grid itself stays at the top of the
           screen — the schedule is the point, the numbers just ride along.
           Day view has its own strip with the same figures, so skip here. */}
-      {view !== "Dagur" && !full && (() => {
-        const cost = view === "Vika" && planCost != null ? planCost : Math.round(kpi.hrs * COST_HR);
+      {!full && (() => {
+        // Sömu fjögur spjöld í öllum sýnum. Kostnaður = taxti hvers starfsmanns m. gjöldum (getWeekBudget);
+        // mánuður lifandi fyrirtækis reiknast úr raunverulegum vöktum mánaðarins (monthFig).
+        const mf = view === "Mánuður" ? monthFig : null;
+        const hrsV = mf ? mf.hrs : kpi.hrs, shiftsV = mf ? mf.shifts : kpi.shifts;
+        const cost = view === "Vika" && planCost != null ? planCost
+          : view === "Dagur" && dayCost != null ? dayCost
+            : mf?.cost != null ? mf.cost : Math.round(hrsV * COST_HR);
+        const otV = mf ? mf.overtime : estHrs.overtime, premV = mf ? mf.premium : estHrs.premium;
         const showBudget = view === "Vika" && planPct != null && budgetCap != null;
         const room = showBudget ? budgetCap! - (planCost ?? 0) : 0;
         return (
         <div className="db2-row4 db2-mini">
           <section className="db2-card db2-tile">
             <div className="db2-k">{t(kpi.hl)}</div>
-            <div className="db2-v">{dec1(kpi.hrs)}<small>{t("klst")}</small></div>
-            <div className="db2-s">{t(kpi.sl)} {kpi.shifts}{kpi.open && !liveCompany ? ` · 2 ${t("opnar")}` : ""}</div>
+            <div className="db2-v">{dec1(hrsV)}<small>{t("klst")}</small></div>
+            <div className="db2-s">{t(kpi.sl)} {shiftsV}{kpi.open && !liveCompany ? ` · 2 ${t("opnar")}` : ""}</div>
           </section>
           <section className="db2-card db2-tile">
             <div className="db2-k">{t("Áætl. launakostnaður")}</div>
@@ -946,11 +1001,19 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
               <div className="db2-s">{room >= 0 ? <>{t("svigrúm")} <b>{nf(room)} kr</b></> : <span style={{ color: "var(--bad)" }}>{nf(-room)} kr {t("yfir launaáætlun")}</span>}</div>
             </>) : <div className="db2-s" style={{ marginTop: 10 }}>{view === "Vika" ? t("Skráðu veltu til að sjá hlutfallið.") : t("Sést í vikusýn")}</div>}
           </section>
-          <section className="db2-card db2-tile">
-            <div className="db2-k">{t("Áætl. yfirvinna")}</div>
-            <div className="db2-v" style={{ color: estHrs.overtime > 0 ? "var(--bad)" : undefined }}>{dec1(estHrs.overtime)}<small>{t("klst")}</small></div>
-            <div className="db2-s">{t("Áætl. álagstímar")} {dec1(estHrs.premium)} {t("klst")}</div>
-          </section>
+          {view === "Dagur" ? (
+            <section className="db2-card db2-tile">
+              <div className="db2-k">{t("Áætl. álagstímar")}</div>
+              <div className="db2-v">{dec1(premV)}<small>{t("klst")}</small></div>
+              <div className="db2-s">{t("Yfirvinna reiknast á viku — sjá vikusýn")}</div>
+            </section>
+          ) : (
+            <section className="db2-card db2-tile">
+              <div className="db2-k">{t("Áætl. yfirvinna")}</div>
+              <div className="db2-v" style={{ color: otV > 0 ? "var(--bad)" : undefined }}>{dec1(otV)}<small>{t("klst")}</small></div>
+              <div className="db2-s">{t("Áætl. álagstímar")} {dec1(premV)} {t("klst")}</div>
+            </section>
+          )}
         </div>
         );
       })()}
@@ -1052,7 +1115,12 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         </div>
       )}
 
+      {view === "Dagur" && <div className="week-paint" style={{ marginTop: 16 }}><PaintTools types={types} tool={paint} setTool={(x) => { setPaint(x); if (x) setClip(null); }} onTypes={() => setModal("types")} /></div>}
       {view === "Dagur" && <DayView day={cur} col={curCol} rows={colShifts(curCol)} need={targets[curCol] ?? 0} onAdd={openNewShift}
+        painting={!!paint}
+        idle={vis.filter((r) => (grid[r]?.[curCol] ?? "off") === "off").map((r) => ({ r, i: emp[r][0], n: emp[r][1], c: deptColors[emp[r][2]] ?? emp[r][3], dep: emp[r][2] }))}
+        onCell={(r) => cellClick(r, curCol)}
+        onBar={(x) => { const r = emp.findIndex((e) => e[1] === x.n); if (r >= 0 && paint) { cellClick(r, curCol); return true; } return false; }}
         onEdit={(x) => { const r = emp.findIndex((e) => e[1] === x.n); if (r >= 0) { setSel({ r, c: curCol }); setModal("shift"); } }}
         onCtx={(x, ev) => {
         const r = emp.findIndex((e) => e[1] === x.n);
@@ -1202,9 +1270,16 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
 
 type DayRow = { i: string; n: string; c: string; dep: string; l: string; h: number; type: string; start: number };
 
-function DayView({ day, col, rows, onAdd, onEdit, onCtx, need = 0 }: { day: Date; col: number; rows: DayRow[]; onAdd: () => void; onEdit: (x: DayRow) => void; onCtx: (x: DayRow, ev: React.MouseEvent) => void; need?: number }) {
+function DayView({ day, col, rows, onAdd, onEdit, onCtx, need = 0, idle = [], onCell, onBar, painting = false }: {
+  day: Date; col: number; rows: DayRow[]; onAdd: () => void; onEdit: (x: DayRow) => void; onCtx: (x: DayRow, ev: React.MouseEvent) => void; need?: number;
+  /** Sýnilegt starfsfólk án vaktar þennan dag — smellur á línuna setur vakt (eða málar valda tegund). */
+  idle?: { r: number; i: string; n: string; c: string; dep: string }[];
+  onCell?: (r: number) => void;
+  /** Mála-hamur: smellur á vakt málar/strokar út í stað þess að opna hana (skilar true ef það var gert). */
+  onBar?: (x: DayRow) => boolean;
+  painting?: boolean;
+}) {
   const { t } = useLang();
-  const tot = rows.reduce((a, x) => a + x.h, 0);
   // Parse "08:00–16:00" / "08–16" labels into fractional hours.
   const parse = (lbl: string): { s: number; e: number } | null => {
     const m = lbl.match(/(\d{1,2})(?::(\d{2}))?\s*–\s*(\d{1,2})(?::(\d{2}))?/);
@@ -1227,16 +1302,15 @@ function DayView({ day, col, rows, onAdd, onEdit, onCtx, need = 0 }: { day: Date
   for (let h = hMin; h <= hMax; h += range > 14 ? 3 : 2) ticks.push(h);
   return (
     <div style={{ marginTop: 16 }}>
-      <div className="kstrip">
-        <span>{t("Á vakt")} <b>{rows.length}</b></span>
-        <span>{t("Tímar dagsins")} <b>{dec1(tot)}</b> {t("klst")}</span>
-        <span>{t("Kostnaður dagsins")} <b>{nf(Math.round(tot * COST_HR))}</b> kr</span>
-        {need > 0 && <span className={rows.length < need ? "bad" : ""}>{t("Mönnunarþörf")} <b>{rows.length}</b> / {need}</span>}
-      </div>
-      <div className="card" style={{ marginTop: 16 }}>
+      {need > 0 && (
+        <div className="kstrip">
+          <span className={rows.length < need ? "bad" : ""}>{t("Mönnunarþörf")} <b>{rows.length}</b> / {need}</span>
+        </div>
+      )}
+      <div className="card" style={{ marginTop: need > 0 ? 16 : 0 }}>
         <div className="ch"><div><div className="ct">{t(DAYNAMES[col])} {day.getDate()}. {t(MONTHS_IS[day.getMonth()])}</div><div className="cs">{t("tímalína dagsins — smelltu á vakt til að breyta, hægrismelltu fyrir aðgerðir")}</div></div><button className="btn sm" onClick={onAdd}>{t("+ Bæta við vakt")}</button></div>
         <div className="cb" style={{ paddingTop: 6 }}>
-          {rows.length ? (
+          {rows.length || idle.length ? (
             <div className="dtl-wrap">
               <div className="dtl">
                 <div className="dtl-row dtl-head">
@@ -1260,13 +1334,28 @@ function DayView({ day, col, rows, onAdd, onEdit, onCtx, need = 0 }: { day: Date
                         <div
                           className={`dtl-bar ${x.type}`}
                           style={{ left: `${pct(x.span.s)}%`, width: `${Math.max(4, pct(x.span.e) - pct(x.span.s))}%` }}
-                          onClick={() => onEdit(x)}
+                          onClick={() => { if (!onBar?.(x)) onEdit(x); }}
                           onContextMenu={(ev) => onCtx(x, ev)}
                           title={`${x.n} · ${x.l} · ${t("hægrismelltu fyrir aðgerðir")}`}
                         >
                           <span>{x.l}</span><small>{dec1(x.h)} {t("klst")}</small>
                         </div>
                       )}
+                    </div>
+                  </div>
+                ))}
+                {idle.map((x) => (
+                  <div className="dtl-row" key={`idle-${x.r}`} style={{ opacity: 0.85 }}>
+                    <div className="dtl-who">
+                      <span className="avt" style={{ background: x.c, width: 28, height: 28, fontSize: 11 }}>{x.i}</span>
+                      <span className="dtl-nm">{x.n}<small>{t(x.dep)}</small></span>
+                    </div>
+                    <div className="dtl-track" role="button" tabIndex={0} style={{ cursor: "pointer" }}
+                      title={painting ? t("Smelltu til að mála vakt") : t("Smelltu til að setja vakt")}
+                      onClick={() => onCell?.(x.r)} onKeyDown={(ev) => { if (ev.key === "Enter") onCell?.(x.r); }}>
+                      {ticks.map((h) => <i key={h} className="dtl-line" style={{ left: `${pct(h)}%` }} />)}
+                      {isToday && nowH >= hMin && nowH <= hMax && <i className="dtl-now" style={{ left: `${pct(nowH)}%` }} />}
+                      <span className="dtl-idle">{painting ? t("Smelltu til að mála vakt") : t("+ Setja vakt")}</span>
                     </div>
                   </div>
                 ))}

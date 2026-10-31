@@ -1167,6 +1167,10 @@ html.dark .wallet-btn.google{background:var(--panel);color:var(--ink)}
 .dtl-nm{font-size:13px;font-weight:650;line-height:1.15;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dtl-nm small{display:block;font-weight:500;font-size:11px;color:var(--ink3)}
 .dtl-track{position:relative;height:50px}
+/* dagsýn: lína starfsmanns án vaktar — smellur setur vakt */
+.dtl-idle{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:12.5px;font-weight:600;color:var(--ink3);opacity:0;transition:opacity .15s}
+.dtl-track[role=button]:hover{background:var(--brand-soft)}
+.dtl-track[role=button]:hover .dtl-idle,.dtl-track[role=button]:focus-visible .dtl-idle{opacity:1;color:var(--brand)}
 .dtl-tick{position:absolute;top:4px;transform:translateX(-50%);font-size:10.5px;font-weight:600;color:var(--ink3);letter-spacing:.02em}
 .dtl-line{position:absolute;top:0;bottom:0;width:1px;background:var(--line2)}
 .dtl-now{position:absolute;top:0;bottom:0;width:2px;background:var(--brand);z-index:2;box-shadow:0 0 6px rgba(233,112,15,.5)}
