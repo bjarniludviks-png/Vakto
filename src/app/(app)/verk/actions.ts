@@ -6,7 +6,7 @@ import { SITE_URL } from "@/lib/site";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { userError } from "@/lib/user-error";
-import { hoursOf, jobTotals, type Client, type JobDetail, type JobListItem, type ReportSnapshot } from "@/lib/verk";
+import { hoursOf, isNum, jobTotals, type Client, type ClientCard, type JobDetail, type JobListItem, type JobStage, type Quote, type QuoteLine, type ReportSnapshot } from "@/lib/verk";
 
 // VAKTO Verk (0102): verk, viðskiptavinir, tímar, efni, myndir og verkskýrslur til samþykktar.
 // RLS sér um aðganginn (fyrirtæki notandans; tímar: eigin eða stjórnandi).
@@ -36,7 +36,7 @@ export async function listJobs(): Promise<{ ok: boolean; companyId: string; jobs
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return empty;
     const [jobsRes, clientsRes, entriesRes] = await Promise.all([
-      supabase.from("jobs").select("id, title, address, status, hourly_rate, client_id, created_at, clients(name)").eq("company_id", ctx.company).order("created_at", { ascending: false }),
+      supabase.from("jobs").select("id, title, address, status, hourly_rate, client_id, created_at, invoiced_at, paid_at, clients(name)").eq("company_id", ctx.company).order("created_at", { ascending: false }),
       supabase.from("clients").select("id, name, kennitala, email, phone, address").eq("company_id", ctx.company).order("name"),
       supabase.from("job_entries").select("id, job_id, user_id, started_at, ended_at").eq("company_id", ctx.company).order("started_at", { ascending: false }).limit(5000),
     ]);
@@ -60,6 +60,7 @@ export async function listJobs(): Promise<{ ok: boolean; companyId: string; jobs
         id: j.id as string, title: j.title as string, address: (j.address as string) ?? null, status: j.status as JobListItem["status"],
         client: c?.name ?? null, clientId: (j.client_id as string) ?? null, hourlyRate: j.hourly_rate != null ? Number(j.hourly_rate) : null,
         hoursMonth: Math.round((a?.month ?? 0) * 10) / 10, hoursTotal: Math.round((a?.total ?? 0) * 10) / 10, lastAt: a?.last ?? (j.created_at as string), running: !!a?.running,
+        invoicedAt: (j.invoiced_at as string) ?? null, paidAt: (j.paid_at as string) ?? null,
       };
     });
     return { ok: true, companyId: ctx.company, jobs, clients: (clientsRes.data ?? []) as Client[], running };
@@ -76,7 +77,7 @@ export async function getJob(id: string): Promise<{ ok: boolean; job?: JobDetail
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const [jr, er, ir, pr, rr] = await Promise.all([
-      supabase.from("jobs").select("id, title, address, lat, lng, status, notes, hourly_rate, clients(id, name, kennitala, email, phone, address)").eq("id", id).maybeSingle(),
+      supabase.from("jobs").select("id, title, address, lat, lng, status, notes, hourly_rate, invoiced_at, paid_at, quote_id, clients(id, name, kennitala, email, phone, address)").eq("id", id).maybeSingle(),
       supabase.from("job_entries").select("id, user_id, started_at, ended_at, note, km, billable, on_site, users(full_name)").eq("job_id", id).order("started_at", { ascending: false }),
       supabase.from("job_items").select("id, kind, description, quantity, unit_price, date, receipt_url").eq("job_id", id).order("date", { ascending: false }),
       supabase.from("job_photos").select("id, url, caption, created_at").eq("job_id", id).order("created_at", { ascending: false }),
@@ -90,6 +91,7 @@ export async function getJob(id: string): Promise<{ ok: boolean; job?: JobDetail
       job: {
         id: j.id as string, title: j.title as string, address: (j.address as string) ?? null, lat: (j.lat as number) ?? null, lng: (j.lng as number) ?? null,
         status: j.status as JobDetail["status"], notes: (j.notes as string) ?? null, hourlyRate: j.hourly_rate != null ? Number(j.hourly_rate) : null, client: c ?? null,
+        invoicedAt: (j.invoiced_at as string) ?? null, paidAt: (j.paid_at as string) ?? null, quoteId: (j.quote_id as string) ?? null,
         entries: (er.data ?? []).map((e) => {
           const u = (Array.isArray(e.users) ? e.users[0] : e.users) as { full_name?: string } | null;
           return { id: e.id as string, userId: e.user_id as string, who: u?.full_name ?? "—", startedAt: e.started_at as string, endedAt: (e.ended_at as string) ?? null, hours: Math.round(hoursOf(e.started_at as string, e.ended_at as string | null) * 100) / 100, note: (e.note as string) ?? null, km: Number(e.km ?? 0), billable: e.billable !== false, onSite: (e.on_site as boolean | null) ?? null };
@@ -312,5 +314,224 @@ export async function createReport(input: { jobId: string; from: string; to: str
     return { ok: true, token, url: `${origin}/samthykki/${token}` };
   } catch (e) {
     return { ok: false, error: userError(e) };
+  }
+}
+
+// ---------- Fasi 2 (0104): staða verka, tilboð og viðskiptavinaspjald ----------
+
+/** Færa verk á milli stiga: Í vinnslu → Lokið → Reikningur sendur → Greitt (og til baka). */
+export async function setJobStage(id: string, stage: JobStage): Promise<Res> {
+  const supabase = await createClient();
+  const ctx = await ctxOf(supabase);
+  if ("error" in ctx) return { ok: false, error: ctx.error };
+  if (await demoBlocked(ctx.company)) return demoResult();
+  const now = new Date().toISOString();
+  const patch = stage === "open" ? { status: "open", invoiced_at: null, paid_at: null }
+    : stage === "done" ? { status: "done", invoiced_at: null, paid_at: null }
+    : stage === "invoiced" ? { status: "done", invoiced_at: now, paid_at: null }
+    : { status: "done", paid_at: now };
+  if (stage === "paid") {
+    const { data } = await supabase.from("jobs").select("invoiced_at").eq("id", id).maybeSingle();
+    if (!data?.invoiced_at) (patch as Record<string, unknown>).invoiced_at = now;
+  }
+  const { error } = await supabase.from("jobs").update(patch).eq("id", id);
+  return error ? { ok: false, error: userError(error) } : { ok: true };
+}
+
+const cleanLines = (items: unknown): QuoteLine[] =>
+  (Array.isArray(items) ? items : []).slice(0, 60).map((x) => {
+    const i = (x ?? {}) as Record<string, unknown>;
+    const kind: QuoteLine["kind"] = i.kind === "labor" || i.kind === "material" ? i.kind : "other";
+    return { kind, description: String(i.description ?? "").trim().slice(0, 300), quantity: num(i.quantity) ?? 1, unit: String(i.unit ?? (kind === "labor" ? "klst." : "stk.")).slice(0, 20), unitPrice: num(i.unitPrice) ?? 0 };
+  }).filter((l) => l.description);
+
+const toQuote = (q: Record<string, unknown>): Quote => {
+  const c = (Array.isArray(q.clients) ? q.clients[0] : q.clients) as { name?: string } | null;
+  return {
+    id: q.id as string, number: Number(q.number ?? 0), title: q.title as string, address: (q.address as string) ?? null, description: (q.description as string) ?? null,
+    items: cleanLines(q.items), validUntil: (q.valid_until as string) ?? null, terms: (q.terms as string) ?? null, status: q.status as Quote["status"],
+    token: q.token as string, clientId: (q.client_id as string) ?? null, client: c?.name ?? null, jobId: (q.job_id as string) ?? null,
+    sentAt: (q.sent_at as string) ?? null, signedName: (q.signed_name as string) ?? null, comment: (q.client_comment as string) ?? null,
+    decidedAt: (q.decided_at as string) ?? null, createdAt: q.created_at as string,
+  };
+};
+const Q_COLS = "id, number, title, address, description, items, valid_until, terms, status, token, client_id, job_id, sent_at, signed_name, client_comment, decided_at, created_at, clients(name)";
+
+export async function listQuotes(): Promise<Quote[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return [];
+    const { data, error } = await supabase.from("quotes").select(Q_COLS).eq("company_id", ctx.company).order("created_at", { ascending: false });
+    if (error) return []; // fyrir 0104
+    return (data ?? []).map((q) => toQuote(q as Record<string, unknown>));
+  } catch { return []; }
+}
+
+/** Nýtt tilboð eða breyting á drögum (sent/samþykkt tilboð breytist ekki). */
+export async function saveQuote(input: { id?: string; title: string; clientId?: string | null; address?: string; description?: string; items: unknown; validUntil?: string | null; terms?: string }): Promise<Res & { id?: string }> {
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    if (await demoBlocked(ctx.company)) return demoResult();
+    const title = txt(input.title, 200);
+    if (!title) return { ok: false, error: "Gefðu tilboðinu heiti" };
+    const items = cleanLines(input.items);
+    if (!items.length) return { ok: false, error: "Bættu við að minnsta kosti einni línu" };
+    const row = {
+      title, client_id: input.clientId || null, address: txt(input.address, 200), description: txt(input.description, 4000), items,
+      valid_until: input.validUntil && /^\d{4}-\d{2}-\d{2}$/.test(input.validUntil) ? input.validUntil : null, terms: txt(input.terms, 4000),
+    };
+    if (input.id) {
+      const { data: cur } = await supabase.from("quotes").select("status").eq("id", input.id).maybeSingle();
+      if (cur && cur.status !== "draft") return { ok: false, error: "Sent tilboð er læst — búðu til nýtt" };
+      const { error } = await supabase.from("quotes").update(row).eq("id", input.id);
+      return error ? { ok: false, error: userError(error) } : { ok: true, id: input.id };
+    }
+    const { data, error } = await supabase.from("quotes").insert({ ...row, company_id: ctx.company, created_by: ctx.userId }).select("id").single();
+    return error ? { ok: false, error: userError(error) } : { ok: true, id: data.id as string };
+  } catch (e) {
+    return { ok: false, error: userError(e) };
+  }
+}
+
+export async function deleteQuote(id: string): Promise<Res> {
+  const supabase = await createClient();
+  const ctx = await ctxOf(supabase);
+  if ("error" in ctx) return { ok: false, error: ctx.error };
+  if (await demoBlocked(ctx.company)) return demoResult();
+  const { error } = await supabase.from("quotes").delete().eq("id", id).in("status", ["draft", "declined"]);
+  return error ? { ok: false, error: userError(error) } : { ok: true };
+}
+
+async function originOf(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  return host ? `${h.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https")}://${host}` : SITE_URL;
+}
+
+/** Senda tilboð: læsist og fær opinberan hlekk (/tilbod/{token}) sem viðskiptavinurinn samþykkir á. */
+export async function sendQuote(id: string): Promise<Res & { url?: string; email?: string | null }> {
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    if (await demoBlocked(ctx.company)) return demoResult();
+    const { data: q } = await supabase.from("quotes").select("token, status, clients(email)").eq("id", id).maybeSingle();
+    if (!q) return { ok: false, error: "Tilboð fannst ekki" };
+    if (q.status === "draft") {
+      const { error } = await supabase.from("quotes").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", id);
+      if (error) return { ok: false, error: userError(error) };
+    }
+    const c = (Array.isArray(q.clients) ? q.clients[0] : q.clients) as { email?: string } | null;
+    return { ok: true, url: `${await originOf()}/tilbod/${q.token}`, email: c?.email ?? null };
+  } catch (e) {
+    return { ok: false, error: userError(e) };
+  }
+}
+
+/** Viðskiptavinaspjöld: verk, opin tilboð, tímar, rukkað og ógreitt per viðskiptavin. */
+export async function listClientCards(): Promise<ClientCard[]> {
+  if (!isSupabaseConfigured()) return [];
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return [];
+    const [cr, jr, er, ir, qr] = await Promise.all([
+      supabase.from("clients").select("id, name, kennitala, email, phone, address, notes").eq("company_id", ctx.company).order("name"),
+      supabase.from("jobs").select("id, client_id, status, hourly_rate, invoiced_at, paid_at, created_at").eq("company_id", ctx.company),
+      supabase.from("job_entries").select("job_id, started_at, ended_at, billable, km").eq("company_id", ctx.company).not("ended_at", "is", null).limit(10000),
+      supabase.from("job_items").select("job_id, kind, quantity, unit_price").eq("company_id", ctx.company).limit(10000),
+      supabase.from("quotes").select("client_id, status").eq("company_id", ctx.company),
+    ]);
+    const entriesBy = new Map<string, { hours: number; km: number; billable: boolean; started: string }[]>();
+    for (const e of er.data ?? []) {
+      const l = entriesBy.get(e.job_id as string) ?? [];
+      l.push({ hours: hoursOf(e.started_at as string, e.ended_at as string), km: Number(e.km ?? 0), billable: e.billable !== false, started: e.started_at as string });
+      entriesBy.set(e.job_id as string, l);
+    }
+    const itemsBy = new Map<string, { kind: "material" | "expense"; quantity: number; unitPrice: number }[]>();
+    for (const i of ir.data ?? []) {
+      const l = itemsBy.get(i.job_id as string) ?? [];
+      l.push({ kind: i.kind as "material", quantity: Number(i.quantity), unitPrice: Number(i.unit_price) });
+      itemsBy.set(i.job_id as string, l);
+    }
+    return (cr.data ?? []).map((c) => {
+      const jobs = (jr.data ?? []).filter((j) => j.client_id === c.id);
+      let hours = 0, billed = 0, unpaid = 0, lastAt: string | null = null;
+      for (const j of jobs) {
+        const es = entriesBy.get(j.id as string) ?? [];
+        const t = jobTotals(es, itemsBy.get(j.id as string) ?? [], j.hourly_rate != null ? Number(j.hourly_rate) : null);
+        hours += t.hours;
+        if (j.invoiced_at) { billed += t.total; if (!j.paid_at) unpaid += t.total; }
+        for (const e of es) if (!lastAt || e.started > lastAt) lastAt = e.started;
+      }
+      return {
+        id: c.id as string, name: c.name as string, kennitala: (c.kennitala as string) ?? null, email: (c.email as string) ?? null, phone: (c.phone as string) ?? null,
+        address: (c.address as string) ?? null, notes: (c.notes as string) ?? null, jobs: jobs.length, openJobs: jobs.filter((j) => j.status === "open").length,
+        quotesOpen: (qr.data ?? []).filter((q) => q.client_id === c.id && q.status === "sent").length, hours: Math.round(hours * 10) / 10,
+        billed, unpaid, lastAt,
+      };
+    });
+  } catch (e) {
+    console.error("listClientCards:", e);
+    return [];
+  }
+}
+
+export async function saveClientNotes(id: string, notes: string): Promise<Res> {
+  const supabase = await createClient();
+  const ctx = await ctxOf(supabase);
+  if ("error" in ctx) return { ok: false, error: ctx.error };
+  if (await demoBlocked(ctx.company)) return demoResult();
+  const { error } = await supabase.from("clients").update({ notes: txt(notes, 4000) }).eq("id", id);
+  return error ? { ok: false, error: userError(error) } : { ok: true };
+}
+
+/** Er Payday tengt fyrirtækinu (Stillingar → Tengingar)? */
+export async function paydayConnected(): Promise<boolean> {
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return false;
+    const { data } = await supabase.from("company_integrations").select("id").eq("company_id", ctx.company).eq("provider", "payday").maybeSingle();
+    return !!data;
+  } catch { return false; }
+}
+
+/** Reikningur fyrir allt verkið í Payday verktakans: vinna (tímar × tímagjald), efni og útlagt, 24 % vsk.
+ *  Verkið fær stöðuna „Reikningur sendur“ og númer reikningsins. */
+export async function invoiceJobInPayday(jobId: string): Promise<Res & { number?: number | null }> {
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    if (await demoBlocked(ctx.company)) return demoResult();
+    const { data: integ } = await supabase.from("company_integrations").select("secret_enc").eq("company_id", ctx.company).eq("provider", "payday").maybeSingle();
+    if (!integ?.secret_enc) return { ok: false, error: "Payday er ekki tengt — tengdu það í Stillingum → Tengingar." };
+    const g = await getJob(jobId);
+    if (!g.ok || !g.job) return { ok: false, error: g.error ?? "Verk fannst ekki" };
+    const j = g.job;
+    if (j.invoicedAt) return { ok: false, error: "Reikningur hefur þegar verið gerður fyrir verkið" };
+    if (!j.client) return { ok: false, error: "Veldu viðskiptavin á verkið (Breyta) áður en reikningur er gerður" };
+    const done = j.entries.filter((e) => e.endedAt);
+    const t = jobTotals(done, j.items, j.hourlyRate);
+    const vat = 24;
+    const lines = [
+      ...(t.labor > 0 ? [{ description: `Vinna: ${j.title}`, comment: `${isNum(t.hours)} klst. × ${Math.round(j.hourlyRate ?? 0)} kr.`, quantity: t.hours, unitPriceExcludingVat: Math.round(j.hourlyRate ?? 0), vatPercentage: vat, discountPercentage: 0 }] : []),
+      ...j.items.map((i) => ({ description: i.kind === "expense" ? `Útlagður kostnaður: ${i.description}` : i.description, quantity: i.quantity, unitPriceExcludingVat: i.unitPrice, vatPercentage: vat, discountPercentage: 0 })),
+    ].filter((l) => l.quantity > 0 && l.unitPriceExcludingVat > 0);
+    if (!lines.length) return { ok: false, error: "Engir reikningshæfir tímar eða efni á verkinu" };
+    const [{ decrypt }, { paydayCreateInvoice }] = await Promise.all([import("@/lib/integrations/providers.server"), import("@/lib/integrations/payday.server")]);
+    const out = await paydayCreateInvoice(decrypt(integ.secret_enc as string), {
+      customer: { name: j.client.name, ssn: j.client.kennitala, email: j.client.email, address: j.client.address },
+      description: `${j.title}${j.address ? `, ${j.address}` : ""}`, reference: `VAKTO ${j.id.slice(0, 8).toUpperCase()}`, lines,
+    });
+    await supabase.from("jobs").update({ status: "done", invoiced_at: new Date().toISOString(), payday_invoice_id: out.id, payday_invoice_number: out.number }).eq("id", j.id);
+    return { ok: true, number: out.number };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error && /Payday/.test(e.message) ? e.message : userError(e, "Reikningur tókst ekki") };
   }
 }

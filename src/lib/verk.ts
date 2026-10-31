@@ -12,6 +12,7 @@ export type Client = { id: string; name: string; kennitala: string | null; email
 export type JobListItem = {
   id: string; title: string; address: string | null; status: JobStatus; client: string | null; clientId: string | null;
   hourlyRate: number | null; hoursMonth: number; hoursTotal: number; lastAt: string | null; running: boolean;
+  invoicedAt?: string | null; paidAt?: string | null;
 };
 export type JobEntry = {
   id: string; userId: string; who: string; startedAt: string; endedAt: string | null; hours: number;
@@ -22,7 +23,7 @@ export type JobPhoto = { id: string; url: string; caption: string | null; create
 export type JobReport = { id: string; token: string; from: string; to: string; status: "sent" | "approved" | "rejected"; signedName: string | null; comment: string | null; decidedAt: string | null; createdAt: string };
 export type JobDetail = {
   id: string; title: string; address: string | null; lat: number | null; lng: number | null; status: JobStatus; notes: string | null;
-  hourlyRate: number | null; client: Client | null;
+  hourlyRate: number | null; client: Client | null; invoicedAt?: string | null; paidAt?: string | null; quoteId?: string | null;
   entries: JobEntry[]; items: JobItem[]; photos: JobPhoto[]; reports: JobReport[];
 };
 
@@ -68,4 +69,34 @@ export type ReportSnapshot = {
   items: { date: string; kind: "material" | "expense"; description: string; quantity: number; unitPrice: number }[];
   photos: { url: string; caption: string | null }[];
   totals: JobTotals;
+};
+
+// ---------- Fasi 2 (0104): tilboð og staða verka ----------
+export type QuoteLine = { kind: "labor" | "material" | "other"; description: string; quantity: number; unit: string; unitPrice: number };
+export type QuoteStatus = "draft" | "sent" | "accepted" | "declined";
+export type Quote = {
+  id: string; number: number; title: string; address: string | null; description: string | null; items: QuoteLine[];
+  validUntil: string | null; terms: string | null; status: QuoteStatus; token: string; clientId: string | null; client: string | null;
+  jobId: string | null; sentAt: string | null; signedName: string | null; comment: string | null; decidedAt: string | null; createdAt: string;
+};
+export const LINE_KIND: Record<QuoteLine["kind"], string> = { labor: "Vinna", material: "Efni", other: "Annað" };
+
+/** Upphæðir tilboðs: vinna, efni og annað sér, vsk. og endurgreiðsla af vinnu (íbúðarhúsnæði). */
+export function quoteTotals(items: QuoteLine[]) {
+  const sum = (k: QuoteLine["kind"]) => Math.round(items.filter((i) => i.kind === k).reduce((a, i) => a + (i.quantity || 0) * (i.unitPrice || 0), 0));
+  const labor = sum("labor"), materials = sum("material"), other = sum("other");
+  const net = labor + materials + other, vsk = Math.round(net * VSK);
+  return { labor, materials, other, net, vsk, total: net + vsk, refund: Math.round(labor * VSK * VSK_REFUND_SHARE) };
+}
+
+/** Staða verks í ferlinu: Í vinnslu → Lokið → Reikningur sendur → Greitt. */
+export type JobStage = "open" | "done" | "invoiced" | "paid";
+export const STAGE_LABEL: Record<JobStage, string> = { open: "Í vinnslu", done: "Lokið", invoiced: "Reikningur sendur", paid: "Greitt" };
+export const stageOf = (j: { status: JobStatus; invoicedAt?: string | null; paidAt?: string | null }): JobStage =>
+  j.paidAt ? "paid" : j.invoicedAt ? "invoiced" : j.status === "done" ? "done" : "open";
+
+/** Viðskiptavinaspjald (CRM): verk, tilboð og upphæðir á einum stað. */
+export type ClientCard = Client & {
+  notes: string | null; jobs: number; openJobs: number; quotesOpen: number; hours: number;
+  billed: number; unpaid: number; lastAt: string | null;
 };

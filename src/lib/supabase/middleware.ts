@@ -129,7 +129,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/fjarfestar") ||
     pathname.startsWith("/personuvernd") || pathname.startsWith("/eyda-adgangi") || pathname.startsWith("/skilmalar") || pathname.startsWith("/vafrakokur") ||
     pathname.startsWith("/kiosk") ||
-    pathname.startsWith("/samthykki/") || // verkskýrsla til samþykktar viðskiptavinar (leynitengill, 0102)
+    pathname.startsWith("/samthykki/") ||
+    pathname.startsWith("/tilbod/") || // tilboð til samþykktar viðskiptavinar (leynitengill, 0104) // verkskýrsla til samþykktar viðskiptavinar (leynitengill, 0102)
     pathname === "/verktakar" || // markaðssíða VAKTO Verk
     // PWA / icon assets must be reachable without auth (home-screen install).
     pathname === "/manifest.webmanifest" ||

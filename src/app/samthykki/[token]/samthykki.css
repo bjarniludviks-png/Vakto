@@ -37,3 +37,6 @@
 .sam-done{margin:0;font-weight:600}
 .sam-foot{display:flex;align-items:center;justify-content:center;gap:8px;color:var(--ink3);font-size:12.5px;margin-top:20px}
 .sam-foot svg{height:16px;width:auto}
+.sam-form label.sam-check{display:flex;gap:10px;align-items:flex-start;font-weight:500;font-size:14px;line-height:1.4}
+.sam-form label.sam-check input{width:auto;margin:2px 0 0;flex:none}
+.sam-desc{white-space:pre-wrap;color:var(--ink2);font-size:14.5px;line-height:1.55;margin:12px 0 0}

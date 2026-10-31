@@ -27,10 +27,11 @@ const FEATURES: { t: string; p: string; soon?: boolean; i: React.ReactNode }[] =
   { t: "Samþykkt með einum smelli", p: "Viðskiptavinurinn fær hlekk, sér tíma, efni, myndir og upphæðir og samþykkir. Nafn og tími eru skráð.", i: <><circle cx="12" cy="12" r="9" /><path d="m8 12.5 2.7 2.7L16.5 9.5" /></> },
   { t: "Efni, útlagt og akstur", p: "Skráðu efni og útlagðan kostnað á verkið og kílómetra við hverja tímatöku. Allt tekið saman fyrir þig.", i: <><path d="M3 7h13v10H3zM16 10h3.5L21 12.5V17h-5" /><circle cx="7" cy="18" r="1.8" /><circle cx="17.5" cy="18" r="1.8" /></> },
   { t: "35 % endurgreiðslan reiknuð", p: "Vinna og efni eru aðskilin í skýrslunni og húseigandinn sér hvað hann fær endurgreitt af vsk. af vinnu.", i: <><path d="M4 20 20 4" /><circle cx="7" cy="7" r="2.5" /><circle cx="17" cy="17" r="2.5" /></> },
+  { t: "Viðskiptavinir á einum stað", p: "Hver viðskiptavinur með sín verk, tilboð, tíma, rukkað og ógreitt, og minnispunkta. Þú sérð strax hvað á eftir að rukka.", i: <><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="10" r="2.4" /><path d="M5.5 16.5c.6-1.8 2-2.8 3.5-2.8s2.9 1 3.5 2.8M14 9h4M14 13h4" /></> },
   { t: "Teymi þegar þú stækkar", p: "Bættu við starfsmanni eða undirverktaka. Hver skráir sína tíma, þú sérð allt og sendir eina skýrslu.", i: <><circle cx="9" cy="8" r="3.2" /><path d="M3 20c.6-3.4 3-5.5 6-5.5s5.4 2.1 6 5.5" /><circle cx="17" cy="9" r="2.6" /><path d="M16 14.6c2.6.2 4.4 2 5 5.4" /></> },
-  { t: "Tilboð og verksamningar", p: "Búðu til tilboð eða verksamning sem viðskiptavinurinn undirritar rafrænt. Samþykkt tilboð verður að verki.", soon: true, i: <><path d="M7 3h7l5 5v13H7z" /><path d="M14 3v5h5M10 13h6M10 17h4" /></> },
-  { t: "Reikningar í Payday", p: "Samþykkt skýrsla verður að reikningi í bókhaldinu þínu, með vinnu og efni aðskilið.", soon: true, i: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></> },
-  { t: "VAKTO AI fyrir verkin", p: "„Skrifaðu verkskýrslu úr myndunum“ eða „hvað vann ég mikið fyrir Jón í október?“ og AI sér um rest.", soon: true, i: <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z M18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z" /> },
+  { t: "Tilboð og verksamningar", p: "Sendu tilboð sem viðskiptavinurinn samþykkir sem verksamning með nafni sínu. Samþykkt tilboð verður sjálfkrafa að verki.", i: <><path d="M7 3h7l5 5v13H7z" /><path d="M14 3v5h5M10 13h6M10 17h4" /></> },
+  { t: "Reikningar í Payday", p: "Einn smellur: reikningur fyrir verkið verður til í Payday hjá þér, með vinnu og efni sundurliðað, og fer til viðskiptavinarins.", i: <><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></> },
+  { t: "VAKTO AI fyrir verkin", p: "Lýstu verkinu og AI skrifar drög að tilboði. Spurðu „hvað vann ég mikið fyrir Jón í október?“ eða „hvað á ég eftir að rukka?“.", i: <path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z M18 15l.9 2.1L21 18l-2.1.9L18 21l-.9-2.1L15 18l2.1-.9z" /> },
 ];
 
 const FAQ: [string, string][] = [
@@ -39,6 +40,7 @@ const FAQ: [string, string][] = [
   ["Er staðsetningin alltaf rakin?", "Nei. Staðsetningin er aðeins lesin þegar þú byrjar og stöðvar tímatöku, til að staðfesta að þú hafir verið á verkstaðnum. Engin stöðug rakning."],
   ["Get ég notað þetta í tölvunni líka?", "Já. Allt sem er í appinu er líka á vakto.is: verk, tímar, efni, myndir og skýrslur."],
   ["Hvað ef ég er ekki með vsk-númer?", "Skýrslan reiknar vsk. sjálfgefið. Stillingar fyrir þá sem eru undir veltumörkum eru á leiðinni. Hafðu samband og við hjálpum þér."],
+  ["Virkar þetta með Payday?", "Já. Tengdu Payday í Stillingum og búðu til reikning fyrir verk með einum smelli. Reikningurinn verður til í Payday hjá þér og fer í tölvupósti til viðskiptavinarins."],
   ["Er binding?", "Nei. 14 daga frí prufa og svo mánaðarleg áskrift sem þú getur sagt upp hvenær sem er."],
 ];
 
@@ -155,6 +157,7 @@ export default function VerktakarClient() {
               <li>Myndir, efni, útlagt og akstur</li>
               <li>Verkskýrslur og samþykkt viðskiptavinar</li>
               <li>App fyrir iPhone og Android, og vefur</li>
+              <li>Tilboð, viðskiptavinayfirlit og reikningar í Payday</li>
               <li>VAKTO AI, {p.aiQuestions} spurningar á mánuði</li>
             </ul>
             <a className="ah-btn ah-btn-lg" href={SIGNUP}>Prófa frítt í 14 daga</a>

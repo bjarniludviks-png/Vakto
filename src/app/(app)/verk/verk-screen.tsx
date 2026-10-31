@@ -4,11 +4,13 @@ import React, { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
-import { hrs, isNum, jobTotals, kr, type Client, type JobDetail } from "@/lib/verk";
+import { hrs, isNum, jobTotals, kr, stageOf, STAGE_LABEL, type Client, type JobDetail, type JobStage } from "@/lib/verk";
 import {
-  listJobs, getJob, saveClient, saveJob, setJobStatus, startTimer, stopTimer, addEntry, deleteEntry,
-  addItem, deleteItem, addPhoto, deletePhoto, createReport,
+  listJobs, getJob, saveClient, saveJob, startTimer, stopTimer, addEntry, deleteEntry,
+  addItem, deleteItem, addPhoto, deletePhoto, createReport, setJobStage, invoiceJobInPayday, paydayConnected,
 } from "./actions";
+import { QuotesPanel } from "./quotes-panel";
+import { ClientsPanel } from "./clients-panel";
 
 // VAKTO Verk (0102): verk, viðskiptavinir, tímataka (með staðsetningu), efni, myndir og verkskýrsla til samþykktar.
 
@@ -36,7 +38,8 @@ function Elapsed({ since }: { since: string }) {
 export default function VerkScreen() {
   const [list, setList] = useState<List | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"open" | "done" | "all">("open");
+  const [view, setView] = useState<"jobs" | "quotes" | "clients">("jobs");
+  const [filter, setFilter] = useState<JobStage | "all">("open");
   const [modal, setModal] = useState<"job" | null>(null);
 
   const reload = useCallback(async () => setList(await listJobs()), []);
@@ -44,7 +47,8 @@ export default function VerkScreen() {
 
   const running = list?.running ?? null;
   const runningJob = running ? list?.jobs.find((j) => j.id === running.jobId) : null;
-  const jobs = (list?.jobs ?? []).filter((j) => filter === "all" ? j.status !== "archived" : j.status === filter);
+  const jobs = (list?.jobs ?? []).filter((j) => j.status !== "archived" && (filter === "all" || stageOf(j) === filter));
+  const count = (st: JobStage) => (list?.jobs ?? []).filter((j) => j.status !== "archived" && stageOf(j) === st).length;
 
   async function stop() {
     const km = window.prompt("Akstur á verkið (km) — sleppa = 0", "0");
@@ -57,7 +61,10 @@ export default function VerkScreen() {
 
   return (
     <div className="page">
-      <PageHeader title="Verk" subtitle="Verk, tímar, myndir og verkskýrslur til samþykktar" actions={<button className="btn" onClick={() => setModal("job")}>+ Nýtt verk</button>} />
+      <PageHeader title="Verk" subtitle="Verk, tilboð, viðskiptavinir og verkskýrslur til samþykktar" actions={view === "jobs" ? <button className="btn" onClick={() => setModal("job")}>+ Nýtt verk</button> : undefined} />
+      <div className="vk-views">
+        {([["jobs", "Verk"], ["quotes", "Tilboð"], ["clients", "Viðskiptavinir"]] as const).map(([k, l]) => <button key={k} className={view === k ? "on" : ""} onClick={() => setView(k)}>{l}</button>)}
+      </div>
 
       {running && runningJob && (
         <div className="vk-run">
@@ -68,13 +75,16 @@ export default function VerkScreen() {
         </div>
       )}
 
+      {view === "quotes" && <QuotesPanel clients={list?.clients ?? []} onOpenJob={setOpenId} onChanged={reload} />}
+      {view === "clients" && <ClientsPanel jobs={list?.jobs ?? []} onOpenJob={setOpenId} onChanged={reload} />}
+      {view === "jobs" && <>
       <div className="vk-tabs">
-        {(["open", "done", "all"] as const).map((f) => <button key={f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{f === "open" ? "Opin" : f === "done" ? "Lokið" : "Öll"}</button>)}
+        {(["open", "done", "invoiced", "paid", "all"] as const).map((f) => <button key={f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{f === "all" ? "Öll" : STAGE_LABEL[f]}{f !== "all" && count(f) ? <b> {count(f)}</b> : null}</button>)}
       </div>
 
       {!list ? <div className="card vk-empty">Hleð…</div> : jobs.length === 0 ? (
         <div className="card vk-empty">
-          <b>{filter === "open" ? "Engin opin verk" : "Ekkert hér"}</b>
+          <b>{filter === "open" ? "Engin verk í vinnslu" : "Ekkert hér"}</b>
           <p className="muted">Stofnaðu verk, byrjaðu tímatöku á staðnum og sendu viðskiptavininum verkskýrslu til samþykktar.</p>
           <button className="btn" onClick={() => setModal("job")}>+ Nýtt verk</button>
         </div>
@@ -85,11 +95,13 @@ export default function VerkScreen() {
               <div className="vk-job-t"><b>{j.title}</b><span className="muted">{[j.client, j.address].filter(Boolean).join(" · ") || "—"}</span></div>
               <div className="vk-job-n"><b>{hrs(j.hoursMonth)}</b><span className="muted">í mánuðinum</span></div>
               <div className="vk-job-n"><b>{hrs(j.hoursTotal)}</b><span className="muted">samtals</span></div>
-              {j.running ? <span className="vk-pill live">Í gangi</span> : j.status === "done" ? <span className="vk-pill">Lokið</span> : null}
+              {j.running ? <span className="vk-pill live">Í gangi</span> : stageOf(j) !== "open" ? <span className={`vk-pill ${stageOf(j) === "paid" ? "approved" : stageOf(j) === "invoiced" ? "sent" : ""}`}>{STAGE_LABEL[stageOf(j)]}</span> : null}
             </button>
           ))}
         </div>
       )}
+
+      </>}
 
       {modal === "job" && <JobModal clients={list?.clients ?? []} onClose={() => setModal(null)} onSaved={(id) => { setModal(null); void reload(); setOpenId(id); }} />}
     </div>
@@ -217,8 +229,23 @@ function JobView({ id, companyId, clients, running, onBack, onChanged }: { id: s
             ? <button className="btn" onClick={async () => { const km = window.prompt("Akstur (km)", "0"); if (km === null) return; await after(await stopTimer({ km, pos: await position() }), "Tímataka stöðvuð"); }}>■ Stöðva <Elapsed since={running!.startedAt} /></button>
             : <button className="btn" onClick={async () => { const r = await startTimer(job.id, await position()); await after(r, r.onSite === true ? "Byrjað — staðfest á verkstað" : r.onSite === false ? "Byrjað — utan verkstaðar" : "Tímataka hafin"); }}>▶ Byrja tímatöku</button>}
           <button className="btn ghost" onClick={() => setEdit(true)}>Breyta</button>
-          <button className="btn ghost" onClick={async () => after(await setJobStatus(job.id, job.status === "done" ? "open" : "done"), job.status === "done" ? "Verk opnað" : "Verki lokið")}>{job.status === "done" ? "Opna aftur" : "Ljúka verki"}</button>
+
         </div>
+      </div>
+
+      <div className="vk-stage">
+        {(["open", "done", "invoiced", "paid"] as const).map((st, i) => {
+          const cur = stageOf(job), idx = ["open", "done", "invoiced", "paid"].indexOf(cur);
+          return <button key={st} className={`${cur === st ? "on" : ""}${i < idx ? " past" : ""}`} onClick={async () => { if (cur !== st) await after(await setJobStage(job.id, st), STAGE_LABEL[st]); }}><i>{i + 1}</i>{STAGE_LABEL[st]}</button>;
+        })}
+        {!job.invoicedAt && (
+          <button className="btn sm vk-payday" disabled={busy} onClick={async () => {
+            if (!(await paydayConnected())) { toast("Tengdu Payday í Stillingum → Tengingar til að senda reikninga"); return; }
+            if (!window.confirm(`Búa til reikning í Payday fyrir ${job.client?.name ?? "viðskiptavininn"} upp á ${kr(t.total)} m. vsk.?`)) return;
+            setBusy(true); const r = await invoiceJobInPayday(job.id); setBusy(false);
+            await after(r, r.ok ? `Reikningur ${r.number ? `nr. ${r.number} ` : ""}stofnaður í Payday og sendur` : undefined);
+          }}>Reikningur í Payday</button>
+        )}
       </div>
 
       <div className="kpis vk-kpis">

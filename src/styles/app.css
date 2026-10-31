@@ -2169,3 +2169,32 @@ html.dark .mroster .sh{background:#23264a;color:#c7ccff}
   .vk-tbl td:nth-child(4){display:none}
   .vk-grid2{grid-template-columns:1fr}
 }
+/* VAKTO Verk, fasi 2 (0104): flipar, tilboð, CRM, staða verks */
+.vk-views{display:inline-flex;gap:2px;background:var(--line2);border-radius:12px;padding:3px;margin:0 0 16px}
+.vk-views button{border:0;background:none;font:inherit;font-size:13.5px;font-weight:600;color:var(--ink2);padding:8px 16px;border-radius:9px;cursor:pointer}
+.vk-views button.on{background:var(--panel);color:var(--ink);box-shadow:var(--shadow)}
+.vk-tabs button b{font-weight:700;opacity:.7}
+.vk-qhead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap}.vk-qhead p{margin:0;max-width:560px}
+.vk-search{border:1px solid var(--line);border-radius:10px;padding:9px 12px;font:inherit;font-size:14px;min-width:240px;background:var(--panel);color:var(--ink)}
+.modal.vk-qmodal{max-width:860px}
+.vk-ai{background:linear-gradient(135deg,var(--brand-soft),transparent);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:16px}
+.vk-ai-h{display:flex;align-items:center;gap:7px;font-weight:650;font-size:13.5px;color:var(--brand);margin-bottom:8px}
+.vk-ai textarea,.vk-qmodal textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:inherit;font-size:14px;background:var(--panel);color:var(--ink);resize:vertical;box-sizing:border-box}
+.vk-ai-r{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;font-size:13px;color:var(--ink2)}
+.vk-ai-r input{width:80px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:inherit;margin:0 4px;background:var(--panel);color:var(--ink)}
+.vk-lines th{text-align:left;font-size:11.5px;color:var(--ink3);font-weight:600;padding:0 6px 6px}
+.vk-lines input,.vk-lines select{width:100%;border:1px solid var(--line);border-radius:8px;padding:7px 8px;font:inherit;font-size:13px;background:var(--panel);color:var(--ink);box-sizing:border-box}
+.vk-lines input.num{width:90px;text-align:right}.vk-lines input.unit{width:64px}
+.vk-lines input:disabled,.vk-lines select:disabled{background:transparent;border-color:transparent}
+.vk-qsum{display:grid;grid-template-columns:1fr auto;gap:6px 18px;max-width:320px;margin:14px 0 16px auto;font-size:14px}
+.vk-qsum dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}.vk-qsum .tot{font-weight:700;font-size:16px;border-top:1px solid var(--line);padding-top:6px}
+.vk-cstats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px}
+.vk-cstats div{background:var(--line2);border-radius:12px;padding:10px 12px}.vk-cstats b{display:block;font-size:16px}.vk-cstats span{font-size:11.5px;color:var(--ink3)}
+.vk-h4{font-size:13px;margin:18px 0 8px;color:var(--ink2)}
+.vk-stage{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.vk-stage>button:not(.btn){display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--panel);color:var(--ink2);font:inherit;font-size:13px;font-weight:600;padding:7px 12px 7px 8px;border-radius:999px;cursor:pointer}
+.vk-stage>button i{font-style:normal;width:20px;height:20px;border-radius:50%;background:var(--line2);display:inline-flex;align-items:center;justify-content:center;font-size:11px}
+.vk-stage>button.past{color:var(--ink)}.vk-stage>button.past i{background:#e3f6ec;color:#11804f}
+.vk-stage>button.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}.vk-stage>button.on i{background:var(--brand);color:#fff}
+.vk-payday{margin-left:auto}
+@media (max-width:900px){.vk-cstats{grid-template-columns:1fr 1fr}.vk-lines th:nth-child(4),.vk-lines td:nth-child(4){display:none}.vk-payday{margin-left:0}}
