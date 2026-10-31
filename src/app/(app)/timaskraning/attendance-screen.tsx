@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { IssuesPanel } from "./issues-panel";
 import Link from "next/link";
 import { AsyncButton } from "@/components/app/async-button";
 import { PageHeader } from "@/components/app/page-header";
@@ -303,6 +304,8 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
           <div className="db2-s">{missing} {t("vantar stimplun")}{longN > 0 ? ` · ${longN} ${t("of langar stimplanir")}` : ""} · {corrections.length} {t("leiðréttingabeiðnir")}</div>
         </section>
       </div>
+
+      <IssuesPanel from={from} to={to} depts={deptSel} search={search} onChanged={() => load(from, to)} />
 
       <section className="db2-card">
         <div className="db2-ch"><div><div className="db2-ct">{t("Á vakt núna")}</div><div className="db2-cs">{t("Skráðir inn í rauntíma. Smelltu á nafn til að sjá allar stimplanir.")}</div></div>

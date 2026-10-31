@@ -2095,3 +2095,16 @@ html.dark .mroster .sh{background:#23264a;color:#c7ccff}
 .prules li button:hover{color:var(--bad)}
 .prules-add{display:flex;gap:8px;margin-top:10px}
 .prules-add input{flex:1;min-width:0;font:inherit;font-size:13px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink)}
+
+/* Tímaskráning → Yfirfara frávik */
+.iss{padding:14px 18px}
+.iss-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.iss-t{flex:1;min-width:0;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:none;border:none;padding:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.iss-t .muted{font-size:12.5px}
+.iss-chev{margin-left:auto;color:var(--ink3)}
+.iss-list{margin-top:12px;display:flex;flex-direction:column}
+.iss-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line2);flex-wrap:wrap}
+.iss-who{flex:1;min-width:220px;display:flex;flex-direction:column;gap:2px;font-size:13.5px}
+.iss-who a{color:inherit;text-decoration:none}
+.iss-who .muted{font-size:12.5px}
+.iss-act{display:flex;align-items:center;gap:8px;flex-wrap:wrap}

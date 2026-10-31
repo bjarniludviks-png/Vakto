@@ -618,3 +618,85 @@ export async function askForCorrection(input: { employeeId: string; date: string
     return { ok: false, error: userError(e, "Villa") };
   }
 }
+
+/* ── Yfirferð frávika (Tímaskráning + VAKTO AI) ─────────────────────────────────────────── */
+
+export type TimesheetIssue = {
+  key: string; kind: "open_long" | "long" | "missed";
+  employeeId: string; name: string; dept: string; hasAccount: boolean;
+  date: string; punchId: string | null; in: string | null; out: string | null; hours: number;
+  sched: { start: string; end: string } | null;
+  /** Tillaga: loka stimplun á áætluðum lokum vaktar, eða biðja starfsmann um réttan tíma. */
+  fix: { type: "close"; out: string; outDate: string } | { type: "ask" };
+};
+
+/** Frávik sem þarf að laga á tímabilinu: gleymd útstimplun (opin > 14 klst), of löng stimplun (> 14 klst)
+ *  og liðnar vaktir án stimplunar — sömu mörk og flöggin á síðu starfsmanns. Aðeins stjórnendur. */
+export async function getTimesheetIssues(fromISO: string, toISO: string): Promise<{ ok: boolean; issues: TimesheetIssue[]; error?: string }> {
+  if (!isSupabaseConfigured()) return { ok: true, issues: [] };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, issues: [], error: ctx.error };
+    const { data: me } = await supabase.from("users").select("role").eq("id", ctx.userId).maybeSingle();
+    if (me?.role !== "owner" && me?.role !== "manager") return { ok: false, issues: [], error: "Aðeins stjórnendur" };
+    const [{ data: emps }, shiftsRes, punchesRes] = await Promise.all([
+      supabase.from("employees").select("id, full_name, user_id, status, departments(name)").eq("company_id", ctx.company),
+      allRows((a, b) => supabase.from("shifts").select("id, employee_id, date, start_time, end_time")
+        .eq("company_id", ctx.company).not("employee_id", "is", null).gte("date", fromISO).lte("date", toISO).order("id").range(a, b)),
+      allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
+        .eq("company_id", ctx.company).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59").order("id").range(a, b)),
+    ]);
+    const empOf = new Map((emps ?? []).map((e) => {
+      const dep = (Array.isArray(e.departments) ? e.departments[0] : e.departments) as { name?: string } | null;
+      return [e.id as string, { name: e.full_name as string, dept: dep?.name ?? "", hasAccount: !!e.user_id, active: e.status !== "inactive" }];
+    }));
+    const shiftsBy = new Map<string, { start: string; end: string }[]>();
+    for (const s of shiftsRes.data ?? []) {
+      const st = String(s.start_time ?? "").slice(0, 5), en = String(s.end_time ?? "").slice(0, 5);
+      if (!st || !en) continue;
+      const k = `${s.employee_id}|${s.date}`;
+      shiftsBy.set(k, [...(shiftsBy.get(k) ?? []), { start: st, end: en }]);
+    }
+    const nowMs = Date.now();
+    const nextDay = (d: string) => { const x = new Date(`${d}T12:00:00`); x.setDate(x.getDate() + 1); return x.toISOString().slice(0, 10); };
+    const issues: TimesheetIssue[] = [];
+    const punched = new Set<string>();
+    for (const p of punchesRes.data ?? []) {
+      const emp = empOf.get(p.employee_id as string);
+      if (!emp) continue;
+      const ci = p.clock_in as string, co = p.clock_out as string | null;
+      const date = ci.slice(0, 10), inHM = hhmm(ci);
+      punched.add(`${p.employee_id}|${date}`);
+      const hours = co ? (new Date(co).getTime() - new Date(ci).getTime()) / 3600e3 : (nowMs - new Date(ci).getTime()) / 3600e3;
+      if (hours <= 14) continue;
+      const cands = shiftsBy.get(`${p.employee_id}|${date}`) ?? [];
+      const sched = cands.length ? cands.reduce((a, b) => Math.abs(minsOf(b.start) - minsOf(inHM)) < Math.abs(minsOf(a.start) - minsOf(inHM)) ? b : a) : null;
+      // Lokun á áætluðum lokum aðeins ef þau eru á eftir innstimpluninni (annars veit kerfið ekki rétta tímann).
+      let fix: TimesheetIssue["fix"] = { type: "ask" };
+      if (sched) {
+        const overnight = minsOf(sched.end) <= minsOf(sched.start);
+        const outDate = overnight ? nextDay(date) : date;
+        if (overnight || minsOf(sched.end) > minsOf(inHM)) fix = { type: "close", out: sched.end, outDate };
+      }
+      issues.push({
+        key: `p:${p.id}`, kind: co ? "long" : "open_long", employeeId: p.employee_id as string, name: emp.name, dept: emp.dept, hasAccount: emp.hasAccount,
+        date, punchId: p.id as string, in: inHM, out: co ? hhmm(co) : null, hours: Math.round(hours * 10) / 10, sched, fix,
+      });
+    }
+    for (const [k, list] of shiftsBy) {
+      if (punched.has(k)) continue;
+      const [empId, date] = k.split("|");
+      const emp = empOf.get(empId);
+      if (!emp?.active) continue;
+      const s = list[0];
+      const endMs = Date.parse(`${minsOf(s.end) <= minsOf(s.start) ? nextDay(date) : date}T${s.end}:00Z`);
+      if (!(endMs < nowMs)) continue; // vaktin er ekki búin
+      issues.push({ key: `m:${k}`, kind: "missed", employeeId: empId, name: emp.name, dept: emp.dept, hasAccount: emp.hasAccount, date, punchId: null, in: null, out: null, hours: 0, sched: s, fix: { type: "ask" } });
+    }
+    issues.sort((a, b) => b.date.localeCompare(a.date) || a.name.localeCompare(b.name, "is"));
+    return { ok: true, issues };
+  } catch (e) {
+    return { ok: false, issues: [], error: userError(e, "Villa") };
+  }
+}

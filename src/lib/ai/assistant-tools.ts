@@ -2,7 +2,7 @@ import "server-only";
 import type Anthropic from "@anthropic-ai/sdk";
 import { getDashboardPeriod } from "@/app/(app)/maelabord/actions";
 import { getWhoIsOn } from "@/app/(app)/timaskraning/attendance.server";
-import { fetchAttendance, setClockOut } from "@/app/(app)/timaskraning/actions";
+import { fetchAttendance, setClockOut, getTimesheetIssues, adjustPunch, askForCorrection } from "@/app/(app)/timaskraning/actions";
 import { getShiftsInRange, saveShift, deleteShift, updateLeaveRequest, approveShiftSwap, getWeekBudget, getWeekShifts, deleteWeekShifts, publishSchedule, createOpenShifts } from "@/app/(app)/vaktaplan/actions";
 import { listContracts, resendContract } from "@/app/(app)/starfsfolk/actions";
 import { getEmployees } from "@/lib/employees.server";
@@ -64,6 +64,11 @@ export const READ_TOOLS: Anthropic.Tool[] = [
     name: "month_planning_context",
     description: "Sama og week_planning_context en fyrir heilan almanaksmánuð (month = YYYY-MM): starfsfólk, núverandi vaktir mánaðarins, óframboð, samþykkt frí, beiðnir, vaktategundir, mönnunarþörf, planreglur og launaáætlun per viku. Kallaðu á þetta ÁÐUR en þú notar plan_month.",
     input_schema: { type: "object", properties: { month: { type: "string", description: "YYYY-MM" } }, required: ["month"] },
+  },
+  {
+    name: "timesheet_issues",
+    description: "Frávik í tímaskráningu sem þarf að laga á tímabilinu: gleymd útstimplun (opin > 14 klst), of löng stimplun (> 14 klst) og liðnar vaktir án stimplunar, með punchId, áætlaðri vakt og tillögu (fix: close = loka á áætluðum lokum vaktar, ask = biðja starfsmann um réttan tíma). Notaðu fyrir „farðu yfir frávik“, „hver gleymdi að stimpla sig út?“.",
+    input_schema: { type: "object", properties: { from: DATE, to: DATE }, required: ["from", "to"] },
   },
   {
     name: "planning_rules",
@@ -191,6 +196,16 @@ export const WRITE_TOOLS: Anthropic.Tool[] = [
       required: ["month", "label", "shifts", "notes"],
     },
     eager_input_streaming: true,
+  },
+  {
+    name: "close_punch",
+    description: "LEGGJA TIL að setja útstimplun á stimplun sem gleymdist að loka eða er of löng (punchId úr timesheet_issues). Venjulega á áætluðum lokum vaktar (fix.out / fix.outDate).",
+    input_schema: { type: "object", properties: { punchId: { type: "string" }, out: TIME, outDate: DATE, label: { type: "string", description: "Lýsing fyrir notandann, t.d. „Fannar 12.10.: út kl. 16:00 (áætluð lok)“" } }, required: ["punchId", "out", "outDate"] },
+  },
+  {
+    name: "ask_correction",
+    description: "LEGGJA TIL að biðja starfsmann um réttan tíma (vakt án stimplunar eða stimplun sem kerfið getur ekki lagað sjálft): skilaboð í beinu spjalli + tilkynning sem opnar leiðréttingarformið. Skrifaðu stutt, vingjarnleg skilaboð á íslensku með deginum og því sem vantar.",
+    input_schema: { type: "object", properties: { employee: { type: "string", description: "Fullt nafn" }, date: DATE, message: { type: "string" } }, required: ["employee", "date", "message"] },
   },
   {
     name: "save_planning_rule",
@@ -520,6 +535,12 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       if (budgets.length) out.budgetByWeek = budgets;
       return JSON.stringify(out);
     }
+    if (name === "timesheet_issues") {
+      if (!okDate(input.from) || !okDate(input.to)) return JSON.stringify({ error: "from/to verða að vera YYYY-MM-DD" });
+      const r = await getTimesheetIssues(str(input.from), str(input.to));
+      if (!r.ok) return JSON.stringify({ error: r.error ?? "Tókst ekki að sækja frávik" });
+      return JSON.stringify(r.issues.slice(0, 150).map((i) => ({ kind: i.kind, employee: i.name, dept: i.dept, date: i.date, punchId: i.punchId, in: i.in, out: i.out, hours: i.hours, planned: i.sched ? `${i.sched.start}–${i.sched.end}` : null, fix: i.fix, hasAccount: i.hasAccount })));
+    }
     if (name === "planning_rules") {
       const rules = await getPlanningRules();
       return JSON.stringify(rules.length ? rules.map((r) => ({ id: r.id, text: r.text, active: r.active })) : { rules: [], note: "Engar planreglur vistaðar" });
@@ -600,6 +621,12 @@ export function describeWrite(name: string, input: In, lang: string): { ok: true
         ? `Email me the report "${REPORT_TITLE.en[rep]}" for ${shortDate(str(input.from))}–${shortDate(str(input.to))} (table + Excel)`
         : `Senda mér skýrsluna „${REPORT_TITLE.is[rep]}“ fyrir ${shortDate(str(input.from))}–${shortDate(str(input.to))} í tölvupósti (tafla + Excel)` };
     }
+    case "close_punch":
+      if (!str(input.punchId) || !okTime(input.out) || !okDate(input.outDate)) return { ok: false, error: "Vantar punchId, tíma eða dagsetningu" };
+      return { ok: true, summary: str(input.label) || (en ? `Set clock-out ${input.outDate} ${input.out}` : `Setja útstimplun ${input.outDate} kl. ${input.out}`) };
+    case "ask_correction":
+      if (!who || !okDate(input.date) || !str(input.message).trim()) return { ok: false, error: "Vantar starfsmann, dagsetningu eða skilaboð" };
+      return { ok: true, summary: en ? `Ask ${who} for the correct time on ${input.date}: "${str(input.message).slice(0, 160)}"` : `Biðja ${who} um réttan tíma ${input.date}: „${str(input.message).slice(0, 160)}“` };
     case "save_planning_rule": {
       const t = str(input.text).trim();
       if (t.length < 3) return { ok: false, error: "Vantar texta reglunnar" };
@@ -682,6 +709,21 @@ export async function executeWrite(name: string, input: In): Promise<{ ok: boole
       return deleteAlert(str(input.id));
     case "send_report_now":
       return sendReportNow({ report: str(input.report), from: str(input.from), to: str(input.to) });
+    case "close_punch": {
+      // Innstimplunin er lesin úr grunninum (aldrei úr líkaninu) svo aðeins útstimplunin breytist.
+      const { data: p } = await (await createClient()).from("punches").select("clock_in").eq("id", str(input.punchId)).maybeSingle();
+      if (!p?.clock_in) return { ok: false, error: "Stimplunin fannst ekki" };
+      const ci = new Date(p.clock_in as string);
+      const inHM = `${String(ci.getHours()).padStart(2, "0")}:${String(ci.getMinutes()).padStart(2, "0")}`;
+      return adjustPunch(str(input.punchId), inHM, str(input.out).padStart(5, "0"), { inDate: (p.clock_in as string).slice(0, 10), outDate: str(input.outDate) });
+    }
+    case "ask_correction": {
+      const { employees } = await getEmployees();
+      const hits = matchStaff(employees, str(input.employee));
+      if (!hits.length) return { ok: false, error: `Starfsmaður fannst ekki: ${str(input.employee)}` };
+      if (hits.length > 1) return { ok: false, error: `Fleiri en einn passar: ${hits.map((e) => e.fullName).join(", ")}` };
+      return askForCorrection({ employeeId: hits[0].id, date: str(input.date), message: str(input.message) });
+    }
     case "save_planning_rule":
       return addPlanningRule(str(input.text), "ai");
     case "remove_planning_rule":
