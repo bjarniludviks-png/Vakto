@@ -10,10 +10,13 @@ import { ChevronLeft, History, SquarePen, Send, Sparkles, Trash2, Check, X } fro
 import { tr, trf } from "../src/lib/i18n";
 import { Txt, Muted, Btn, Sheet, useToast } from "../src/components/ui";
 import { AiAvatar } from "../src/components/ai-avatar";
+import { isManager } from "../src/lib/api/ops";
 import { colors, font, useTheme } from "../src/theme";
-import { ask, execute, listConversations, getConversation, deleteConversation, saveActionState, type AiMsg, type AiAction, type AiConversation } from "../src/lib/api/assistant";
+import { ask, execute, askEmployee, executeEmployee, listConversations, getConversation, deleteConversation, saveActionState, type AiMsg, type AiAction, type AiConversation } from "../src/lib/api/assistant";
 
 const CONSENT_KEY = "@vakto-ai-consent";
+// Starfsfólk (ekki stjórnendur) fær sína eigin VAKTO AI: eigin vaktir/tímar og hver getur tekið vakt.
+const STAFF_CHIPS = ["Hvenær er ég á vakt næstu viku?", "Hvað hef ég unnið marga tíma í þessum mánuði?", "Hver getur tekið næstu vaktina mína?"];
 const CHIPS = ["Hver er á vakt núna?", "Hvernig er laun % af veltu þessa vikuna?", "Berðu saman launakostnað og tíma í þessum mánuði og síðasta", "Hvaða beiðnir bíða afgreiðslu?"];
 const STAGE: Record<string, string> = {
   think: "Hugsa…", read: "Sæki gögn…", week_planning_context: "Les vaktaplan, starfsfólk og beiðnir…", shifts: "Les vaktaplanið…",
@@ -28,6 +31,10 @@ export default function VaktoAi() {
   const toast = useToast();
   const scroll = useRef<ScrollView>(null);
   const [consent, setConsent] = useState<boolean | null>(null);
+  // null = óljóst enn; false = starfsmannahamur (/api/app/employee-ai)
+  const [manager, setManager] = useState<boolean | null>(null);
+  useEffect(() => { isManager().then(setManager).catch(() => setManager(false)); }, []);
+  const staff = manager === false;
   const [msgs, setMsgs] = useState<AiMsg[]>([]);
   const [convId, setConvId] = useState<string | null>(null);
   const [text, setText] = useState("");
@@ -49,6 +56,13 @@ export default function VaktoAi() {
     const content = q.trim();
     if (!content || busy) return;
     const next: AiMsg[] = [...msgs, { role: "user", content }];
+    if (staff) {
+      setMsgs(next); setText(""); setBusy(true); setLive({ stage: "think", text: "", plan: 0, actions: [] });
+      const r = await askEmployee(next);
+      setBusy(false); setLive(null);
+      setMsgs([...next, r.ok ? { role: "assistant", content: r.reply ?? "", actions: (r.actions ?? []).map((a) => ({ ...a, state: "pending" as const })) } : { role: "assistant", content: r.error ?? tr("VAKTO AI gat ekki svarað núna. Reyndu aftur.") }]);
+      return;
+    }
     setMsgs(next); setText(""); setBusy(true);
     let lv: Live = { stage: "think", text: "", plan: 0, actions: [] };
     setLive(lv);
@@ -74,8 +88,9 @@ export default function VaktoAi() {
     const a = msgs[mi]?.actions?.[ai];
     if (!a || a.state !== "pending") return;
     patch(mi, ai, { state: "busy" });
-    const r = await execute(a);
+    const r = staff ? await executeEmployee(a) : await execute(a);
     patch(mi, ai, r.ok ? { state: "done" } : { state: "error", error: r.error ?? tr("Tókst ekki") });
+    if (staff) return; // starfsmannasamtöl eru ekki vistuð
     const id = msgs[mi]?.id;
     if (id) saveActionState(id, ai, r.ok ? "done" : "error").catch(() => {});
   }
@@ -107,9 +122,9 @@ export default function VaktoAi() {
         <AiAvatar />
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt weight="bold" size={15}>VAKTO AI</Txt>
-          <Muted size={12}>{busy ? liveLabel : tr("Aðstoðarmaður stjórnenda")}</Muted>
+          <Muted size={12}>{busy ? liveLabel : staff ? tr("Aðstoðarmaðurinn þinn") : tr("Aðstoðarmaður stjórnenda")}</Muted>
         </View>
-        <Pressable onPress={openHistory} hitSlop={8} accessibilityLabel={tr("Fyrri samtöl")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }}><History color={colors.brand} size={22} /></Pressable>
+        {staff ? null : <Pressable onPress={openHistory} hitSlop={8} accessibilityLabel={tr("Fyrri samtöl")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }}><History color={colors.brand} size={22} /></Pressable>}
         <Pressable onPress={() => { setMsgs([]); setConvId(null); }} disabled={busy} hitSlop={8} accessibilityLabel={tr("Nýtt samtal")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }}><SquarePen color={colors.brand} size={22} /></Pressable>
       </View>
 
@@ -119,10 +134,10 @@ export default function VaktoAi() {
         {msgs.length === 0 ? (
           <View style={{ gap: 12 }}>
             <View style={{ backgroundColor: colors.panel, borderRadius: 16, borderWidth: 1, borderColor: colors.line2, padding: 14 }}>
-              <Txt size={15}>{tr("Hæ! Ég get svarað spurningum um laun, tíma og vaktir og undirbúið breytingar sem þú staðfestir.")}</Txt>
+              <Txt size={15}>{staff ? tr("Hæ! Ég get sagt þér hvenær þú ert á vakt, hvað þú hefur unnið og fundið hver getur tekið vakt fyrir þig.") : tr("Hæ! Ég get svarað spurningum um laun, tíma og vaktir og undirbúið breytingar sem þú staðfestir.")}</Txt>
             </View>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-              {CHIPS.map((c) => (
+              {(staff ? STAFF_CHIPS : CHIPS).map((c) => (
                 <Pressable key={c} onPress={() => consent && send(tr(c))} style={({ pressed }) => ({ borderWidth: 1, borderColor: colors.line, backgroundColor: colors.panel, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, opacity: pressed ? 0.6 : 1 })}>
                   <Txt size={13} color={colors.ink2}>{tr(c)}</Txt>
                 </Pressable>

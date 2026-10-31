@@ -12,7 +12,6 @@ import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { listConversations, listPeople, startDM, createGroup, subscribeChat, teamPicks, defaultGroupName, listMessages, type Conversation, type Person, type ChatMessage } from "../../src/lib/api/chat";
 import { getMuted, onMuteChange, getDnd, dndLabel, toggleMute } from "../../src/lib/mute";
-import { isManager } from "../../src/lib/api/ops";
 import { AiAvatar } from "../../src/components/ai-avatar";
 
 function when(ts: string | null): string {
@@ -77,9 +76,8 @@ export default function Spjall() {
   const [groupName, setGroupName] = useState("");
   const [sel, setSel] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
-  // VAKTO AI fest efst hjá stjórnendum og vaktstjórum (eins og á vefnum)
-  const [ai, setAi] = useState(false);
-  useEffect(() => { isManager().then(setAi).catch(() => {}); }, [me]);
+  // VAKTO AI fest efst hjá öllum: stjórnendur fá stjórnendaaðstoð, starfsfólk sína eigin (vaktir, tímar, vaktaskipti).
+  const ai = !!me;
 
   const [dnd, setDnd] = useState<number | null>(null);
   useEffect(() => {
