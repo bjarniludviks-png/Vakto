@@ -19,7 +19,7 @@ const CONSENT_KEY = "@vakto-ai-consent";
 const STAFF_CHIPS = ["Hvenær er ég á vakt næstu viku?", "Hvað hef ég unnið marga tíma í þessum mánuði?", "Hver getur tekið næstu vaktina mína?"];
 const CHIPS = ["Hver er á vakt núna?", "Hvernig er laun % af veltu þessa vikuna?", "Berðu saman launakostnað og tíma í þessum mánuði og síðasta", "Hvaða beiðnir bíða afgreiðslu?"];
 const STAGE: Record<string, string> = {
-  think: "Hugsa…", read: "Sæki gögn…", week_planning_context: "Les vaktaplan, starfsfólk og beiðnir…", shifts: "Les vaktaplanið…",
+  think: "Hugsa…", read: "Sæki gögn…", web_search: "Fletti upp á vef stéttarfélaga…", web_fetch: "Les launatöflu…", week_planning_context: "Les vaktaplan, starfsfólk og beiðnir…", shifts: "Les vaktaplanið…",
   pending_requests: "Les beiðnir…", who_is_on_now: "Athuga hver er á vakt…", labor: "Reikna laun og tíma…", write: "Undirbý tillögu…", summary: "Skrifa samantekt…",
 };
 type Live = { stage: string; tool?: string; text: string; plan: number; actions: AiAction[] };
@@ -228,7 +228,7 @@ function ActionCard({ a, onConfirm, onCancel }: { a: AiAction; onConfirm?: () =>
   );
 }
 
-/** Einfalt markdown: **feitletrun**, punktalistar („- “) og fyrirsagnir („#“). */
+/** Einfalt markdown: **feitletrun**, [tenglar](https://…), punktalistar („- “) og fyrirsagnir („#“). */
 function Rich({ text }: { text: string }) {
   return (
     <View style={{ gap: 4 }}>
@@ -238,8 +238,12 @@ function Rich({ text }: { text: string }) {
         const bullet = /^[-*•]\s+/.test(t);
         const head = /^#{1,4}\s+/.test(t);
         const body = t.replace(/^[-*•]\s+/, "").replace(/^#{1,4}\s+/, "");
-        const parts = body.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
-        const inner = parts.map((p, k) => (p.startsWith("**") && p.endsWith("**") ? <Txt key={k} weight="bold" size={15}>{p.slice(2, -2)}</Txt> : p));
+        const parts = body.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\(https?:\/\/[^)\s]+\))/g).filter(Boolean);
+        const inner = parts.map((p, k) => {
+          if (p.startsWith("**") && p.endsWith("**")) return <Txt key={k} weight="bold" size={15}>{p.slice(2, -2)}</Txt>;
+          const a = /^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/.exec(p); // heimild úr vefleit
+          return a ? <Txt key={k} size={15} weight="semibold" color={colors.brandDeep} onPress={() => Linking.openURL(a[2])}>{a[1]}</Txt> : p;
+        });
         return bullet ? (
           <View key={i} style={{ flexDirection: "row", gap: 8, paddingLeft: 2 }}>
             <Txt size={15} color={colors.ink3}>•</Txt>
