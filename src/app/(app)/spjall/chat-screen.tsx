@@ -180,7 +180,7 @@ const TYPING_SEND_EVERY = 2000; // throttle: at most one "typing" broadcast per 
 const TYPING_IDLE_STOP = 3000;  // "stop" after 3 s without a keystroke
 const TYPING_EXPIRE = 4500;     // drop a typer we have not heard from in 4.5 s
 
-type Typer = { name: string; at: number };
+type Typer = { name: string; at: number; photo?: string | null; color?: string | null };
 
 function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; embedded?: boolean; ai: AiAccess }) {
   const { t, lang } = useLang();
@@ -537,11 +537,11 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     const supabase = sb();
     const ch = supabase.channel(`typing:${id}`, { config: { broadcast: { self: false } } });
     ch.on("broadcast", { event: "typing" }, ({ payload }) => {
-      const p = payload as { userId?: string; name?: string; stop?: boolean };
+      const p = payload as { userId?: string; name?: string; photo?: string | null; color?: string | null; stop?: boolean };
       if (!p.userId || p.userId === initial.meId) return;
       setTypers((tp) => {
         const next = { ...tp };
-        if (p.stop) delete next[p.userId!]; else next[p.userId!] = { name: p.name || t("Einhver"), at: Date.now() };
+        if (p.stop) delete next[p.userId!]; else next[p.userId!] = { name: p.name || t("Einhver"), at: Date.now(), photo: p.photo, color: p.color };
         return next;
       });
     }).subscribe();
@@ -1021,10 +1021,32 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                     <i className="sk-line" style={{ width: "42%" }} /><i className="sk-line me" style={{ width: "34%" }} /><i className="sk-line" style={{ width: "55%" }} />
                   </div>
                 )}
+                {/* hver skrifar: prófílmynd + „•••“, eins og í Messenger */}
+                {Object.entries(typers).map(([uid, ty]) => {
+                  const known = msgs.find((m) => m.senderId === uid);
+                  const photo = ty.photo ?? known?.photo ?? null;
+                  const color = ty.color ?? known?.color;
+                  const sz = phone ? 28 : 30;
+                  return (
+                    <div key={uid} className="mrow them g-first g-last typing-row" title={`${ty.name} ${t("er að skrifa…")}`}>
+                      <span className="m-ava">
+                        {photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img className="avt-img" src={photo} alt="" style={{ width: sz, height: sz }} />
+                        ) : (
+                          <span className="avt" style={{ background: color ?? "var(--brand-soft)", color: color ? "#fff" : "var(--brand)", width: sz, height: sz, fontSize: phone ? 10.5 : 11, fontWeight: 700 }}>
+                            {ty.name.slice(0, 2).toUpperCase()}
+                          </span>
+                        )}
+                      </span>
+                      <div className="mbub them typing-dots" aria-hidden="true"><i /><i /><i /></div>
+                    </div>
+                  );
+                })}
                 <div ref={endRef} />
               </div>
-              {/* typing indicator — fixed height so the composer never jumps */}
-              <div className="msgr-typing" aria-live="polite">{typingText}</div>
+              {/* skjálesarar: texti; sjónrænt sést bólan með myndinni í þræðinum */}
+              <div className="sr-only" aria-live="polite">{typingText}</div>
               {editing && (
                 <div className="replybar">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>

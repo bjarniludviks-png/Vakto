@@ -66,7 +66,8 @@ export default function Thread() {
   // Þýðingar á tungumál appsins: id → þýddur texti (null = í vinnslu); `orig` = sýna frumtexta aftur.
   const [trans, setTrans] = useState<Record<string, string | null>>({});
   const [orig, setOrig] = useState<Record<string, boolean>>({});
-  const [typing, setTyping] = useState<string | null>(null);
+  // hver skrifar: nafn + mynd, eins og Messenger sýnir prófílmyndina við „•••“
+  const [typing, setTyping] = useState<{ userId: string; name: string; photo: string | null; color: string | null } | null>(null);
   const [members, setMembers] = useState(0);
   const [isGroup, setIsGroup] = useState(true);
   // Mynd/litur í hausnum — sama og í spjalllistanum (profílmynd viðmælanda eða grúppumynd).
@@ -299,7 +300,14 @@ export default function Thread() {
       setMsgs((cur) => cur.map((m) => (m.id === e.id && m.body !== e.body ? { ...m, body: e.body, edited: true } : m)));
       setTrans((cur) => { if (!(e.id in cur)) return cur; const n = { ...cur }; delete n[e.id]; return n; });
     });
-    typingRef.current = typingChannel(id, (p) => { if (p.stop) setTyping(null); else { setTyping(p.name); setTimeout(() => setTyping((cur) => (cur === p.name ? null : cur)), 4000); } });
+    typingRef.current = typingChannel(id, async (p) => {
+      if (p.stop) { setTyping(null); return; }
+      // mynd úr skilaboðunum sjálfum, annars úr starfsmannaskránni (eldri útgáfur sendu hana ekki)
+      const person = p.photo === undefined ? (await peopleMap(me.companyId)).get(p.userId) : undefined;
+      const who = { userId: p.userId, name: p.name || person?.name || "", photo: p.photo ?? person?.photo ?? null, color: p.color ?? person?.color ?? null };
+      setTyping(who);
+      setTimeout(() => setTyping((cur) => (cur?.userId === who.userId && cur.name === who.name ? null : cur)), 4000);
+    });
     const poll = setInterval(load, 15000);
     return () => { ch.unsubscribe(); typingRef.current?.unsubscribe(); clearInterval(poll); if (t) clearTimeout(t); };
   }, [me, id, load]);
@@ -309,7 +317,7 @@ export default function Thread() {
     const now = Date.now();
     if (now - lastTyped.current > 2500 && me) {
       lastTyped.current = now;
-      typingRef.current?.send({ type: "broadcast", event: "typing", payload: { userId: me.empId, name: me.fullName.split(/\s+/)[0] } });
+      void authUser().then(({ data }) => typingRef.current?.send({ type: "broadcast", event: "typing", payload: { userId: data.user?.id ?? me.empId, name: me.fullName.split(/\s+/)[0], photo: me.photoUrl, color: me.avatarColor } }));
     }
   }
 
@@ -337,7 +345,7 @@ export default function Thread() {
     setSending(false);
     if (!r.ok) { setMsgs((cur) => cur.filter((m) => m.id !== tmp.id)); setText(body); return; }
     setMsgs((cur) => cur.map((m) => (m.id === tmp.id ? { ...m, id: r.id ?? m.id } : m)));
-    typingRef.current?.send({ type: "broadcast", event: "typing", payload: { userId: me.empId, name: "", stop: true } });
+    typingRef.current?.send({ type: "broadcast", event: "typing", payload: { userId: "", name: "", stop: true } });
   }
 
   async function translate(m: ChatMessage) {
@@ -378,7 +386,7 @@ export default function Thread() {
         {kind === "general" ? <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: colors.brand, alignItems: "center", justifyContent: "center" }}><Hash color="#fff" size={18} /></View> : <Avatar name={name ?? "?"} size={36} color={head.color} photo={head.photo} />}
         <View style={{ flex: 1, minWidth: 0 }}>
           <Txt weight="bold" size={15} numberOfLines={1}>{name ?? "Spjall"}</Txt>
-          <Muted size={12}>{typing ? trf("{x} skrifar…", typing) : isGroup ? (muted ? trf("{n} meðlimir · þaggað", members || "—") : trf("{n} meðlimir", members || "—")) : peerLabel.text ? tr(peerLabel.text) : muted ? "Einkaspjall · þaggað" : "Einkaspjall"}</Muted>
+          <Muted size={12}>{typing ? trf("{x} skrifar…", typing.name) : isGroup ? (muted ? trf("{n} meðlimir · þaggað", members || "—") : trf("{n} meðlimir", members || "—")) : peerLabel.text ? tr(peerLabel.text) : muted ? "Einkaspjall · þaggað" : "Einkaspjall"}</Muted>
         </View>
         </Pressable>
         {!isGroup && peerPhone ? <Pressable onPress={() => Linking.openURL(`tel:${peerPhone.replace(/[^\d+]/g, "")}`)} hitSlop={10} accessibilityLabel={tr("Hringja")} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}><Phone color={colors.brand} size={22} /></Pressable> : null}
@@ -398,7 +406,12 @@ export default function Thread() {
         // öfugur listi: haus = neðst (skrifar…, séð af), fótur = efst (eldri skilaboð)
         ListHeaderComponent={
           <View style={{ gap: 6, width: W - 28 }}>
-            {typing ? <View style={{ alignSelf: "flex-start", marginLeft: 34, backgroundColor: colors.bubbleThem, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 10 }}><Muted size={13}>•••</Muted></View> : null}
+            {typing ? (
+              <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 8, alignSelf: "flex-start" }}>
+                <Avatar name={typing.name || "?"} size={28} color={typing.color} photo={typing.photo} />
+                <View style={{ backgroundColor: colors.bubbleThem, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12 }}><TypingDots /></View>
+              </View>
+            ) : null}
             {seenBy.length ? <View style={{ flexDirection: "row", alignSelf: "flex-end", gap: 2, marginTop: 4 }}>{seenBy.slice(0, 5).map((r) => <Avatar key={r.userId} name={r.name} size={16} color={r.color} photo={r.photo} />)}</View> : null}
             {/* eins og Messenger: „Sendi…“ → „Sent“ undir síðustu skilaboðunum mínum þar til einhver hefur séð þau */}
             {lastIsMine && !seenBy.length ? <Txt size={11.5} color={colors.ink3} style={{ alignSelf: "flex-end", marginTop: 2, marginRight: 2 }}>{lastMine?.id.startsWith("tmp-") ? tr("Sendi…") : tr("Sent")}</Txt> : null}
@@ -605,6 +618,23 @@ const TIME_W = 58;
 /** Mynd? Líka skjal með myndarendingu (eldri skilaboð og skrár úr „Skrár“ án MIME-tegundar). */
 const IMG_RE = /\.(jpe?g|png|gif|webp|heic|heif)(\?|$)/i;
 const isImage = (m: ChatMessage) => !!m.url && (m.kind === "image" || (m.kind === "file" && (IMG_RE.test(m.url) || IMG_RE.test(m.body))));
+
+/** „•••“ sem dúar, eins og í Messenger. */
+function TypingDots() {
+  const t = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(t, { toValue: 3, duration: 1200, useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [t]);
+  return (
+    <View style={{ flexDirection: "row", gap: 4 }}>
+      {[0, 1, 2].map((i) => (
+        <Animated.View key={i} style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.ink3, opacity: t.interpolate({ inputRange: [i, i + 0.5, i + 1], outputRange: [0.35, 1, 0.35], extrapolate: "clamp" }), transform: [{ translateY: t.interpolate({ inputRange: [i, i + 0.5, i + 1], outputRange: [0, -2, 0], extrapolate: "clamp" }) }] }} />
+      ))}
+    </View>
+  );
+}
 
 function Bubble({ item, onLong, onImage, onReactions, translated, onToggleOriginal, showingOriginal }: {
   item: Extract<RowItem, { kind: "msg" }>; onLong: () => void; onImage: (url: string) => void; onReactions: () => void;
