@@ -10,13 +10,16 @@ export const VSK_REFUND_SHARE = 0.35;
 const SITE = "https://www.vakto.is";
 
 export type Client = { id: string; name: string; email: string | null; phone: string | null };
-export type JobRow = { id: string; title: string; address: string | null; status: "open" | "done" | "archived"; client: string | null; hourlyRate: number | null; hoursMonth: number; hoursTotal: number };
+export type JobRow = { id: string; title: string; address: string | null; status: "open" | "done" | "archived"; client: string | null; hourlyRate: number | null; hoursMonth: number; hoursTotal: number; invoicedAt?: string | null; paidAt?: string | null };
+export type Stage = "open" | "done" | "invoiced" | "paid";
+export const STAGE_LABEL: Record<Stage, string> = { open: "Í vinnslu", done: "Lokið", invoiced: "Reikningur sendur", paid: "Greitt" };
+export const stageOf = (j: { status: string; invoicedAt?: string | null; paidAt?: string | null }): Stage => (j.paidAt ? "paid" : j.invoicedAt ? "invoiced" : j.status === "done" ? "done" : "open");
 export type Running = { jobId: string; startedAt: string } | null;
 export type Entry = { id: string; who: string; startedAt: string; endedAt: string | null; hours: number; note: string | null; km: number; billable: boolean; onSite: boolean | null };
 export type Item = { id: string; kind: "material" | "expense"; description: string; quantity: number; unitPrice: number; date: string };
 export type Photo = { id: string; url: string; caption: string | null; createdAt: string };
 export type Report = { id: string; token: string; from: string; to: string; status: "sent" | "approved" | "rejected"; signedName: string | null; comment: string | null; createdAt: string };
-export type Job = { id: string; title: string; address: string | null; lat: number | null; lng: number | null; status: JobRow["status"]; hourlyRate: number | null; client: Client | null; entries: Entry[]; items: Item[]; photos: Photo[]; reports: Report[] };
+export type Job = { id: string; title: string; address: string | null; lat: number | null; lng: number | null; status: JobRow["status"]; hourlyRate: number | null; invoicedAt: string | null; paidAt: string | null; client: Client | null; entries: Entry[]; items: Item[]; photos: Photo[]; reports: Report[] };
 
 export const hoursOf = (s: string, e: string | null) => Math.max(0, ((e ? new Date(e).getTime() : Date.now()) - new Date(s).getTime()) / 3600000);
 const thou = (s: string) => s.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
@@ -49,7 +52,7 @@ export async function here(): Promise<{ lat: number; lng: number } | null> {
 export async function listJobs(me: Me): Promise<{ jobs: JobRow[]; clients: Client[]; running: Running }> {
   const { data: auth } = await authUser();
   const [jr, cr, er] = await Promise.all([
-    supabase.from("jobs").select("id, title, address, status, hourly_rate, clients(name)").eq("company_id", me.companyId).order("created_at", { ascending: false }),
+    supabase.from("jobs").select("id, title, address, status, hourly_rate, invoiced_at, paid_at, clients(name)").eq("company_id", me.companyId).order("created_at", { ascending: false }),
     supabase.from("clients").select("id, name, email, phone").eq("company_id", me.companyId).order("name"),
     supabase.from("job_entries").select("job_id, user_id, started_at, ended_at").eq("company_id", me.companyId).order("started_at", { ascending: false }).limit(3000),
   ]);
@@ -67,7 +70,7 @@ export async function listJobs(me: Me): Promise<{ jobs: JobRow[]; clients: Clien
   return {
     jobs: (jr.data ?? []).map((j) => {
       const c = (Array.isArray(j.clients) ? j.clients[0] : j.clients) as { name?: string } | null;
-      return { id: j.id, title: j.title, address: j.address, status: j.status, client: c?.name ?? null, hourlyRate: j.hourly_rate != null ? Number(j.hourly_rate) : null, hoursMonth: r1(agg.get(j.id)?.m ?? 0), hoursTotal: r1(agg.get(j.id)?.t ?? 0) };
+      return { id: j.id, title: j.title, address: j.address, status: j.status, client: c?.name ?? null, hourlyRate: j.hourly_rate != null ? Number(j.hourly_rate) : null, hoursMonth: r1(agg.get(j.id)?.m ?? 0), hoursTotal: r1(agg.get(j.id)?.t ?? 0), invoicedAt: j.invoiced_at ?? null, paidAt: j.paid_at ?? null };
     }),
     clients: (cr.data ?? []) as Client[],
     running,
@@ -76,7 +79,7 @@ export async function listJobs(me: Me): Promise<{ jobs: JobRow[]; clients: Clien
 
 export async function getJob(id: string): Promise<Job | null> {
   const [jr, er, ir, pr, rr] = await Promise.all([
-    supabase.from("jobs").select("id, title, address, lat, lng, status, hourly_rate, clients(id, name, email, phone)").eq("id", id).maybeSingle(),
+    supabase.from("jobs").select("id, title, address, lat, lng, status, hourly_rate, invoiced_at, paid_at, clients(id, name, email, phone)").eq("id", id).maybeSingle(),
     supabase.from("job_entries").select("id, started_at, ended_at, note, km, billable, on_site, users(full_name)").eq("job_id", id).order("started_at", { ascending: false }),
     supabase.from("job_items").select("id, kind, description, quantity, unit_price, date").eq("job_id", id).order("date", { ascending: false }),
     supabase.from("job_photos").select("id, url, caption, created_at").eq("job_id", id).order("created_at", { ascending: false }),
@@ -87,6 +90,7 @@ export async function getJob(id: string): Promise<Job | null> {
   const c = (Array.isArray(j.clients) ? j.clients[0] : j.clients) as Client | null;
   return {
     id: j.id, title: j.title, address: j.address, lat: j.lat, lng: j.lng, status: j.status, hourlyRate: j.hourly_rate != null ? Number(j.hourly_rate) : null, client: c ?? null,
+    invoicedAt: j.invoiced_at ?? null, paidAt: j.paid_at ?? null,
     entries: (er.data ?? []).map((e) => {
       const u = (Array.isArray(e.users) ? e.users[0] : e.users) as { full_name?: string } | null;
       return { id: e.id, who: u?.full_name ?? "—", startedAt: e.started_at, endedAt: e.ended_at, hours: Math.round(hoursOf(e.started_at, e.ended_at) * 100) / 100, note: e.note, km: Number(e.km ?? 0), billable: e.billable !== false, onSite: e.on_site };
@@ -196,4 +200,34 @@ export async function createReport(me: Me, job: Job, from: string, to: string): 
   };
   const { data, error } = await supabase.from("job_reports").insert({ company_id: me.companyId, job_id: job.id, period_from: from, period_to: to, snapshot, created_by: auth.user?.id }).select("token").single();
   return error ? fail(error) : { ok: true, url: `${SITE}/samthykki/${data.token}` };
+}
+
+/** Færa verk á milli stiga (sama regla og vefurinn, 0104). */
+export async function setStage(id: string, stage: Stage, invoicedAt: string | null): Promise<Res> {
+  const now = new Date().toISOString();
+  const patch = stage === "open" ? { status: "open", invoiced_at: null, paid_at: null }
+    : stage === "done" ? { status: "done", invoiced_at: null, paid_at: null }
+    : stage === "invoiced" ? { status: "done", invoiced_at: now, paid_at: null }
+    : { status: "done", paid_at: now, invoiced_at: invoicedAt ?? now };
+  return fail((await supabase.from("jobs").update(patch).eq("id", id)).error);
+}
+
+export type QuoteRow = { id: string; number: number; title: string; status: "draft" | "sent" | "accepted" | "declined"; token: string; client: string | null; total: number; jobId: string | null; signedName: string | null; sentAt: string | null };
+export async function listQuotes(me: Me): Promise<QuoteRow[]> {
+  const { data, error } = await supabase.from("quotes").select("id, number, title, status, token, items, job_id, signed_name, sent_at, clients(name)").eq("company_id", me.companyId).order("created_at", { ascending: false });
+  if (error) return [];
+  return (data ?? []).map((q) => {
+    const c = (Array.isArray(q.clients) ? q.clients[0] : q.clients) as { name?: string } | null;
+    const net = ((q.items ?? []) as { quantity?: number; unitPrice?: number }[]).reduce((a, i) => a + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0);
+    return { id: q.id, number: q.number, title: q.title, status: q.status, token: q.token, client: c?.name ?? null, total: Math.round(net * (1 + VSK)), jobId: q.job_id, signedName: q.signed_name, sentAt: q.sent_at };
+  });
+}
+
+/** Senda tilboð (drög → sent) og skila hlekknum. */
+export async function sendQuote(q: QuoteRow): Promise<Res & { url?: string }> {
+  if (q.status === "draft") {
+    const r = fail((await supabase.from("quotes").update({ status: "sent", sent_at: new Date().toISOString() }).eq("id", q.id)).error);
+    if (!r.ok) return r;
+  }
+  return { ok: true, url: `${SITE}/tilbod/${q.token}` };
 }

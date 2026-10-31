@@ -13,8 +13,8 @@ import { ImageViewer } from "../../src/components/image-viewer";
 import { colors, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import {
-  getJob, listJobs, start, addEntry, removeEntry, addItem, removeItem, addPhoto, removePhoto, createReport, setStatus,
-  totals, kr, hrs, isNum, type Job, type Running,
+  getJob, listJobs, start, addEntry, removeEntry, addItem, removeItem, addPhoto, removePhoto, createReport, setStage, stageOf, STAGE_LABEL,
+  totals, kr, hrs, isNum, type Job, type Running, type Stage,
 } from "../../src/lib/api/verk";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -180,7 +180,19 @@ export default function VerkDetail() {
         </Card>
       ) : null}
 
-      <Btn title={job.status === "done" ? "Opna verk aftur" : "Ljúka verki"} variant="ghost" onPress={async () => done(await setStatus(job.id, job.status === "done" ? "open" : "done"), job.status === "done" ? "Verk opnað" : "Verki lokið")} />
+      <Card style={{ padding: 12, gap: 8 }}>
+        <Muted size={12}>Staða verks</Muted>
+        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+          {(["open", "done", "invoiced", "paid"] as Stage[]).map((st) => {
+            const on = stageOf(job) === st;
+            return (
+              <Pressable key={st} onPress={async () => { if (!on) await done(await setStage(job.id, st, job.invoicedAt), STAGE_LABEL[st]); }} style={{ paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999, backgroundColor: on ? colors.ink : colors.panel2 }}>
+                <Txt size={13} weight="semibold" color={on ? colors.panel : colors.ink2}>{STAGE_LABEL[st]}</Txt>
+              </Pressable>
+            );
+          })}
+        </View>
+      </Card>
       {job.lat != null ? <View style={{ flexDirection: "row", alignItems: "center", gap: 6, justifyContent: "center" }}><MapPin color={colors.ink3} size={13} /><Muted size={12}>Tímataka staðfestir hvort þú sért á verkstaðnum</Muted></View> : null}
 
       <StopSheet open={sheet === "stop"} onClose={() => setSheet(null)} onDone={() => { setSheet(null); void load(); }} />

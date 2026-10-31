@@ -2,13 +2,13 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { View, Pressable, TextInput } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Briefcase, Plus, Square } from "lucide-react-native";
+import { Briefcase, FileText, Plus, Square } from "lucide-react-native";
 import { Screen, IconBtn } from "./screen";
 import { Card, Txt, Muted, Pill, Btn, Seg, Empty, Sheet, useToast } from "./ui";
 import { Field, inputStyle } from "./request-sheets";
 import { colors, useTheme } from "../theme";
 import { useMe } from "../lib/me-context";
-import { listJobs, saveClient, saveJob, stop, here, hrs, type Client, type JobRow, type Running } from "../lib/api/verk";
+import { listJobs, saveClient, saveJob, stop, here, hrs, stageOf, STAGE_LABEL, type Client, type JobRow, type Running, type Stage } from "../lib/api/verk";
 
 export function Elapsed({ since, size = 22, color = "#fff" }: { since: string; size?: number; color?: string }) {
   const [now, setNow] = useState(() => Date.now());
@@ -101,7 +101,7 @@ export function VerkList({ inTab = false }: { inTab?: boolean }) {
   const { me } = useMe();
   const router = useRouter();
   const [data, setData] = useState<{ jobs: JobRow[]; clients: Client[]; running: Running } | null>(null);
-  const [filter, setFilter] = useState<"open" | "done">("open");
+  const [filter, setFilter] = useState<Stage>("open");
   const [sheet, setSheet] = useState<"new" | "stop" | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const load = useCallback(async () => { if (me) setData(await listJobs(me)); }, [me]);
@@ -109,7 +109,7 @@ export function VerkList({ inTab = false }: { inTab?: boolean }) {
 
   const running = data?.running ?? null;
   const runJob = running ? data?.jobs.find((j) => j.id === running.jobId) : null;
-  const jobs = (data?.jobs ?? []).filter((j) => j.status === filter);
+  const jobs = (data?.jobs ?? []).filter((j) => j.status !== "archived" && stageOf(j) === filter);
   const monthH = (data?.jobs ?? []).reduce((a, j) => a + j.hoursMonth, 0);
 
   return (
@@ -134,9 +134,16 @@ export function VerkList({ inTab = false }: { inTab?: boolean }) {
         <Card style={{ flex: 1, padding: 13 }}><Muted size={12}>Tímar í mánuðinum</Muted><Txt weight="bold" size={20}>{hrs(monthH)}</Txt></Card>
         <Card style={{ flex: 1, padding: 13 }}><Muted size={12}>Opin verk</Muted><Txt weight="bold" size={20}>{(data?.jobs ?? []).filter((j) => j.status === "open").length}</Txt></Card>
       </View>
-      <Seg value={filter} onChange={setFilter} items={[{ id: "open", label: "Opin" }, { id: "done", label: "Lokið" }]} />
+      <Pressable onPress={() => router.push("/verk/tilbod")}>
+        <Card style={{ padding: 14, flexDirection: "row", alignItems: "center", gap: 12 }}>
+          <FileText color={colors.brand} size={20} />
+          <View style={{ flex: 1 }}><Txt weight="bold" size={15}>Tilboð</Txt><Muted size={12.5}>Sendu tilboð — samþykkt tilboð verður að verki</Muted></View>
+          <Txt size={20} color={colors.ink3}>›</Txt>
+        </Card>
+      </Pressable>
+      <Seg value={filter} onChange={setFilter} items={[{ id: "open", label: "Í vinnslu" }, { id: "done", label: "Lokið" }, { id: "invoiced", label: "Rukkað" }, { id: "paid", label: "Greitt" }]} />
       {data && jobs.length === 0 ? (
-        <Empty icon={<Briefcase color={colors.ink3} size={26} />} title={filter === "open" ? "Engin opin verk" : "Engin lokin verk"} sub="Stofnaðu verk, byrjaðu tímatöku á staðnum og sendu viðskiptavininum verkskýrslu til samþykktar." />
+        <Empty icon={<Briefcase color={colors.ink3} size={26} />} title={filter === "open" ? "Engin verk í vinnslu" : `Ekkert: ${STAGE_LABEL[filter]}`} sub="Stofnaðu verk, byrjaðu tímatöku á staðnum og sendu viðskiptavininum verkskýrslu til samþykktar." />
       ) : null}
       {jobs.map((j) => (
         <Pressable key={j.id} onPress={() => router.push(`/verk/${j.id}`)}>
