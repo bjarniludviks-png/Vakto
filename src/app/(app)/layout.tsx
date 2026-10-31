@@ -58,6 +58,12 @@ async function getAccount(): Promise<Account & { country: string }> {
       const kt = await supabase.from("companies").select("kiosk_token").eq("id", companyId).maybeSingle();
       if (!kt.error && kt.data?.kiosk_token) kioskToken = kt.data.kiosk_token as string;
     }
+    // Verktakahamur (0102): einfaldari valmynd — þolir að dálkurinn vanti.
+    let solo = false;
+    if (companyId) {
+      const ak = await supabase.from("companies").select("account_kind").eq("id", companyId).maybeSingle();
+      solo = !ak.error && ak.data?.account_kind === "solo";
+    }
     // Aðgangur stjórnanda per svæði (0095) — hliðarstikan felur það sem hann má ekki opna.
     // Þolir að dálkurinn vanti (null = sjálfgefið fyrir hlutverkið).
     let permissions: unknown = null;
@@ -72,6 +78,7 @@ async function getAccount(): Promise<Account & { country: string }> {
       company: comp?.name ?? "VAKTO",
       companyId,
       kioskToken,
+      solo,
       role: (profile?.role as Role) ?? "owner",
       demo: isDemoCompany(companyId),
       country: comp?.country ?? "IS",

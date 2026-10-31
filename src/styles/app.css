@@ -2127,3 +2127,45 @@ html.dark .mroster .sh{background:#23264a;color:#c7ccff}
 .rwho-n b{font-weight:600;font-size:15px}
 .rwho-n small{font-size:12.5px;color:var(--ink3)}
 .rwho-e{font-size:24px;line-height:1}
+
+/* ============ VAKTO Verk (0102) ============ */
+.vk-run{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,#16171d,#2a2230);color:#fff;border-radius:16px;padding:14px 18px;margin-bottom:16px;box-shadow:var(--shadow-card)}
+.vk-dot{width:10px;height:10px;border-radius:50%;background:#2fd17c;box-shadow:0 0 0 0 rgba(47,209,124,.6);animation:vk-pulse 1.6s infinite}
+@keyframes vk-pulse{70%{box-shadow:0 0 0 10px rgba(47,209,124,0)}100%{box-shadow:0 0 0 0 rgba(47,209,124,0)}}
+.vk-run-t{flex:1;min-width:0;display:flex;flex-direction:column}.vk-run-t span{font-size:12.5px;opacity:.7}
+.vk-run-c{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.vk-tabs{display:flex;gap:6px;margin:4px 0 14px;flex-wrap:wrap}
+.vk-tabs button{border:1px solid var(--line);background:var(--panel);color:var(--ink2);font:inherit;font-size:13px;font-weight:600;padding:7px 13px;border-radius:999px;cursor:pointer}
+.vk-tabs button.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
+.vk-empty{padding:28px;text-align:center}.vk-empty p{margin:8px 0 16px}
+.vk-list{display:flex;flex-direction:column;gap:8px}
+.vk-job{display:flex;align-items:center;gap:18px;padding:14px 18px;text-align:left;font:inherit;color:var(--ink);cursor:pointer;width:100%}
+.vk-job:hover{border-color:var(--brand-2)}.vk-job.live{border-color:#2fd17c}
+.vk-job-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}.vk-job-t span{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vk-job-n{display:flex;flex-direction:column;align-items:flex-end;font-size:13px}.vk-job-n span{font-size:11.5px}
+.vk-pill{font-size:11.5px;font-weight:650;padding:4px 9px;border-radius:999px;background:var(--line2);color:var(--ink2);white-space:nowrap}
+.vk-pill.live{background:#e3f6ec;color:#11804f}.vk-pill.approved{background:#e3f6ec;color:#11804f}.vk-pill.rejected{background:#fde8e8;color:#b13434}.vk-pill.sent{background:#fff1e6;color:#b4520f}
+.vk-back{border:0;background:none;color:var(--brand);font:inherit;font-weight:600;cursor:pointer;padding:0;margin-bottom:10px}
+.vk-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:16px}
+.vk-head h1{margin:0 0 4px;font-size:24px;letter-spacing:-.02em}
+.vk-head-a{display:flex;gap:8px;flex-wrap:wrap}
+.vk-kpis{margin-bottom:14px}
+.vk-sec{padding:16px}
+.vk-add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.vk-add input,.vk-add select{border:1px solid var(--line);border-radius:9px;padding:8px 10px;font:inherit;font-size:13.5px;background:var(--panel);color:var(--ink)}
+.vk-tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.vk-tbl td{padding:9px 6px;border-top:1px solid var(--line2);vertical-align:middle}
+.vk-tbl .r{text-align:right;white-space:nowrap}
+.vk-geo{color:#18a06a;font-size:11.5px;font-weight:600}
+.vk-x{border:0;background:none;color:var(--ink3);cursor:pointer;font-size:13px;padding:2px 6px;border-radius:6px}.vk-x:hover{background:var(--line2);color:var(--bad)}
+.vk-link{border:0;background:none;color:var(--brand);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;padding:6px 0 0;text-decoration:none}
+.vk-photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:14px}
+.vk-photos figure{margin:0}.vk-photos img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;display:block}
+.vk-photos figcaption{font-size:12px;color:var(--ink2);margin-top:4px;display:flex;justify-content:space-between;align-items:center}
+.vk-grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+@media (max-width:900px){
+  .vk-kpis{grid-template-columns:repeat(2,1fr);gap:10px}
+  .vk-job{gap:10px;padding:12px 14px}.vk-job-n:nth-of-type(3){display:none}
+  .vk-tbl td:nth-child(4){display:none}
+  .vk-grid2{grid-template-columns:1fr}
+}

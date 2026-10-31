@@ -11,8 +11,7 @@ import { PRICING_TEXT } from "./pricing-text";
 import { nf } from "@/lib/format";
 import {
   AI_PACK, ANNUAL_DISCOUNT, ESIGN_PRICE, PLANS, QUOTE_ABOVE_EMPLOYEES,
-  annualMonthly, cheapestPlan, planCost, type Plan,
-} from "@/lib/plans";
+  annualMonthly, cheapestPlan, planCost, type Plan, type TeamPlanId } from "@/lib/plans";
 
 const HOT = "voxtur";
 const EMP_MAX = QUOTE_ABOVE_EMPLOYEES;
@@ -42,6 +41,8 @@ export default function PricingClient() {
   const [toVoxtur, toRekstur] = useMemo(() => [crossover("voxtur"), crossover("rekstur")], []);
 
   const best = cheapestPlan(emp, ai, yearly);
+
+  const bestId = best.plan.id as TeamPlanId; // cheapestPlan velur aðeins úr PLANS (leiðum fyrirtækja)
   const all = PLANS.map((p) => ({ p, c: planCost(p, emp, ai, yearly) }));
   const extras = PLANS.map((p) => p.extraPerEmployee).filter((x): x is number => x !== null);
 
@@ -118,17 +119,17 @@ export default function PricingClient() {
             </div>
             <div className="vp-res" aria-live="polite">
               <div className="vp-k">{t.yourPlan}</div>
-              <div className="vp-res-plan">{t.plans[best.plan.id].name}</div>
+              <div className="vp-res-plan">{t.plans[bestId].name}</div>
               <div className="vp-res-tot">{m(best.total)}</div>
               <div className="vp-k">{t.perMonth}{emp > 1 && best.total > 0 ? ` · ${t.perEmp(m(best.total / emp))}` : ""}</div>
               <ul className="vp-res-list">
-                <li><span>{t.rowBase(t.plans[best.plan.id].name, yearly)}</span><span>{m(best.base)}</span></li>
+                <li><span>{t.rowBase(t.plans[bestId].name, yearly)}</span><span>{m(best.base)}</span></li>
                 {best.extraEmployees > 0 && <li><span>{t.rowExtra(best.extraEmployees, m, price(best.plan.extraPerEmployee ?? 0))}</span><span>{m(best.extra)}</span></li>}
                 {best.aiPacks > 0 && <li><span>{t.rowAi(best.aiPacks)}</span><span>{m(best.ai)}</span></li>}
               </ul>
               {best.plan.id === "free" && <p className="vp-res-note">{t.freeNote}</p>}
               {emp >= EMP_MAX && <p className="vp-res-note">{t.overQuote(EMP_MAX)}</p>}
-              <a className="ah-btn vp-res-btn" href={t.plans[best.plan.id].href}>{t.plans[best.plan.id].btn}</a>
+              <a className="ah-btn vp-res-btn" href={t.plans[bestId].href}>{t.plans[bestId].btn}</a>
             </div>
           </div>
           <p className="vp-cross"><b>{t.crossH}</b> {t.cross(toVoxtur, toRekstur)}</p>

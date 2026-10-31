@@ -247,13 +247,16 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
   // Lesið við notkun (eftir samskipti notanda), ekki í render → engin hydration-misræmi.
   const urlPlan = (): Exclude<PlanId, "rekstur"> => {
     const p = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("plan");
-    return p === "free" || p === "grunnur" ? p : "voxtur";
+    return p === "free" || p === "grunnur" || p === "verktaki" ? p : "voxtur";
   };
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [proof, setProof] = useState<string | null>(null);
   const [fullName, setFullName] = useState("");
   const [companyName, setCompanyName] = useState("");
+  // Verktakaleið (/nyskraning?plan=verktaki, VAKTO Verk 0102) — lesið eftir hydration.
+  const [solo, setSolo] = useState(false);
+  useEffect(() => { setSolo(urlPlan() === "verktaki"); }, []); // eslint-disable-line react-hooks/set-state-in-effect -- slóðin breytist ekki
   const [kennitala, setKennitala] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -430,7 +433,7 @@ export default function SignupForm({ lang = "is" }: { lang?: SignupLang }) {
       <div className="sub">{s.accSubA}{email}{s.accSubB}</div>
 
       <div className="field"><div className="lbl"><label htmlFor="fn">{s.fullName}</label></div><input id="fn" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder={s.namePh} autoComplete="name" autoFocus required /></div>
-      <div className="field"><div className="lbl"><label htmlFor="co">{s.company}</label></div><input id="co" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder={s.coPh} autoComplete="organization" required /></div>
+      <div className="field"><div className="lbl"><label htmlFor="co">{solo ? (lang === "is" ? "Nafn rekstrar (eða þitt nafn ef þú ert einyrki)" : "Business name (or your name if self-employed)") : s.company}</label></div><input id="co" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder={solo ? (lang === "is" ? "t.d. Jón Rafvirki ehf. eða Jón Jónsson" : "e.g. John's Electric") : s.coPh} autoComplete="organization" required /></div>
       <div className="field"><div className="lbl"><label htmlFor="kt">{s.ktLbl}</label></div><input id="kt" value={kennitala} onChange={(e) => setKennitala(e.target.value.replace(/[^\d-]/g, "").slice(0, 11))} placeholder="000000-0000" inputMode="numeric" autoComplete="off" required /></div>
       <div className="field"><div className="lbl"><label htmlFor="pw">{s.pw}</label></div>
         <div className="pwwrap">

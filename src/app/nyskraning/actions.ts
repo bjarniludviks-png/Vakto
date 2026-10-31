@@ -103,9 +103,9 @@ export async function createOwnerAccount(input: { fullName: string; companyName:
     // Leið úr /verd (?plan=): Frítt → ekkert kort, engin prufa, aldrei rukkað. Grunnur/Vöxtur (sjálfgefið) →
     // prufan hefst núna (á Vexti) og aðgangur opnast ekki fyrr en kort er skráð (middleware + card_required).
     if (prov.companyId) {
-      const tier = input.plan === "free" || input.plan === "grunnur" ? input.plan : "voxtur";
+      const tier = input.plan === "free" || input.plan === "grunnur" || input.plan === "verktaki" ? input.plan : "voxtur";
       const trialEnds = tier === "free" ? null : new Date(Date.now() + (promoDays(input.promo) ?? TRIAL_DAYS) * 86400000).toISOString();
-      await admin.from("companies").update({ plan: tier, trial_ends_at: trialEnds, card_required: tier !== "free", ...(isValidKennitala(input.kennitala ?? "") ? { kennitala: formatKennitala(input.kennitala!) } : {}), terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }).eq("id", prov.companyId);
+      await admin.from("companies").update({ plan: tier, trial_ends_at: trialEnds, card_required: tier !== "free", ...(tier === "verktaki" ? { account_kind: "solo" } : {}), ...(isValidKennitala(input.kennitala ?? "") ? { kennitala: formatKennitala(input.kennitala!) } : {}), terms_accepted_at: new Date().toISOString(), terms_version: TERMS_VERSION }).eq("id", prov.companyId);
     }
     await sendWelcomeEmail(email, fullName, companyName); // no-op until Resend is configured
     await sendSignupAlert({ company: companyName, name: fullName, email, country: input.country, companyId: prov.companyId, kennitala: isValidKennitala(input.kennitala ?? "") ? formatKennitala(input.kennitala!) : null, promo: promoDays(input.promo) ? input.promo!.trim().toUpperCase() : null }).catch((e) => console.error("[signup-alert]", e));
