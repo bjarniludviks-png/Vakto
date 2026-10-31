@@ -82,6 +82,34 @@ export async function execute(a: AiAction): Promise<{ ok: boolean; error?: strin
   return d ? { ok: !!d.ok, error: d.error as string | undefined } : { ok: false, error: "Engin tenging — reyndu aftur" };
 }
 
+/** VAKTO AI fyrir starfsfólk (/api/app/employee-ai): eigin vaktir/tímar, hver getur tekið vakt, tillaga að
+ *  vaktaskiptum. Ekki streymt — stutt svör. */
+export async function askEmployee(messages: AiMsg[]): Promise<{ ok: boolean; reply?: string; actions?: AiAction[]; error?: string }> {
+  const t = await token();
+  if (!t) return { ok: false, error: "Ekki innskráð(ur)" };
+  try {
+    const r = await fetch(`${API}/api/app/employee-ai`, {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+      body: JSON.stringify({ messages: messages.map((m) => ({ role: m.role, content: m.content })), lang: getLang() }),
+    });
+    const d = (await r.json()) as { ok?: boolean; reply?: string; actions?: AiAction[]; error?: string };
+    return { ok: !!d.ok, reply: d.reply, actions: d.actions, error: d.error };
+  } catch { return { ok: false, error: "Engin tenging — reyndu aftur" }; }
+}
+
+export async function executeEmployee(a: AiAction): Promise<{ ok: boolean; error?: string }> {
+  const t = await token();
+  if (!t) return { ok: false, error: "Ekki innskráð(ur)" };
+  try {
+    const r = await fetch(`${API}/api/app/employee-ai/execute`, {
+      method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+      body: JSON.stringify({ tool: a.tool, input: a.input }),
+    });
+    const d = (await r.json()) as { ok?: boolean; error?: string };
+    return { ok: !!d.ok, error: d.error };
+  } catch { return { ok: false, error: "Engin tenging — reyndu aftur" }; }
+}
+
 export async function listConversations(): Promise<AiConversation[]> {
   return ((await call("/conversations"))?.conversations as AiConversation[] | undefined) ?? [];
 }

@@ -30,6 +30,12 @@ export function useLang(): Lang {
 
 type E = [string, string, string]; // [en, vi, pl]
 const D: Record<string, E> = {
+  // VAKTO AI fyrir starfsfólk
+  "Hvenær er ég á vakt næstu viku?": ["When am I working next week?", "Tuần sau tôi làm ca nào?", "Kiedy pracuję w przyszłym tygodniu?"],
+  "Hvað hef ég unnið marga tíma í þessum mánuði?": ["How many hours have I worked this month?", "Tháng này tôi đã làm bao nhiêu giờ?", "Ile godzin przepracowałem w tym miesiącu?"],
+  "Hver getur tekið næstu vaktina mína?": ["Who can take my next shift?", "Ai có thể làm thay ca tới của tôi?", "Kto może wziąć moją następną zmianę?"],
+  "Aðstoðarmaðurinn þinn": ["Your assistant", "Trợ lý của bạn", "Twój asystent"],
+  "Hæ! Ég get sagt þér hvenær þú ert á vakt, hvað þú hefur unnið og fundið hver getur tekið vakt fyrir þig.": ["Hi! I can tell you when you're working, how much you've worked, and find who can take a shift for you.", "Chào bạn! Tôi có thể cho bạn biết lịch làm, số giờ đã làm và tìm người làm thay ca cho bạn.", "Cześć! Powiem Ci, kiedy pracujesz, ile przepracowałeś, i znajdę kogoś, kto weźmie Twoją zmianę."],
   // spjall: afrita, þýða, breyta (0100)
   "Afrita texta": ["Copy text", "Sao chép văn bản", "Kopiuj tekst"],
   "Haltu fingri á textanum til að velja og afrita hann.": ["Press and hold the text to select and copy it.", "Nhấn giữ văn bản để chọn và sao chép.", "Przytrzymaj tekst, aby go zaznaczyć i skopiować."],
