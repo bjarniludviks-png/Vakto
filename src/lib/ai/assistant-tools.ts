@@ -6,6 +6,8 @@ import { fetchAttendance, setClockOut, getTimesheetIssues, adjustPunch, askForCo
 import { getShiftsInRange, saveShift, deleteShift, updateLeaveRequest, approveShiftSwap, getWeekBudget, getWeekShifts, deleteWeekShifts, publishSchedule, createOpenShifts } from "@/app/(app)/vaktaplan/actions";
 import { listContracts, resendContract } from "@/app/(app)/starfsfolk/actions";
 import { getEmployees } from "@/lib/employees.server";
+import { getPlanningHistory, historyForPrompt, historyRange } from "@/lib/ai/planning-history.server";
+import { getCompanyId } from "@/lib/labor";
 import { createClient } from "@/lib/supabase/server";
 import { getPendingRequests } from "@/app/(app)/vaktaplan/requests.server";
 import { comparePeriods, laborTrend, payrollRuns } from "./assistant-insights";
@@ -34,6 +36,11 @@ export const READ_TOOLS: Anthropic.Tool[] = [
     name: "labor_summary",
     description: "Laun sem % af veltu, velta, launakostnaður, unnir og áætlaðir tímar, frávik og kostnaður þess, yfirvinna og álag, og tölur per starfsmann, fyrir tímabil.",
     input_schema: { type: "object", properties: { from: DATE, to: DATE }, required: ["from", "to"] },
+  },
+  {
+    name: "planning_history",
+    description: "Saga vaktaplans: hvar var unnið meira eða minna en planað var — meðaltal per vikudag (planað/unnið klst. og velta), fjöldi á vakt eftir klukkustund per vikudag (planað/unnið), deildir, verstu dagarnir (og hverjir fóru yfir) og starfsfólk sem vinnur oftast umfram plan. Stimplanir yfir 14 klst. (gleymd útstimplun) eru ekki taldar. Notaðu ÁÐUR en þú setur upp viku eða mánuð, og þegar spurt er hvar/hvenær farið er yfir tíma. Sjálfgefið síðustu 8 heilu vikur; from/to fyrir annað tímabil (t.d. sama mánuð í fyrra).",
+    input_schema: { type: "object", properties: { from: DATE, to: DATE, weeks: { type: "number", description: "Fjöldi heilla vikna aftur í tímann (4–26), sjálfgefið 8" } } },
   },
   {
     name: "who_is_on_now",
@@ -395,6 +402,22 @@ function alertInput(name: string, input: In) {
 }
 
 /** Keyrir lesverkfæri og skilar JSON-streng fyrir líkanið. */
+/** Saga síðustu 8 heilu vikna (fyrir dagsetninguna eða í dag ef hún er í framtíðinni) sem stuttur texti
+ * — fylgir vikusamhengi og mánaðarsamhengi svo AI-ið planar nær raunverulegri þörf. */
+async function historyText(supabase: Awaited<ReturnType<typeof createClient>>, start: string): Promise<string> {
+  try {
+    const company = await getCompanyId(supabase);
+    if (!company) return "";
+    const today = new Date().toISOString().slice(0, 10);
+    const r = historyRange(start < today ? start : today, 8);
+    const h = await getPlanningHistory(supabase, company, r.from, r.to);
+    return "error" in h ? "" : historyForPrompt(h);
+  } catch (e) {
+    console.error("[assistant] history", e instanceof Error ? e.message : e);
+    return "";
+  }
+}
+
 export async function runReadTool(name: string, input: In): Promise<string> {
   try {
     if (name === "labor_summary" || name === "staff_hours" || name === "shifts") {
@@ -452,6 +475,7 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       const companyRules = (await rulesP).filter((r) => r.active).map((r) => r.text);
       if (companyRules.length) out.companyRules = companyRules;
       if (budget) out.budget = { revenueForecast: budget.revenue, revenueSource: budget.revenueSource, laborTargetPct: budget.target, fixedSalaryCostKr: budget.fixed, avgCostPerHourKr: Math.round(budget.avgRate) };
+      if (!input.noHistory) { const h = await historyText(supabase, mon); if (h) out.history = h; }
       return JSON.stringify(out);
     }
     if (name === "compare_periods" || name === "labor_trend" || name === "payroll_runs") {
@@ -512,7 +536,7 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       const dates = monthDates(input.month);
       if (!dates) return JSON.stringify({ error: "month verður að vera YYYY-MM" });
       // Vikusamhengi fyrir hverja viku sem snertir mánuðinn, sameinað og síað á daga mánaðarins.
-      const weeks = await Promise.all(mondaysOf(dates).map(async (monday) => ({ monday, ctx: JSON.parse(await runReadTool("week_planning_context", { monday })) as Record<string, unknown> })));
+      const weeks = await Promise.all(mondaysOf(dates).map(async (monday) => ({ monday, ctx: JSON.parse(await runReadTool("week_planning_context", { monday, noHistory: true })) as Record<string, unknown> })));
       const bad = weeks.find((w) => w.ctx.error);
       if (bad) return JSON.stringify({ error: bad.ctx.error });
       const inMonth = (s: string) => dates.includes(s.split("|")[1] ?? "");
@@ -533,6 +557,8 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       if (first.staffingTargetsMonToSun) out.staffingTargetsMonToSun = first.staffingTargetsMonToSun;
       const budgets = weeks.filter((w) => w.ctx.budget).map((w) => ({ monday: w.monday, ...(w.ctx.budget as object) }));
       if (budgets.length) out.budgetByWeek = budgets;
+      const h = await historyText(await createClient(), dates[0]);
+      if (h) out.history = h;
       return JSON.stringify(out);
     }
     if (name === "timesheet_issues") {
@@ -540,6 +566,15 @@ export async function runReadTool(name: string, input: In): Promise<string> {
       const r = await getTimesheetIssues(str(input.from), str(input.to));
       if (!r.ok) return JSON.stringify({ error: r.error ?? "Tókst ekki að sækja frávik" });
       return JSON.stringify(r.issues.slice(0, 150).map((i) => ({ kind: i.kind, employee: i.name, dept: i.dept, date: i.date, punchId: i.punchId, in: i.in, out: i.out, hours: i.hours, planned: i.sched ? `${i.sched.start}–${i.sched.end}` : null, fix: i.fix, hasAccount: i.hasAccount })));
+    }
+    if (name === "planning_history") {
+      const supabase = await createClient();
+      const company = await getCompanyId(supabase);
+      if (!company) return JSON.stringify({ error: "Fyrirtæki fannst ekki" });
+      const today = new Date().toISOString().slice(0, 10);
+      const weeks = Math.min(26, Math.max(4, Math.round(Number(input.weeks) || 8)));
+      const r = okDate(input.from) && okDate(input.to) ? { from: str(input.from), to: str(input.to) } : historyRange(today, weeks);
+      return JSON.stringify(await getPlanningHistory(supabase, company, r.from, r.to));
     }
     if (name === "planning_rules") {
       const rules = await getPlanningRules();

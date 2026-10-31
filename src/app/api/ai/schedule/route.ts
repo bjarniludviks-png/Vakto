@@ -7,6 +7,7 @@ import { isDemoCompany } from "@/lib/demo.server";
 import { ndjsonStream, NDJSON_HEADERS, type ScheduleEvent } from "@/lib/ai/stream";
 import { getPlanningRules } from "@/lib/planning-rules.server";
 import { rulesForPrompt } from "@/lib/planning-rules";
+import { getPlanningHistory, historyForPrompt, historyRange } from "@/lib/ai/planning-history.server";
 import { getPlanRequests, formatPlanRequests, guardLeaveShifts, weekDatesFrom, dayShortIS, type PlanRequests } from "@/lib/ai/plan-requests.server";
 
 // AI-tillaga að vaktaplani — aðeins stjórnendur og vaktstjórar, með sömu takmörkun og VAKTO AI.
@@ -49,10 +50,21 @@ export async function POST(request: Request) {
     }
     // Vistaðar planreglur fyrirtækisins (0101) gilda í hverju plani.
     const rules = rulesForPrompt(await getPlanningRules(supabase, me.companyId));
+    // Saga síðustu 8 vikna (planað/unnið per vikudag og klst.) svo planið fari nær raunverulegri þörf.
+    let history = "";
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const start = dates?.[0] && dates[0] < today ? dates[0] : today;
+      const r = historyRange(start, 8);
+      const h = await getPlanningHistory(supabase, me.companyId, r.from, r.to);
+      if (!("error" in h)) history = historyForPrompt(h);
+    } catch (err) {
+      console.error("[ai/schedule] history", err instanceof Error ? err.message : err);
+    }
     send({ t: "stage", stage: "think" });
     try {
       let last = "";
-      const proposal = await getAiScheduleProposal(prompt, rules ? `${context}\n\n${rules}` : context, lang, reqs ? formatPlanRequests(reqs) : "", { demo, companyId: me.companyId, userId: me.userId }, (p) => {
+      const proposal = await getAiScheduleProposal(prompt, [context, rules, history].filter(Boolean).join("\n\n"), lang, reqs ? formatPlanRequests(reqs) : "", { demo, companyId: me.companyId, userId: me.userId }, (p) => {
         const key = `${p.stage}:${p.shifts}`;
         if (key === last) return;
         if (p.stage !== last.split(":")[0]) send({ t: "stage", stage: p.stage });
