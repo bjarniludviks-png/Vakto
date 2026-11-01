@@ -1,7 +1,7 @@
 // Allur texti verðsíðunnar (/verd) á íslensku og ensku. Tölurnar sjálfar koma úr src/lib/plans.ts
 // og eru settar inn í textann með föllum (m = krónur á tungumáli síðunnar, t.d. „9.990 kr“ / „ISK 9,990“).
 import type { SiteLang } from "./lang";
-import { AI_PACK, type PlanId } from "@/lib/plans";
+import { AI_PACK, type TeamPlanId } from "@/lib/plans";
 
 type Money = (n: number) => string;
 /** Lína undir verði leiðar: (krónur, innifaldir starfsmenn, verð á hvern umfram). */
@@ -48,7 +48,7 @@ const is = {
       btn: "Tala við okkur", href: "mailto:hallo@vakto.is?subject=VAKTO%20Rekstur",
       f: [["Allt í Vexti, og:", 2], ["Forgangsþjónusta", 1], ["Aðstoð við innleiðingu", 1], ["Sérsniðnar launareglur", 1], ["Sami tengiliður hjá VAKTO", 1]] as Feat[],
     },
-  } satisfies Record<PlanId, unknown>,
+  } satisfies Record<TeamPlanId, unknown>,
   under: [
     "Virkur starfsmaður = var á vakt eða stimplaði sig inn í mánuðinum. Þú borgar ekki fyrir þá sem unnu ekki.",
     "14 daga frí prufa á Vexti. Engin binding. Ekkert kort fyrir Frítt.",

@@ -36,3 +36,39 @@ export async function paydayUploadTimesheet(c: PaydayCreds, rows: PaydayRow[]): 
   const res = await call("/payroll/upload/timesheet", { method: "POST", headers: { ...HEADERS, Authorization: `Bearer ${token}` }, body: JSON.stringify(rows) });
   if (!res.ok) throw new Error(`Payday tók ekki við tímaskránni: ${await reason(res)}`);
 }
+
+// ---------- Reikningar verktaka (VAKTO Verk, 0104) ----------
+//   GET  /customers/search/?query=<kt>   POST /customers   POST /invoices
+export type PaydayInvoiceLine = { description: string; comment?: string; quantity: number; unitPriceExcludingVat: number; vatPercentage: number; discountPercentage: number };
+
+/** Reikningur í Payday fyrirtækisins: viðskiptamaður fundinn eftir kennitölu (annars stofnaður), sendur í pósti. */
+export async function paydayCreateInvoice(c: PaydayCreds, inv: {
+  customer: { name: string; ssn?: string | null; email?: string | null; address?: string | null };
+  description: string; reference: string; lines: PaydayInvoiceLine[]; dueDays?: number; sendEmail?: boolean;
+}): Promise<{ id: string; number: number | null }> {
+  const token = await paydayToken(c);
+  const auth = { ...HEADERS, Authorization: `Bearer ${token}` };
+  const ssn = (inv.customer.ssn ?? "").replace(/\D/g, "");
+  let customerId: string | null = null;
+  if (ssn.length === 10) {
+    const r = await call(`/customers/search/?query=${ssn}`, { headers: auth });
+    if (r.ok) {
+      const list = (await r.json().catch(() => [])) as { id: string; ssn?: string }[] | { customers?: { id: string; ssn?: string }[] };
+      customerId = (Array.isArray(list) ? list : (list.customers ?? [])).find((x) => (x.ssn ?? "").replace(/\D/g, "") === ssn)?.id ?? null;
+    }
+  }
+  if (!customerId) {
+    const r = await call("/customers", { method: "POST", headers: auth, body: JSON.stringify({ language: "is", ...(ssn.length === 10 ? { ssn } : {}), name: inv.customer.name, email: inv.customer.email ?? undefined, address: inv.customer.address ?? undefined }) });
+    if (!r.ok) throw new Error(`Payday stofnaði ekki viðskiptamann: ${await reason(r)}`);
+    customerId = ((await r.json()) as { id: string }).id;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const due = new Date(Date.now() + (inv.dueDays ?? 14) * 864e5).toISOString().slice(0, 10);
+  const r = await call("/invoices", {
+    method: "POST", headers: auth,
+    body: JSON.stringify({ customer: { id: customerId }, description: inv.description, invoiceDate: today, dueDate: due, finalDueDate: due, currencyCode: "ISK", createClaim: false, sendEmail: inv.sendEmail !== false, reference: inv.reference, lines: inv.lines }),
+  });
+  if (!r.ok) throw new Error(`Payday tók ekki við reikningnum: ${await reason(r)}`);
+  const out = (await r.json()) as { id: string; number?: number };
+  return { id: out.id, number: out.number ?? null };
+}
