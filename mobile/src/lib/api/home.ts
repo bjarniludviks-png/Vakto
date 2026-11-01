@@ -5,6 +5,7 @@ import { supabase } from "../supabase";
 import { tr, trf } from "../../../src/lib/i18n";
 import { iso, type Me } from "./me";
 import { monthPay, type MonthPay } from "./pay";
+import { addDaysISO, localMidnight, normalizePayPeriod, periodAt, type PayPeriodCfg } from "../periods";
 import { getUnreadTotal } from "./chat";
 
 export type HomeShift = { id: string; date: string; start: string; end: string; dept: string | null; typeName: string | null; color: string | null };
@@ -126,28 +127,47 @@ export async function getHome(me: Me): Promise<Home> {
 }
 
 /** Month pay for the Laun screen (earned + planned). */
-/** Laun mánaðar. offset 0 = þessi mánuður, -1 = síðasti, +1 = næsti (bara staðfestar vaktir). */
-export async function getMonthPay(me: Me, offset = 0): Promise<MonthPay> {
+/** Launatímabil fyrirtækisins (companies.pay_period, eldra pay_period_start). Almanaksmánuður ef ekkert er stillt
+ *  eða dálkana vantar. Geymt í minni per fyrirtæki meðan appið er opið. */
+const periodCache = new Map<string, PayPeriodCfg>();
+export async function getPayPeriod(me: Me): Promise<PayPeriodCfg> {
+  const hit = periodCache.get(me.companyId);
+  if (hit) return hit;
+  let cfg: PayPeriodCfg = { kind: "month", startDay: 1 };
+  try {
+    const full = await supabase.from("companies").select("pay_period_start, pay_period").eq("id", me.companyId).maybeSingle();
+    if (!full.error) {
+      const d = full.data as { pay_period_start?: number; pay_period?: unknown } | null;
+      cfg = normalizePayPeriod(d?.pay_period, Number(d?.pay_period_start) || 1);
+    } else {
+      const old = await supabase.from("companies").select("pay_period_start").eq("id", me.companyId).maybeSingle(); // fyrir 0097
+      if (!old.error) cfg = normalizePayPeriod(null, Number((old.data as { pay_period_start?: number } | null)?.pay_period_start) || 1);
+    }
+    periodCache.set(me.companyId, cfg);
+  } catch { /* netvilla → almanaksmánuður, reynt aftur næst */ }
+  return cfg;
+}
+
+/** Laun launatímabils. offset 0 = núverandi tímabil, −1 = síðasta, +1 = næsta (bara vaktir á plani). */
+export async function getMonthPay(me: Me, offset = 0, cfg?: PayPeriodCfg): Promise<MonthPay> {
   const now = new Date();
   const today = iso(now);
-  const monthFrom = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
-  const nextFrom = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1);
-  // Viðmiðunardagur innan mánaðarins (stýrir mánaðarheiti, vikum og útborgunardegi).
-  const ref = offset === 0 ? now : monthEnd;
-  // Vaktir á plani: aðeins dagar eftir daginn í dag (liðnir mánuðir fá engar).
-  const shiftFrom = offset > 0 ? iso(monthFrom) : null;
+  const period = cfg ?? (await getPayPeriod(me));
+  const range = periodAt(period, offset, today);
+  const from = localMidnight(range.from);
+  const until = localMidnight(addDaysISO(range.to, 1)); // ekki með
+  // Viðmiðunardagur innan tímabilsins (fyrir launareglur sem fara eftir degi).
+  const ref = offset === 0 ? now : localMidnight(range.to);
   const [punchesQ, shiftsQ] = await Promise.all([
     offset > 0
       ? Promise.resolve({ data: [] as { clock_in: string; clock_out: string }[] })
-      : supabase.from("punches").select("clock_in, clock_out").eq("employee_id", me.empId).gte("clock_in", monthFrom.toISOString()).lt("clock_in", nextFrom.toISOString()).not("clock_out", "is", null),
+      : supabase.from("punches").select("clock_in, clock_out").eq("employee_id", me.empId).gte("clock_in", from.toISOString()).lt("clock_in", until.toISOString()).not("clock_out", "is", null),
+    // Vaktir á plani: aðeins dagar eftir daginn í dag (liðin tímabil fá engar).
     offset < 0
       ? Promise.resolve({ data: [] as { date: string; start_time: string; end_time: string }[] })
-      : shiftFrom
-      ? supabase.from("shifts").select("date, start_time, end_time").eq("employee_id", me.empId).gte("date", shiftFrom).lte("date", iso(monthEnd))
-      : supabase.from("shifts").select("date, start_time, end_time").eq("employee_id", me.empId).gt("date", today).lte("date", iso(monthEnd)),
+      : supabase.from("shifts").select("date, start_time, end_time").eq("employee_id", me.empId).gte("date", offset > 0 ? range.from : addDaysISO(today, 1)).lte("date", range.to),
   ]);
   const punches = (punchesQ.data ?? []).map((p) => ({ clockIn: p.clock_in as string, clockOut: p.clock_out as string }));
   const future = (shiftsQ.data ?? []).map((s) => ({ date: s.date as string, start: hm(s.start_time as string), end: hm(s.end_time as string) }));
-  return monthPay(me, punches, future, ref);
+  return monthPay(me, punches, future, ref, range);
 }

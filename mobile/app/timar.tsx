@@ -10,7 +10,10 @@ import { useMe } from "../src/lib/me-context";
 import { listMyPunches, type PunchRow } from "../src/lib/api/punches";
 import { dec1, kr } from "../src/lib/format";
 import { monthPay } from "../src/lib/api/pay";
-import { MonthStepper, monthRange } from "../src/components/month-stepper";
+import { MonthStepper } from "../src/components/month-stepper";
+import { getPayPeriod } from "../src/lib/api/home";
+import { iso } from "../src/lib/api/me";
+import { addDaysISO, isCalendarMonth, localMidnight, periodAt, periodLabel, stepLimit, type PayPeriodCfg } from "../src/lib/periods";
 import { CorrectionSheet } from "../src/components/request-sheets";
 
 const DAY_L = ["Sun", "Mán", "Þri", "Mið", "Fim", "Fös", "Lau"];
@@ -38,40 +41,45 @@ export default function Timar() {
   const [refreshing, setRefreshing] = useState(false);
   const [offset, setOffset] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const [cfg, setCfg] = useState<PayPeriodCfg | null>(null);
+  useEffect(() => { if (me) getPayPeriod(me).then(setCfg); }, [me]);
+  const range = cfg ? periodAt(cfg, offset, iso(new Date())) : null;
+  const calendar = range ? isCalendarMonth(range) : true;
   const offsetRef = useRef(offset);
   offsetRef.current = offset;
   const load = useCallback(async () => {
-    if (!me) return;
+    if (!me || !cfg) return;
     const o = offset;
-    const { from, to } = monthRange(o);
+    const r0 = periodAt(cfg, o, iso(new Date()));
+    const from = localMidnight(r0.from), to = localMidnight(addDaysISO(r0.to, 1));
     // Þessi mánuður: sækja líka byrjun vikunnar ef hún er í síðasta mánuði (fyrir „Þessi vika“).
     const wk = new Date(); wk.setDate(wk.getDate() - ((wk.getDay() + 6) % 7)); wk.setHours(0, 0, 0, 0);
     const start = o === 0 && wk < from ? wk : from;
     const r = await listMyPunches(me, start.toISOString(), to.toISOString());
     if (o !== offsetRef.current) return; // notandi fletti áfram á meðan
     setRows(r); setLoaded(true);
-  }, [me, offset]);
+  }, [me, offset, cfg]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
   const changeMonth = (o: number) => { setRows([]); setLoaded(false); setOffset(o); };
 
   const now = new Date();
-  const monthFrom = monthRange(offset).from;
+  const monthFrom = range ? localMidnight(range.from) : new Date(0);
   const rows = fetched.filter((p) => new Date(p.clockIn) >= monthFrom);
   const hours = (p: PunchRow) => (p.clockOut ? (new Date(p.clockOut).getTime() - new Date(p.clockIn).getTime()) / 3600000 : 0);
   const mon = new Date(now); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7)); mon.setHours(0, 0, 0, 0);
   const weekH = fetched.filter((p) => new Date(p.clockIn) >= mon).reduce((a, p) => a + hours(p), 0);
   // Heildartölur tímabilsins: sami launaútreikningur og Laun-skjárinn (lokaðar stimplanir).
   const sum = useMemo(() => {
-    if (!me) return null;
+    if (!me || !range) return null;
     const closed = rows.filter((p) => p.clockOut).map((p) => ({ clockIn: p.clockIn, clockOut: p.clockOut as string }));
-    const ref = offset === 0 ? new Date() : new Date(monthRange(offset).to.getTime() - 86400000);
-    return monthPay(me, closed, [], ref);
-  }, [me, fetched, offset]); // eslint-disable-line react-hooks/exhaustive-deps
+    const ref = offset === 0 ? new Date() : localMidnight(range.to);
+    return monthPay(me, closed, [], ref, range);
+  }, [me, fetched, offset, cfg]); // eslint-disable-line react-hooks/exhaustive-deps
   const days = new Set(rows.filter((p) => p.clockOut).map((p) => p.clockIn.slice(0, 10))).size;
 
   return (
     <Screen title="Tímar" back refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}>
-      <MonthStepper offset={offset} onChange={changeMonth} min={-24} max={0} />
+      <MonthStepper offset={offset} onChange={changeMonth} label={range ? periodLabel(range) : "…"} calendar={calendar} min={cfg ? -stepLimit(cfg) : 0} max={0} />
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
         <Stat label={tr("Heildartímar")} value={`${dec1(sum?.earnedH ?? 0)} klst`} sub={trf("{n} vaktir · {n} dagar", sum?.shifts ?? 0, days)} />
         {offset === 0
@@ -86,7 +94,7 @@ export default function Timar() {
       </View>
       <Card style={{ paddingVertical: 8 }}>
         <View style={{ paddingVertical: 6 }}><Eyebrow>Stimplanir</Eyebrow></View>
-        {rows.length === 0 ? <Muted style={{ paddingVertical: 10 }}>{loaded ? tr("Engar stimplanir í þessum mánuði.") : "…"}</Muted> : null}
+        {rows.length === 0 ? <Muted style={{ paddingVertical: 10 }}>{loaded ? tr(calendar ? "Engar stimplanir í þessum mánuði." : "Engar stimplanir á þessu tímabili.") : "…"}</Muted> : null}
         {rows.map((p, i) => {
           const d = new Date(p.clockIn);
           return (

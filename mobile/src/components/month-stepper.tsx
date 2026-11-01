@@ -1,4 +1,4 @@
-// Mánaðarval með örvum (‹ október 2026 ›). offset 0 = þessi mánuður.
+// Tímabilsval með örvum (‹ október 2026 › eða ‹ 21. okt. – 20. nóv. ›). offset 0 = núverandi tímabil.
 import React from "react";
 import { Pressable, View } from "react-native";
 import { ChevronLeft, ChevronRight } from "lucide-react-native";
@@ -6,21 +6,14 @@ import { Txt, Muted } from "./ui";
 import { colors } from "../theme";
 import { tr } from "../lib/i18n";
 
-const MONTHS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
-
-export function monthRange(offset: number, now = new Date()) {
-  const from = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-  const to = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1); // ekki með
-  return { from, to, label: `${tr(MONTHS[from.getMonth()])} ${from.getFullYear()}` };
-}
-
-export function MonthStepper({ offset, onChange, min = -24, max = 0 }: { offset: number; onChange: (o: number) => void; min?: number; max?: number }) {
-  const { label } = monthRange(offset);
-  const sub = offset === 0 ? tr("Þessi mánuður") : offset === -1 ? tr("Síðasti mánuður") : offset === 1 ? tr("Næsti mánuður") : null;
+export function MonthStepper({ offset, onChange, label, calendar = true, min = -24, max = 0 }: { offset: number; onChange: (o: number) => void; label: string; calendar?: boolean; min?: number; max?: number }) {
+  const sub = calendar
+    ? (offset === 0 ? tr("Þessi mánuður") : offset === -1 ? tr("Síðasti mánuður") : offset === 1 ? tr("Næsti mánuður") : null)
+    : (offset === 0 ? tr("Núverandi launatímabil") : offset === -1 ? tr("Síðasta launatímabil") : offset === 1 ? tr("Næsta launatímabil") : tr("Launatímabil"));
   return (
     <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", backgroundColor: colors.panel, borderRadius: 14, borderWidth: 1, borderColor: colors.line2, paddingHorizontal: 6, paddingVertical: 6 }}>
       {offset > min ? (
-        <Pressable accessibilityLabel={tr("Fyrri mánuður")} onPress={() => onChange(offset - 1)} hitSlop={10} style={{ padding: 6 }}>
+        <Pressable accessibilityLabel={tr("Fyrra tímabil")} onPress={() => onChange(offset - 1)} hitSlop={10} style={{ padding: 6 }}>
           <ChevronLeft color={colors.ink2} size={22} />
         </Pressable>
       ) : <View style={{ width: 34 }} />}
@@ -29,7 +22,7 @@ export function MonthStepper({ offset, onChange, min = -24, max = 0 }: { offset:
         {sub ? <Muted size={11.5}>{sub}</Muted> : null}
       </Pressable>
       {offset < max ? (
-        <Pressable accessibilityLabel={tr("Næsti mánuður")} onPress={() => onChange(offset + 1)} hitSlop={10} style={{ padding: 6 }}>
+        <Pressable accessibilityLabel={tr("Næsta tímabil")} onPress={() => onChange(offset + 1)} hitSlop={10} style={{ padding: 6 }}>
           <ChevronRight color={colors.ink2} size={22} />
         </Pressable>
       ) : <View style={{ width: 34 }} />}
