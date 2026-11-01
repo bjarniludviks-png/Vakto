@@ -86,10 +86,19 @@ export default function Laun() {
 
       {pay && !ahead ? (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
-          <Tile label="Dagvinna" value={kr(pay.dayKr)} sub={`${dec1(pay.dayH)} klst`} />
+          {me?.hourly === false && !me?.contractor ? <>
+            {/* Fastlaun: launakeyrslan greiðir mánaðarlaunin óbreytt — álag og yfirvinna eru ekki greidd ofan á. */}
+            <Tile label="Föst laun" value={kr(pay.dayKr)} sub={`${dec1(pay.earnedH)} klst ${tr("unnið")}`} />
+            <Tile label="Kvöld- og helgarálag" value={`${dec1(pay.premH)} klst`} sub={tr("innifalið í föstum launum")} />
+            <Tile label="Yfirvinna" value={`${dec1(pay.otH)} klst`} sub={tr("innifalið í föstum launum")} />
+          </> : <>
+            <Tile label="Dagvinna" value={kr(pay.dayKr)} sub={`${dec1(pay.dayH)} klst`} />
+            {!me?.contractor && <>
+              <Tile label="Kvöld- og helgarálag" value={kr(pay.premKr)} sub={`${dec1(pay.premH)} klst`} />
+              <Tile label="Yfirvinna" value={kr(pay.otKr)} sub={`${dec1(pay.otH)} klst`} />
+            </>}
+          </>}
           {!me?.contractor && <>
-            <Tile label="Kvöld- og helgarálag" value={kr(pay.premKr)} sub={`${dec1(pay.premH)} klst`} />
-            <Tile label="Yfirvinna" value={kr(pay.otKr)} sub={`${dec1(pay.otH)} klst`} />
             <Tile label={`${tr("Orlof")} (${String(pay.orlofPct).replace(".", ",")}%)`} value={kr(pay.orlofKr)} sub={pay.orlofMode === "pay_out" ? tr("greitt út með launum") : pay.orlofMode === "to_bank" ? tr("lagt inn á orlofsreikning") : tr("safnast upp")} />
           </>}
         </View>

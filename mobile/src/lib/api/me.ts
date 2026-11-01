@@ -88,6 +88,12 @@ export async function getMe(): Promise<Me | null> {
 
 /* ---------- date helpers (local time, Mon-based weeks like the web) ---------- */
 
+/** Hvaða vaktir notandinn sér: starfsfólk sér aðeins BIRTAR vaktir (drög aldrei), stjórnendur líka drög.
+ *  Notað sem `.in("published", shiftVisibility(me))` í öllum vaktafyrirspurnum sem starfsmaður sér. */
+export function shiftVisibility(me: Pick<Me, "role"> | null | undefined): boolean[] {
+  return me && (me.role === "owner" || me.role === "manager") ? [true, false] : [true];
+}
+
 export function iso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
@@ -164,6 +170,7 @@ export async function getMyArea(me: Me): Promise<MyArea> {
       .from("shifts")
       .select("date, start_time, end_time")
       .eq("employee_id", me.empId)
+      .in("published", shiftVisibility(me))
       .gte("date", iso(mon))
       .lte("date", iso(in14))
       .order("date")
@@ -185,6 +192,7 @@ export async function getMyArea(me: Me): Promise<MyArea> {
       .from("shifts")
       .select("id, date, start_time, end_time")
       .eq("company_id", me.companyId)
+      .in("published", shiftVisibility(me))
       .is("employee_id", null)
       .gte("date", today)
       .order("date")

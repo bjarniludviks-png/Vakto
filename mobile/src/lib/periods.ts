@@ -94,3 +94,15 @@ export function stepLimit(cfg: PayPeriodInput): number {
   const c = normalizePayPeriod(cfg ?? 1);
   return c.kind === "weekly" ? 104 : c.kind === "biweekly" ? 52 : c.kind === "semimonth" ? 48 : 24;
 }
+
+/** Hlutfall mánaðarlauna fyrir eitt launatímabil (fastlaunafólk).
+ *  Mánaðarlegt (hvaða upphafsdagur sem er) = 1, hálfsmánaðarlegt = ½, vikulegt/tveggja vikna = dagar × 12 / 365.
+ *  ATH: launakeyrslan á vefnum greiðir í dag heil mánaðarlaun í hverri keyrslu óháð lengd tímabils —
+ *  þetta er áætlun appsins þar til það er samræmt. */
+export function monthlySalaryFactor(cfg: PayPeriodInput): number {
+  const c = normalizePayPeriod(cfg ?? 1);
+  if (c.kind === "semimonth") return 0.5;
+  if (c.kind === "weekly") return (7 * 12) / 365;
+  if (c.kind === "biweekly") return (14 * 12) / 365;
+  return 1;
+}

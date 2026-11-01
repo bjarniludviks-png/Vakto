@@ -3,9 +3,9 @@
 // skilaboðum) og launamat mánaðarins.
 import { supabase } from "../supabase";
 import { tr, trf } from "../../../src/lib/i18n";
-import { iso, type Me } from "./me";
+import { iso, shiftVisibility, type Me } from "./me";
 import { monthPay, type MonthPay } from "./pay";
-import { addDaysISO, localMidnight, normalizePayPeriod, periodAt, type PayPeriodCfg } from "../periods";
+import { addDaysISO, localMidnight, monthlySalaryFactor, normalizePayPeriod, periodAt, type PayPeriodCfg } from "../periods";
 import { getUnreadTotal } from "./chat";
 
 export type HomeShift = { id: string; date: string; start: string; end: string; dept: string | null; typeName: string | null; color: string | null };
@@ -59,11 +59,11 @@ export async function getHome(me: Me): Promise<Home> {
 
   const [mineQ, openPunchQ, todayAllQ, openQ, punchesQ, leavesQ, swapsQ, postsQ, unread] = await Promise.all([
     supabase.from("shifts").select("id, date, start_time, end_time, shift_types(name, color), employees:coworkers(departments(name, color))")
-      .eq("employee_id", me.empId).gte("date", today).lte("date", iso(in21)).order("date").order("start_time").limit(12),
+      .eq("employee_id", me.empId).in("published", shiftVisibility(me)).gte("date", today).lte("date", iso(in21)).order("date").order("start_time").limit(12),
     supabase.from("punches").select("clock_in").eq("employee_id", me.empId).is("clock_out", null).order("clock_in", { ascending: false }).limit(1),
     supabase.from("shifts").select("id, employee_id, start_time, end_time, employees:coworkers(full_name, avatar_color, photo_url, departments(name))")
-      .eq("company_id", me.companyId).eq("date", today).not("employee_id", "is", null).order("start_time"),
-    supabase.from("shifts").select("id, date, start_time, end_time, created_at").eq("company_id", me.companyId).is("employee_id", null).gte("date", today).order("date").limit(10),
+      .eq("company_id", me.companyId).in("published", shiftVisibility(me)).eq("date", today).not("employee_id", "is", null).order("start_time"),
+    supabase.from("shifts").select("id, date, start_time, end_time, created_at").eq("company_id", me.companyId).in("published", shiftVisibility(me)).is("employee_id", null).gte("date", today).order("date").limit(10),
     supabase.from("punches").select("clock_in, clock_out").eq("employee_id", me.empId).gte("clock_in", monthFrom.toISOString()).not("clock_out", "is", null),
     supabase.from("leave_requests").select("id, type, from_date, to_date, status").eq("employee_id", me.empId).neq("status", "pending").gte("from_date", iso(since14)).limit(5),
     supabase.from("shift_swaps").select("id, note, status, created_at").eq("requester_id", me.empId).neq("status", "pending").gte("created_at", since14.toISOString()).limit(5),
@@ -165,9 +165,9 @@ export async function getMonthPay(me: Me, offset = 0, cfg?: PayPeriodCfg): Promi
     // Vaktir á plani: aðeins dagar eftir daginn í dag (liðin tímabil fá engar).
     offset < 0
       ? Promise.resolve({ data: [] as { date: string; start_time: string; end_time: string }[] })
-      : supabase.from("shifts").select("date, start_time, end_time").eq("employee_id", me.empId).gte("date", offset > 0 ? range.from : addDaysISO(today, 1)).lte("date", range.to),
+      : supabase.from("shifts").select("date, start_time, end_time").eq("employee_id", me.empId).in("published", shiftVisibility(me)).gte("date", offset > 0 ? range.from : addDaysISO(today, 1)).lte("date", range.to),
   ]);
   const punches = (punchesQ.data ?? []).map((p) => ({ clockIn: p.clock_in as string, clockOut: p.clock_out as string }));
   const future = (shiftsQ.data ?? []).map((s) => ({ date: s.date as string, start: hm(s.start_time as string), end: hm(s.end_time as string) }));
-  return monthPay(me, punches, future, ref, range);
+  return monthPay(me, punches, future, ref, range, monthlySalaryFactor(period));
 }
