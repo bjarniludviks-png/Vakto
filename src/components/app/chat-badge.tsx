@@ -13,7 +13,7 @@ export const CHAT_READ_EVENT = "vakto-chat-read";
  * or vanishing never moves the label). Refreshes on mount, on every new message
  * (Realtime INSERT on `messages`, RLS-scoped), on read-cursor changes, and when
  * the tab becomes visible again. */
-export function ChatBadge() {
+export function ChatBadge({ companyId }: { companyId?: string } = {}) {
   const [total, setTotal] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -27,12 +27,19 @@ export function ChatBadge() {
     };
     refresh();
 
+    // Síað á fyrirtækið (skilaboð) og eigin lestrarstöðu — Realtime metur þá ekki atburði
+    // annarra fyrirtækja/notenda fyrir hvern tengdan glugga.
     const supabase = createClient();
-    const ch = supabase
-      .channel("chat-badge")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, refresh)
-      .on("postgres_changes", { event: "*", schema: "public", table: "channel_reads" }, refresh)
-      .subscribe();
+    let ch: ReturnType<typeof supabase.channel> | null = null;
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!alive) return;
+      const uid = data.session?.user.id;
+      ch = supabase
+        .channel("chat-badge")
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", ...(companyId ? { filter: `company_id=eq.${companyId}` } : {}) }, refresh)
+        .on("postgres_changes", { event: "*", schema: "public", table: "channel_reads", ...(uid ? { filter: `user_id=eq.${uid}` } : {}) }, refresh)
+        .subscribe();
+    });
 
     const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
     document.addEventListener("visibilitychange", onVisible);
@@ -44,9 +51,9 @@ export function ChatBadge() {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("focus", onVisible);
       window.removeEventListener(CHAT_READ_EVENT, refresh);
-      void supabase.removeChannel(ch);
+      if (ch) void supabase.removeChannel(ch);
     };
-  }, []);
+  }, [companyId]);
 
   if (total <= 0) return null;
   return <span className="ct" aria-label={`${total} ólesin skilaboð`}>{total > 99 ? "99+" : total}</span>;
