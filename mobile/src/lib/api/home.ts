@@ -126,16 +126,28 @@ export async function getHome(me: Me): Promise<Home> {
 }
 
 /** Month pay for the Laun screen (earned + planned). */
-export async function getMonthPay(me: Me): Promise<MonthPay> {
+/** Laun mánaðar. offset 0 = þessi mánuður, -1 = síðasti, +1 = næsti (bara staðfestar vaktir). */
+export async function getMonthPay(me: Me, offset = 0): Promise<MonthPay> {
   const now = new Date();
   const today = iso(now);
-  const monthFrom = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const monthFrom = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + offset + 1, 0);
+  const nextFrom = new Date(now.getFullYear(), now.getMonth() + offset + 1, 1);
+  // Viðmiðunardagur innan mánaðarins (stýrir mánaðarheiti, vikum og útborgunardegi).
+  const ref = offset === 0 ? now : monthEnd;
+  // Vaktir á plani: aðeins dagar eftir daginn í dag (liðnir mánuðir fá engar).
+  const shiftFrom = offset > 0 ? iso(monthFrom) : null;
   const [punchesQ, shiftsQ] = await Promise.all([
-    supabase.from("punches").select("clock_in, clock_out").eq("employee_id", me.empId).gte("clock_in", monthFrom.toISOString()).not("clock_out", "is", null),
-    supabase.from("shifts").select("date, start_time, end_time").eq("employee_id", me.empId).gt("date", today).lte("date", iso(monthEnd)),
+    offset > 0
+      ? Promise.resolve({ data: [] as { clock_in: string; clock_out: string }[] })
+      : supabase.from("punches").select("clock_in, clock_out").eq("employee_id", me.empId).gte("clock_in", monthFrom.toISOString()).lt("clock_in", nextFrom.toISOString()).not("clock_out", "is", null),
+    offset < 0
+      ? Promise.resolve({ data: [] as { date: string; start_time: string; end_time: string }[] })
+      : shiftFrom
+      ? supabase.from("shifts").select("date, start_time, end_time").eq("employee_id", me.empId).gte("date", shiftFrom).lte("date", iso(monthEnd))
+      : supabase.from("shifts").select("date, start_time, end_time").eq("employee_id", me.empId).gt("date", today).lte("date", iso(monthEnd)),
   ]);
   const punches = (punchesQ.data ?? []).map((p) => ({ clockIn: p.clock_in as string, clockOut: p.clock_out as string }));
   const future = (shiftsQ.data ?? []).map((s) => ({ date: s.date as string, start: hm(s.start_time as string), end: hm(s.end_time as string) }));
-  return monthPay(me, punches, future, now);
+  return monthPay(me, punches, future, ref);
 }

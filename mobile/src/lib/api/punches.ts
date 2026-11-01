@@ -71,14 +71,14 @@ export async function clockOut(me: Me, pos?: PunchPos | null): Promise<{ ok: boo
 
 export type PunchRow = { id: string; clockIn: string; clockOut: string | null; source: string };
 
-export async function listMyPunches(me: Me, fromISO: string): Promise<PunchRow[]> {
-  const { data } = await supabase
+export async function listMyPunches(me: Me, fromISO: string, toISO?: string): Promise<PunchRow[]> {
+  let q = supabase
     .from("punches")
     .select("id, clock_in, clock_out, source")
     .eq("employee_id", me.empId)
-    .gte("clock_in", fromISO)
-    .order("clock_in", { ascending: false })
-    .limit(100);
+    .gte("clock_in", fromISO);
+  if (toISO) q = q.lt("clock_in", toISO);
+  const { data } = await q.order("clock_in", { ascending: false }).limit(toISO ? 400 : 100);
   return (data ?? []).map((p) => ({
     id: p.id,
     clockIn: p.clock_in,
