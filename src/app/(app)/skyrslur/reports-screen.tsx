@@ -1,5 +1,6 @@
 "use client";
 
+import { CtlSelect } from "@/components/app/controls";
 import { useState } from "react";
 import { CustomSections, CustomizeButton } from "@/components/app/section-prefs";
 import { PageHeader } from "@/components/app/page-header";
@@ -97,11 +98,11 @@ function ReportLibrary({ from, to, departments }: { from: string; to: string; de
       <div className="ch"><div><div className="ct">{t("Skýrslusafn")}</div><div className="cs">{t("veldu fyrst síur — svo skýrsluna sem þú vilt sækja")}</div></div></div>
       <div className="cb" style={{ paddingBottom: 0 }}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          <select className="pchip" style={{ font: "inherit", fontSize: 13 }} value={dept} onChange={(e) => setDept(e.target.value)}>
+          <CtlSelect value={dept} onChange={setDept}>
             <option value="">{t("Allar deildir")}</option>
             {departments.map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
-          <input className="pchip" style={{ font: "inherit", fontSize: 13, minWidth: 170 }} value={who} onChange={(e) => setWho(e.target.value)} placeholder={t("Starfsmaður (allir)")} />
+          </CtlSelect>
+          <input className="ctl" style={{ cursor: "text", minWidth: 170 }} value={who} onChange={(e) => setWho(e.target.value)} placeholder={t("Starfsmaður (allir)")} />
         </div>
       </div>
       <div className="cb att" style={{ paddingTop: 0 }}>

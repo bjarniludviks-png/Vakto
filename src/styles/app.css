@@ -2205,3 +2205,34 @@ html.dark .mroster .sh{background:#23264a;color:#c7ccff}
 .vk-stage>button.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}.vk-stage>button.on i{background:var(--brand);color:#fff}
 .vk-payday{margin-left:auto}
 @media (max-width:900px){.vk-cstats{grid-template-columns:1fr 1fr}.vk-lines th:nth-child(4),.vk-lines td:nth-child(4){display:none}.vk-payday{margin-left:0}}
+
+/* ── Samræmdar stjórnir í síu-röðum (nóv. 2026) ─────────────────────────────
+   Ein hæð (38px), einn radíus (12px), sama letur alls staðar: deildaval, select,
+   segmented, dagsetningabil, leit og hnappar í tækjastikum. Íhlutir: components/app/controls.tsx */
+:root{--ctl-h:38px;--ctl-r:12px}
+.ctl-wrap{position:relative;display:inline-flex}
+.ctl{display:inline-flex;align-items:center;gap:8px;height:var(--ctl-h);padding:0 13px;border-radius:var(--ctl-r);border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;font-size:13px;font-weight:600;line-height:1;cursor:pointer;white-space:nowrap;transition:border-color .12s}
+.ctl:hover{border-color:var(--ink3)}
+.ctl.on{border-color:var(--brand);color:var(--brand);background:var(--brand-soft)}
+.ctl .ctl-lbl{overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.ctl-chev{width:15px;height:15px;flex-shrink:0;color:var(--ink3)}
+.ctl.on .ctl-chev{color:var(--brand)}
+.ctl-sel{position:relative;display:inline-flex}
+.ctl-sel select.ctl{appearance:none;-webkit-appearance:none;padding-right:34px}
+.ctl-sel .ctl-chev{position:absolute;right:12px;top:50%;transform:translateY(-50%);pointer-events:none}
+.ctl-menu{position:absolute!important;left:0;top:calc(100% + 6px);right:auto;min-width:230px;max-height:360px;overflow-y:auto}
+.ctl-menu .ctl-all{font-weight:700}
+.ctl-menu .ctl-opt{display:flex;align-items:center;gap:10px;cursor:pointer}
+.ctl-menu .ctl-opt input{width:16px;height:16px;margin:0;accent-color:var(--brand)}
+.ctl-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+/* Segmented: sama útlit og .db2-seg (svart „on“) og sama hæð */
+.seg,.db2-seg{display:inline-flex;align-items:center;height:var(--ctl-h);box-sizing:border-box;background:var(--panel);border:0;border-radius:var(--ctl-r);padding:3px;box-shadow:0 0 0 1px var(--line)}
+.seg button,.db2-seg button{height:100%;display:inline-flex;align-items:center;font:inherit;font-size:13px;font-weight:600;padding:0 13px;border-radius:9px;border:0;background:none;color:var(--ink2);cursor:pointer;box-shadow:none}
+.seg button.on,.db2-seg button.on{background:var(--ink);color:var(--panel);box-shadow:none}
+/* Dagsetningabil + leit í sömu hæð */
+.pp-btn{height:var(--ctl-h);padding:0 13px;border-radius:var(--ctl-r);box-sizing:border-box}
+.srchbox{height:var(--ctl-h);border-radius:var(--ctl-r);background:var(--panel)}
+/* Hnappar í síu-röðum og haus-spjalda fá sömu hæð */
+.stoolbar .btn,.db2-period .btn,.db2-ch>.btn,.db2-ch .btn.sm{height:var(--ctl-h);padding:0 14px;border-radius:var(--ctl-r);font-size:13px;box-sizing:border-box}
+@media(max-width:760px){.stoolbar .ctl-wrap,.stoolbar .ctl-sel,.stoolbar .ctl-wrap>.ctl,.stoolbar .ctl-sel>.ctl{width:100%}.stoolbar .ctl-wrap>.ctl{justify-content:space-between}}
+.emp-search input{height:var(--ctl-h);border-radius:var(--ctl-r);padding-top:0;padding-bottom:0;box-sizing:border-box}
