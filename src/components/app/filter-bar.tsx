@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { CtlSelect, DeptPicker } from "./controls";
 import { useLang } from "./lang";
 import { PeriodPicker, presetRange, type PresetKey } from "./period-picker";
 
@@ -36,39 +37,7 @@ export type Period = "Dagur" | "Vika" | "Mánuður" | "Ársfj." | "Ár" | "Sérs
 
 export type SelectFilter = { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] };
 /** Fjölval (t.d. deildir): tómt = allt. */
-export type MultiFilter = { values: string[]; onChange: (v: string[]) => void; options: string[]; allLabel: string; unit: string };
-
-function MultiSelect({ f }: { f: MultiFilter }) {
-  const { t } = useLang();
-  const [open, setOpen] = useState(false);
-  const vs = f.values;
-  return (
-    <div style={{ position: "relative" }}>
-      <button type="button" className="badge" aria-expanded={open} onClick={() => setOpen((v) => !v)}
-        style={{ border: "1px solid var(--line)", padding: "7px 11px", cursor: "pointer", background: vs.length ? "var(--brand-soft)" : undefined, color: vs.length ? "var(--brand)" : undefined }}>
-        {vs.length === 0 ? t(f.allLabel) : vs.length <= 2 ? vs.map((v) => t(v)).join(" + ") : `${vs.length} ${t(f.unit)}`} ▾
-      </button>
-      {open && (
-        <>
-          <div style={{ position: "fixed", inset: 0, zIndex: 55 }} onClick={() => setOpen(false)} />
-          <div className="tmenu show" style={{ position: "absolute", left: 0, top: "calc(100% + 6px)", right: "auto", minWidth: 220, maxHeight: 360, overflowY: "auto" }}>
-            <div className="mi" onClick={() => { f.onChange([]); setOpen(false); }} style={{ fontWeight: vs.length === 0 ? 700 : undefined }}>{t(f.allLabel)}</div>
-            <div className="sep" />
-            {f.options.map((o) => {
-              const on = vs.includes(o);
-              return (
-                <label className="mi" key={o} style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer" }}>
-                  <input type="checkbox" checked={on} onChange={() => f.onChange(on ? vs.filter((x) => x !== o) : [...vs, o])} style={{ width: 15, height: 15, accentColor: "var(--brand)" }} />
-                  {t(o)}
-                </label>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
+export type MultiFilter = { values: string[]; onChange: (v: string[]) => void; options: string[]; allLabel: string; unit: string; colors?: Record<string, string> };
 
 /** Shared toolbar: period segments (+ custom range), search, dept/location
  * filters, and an optional comparison selector. Fully controlled. */
@@ -145,17 +114,17 @@ export function FilterBar({
           </div>
         )}
         {filters.map((flt, i) => (
-          <select key={i} className="badge" style={{ border: "1px solid var(--line)", padding: "7px 11px" }} value={flt.value} onChange={(e) => flt.onChange(e.target.value)}>
+          <CtlSelect key={i} value={flt.value} onChange={flt.onChange}>
             {flt.options.map((o) => <option key={o.value} value={o.value}>{t(o.label)}</option>)}
-          </select>
+          </CtlSelect>
         ))}
-        {multi && multi.options.length > 0 && <MultiSelect f={multi} />}
+        {multi && multi.options.length > 0 && <DeptPicker values={multi.values} onChange={multi.onChange} options={multi.options} allLabel={multi.allLabel} unit={multi.unit} colors={multi.colors} />}
         {compare !== undefined && onCompare && (
-          <select className="badge" style={{ border: "1px solid var(--line)", padding: "7px 11px" }} value={compare} onChange={(e) => onCompare(e.target.value)} title={t("Bera saman við")}>
+          <CtlSelect value={compare} onChange={onCompare} title={t("Bera saman við")}>
             <option value="none">{t("Enginn samanburður")}</option>
             <option value="prev">{t("Fyrra tímabil")}</option>
             <option value="year">{t("Sama tímabil í fyrra")}</option>
-          </select>
+          </CtlSelect>
         )}
         <div className="sp" style={{ flex: 1 }} />
         {rangeLabel && <span className="badge" style={{ background: "var(--brand-soft)", color: "var(--brand)" }}>{rangeLabel}</span>}

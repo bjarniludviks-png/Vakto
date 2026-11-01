@@ -1,5 +1,6 @@
 "use client";
 
+import { CtlSelect } from "@/components/app/controls";
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { PeriodPicker } from "@/components/app/period-picker";
@@ -316,9 +317,9 @@ export default function PayrollScreen({ view, empty = false, periodStart = 1, no
       <div className="db2-grid2">
         <section className="db2-card">
           <div className="db2-ch"><div><div className="db2-ct">{t("Launakeyrslur — yfirlit")}</div><div className="db2-cs">{t("sundurliðun eftir mánuðum · færðu músina yfir súlu")}</div></div>
-            <select className="badge" style={{ border: "1px solid var(--line)", padding: "5px 10px" }} value={histYear} onChange={(e) => setHistYear(Number(e.target.value))}>
+            <CtlSelect value={String(histYear)} onChange={(v) => setHistYear(Number(v))}>
               {[new Date().getFullYear(), new Date().getFullYear() - 1].map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
+            </CtlSelect>
           </div>
           <div className="db2-pad">
             {(() => {

@@ -1,5 +1,6 @@
 "use client";
 
+import { CtlSelect } from "@/components/app/controls";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { IssuesPanel } from "./issues-panel";
@@ -87,7 +88,7 @@ export default function AttendanceScreen({ onShift = 5, empty = false, live = fa
         <div className="wk"><button onClick={() => setWk((w) => w - 1)}>‹</button><span className="lbl">{lbl}</span><button onClick={() => setWk((w) => w + 1)}>›</button></div>
         <div className="seg"><button>{t("Dagur")}</button><button className="on">{t("Vika")}</button><button>{t("Mánuður")}</button></div>
         <div className="srchbox"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.4-3.4" /></svg><input placeholder={t("Leita að starfsmanni")} /></div>
-        <select className="badge" style={{ border: "1px solid var(--line)", padding: "7px 11px" }}><option>{t("Allar deildir")}</option><option>Eldhús</option><option>Sal</option><option>Stjórnun</option></select>
+        <CtlSelect><option>{t("Allar deildir")}</option><option>Eldhús</option><option>Sal</option><option>Stjórnun</option></CtlSelect>
         <div className="sp" style={{ flex: 1 }} />
         <button className="btn ghost sm" onClick={() => toast("Tímaskráning sótt í CSV")}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Sækja CSV")}</button>
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { CtlSelect, DeptPicker } from "@/components/app/controls";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Autocomplete } from "@/components/app/autocomplete";
@@ -95,7 +96,7 @@ export default function EmployeesScreen({
     router.refresh();
   }
   const [search, setSearch] = useState("");
-  const [deptF, setDeptF] = useState("all");
+  const [deptF, setDeptF] = useState<string[]>([]);
   const [leftF, setLeftF] = useState(false); // sía: „Hættir“ (starfslok skráð)
   const importRef = useRef<HTMLInputElement>(null);
 
@@ -169,7 +170,7 @@ export default function EmployeesScreen({
   const q = search.trim().toLowerCase();
   const list = employees.filter((e) =>
     (leftF ? !!leaving[e.id] : showInactive || e.status !== "inactive") &&
-    (deptF === "all" || e.department === deptF) &&
+    (deptF.length === 0 || deptF.includes(e.department ?? "")) &&
     (!q || e.fullName.toLowerCase().includes(q) || (e.title ?? "").toLowerCase().includes(q)));
   const avBg = (e: Employee) => e.avatarColor;
   const roleTag = (e: Employee) =>
@@ -254,16 +255,13 @@ export default function EmployeesScreen({
               <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t("Leita að starfsmanni…")} />
             </div>
             {employees.some((e) => leaving[e.id]) && (
-              <select className="emp-sel" aria-label={t("Staða")} value={leftF ? "left" : "all"} onChange={(e) => setLeftF(e.target.value === "left")}>
+              <CtlSelect aria-label={t("Staða")} value={leftF ? "left" : "all"} onChange={(v) => setLeftF(v === "left")}>
                 <option value="all">{t("Allt starfsfólk")}</option>
                 <option value="left">{t("Hættir")} ({employees.filter((e) => leaving[e.id]).length})</option>
-              </select>
+              </CtlSelect>
             )}
             {depts.length > 1 && (
-              <select className="emp-sel" value={deptF} onChange={(e) => setDeptF(e.target.value)}>
-                <option value="all">{t("Allar deildir")}</option>
-                {depts.map((d) => <option key={d} value={d}>{t(d)}</option>)}
-              </select>
+              <DeptPicker values={deptF} onChange={setDeptF} options={depts} />
             )}
           </div>
         </div>
@@ -300,7 +298,7 @@ export default function EmployeesScreen({
                     </td>
                   </tr>
                 );
-              }) : <tr><td colSpan={7} className="db2-muted" style={{ textAlign: "center", padding: 24 }}>{q || deptF !== "all" ? t("Enginn starfsmaður passar við leitina.") : t("Engir starfsmenn skráðir enn.")}</td></tr>}
+              }) : <tr><td colSpan={7} className="db2-muted" style={{ textAlign: "center", padding: 24 }}>{q || deptF.length ? t("Enginn starfsmaður passar við leitina.") : t("Engir starfsmenn skráðir enn.")}</td></tr>}
             </tbody>
           </table>
           {inactiveN > 0 && (

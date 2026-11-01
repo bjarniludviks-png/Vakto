@@ -7,6 +7,7 @@ import { nf, dec1, krCompact } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
 import { publishSchedule, updateLeaveRequest, approveShiftSwap, rejectShiftSwap, saveShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, getWeekBudget, type ShiftInput } from "./actions";
 import { getCompanyDepartments, getDepartmentColors } from "../starfsfolk/actions";
+import { DeptPicker } from "@/components/app/controls";
 import { getDashboardPeriod } from "../maelabord/actions";
 import { buildSchedulePdf, type PdfShift } from "./pdf";
 import type { ReqItem } from "./requests.server";
@@ -112,7 +113,6 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   // A manager scoped to a single department lands on it; otherwise "all" (within scope).
   // Valdar deildir (tómt = allar innan umsjónar). Hægt að velja fleiri en eina, t.d. Eldhús + Sal.
   const [depts, setDepts] = useState<string[]>(scopeDepts.length === 1 ? [scopeDepts[0]] : []);
-  const [deptMenu, setDeptMenu] = useState(false);
   const [monthMode, setMonthMode] = useState<"tafla" | "dagatal">("tafla");
   const [full, setFull] = useState(false);
   type MonthShift = { emp: string; date: string; start: string; end: string };
@@ -884,32 +884,14 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
             <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{t(v)}</button>
           ))}
         </div>
-        <div style={{ position: "relative" }}>
-          <button type="button" className="badge" style={{ border: "1px solid var(--line)", padding: "7px 11px", cursor: "pointer", background: depts.length ? "var(--brand-soft)" : undefined, color: depts.length ? "var(--brand)" : undefined }} onClick={() => setDeptMenu((v) => !v)} aria-expanded={deptMenu}>
-            {depts.length === 0 ? (scopeDepts.length ? t("Allar mínar deildir") : t("Allar deildir")) : depts.length <= 2 ? depts.join(" + ") : `${depts.length} ${t("deildir")}`} ▾
-          </button>
-          {deptMenu && (
-            <>
-              <div style={{ position: "fixed", inset: 0, zIndex: 55 }} onClick={() => setDeptMenu(false)} />
-              <div className="tmenu show" style={{ position: "absolute", left: 0, top: "calc(100% + 6px)", right: "auto", minWidth: 220, maxHeight: 360, overflowY: "auto" }}>
-                <div className="mi" onClick={() => { setDepts([]); setDeptMenu(false); }} style={{ fontWeight: depts.length === 0 ? 700 : undefined }}>
-                  {scopeDepts.length ? t("Allar mínar deildir") : t("Allar deildir")}
-                </div>
-                <div className="sep" />
-                {(scopeDepts.length ? scopeDepts : deptList).map((d) => {
-                  const on = depts.includes(d);
-                  return (
-                    <label className="mi" key={d} style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer" }}>
-                      <input type="checkbox" checked={on} onChange={() => setDepts((xs) => (on ? xs.filter((x) => x !== d) : [...xs, d]))} style={{ width: 15, height: 15, accentColor: "var(--brand)" }} />
-                      {deptColors[d] && <i style={{ width: 9, height: 9, borderRadius: 3, background: deptColors[d] }} />}
-                      {d}
-                    </label>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
+        <DeptPicker
+          values={depts}
+          onChange={setDepts}
+          options={scopeDepts.length ? scopeDepts : deptList}
+          allLabel={scopeDepts.length ? "Allar mínar deildir" : "Allar deildir"}
+          colors={deptColors}
+          translate={false}
+        />
         {view === "Mánuður" && liveCompany && (
           <div className="seg">
             <button className={monthMode === "tafla" ? "on" : ""} onClick={() => setMonthMode("tafla")}>{t("Tafla")}</button>

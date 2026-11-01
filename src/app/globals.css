@@ -225,7 +225,7 @@ html.dark {
 
 /* Surfaces that hardcode white in app.css — re-tint for dark. */
 html.dark .dhero { background: linear-gradient(105deg, var(--panel) 55%, #2a1b0f 100%); }
-html.dark .seg { background: var(--line2); }
+html.dark .seg { background: var(--panel); }
 /* !important so inline background:#fff on fields (FLD, date pickers, …) can't
    punch a white hole in dark mode. */
 html.dark input, html.dark select, html.dark textarea {
