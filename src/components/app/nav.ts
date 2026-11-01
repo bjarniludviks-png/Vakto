@@ -65,6 +65,8 @@ export function visibleFor(role: Role, perms?: unknown, solo = false) {
   const access = role === "manager" ? resolveAccess(role, perms) : null;
   const shows = (i: NavItem) => {
     if (solo) return SOLO_SLUGS.has(i.slug) && i.roles.includes(role);
+    // „Verk“ er verktakavirkni — birtist bara í verktakaham (eða hjá verktaka-hlutverki).
+    if (i.slug === "jobs" && role !== "contractor") return false;
     const area = access ? areaOf(i.href) : null;
     return access && area ? access[area] : i.roles.includes(role);
   };
