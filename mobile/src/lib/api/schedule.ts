@@ -1,7 +1,7 @@
 // Week schedule for the Vaktir tab — mine / everyone / open, Sling-style.
 // Employees can read all company shifts + employee names (RLS company-wide).
 import { supabase } from "../supabase";
-import { iso, mondayOf, type Me } from "./me";
+import { iso, mondayOf, shiftVisibility, type Me } from "./me";
 import { trf } from "../../../src/lib/i18n";
 
 export type SchedShift = {
@@ -43,6 +43,7 @@ export async function getWeekShifts(me: Me, weekStart: Date): Promise<SchedShift
       "id, date, start_time, end_time, employee_id, employees:coworkers(full_name, avatar_color, departments(name, color)), shift_types(name, color)"
     )
     .eq("company_id", me.companyId)
+    .in("published", shiftVisibility(me))
     .gte("date", from)
     .lte("date", to)
     .order("date")

@@ -13,7 +13,7 @@ import { monthPay } from "../src/lib/api/pay";
 import { MonthStepper } from "../src/components/month-stepper";
 import { getPayPeriod } from "../src/lib/api/home";
 import { iso } from "../src/lib/api/me";
-import { addDaysISO, isCalendarMonth, localMidnight, periodAt, periodLabel, stepLimit, type PayPeriodCfg } from "../src/lib/periods";
+import { addDaysISO, isCalendarMonth, localMidnight, monthlySalaryFactor, periodAt, periodLabel, stepLimit, type PayPeriodCfg } from "../src/lib/periods";
 import { CorrectionSheet } from "../src/components/request-sheets";
 
 const DAY_L = ["Sun", "Mán", "Þri", "Mið", "Fim", "Fös", "Lau"];
@@ -73,7 +73,7 @@ export default function Timar() {
     if (!me || !range) return null;
     const closed = rows.filter((p) => p.clockOut).map((p) => ({ clockIn: p.clockIn, clockOut: p.clockOut as string }));
     const ref = offset === 0 ? new Date() : localMidnight(range.to);
-    return monthPay(me, closed, [], ref, range);
+    return monthPay(me, closed, [], ref, range, cfg ? monthlySalaryFactor(cfg) : 1);
   }, [me, fetched, offset, cfg]); // eslint-disable-line react-hooks/exhaustive-deps
   const days = new Set(rows.filter((p) => p.clockOut).map((p) => p.clockIn.slice(0, 10))).size;
 

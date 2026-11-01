@@ -57,21 +57,27 @@ export function monthPay(
   futureShifts: { date: string; start: string | null; end: string | null }[],
   now = new Date(),
   /** Launatímabil (frá–til, báðir dagar með). Án þess: almanaksmánuður `now`. */
-  range?: PeriodRange
+  range?: PeriodRange,
+  /** Hlutfall mánaðarlauna sem tímabilið ber (fastlaunafólk). 1 = mánaðarlegt tímabil; sjá `monthlySalaryFactor`. */
+  salaryFactor = 1
 ): MonthPay {
   const rate = me.rate;
+  // Fastlaun tímabilsins. Launakeyrslan (computeFromPunches) greiðir fastlaunafólki mánaðarlaunin óbreytt:
+  // ekkert álag og engin yfirvinna ofan á — tímarnir eru innifaldir.
+  const salary = me.hourly ? 0 : Math.round(rate * salaryFactor);
   const earnedCls = classifyPay(rate, me.hourly, punches, me.rules);
-  const emp = { id: me.empId, fullName: me.fullName, payType: (me.hourly ? "hourly" : "monthly") as "hourly" | "monthly", rate, employmentRatio: me.ratio, pay: me.pay, orlof: me.orlof, benefits: me.benefits };
+  const emp = { id: me.empId, fullName: me.fullName, payType: (me.hourly ? "hourly" : "monthly") as "hourly" | "monthly", rate: me.hourly ? rate : salary, employmentRatio: me.ratio, pay: me.pay, orlof: me.orlof, benefits: me.benefits };
   // Unnið hingað til = launin sjálf (dagvinna + álag + yfirvinna), án orlofs og hlunninda.
-  const earnedKr = me.hourly ? Math.round(earnedCls.total * rate + (earnedCls.premiumPay + earnedCls.overtimePay) / (1 + BURDEN)) : Math.round(rate);
+  const earnedKr = me.hourly ? Math.round(earnedCls.total * rate + (earnedCls.premiumPay + earnedCls.overtimePay) / (1 + BURDEN)) : salary;
 
   const planned = futureShifts.filter((s) => s.start && s.end).map((s) => shiftPunch(s.date, s.start!, s.end!));
   const plannedCls = classifyPay(rate, me.hourly, planned, me.rules);
   const plannedKr = me.hourly ? Math.round(plannedCls.total * rate + (plannedCls.premiumPay + plannedCls.overtimePay) / (1 + BURDEN)) : 0;
 
   const dayH = Math.max(0, earnedCls.total - earnedCls.premium - earnedCls.overtime);
-  const premKr = Math.round(earnedCls.premium * rate + earnedCls.premiumPay / (1 + BURDEN));
-  const otKr = Math.round(earnedCls.overtime * rate + earnedCls.overtimePay / (1 + BURDEN));
+  // Fastlaunafólk: taxtinn er mánaðarlaun, ekki tímakaup — klst × taxti væri rugl. Allt fellur undir fastlaunin.
+  const premKr = me.hourly ? Math.round(earnedCls.premium * rate + earnedCls.premiumPay / (1 + BURDEN)) : 0;
+  const otKr = me.hourly ? Math.round(earnedCls.overtime * rate + earnedCls.overtimePay / (1 + BURDEN)) : 0;
 
   // vikur tímabilsins
   const y = now.getFullYear(), m = now.getMonth();
@@ -97,7 +103,7 @@ export function monthPay(
   return {
     orlofMode: o.mode, orlofPct: o.pct, slip,
     earnedKr, earnedH: earnedCls.total, plannedKr, plannedH: plannedCls.total, projectedKr: earnedKr + plannedKr,
-    dayKr: Math.round(dayH * rate), dayH, premKr, premH: earnedCls.premium, otKr, otH: earnedCls.overtime,
+    dayKr: me.hourly ? Math.round(dayH * rate) : salary, dayH, premKr, premH: earnedCls.premium, otKr, otH: earnedCls.overtime,
     // Fastlaunafólk fær ekki orlof ofan á laun (heldur launum í orlofi) — aðeins af yfirvinnu.
     orlofKr: me.contractor ? 0 : Math.round((me.hourly ? earnedKr : otKr) * o.pct / 100), shifts: punches.length,
     weeks, monthLabel: range ? periodLabel(range) : `${tr(MONTHS[m])} ${y}`, payday: `${payday.getDate()}. ${tr(MONTHS[payday.getMonth()])}`,

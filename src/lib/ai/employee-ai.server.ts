@@ -34,7 +34,7 @@ export const EMPLOYEE_TOOLS: Anthropic.Tool[] = [
 export const EMPLOYEE_WRITE = new Set(["request_swap"]);
 
 async function myShift(supabase: Db, me: EmpCtx, shiftId: string) {
-  const { data } = await supabase.from("shifts").select("id, date, start_time, end_time, employee_id").eq("id", shiftId).maybeSingle();
+  const { data } = await supabase.from("shifts").select("id, date, start_time, end_time, employee_id").eq("id", shiftId).eq("published", true).maybeSingle();
   return data && data.employee_id === me.employeeId ? { id: data.id as string, date: data.date as string, start: String(data.start_time).slice(0, 5), end: String(data.end_time).slice(0, 5) } : null;
 }
 
@@ -43,7 +43,7 @@ export async function runEmployeeRead(name: string, input: In, me: EmpCtx): Prom
   try {
     if (name === "my_shifts") {
       if (!okDate(input.from) || !okDate(input.to)) return JSON.stringify({ error: "from/to YYYY-MM-DD" });
-      const { data } = await supabase.from("shifts").select("id, date, start_time, end_time, shift_types(name)").eq("employee_id", me.employeeId).gte("date", str(input.from)).lte("date", str(input.to)).order("date");
+      const { data } = await supabase.from("shifts").select("id, date, start_time, end_time, shift_types(name)").eq("employee_id", me.employeeId).eq("published", true).gte("date", str(input.from)).lte("date", str(input.to)).order("date"); // drög aldrei
       return JSON.stringify((data ?? []).map((s) => ({ id: s.id, date: s.date, time: `${String(s.start_time).slice(0, 5)}–${String(s.end_time).slice(0, 5)}`, type: ((Array.isArray(s.shift_types) ? s.shift_types[0] : s.shift_types) as { name?: string } | null)?.name ?? null })));
     }
     if (name === "my_hours") {
