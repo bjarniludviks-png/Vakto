@@ -2282,6 +2282,7 @@ export const DICT: Dict = {
   "Staðarrás": { is: "Staðarrás", en: "Location channel", vi: "Kênh địa điểm", pl: "Kanał lokalizacji" },
   "Einhver": { is: "Einhver", en: "Someone", vi: "Ai đó", pl: "Ktoś" },
   "Séð": { is: "Séð", en: "Seen", vi: "Đã xem", pl: "Wyświetlono" },
+  "Séð af": { is: "Séð af", en: "Seen by", vi: "Đã xem bởi", pl: "Wyświetlone przez" },
   "er að skrifa…": { is: "er að skrifa…", en: "is typing…", vi: "đang nhập…", pl: "pisze…" },
   "eru að skrifa…": { is: "eru að skrifa…", en: "are typing…", vi: "đang nhập…", pl: "piszą…" },
   "ólesin": { is: "ólesin", en: "unread", vi: "chưa đọc", pl: "nieprzeczytane" },

@@ -365,11 +365,12 @@ export function subscribeChat(onMessage: (row: { id: string; channel_id: string;
     .subscribe();
 }
 
-/** Typing indicator (broadcast only). */
-export function typingChannel(channelId: string, onTyping: (p: { userId: string; name: string; stop?: boolean }) => void): RealtimeChannel {
+/** Typing indicator (broadcast only). `userId` = auth-notandi; mynd/litur fylgja svo „•••“ sýni hver skrifar. */
+export type TypingPayload = { userId: string; name: string; photo?: string | null; color?: string | null; stop?: boolean };
+export function typingChannel(channelId: string, onTyping: (p: TypingPayload) => void): RealtimeChannel {
   return supabase
     .channel(`typing:${channelId}`, { config: { broadcast: { self: false } } })
-    .on("broadcast", { event: "typing" }, (m) => onTyping(m.payload as { userId: string; name: string; stop?: boolean }))
+    .on("broadcast", { event: "typing" }, (m) => onTyping(m.payload as TypingPayload))
     .subscribe();
 }
 

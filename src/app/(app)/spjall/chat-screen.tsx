@@ -86,6 +86,38 @@ function ImageViewer({ url, onClose }: { url: string; onClose: () => void }) {
   );
 }
 
+/** „Séð af“: hverjir hafa séð síðustu skilaboðin mín og hvenær (ýtt á „Séð“ undir þeim). */
+function SeenModal({ reads, msgs, onClose }: { reads: ChannelRead[]; msgs: ChatMessage[]; onClose: () => void }) {
+  const { t } = useLang();
+  const rows = [...reads].sort((a, b) => b.lastReadAt.localeCompare(a.lastReadAt));
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal rwho" role="dialog" aria-label={t("Séð af")}>
+        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Séð af")}</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="rwho-list">
+          {rows.map((r) => {
+            const known = msgs.find((m) => m.senderId === r.userId);
+            const d = new Date(r.lastReadAt);
+            const today = d.toDateString() === new Date().toDateString();
+            return (
+              <button key={r.userId} disabled>
+                {known?.photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="avt-img" src={known.photo} alt="" style={{ width: 40, height: 40 }} />
+                ) : (
+                  <span className="avt" style={{ background: known?.color ?? "var(--brand-soft)", color: known?.color ? "#fff" : "var(--brand)", width: 40, height: 40, fontSize: 14, fontWeight: 700 }}>{r.name.slice(0, 2).toUpperCase()}</span>
+                )}
+                <span className="rwho-n"><b>{r.name}</b><small>{t("Séð")} {today ? "" : `${d.getDate()}.${d.getMonth() + 1}. `}{hhmm(r.lastReadAt)}</small></span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** „Viðbrögð“: allir sem brugðust við skilaboðum, eftir emoji (eins og í Messenger). Ýtt á eigin línu fjarlægir. */
 function ReactionsModal({ m, onClose, onRemove }: { m: ChatMessage; onClose: () => void; onRemove: () => void }) {
   const { t } = useLang();
@@ -180,7 +212,7 @@ const TYPING_SEND_EVERY = 2000; // throttle: at most one "typing" broadcast per 
 const TYPING_IDLE_STOP = 3000;  // "stop" after 3 s without a keystroke
 const TYPING_EXPIRE = 4500;     // drop a typer we have not heard from in 4.5 s
 
-type Typer = { name: string; at: number };
+type Typer = { name: string; at: number; photo?: string | null; color?: string | null };
 
 function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; embedded?: boolean; ai: AiAccess }) {
   const { t, lang } = useLang();
@@ -261,6 +293,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const [sheetFor, setSheetFor] = useState<ChatMessage | null>(null);
   // „Viðbrögð“: hverjir settu hvaða emoji (ýtt á emoji-merkið undir skilaboðum)
   const [whoFor, setWhoFor] = useState<ChatMessage | null>(null);
+  const [seenOpen, setSeenOpen] = useState(false);
   const pressRef = useRef<{ t: ReturnType<typeof setTimeout> | null; x: number; y: number; fired?: boolean }>({ t: null, x: 0, y: 0 });
   const [viewer, setViewer] = useState<string | null>(null);
   const camRef = useRef<HTMLInputElement | null>(null);
@@ -565,11 +598,11 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     const supabase = sb();
     const ch = supabase.channel(`typing:${id}`, { config: { broadcast: { self: false } } });
     ch.on("broadcast", { event: "typing" }, ({ payload }) => {
-      const p = payload as { userId?: string; name?: string; stop?: boolean };
+      const p = payload as { userId?: string; name?: string; photo?: string | null; color?: string | null; stop?: boolean };
       if (!p.userId || p.userId === initial.meId) return;
       setTypers((tp) => {
         const next = { ...tp };
-        if (p.stop) delete next[p.userId!]; else next[p.userId!] = { name: p.name || t("Einhver"), at: Date.now() };
+        if (p.stop) delete next[p.userId!]; else next[p.userId!] = { name: p.name || t("Einhver"), at: Date.now(), photo: p.photo, color: p.color };
         return next;
       });
     }).subscribe();
@@ -1034,7 +1067,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                     </div>
                   </div>
                   {mi === lastMineIdx && seenText && (
-                    <div className="m-seen" style={{ marginTop: m.reactions.length ? 6 : 0 }}>{seenText}</div>
+                    <button type="button" className="m-seen" onClick={() => setSeenOpen(true)} title={t("Séð af")} style={{ marginTop: m.reactions.length ? 6 : 0 }}>{seenText}</button>
                   )}
                   </React.Fragment>
                   );
@@ -1050,10 +1083,32 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                     <i className="sk-line" style={{ width: "42%" }} /><i className="sk-line me" style={{ width: "34%" }} /><i className="sk-line" style={{ width: "55%" }} />
                   </div>
                 )}
+                {/* hver skrifar: prófílmynd + „•••“, eins og í Messenger */}
+                {Object.entries(typers).map(([uid, ty]) => {
+                  const known = msgs.find((m) => m.senderId === uid);
+                  const photo = ty.photo ?? known?.photo ?? null;
+                  const color = ty.color ?? known?.color;
+                  const sz = phone ? 28 : 30;
+                  return (
+                    <div key={uid} className="mrow them g-first g-last typing-row" title={`${ty.name} ${t("er að skrifa…")}`}>
+                      <span className="m-ava">
+                        {photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img className="avt-img" src={photo} alt="" style={{ width: sz, height: sz }} />
+                        ) : (
+                          <span className="avt" style={{ background: color ?? "var(--brand-soft)", color: color ? "#fff" : "var(--brand)", width: sz, height: sz, fontSize: phone ? 10.5 : 11, fontWeight: 700 }}>
+                            {ty.name.slice(0, 2).toUpperCase()}
+                          </span>
+                        )}
+                      </span>
+                      <div className="mbub them typing-dots" aria-hidden="true"><i /><i /><i /></div>
+                    </div>
+                  );
+                })}
                 <div ref={endRef} />
               </div>
-              {/* typing indicator — fixed height so the composer never jumps */}
-              <div className="msgr-typing" aria-live="polite">{typingText}</div>
+              {/* skjálesarar: texti; sjónrænt sést bólan með myndinni í þræðinum */}
+              <div className="sr-only" aria-live="polite">{typingText}</div>
               {editing && (
                 <div className="replybar">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></svg>
@@ -1144,6 +1199,8 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
             </aside>
           </>
         )}
+
+        {seenOpen && seenBy.length > 0 && <SeenModal reads={seenBy} msgs={msgs} onClose={() => setSeenOpen(false)} />}
 
         {whoFor && (() => {
           // nýjasta útgáfa skilaboðanna (viðbrögð geta breyst meðan glugginn er opinn)
