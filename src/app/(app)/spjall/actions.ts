@@ -862,3 +862,28 @@ export async function addPostComment(postId: string, body: string, parentId?: st
     return { ok: false, error: userError(e, "Villa") };
   }
 }
+
+/** Sjálfvirk þýðing spjalls (0103): 'on' | 'off' | null (null = kveikt ef viðmótið er ekki á íslensku). */
+export async function getChatTranslate(): Promise<"on" | "off" | null> {
+  if (!isSupabaseConfigured()) return null;
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data, error } = await supabase.from("users").select("chat_translate").eq("id", user.id).maybeSingle();
+    if (error) return null; // fyrir 0103
+    return data?.chat_translate === "on" || data?.chat_translate === "off" ? data.chat_translate : null;
+  } catch { return null; }
+}
+
+export async function setChatTranslate(v: "on" | "off"): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
+    const { error } = await supabase.from("users").update({ chat_translate: v }).eq("id", user.id);
+    return error ? { ok: false, error: userError(error) } : { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e) };
+  }
+}

@@ -16,7 +16,7 @@ import {
 import {
   listConversations, listMessages, sendChatMessage, createGroup, startDM, searchPeople,
   listMembers, addMembers, removeMember, leaveChannel, uploadChatMedia,
-  renameChannel, setChannelPhoto, setMessageReaction, deleteMessage, editMessage, listTeamPicks,
+  renameChannel, setChannelPhoto, setMessageReaction, deleteMessage, editMessage, listTeamPicks, getChatTranslate, setChatTranslate,
   markChannelRead, listChannelReads, listChatMedia, searchChannelMessages,
   type Conversation, type ChatMessage, type Person, type Members, type TeamPick, type ChannelRead, type ChatMedia, type ChatHit,
 } from "./actions";
@@ -216,6 +216,33 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   // Þýðingar á tungumál notandans: id → texti (null = í vinnslu); orig = sýna frumtexta aftur.
   const [trans, setTrans] = useState<Record<string, string | null>>({});
   const [orig, setOrig] = useState<Record<string, boolean>>({});
+  // Sjálfvirk þýðing (0103): skilaboð frá öðrum á öðru máli birtast þýdd. null = sjálfgefið (kveikt ef ekki íslenska).
+  const [autoPref, setAutoPref] = useState<"on" | "off" | null>(null);
+  const autoOn = autoPref === "on" || (autoPref === null && lang !== "is");
+  const autoAsked = useRef(new Set<string>());
+  useEffect(() => { void getChatTranslate().then(setAutoPref); }, []);
+  useEffect(() => { autoAsked.current = new Set(); }, [lang]);
+  useEffect(() => {
+    if (!autoOn) return;
+    const ids = msgs.filter((m) => !m.me && m.kind === "text" && m.body && !m.id.startsWith("tmp-") && !(m.id in trans) && !autoAsked.current.has(m.id)).map((m) => m.id).slice(-40);
+    if (!ids.length) return;
+    ids.forEach((id) => autoAsked.current.add(id));
+    void fetch("/api/chat/translate-batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids, lang }) })
+      .then((x) => x.json() as Promise<{ translations?: Record<string, string | null> }>)
+      .then((r) => {
+        const got = Object.entries(r.translations ?? {}).filter((e): e is [string, string] => typeof e[1] === "string");
+        if (got.length) setTrans((x) => ({ ...x, ...Object.fromEntries(got) }));
+      })
+      .catch(() => {});
+  }, [msgs, autoOn, lang, trans]);
+  async function toggleAuto() {
+    const next = autoOn ? "off" : "on";
+    setAutoPref(next);
+    const r = await setChatTranslate(next);
+    if (!r.ok) toast(r.error ?? t("Tókst ekki"));
+    else toast(next === "on" ? t("Sjálfvirk þýðing: kveikt") : t("Sjálfvirk þýðing: slökkt"));
+    if (next === "off") { setTrans({}); setOrig({}); }
+  }
   const [reactFor, setReactFor] = useState<string | null>(null);
   // VAKTO AI as a pinned conversation (thread column uses the shared assistant UI).
   const [aiOpen, setAiOpen] = useState(false);
@@ -516,6 +543,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
         const row = payload.new as { id: string; channel_id?: string; body?: string };
         if (row.channel_id !== activeRef.current) return;
         setMsgs((ms) => ms.map((m) => (m.id === row.id && row.body != null && m.body !== row.body ? { ...m, body: row.body, edited: true } : m)));
+        autoAsked.current.delete(row.id); // breytt skilaboð: þýða aftur ef sjálfvirk þýðing er á
         setTrans((x) => { if (!(row.id in x)) return x; const n = { ...x }; delete n[row.id]; return n; });
       })
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "channels" }, () => reloadConvs())
@@ -824,6 +852,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
         <div className="msgr-list">
           <div className="msgr-lhead">
             <h2>{t("Spjall")}</h2>
+            <button className={`iconbtn soft${autoOn ? " on" : ""}`} title={autoOn ? t("Sjálfvirk þýðing: kveikt") : t("Sjálfvirk þýðing: slökkt")} aria-label={t("Sjálfvirk þýðing")} aria-pressed={autoOn} onClick={toggleAuto} style={autoOn ? { color: "var(--brand)", background: "var(--brand-soft)" } : undefined}>{I.translate}</button>
             <button className="iconbtn soft" title={t("Nýtt spjall")} aria-label={t("Nýtt spjall")} onClick={() => setModal("new")}>{I.compose}</button>
           </div>
           <div className="msgr-lsearch">
