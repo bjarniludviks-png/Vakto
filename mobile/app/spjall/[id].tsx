@@ -62,6 +62,8 @@ export default function Thread() {
   const [copyOf, setCopyOf] = useState<ChatMessage | null>(null);
   // „Viðbrögð“: hverjir settu hvaða emoji (ýtt á emoji-merkið undir skilaboðum)
   const [whoFor, setWhoFor] = useState<string | null>(null);
+  // „Séð af“: ýtt á litlu myndirnar undir síðustu skilaboðunum mínum → listi með nöfnum
+  const [seenOpen, setSeenOpen] = useState(false);
   const [whoTab, setWhoTab] = useState<string | null>(null);
   // Þýðingar á tungumál appsins: id → þýddur texti (null = í vinnslu); `orig` = sýna frumtexta aftur.
   const [trans, setTrans] = useState<Record<string, string | null>>({});
@@ -412,7 +414,12 @@ export default function Thread() {
                 <View style={{ backgroundColor: colors.bubbleThem, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12 }}><TypingDots /></View>
               </View>
             ) : null}
-            {seenBy.length ? <View style={{ flexDirection: "row", alignSelf: "flex-end", gap: 2, marginTop: 4 }}>{seenBy.slice(0, 5).map((r) => <Avatar key={r.userId} name={r.name} size={16} color={r.color} photo={r.photo} />)}</View> : null}
+            {seenBy.length ? (
+              <Pressable onPress={() => setSeenOpen(true)} hitSlop={10} accessibilityRole="button" accessibilityLabel={tr("Séð af")} style={{ flexDirection: "row", alignItems: "center", alignSelf: "flex-end", gap: 2, marginTop: 4 }}>
+                {seenBy.slice(0, 5).map((r) => <Avatar key={r.userId} name={r.name} size={16} color={r.color} photo={r.photo} />)}
+                {seenBy.length > 5 ? <Txt size={11} color={colors.ink3} style={{ marginLeft: 2 }}>+{seenBy.length - 5}</Txt> : null}
+              </Pressable>
+            ) : null}
             {/* eins og Messenger: „Sendi…“ → „Sent“ undir síðustu skilaboðunum mínum þar til einhver hefur séð þau */}
             {lastIsMine && !seenBy.length ? <Txt size={11.5} color={colors.ink3} style={{ alignSelf: "flex-end", marginTop: 2, marginRight: 2 }}>{lastMine?.id.startsWith("tmp-") ? tr("Sendi…") : tr("Sent")}</Txt> : null}
           </View>
@@ -540,6 +547,21 @@ export default function Thread() {
           </Sheet>
         );
       })()}
+      <Sheet open={seenOpen && seenBy.length > 0} onClose={() => setSeenOpen(false)} title={tr("Séð af")}>
+        {[...seenBy].sort((a, b) => b.lastReadAt.localeCompare(a.lastReadAt)).map((r) => {
+          const d = new Date(r.lastReadAt);
+          const today = d.toDateString() === new Date().toDateString();
+          return (
+            <View key={r.userId} style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 }}>
+              <Avatar name={r.name} size={44} color={r.color} photo={r.photo} />
+              <View style={{ flex: 1 }}>
+                <Txt size={16} weight="semibold">{r.name}</Txt>
+                <Muted size={13}>{tr("Séð")} {today ? "" : `${d.getDate()}.${d.getMonth() + 1}. `}{d.toTimeString().slice(0, 5)}</Muted>
+              </View>
+            </View>
+          );
+        })}
+      </Sheet>
       <Sheet open={!!copyOf} onClose={() => setCopyOf(null)} title={tr("Afrita texta")}>
         <Muted size={13} style={{ marginBottom: 10 }}>{tr("Haltu fingri á textanum til að velja og afrita hann.")}</Muted>
         <View style={{ backgroundColor: colors.panel2, borderRadius: 14, padding: 14 }}>

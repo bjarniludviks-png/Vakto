@@ -86,6 +86,38 @@ function ImageViewer({ url, onClose }: { url: string; onClose: () => void }) {
   );
 }
 
+/** „Séð af“: hverjir hafa séð síðustu skilaboðin mín og hvenær (ýtt á „Séð“ undir þeim). */
+function SeenModal({ reads, msgs, onClose }: { reads: ChannelRead[]; msgs: ChatMessage[]; onClose: () => void }) {
+  const { t } = useLang();
+  const rows = [...reads].sort((a, b) => b.lastReadAt.localeCompare(a.lastReadAt));
+  return (
+    <div className="mwrap show" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mbg" onClick={onClose} />
+      <div className="modal rwho" role="dialog" aria-label={t("Séð af")}>
+        <div className="mh"><div style={{ fontSize: 16, fontWeight: 700 }}>{t("Séð af")}</div><button className="x" onClick={onClose}>✕</button></div>
+        <div className="rwho-list">
+          {rows.map((r) => {
+            const known = msgs.find((m) => m.senderId === r.userId);
+            const d = new Date(r.lastReadAt);
+            const today = d.toDateString() === new Date().toDateString();
+            return (
+              <button key={r.userId} disabled>
+                {known?.photo ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img className="avt-img" src={known.photo} alt="" style={{ width: 40, height: 40 }} />
+                ) : (
+                  <span className="avt" style={{ background: known?.color ?? "var(--brand-soft)", color: known?.color ? "#fff" : "var(--brand)", width: 40, height: 40, fontSize: 14, fontWeight: 700 }}>{r.name.slice(0, 2).toUpperCase()}</span>
+                )}
+                <span className="rwho-n"><b>{r.name}</b><small>{t("Séð")} {today ? "" : `${d.getDate()}.${d.getMonth() + 1}. `}{hhmm(r.lastReadAt)}</small></span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** „Viðbrögð“: allir sem brugðust við skilaboðum, eftir emoji (eins og í Messenger). Ýtt á eigin línu fjarlægir. */
 function ReactionsModal({ m, onClose, onRemove }: { m: ChatMessage; onClose: () => void; onRemove: () => void }) {
   const { t } = useLang();
@@ -234,6 +266,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const [sheetFor, setSheetFor] = useState<ChatMessage | null>(null);
   // „Viðbrögð“: hverjir settu hvaða emoji (ýtt á emoji-merkið undir skilaboðum)
   const [whoFor, setWhoFor] = useState<ChatMessage | null>(null);
+  const [seenOpen, setSeenOpen] = useState(false);
   const pressRef = useRef<{ t: ReturnType<typeof setTimeout> | null; x: number; y: number; fired?: boolean }>({ t: null, x: 0, y: 0 });
   const [viewer, setViewer] = useState<string | null>(null);
   const camRef = useRef<HTMLInputElement | null>(null);
@@ -1005,7 +1038,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                     </div>
                   </div>
                   {mi === lastMineIdx && seenText && (
-                    <div className="m-seen" style={{ marginTop: m.reactions.length ? 6 : 0 }}>{seenText}</div>
+                    <button type="button" className="m-seen" onClick={() => setSeenOpen(true)} title={t("Séð af")} style={{ marginTop: m.reactions.length ? 6 : 0 }}>{seenText}</button>
                   )}
                   </React.Fragment>
                   );
@@ -1137,6 +1170,8 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
             </aside>
           </>
         )}
+
+        {seenOpen && seenBy.length > 0 && <SeenModal reads={seenBy} msgs={msgs} onClose={() => setSeenOpen(false)} />}
 
         {whoFor && (() => {
           // nýjasta útgáfa skilaboðanna (viðbrögð geta breyst meðan glugginn er opinn)

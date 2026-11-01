@@ -129,13 +129,13 @@ export async function listChannelReads(channelId: string): Promise<ChannelRead[]
 async function channelReadsOf(supabase: Sb, ctx: { userId: string; company: string }, channelId: string): Promise<ChannelRead[]> {
   try {
     const [{ data, error }, emps] = await Promise.all([
-      supabase.from("channel_reads").select("user_id, last_read_at, users(full_name)").eq("channel_id", channelId).neq("user_id", ctx.userId),
+      // ekkert FK channel_reads → public.users, svo `users(...)` braut fyrirspurnina og „Séð“ birtist aldrei
+      supabase.from("channel_reads").select("user_id, last_read_at").eq("channel_id", channelId).neq("user_id", ctx.userId),
       empNameMap(supabase, ctx.company),
     ]);
     if (error || !data) return [];
     return data.map((r) => {
-      const u = (Array.isArray(r.users) ? r.users[0] : r.users) as { full_name?: string } | null;
-      const name = emps.get(r.user_id as string)?.name ?? u?.full_name ?? "?";
+      const name = emps.get(r.user_id as string)?.name ?? "?";
       return { userId: r.user_id as string, name, lastReadAt: r.last_read_at as string };
     });
   } catch {
