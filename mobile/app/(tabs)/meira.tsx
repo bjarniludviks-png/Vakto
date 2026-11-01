@@ -75,7 +75,7 @@ export default function Eg() {
         <Row icon={<IconBox tone="brand"><FileCheck color={iconColor("brand")} size={19} /></IconBox>} title="Vinnuyfirlit" sub="Staðfestu tímana þína fyrir tímabilið" onPress={() => router.push("/vinnuyfirlit")} />
         <Row icon={<IconBox tone="good"><CheckCircle2 color={iconColor("good")} size={19} /></IconBox>} title="Beiðnir" sub={reqCount ? `${pending} í bið · ${reqCount} alls` : "Frí, vaktaskipti, leiðréttingar"} onPress={() => router.push("/beidnir")} />
         {me && !me.solo && (me.role === "owner" || me.role === "manager" || me.role === "contractor") ? <Row icon={<IconBox><Briefcase color={colors.ink2} size={19} /></IconBox>} title="Verk" sub="Verk, tímar og verkskýrslur" onPress={() => router.push("/verk")} /> : null}
-        <Row icon={<IconBox><Clock color={colors.ink2} size={19} /></IconBox>} title="Tímar og stimplanir" sub={pay ? trf("{n} klst í {x}", dec1(pay.earnedH), pay.monthLabel.split(" ")[0]) : "Stimplanirnar þínar"} onPress={() => router.push("/timar")} />
+        <Row icon={<IconBox><Clock color={colors.ink2} size={19} /></IconBox>} title="Tímar og stimplanir" sub={pay ? (pay.monthLabel.includes("–") ? trf("{n} klst á tímabilinu", dec1(pay.earnedH)) : trf("{n} klst í {x}", dec1(pay.earnedH), pay.monthLabel.split(" ")[0])) : "Stimplanirnar þínar"} onPress={() => router.push("/timar")} />
         <Row icon={<IconBox><Users color={colors.ink2} size={19} /></IconBox>} title="Samstarfsfólk" sub="Hverjir vinna með þér" onPress={() => router.push("/samstarfsfolk")} last />
       </List>
 

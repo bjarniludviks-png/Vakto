@@ -4,6 +4,7 @@ import { classifyPay, computeFromPunches, BURDEN, type PayLine } from "../payrol
 import { resolveOrlof, type OrlofMode } from "../payrules";
 import { tr, trf } from "../../../src/lib/i18n";
 import type { Me } from "./me";
+import { addDaysISO, localMidnight, periodLabel, type PeriodRange } from "../periods";
 
 export type ShiftPay = { hours: number; base: number; extra: number; total: number; label: string };
 
@@ -54,7 +55,9 @@ export function monthPay(
   me: Me,
   punches: { clockIn: string; clockOut: string }[],
   futureShifts: { date: string; start: string | null; end: string | null }[],
-  now = new Date()
+  now = new Date(),
+  /** Launatímabil (frá–til, báðir dagar með). Án þess: almanaksmánuður `now`. */
+  range?: PeriodRange
 ): MonthPay {
   const rate = me.rate;
   const earnedCls = classifyPay(rate, me.hourly, punches, me.rules);
@@ -70,13 +73,13 @@ export function monthPay(
   const premKr = Math.round(earnedCls.premium * rate + earnedCls.premiumPay / (1 + BURDEN));
   const otKr = Math.round(earnedCls.overtime * rate + earnedCls.overtimePay / (1 + BURDEN));
 
-  // vikur mánaðarins
+  // vikur tímabilsins
   const y = now.getFullYear(), m = now.getMonth();
-  const first = new Date(y, m, 1);
+  const first = range ? localMidnight(range.from) : new Date(y, m, 1);
   const weeks: MonthPay["weeks"] = [];
   const cur = new Date(first);
   cur.setDate(cur.getDate() - ((cur.getDay() + 6) % 7));
-  const end = new Date(y, m + 1, 0);
+  const end = range ? localMidnight(range.to) : new Date(y, m + 1, 0);
   while (cur <= end) {
     const ws = new Date(cur), we = new Date(cur); we.setDate(we.getDate() + 6);
     const inWeek = (iso: string) => { const d = new Date(iso); return d >= ws && d <= new Date(we.getFullYear(), we.getMonth(), we.getDate(), 23, 59, 59); };
@@ -87,15 +90,16 @@ export function monthPay(
     if (cw.total > 0) weeks.push({ label: `${ws.getDate()}.${ws.getMonth() + 1}–${we.getDate()}.${we.getMonth() + 1}`, hours: cw.total, kr: krw, planned: pw.length === 0 && sw.length > 0 });
     cur.setDate(cur.getDate() + 7);
   }
-  const payday = new Date(y, m + 1, 1);
+  // Útborgun = dagurinn eftir lok tímabilsins (1. næsta mánaðar fyrir almanaksmánuð).
+  const payday = range ? localMidnight(addDaysISO(range.to, 1)) : new Date(y, m + 1, 1);
   const o = resolveOrlof(me.orlof);
-  const slip = me.contractor ? null : computeFromPunches(emp, [...punches, ...planned], me.rules, 0, y);
+  const slip = me.contractor ? null : computeFromPunches(emp, [...punches, ...planned], me.rules, 0, range ? end.getFullYear() : y);
   return {
     orlofMode: o.mode, orlofPct: o.pct, slip,
     earnedKr, earnedH: earnedCls.total, plannedKr, plannedH: plannedCls.total, projectedKr: earnedKr + plannedKr,
     dayKr: Math.round(dayH * rate), dayH, premKr, premH: earnedCls.premium, otKr, otH: earnedCls.overtime,
     // Fastlaunafólk fær ekki orlof ofan á laun (heldur launum í orlofi) — aðeins af yfirvinnu.
     orlofKr: me.contractor ? 0 : Math.round((me.hourly ? earnedKr : otKr) * o.pct / 100), shifts: punches.length,
-    weeks, monthLabel: `${tr(MONTHS[m])} ${y}`, payday: `${payday.getDate()}. ${tr(MONTHS[payday.getMonth()])}`,
+    weeks, monthLabel: range ? periodLabel(range) : `${tr(MONTHS[m])} ${y}`, payday: `${payday.getDate()}. ${tr(MONTHS[payday.getMonth()])}`,
   };
 }

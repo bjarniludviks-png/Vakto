@@ -1,5 +1,5 @@
-// Laun — unnið hingað til, áætlað í mánaðarlok, sundurliðun og vikur.
-import React, { useCallback, useState } from "react";
+// Laun — unnið hingað til, áætlað í mánaðarlok, sundurliðun og vikur. Flett milli mánaða með örvum.
+import React, { useCallback, useEffect, useState } from "react";
 import { tr, trf } from "../src/lib/i18n";
 import { View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -8,9 +8,12 @@ import { Screen } from "../src/components/screen";
 import { Card, Txt, Muted, Eyebrow, Bar, Btn, Pill } from "../src/components/ui";
 import { colors, useTheme } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
-import { getMonthPay } from "../src/lib/api/home";
+import { getMonthPay, getPayPeriod } from "../src/lib/api/home";
+import { iso } from "../src/lib/api/me";
+import { isCalendarMonth, periodAt, periodLabel, stepLimit, type PayPeriodCfg } from "../src/lib/periods";
 import type { MonthPay } from "../src/lib/api/pay";
 import { kr, dec1 } from "../src/lib/format";
+import { MonthStepper } from "../src/components/month-stepper";
 
 function Row({ label, value, minus, strong }: { label: string; value: number; minus?: boolean; strong?: boolean }) {
   if (!value && !strong) return null;
@@ -37,31 +40,51 @@ export default function Laun() {
   const { me } = useMe();
   const router = useRouter();
   const [pay, setPay] = useState<MonthPay | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [cfg, setCfg] = useState<PayPeriodCfg | null>(null);
+  useEffect(() => { if (me) getPayPeriod(me).then(setCfg); }, [me]);
+  const range = cfg ? periodAt(cfg, offset, iso(new Date())) : null;
+  const calendar = range ? isCalendarMonth(range) : true;
   const [refreshing, setRefreshing] = useState(false);
-  const load = useCallback(async () => { if (me) setPay(await getMonthPay(me)); }, [me]);
+  // Hunsa svar sem berst eftir að notandi fletti áfram (hröð smellt á örvarnar).
+  const offsetRef = React.useRef(offset);
+  offsetRef.current = offset;
+  const load = useCallback(async () => {
+    if (!me || !cfg) return;
+    const o = offset;
+    const p = await getMonthPay(me, o, cfg);
+    setPay((prev) => (o === offsetRef.current ? p : prev));
+  }, [me, offset, cfg]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
+  const past = offset < 0, ahead = offset > 0;
+  const changeMonth = (o: number) => { setPay(null); setOffset(o); };
   const pct = pay && pay.projectedKr > 0 ? pay.earnedKr / pay.projectedKr : 0;
 
   return (
     <Screen title="Laun" back refreshing={refreshing} onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }}>
+      <MonthStepper offset={offset} onChange={changeMonth} label={range ? periodLabel(range) : "…"} calendar={calendar} min={cfg ? -stepLimit(cfg) : 0} max={1} />
       <Card style={{ gap: 10 }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
           <Eyebrow>{pay?.monthLabel ?? "…"}</Eyebrow>
-          {pay ? <Pill tone="good" label={trf("Greitt {x}", pay.payday)} /> : null}
+          {pay ? <Pill tone={past ? "good" : "neutral"} label={trf(past ? "Greitt {x}" : "Útborgun {x}", pay.payday)} /> : null}
         </View>
         <View>
-          <Txt weight="bold" size={34} style={{ letterSpacing: -0.8, lineHeight: 38, fontVariant: ["tabular-nums"] }}>{pay ? kr(pay.earnedKr) : "—"}</Txt>
-          <Muted>{pay ? `unnið hingað til · ${dec1(pay.earnedH)} klst · ${pay.shifts} ${pay.shifts === 1 ? "vakt" : "vaktir"}` : "unnið hingað til"}</Muted>
+          <Txt weight="bold" size={34} style={{ letterSpacing: -0.8, lineHeight: 38, fontVariant: ["tabular-nums"] }}>{pay ? kr(ahead ? pay.projectedKr : pay.earnedKr) : "—"}</Txt>
+          <Muted>{!pay ? "…" : ahead
+            ? `áætlað m.v. vaktir á plani · ${dec1(pay.plannedH)} klst`
+            : `${past ? (calendar ? "unnið í mánuðinum" : "unnið á tímabilinu") : "unnið hingað til"} · ${dec1(pay.earnedH)} klst · ${pay.shifts} ${pay.shifts === 1 ? "vakt" : "vaktir"}`}</Muted>
         </View>
-        <Bar value={pct} />
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Muted>Áætlað í mánaðarlok m.v. staðfestar vaktir</Muted>
-          <Txt weight="bold" size={14} style={{ fontVariant: ["tabular-nums"] }}>{pay ? kr(pay.projectedKr) : "—"}</Txt>
-        </View>
-        {pay && pay.plannedH > 0 ? <Muted size={12}>{dec1(pay.plannedH)} klst eftir á plani · {kr(pay.plannedKr)}</Muted> : null}
+        {offset === 0 ? <>
+          <Bar value={pct} />
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Muted>{calendar ? "Áætlað í mánaðarlok m.v. staðfestar vaktir" : "Áætlað í lok tímabils m.v. staðfestar vaktir"}</Muted>
+            <Txt weight="bold" size={14} style={{ fontVariant: ["tabular-nums"] }}>{pay ? kr(pay.projectedKr) : "—"}</Txt>
+          </View>
+          {pay && pay.plannedH > 0 ? <Muted size={12}>{dec1(pay.plannedH)} klst eftir á plani · {kr(pay.plannedKr)}</Muted> : null}
+        </> : null}
       </Card>
 
-      {pay ? (
+      {pay && !ahead ? (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
           <Tile label="Dagvinna" value={kr(pay.dayKr)} sub={`${dec1(pay.dayH)} klst`} />
           {!me?.contractor && <>
@@ -75,7 +98,7 @@ export default function Laun() {
       {pay?.slip && pay.slip.gross > 0 ? (
         <Card style={{ paddingVertical: 12 }}>
           <Eyebrow>Áætlaður launaseðill</Eyebrow>
-          <Muted size={12} style={{ marginTop: 2, marginBottom: 6 }}>{tr("Allur mánuðurinn: unnið + staðfestar vaktir")}</Muted>
+          <Muted size={12} style={{ marginTop: 2, marginBottom: 6 }}>{past ? tr("Út frá stimplunum tímabilsins") : ahead ? tr("Út frá vöktum á plani") : tr(calendar ? "Allur mánuðurinn: unnið + staðfestar vaktir" : "Allt tímabilið: unnið + staðfestar vaktir")}</Muted>
           <Row label={tr("Laun")} value={pay.slip.gross - pay.slip.orlof - pay.slip.benefits - pay.slip.uppbot} />
           <Row label={tr("Orlof")} value={pay.slip.orlof} />
           <Row label={tr("Hlunnindi og styrkir")} value={pay.slip.benefits} />
