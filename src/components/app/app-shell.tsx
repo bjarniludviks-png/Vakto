@@ -206,7 +206,7 @@ export default function AppShell({
                     >
                       <Icon name={it.icon} />
                       <span className="nlbl">{t("nav:" + it.slug)}</span>
-                      {it.slug === "chat" && <ChatBadge />}
+                      {it.slug === "chat" && <ChatBadge companyId={account.companyId} />}
                     </Link>
                   ))}
               </div>

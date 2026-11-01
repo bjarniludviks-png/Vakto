@@ -18,7 +18,7 @@ import { Txt, Muted, Avatar, Sheet, Row, useToast, colorFor } from "../../src/co
 import { uploadImage } from "../../src/lib/api/feed";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, editMessage, translateMessage, translateBatch, getChatTranslate, setChatTranslate, subscribeChat, typingChannel, peopleMap, authUser, type ChatMessage, type ChannelRead } from "../../src/lib/api/chat";
+import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, editMessage, translateMessage, translateBatch, getChatTranslate, setChatTranslate, subscribeChat, typingChannel, peopleMap, authUser, type ChatMessage, type ChannelRead, type LiveMessage } from "../../src/lib/api/chat";
 import { supabase } from "../../src/lib/supabase";
 import { isMuted, toggleMute } from "../../src/lib/mute";
 import { reportContent, blockUser, blockedUsers } from "../../src/lib/api/moderation";
@@ -126,7 +126,7 @@ export default function Thread() {
     setUploading(true);
     const up = await uploadChatFile(me, f.uri, f.name, f.mimeType ?? "application/octet-stream");
     if (!up.ok || !up.url) { setUploading(false); toast(up.error ?? "Skráin hlóðst ekki upp"); return; }
-    const res = (f.mimeType ?? "").startsWith("image/") || IMG_RE.test(f.name) ? await sendChatImage(me, id, up.url) : await sendChatFile(me, id, up.url, f.name);
+    const res = (f.mimeType ?? "").startsWith("image/") || IMG_RE.test(f.name) ? await sendChatImage(me, id, up.url, typingRef.current) : await sendChatFile(me, id, up.url, f.name);
     setUploading(false);
     if (!res.ok) toast(res.error ?? "Tókst ekki að senda"); else load();
   }
@@ -177,7 +177,7 @@ export default function Thread() {
     setUploading(true);
     const up = await uploadImage(me, r.assets[0].uri, r.assets[0].uri.toLowerCase().endsWith(".png") ? "png" : "jpg");
     if (!up.ok || !up.url) { setUploading(false); toast(up.error ?? "Mynd hlóðst ekki upp"); return; }
-    const res = await sendChatImage(me, id, up.url);
+    const res = await sendChatImage(me, id, up.url, typingRef.current);
     setUploading(false);
     if (!res.ok) toast(res.error ?? "Tókst ekki að senda mynd");
     else load();
@@ -189,7 +189,7 @@ export default function Thread() {
     setUploading(true);
     const up = await uploadImage(me, r.assets[0].uri, r.assets[0].uri.toLowerCase().endsWith(".png") ? "png" : "jpg");
     if (!up.ok || !up.url) { setUploading(false); toast(up.error ?? "Mynd hlóðst ekki upp"); return; }
-    const res = await sendChatImage(me, id, up.url);
+    const res = await sendChatImage(me, id, up.url, typingRef.current);
     setUploading(false);
     if (!res.ok) toast(res.error ?? "Tókst ekki að senda mynd");
     else load();
@@ -285,23 +285,38 @@ export default function Thread() {
   useEffect(() => {
     if (!me || !id) return;
     let t: ReturnType<typeof setTimeout> | null = null;
-    const ch = subscribeChat(async (row) => {
-      if (row.channel_id !== id) return;
-      const people = await peopleMap(me.companyId);
-      const { data: auth } = await authUser();
-      const p = people.get(row.sender_id);
-      const full = p?.name ?? "Notandi";
-      setMsgs((cur) => cur.some((m) => m.id === row.id) ? cur : [...cur, {
-        id: row.id, senderId: row.sender_id, sender: full.split(/\s+/)[0], senderFull: full, color: p?.color ?? null, photo: p?.photo ?? null,
-        me: row.sender_id === auth.user?.id, body: row.body ?? "", at: new Date(row.created_at).toTimeString().slice(0, 5), createdAt: row.created_at,
-        kind: (row.kind ?? "text") as ChatMessage["kind"], url: row.attachment_url, reactions: [], replyTo: null,
-      }]);
+    let alive = true;
+    // auðkenni og nafnaskrá sótt EINU sinni — nýtt skilaboð teiknast strax, án þess að bíða eftir neinu
+    const myId = { current: null as string | null };
+    let people: Awaited<ReturnType<typeof peopleMap>> | null = null;
+    void authUser().then(({ data }) => { myId.current = data.user?.id ?? null; });
+    void peopleMap(me.companyId).then((m) => { people = m; });
+    const paint = (row: LiveMessage) => {
+      if (row.channel_id !== id || !alive) return;
+      const p = people?.get(row.sender_id);
+      const full = p?.name ?? row.name ?? "";
+      const mine = row.sender_id === myId.current;
+      setMsgs((cur) => {
+        if (cur.some((m) => m.id === row.id)) return cur;
+        // eigin skilaboð geta borist áður en vistunin svarar → skipta út bráðabirgðaútgáfunni
+        if (mine) { const i = cur.findIndex((m) => m.id.startsWith("tmp-") && m.body === (row.body ?? "")); if (i >= 0) { const c = cur.slice(); c[i] = { ...c[i], id: row.id }; return c; } }
+        const rp = row.reply_to ? cur.find((m) => m.id === row.reply_to) : undefined;
+        return [...cur, {
+          id: row.id, senderId: row.sender_id, sender: full.split(/\s+/)[0] || "…", senderFull: full, color: p?.color ?? row.color ?? null, photo: p?.photo ?? row.photo ?? null,
+          me: mine, body: row.body ?? "", at: new Date(row.created_at).toTimeString().slice(0, 5), createdAt: row.created_at,
+          kind: (row.kind ?? "text") as ChatMessage["kind"], url: row.attachment_url, reactions: [], replyTo: rp ? { sender: rp.sender, body: rp.body } : null,
+        }];
+      });
       setTyping(null);
+      // nafn vantaði (nýr starfsmaður / skráin ekki komin) → fylla inn þegar hún er til
+      if (!full) void peopleMap(me.companyId).then((m) => { const q = m.get(row.sender_id); if (q) patchMsg(row.id, (x) => ({ ...x, sender: q.name.split(/\s+/)[0], senderFull: q.name, color: q.color, photo: q.photo })); });
       // þráðurinn er opinn: merkja lesið STRAX svo sendandinn sjái „séð“ án tafar
-      if (row.sender_id !== auth.user?.id) markChannelRead(id).catch(() => {});
+      if (!mine) markChannelRead(id).catch(() => {});
+      // létt samræming (viðbrögð o.þ.h.) — ekki full endurhleðsla eftir hvert skilaboð
       if (t) clearTimeout(t);
-      t = setTimeout(load, 1500);
-    }, async (r) => {
+      t = setTimeout(load, 10000);
+    };
+    const ch = subscribeChat(paint, async (r) => {
       // einhver las: uppfæra „séð“ beint úr atburðinum — engin endurhleðsla á öllum þræðinum
       if (!r || r.channel_id !== id) return;
       const { data: auth } = await authUser();
@@ -314,7 +329,7 @@ export default function Thread() {
       setMsgs((cur) => cur.map((m) => (m.id === e.id && m.body !== e.body ? { ...m, body: e.body, edited: true } : m)));
       autoAsked.current.delete(e.id);
       setTrans((cur) => { if (!(e.id in cur)) return cur; const n = { ...cur }; delete n[e.id]; return n; });
-    });
+    }, { channelId: id });
     typingRef.current = typingChannel(id, async (p) => {
       if (p.stop) { setTyping(null); return; }
       // mynd úr skilaboðunum sjálfum, annars úr starfsmannaskránni (eldri útgáfur sendu hana ekki)
@@ -322,9 +337,9 @@ export default function Thread() {
       const who = { userId: p.userId, name: p.name || person?.name || "", photo: p.photo ?? person?.photo ?? null, color: p.color ?? person?.color ?? null };
       setTyping(who);
       setTimeout(() => setTyping((cur) => (cur?.userId === who.userId && cur.name === who.name ? null : cur)), 4000);
-    });
+    }, paint);
     const poll = setInterval(load, 15000);
-    return () => { ch.unsubscribe(); typingRef.current?.unsubscribe(); clearInterval(poll); if (t) clearTimeout(t); };
+    return () => { alive = false; ch.unsubscribe(); typingRef.current?.unsubscribe(); clearInterval(poll); if (t) clearTimeout(t); };
   }, [me, id, load]);
 
   function onType(v: string) {
@@ -356,7 +371,7 @@ export default function Thread() {
     // optimistic
     const tmp: ChatMessage = { id: "tmp-" + Date.now(), senderId: "me", sender: me.fullName.split(/\s+/)[0], senderFull: me.fullName, color: me.avatarColor, photo: me.photoUrl, me: true, body, at: new Date().toTimeString().slice(0, 5), createdAt: new Date().toISOString(), kind: "text", url: null, reactions: [], replyTo: rt ? { sender: rt.sender, body: rt.body } : null };
     setMsgs((cur) => [...cur, tmp]);
-    const r = await sendChatMessage(me, id, body, rt?.id ?? null);
+    const r = await sendChatMessage(me, id, body, rt?.id ?? null, typingRef.current);
     setSending(false);
     if (!r.ok) { setMsgs((cur) => cur.filter((m) => m.id !== tmp.id)); setText(body); return; }
     setMsgs((cur) => cur.map((m) => (m.id === tmp.id ? { ...m, id: r.id ?? m.id } : m)));

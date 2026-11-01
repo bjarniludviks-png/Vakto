@@ -24,7 +24,11 @@ import {
 import { REACTIONS } from "@/lib/reactions";
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "🔥", "👏", "😅", "😮", "😢", "💪", "✅", "🤝", "☕", "🍕", "🚀"];
 
-type ChatInitial = { ok: boolean; items: Conversation[]; meId: string; meName?: string };
+type ChatInitial = { ok: boolean; items: Conversation[]; meId: string; meName?: string; companyId?: string };
+/** Ný skilaboð eins og þau berast — úr postgres_changes (raunveruleg röð) eða beint frá
+ * sendanda yfir Realtime broadcast (`message` á `typing:<þráður>`, nafn/mynd fylgja). */
+type IncomingRow = { id: string; channel_id?: string; sender_id?: string; body?: string; kind?: string; attachment_url?: string | null; created_at?: string; reply_to?: string | null; name?: string; photo?: string | null; color?: string | null };
+const lastLabel = (kind?: string, body?: string) => (kind === "image" ? "Mynd" : kind === "audio" ? "Talskilaboð" : kind === "file" ? (body || "Skjal") : (body ?? ""));
 type SupabaseBrowser = ReturnType<typeof createBrowserClient>;
 /** VAKTO AI í samtalalistanum: aðeins stjórnendur og vaktstjórar (sjá page.tsx). */
 type AiAccess = { enabled: boolean; demo: boolean };
@@ -489,7 +493,8 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const reloadT = useRef<ReturnType<typeof setTimeout> | null>(null);
   function scheduleReload(id: string) {
     if (reloadT.current) clearTimeout(reloadT.current);
-    reloadT.current = setTimeout(() => loadMsgs(id), 400);
+    // Skilaboðin eru þegar teiknuð úr atburðinum; þetta sækir bara viðbrögð/nöfn í rólegheitum.
+    reloadT.current = setTimeout(() => loadMsgs(id), 2000);
   }
 
   useEffect(() => {
@@ -537,41 +542,65 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Instant delivery: subscribe to new messages (RLS-scoped) — reload the open
-  // thread and the list the moment anything lands, instead of waiting to poll.
-  // Read cursors stream too, so "Séð" appears the moment the other side looks.
+  // Ný skilaboð: teikna strax í opnum þræði og uppfæra samtalið í listanum beint úr
+  // atburðinum. Sama skilaboð getur borist tvisvar (broadcast + postgres_changes) — id afritar.
+  const seenRef = useRef(new Set<string>());
+  const convsT = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function scheduleConvs() {
+    if (convsT.current) clearTimeout(convsT.current);
+    convsT.current = setTimeout(reloadConvs, 3000);
+  }
+  function paintIncoming(row: IncomingRow) {
+    if (!row.id || !row.channel_id) return;
+    const fresh = !seenRef.current.has(row.id);
+    seenRef.current.add(row.id);
+    const mine = row.sender_id === initial.meId;
+    if (row.channel_id === activeRef.current) {
+      setMsgs((ms) => {
+        if (ms.some((m) => m.id === row.id)) return ms;
+        if (mine) {
+          const i = ms.findIndex((m) => m.id.startsWith("tmp-") && m.body === (row.body ?? ""));
+          if (i >= 0) { const c = ms.slice(); c[i] = { ...c[i], id: row.id }; return c; }
+        }
+        const known = ms.find((m) => m.senderId === row.sender_id && !m.id.startsWith("tmp-"));
+        const conv = activeConvRef.current;
+        const d = new Date(row.created_at ?? Date.now());
+        const rp = row.reply_to ? ms.find((m) => m.id === row.reply_to) : undefined;
+        return [...ms, {
+          id: row.id, senderId: row.sender_id ?? "", me: mine,
+          sender: mine ? "Ég" : (known?.sender ?? (row.name ? firstName(row.name) : conv?.dm ? conv.name.split(/\s+/)[0] : "…")),
+          body: row.body ?? "", at: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
+          kind: row.kind ?? "text", url: row.attachment_url ?? null, reactions: [],
+          createdAt: row.created_at ?? d.toISOString(), replyTo: rp ? { sender: rp.sender, body: rp.body } : null,
+          photo: known?.photo ?? row.photo ?? null, color: known?.color ?? row.color ?? undefined,
+        }];
+      });
+      if (!mine) setTypers((tp) => { if (!row.sender_id || !(row.sender_id in tp)) return tp; const n = { ...tp }; delete n[row.sender_id]; return n; });
+      read(activeRef.current);
+      scheduleReload(row.channel_id);
+    }
+    if (!fresh) return;
+    // Listinn: síðustu skilaboð, tími og ólesið beint úr atburðinum — full endurhleðsla síðar.
+    setConvs((cs) => {
+      const i = cs.findIndex((c) => c.id === row.channel_id);
+      if (i < 0) { scheduleConvs(); return cs; }
+      const at = row.created_at ?? new Date().toISOString();
+      const open = visible() && activeRef.current === row.channel_id;
+      const c = { ...cs[i], last: lastLabel(row.kind, row.body), lastAt: at, sortAt: at, lastKind: row.kind ?? "text", lastMine: mine, unread: open ? 0 : mine ? cs[i].unread : cs[i].unread + 1 };
+      return [c, ...cs.slice(0, i), ...cs.slice(i + 1)];
+    });
+    scheduleConvs();
+  }
+
+  // Varaleið og samtalalisti: postgres_changes (RLS-afmarkað), síað á fyrirtækið svo Realtime
+  // þurfi ekki að meta skilaboð annarra fyrirtækja. Eldri öpp senda ekki broadcast — þetta grípur þau.
   useEffect(() => {
     const supabase = sb();
+    const co = initial.companyId ? { filter: `company_id=eq.${initial.companyId}` } : {};
     const ch = supabase
       .channel("chat-live")
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (payload) => {
-        const row = payload.new as { id: string; channel_id?: string; sender_id?: string; body?: string; kind?: string; attachment_url?: string | null; created_at?: string };
-        if (row.channel_id && row.channel_id === activeRef.current) {
-          // Paint straight from the event — the bubble shows before any round trip.
-          setMsgs((ms) => {
-            if (ms.some((m) => m.id === row.id)) return ms;
-            const mine = row.sender_id === initial.meId;
-            if (mine) {
-              const i = ms.findIndex((m) => m.id.startsWith("tmp-") && m.body === (row.body ?? ""));
-              if (i >= 0) { const c = ms.slice(); c[i] = { ...c[i], id: row.id }; return c; }
-            }
-            const known = ms.find((m) => m.senderId === row.sender_id && !m.id.startsWith("tmp-"));
-            const conv = activeConvRef.current;
-            const d = new Date(row.created_at ?? Date.now());
-            return [...ms, {
-              id: row.id, senderId: row.sender_id ?? "", me: mine,
-              sender: mine ? "Ég" : (known?.sender ?? (conv?.dm ? conv.name.split(/\s+/)[0] : "…")),
-              body: row.body ?? "", at: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
-              kind: row.kind ?? "text", url: row.attachment_url ?? null, reactions: [],
-              createdAt: row.created_at ?? d.toISOString(), replyTo: null, photo: known?.photo ?? null, color: known?.color,
-            }];
-          });
-          scheduleReload(row.channel_id);
-          read(activeRef.current);
-        }
-        reloadConvs();
-      })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (payload) => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", ...co }, (payload) => paintIncoming(payload.new as IncomingRow))
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages", ...co }, (payload) => {
         // breytt skilaboð (0100): nýr texti strax, eldri þýðing fellur út
         const row = payload.new as { id: string; channel_id?: string; body?: string };
         if (row.channel_id !== activeRef.current) return;
@@ -579,14 +608,9 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
         autoAsked.current.delete(row.id); // breytt skilaboð: þýða aftur ef sjálfvirk þýðing er á
         setTrans((x) => { if (!(row.id in x)) return x; const n = { ...x }; delete n[row.id]; return n; });
       })
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "channels" }, () => reloadConvs())
-      .on("postgres_changes", { event: "*", schema: "public", table: "channel_reads" }, (payload) => {
-        const row = (payload.new ?? payload.old) as { channel_id?: string; user_id?: string };
-        if (row.user_id === initial.meId) return;
-        if (row.channel_id && row.channel_id === activeRef.current) listChannelReads(row.channel_id).then(setReads);
-      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "channels", ...co }, () => reloadConvs())
       .subscribe();
-    return () => { void supabase.removeChannel(ch); };
+    return () => { void supabase.removeChannel(ch); if (convsT.current) clearTimeout(convsT.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -597,6 +621,16 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     if (!id) return;
     const supabase = sb();
     const ch = supabase.channel(`typing:${id}`, { config: { broadcast: { self: false } } });
+    // Ný skilaboð beint frá sendanda (hraðasta leiðin) + „séð“ í þessum þræði.
+    ch.on("broadcast", { event: "message" }, ({ payload }) => {
+      const p = payload as IncomingRow;
+      if (p.channel_id === id && p.sender_id !== initial.meId) paintIncoming(p);
+    });
+    ch.on("postgres_changes", { event: "*", schema: "public", table: "channel_reads", filter: `channel_id=eq.${id}` }, (payload) => {
+      const row = (payload.new ?? payload.old) as { channel_id?: string; user_id?: string };
+      if (row.user_id === initial.meId) return;
+      if (row.channel_id && row.channel_id === activeRef.current) listChannelReads(row.channel_id).then(setReads);
+    });
     ch.on("broadcast", { event: "typing" }, ({ payload }) => {
       const p = payload as { userId?: string; name?: string; photo?: string | null; color?: string | null; stop?: boolean };
       if (!p.userId || p.userId === initial.meId) return;
@@ -723,7 +757,17 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     // Swap the optimistic id for the real one so the realtime echo dedups;
     // the debounced reconcile brings names/reads without a second full fetch.
     const realId = res.id;
-    if (realId) setMsgs((ms) => ms.map((m) => (m.id === `tmp-${now.getTime()}` ? { ...m, id: realId } : m)));
+    if (realId) {
+      seenRef.current.add(realId);
+      setMsgs((ms) => ms.map((m) => (m.id === `tmp-${now.getTime()}` ? { ...m, id: realId } : m)));
+      // Beint til þeirra sem hafa þráðinn opinn — birtist án þess að bíða eftir gagnagrunnsatburðinum.
+      const bc = typingRef.current.ch;
+      if (bc) void bc.send({ type: "broadcast", event: "message", payload: {
+        id: realId, channel_id: active.id, sender_id: initial.meId, body: text, kind, attachment_url: url ?? null,
+        created_at: now.toISOString(), reply_to: reply?.id ?? null, name: initial.meName ?? "", photo: null, color: null,
+      } satisfies IncomingRow });
+      setConvs((cs) => cs.map((c) => (c.id === active.id ? { ...c, last: lastLabel(kind, text), lastAt: now.toISOString(), sortAt: now.toISOString(), lastKind: kind, lastMine: true } : c)));
+    }
     scheduleReload(active.id);
   }
 

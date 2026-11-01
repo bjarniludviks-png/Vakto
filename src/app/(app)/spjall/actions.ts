@@ -144,7 +144,7 @@ async function channelReadsOf(supabase: Sb, ctx: { userId: string; company: stri
 }
 
 /** Conversations the user can see: their groups + their DMs (+ eldra „Almennt“ ef það hefur verið notað). */
-export async function listConversations(): Promise<{ ok: boolean; items: Conversation[]; meId: string; meName: string; needsMigration?: boolean }> {
+export async function listConversations(): Promise<{ ok: boolean; items: Conversation[]; meId: string; meName: string; companyId?: string; needsMigration?: boolean }> {
   if (!isSupabaseConfigured()) return { ok: false, items: [], meId: "", meName: "" };
   try {
     const supabase = await createClient();
@@ -217,7 +217,7 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
     // Nýjasta virkni efst — ekkert fest (nýr tómur hópur raðast eftir stofndegi).
     items.sort((a, b) => b.sortAt.localeCompare(a.sortAt));
     const meName = emps.get(ctx.userId)?.name ?? (await supabase.from("users").select("full_name").eq("id", ctx.userId).maybeSingle()).data?.full_name ?? "";
-    return { ok: true, items, meId: ctx.userId, meName: meName.includes("@") ? "" : meName };
+    return { ok: true, items, meId: ctx.userId, meName: meName.includes("@") ? "" : meName, companyId: ctx.company as string };
   } catch (e) {
     console.error("listConversations failed:", e);
     return { ok: false, items: [], meId: "", meName: "" };

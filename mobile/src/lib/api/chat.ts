@@ -256,11 +256,20 @@ export async function listMessages(me: Me, channelId: string, before?: MessageCu
   return { messages, reads: readsOut, hasMore, myReadAt };
 }
 
-export async function sendChatMessage(me: Me, channelId: string, body: string, replyTo?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
+/** Senda skilaboð beint til þeirra sem hafa þráðinn opinn (Realtime broadcast) — birtist áður en
+ * gagnagrunnsatburðurinn (postgres_changes) kemur; sá síðarnefndi er varaleið og afritast á id. */
+function broadcastMessage(live: RealtimeChannel | null | undefined, me: Me, row: { id: string; channel_id: string; sender_id: string; body: string; kind: string; attachment_url: string | null; reply_to: string | null }) {
+  if (!live) return;
+  const payload: LiveMessage = { ...row, created_at: new Date().toISOString(), name: me.fullName, photo: me.photoUrl ?? null, color: me.avatarColor ?? null };
+  void live.send({ type: "broadcast", event: "message", payload });
+}
+
+export async function sendChatMessage(me: Me, channelId: string, body: string, replyTo?: string | null, live?: RealtimeChannel | null): Promise<{ ok: boolean; id?: string; error?: string }> {
   const { data: auth } = await authUser();
   if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
   const { data, error } = await supabase.from("messages").insert({ company_id: me.companyId, channel_id: channelId, sender_id: auth.user.id, body, kind: "text", reply_to: replyTo ?? null }).select("id").single();
   if (error) return { ok: false, error: error.message };
+  if (data?.id) broadcastMessage(live, me, { id: data.id as string, channel_id: channelId, sender_id: auth.user.id, body, kind: "text", attachment_url: null, reply_to: replyTo ?? null });
   markChannelRead(channelId).catch(() => {});
   if (data?.id) notifyServer("chat_message", data.id as string);
   return { ok: true, id: data?.id as string };
@@ -356,30 +365,39 @@ export async function startDM(me: Me, otherUserId: string): Promise<{ ok: boolea
 
 /** Realtime: ný og breytt skilaboð + lestrarstöður (RLS sér um afmörkun). */
 export type ReadRow = { channel_id: string; user_id: string; last_read_at: string };
-export function subscribeChat(onMessage: (row: { id: string; channel_id: string; sender_id: string; body: string; kind: string; created_at: string; attachment_url: string | null; reply_to: string | null }) => void, onReads?: (row: ReadRow | null) => void, onEdit?: (row: { id: string; channel_id: string; body: string }) => void): RealtimeChannel {
+/** Skilaboð eins og þau berast í beinni: úr gagnagrunnsatburði, eða beint frá sendanda (þá fylgja nafn/mynd/litur). */
+export type LiveMessage = { id: string; channel_id: string; sender_id: string; body: string; kind: string; created_at: string; attachment_url: string | null; reply_to: string | null; name?: string; photo?: string | null; color?: string | null };
+/** `scope.channelId`: aðeins þessi þráður (skilaboð + lestrarstöður); annars allt fyrirtækið (`companyId`).
+ * Síunin léttir á Realtime — það metur þá ekki atburði annarra þráða/fyrirtækja fyrir hvern síma. */
+export function subscribeChat(onMessage: (row: LiveMessage) => void, onReads?: (row: ReadRow | null) => void, onEdit?: (row: { id: string; channel_id: string; body: string }) => void, scope?: { channelId?: string; companyId?: string }): RealtimeChannel {
+  const msgF = scope?.channelId ? { filter: `channel_id=eq.${scope.channelId}` } : scope?.companyId ? { filter: `company_id=eq.${scope.companyId}` } : {};
+  const readF = scope?.channelId ? { filter: `channel_id=eq.${scope.channelId}` } : {};
   return supabase
     .channel("chat-live-" + Math.random().toString(36).slice(2, 8))
-    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, (p) => onMessage(p.new as Parameters<typeof onMessage>[0]))
-    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages" }, (p) => onEdit?.(p.new as { id: string; channel_id: string; body: string }))
-    .on("postgres_changes", { event: "*", schema: "public", table: "channel_reads" }, (p) => onReads?.((p.new ?? null) as ReadRow | null))
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", ...msgF }, (p) => onMessage(p.new as LiveMessage))
+    .on("postgres_changes", { event: "UPDATE", schema: "public", table: "messages", ...msgF }, (p) => onEdit?.(p.new as { id: string; channel_id: string; body: string }))
+    .on("postgres_changes", { event: "*", schema: "public", table: "channel_reads", ...readF }, (p) => onReads?.((p.new ?? null) as ReadRow | null))
     .subscribe();
 }
 
 /** Typing indicator (broadcast only). `userId` = auth-notandi; mynd/litur fylgja svo „•••“ sýni hver skrifar. */
 export type TypingPayload = { userId: string; name: string; photo?: string | null; color?: string | null; stop?: boolean };
-export function typingChannel(channelId: string, onTyping: (p: TypingPayload) => void): RealtimeChannel {
-  return supabase
+export function typingChannel(channelId: string, onTyping: (p: TypingPayload) => void, onMessage?: (m: LiveMessage) => void): RealtimeChannel {
+  const ch = supabase
     .channel(`typing:${channelId}`, { config: { broadcast: { self: false } } })
-    .on("broadcast", { event: "typing" }, (m) => onTyping(m.payload as TypingPayload))
-    .subscribe();
+    .on("broadcast", { event: "typing" }, (m) => onTyping(m.payload as TypingPayload));
+  // Ný skilaboð beint frá sendanda (vefur og nýrri öpp senda þau hingað strax eftir vistun).
+  if (onMessage) ch.on("broadcast", { event: "message" }, (m) => { const p = m.payload as LiveMessage; if (p?.channel_id === channelId) onMessage(p); });
+  return ch.subscribe();
 }
 
 /** Senda mynd (þegar hlaðið upp í `chat` bucket). */
-export async function sendChatImage(me: Me, channelId: string, url: string): Promise<{ ok: boolean; error?: string }> {
+export async function sendChatImage(me: Me, channelId: string, url: string, live?: RealtimeChannel | null): Promise<{ ok: boolean; error?: string }> {
   const { data: auth } = await authUser();
   if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
   const { data, error } = await supabase.from("messages").insert({ company_id: me.companyId, channel_id: channelId, sender_id: auth.user.id, body: "", kind: "image", attachment_url: url  }).select("id").single();
   if (error) return { ok: false, error: error.message };
+  if (data?.id) broadcastMessage(live, me, { id: data.id as string, channel_id: channelId, sender_id: auth.user.id, body: "", kind: "image", attachment_url: url, reply_to: null });
   markChannelRead(channelId).catch(() => {});
   if (data?.id) notifyServer("chat_message", data.id as string);
   return { ok: true };
