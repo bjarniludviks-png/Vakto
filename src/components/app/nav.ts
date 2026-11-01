@@ -22,6 +22,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { slug: "dashboard", href: "/maelabord", label: "Mælaborð", roles: STAFF_MGMT, icon: "dashboard" },
       { slug: "schedule", href: "/vaktaplan", label: "Vaktaplan", roles: STAFF_MGMT, icon: "schedule" },
       { slug: "attendance", href: "/timaskraning", label: "Tímaskráning", roles: STAFF_MGMT, icon: "clock" },
+      { slug: "jobs", href: "/verk", label: "Verk", roles: ["owner", "manager", "contractor"], icon: "briefcase" },
     ],
   },
   {
@@ -57,9 +58,13 @@ export const FOOT_ITEMS: NavItem[] = [
 
 /** Atriði sem hlutverkið sér. Stjórnandi: stjórnendasvæðin fara eftir users.permissions (0095),
  * sama regla og canAccess() í middleware — null = sjálfgefið fyrir hlutverkið. */
-export function visibleFor(role: Role, perms?: unknown) {
+/** Verktakahamur (0102): aðeins það sem einyrki/verktaki notar. */
+const SOLO_SLUGS = new Set(["jobs", "chat", "settings", "help"]);
+
+export function visibleFor(role: Role, perms?: unknown, solo = false) {
   const access = role === "manager" ? resolveAccess(role, perms) : null;
   const shows = (i: NavItem) => {
+    if (solo) return SOLO_SLUGS.has(i.slug) && i.roles.includes(role);
     const area = access ? areaOf(i.href) : null;
     return access && area ? access[area] : i.roles.includes(role);
   };

@@ -7,6 +7,7 @@ import { getShiftsInRange, saveShift, deleteShift, updateLeaveRequest, approveSh
 import { listContracts, resendContract } from "@/app/(app)/starfsfolk/actions";
 import { getEmployees } from "@/lib/employees.server";
 import { getPlanningHistory, historyForPrompt, historyRange } from "@/lib/ai/planning-history.server";
+import { jobTotals, quoteTotals } from "@/lib/verk";
 import { getCompanyId } from "@/lib/labor";
 import { createClient } from "@/lib/supabase/server";
 import { getPendingRequests } from "@/app/(app)/vaktaplan/requests.server";
@@ -46,6 +47,11 @@ export const READ_TOOLS: Anthropic.Tool[] = [
     name: "staff_pay",
     description: "Launakjör starfsfólks: starfsheiti, deild, tímakaup eða mánaðarlaun, starfshlutfall, stéttarfélag, ráðningardagur og starfsaldur í árum (að meðtöldum fyrri starfsaldri). Notaðu þegar spurt er um laun tiltekins starfsmanns eða hvort laun séu í samræmi við kjarasamning. name síar á nafn (valfrjálst).",
     input_schema: { type: "object", properties: { name: { type: "string", description: "Nafn eða hluti nafns (valfrjálst)" } } },
+  },
+  {
+    name: "verk_jobs",
+    description: "VAKTO Verk (verktakar): verk með viðskiptavini, stöðu (Í vinnslu/Lokið/Reikningur sendur/Greitt), tímum, akstri, vinnu, efni og upphæð með vsk. á tímabili, ásamt opnum tilboðum. Notaðu fyrir spurningar eins og „hvað vann ég mikið fyrir Jón í október?“, „hvað á ég eftir að rukka?“, „hvaða tilboð bíða svars?“. client síar á viðskiptavin (valfrjálst); from/to takmarka tíma og efni við tímabilið (valfrjálst).",
+    input_schema: { type: "object", properties: { client: { type: "string" }, from: DATE, to: DATE } },
   },
   {
     name: "who_is_on_now",
@@ -218,6 +224,14 @@ export const WRITE_TOOLS: Anthropic.Tool[] = [
     name: "ask_correction",
     description: "LEGGJA TIL að biðja starfsmann um réttan tíma (vakt án stimplunar eða stimplun sem kerfið getur ekki lagað sjálft): skilaboð í beinu spjalli + tilkynning sem opnar leiðréttingarformið. Skrifaðu stutt, vingjarnleg skilaboð á íslensku með deginum og því sem vantar.",
     input_schema: { type: "object", properties: { employee: { type: "string", description: "Fullt nafn" }, date: DATE, message: { type: "string" } }, required: ["employee", "date", "message"] },
+  },
+  {
+    name: "draft_quote",
+    description: "LEGGJA TIL drög að tilboði í VAKTO Verk (verktakar). Fylltu út línur: vinna (kind labor, unit klst., unitPrice = tímagjald án vsk.), efni (material) og annað (other), öll verð án vsk. í heilum krónum. client = nafn viðskiptavinar ef hann er til (annars sleppa). Drögin vistast sem Drög í Verk → Tilboð — notandinn fer yfir og sendir sjálfur.",
+    input_schema: { type: "object", properties: {
+      title: { type: "string" }, client: { type: "string" }, address: { type: "string" }, description: { type: "string" },
+      items: { type: "array", items: { type: "object", properties: { kind: { type: "string", enum: ["labor", "material", "other"] }, description: { type: "string" }, quantity: { type: "number" }, unit: { type: "string" }, unitPrice: { type: "number" } }, required: ["kind", "description", "quantity", "unitPrice"] } },
+    }, required: ["title", "items"] },
   },
   {
     name: "save_planning_rule",
@@ -597,6 +611,30 @@ export async function runReadTool(name: string, input: In): Promise<string> {
         });
       return JSON.stringify(rows.slice(0, 200));
     }
+    if (name === "verk_jobs") {
+      const supabase = await createClient();
+      const company = await getCompanyId(supabase);
+      if (!company) return JSON.stringify({ error: "Fyrirtæki fannst ekki" });
+      const from = okDate(input.from) ? str(input.from) : null, to = okDate(input.to) ? str(input.to) : null;
+      const inRange = (d: string) => (!from || d >= from) && (!to || d <= to);
+      const [jr, er, ir, qr] = await Promise.all([
+        supabase.from("jobs").select("id, title, address, status, hourly_rate, invoiced_at, paid_at, clients(name)").eq("company_id", company),
+        supabase.from("job_entries").select("job_id, started_at, ended_at, km, billable").eq("company_id", company).not("ended_at", "is", null).limit(10000),
+        supabase.from("job_items").select("job_id, kind, quantity, unit_price, date").eq("company_id", company).limit(10000),
+        supabase.from("quotes").select("number, title, status, items, sent_at, clients(name)").eq("company_id", company),
+      ]);
+      if (jr.error) return JSON.stringify({ error: "VAKTO Verk er ekki virkt hjá fyrirtækinu" });
+      const want = str(input.client).trim().toLowerCase();
+      const nameOf = (x: { clients?: unknown }) => ((Array.isArray(x.clients) ? x.clients[0] : x.clients) as { name?: string } | null)?.name ?? null;
+      const jobs = (jr.data ?? []).filter((j) => !want || (nameOf(j) ?? "").toLowerCase().includes(want)).map((j) => {
+        const es = (er.data ?? []).filter((e) => e.job_id === j.id && inRange(String(e.started_at).slice(0, 10))).map((e) => ({ hours: (new Date(e.ended_at as string).getTime() - new Date(e.started_at as string).getTime()) / 3600000, km: Number(e.km ?? 0), billable: e.billable !== false }));
+        const its = (ir.data ?? []).filter((i) => i.job_id === j.id && inRange(String(i.date))).map((i) => ({ kind: i.kind as "material" | "expense", quantity: Number(i.quantity), unitPrice: Number(i.unit_price) }));
+        const t = jobTotals(es, its, j.hourly_rate != null ? Number(j.hourly_rate) : null);
+        return { title: j.title, client: nameOf(j), address: j.address, stage: j.paid_at ? "Greitt" : j.invoiced_at ? "Reikningur sendur" : j.status === "done" ? "Lokið" : "Í vinnslu", hours: t.hours, km: t.km, laborKr: t.labor, materialsKr: t.materials + t.expenses, totalWithVatKr: t.total };
+      }).filter((j) => !from && !to ? true : j.hours > 0 || j.materialsKr > 0);
+      const quotes = (qr.data ?? []).filter((q) => q.status === "sent" && (!want || (nameOf(q) ?? "").toLowerCase().includes(want))).map((q) => ({ number: q.number, title: q.title, client: nameOf(q), sentAt: q.sent_at, totalWithVatKr: quoteTotals((q.items ?? []) as never).total }));
+      return JSON.stringify({ period: from || to ? { from, to } : "allt", jobs, openQuotes: quotes, notInvoiced: jobs.filter((j) => j.stage === "Lokið").map((j) => j.title) });
+    }
     if (name === "planning_rules") {
       const rules = await getPlanningRules();
       return JSON.stringify(rules.length ? rules.map((r) => ({ id: r.id, text: r.text, active: r.active })) : { rules: [], note: "Engar planreglur vistaðar" });
@@ -683,6 +721,12 @@ export function describeWrite(name: string, input: In, lang: string): { ok: true
     case "ask_correction":
       if (!who || !okDate(input.date) || !str(input.message).trim()) return { ok: false, error: "Vantar starfsmann, dagsetningu eða skilaboð" };
       return { ok: true, summary: en ? `Ask ${who} for the correct time on ${input.date}: "${str(input.message).slice(0, 160)}"` : `Biðja ${who} um réttan tíma ${input.date}: „${str(input.message).slice(0, 160)}“` };
+    case "draft_quote": {
+      const items = Array.isArray(input.items) ? (input.items as { quantity?: number; unitPrice?: number }[]) : [];
+      if (!str(input.title) || !items.length) return { ok: false, error: "Vantar heiti og línur" };
+      const net = Math.round(items.reduce((a, i) => a + (Number(i.quantity) || 0) * (Number(i.unitPrice) || 0), 0));
+      return { ok: true, summary: `${en ? "Save quote draft" : "Vista drög að tilboði"}: ${str(input.title)}${str(input.client) ? ` (${str(input.client)})` : ""} — ${items.length} ${en ? "lines" : "línur"}, ${net.toLocaleString("is-IS")} kr. ${en ? "excl. VAT" : "án vsk."}` };
+    }
     case "save_planning_rule": {
       const t = str(input.text).trim();
       if (t.length < 3) return { ok: false, error: "Vantar texta reglunnar" };
@@ -779,6 +823,13 @@ export async function executeWrite(name: string, input: In): Promise<{ ok: boole
       if (!hits.length) return { ok: false, error: `Starfsmaður fannst ekki: ${str(input.employee)}` };
       if (hits.length > 1) return { ok: false, error: `Fleiri en einn passar: ${hits.map((e) => e.fullName).join(", ")}` };
       return askForCorrection({ employeeId: hits[0].id, date: str(input.date), message: str(input.message) });
+    }
+    case "draft_quote": {
+      const { saveQuote, listJobs } = await import("@/app/(app)/verk/actions");
+      let clientId: string | null = null;
+      const want = str(input.client).trim().toLowerCase();
+      if (want) clientId = (await listJobs()).clients.find((c) => c.name.toLowerCase().includes(want))?.id ?? null;
+      return saveQuote({ title: str(input.title), clientId, address: str(input.address), description: str(input.description), items: input.items });
     }
     case "save_planning_rule":
       return addPlanningRule(str(input.text), "ai");

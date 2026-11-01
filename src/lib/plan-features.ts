@@ -2,7 +2,7 @@
 // breyta á báðum stöðum. Öruggt í Client Components (engin server-köll).
 import { getPlan, type PlanId } from "@/lib/plans";
 
-export const PLAN_RANK: Record<PlanId, number> = { free: 0, grunnur: 1, voxtur: 2, rekstur: 3 };
+export const PLAN_RANK: Record<PlanId, number> = { free: 0, verktaki: 1, grunnur: 1, voxtur: 2, rekstur: 3 };
 export const PLAN_IDS = Object.keys(PLAN_RANK) as PlanId[];
 
 export type Feature =
@@ -27,14 +27,14 @@ export const FEATURE_MIN: Record<Feature, PlanId> = {
 
 /** Hámarksfjöldi starfsmanna (ekki óvirkra) og staða per leið; null = ótakmarkað. */
 export const PLAN_LIMITS: Record<PlanId, { employees: number | null; locations: number | null }> = {
-  free: { employees: 5, locations: 1 }, grunnur: { employees: null, locations: 1 }, voxtur: { employees: null, locations: null }, rekstur: { employees: null, locations: null },
+  free: { employees: 5, locations: 1 }, verktaki: { employees: null, locations: 1 }, grunnur: { employees: null, locations: 1 }, voxtur: { employees: null, locations: null }, rekstur: { employees: null, locations: null },
 };
 
 export const asPlan = (p: unknown): PlanId => (typeof p === "string" && p in PLAN_RANK ? (p as PlanId) : "voxtur");
 export const planAllows = (plan: PlanId, f: Feature) => PLAN_RANK[plan] >= PLAN_RANK[FEATURE_MIN[f]];
 
 // Þágufall leiðanna: „Í boði í Grunni“.
-const DAT: Record<PlanId, string> = { free: "Fríu leiðinni", grunnur: "Grunni", voxtur: "Vexti", rekstur: "Rekstri" };
+const DAT: Record<PlanId, string> = { free: "Fríu leiðinni", verktaki: "Verktakaleiðinni", grunnur: "Grunni", voxtur: "Vexti", rekstur: "Rekstri" };
 export const planName = (p: PlanId) => getPlan(p).name;
 
 /** „Í boði í Grunni — sjá verð“ (hlekkurinn á /verd bætist við í viðmótinu). */

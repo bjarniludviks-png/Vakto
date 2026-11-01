@@ -1,4 +1,4 @@
-// Leiðir VAKTO (okt. 2026): Frítt / Grunnur / Vöxtur / Rekstur.
+// Leiðir VAKTO (okt. 2026): Frítt / Verktaki / Grunnur / Vöxtur / Rekstur.
 // EINI staðurinn sem tölur leiðanna eru skilgreindar — verðsíðan (/verd), forsíðan, spjallgaurinn
 // og reikningagerðin lesa allar héðan. Engin import: má nota jafnt í server- og client-kóða.
 // Öll verð í kr á mánuði, án VSK.
@@ -7,7 +7,9 @@
 // Frítt: allt að 5 starfsmenn, 1 staður, aðeins á vefnum. Ekki hægt að bæta við starfsmönnum
 // (extraPerEmployee = null) og engin VAKTO AI.
 
-export type PlanId = "free" | "grunnur" | "voxtur" | "rekstur";
+/** Leiðir fyrirtækja (verðsíðan /verd og cheapestPlan). */
+export type TeamPlanId = "free" | "grunnur" | "voxtur" | "rekstur";
+export type PlanId = TeamPlanId | "verktaki";
 
 export type Plan = {
   id: PlanId;
@@ -23,12 +25,16 @@ export type Plan = {
   aiQuestions: number;
 };
 
-export const PLANS: readonly Plan[] = [
+export const PLANS: readonly (Plan & { id: TeamPlanId })[] = [
   { id: "free", name: "Frítt", base: 0, included: 5, extraPerEmployee: null, aiQuestions: 0 },
   { id: "grunnur", name: "Grunnur", base: 9990, included: 8, extraPerEmployee: 1190, aiQuestions: 25 },
   { id: "voxtur", name: "Vöxtur", base: 24990, included: 25, extraPerEmployee: 990, aiQuestions: 100 },
   { id: "rekstur", name: "Rekstur", base: 54990, included: 60, extraPerEmployee: 790, aiQuestions: 300 },
 ];
+
+/** Verktakaleiðin (VAKTO Verk, 0102): einyrki eða lítið verktakateymi — verk, tímar, myndir, samþykkt
+ *  viðskiptavinar og AI. Utan PLANS svo hún birtist ekki í verðtöflu fyrirtækja né í cheapestPlan. */
+export const VERKTAKI_PLAN: Plan = { id: "verktaki", name: "Verktaki", base: 2990, included: 1, extraPerEmployee: 1490, aiQuestions: 15 };
 
 /** Viðbót við VAKTO AI: 1.490 kr fyrir hverjar 50 spurningar umfram (aðeins ef stjórnandi kveikir, með hámarki). */
 export const AI_PACK = { price: 1490, questions: 50 } as const;
@@ -42,7 +48,7 @@ export const TRIAL_DAYS = 14;
 export const QUOTE_ABOVE_EMPLOYEES = 150;
 
 export function getPlan(id: PlanId): Plan {
-  return PLANS.find((p) => p.id === id)!;
+  return id === "verktaki" ? VERKTAKI_PLAN : PLANS.find((p) => p.id === id)!;
 }
 
 /** Mánaðarverð þegar greitt er árlega (námundað að 10 kr), t.d. 9.990 → 8.490. */

@@ -5,6 +5,7 @@ import { getPendingRequests } from "../vaktaplan/requests.server";
 import { getMyScope, scopeRows } from "@/lib/scope.server";
 import { checkNoShows } from "@/lib/noshow.server";
 import { after } from "next/server";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import type { DashPrefs } from "./widgets";
@@ -24,7 +25,18 @@ async function me(): Promise<{ name: string; prefs: DashPrefs | null }> {
   } catch { return { name: "", prefs: null }; }
 }
 
+/** Verktakahamur (0102): einyrki á ekkert mælaborð vakta — upphafssíðan er Verk. */
+async function isSolo(): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase.from("companies").select("account_kind").limit(1).maybeSingle();
+    return data?.account_kind === "solo";
+  } catch { return false; }
+}
+
 export default async function MaelabordPage() {
+  if (await isSolo()) redirect("/verk");
   after(() => checkNoShows());
   const scope = await getMyScope();
   const [view, board, reqs, name, due] = await Promise.all([getDashboard(scope.departments), getWhoIsOn(), getPendingRequests(), me(), scope.role === "owner" ? getSettlementsDue() : Promise.resolve([])]); // lokauppgjör: Launakeyrslur eru aðeins fyrir eiganda

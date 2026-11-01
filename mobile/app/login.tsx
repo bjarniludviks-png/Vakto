@@ -171,7 +171,7 @@ export default function Login() {
               {note ? <Txt color={colors.good} size={13}>{note}</Txt> : null}
               <Btn title="Skrá inn" size="lg" onPress={signIn} loading={busy} />
               <Muted size={12.5} style={{ textAlign: "center", lineHeight: 18, marginTop: 6 }}>
-                Ertu ekki með aðgang? Vinnuveitandinn þinn býður þér í VAKTO og þú færð boð í tölvupósti.
+                Ertu ekki með aðgang? Starfsfólk fær boð frá vinnuveitanda í tölvupósti. Verktakar skrá sig inn með sama aðgangi og á vefnum.
               </Muted>
             </Animated.View>
           </ScrollView>

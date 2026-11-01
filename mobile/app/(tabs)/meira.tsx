@@ -3,7 +3,7 @@ import React, { useCallback, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
 import { View, Pressable, Alert } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
-import { IdCard, FolderOpen, Gauge, FileText, FileCheck, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight, HeartPulse } from "lucide-react-native";
+import { IdCard, FolderOpen, Gauge, FileText, FileCheck, LogOut, Clock, Users, Settings, CheckCircle2, ChevronRight, HeartPulse, Briefcase } from "lucide-react-native";
 import { Screen, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, List, Row, IconBox, Eyebrow, Bar, Pill, iconColor } from "../../src/components/ui";
 import { colors, useTheme } from "../../src/theme";
@@ -74,6 +74,7 @@ export default function Eg() {
         <Row icon={<IconBox tone="info"><FolderOpen color={iconColor("info")} size={19} /></IconBox>} title="Skjöl" sub="Ráðningarsamningur, HACCP, handbækur" onPress={() => router.push("/skjol")} />
         <Row icon={<IconBox tone="brand"><FileCheck color={iconColor("brand")} size={19} /></IconBox>} title="Vinnuyfirlit" sub="Staðfestu tímana þína fyrir tímabilið" onPress={() => router.push("/vinnuyfirlit")} />
         <Row icon={<IconBox tone="good"><CheckCircle2 color={iconColor("good")} size={19} /></IconBox>} title="Beiðnir" sub={reqCount ? `${pending} í bið · ${reqCount} alls` : "Frí, vaktaskipti, leiðréttingar"} onPress={() => router.push("/beidnir")} />
+        {me && !me.solo && (me.role === "owner" || me.role === "manager" || me.role === "contractor") ? <Row icon={<IconBox><Briefcase color={colors.ink2} size={19} /></IconBox>} title="Verk" sub="Verk, tímar og verkskýrslur" onPress={() => router.push("/verk")} /> : null}
         <Row icon={<IconBox><Clock color={colors.ink2} size={19} /></IconBox>} title="Tímar og stimplanir" sub={pay ? trf("{n} klst í {x}", dec1(pay.earnedH), pay.monthLabel.split(" ")[0]) : "Stimplanirnar þínar"} onPress={() => router.push("/timar")} />
         <Row icon={<IconBox><Users color={colors.ink2} size={19} /></IconBox>} title="Samstarfsfólk" sub="Hverjir vinna með þér" onPress={() => router.push("/samstarfsfolk")} last />
       </List>
