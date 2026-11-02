@@ -5,7 +5,8 @@ import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { nf, dec1, krCompact } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
-import { publishSchedule, updateLeaveRequest, approveShiftSwap, rejectShiftSwap, saveShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, getWeekBudget, type ShiftInput } from "./actions";
+import { publishSchedule, updateLeaveRequest, approveShiftSwap, rejectShiftSwap, saveShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, getWeekBudget, getDraftCount, publishRange, type ShiftInput } from "./actions";
+import { offerUndo } from "./undo-delete";
 import { getCompanyDepartments, getDepartmentColors } from "../starfsfolk/actions";
 import { DeptPicker } from "@/components/app/controls";
 import { getDashboardPeriod } from "../maelabord/actions";
@@ -123,6 +124,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [sel, setSel] = useState<{ r: number; c: number }>({ r: 0, c: 0 });
   const [monthShifts, setMonthShifts] = useState<Record<string, { first: string; start: string; end: string; ref: string; tn?: string }[]>>({});
   const [monthVer, setMonthVer] = useState(0);
+  const [rosterKey, setRosterKey] = useState(0);
   const [dayModal, setDayModal] = useState<Date | null>(null);
   const monthDragRef = useRef<{ first: string; ref: string; start: string; end: string; fromISO: string; tn?: string } | null>(null);
   const [monthClip, setMonthClip] = useState<{ first: string; ref: string; start: string; end: string; tn?: string } | null>(null);
@@ -326,7 +328,8 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     if (liveCompany) {
       const dates = weekDays.map((d) => fmtISO(d));
       const res = await deleteWeekShifts(dates);
-      toast(res.ok ? `${t("Vika hreinsuð")}${res.count ? ` — ${res.count} ${t("vöktum eytt")}` : ""}` : (res.error ?? "Villa"));
+      if (res.ok && res.deleted?.length) offerUndo(res.deleted, t, reloadWeek);
+      else toast(res.ok ? t("Vika hreinsuð") : (res.error ?? "Villa"));
     } else {
       toast(t("Vika hreinsuð"));
     }
@@ -528,7 +531,33 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     });
     return out;
   }
+  // Útgáfa: drög á opna tímabilinu (vika / dagur / mánuður) → „Gefa út plan (N)“, annars „✓ Plan útgefið“.
+  const pubFrom = view === "Dagur" ? fmtISO(cur) : view === "Mánuður" ? fmtISO(new Date(cur.getFullYear(), cur.getMonth(), 1)) : fmtISO(weekDays[0]);
+  const pubTo = view === "Dagur" ? fmtISO(cur) : view === "Mánuður" ? fmtISO(new Date(cur.getFullYear(), cur.getMonth() + 1, 0)) : fmtISO(weekDays[6]);
+  const [drafts, setDrafts] = useState<number | null>(null);
+  const [pubVer, setPubVer] = useState(0);
+  const [publishing, setPublishing] = useState(false);
+  useEffect(() => {
+    if (!liveCompany) return;
+    let gone = false;
+    // Smá bið: vistanir fara á þjóninn um leið og gridið breytist.
+    const tm = setTimeout(() => { getDraftCount(pubFrom, pubTo).then((r) => { if (!gone && r.ok) setDrafts(r.count); }); }, 900);
+    return () => { gone = true; clearTimeout(tm); };
+  }, [liveCompany, pubFrom, pubTo, grid, cellTimes, cellTypes, monthTot, monthVer, pubVer]);
+
   async function publish() {
+    if (liveCompany) {
+      if (!drafts) { toast(t("Planið er þegar útgefið — engar óútgefnar breytingar.")); return; }
+      if (view === "Vika" && planPct != null && planPct > laborTarget
+        && !window.confirm(`${t("Áætluð laun eru")} ${dec1(planPct)} % ${t("af veltuspá vikunnar — markmiðið er")} ${dec1(laborTarget)} %. ${t("Birta samt?")}`)) return;
+      setPublishing(true);
+      const res = await publishRange(pubFrom, pubTo);
+      setPublishing(false);
+      if (!res.ok) { toast(res.error ?? t("Tókst ekki að gefa út planið")); return; }
+      setDrafts(0); setPubVer((v) => v + 1); setRosterKey((k) => k + 1); setMonthVer((v) => v + 1);
+      toast(`${t("Plan gefið út")} — ${res.count ?? 0} ${t("vaktir")} · ${res.people ?? 0} ${t("starfsmenn fengu tilkynningu")}`);
+      return;
+    }
     if (planPct != null && planPct > laborTarget
       && !window.confirm(`${t("Áætluð laun eru")} ${dec1(planPct)} % ${t("af veltuspá vikunnar — markmiðið er")} ${dec1(laborTarget)} %. ${t("Birta samt?")}`)) return;
     const res = await publishSchedule(buildShiftPayload());
@@ -716,7 +745,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     setModal(null);
     if (liveCompany) {
       deleteShift({ employeeName: empRef(emp[r]), dateISO: fmtISO(weekDays[c]) })
-        .then((res) => toast(res.ok ? "Vakt eydd" : (res.error ?? "Villa")));
+        .then((res) => { if (res.ok) offerUndo(res.deleted, t, reloadWeek); else toast(res.error ?? "Villa"); });
     } else toast("Vakt eydd (demo)");
   }
   /** Veikindi skráð á vaktina: hún er orðin laus vakt á þjóninum (registerAbsence) — tökum hana úr gridinu. */
@@ -870,7 +899,18 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     <div className={`db2x${full ? " sched-full" : ""}`}>
       <div className="db2-top">
         <div><h1>{t("Vaktaplan")}</h1><div className="db2-sub">{t("Dragðu vaktir til, sjáðu kostnaðinn strax og birtu planið.")}</div></div>
-        <button className="btn" onClick={publish}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Birta plan")}</button>
+        {liveCompany && drafts === 0 ? (
+          <button className="btn pub-done" onClick={publish} title={t("Allar vaktir á þessu tímabili eru útgefnar. Nýjar breytingar verða drög þar til þú gefur út aftur.")}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M5 12.5l4 4 10-10" /></svg>{t("Plan útgefið")}
+          </button>
+        ) : (
+          <button className="btn pub-state" onClick={publish} disabled={publishing}
+            title={liveCompany && drafts ? t("Starfsfólk sér ekki drög fyrr en planið er gefið út.") : undefined}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>
+            {publishing ? t("Gef út…") : t("Birta plan")}
+            {liveCompany && !!drafts && <span className="n">{drafts}</span>}
+          </button>
+        )}
       </div>
 
       <div className="stoolbar">
@@ -1126,7 +1166,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       {view === "Mánuður" && liveCompany && monthMode === "tafla" && (
         <MonthRoster month={cur} todayISO={todayISO} types={types} deptSel={depts} scopeDepts={scopeDepts}
           onOpenDay={(d) => { setCur(d); setView("Dagur"); setFull(false); }} onTotals={setMonthTot}
-          full={full} onToggleFull={() => setFull((v) => !v)} onTypes={() => setModal("types")} />
+          full={full} onToggleFull={() => setFull((v) => !v)} onTypes={() => setModal("types")} reloadKey={rosterKey} />
       )}
       {view === "Mánuður" && (!liveCompany || monthMode === "dagatal") && <MonthView monthDate={cur} todayISO={todayISO} blocks={monthBlocks}
         onEdit={(d) => { if (monthClip) { void pasteMonthShift(fmtISO(d)); } else setDayModal(d); }}
@@ -1141,7 +1181,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
           ...(monthClip ? [{ label: t("Líma hér"), act: () => { void pasteMonthShift(iso); } }] : []),
           { label: t("Eyða vakt"), danger: true, act: () => {
             if (!liveCompany) { toast("Vakt eydd (demo)"); return; }
-            void deleteShift({ employeeName: b.ref, dateISO: iso }).then((res) => { setMonthVer((v) => v + 1); toast(res.ok ? "Vakt eydd" : (res.error ?? "Villa")); });
+            void deleteShift({ employeeName: b.ref, dateISO: iso }).then((res) => { setMonthVer((v) => v + 1); if (res.ok) offerUndo(res.deleted, t, () => setMonthVer((v) => v + 1)); else toast(res.error ?? "Villa"); });
           } },
         ])}
         onCtxDay={(d, ev) => openCtx(ev, [
@@ -1432,7 +1472,9 @@ function MonthShiftModal({ date, entries, names, types, onClose, onChanged, onOp
     setBusy(true);
     const res = await deleteShift({ employeeName: r.ref, dateISO: iso });
     setBusy(false);
-    toast(res.ok ? (res.demo ? "Eytt (demo)" : tr("Vakt eytt")) : (res.error ?? "Villa"));
+    if (!res.ok) toast(res.error ?? "Villa");
+    else if (res.demo) toast("Eytt (demo)");
+    else offerUndo(res.deleted, tr, onChanged);
     if (res.ok) { setRows((rs) => rs.filter((_, j) => j !== i)); setEditing(null); onChanged(); }
   }
 

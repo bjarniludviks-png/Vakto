@@ -75,7 +75,7 @@ export async function getPlan(weekStartISO: string): Promise<{ live: boolean; sh
     const { data } = await allRows((a, b) => supabase
       .from("shifts")
       .select("id, date, start_time, end_time, employee_id, employees:coworkers(full_name, avatar_color, departments(name, color)), shift_types(name, color)")
-      .eq("company_id", ctx.company)
+      .eq("company_id", ctx.company).eq("published", true) // drög sjást ekki fyrr en planið er gefið út
       .gte("date", from).lte("date", to)
       .order("date").order("start_time").order("id").range(a, b));
 

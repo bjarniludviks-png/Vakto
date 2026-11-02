@@ -50,7 +50,7 @@ export async function sendDigests(now = new Date()): Promise<{ sent: number }> {
         .eq("company_id", company).gte("clock_in", fromTs).lte("clock_in", toTs).order("id").range(a, b));
       if (!punches?.length) continue; // no activity → no email
       const { data: shifts } = await allRows((a, b) => admin
-        .from("shifts").select("id, employee_id, date, start_time, end_time").eq("company_id", company)
+        .from("shifts").select("id, employee_id, date, start_time, end_time").eq("company_id", company).eq("published", true)
         .gte("date", p.from).lte("date", p.to).order("id").range(a, b));
       const scheduled = new Set((shifts ?? []).map((x) => `${x.employee_id}:${x.date}`));
 

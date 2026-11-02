@@ -6,6 +6,7 @@ import { useLang } from "@/components/app/lang";
 import { dec1 } from "@/lib/format";
 import { getPlan, saveShift, deleteShift, copyShifts, clearShifts, type PlanShift, type PlanLeave } from "./actions";
 import type { PlanEmp } from "./roster.server";
+import { offerUndo } from "./undo-delete";
 import { ShiftForm, ShiftSheet, PaintTools, typeTimes, defaultsFor, type ShiftType, type PaintTool } from "./shift-form";
 
 // Mánaðarplan sem starfsmannatafla: starfsfólk í röðum, dagar mánaðarins í dálkum.
@@ -26,11 +27,13 @@ const hrs = (a: string, b: string) => {
 };
 const short = (t: string) => (t.endsWith(":00") ? t.slice(0, 2) : t);
 
-export default function MonthRoster({ month, todayISO, types, deptSel, scopeDepts, onOpenDay, onTotals, full, onToggleFull, onTypes }: {
+export default function MonthRoster({ month, todayISO, types, deptSel, scopeDepts, onOpenDay, onTotals, full, onToggleFull, onTypes, reloadKey = 0 }: {
   month: Date; todayISO: string; types: ShiftType[]; deptSel: string[]; scopeDepts: string[];
   onOpenDay: (d: Date) => void; onTotals: (x: { hrs: number; shifts: number; list: { emp: string; date: string; start: string; end: string }[] }) => void; full: boolean; onToggleFull: () => void;
   /** Opnar vaktategundaglugga Vaktaplansins. */
   onTypes?: () => void;
+  /** Breytist þegar foreldrið vill að planið sé sótt aftur (t.d. eftir útgáfu). */
+  reloadKey?: number;
 }) {
   const { t } = useLang();
   const y = month.getFullYear(), m = month.getMonth();
@@ -56,7 +59,7 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
       setEmps(res.employees); setShifts(res.shifts); setLeave(res.leave);
     });
     return () => { gone = true; };
-  }, [from, to, ver]); // eslint-disable-line react-hooks/exhaustive-deps -- t breytist ekki
+  }, [from, to, ver, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps -- t breytist ekki
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { setTool(null); setMenu(false); } };
@@ -98,7 +101,9 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
   const put = useCallback(async (emp: PlanEmp, date: string, start: string, end: string, type: string | null) => {
     const key = `${emp.id}|${date}`;
     const prev = shifts;
-    setShifts((ss) => [...ss.filter((s) => `${s.employeeId}|${s.date}` !== key), { id: `tmp-${key}`, employeeId: emp.id, date, start, end, type }]);
+    const old = shifts.find((s) => `${s.employeeId}|${s.date}` === key);
+    const draft = !(old && !old.draft && old.start === start && old.end === end); // sama regla og saveShift
+    setShifts((ss) => [...ss.filter((s) => `${s.employeeId}|${s.date}` !== key), { id: `tmp-${key}`, employeeId: emp.id, date, start, end, type, draft }]);
     const res = await saveShift({ employeeName: emp.id, date, startTime: start, endTime: end, shiftTypeName: type ?? "" });
     if (!res.ok) { setShifts(prev); toast(res.error ?? t("Tókst ekki að vista vaktina")); }
     return res.ok;
@@ -108,7 +113,8 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
     const prev = shifts;
     setShifts((ss) => ss.filter((s) => `${s.employeeId}|${s.date}` !== key));
     const res = await deleteShift({ employeeName: emp.id, dateISO: date });
-    if (!res.ok) { setShifts(prev); toast(res.error ?? t("Tókst ekki að eyða vaktinni")); }
+    if (!res.ok) { setShifts(prev); toast(res.error ?? t("Tókst ekki að eyða vaktinni")); return; }
+    offerUndo(res.deleted, t, () => setVer((v) => v + 1));
   }, [shifts, t]);
 
   function clickCell(emp: PlanEmp, date: string) {
@@ -156,11 +162,12 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
     setVer((v) => v + 1);
   }
   async function clearMonth() {
-    if (!window.confirm(t("Eyða öllum vöktum mánaðarins hjá starfsfólkinu sem sést? Þetta er ekki hægt að afturkalla."))) return;
+    if (!window.confirm(t("Eyða öllum vöktum mánaðarins hjá starfsfólkinu sem sést?"))) return;
     setBusy(true); setMenu(false);
     const res = await clearShifts({ dates: days.map(iso), employeeIds: visibleIds() });
     setBusy(false);
-    toast(res.ok ? `${res.count ?? 0} ${t("vöktum eytt")}` : (res.error ?? "Villa"));
+    if (res.ok && res.deleted?.length) offerUndo(res.deleted, t, () => setVer((v) => v + 1));
+    else toast(res.ok ? `${res.count ?? 0} ${t("vöktum eytt")}` : (res.error ?? "Villa"));
     setVer((v) => v + 1);
   }
   // Mánudagar sem byrja viku innan mánaðarins — til að velja „endurtaka viku“.
@@ -242,7 +249,7 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
                       <td key={ds} className={`${wd >= 5 ? "we" : ""}${ds === todayISO ? " tod" : ""}${tool ? " paint" : ""}`} onClick={() => clickCell(e, ds)}
                         onContextMenu={(ev) => { if (s) { ev.preventDefault(); setTool({ kind: "clip", start: s.start, end: s.end, type: s.type }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } }}
                         title={s ? `${e.name} · ${s.start}–${s.end}${s.type ? ` · ${t(s.type)}` : ""}` : lv ? t(LEAVE_LBL[lv.type] ?? "Frí") : undefined}>
-                        {s ? <span className="sh" style={typeStyle(s)}>{short(s.start)}<i>{short(s.end)}</i></span>
+                        {s ? <span className={`sh${s.draft ? " draft" : ""}`} style={typeStyle(s)} title={s.draft ? t("Drög — ekki útgefið") : undefined}>{short(s.start)}<i>{short(s.end)}</i></span>
                           : lv ? <span className="lv">{t(LEAVE_LBL[lv.type] ?? "Frí")}</span> : null}
                       </td>
                     );
@@ -273,7 +280,7 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
         <CellEditor emp={edit.emp} date={edit.date} shift={editShift} types={types} leave={leaveOf(edit.emp.id, edit.date)} monthName={t(MONTHS_IS[m])}
           onClose={() => setEdit(null)}
           onSave={async (st, en, ty) => { setEdit(null); if (await put(edit.emp, edit.date, st, en, ty)) toast(t("Vakt vistuð")); }}
-          onDelete={async () => { setEdit(null); await drop(edit.emp, edit.date); toast(t("Vakt eydd")); }}
+          onDelete={async () => { setEdit(null); await drop(edit.emp, edit.date); }}
           onSick={() => { setEdit(null); setVer((v) => v + 1); }}
           onCopy={() => { if (editShift) { setTool({ kind: "clip", start: editShift.start, end: editShift.end, type: editShift.type }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } setEdit(null); }} />
       )}

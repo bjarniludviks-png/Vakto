@@ -520,7 +520,7 @@ export async function getEmployeePayRule(id: string): Promise<CustomRules | null
 }
 
 /** Deactivate (or reactivate) an employee — keeps all history. */
-export async function setEmployeeStatus(id: string, active: boolean): Promise<ActionResult> {
+export async function setEmployeeStatus(id: string, active: boolean, opts?: { dropFutureShifts?: boolean }): Promise<ActionResult & { droppedShifts?: number }> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   if (id.startsWith("e") && id.length <= 3) return { ok: true, demo: true }; // demo row id
@@ -528,6 +528,13 @@ export async function setEmployeeStatus(id: string, active: boolean): Promise<Ac
     const supabase = await createClient();
     const { error } = await supabase.from("employees").update({ status: active ? "active" : "inactive" }).eq("id", id);
     if (error) return { ok: false, error: userError(error) };
+    // Óvirkjun: vaktir frá og með morgundeginum má fjarlægja í leiðinni (liðnar vaktir haldast — saga).
+    let droppedShifts = 0;
+    if (!active && opts?.dropFutureShifts) {
+      const tm = new Date(); tm.setDate(tm.getDate() + 1);
+      const { data: gone } = await supabase.from("shifts").delete().eq("employee_id", id).gte("date", tm.toISOString().slice(0, 10)).select("id");
+      droppedShifts = gone?.length ?? 0;
+    }
     const { data: { user } } = await supabase.auth.getUser();
     const company = await companyId(supabase);
     if (company) await logAudit(supabase, company, user?.id ?? null, {
@@ -536,7 +543,7 @@ export async function setEmployeeStatus(id: string, active: boolean): Promise<Ac
     // Endurráðning: starfslok (0088) falla úr gildi og innskráning opnast aftur (RLS staðfesti aðganginn hér að ofan).
     if (active && company) await (await import("@/lib/terminations-cron.server")).reopenAfterRehire(company, id, user?.id ?? null).catch((e) => console.error("[reopenAfterRehire]", e));
     revalidatePath("/starfsfolk");
-    return { ok: true };
+    return { ok: true, droppedShifts };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
   }
