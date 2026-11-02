@@ -34,7 +34,7 @@ export async function getPlanningHistory(supabase: Db, companyId: string, from: 
   const [empRes, shiftRes, punchRes, locRes] = await Promise.all([
     supabase.from("employees").select("id, full_name, departments(name)").eq("company_id", companyId),
     allRows((a, b) => supabase.from("shifts").select("id, employee_id, date, start_time, end_time")
-      .eq("company_id", companyId).not("employee_id", "is", null).gte("date", from).lte("date", to).order("id").range(a, b)),
+      .eq("company_id", companyId).eq("pending_delete", false).not("employee_id", "is", null).gte("date", from).lte("date", to).order("id").range(a, b)),
     allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
       .eq("company_id", companyId).gte("clock_in", from).lte("clock_in", `${to}T23:59:59`).order("id").range(a, b)),
     supabase.from("locations").select("id").eq("company_id", companyId),

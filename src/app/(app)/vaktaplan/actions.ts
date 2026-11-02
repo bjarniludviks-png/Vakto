@@ -111,10 +111,29 @@ export type DecisionResult = { ok: boolean; demo?: boolean; error?: string };
 
 /** Afrit af eyddri vakt — svo „Afturkalla“ geti sett hana aftur inn nákvæmlega eins. */
 export type ShiftSnap = {
-  employee_id: string | null; date: string; start_time: string | null; end_time: string | null;
+  id?: string; employee_id: string | null; date: string; start_time: string | null; end_time: string | null;
   shift_type_id: string | null; status: string; published: boolean; note: string | null; location_id: string | null;
+  /** Útgefin vakt sem var aðeins merkt til eyðingar — „Afturkalla“ tekur merkið af í stað þess að setja inn. */
+  pending?: boolean;
 };
-const SNAP_COLS = "employee_id, date, start_time, end_time, shift_type_id, status, published, note, location_id";
+const SNAP_COLS = "id, employee_id, date, start_time, end_time, shift_type_id, status, published, note, location_id";
+
+type Sb = Awaited<ReturnType<typeof createClient>>;
+/** Taka vaktir úr vinnuplaninu. Drögum er eytt strax; ÚTGEFNAR vaktir fá pending_delete og starfsfólk
+ * sér þær áfram þar til planið er gefið út næst (þá er þeim eytt). Skilar afriti fyrir „Afturkalla“. */
+async function retireShifts(supabase: Sb, rows: (ShiftSnap & { id: string })[]): Promise<{ snaps: ShiftSnap[]; error?: string }> {
+  const drafts = rows.filter((r) => !r.published).map((r) => r.id);
+  const pubs = rows.filter((r) => r.published).map((r) => r.id);
+  for (let i = 0; i < drafts.length; i += 200) {
+    const { error } = await supabase.from("shifts").delete().in("id", drafts.slice(i, i + 200));
+    if (error) return { snaps: [], error: userError(error) };
+  }
+  for (let i = 0; i < pubs.length; i += 200) {
+    const { error } = await supabase.from("shifts").update({ pending_delete: true }).in("id", pubs.slice(i, i + 200));
+    if (error) return { snaps: [], error: userError(error) };
+  }
+  return { snaps: rows.map((r) => (r.published ? { ...r, pending: true } : r)) };
+}
 
 function weekCodeForStart(start: string | null): string {
   const h = parseInt((start ?? "").slice(0, 2), 10);
@@ -158,7 +177,7 @@ export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; gri
     });
     const { data: shifts } = await allRows((a, b) => supabase
       .from("shifts").select("id, employee_id, date, start_time, end_time, published, shift_types(name)")
-      .eq("company_id", ctx.company).in("date", dates).order("id").range(a, b));
+      .eq("company_id", ctx.company).eq("pending_delete", false).in("date", dates).order("id").range(a, b));
 
     const idIndex = new Map(employees.map((e, i) => [e.id, i]));
     const grid: string[][] = employees.map(() => Array(7).fill("off"));
@@ -245,22 +264,30 @@ export async function saveShift(input: Omit<ShiftInput, "date"> & { date?: strin
     const shiftDate = input.date || new Date().toISOString().slice(0, 10);
     // Ný eða breytt vakt er DRÖG — starfsfólk sér hana ekki fyrr en planið er gefið út.
     // Undantekning: aðeins vaktategund (litur/álag) breytt á útgefinni vakt — tímarnir eru þeir sömu.
-    const { data: prev } = await supabase.from("shifts").select("start_time, end_time, published")
-      .eq("company_id", ctx.company).eq("employee_id", employee_id).eq("date", shiftDate).limit(1).maybeSingle();
-    const same = !!prev?.published && hm(prev.start_time) === hm(input.startTime) && hm(prev.end_time) === hm(input.endTime);
-    // One shift per employee per day cell — replace any existing one.
-    await supabase.from("shifts").delete()
+    // Útgefna vaktin í reitnum helst hjá starfsfólki (pending_delete) þar til nýtt plan er gefið út.
+    const { data: cell } = await supabase.from("shifts").select("id, start_time, end_time, published, pending_delete")
       .eq("company_id", ctx.company).eq("employee_id", employee_id).eq("date", shiftDate);
-    const { error } = await supabase.from("shifts").insert({
-      company_id: ctx.company,
-      employee_id,
-      shift_type_id: shift_type_id ?? null,
-      date: shiftDate,
-      start_time: input.startTime,
-      end_time: input.endTime,
-      status: same ? "published" : "draft",
-      published: same,
-    });
+    const sameTimes = (r: { start_time: unknown; end_time: unknown }) => hm(r.start_time) === hm(input.startTime) && hm(r.end_time) === hm(input.endTime);
+    const live = (cell ?? []).filter((r) => !r.pending_delete);
+    const livePub = live.find((r) => r.published);
+    const liveDrafts = live.filter((r) => !r.published).map((r) => r.id as string);
+    const retired = (cell ?? []).find((r) => r.pending_delete && sameTimes(r));
+    let error: { message: string } | null = null;
+    if (livePub && sameTimes(livePub)) {
+      // Aðeins vaktategund (litur/álag) breytt — vaktin helst útgefin.
+      ({ error } = await supabase.from("shifts").update({ shift_type_id: shift_type_id ?? null }).eq("id", livePub.id as string));
+    } else if (!livePub && retired) {
+      // Breytt aftur í útgefnu útgáfuna — engin drög, útgefna vaktin lifnar við.
+      if (liveDrafts.length) await supabase.from("shifts").delete().in("id", liveDrafts);
+      ({ error } = await supabase.from("shifts").update({ pending_delete: false, shift_type_id: shift_type_id ?? null }).eq("id", retired.id as string));
+    } else {
+      if (livePub) ({ error } = await supabase.from("shifts").update({ pending_delete: true }).eq("id", livePub.id as string));
+      if (!error && liveDrafts.length) ({ error } = await supabase.from("shifts").delete().in("id", liveDrafts));
+      if (!error) ({ error } = await supabase.from("shifts").insert({
+        company_id: ctx.company, employee_id, shift_type_id: shift_type_id ?? null, date: shiftDate,
+        start_time: input.startTime, end_time: input.endTime, status: "draft", published: false,
+      }));
+    }
     if (error) return { ok: false, error: userError(error) };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "shift.save", entity: "shift", detail: `Vakt vistuð — ${input.employeeName} ${input.startTime}–${input.endTime}`,
@@ -305,16 +332,15 @@ export async function deleteShift(input: { employeeName: string; dateISO: string
       .from("employees").select("id, full_name").eq("company_id", ctx.company);
     const employee_id = pickEmployee(emps, input.employeeName);
     if (!employee_id) return { ok: false, error: NO_EMP };
-    const { data: gone, error } = await supabase
-      .from("shifts").delete()
-      .eq("company_id", ctx.company).eq("employee_id", employee_id).eq("date", input.dateISO)
-      .select(SNAP_COLS);
-    if (error) return { ok: false, error: userError(error) };
+    const { data: cell } = await supabase.from("shifts").select(SNAP_COLS)
+      .eq("company_id", ctx.company).eq("employee_id", employee_id).eq("date", input.dateISO).eq("pending_delete", false);
+    const { snaps: gone, error } = await retireShifts(supabase, (cell ?? []) as unknown as (ShiftSnap & { id: string })[]);
+    if (error) return { ok: false, error };
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "shift.delete", entity: "shift", detail: `Vakt eydd — ${input.employeeName} ${input.dateISO}`,
     });
     revalidatePath("/vaktaplan");
-    return { ok: true, deleted: (gone ?? []) as ShiftSnap[] };
+    return { ok: true, deleted: gone };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
   }
@@ -334,7 +360,7 @@ export async function getShiftsInRange(fromISO: string, toISO: string): Promise<
     const meta = new Map(employees.map((e) => [e.id, { full: e.fullName, first: e.fullName.split(/\s+/)[0], dept: e.department ?? "" }]));
     const { data: shifts } = await allRows((a, b) => supabase
       .from("shifts").select("id, employee_id, date, start_time, end_time, shift_types(name)")
-      .eq("company_id", ctx.company).gte("date", fromISO).lte("date", toISO)
+      .eq("company_id", ctx.company).eq("pending_delete", false).gte("date", fromISO).lte("date", toISO)
       .order("date").order("start_time").order("id").range(a, b));
     const rows: ExportRow[] = (shifts ?? []).map((s) => {
       const m = meta.get(s.employee_id as string);
@@ -367,7 +393,7 @@ export async function getPlan(fromISO: string, toISO: string): Promise<{ ok: boo
     if (!live) return empty;
     const { data: rows } = await allRows((a, b) => supabase
       .from("shifts").select("id, employee_id, date, start_time, end_time, published, shift_types(name)")
-      .eq("company_id", ctx.company).not("employee_id", "is", null).gte("date", fromISO).lte("date", toISO)
+      .eq("company_id", ctx.company).eq("pending_delete", false).not("employee_id", "is", null).gte("date", fromISO).lte("date", toISO)
       .order("date").order("start_time").order("id").range(a, b));
     const shifts: PlanShift[] = (rows ?? []).map((s) => ({
       draft: s.published === false,
@@ -403,9 +429,9 @@ export async function copyShifts(input: { pairs: [string, string][]; employeeIds
     const src = [...new Set(pairs.map((p) => p[0]))], dst = [...new Set(pairs.map((p) => p[1]))];
     const { data: srcRows } = await allRows((a, b) => supabase.from("shifts")
       .select("employee_id, date, start_time, end_time, shift_type_id")
-      .eq("company_id", ctx.company).not("employee_id", "is", null).in("date", src).order("id").range(a, b));
+      .eq("company_id", ctx.company).eq("pending_delete", false).not("employee_id", "is", null).in("date", src).order("id").range(a, b));
     const { data: dstRows } = await allRows((a, b) => supabase.from("shifts")
-      .select("id, employee_id, date").eq("company_id", ctx.company).not("employee_id", "is", null).in("date", dst).order("id").range(a, b));
+      .select(SNAP_COLS).eq("company_id", ctx.company).eq("pending_delete", false).not("employee_id", "is", null).in("date", dst).order("id").range(a, b));
     const { data: lv } = await supabase.from("leave_requests").select("employee_id, from_date, to_date")
       .eq("company_id", ctx.company).eq("status", "approved").lte("from_date", dst.reduce((a, b) => (a > b ? a : b))).gte("to_date", dst.reduce((a, b) => (a < b ? a : b)));
     const onLeave = (eid: string, d: string) => (lv ?? []).some((l) => l.employee_id === eid && (l.from_date as string) <= d && (l.to_date as string) >= d);
@@ -425,11 +451,9 @@ export async function copyShifts(input: { pairs: [string, string][]; employeeIds
       }
     }
     if (input.overwrite) {
-      const ids = (dstRows ?? []).filter((r) => !only || only.has(r.employee_id as string)).map((r) => r.id as string);
-      for (let i = 0; i < ids.length; i += 200) {
-        const { error } = await supabase.from("shifts").delete().in("id", ids.slice(i, i + 200));
-        if (error) return { ok: false, error: userError(error) };
-      }
+      const old = (dstRows ?? []).filter((r) => !only || only.has(r.employee_id as string)) as unknown as (ShiftSnap & { id: string })[];
+      const { error } = await retireShifts(supabase, old);
+      if (error) return { ok: false, error };
     }
     for (let i = 0; i < rows.length; i += 500) {
       const { error } = await supabase.from("shifts").insert(rows.slice(i, i + 500));
@@ -455,15 +479,16 @@ export async function clearShifts(input: { dates: string[]; employeeIds?: string
     const supabase = await createClient();
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    let q = supabase.from("shifts").delete().eq("company_id", ctx.company).not("employee_id", "is", null).in("date", dates);
+    let q = supabase.from("shifts").select(SNAP_COLS).eq("company_id", ctx.company).eq("pending_delete", false).not("employee_id", "is", null).in("date", dates);
     if (input.employeeIds?.length) q = q.in("employee_id", input.employeeIds);
-    const { data: gone, error } = await q.select(SNAP_COLS);
-    if (error) return { ok: false, error: userError(error) };
+    const { data: rows } = await q;
+    const { snaps: gone, error } = await retireShifts(supabase, (rows ?? []) as unknown as (ShiftSnap & { id: string })[]);
+    if (error) return { ok: false, error };
     await logAudit(supabase, ctx.company, ctx.userId, {
-      action: "schedule.clear", entity: "shifts", detail: `Vaktir hreinsaðar — ${gone?.length ?? 0} vaktir (${dates[0]}…${dates[dates.length - 1]})`,
+      action: "schedule.clear", entity: "shifts", detail: `Vaktir hreinsaðar — ${gone.length} vaktir (${dates[0]}…${dates[dates.length - 1]})`,
     });
     revalidatePath("/vaktaplan");
-    return { ok: true, count: gone?.length ?? 0, deleted: (gone ?? []) as ShiftSnap[] };
+    return { ok: true, count: gone.length, deleted: gone };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
   }
@@ -725,14 +750,15 @@ export async function deleteWeekShifts(dates: string[]): Promise<{ ok: boolean; 
     const company = profile?.company_id as string | undefined;
     if (!company) return { ok: false, error: "Fyrirtæki fannst ekki" };
     // Lausar vaktir (employee_id null) haldast — þær eru ekki hluti af planinu sem kemur í staðinn.
-    const { data: gone, error } = await supabase.from("shifts").delete()
-      .eq("company_id", company).in("date", dates).not("employee_id", "is", null).select(SNAP_COLS);
-    if (error) return { ok: false, error: userError(error) };
+    const { data: rows } = await supabase.from("shifts").select(SNAP_COLS)
+      .eq("company_id", company).eq("pending_delete", false).in("date", dates).not("employee_id", "is", null);
+    const { snaps: gone, error } = await retireShifts(supabase, (rows ?? []) as unknown as (ShiftSnap & { id: string })[]);
+    if (error) return { ok: false, error };
     await logAudit(supabase, company, user.id, {
-      action: "schedule.clear", entity: "shifts", detail: `Vika hreinsuð — ${gone?.length ?? 0} vaktir (${dates[0]}…)`,
+      action: "schedule.clear", entity: "shifts", detail: `Vika hreinsuð — ${gone.length} vaktir (${dates[0]}…)`,
     });
     revalidatePath("/vaktaplan");
-    return { ok: true, count: gone?.length ?? 0, deleted: (gone ?? []) as ShiftSnap[] };
+    return { ok: true, count: gone.length, deleted: gone };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
   }
@@ -888,7 +914,7 @@ export async function getDraftCount(fromISO: string, toISO: string): Promise<{ o
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return { ok: false, count: 0 };
     const { count } = await supabase.from("shifts").select("id", { count: "exact", head: true })
-      .eq("company_id", ctx.company).eq("published", false).not("employee_id", "is", null)
+      .eq("company_id", ctx.company).or("published.eq.false,pending_delete.eq.true").not("employee_id", "is", null)
       .gte("date", fromISO).lte("date", toISO);
     return { ok: true, count: count ?? 0 };
   } catch {
@@ -896,8 +922,8 @@ export async function getDraftCount(fromISO: string, toISO: string): Promise<{ o
   }
 }
 
-/** Gefa út planið fyrir tímabilið sem er opið: öll drög verða útgefin og starfsfólkið
- * sem fékk nýjar/breyttar vaktir fær tilkynningu. Ekkert er eytt eða skrifað yfir. */
+/** Gefa út planið fyrir tímabilið sem er opið: vöktum sem bíða eyðingar er eytt, öll drög verða
+ * útgefin og starfsfólkið sem fékk nýjar/breyttar/fjarlægðar vaktir fær tilkynningu. */
 export async function publishRange(fromISO: string, toISO: string): Promise<{ ok: boolean; demo?: boolean; count?: number; people?: number; error?: string }> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true, count: 0 };
@@ -906,13 +932,18 @@ export async function publishRange(fromISO: string, toISO: string): Promise<{ ok
     const supabase = await createClient();
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
+    // Fyrst hverfa útgefnar vaktir sem var eytt/breytt, svo verða drögin útgefin.
+    const { data: gone, error: gErr } = await supabase.from("shifts").delete()
+      .eq("company_id", ctx.company).eq("pending_delete", true).not("employee_id", "is", null)
+      .gte("date", fromISO).lte("date", toISO).select("employee_id");
+    if (gErr) return { ok: false, error: userError(gErr) };
     const { data: done, error } = await supabase.from("shifts").update({ status: "published", published: true })
       .eq("company_id", ctx.company).eq("published", false).not("employee_id", "is", null)
       .gte("date", fromISO).lte("date", toISO).select("employee_id");
     if (error) return { ok: false, error: userError(error) };
-    const ids = [...new Set((done ?? []).map((r) => r.employee_id as string).filter(Boolean))];
+    const ids = [...new Set([...(done ?? []), ...(gone ?? [])].map((r) => r.employee_id as string).filter(Boolean))];
     await logAudit(supabase, ctx.company, ctx.userId, {
-      action: "schedule.publish", entity: "shifts", detail: `Vaktaplan gefið út — ${done?.length ?? 0} vaktir (${fromISO}…${toISO})`,
+      action: "schedule.publish", entity: "shifts", detail: `Vaktaplan gefið út — ${done?.length ?? 0} vaktir, ${gone?.length ?? 0} fjarlægðar (${fromISO}…${toISO})`,
     });
     if (ids.length) {
       const { data: emps } = await supabase.from("employees").select("id, full_name, email").in("id", ids);
@@ -925,7 +956,7 @@ export async function publishRange(fromISO: string, toISO: string): Promise<{ ok
       }
     }
     revalidatePath("/vaktaplan");
-    return { ok: true, count: done?.length ?? 0, people: ids.length };
+    return { ok: true, count: (done?.length ?? 0) + (gone?.length ?? 0), people: ids.length };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
   }
@@ -948,9 +979,19 @@ export async function restoreShifts(rows: ShiftSnap[]): Promise<{ ok: boolean; d
     const ok = new Set((mine ?? []).map((e) => e.id as string));
     const dates = [...new Set(list.map((r) => r.date))];
     const { data: taken } = await allRows((a, b) => supabase.from("shifts").select("employee_id, date")
-      .eq("company_id", ctx.company).in("employee_id", empIds).in("date", dates).order("id").range(a, b));
+      .eq("company_id", ctx.company).eq("pending_delete", false).in("employee_id", empIds).in("date", dates).order("id").range(a, b));
     const busy = new Set((taken ?? []).map((t) => `${t.employee_id}|${t.date}`));
-    const ins = list.filter((r) => ok.has(r.employee_id as string) && !busy.has(`${r.employee_id}|${r.date}`)).map((r) => ({
+    const free = list.filter((r) => ok.has(r.employee_id as string) && !busy.has(`${r.employee_id}|${r.date}`));
+    // Útgefnar vaktir sem voru aðeins merktar: taka merkið af (ef þær eru enn til — annars setja inn).
+    const pendIds = free.filter((r) => r.pending && r.id).map((r) => r.id as string);
+    const revived = new Set<string>();
+    for (let i = 0; i < pendIds.length; i += 200) {
+      const { data: back, error } = await supabase.from("shifts").update({ pending_delete: false })
+        .eq("company_id", ctx.company).eq("pending_delete", true).in("id", pendIds.slice(i, i + 200)).select("id");
+      if (error) return { ok: false, error: userError(error) };
+      for (const b of back ?? []) revived.add(b.id as string);
+    }
+    const ins = free.filter((r) => !(r.id && revived.has(r.id))).map((r) => ({
       company_id: ctx.company, employee_id: r.employee_id, date: r.date, start_time: r.start_time, end_time: r.end_time,
       shift_type_id: r.shift_type_id, status: r.published ? "published" : "draft", published: !!r.published,
       note: r.note, location_id: r.location_id,
@@ -960,10 +1001,10 @@ export async function restoreShifts(rows: ShiftSnap[]): Promise<{ ok: boolean; d
       if (error) return { ok: false, error: userError(error) };
     }
     await logAudit(supabase, ctx.company, ctx.userId, {
-      action: "shift.restore", entity: "shifts", detail: `Eyðing afturkölluð — ${ins.length} vaktir settar aftur inn`,
+      action: "shift.restore", entity: "shifts", detail: `Eyðing afturkölluð — ${ins.length + revived.size} vaktir settar aftur inn`,
     });
     revalidatePath("/vaktaplan");
-    return { ok: true, count: ins.length };
+    return { ok: true, count: ins.length + revived.size };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
   }

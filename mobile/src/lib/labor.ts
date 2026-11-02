@@ -86,7 +86,7 @@ export async function getLaborPeriods(companyId: string, ranges: { from: string;
       .eq("company_id", companyId),
     supabase.from("employees").select("id, pay_rule").eq("company_id", companyId),
     supabase.from("shifts").select("employee_id, date, start_time, end_time")
-      .eq("company_id", companyId).gte("date", spanFrom).lte("date", spanTo),
+      .eq("company_id", companyId).eq("pending_delete", false).gte("date", spanFrom).lte("date", spanTo),
     supabase.from("punches").select("employee_id, clock_in, clock_out")
       .eq("company_id", companyId).gte("clock_in", spanFrom).lte("clock_in", `${spanTo}T23:59:59`),
     supabase.from("locations").select("id").eq("company_id", companyId),
