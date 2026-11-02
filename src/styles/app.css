@@ -914,6 +914,13 @@ body.emp #sc-employeeapp .grid2b{grid-template-columns:1fr;justify-items:center}
 .iconbtn{width:36px;height:36px;border-radius:50%;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--ink2);flex-shrink:0}
 .iconbtn:hover{background:var(--line2)}
 .emojibar{display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--line2)}
+.mention-pop{display:flex;flex-direction:column;gap:2px;padding:6px;border-top:1px solid var(--line2);max-height:240px;overflow-y:auto}
+.mention-pop button{display:flex;align-items:center;gap:10px;padding:6px 10px;border:none;background:none;border-radius:10px;cursor:pointer;font:inherit;font-size:14px;color:var(--ink);text-align:left}
+.mention-pop button.on{background:var(--brand-soft)}
+.mention-pop .avt,.mention-pop .avt-img{width:28px;height:28px;border-radius:50%;flex:none;font-size:11px;font-weight:700;color:#fff;display:inline-flex;align-items:center;justify-content:center;object-fit:cover}
+.mtag{font-weight:650;color:var(--brand-deep)}
+.mbub.me .mtag{color:inherit;text-decoration:underline;text-underline-offset:2px}
+.mtag.me{background:rgba(245,147,49,.18);border-radius:5px;padding:0 3px}
 .emojibar button{font-size:21px;background:none;border:none;cursor:pointer;padding:2px;line-height:1}
 
 /* ---- autocomplete (type-ahead suggestions) ---- */

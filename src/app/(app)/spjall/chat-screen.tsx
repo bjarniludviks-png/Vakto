@@ -1,6 +1,7 @@
 "use client";
 
 import { emojify } from "@/lib/emoticons";
+import { mentionQuery, filterMentions, insertMention, splitMentions } from "@/lib/mentions";
 import { presenceLabel, type CoworkerStatus } from "@/lib/presence";
 import { getCoworkerStatus } from "./presence-actions";
 import { ProfileModal } from "./profile-modal";
@@ -308,6 +309,10 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   // Sími (≤900px): Messenger-útlit — fastir hringir efst, þráður á heilum skjá, aðgerðir með löngu ýti.
   const [phone, setPhone] = useState(false);
   const [memberCount, setMemberCount] = useState<number | null>(null);
+  // @-merkingar í hópspjalli: meðlimir þráðarins, leitin sem er í gangi og valin lína.
+  const [tagPeople, setTagPeople] = useState<Person[]>([]);
+  const [mq, setMq] = useState<{ start: number; q: string } | null>(null);
+  const [mqIdx, setMqIdx] = useState(0);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [sheetFor, setSheetFor] = useState<ChatMessage | null>(null);
   // „Viðbrögð“: hverjir settu hvaða emoji (ýtt á emoji-merkið undir skilaboðum)
@@ -543,6 +548,25 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     listMembers(countFor).then((m) => { if (alive) setMemberCount(m.members.length || null); });
     return () => { alive = false; setMemberCount(null); };
   }, [countFor, infoVer]);
+
+  const tagFor = active && !active.dm ? active.id : null;
+  useEffect(() => {
+    if (!tagFor) return;
+    let alive = true;
+    listMembers(tagFor).then((m) => { if (alive) setTagPeople(m.members); });
+    return () => { alive = false; setTagPeople([]); setMq(null); };
+  }, [tagFor, infoVer]);
+  const mqList = mq ? filterMentions(tagPeople.filter((p) => p.userId !== initial.meId), mq.q) : [];
+  function pickMention(p: Person) {
+    const el = inputRef.current;
+    if (!mq || !el) return;
+    const r = insertMention(val, mq.start, el.selectionStart ?? val.length, p.name);
+    setVal(r.text); setMq(null);
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(r.caret, r.caret); });
+  }
+  const withTags = (text: string) => (tagPeople.length && text.includes("@")
+    ? splitMentions(text, tagPeople).map((x, i) => (x.userId ? <span key={i} className={`mtag${x.userId === initial.meId ? " me" : ""}`}>{x.text}</span> : x.text))
+    : text);
 
   // Coming back to the tab: refresh + mark the open thread read.
   useEffect(() => {
@@ -1092,7 +1116,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                         ? <a href={m.url!} target="_blank" rel="noreferrer" onClick={(e) => { if (pressRef.current.fired) e.preventDefault(); else openImage(e, m.url!, setViewer); }}><img src={m.url!} alt="" /></a>
                         : m.kind === "audio" && m.url ? <audio controls src={m.url} style={{ height: 36 }} />
                           : m.kind === "file" && m.url ? <a className="mfile" href={m.url} target="_blank" rel="noreferrer">{I.file}<span>{m.body || t("Skjal")}</span></a>
-                            : (m.id in trans && !orig[m.id] ? (trans[m.id] ?? "…") : m.body)}
+                            : withTags(m.id in trans && !orig[m.id] ? (trans[m.id] ?? "…") : m.body)}
                       {m.id in trans && (
                         <span className="medit" onClick={() => setOrig((o) => ({ ...o, [m.id]: !o[m.id] }))} style={{ display: "block", fontSize: 11.5, opacity: 0.75, marginTop: 3, cursor: "pointer" }}>
                           {orig[m.id] ? t("Sýna þýðingu") : t("Þýtt · Sýna frumtexta")}
@@ -1195,6 +1219,20 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                 </div>
               )}
               {emoji && <div className="emojibar">{EMOJIS.map((e) => <button key={e} onClick={() => { setVal((v) => v + e); sendTyping(); }}>{e}</button>)}</div>}
+              {mqList.length > 0 && (
+                <div className="mention-pop" role="listbox" aria-label={t("Nefna")}>
+                  {mqList.map((p, i) => (
+                    <button key={p.userId} role="option" aria-selected={i === mqIdx} className={i === mqIdx ? "on" : ""}
+                      onPointerDown={(e) => e.preventDefault()} onMouseEnter={() => setMqIdx(i)} onClick={() => pickMention(p)}>
+                      {p.photo
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img className="avt-img" src={p.photo} alt="" />
+                        : <span className="avt" style={{ background: p.color }}>{p.av}</span>}
+                      <span>{p.name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <div className={`msgr-input${phone ? " mob" : ""}`}>
                 {phone ? (
                   // Sími: + (tákn) · myndavél · myndasafn · hljóðnemi — falla saman í ör meðan skrifað er.
@@ -1223,9 +1261,20 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                 <textarea
                   ref={inputRef} className="txt" rows={1} placeholder={rec ? t("Tek upp… smelltu til að stöðva") : phone ? "Aa" : t("chat:ph")} value={val}
                   onFocus={() => setToolsOpen(false)}
-                  onChange={(e) => { setVal(e.target.value); if (e.target.value) sendTyping(); else { sendTyping(true); setToolsOpen(false); } }}
-                  onBlur={() => sendTyping(true)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); inputRef.current?.focus(); } }}
+                  onChange={(e) => {
+                    setVal(e.target.value); if (e.target.value) sendTyping(); else { sendTyping(true); setToolsOpen(false); }
+                    const q = tagPeople.length ? mentionQuery(e.target.value, e.target.selectionStart ?? e.target.value.length) : null;
+                    setMq(q); if (q?.q !== mq?.q) setMqIdx(0);
+                  }}
+                  onBlur={() => { sendTyping(true); setMq(null); }}
+                  onKeyDown={(e) => {
+                    if (mqList.length) {
+                      if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); setMqIdx((i) => (i + (e.key === "ArrowDown" ? 1 : mqList.length - 1)) % mqList.length); return; }
+                      if ((e.key === "Enter" || e.key === "Tab") && !e.nativeEvent.isComposing) { e.preventDefault(); pickMention(mqList[Math.min(mqIdx, mqList.length - 1)]); return; }
+                      if (e.key === "Escape") { e.preventDefault(); setMq(null); return; }
+                    }
+                    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); inputRef.current?.focus(); }
+                  }}
                 />
                 <button className="msgr-send" disabled={!val.trim() && !rec} onPointerDown={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()} onClick={() => { send(); inputRef.current?.focus(); }} aria-label={t("chat:send")}>
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>

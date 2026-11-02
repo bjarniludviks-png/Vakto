@@ -1,6 +1,7 @@
 // Spjallþráður — realtime, skilaboð flokkuð eftir sendanda, viðbrögð með
 // löngu ýti, „séð af“, svar í þræði, skrifar-vísir.
 import { emojify } from "../../src/lib/emoticons";
+import { mentionQuery, filterMentions, insertMention, splitMentions, type MentionPerson } from "../../src/lib/mentions";
 import { presenceLabel, type CoworkerStatus } from "../../src/lib/presence";
 import { coworkerStatus } from "../../src/lib/api/presence";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -113,6 +114,29 @@ export default function Thread() {
   const [muted, setMuted] = useState(false);
   const [memberList, setMemberList] = useState<Person[]>([]);
   const [kind, setKind] = useState<string>("group");
+  // @-merkingar í hópspjalli: meðlimir þráðarins (ekki ég), leitin í gangi og staða bendils.
+  const [tagPeople, setTagPeople] = useState<Person[]>([]);
+  const [meUid, setMeUid] = useState<string | null>(null);
+  const [mq, setMq] = useState<{ start: number; q: string } | null>(null);
+  const caret = useRef(0);
+  useEffect(() => {
+    if (!me || !id || !isGroup) { setTagPeople([]); return; }
+    let alive = true;
+    (async () => {
+      const [people, { data: au }] = await Promise.all([peopleMap(me.companyId), authUser()]);
+      let list: Person[];
+      if (kind === "general") list = [...people.values()];
+      else { const { data: mem } = await supabase.from("channel_members").select("user_id").eq("channel_id", id); list = (mem ?? []).map((m) => people.get(m.user_id as string)).filter(Boolean) as Person[]; }
+      if (alive) { setTagPeople(list.sort((a, b) => a.name.localeCompare(b.name))); setMeUid(au.user?.id ?? null); }
+    })();
+    return () => { alive = false; };
+  }, [me, id, isGroup, kind]);
+  const mqList = mq ? filterMentions(tagPeople.filter((p) => p.userId !== meUid), mq.q, 5) : [];
+  function pickMention(p: Person) {
+    if (!mq) return;
+    const r = insertMention(text, mq.start, caret.current, p.name);
+    caret.current = r.caret; setText(r.text); setMq(null);
+  }
   const [media, setMedia] = useState<Attachment[] | null>(null);
   async function openMedia() {
     if (!me || !id) return;
@@ -478,7 +502,7 @@ export default function Thread() {
               <View style={{ width: W - 28 }}><Bubble item={item} onLong={() => setSel(item.m)} onImage={setViewer} onReactions={() => { setWhoTab(null); setWhoFor(item.m.id); }}
                 translated={item.m.id in trans && !orig[item.m.id] ? (trans[item.m.id] ?? "…") : undefined}
                 onToggleOriginal={item.m.id in trans ? () => setOrig((cur) => ({ ...cur, [item.m.id]: !cur[item.m.id] })) : undefined}
-                showingOriginal={!!orig[item.m.id]} /></View>
+                showingOriginal={!!orig[item.m.id]} tagPeople={tagPeople} meUid={meUid} /></View>
               <View style={{ width: TIME_W + 14, alignItems: "center", paddingBottom: item.last ? 8 : 2 }}>
                 <Txt size={11} color={colors.ink3} style={{ fontVariant: ["tabular-nums"] }}>{item.m.at}</Txt>
               </View>
@@ -502,6 +526,16 @@ export default function Thread() {
           <Pressable onPress={() => setReplyTo(null)} hitSlop={8}><X color={colors.ink3} size={18} /></Pressable>
         </View>
       ) : null}
+      {mqList.length > 0 ? (
+        <View style={{ backgroundColor: colors.panel, borderTopWidth: 1, borderTopColor: colors.line2, paddingVertical: 4 }}>
+          {mqList.map((p) => (
+            <Pressable key={p.userId} onPress={() => pickMention(p)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: pressed ? colors.panel2 : "transparent" })}>
+              <Avatar name={p.name} size={30} color={p.color ?? undefined} photo={p.photo} />
+              <Txt size={15}>{p.name}</Txt>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 2, paddingHorizontal: 8, paddingTop: 6, paddingBottom: kbOpen ? 8 : Math.max(8, insets.bottom), backgroundColor: colors.panel }}>
         {compact ? (
           <Pressable onPress={() => setToolsOpen(true)} hitSlop={6} accessibilityLabel={tr("Fleiri valkostir")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }}>
@@ -522,7 +556,14 @@ export default function Thread() {
         )}
         <TextInput
           style={{ flex: 1, backgroundColor: colors.panel2, borderRadius: 22, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, minHeight: 40, marginHorizontal: 4, marginBottom: 2, fontSize: 16, fontFamily: font.regular, color: colors.ink, maxHeight: 120 }}
-          multiline value={text} onChangeText={(v) => { onType(v); if (!v) setToolsOpen(false); }} onFocus={() => setToolsOpen(false)} placeholder="Aa" placeholderTextColor={colors.ink3} blurOnSubmit={false}
+          multiline value={text} onChangeText={(v) => {
+            onType(v); if (!v) setToolsOpen(false);
+            // Bendillinn færist um jafnmarga stafi og bættust við (onSelectionChange kemur stundum á eftir).
+            const c = Math.max(0, Math.min(v.length, caret.current + (v.length - text.length)));
+            caret.current = c;
+            setMq(tagPeople.length ? mentionQuery(v, c) : null);
+          }}
+          onSelectionChange={(e) => { caret.current = e.nativeEvent.selection.end; }} onFocus={() => setToolsOpen(false)} placeholder="Aa" placeholderTextColor={colors.ink3} blurOnSubmit={false}
         />
         <Pressable onPress={send} disabled={!text.trim() || sending} accessibilityLabel={tr("Senda")} style={{ width: 40, height: 40, marginBottom: 2, borderRadius: 20, backgroundColor: text.trim() ? colors.brand : colors.line2, alignItems: "center", justifyContent: "center" }}>
           <Send color={text.trim() ? "#fff" : colors.ink3} size={18} />
@@ -689,9 +730,18 @@ function TypingDots() {
   );
 }
 
-function Bubble({ item, onLong, onImage, onReactions, translated, onToggleOriginal, showingOriginal }: {
+/** @-merkingar feitletraðar í kúlunni; ef ég var nefnd(ur) er bakgrunnur á nafninu. */
+function withTags(text: string, people: MentionPerson[], meUid: string | null | undefined, mine: boolean): React.ReactNode {
+  if (!people.length || !text.includes("@")) return text;
+  return splitMentions(text, people).map((x, i) => (x.userId
+    ? <Text key={i} style={{ fontFamily: font.bold, color: mine ? "#fff" : colors.brandDeep, backgroundColor: x.userId === meUid ? "rgba(245,147,49,.22)" : undefined, textDecorationLine: mine ? "underline" : "none" }}>{x.text}</Text>
+    : x.text));
+}
+
+function Bubble({ item, onLong, onImage, onReactions, translated, onToggleOriginal, showingOriginal, tagPeople = [], meUid }: {
   item: Extract<RowItem, { kind: "msg" }>; onLong: () => void; onImage: (url: string) => void; onReactions: () => void;
   translated?: string; onToggleOriginal?: () => void; showingOriginal?: boolean;
+  tagPeople?: MentionPerson[]; meUid?: string | null;
 }) {
   const { m, first, last, showSender } = item;
   const img = isImage(m);
@@ -719,7 +769,7 @@ function Bubble({ item, onLong, onImage, onReactions, translated, onToggleOrigin
               <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: m.me ? "rgba(255,255,255,.2)" : colors.panel, alignItems: "center", justifyContent: "center" }}><FileText color={m.me ? "#fff" : colors.ink2} size={18} /></View>
               <View style={{ flexShrink: 1 }}><Txt weight="bold" size={14} color={m.me ? "#fff" : colors.ink} numberOfLines={2}>{m.body || "Skjal"}</Txt><Txt size={11.5} color={m.me ? "rgba(255,255,255,.8)" : colors.ink3}>Ýttu til að opna</Txt></View>
             </Pressable>
-          ) : m.body ? <Txt size={16} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 21 }}>{translated ?? m.body}</Txt> : null}
+          ) : m.body ? <Txt size={16} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 21 }}>{withTags(translated ?? m.body, tagPeople, meUid, m.me)}</Txt> : null}
           {onToggleOriginal ? (
             <Txt onPress={onToggleOriginal} suppressHighlighting weight="medium" size={11.5} color={m.me ? "rgba(255,255,255,.8)" : colors.ink3} style={{ marginTop: 3 }}>
               {showingOriginal ? tr("Sýna þýðingu") : tr("Þýtt · Sýna frumtexta")}
