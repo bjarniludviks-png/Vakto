@@ -444,7 +444,8 @@ export default function Thread() {
                 <View style={{ backgroundColor: colors.bubbleThem, borderRadius: 18, paddingHorizontal: 14, paddingVertical: 12 }}><TypingDots /></View>
               </View>
             ) : null}
-            {seenBy.length ? (
+            {/* eins og Messenger: aðeins þegar síðustu skilaboðin eru mín — ekki eftir að hinn svarar */}
+            {lastIsMine && seenBy.length ? (
               <Pressable onPress={() => setSeenOpen(true)} hitSlop={10} accessibilityRole="button" accessibilityLabel={tr("Séð af")} style={{ flexDirection: "row", alignItems: "center", alignSelf: "flex-end", gap: 2, marginTop: 4 }}>
                 {seenBy.slice(0, 5).map((r) => <Avatar key={r.userId} name={r.name} size={16} color={r.color} photo={r.photo} />)}
                 {seenBy.length > 5 ? <Txt size={11} color={colors.ink3} style={{ marginLeft: 2 }}>+{seenBy.length - 5}</Txt> : null}

@@ -15,6 +15,8 @@ export type Conversation = {
   id: string; name: string; kind: string; av: string; color: string; last: string; lastAt: string | null; dm: boolean; photo: string | null;
   /** Bein skilaboð: notandi viðmælandans (staða „á vakt“/virk(ur) og prófíll). */
   peerId?: string | null;
+  /** Hópar án hópmyndar: tveir meðlimir (aðrir en ég) fyrir tvöfalda mynd eins og í Messenger. */
+  faces?: { name: string; av: string; photo: string | null; color: string }[];
   /** Unread messages from others (server-side, `channel_reads`). */
   unread: number;
   /** Kind of the last message ('text' | 'image' | 'audio' | 'file') and whether I sent it. */
@@ -180,6 +182,11 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
     const lastByCh = new Map<string, string>();
     const lastAtByCh = new Map<string, string>();
     const lastMeta = new Map<string, { kind: string; mine: boolean }>();
+    const sendersByCh = new Map<string, string[]>(); // nýjast fyrst, einstök, ekki ég
+    for (const m of msgs ?? []) {
+      const l = sendersByCh.get(m.channel_id as string) ?? [];
+      if (m.sender_id !== ctx.userId && !l.includes(m.sender_id as string) && l.length < 2) sendersByCh.set(m.channel_id as string, [...l, m.sender_id as string]);
+    }
     for (const m of msgs ?? []) {
       if (lastByCh.has(m.channel_id as string)) continue;
       // Plain text — the list draws a line icon for media (no emoji in UI chrome).
@@ -210,6 +217,11 @@ export async function listConversations(): Promise<{ ok: boolean; items: Convers
         id: c.id, name, kind: c.kind, av: dm ? initials(name) : (c.kind === "general" ? "#" : initials(c.name)), color: dm ? (others[0]?.color ?? FALLBACK) : colorFor(c.id),
         last: lastByCh.get(c.id) ?? "", lastAt: lastAtByCh.get(c.id) ?? null, dm, photo: dm ? (others[0]?.photo ?? null) : (c.photo_url ?? null),
         peerId: dm ? (others[0]?.id ?? null) : null,
+        // Sama regla og í appinu: tveir síðustu sem sendu (aðrir en ég), svo aðrir meðlimir.
+        faces: dm || c.kind === "general" ? undefined
+          : [...new Set([...(sendersByCh.get(c.id) ?? []), ...others.map((m) => m.id)])].slice(0, 2)
+            .map((id) => others.find((m) => m.id === id)).filter((m): m is NonNullable<typeof m> => !!m)
+            .map((m) => ({ name: m.name, av: initials(m.name), photo: m.photo, color: m.color })),
         unread: unread[c.id] ?? 0, sortAt: lastAtByCh.get(c.id) ?? c.created_at ?? "",
         lastKind: lastMeta.get(c.id)?.kind ?? null, lastMine: lastMeta.get(c.id)?.mine ?? false,
       };

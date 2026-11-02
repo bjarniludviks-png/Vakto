@@ -169,6 +169,20 @@ function ConvAvatar({ c, size = 40 }: { c: Conversation; size?: number }) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img className="avt-img" src={c.photo} alt="" style={{ width: size, height: size }} />;
   }
+  // Hópur án hópmyndar: tvö andlit meðlima, skáhallt (eins og Messenger).
+  if (!c.dm && c.faces && c.faces.length >= 2) {
+    const fs = Math.round(size * 0.66);
+    const face = (f: NonNullable<Conversation["faces"]>[number]) => f.photo
+      // eslint-disable-next-line @next/next/no-img-element
+      ? <img className="avt-img" src={f.photo} alt="" style={{ width: fs, height: fs }} />
+      : <span className="avt" style={{ background: f.color, width: fs, height: fs, fontSize: Math.round(fs * 0.38) }}>{f.av}</span>;
+    return (
+      <span className="avt-duo" style={{ width: size, height: size }} aria-hidden="true">
+        <span className="d1">{face(c.faces[1])}</span>
+        <span className="d2">{face(c.faces[0])}</span>
+      </span>
+    );
+  }
   return <span className="avt" style={{ background: c.color, width: size, height: size, fontSize: c.kind === "general" ? size * 0.45 : size * 0.33 }}>{c.av}</span>;
 }
 
