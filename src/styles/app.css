@@ -599,6 +599,7 @@ th.r,td.r{text-align:right;font-variant-numeric:tabular-nums}
 .wk button{width:28px;height:28px;border-radius:7px;color:var(--ink2);display:flex;align-items:center;justify-content:center}
 .wk button:hover{background:var(--line2)}
 .wk .lbl{font-size:12.5px;font-weight:600;padding:0 8px;min-width:140px;text-align:center}
+.wk .wk-now{width:auto;padding:0 10px;font-size:12px;font-weight:600;color:var(--brand-2);white-space:nowrap}
 .sgrid-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--panel);box-shadow:var(--shadow-card)}
 table.sgrid{min-width:840px;width:100%}
 .sgrid th{padding:9px 8px;text-align:center;border-right:1px solid var(--line2);border-bottom:1px solid var(--line);font-size:12px;font-weight:600;color:var(--ink2)}

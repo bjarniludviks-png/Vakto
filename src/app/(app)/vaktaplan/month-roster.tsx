@@ -49,6 +49,8 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
   const [edit, setEdit] = useState<{ emp: PlanEmp; date: string } | null>(null);
   const [menu, setMenu] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Draga og sleppa: vakt dregin í annan reit færist (Alt/⌥ eða Ctrl = afrita).
+  const [dragSrc, setDragSrc] = useState<{ emp: PlanEmp; date: string } | null>(null);
 
   useEffect(() => {
     let gone = false;
@@ -116,6 +118,22 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
     if (!res.ok) { setShifts(prev); toast(res.error ?? t("Tókst ekki að eyða vaktinni")); return; }
     offerUndo(res.deleted, t, () => setVer((v) => v + 1));
   }, [shifts, t]);
+
+  async function dropOn(emp: PlanEmp, date: string, copy: boolean) {
+    const src = dragSrc;
+    setDragSrc(null);
+    if (!src || (src.emp.id === emp.id && src.date === date)) return;
+    const s = byCell.get(`${src.emp.id}|${src.date}`);
+    if (!s) return;
+    if (byCell.get(`${emp.id}|${date}`) && !window.confirm(t("Það er vakt fyrir í þessum reit. Skipta henni út?"))) return;
+    if (!(await put(emp, date, s.start, s.end, s.type))) return;
+    if (copy) { toast(t("Vakt afrituð")); return; }
+    const key = `${src.emp.id}|${src.date}`;
+    setShifts((ss) => ss.filter((x) => `${x.employeeId}|${x.date}` !== key));
+    const res = await deleteShift({ employeeName: src.emp.id, dateISO: src.date });
+    if (!res.ok) { toast(res.error ?? t("Tókst ekki að eyða vaktinni")); setVer((v) => v + 1); return; }
+    toast(t("Vakt færð — gefðu planið út svo starfsfólk sjái breytinguna"));
+  }
 
   function clickCell(emp: PlanEmp, date: string) {
     const cur = byCell.get(`${emp.id}|${date}`);
@@ -247,9 +265,14 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
                     const wd = (d.getDay() + 6) % 7;
                     return (
                       <td key={ds} className={`${wd >= 5 ? "we" : ""}${ds === todayISO ? " tod" : ""}${tool ? " paint" : ""}`} onClick={() => clickCell(e, ds)}
+                        onDragOver={dragSrc ? (ev) => { ev.preventDefault(); ev.dataTransfer.dropEffect = ev.altKey || ev.ctrlKey ? "copy" : "move"; ev.currentTarget.classList.add("cellh"); } : undefined}
+                        onDragLeave={(ev) => ev.currentTarget.classList.remove("cellh")}
+                        onDrop={(ev) => { ev.preventDefault(); ev.currentTarget.classList.remove("cellh"); void dropOn(e, ds, ev.altKey || ev.ctrlKey); }}
                         onContextMenu={(ev) => { if (s) { ev.preventDefault(); setTool({ kind: "clip", start: s.start, end: s.end, type: s.type }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } }}
                         title={s ? `${e.name} · ${s.start}–${s.end}${s.type ? ` · ${t(s.type)}` : ""}` : lv ? t(LEAVE_LBL[lv.type] ?? "Frí") : undefined}>
-                        {s ? <span className={`sh${s.draft ? " draft" : ""}`} style={typeStyle(s)} title={s.draft ? t("Drög — ekki útgefið") : undefined}>{short(s.start)}<i>{short(s.end)}</i></span>
+                        {s ? <span className={`sh${s.draft ? " draft" : ""}`} style={typeStyle(s)} draggable={!tool}
+                          onDragStart={(ev) => { ev.dataTransfer.effectAllowed = "copyMove"; ev.dataTransfer.setData("text/plain", `${s.start}-${s.end}`); setDragSrc({ emp: e, date: ds }); }}
+                          onDragEnd={() => setDragSrc(null)} title={s.draft ? t("Drög — ekki útgefið") : undefined}>{short(s.start)}<i>{short(s.end)}</i></span>
                           : lv ? <span className="lv">{t(LEAVE_LBL[lv.type] ?? "Frí")}</span> : null}
                       </td>
                     );
@@ -274,7 +297,7 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
         </table>
       </div>
       <div className="mr-foot muted">
-        {t("Veldu vaktategund og smelltu á reiti til að fylla mánuðinn hratt · hægrismelltu á vakt til að afrita hana · smelltu á dag efst til að opna dagsýn.")}
+        {t("Veldu vaktategund og smelltu á reiti til að fylla mánuðinn hratt · dragðu vakt til að færa hana (haltu ⌥/Alt til að afrita) · hægrismelltu á vakt til að afrita hana · smelltu á dag efst til að opna dagsýn.")}
       </div>
       {edit && (
         <CellEditor emp={edit.emp} date={edit.date} shift={editShift} types={types} leave={leaveOf(edit.emp.id, edit.date)} monthName={t(MONTHS_IS[m])}

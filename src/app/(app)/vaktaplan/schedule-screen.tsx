@@ -258,6 +258,10 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     document.body.style.overflow = "hidden";
     return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = ""; };
   }, [full]);
+  // „Í dag / Þessi vika / Þessi mánuður“ birtist aðeins þegar annað tímabil er opið.
+  const onCurrentPeriod = view === "Dagur" ? fmtISO(cur) === todayISO
+    : view === "Mánuður" ? fmtISO(cur).slice(0, 7) === todayISO.slice(0, 7)
+    : todayCol >= 0;
   const resetLabel = view === "Dagur" ? "Í dag" : view === "Mánuður" ? "Þessi mánuður" : "Þessi vika";
 
   /** Apply a fetched week onto the CURRENT grid rows. The server grid is
@@ -918,6 +922,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
           <button onClick={() => shiftPeriod(-1)}>‹</button>
           <span className="lbl">{periodLabel}</span>
           <button onClick={() => shiftPeriod(1)}>›</button>
+          {!onCurrentPeriod && <button className="wk-now" onClick={() => setCur(parseISO(todayISO))}>{t(resetLabel)}</button>}
         </div>
         <div className="seg" style={{ marginLeft: 4 }}>
           {(["Vika", "Dagur", "Mánuður"] as const).map((v) => (
@@ -960,9 +965,6 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
             <>
               <div style={{ position: "fixed", inset: 0, zIndex: 55 }} onClick={() => setMoreOpen(false)} />
               <div className="tmenu show" style={{ position: "absolute", right: 0, top: "calc(100% + 6px)", left: "auto" }} onClick={() => setMoreOpen(false)}>
-                <div className="mi" onClick={() => setCur(parseISO(todayISO))}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4" width="18" height="17" rx="2" /><path d="M3 9h18M8 2v4M16 2v4" /></svg>{t(resetLabel)}
-                </div>
                 <div className="mi" onClick={openNewShift}>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M12 5v14M5 12h14" /></svg>{t("Vakt")}
                 </div>
