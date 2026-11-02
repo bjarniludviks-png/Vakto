@@ -89,9 +89,15 @@ export async function getMe(): Promise<Me | null> {
 /* ---------- date helpers (local time, Mon-based weeks like the web) ---------- */
 
 /** Hvaða vaktir notandinn sér: starfsfólk sér aðeins BIRTAR vaktir (drög aldrei), stjórnendur líka drög.
- *  Notað sem `.in("published", shiftVisibility(me))` í öllum vaktafyrirspurnum sem starfsmaður sér. */
+ *  Notað sem `.or(shiftScope(me))` í öllum vaktafyrirspurnum sem starfsmaður sér. */
 export function shiftVisibility(me: Pick<Me, "role"> | null | undefined): boolean[] {
   return me && (me.role === "owner" || me.role === "manager") ? [true, false] : [true];
+}
+
+/** PostgREST `or`-sía fyrir vaktir: vaktstjórar sjá vinnuplanið (drög, ekki vaktir sem bíða eyðingar);
+ * starfsfólk sér útgefna planið — líka vaktir sem bíða eyðingar þar til nýtt plan er gefið út. */
+export function shiftScope(me: Pick<Me, "role"> | null | undefined): string {
+  return me && (me.role === "owner" || me.role === "manager") ? "pending_delete.eq.false" : "published.eq.true";
 }
 
 export function iso(d: Date): string {
@@ -170,7 +176,7 @@ export async function getMyArea(me: Me): Promise<MyArea> {
       .from("shifts")
       .select("date, start_time, end_time")
       .eq("employee_id", me.empId)
-      .in("published", shiftVisibility(me))
+      .or(shiftScope(me))
       .gte("date", iso(mon))
       .lte("date", iso(in14))
       .order("date")
@@ -192,7 +198,7 @@ export async function getMyArea(me: Me): Promise<MyArea> {
       .from("shifts")
       .select("id, date, start_time, end_time")
       .eq("company_id", me.companyId)
-      .in("published", shiftVisibility(me))
+      .or(shiftScope(me))
       .is("employee_id", null)
       .gte("date", today)
       .order("date")

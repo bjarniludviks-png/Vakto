@@ -142,7 +142,7 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
       .eq("company_id", companyId),
     supabase.from("employees").select("id, pay_rule").eq("company_id", companyId), // tolerant: null before migration 0013
     allRows((a, b) => supabase.from("shifts").select("id, employee_id, date, start_time, end_time")
-      .eq("company_id", companyId).gte("date", spanFrom).lte("date", spanTo).order("id").range(a, b)),
+      .eq("company_id", companyId).eq("pending_delete", false).gte("date", spanFrom).lte("date", spanTo).order("id").range(a, b)),
     allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
       .eq("company_id", companyId).gte("clock_in", spanFrom).lte("clock_in", spanTo + "T23:59:59").order("id").range(a, b)),
     supabase.from("locations").select("id").eq("company_id", companyId),

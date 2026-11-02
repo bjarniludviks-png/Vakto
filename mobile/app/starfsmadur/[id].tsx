@@ -10,7 +10,7 @@ import { colors, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
 import { supabase } from "../../src/lib/supabase";
 import { startDM } from "../../src/lib/api/chat";
-import { iso, mondayOf, shiftVisibility } from "../../src/lib/api/me";
+import { iso, mondayOf, shiftScope } from "../../src/lib/api/me";
 import { presenceLabel, type CoworkerStatus } from "../../src/lib/presence";
 import { coworkerStatus } from "../../src/lib/api/presence";
 import { ImageViewer } from "../../src/components/image-viewer";
@@ -39,7 +39,7 @@ export default function Starfsmadur() {
       if (data.user_id) coworkerStatus([data.user_id as string]).then((m) => setStatus(m[data.user_id as string] ?? null)).catch(() => {});
     });
     const mon = mondayOf(new Date()); const sun = new Date(mon); sun.setDate(sun.getDate() + 13);
-    supabase.from("shifts").select("date, start_time, end_time").eq("employee_id", id).in("published", shiftVisibility(me)).gte("date", iso(mon)).lte("date", iso(sun)).order("date").then(({ data }) => setShifts((data ?? []).filter((s) => s.start_time).map((s) => ({ date: s.date, start: s.start_time.slice(0, 5), end: (s.end_time ?? "").slice(0, 5) }))));
+    supabase.from("shifts").select("date, start_time, end_time").eq("employee_id", id).or(shiftScope(me)).gte("date", iso(mon)).lte("date", iso(sun)).order("date").then(({ data }) => setShifts((data ?? []).filter((s) => s.start_time).map((s) => ({ date: s.date, start: s.start_time.slice(0, 5), end: (s.end_time ?? "").slice(0, 5) }))));
   }, [id, me]));
 
   async function message() {

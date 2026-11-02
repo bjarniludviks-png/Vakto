@@ -158,7 +158,7 @@ export async function buildManagerReport(ctx: ReportCtx, kind: ReportKind, fromI
     if (kind === "attendance") {
       const [{ data: shifts }, { data: punches }] = await Promise.all([
         allRows((a, b) => supabase.from("shifts").select("id, employee_id, start_time, end_time")
-          .eq("company_id", company).gte("date", fromISO).lte("date", toISO).order("id").range(a, b)),
+          .eq("company_id", company).eq("pending_delete", false).gte("date", fromISO).lte("date", toISO).order("id").range(a, b)),
         allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
           .eq("company_id", company).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59").order("id").range(a, b)),
       ]);

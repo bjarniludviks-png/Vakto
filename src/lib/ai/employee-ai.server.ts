@@ -61,7 +61,7 @@ export async function runEmployeeRead(name: string, input: In, me: EmpCtx): Prom
       const prev = addDays(sh.date, -1), next = addDays(sh.date, 1);
       const [{ data: emps }, { data: near }, { data: leave }, { data: avail }] = await Promise.all([
         admin.from("employees").select("id, full_name, status, role, departments(name)").eq("company_id", me.companyId),
-        admin.from("shifts").select("employee_id, date, start_time, end_time").eq("company_id", me.companyId).in("date", [prev, sh.date, next]).not("employee_id", "is", null),
+        admin.from("shifts").select("employee_id, date, start_time, end_time").eq("company_id", me.companyId).eq("pending_delete", false).in("date", [prev, sh.date, next]).not("employee_id", "is", null),
         admin.from("leave_requests").select("employee_id").eq("company_id", me.companyId).eq("status", "approved").lte("from_date", sh.date).gte("to_date", sh.date),
         admin.from("availability").select("employee_id, available, weekdays, from_date, to_date").eq("company_id", me.companyId).eq("available", false),
       ]);

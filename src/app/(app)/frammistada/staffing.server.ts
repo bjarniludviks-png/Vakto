@@ -42,7 +42,7 @@ export async function getStaffingPattern(fromISO: string, toISO: string): Promis
     if (!company) return { live: false, rows: DEMO, weeks: 4 };
 
     const [{ data: shifts }, { data: punches }] = await Promise.all([
-      allRows((a, b) => supabase.from("shifts").select("id, date, start_time, end_time").eq("company_id", company).gte("date", fromISO).lte("date", toISO).order("id").range(a, b)),
+      allRows((a, b) => supabase.from("shifts").select("id, date, start_time, end_time").eq("company_id", company).eq("pending_delete", false).gte("date", fromISO).lte("date", toISO).order("id").range(a, b)),
       allRows((a, b) => supabase.from("punches").select("id, clock_in, clock_out").eq("company_id", company).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59").order("id").range(a, b)),
     ]);
 

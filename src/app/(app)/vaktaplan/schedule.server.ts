@@ -81,7 +81,7 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
     if (company) {
       const { data: shifts } = await allRows((a, b) => supabase
         .from("shifts").select("id, employee_id, date, start_time, end_time, shift_types(name)")
-        .eq("company_id", company).in("date", WEEK_DATES).order("id").range(a, b));
+        .eq("company_id", company).eq("pending_delete", false).in("date", WEEK_DATES).order("id").range(a, b));
       for (const s of shifts ?? []) {
         const r = idById.get(s.employee_id as string);
         const c = WEEK_DATES.indexOf(s.date as string);
