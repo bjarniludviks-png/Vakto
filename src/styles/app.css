@@ -395,6 +395,26 @@ body.kioskmode .cookie{display:none}
 
 /* ---------- Fréttaveita (company feed, Facebook-style) ---------- */
 .feedwrap{max-width:640px;margin:0 auto}
+.feed-page{position:relative;z-index:1}
+.fp-cb-wrap{position:relative;display:inline-block;max-width:100%}
+.fp-cheart{position:absolute;right:-8px;bottom:-9px;display:inline-flex;align-items:center;gap:2px;background:var(--panel);border-radius:999px;padding:1px 5px;font-size:11px;box-shadow:0 1px 3px rgba(0,0,0,.14)}
+.fp-cheart b{font-size:10.5px;color:var(--ink2);font-weight:650}
+.fp-reply.liked{color:#e0245e}
+.fp-min{position:relative;flex:1;min-width:0;display:flex}
+.fp-min input{flex:1;min-width:0}
+.fp-mpop{position:absolute;left:0;right:0;bottom:calc(100% + 6px);background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.12);z-index:30}
+/* Bjarmi fréttaveitunnar — aðeins tölva; --fy = skrunstaða (px) */
+.feed-glow{display:none}
+@media (min-width:901px){
+  .feed-glow{display:block;position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+  .feed-glow i{position:absolute;border-radius:50%;will-change:transform;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+  .feed-glow i:nth-child(1){width:720px;height:720px;right:-180px;top:-160px;background:radial-gradient(circle,rgba(245,147,49,.20),rgba(245,147,49,0) 64%);transform:translate3d(calc(var(--fy,0) * -.06px),calc(var(--fy,0) * -.22px),0)}
+  .feed-glow i:nth-child(2){width:560px;height:560px;left:8%;top:52%;background:radial-gradient(circle,rgba(233,112,15,.14),rgba(233,112,15,0) 66%);transform:translate3d(calc(var(--fy,0) * .08px),calc(var(--fy,0) * -.12px),0)}
+  .feed-glow i:nth-child(3){width:420px;height:420px;right:12%;top:105%;background:radial-gradient(circle,rgba(255,190,120,.18),rgba(255,190,120,0) 66%);transform:translate3d(0,calc(var(--fy,0) * -.34px),0)}
+  html.dark .feed-glow i:nth-child(1){background:radial-gradient(circle,rgba(245,147,49,.26),rgba(245,147,49,0) 64%)}
+  html.dark .feed-glow i:nth-child(2){background:radial-gradient(circle,rgba(233,112,15,.2),rgba(233,112,15,0) 66%)}
+}
+@media (prefers-reduced-motion:reduce){.feed-glow i{transform:none!important;transition:none}}
 .fc-input{width:100%;border:0;background:none;font:inherit;font-size:14px;resize:none;outline:none;color:var(--ink);padding:2px 0 6px}
 .fc-bar{display:flex;gap:8px;align-items:center;border-top:1px solid var(--line2);padding-top:10px;margin-top:6px}
 .fc-act{display:inline-flex;align-items:center;gap:7px;font:inherit;font-size:12.5px;font-weight:600;color:var(--ink3);background:none;border:1px solid var(--line);border-radius:10px;padding:7px 12px;cursor:pointer}
