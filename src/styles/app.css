@@ -2259,3 +2259,10 @@ html.dark .mroster .sh{background:#23264a;color:#c7ccff}
 tr:hover .att-hide,.att-hide:focus-visible{opacity:1}
 .att-hide:hover{background:rgba(0,0,0,.06);color:var(--ink,#14151c)}
 @media (hover:none){.att-hide{opacity:1}}
+
+/* hópspjall án hópmyndar: tvö andlit */
+.avt-duo{position:relative;display:inline-block;flex-shrink:0}
+.avt-duo>span{position:absolute;display:flex;border-radius:50%}
+.avt-duo .d1{top:0;right:0}
+.avt-duo .d2{bottom:0;left:0;box-shadow:0 0 0 2.5px var(--panel);border-radius:50%}
+.avt-duo .avt,.avt-duo .avt-img{display:flex;align-items:center;justify-content:center}
