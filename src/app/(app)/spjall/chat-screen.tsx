@@ -306,7 +306,15 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const endRef = useRef<HTMLDivElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  // Innsláttarreiturinn stækkar með textanum (upp í ~6 línur) svo langur texti sjáist allur.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+    el.classList.toggle("multi", el.scrollHeight > 48);
+  }, [val]);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   // Thread cache: clicking a conversation paints its last-known messages
   // instantly, the network refresh reconciles in the background.
@@ -1197,12 +1205,12 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                     </button>
                   </>
                 )}
-                <input
-                  ref={inputRef} className="txt" placeholder={rec ? t("Tek upp… smelltu til að stöðva") : phone ? "Aa" : t("chat:ph")} value={val}
+                <textarea
+                  ref={inputRef} className="txt" rows={1} placeholder={rec ? t("Tek upp… smelltu til að stöðva") : phone ? "Aa" : t("chat:ph")} value={val}
                   onFocus={() => setToolsOpen(false)}
                   onChange={(e) => { setVal(e.target.value); if (e.target.value) sendTyping(); else { sendTyping(true); setToolsOpen(false); } }}
                   onBlur={() => sendTyping(true)}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); send(); inputRef.current?.focus(); } }}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); inputRef.current?.focus(); } }}
                 />
                 <button className="msgr-send" disabled={!val.trim() && !rec} onPointerDown={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()} onClick={() => { send(); inputRef.current?.focus(); }} aria-label={t("chat:send")}>
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
