@@ -8,6 +8,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { initials } from "@/lib/employees";
 import { colorFor } from "@/lib/avatar";
 import { notifyEmployee } from "@/lib/push";
+import { pushCommentMentions } from "@/lib/feed-push.server";
 import { pushChatMessage } from "@/lib/chat-push.server";
 import { userError } from "@/lib/user-error";
 
@@ -696,7 +697,9 @@ export async function uploadChatMedia(dataUrl: string, ext: string): Promise<{ o
 
 /* ---------- news feed (posts + likes + comments) ---------- */
 
-export type FeedComment = { id: string; sender: string; av: string; color: string; body: string; at: string; atISO: string; photo: string | null; parentId: string | null };
+export type FeedComment = { id: string; sender: string; av: string; color: string; body: string; at: string; atISO: string; photo: string | null; parentId: string | null; likes: number; liked: boolean };
+/** Fólk sem má @-merkja í fréttaveitunni (allir í fyrirtækinu með aðgang). */
+export type FeedPerson = { userId: string; name: string; av: string; color: string; photo: string | null };
 export type FeedAudience = { kind: "all" | "department" | "location"; id: string | null; name: string };
 export type FeedPost = {
   id: string; sender: string; av: string; color: string; me: boolean; photo: string | null;
@@ -709,7 +712,7 @@ export type FeedPost = {
 };
 
 /** Latest 50 posts with likes + comments, newest first. */
-export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meId: string; canPin: boolean; canPost: boolean; audiences: FeedAudience[]; mePhoto: string | null }> {
+export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meId: string; canPin: boolean; canPost: boolean; audiences: FeedAudience[]; mePhoto: string | null; people?: FeedPerson[] }> {
   if (!isSupabaseConfigured()) return { ok: false, posts: [], meId: "", canPin: false, canPost: false, audiences: [], mePhoto: null };
   try {
     const supabase = await createClient();
@@ -753,6 +756,14 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
         .then(async (r) => r.error ? await supabase.from("post_comments").select("id, post_id, sender_id, body, created_at, users!post_comments_sender_id_fkey(full_name)").in("post_id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]).order("created_at") : r),
       empNameMap(supabase, ctx.company),
     ]);
+    // 0106: hjörtu á athugasemdum (þolir grunn án töflunnar)
+    const cIds = (comments ?? []).map((cm) => cm.id as string);
+    const cl = cIds.length ? await supabase.from("post_comment_likes").select("comment_id, user_id").in("comment_id", cIds) : { data: [] as { comment_id: string; user_id: string }[] };
+    const cLikes = new Map<string, { n: number; mine: boolean }>();
+    for (const l of cl.data ?? []) {
+      const k = l.comment_id as string; const cur = cLikes.get(k) ?? { n: 0, mine: false };
+      cur.n++; if (l.user_id === ctx.userId) cur.mine = true; cLikes.set(k, cur);
+    }
     // Prefer the employee's real name — users.full_name can hold the email
     // (or nothing) for invited accounts.
     const nameOf = (u: unknown, senderId?: unknown) =>
@@ -778,11 +789,13 @@ export async function listPosts(): Promise<{ ok: boolean; posts: FeedPost[]; meI
         myReaction: (pLikes.find((l) => l.user_id === ctx.userId)?.reaction as string) ?? null,
         comments: (comments ?? []).filter((cm) => cm.post_id === r.id).map((cm) => {
           const cn = nameOf(cm.users, cm.sender_id);
-          return { id: cm.id as string, sender: cn, av: initials(cn), color: empNames.get(String(cm.sender_id))?.color ?? FALLBACK, body: cm.body as string, at: hhmm(cm.created_at as string), atISO: String(cm.created_at), photo: empNames.get(String(cm.sender_id))?.photo ?? null, parentId: ("parent_id" in cm ? (cm.parent_id as string | null) : null) ?? null };
+          return { id: cm.id as string, sender: cn, av: initials(cn), color: empNames.get(String(cm.sender_id))?.color ?? FALLBACK, body: cm.body as string, at: hhmm(cm.created_at as string), atISO: String(cm.created_at), photo: empNames.get(String(cm.sender_id))?.photo ?? null, parentId: ("parent_id" in cm ? (cm.parent_id as string | null) : null) ?? null, likes: cLikes.get(cm.id as string)?.n ?? 0, liked: !!cLikes.get(cm.id as string)?.mine };
         }),
       };
     });
-    return { ok: true, posts, meId: ctx.userId, canPin, canPost, audiences, mePhoto: empNames.get(ctx.userId)?.photo ?? null };
+    const people: FeedPerson[] = [...empNames.entries()].map(([userId, e]) => ({ userId, name: e.name, av: initials(e.name), color: e.color, photo: e.photo }))
+      .filter((x) => x.name).sort((a, b) => a.name.localeCompare(b.name, "is"));
+    return { ok: true, posts, meId: ctx.userId, canPin, canPost, audiences, mePhoto: empNames.get(ctx.userId)?.photo ?? null, people };
   } catch {
     return { ok: false, posts: [], meId: "", canPin: false, canPost: false, audiences: [], mePhoto: null };
   }
@@ -841,6 +854,23 @@ export async function createPost(body: string, media?: { imageUrl?: string; file
 }
 
 /** One reaction per user per post — emoji sets/updates it, null removes it. */
+/** Hjarta á athugasemd (af/á). */
+export async function setCommentLike(commentId: string, on: boolean): Promise<{ ok: boolean }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  if (!isSupabaseConfigured()) return { ok: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false };
+    const { error } = on
+      ? await supabase.from("post_comment_likes").upsert({ comment_id: commentId, user_id: ctx.userId, company_id: ctx.company })
+      : await supabase.from("post_comment_likes").delete().eq("comment_id", commentId).eq("user_id", ctx.userId);
+    return { ok: !error };
+  } catch {
+    return { ok: false };
+  }
+}
+
 export async function setPostReaction(postId: string, emoji: string | null): Promise<{ ok: boolean }> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true };
@@ -865,10 +895,11 @@ export async function addPostComment(postId: string, body: string, parentId?: st
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const row: Record<string, string> = { post_id: postId, company_id: ctx.company, sender_id: ctx.userId, body: body.trim() };
-    let { error } = await supabase.from("post_comments").insert(parentId ? { ...row, parent_id: parentId } : row);
+    let { data: ins, error } = await supabase.from("post_comments").insert(parentId ? { ...row, parent_id: parentId } : row).select("id").maybeSingle();
     // parent_id column arrives with 0048 — post the reply as a plain comment before it runs
-    if (error && parentId && /parent_id/.test(error.message)) ({ error } = await supabase.from("post_comments").insert(row));
+    if (error && parentId && /parent_id/.test(error.message)) ({ data: ins, error } = await supabase.from("post_comments").insert(row).select("id").maybeSingle());
     if (error) { console.error("addPostComment:", error.message); return { ok: false, error: "Tókst ekki að senda athugasemd" }; }
+    if (ins?.id && body.includes("@")) { const cid = ins.id as string; after(() => pushCommentMentions(cid)); }
     return { ok: true };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };

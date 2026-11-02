@@ -354,10 +354,23 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const meName = initial.meName || t("Einhver");
 
   // Phone: land on the conversation LIST, not inside the first thread.
+  // Tölva: opna aftur þráðinn sem var opinn síðast (endurhleðsla á ekki að hoppa í fyrsta spjallið).
+  const lastKey = `vakto-chat-last:${initial.meId}`;
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- needs the viewport, only known in the browser
-    if (window.matchMedia("(max-width: 760px)").matches) setActive(null);
-  }, []);
+    if (window.matchMedia("(max-width: 760px)").matches) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- needs the viewport, only known in the browser
+      setActive(null);
+      return;
+    }
+    let last: string | null = null;
+    try { last = localStorage.getItem(lastKey); } catch { /* geymsla ekki í boði */ }
+    const hit = last ? initial.items.find((c) => c.id === last) : null;
+    if (hit) setActive(hit);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- aðeins við fyrstu birtingu
+  useEffect(() => {
+    if (!active?.id) return;
+    try { localStorage.setItem(lastKey, active.id); } catch { /* geymsla ekki í boði */ }
+  }, [active?.id, lastKey]);
 
   // Layout mode, remembered details-panel preference and the relative-time clock.
   useEffect(() => {

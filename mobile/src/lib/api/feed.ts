@@ -1,5 +1,6 @@
 // Fréttaveita — beint á Supabase (posts / post_likes / post_comments).
 // Allir í fyrirtækinu mega birta; aðeins stjórnendur/vaktstjórar festa efst.
+import { notifyServer } from "./notify";
 import { supabase } from "../supabase";
 import { tr, trf } from "../../../src/lib/i18n";
 import type { Me } from "./me";
@@ -7,7 +8,7 @@ import { peopleMap } from "./chat";
 
 export const REACTIONS = ["👍", "❤️", "😂", "🎉", "👏", "🔥"] as const;
 
-export type FeedComment = { id: string; sender: string; body: string; at: string; color: string | null; photo: string | null; me: boolean };
+export type FeedComment = { id: string; sender: string; body: string; at: string; color: string | null; photo: string | null; me: boolean; likes: number; liked: boolean };
 
 export type FeedAudience = { kind: "all" | "department" | "location"; id: string | null; name: string };
 export type FeedPost = {
@@ -79,7 +80,7 @@ export async function feedOptions(me: Me): Promise<{ canPost: boolean; audiences
 export async function listPosts(me: Me): Promise<FeedPost[]> {
   const sel = (withAud: boolean) => supabase
       .from("posts")
-      .select(`id, sender_id, body, created_at, image_url, file_url, file_name, pinned${withAud ? ", audience_kind, audience_id" : ""}, post_likes(user_id, reaction), post_comments(id, sender_id, body, created_at)`)
+      .select(`id, sender_id, body, created_at, image_url, file_url, file_name, pinned${withAud ? ", audience_kind, audience_id" : ""}, post_likes(user_id, reaction), post_comments(id, sender_id, body, created_at, post_comment_likes(user_id))`)
       .eq("company_id", me.companyId)
       .order("pinned", { ascending: false })
       .order("created_at", { ascending: false })
@@ -101,9 +102,9 @@ export async function listPosts(me: Me): Promise<FeedPost[]> {
     const counts = new Map<string, number>();
     let myReaction: string | null = null;
     for (const l of likes) { counts.set(l.reaction, (counts.get(l.reaction) ?? 0) + 1); if (l.user_id === myId) myReaction = l.reaction; }
-    const comments = ((p.post_comments ?? []) as { id: string; sender_id: string; body: string; created_at: string }[])
+    const comments = ((p.post_comments ?? []) as { id: string; sender_id: string; body: string; created_at: string; post_comment_likes?: { user_id: string }[] }[])
       .sort((a, b) => (a.created_at < b.created_at ? -1 : 1))
-      .map((c) => { const s = people.get(c.sender_id); return { id: c.id, sender: (s?.name ?? "Notandi").split(/\s+/)[0], body: c.body, at: ago(c.created_at), color: s?.color ?? null, photo: s?.photo ?? null, me: c.sender_id === myId }; });
+      .map((c) => { const s = people.get(c.sender_id); return { id: c.id, sender: (s?.name ?? "Notandi").split(/\s+/)[0], body: c.body, at: ago(c.created_at), color: s?.color ?? null, photo: s?.photo ?? null, me: c.sender_id === myId, likes: (c.post_comment_likes ?? []).length, liked: (c.post_comment_likes ?? []).some((l) => l.user_id === myId) }; });
     const s = p.sender_id ? people.get(p.sender_id) : null;
     return {
       id: p.id, audience: audName(p.audience_kind, p.audience_id), sender: p.sender_id ? (s?.name ?? "Notandi") : "VAKTO", senderId: p.sender_id, senderRole: s?.role ?? null, color: s?.color ?? null, photo: s?.photo ?? null,
@@ -149,7 +150,19 @@ export async function setPostReaction(me: Me, postId: string, emoji: string | nu
 export async function addPostComment(me: Me, postId: string, body: string): Promise<{ ok: boolean }> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false };
-  const { error } = await supabase.from("post_comments").insert({ post_id: postId, company_id: me.companyId, sender_id: auth.user.id, body });
+  const { data, error } = await supabase.from("post_comments").insert({ post_id: postId, company_id: me.companyId, sender_id: auth.user.id, body }).select("id").maybeSingle();
+  // @-merkingar: vefurinn sendir „X nefndi þig“ (appið hefur engar server actions).
+  if (!error && data?.id && body.includes("@")) void notifyServer("comment_mention", data.id as string);
+  return { ok: !error };
+}
+
+/** Hjarta á athugasemd (af/á). */
+export async function setCommentLike(me: Me, commentId: string, on: boolean): Promise<{ ok: boolean }> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) return { ok: false };
+  const { error } = on
+    ? await supabase.from("post_comment_likes").upsert({ comment_id: commentId, user_id: auth.user.id, company_id: me.companyId }, { onConflict: "comment_id,user_id" })
+    : await supabase.from("post_comment_likes").delete().eq("comment_id", commentId).eq("user_id", auth.user.id);
   return { ok: !error };
 }
 

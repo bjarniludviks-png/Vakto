@@ -9,9 +9,10 @@ import { PageHeader } from "@/components/app/page-header";
 import { useLang } from "@/components/app/lang";
 import { toast } from "@/components/app/toast";
 import {
-  listPosts, createPost, setPostReaction, addPostComment, uploadChatMedia, setPostPinned,
-  type FeedPost, type FeedAudience,
+  listPosts, createPost, setPostReaction, addPostComment, uploadChatMedia, setPostPinned, setCommentLike,
+  type FeedPost, type FeedAudience, type FeedPerson,
 } from "../spjall/actions";
+import { mentionQuery, filterMentions, insertMention, splitMentions } from "@/lib/mentions";
 import type { FeedComment } from "../spjall/actions";
 import { timeAgo } from "@/lib/time-ago";
 
@@ -25,6 +26,8 @@ export default function FeedScreen() {
   const [audiences, setAudiences] = useState<FeedAudience[]>([]);
   const [aud, setAud] = useState<string>("all");
   const [mePhoto, setMePhoto] = useState<string | null>(null);
+  const [people, setPeople] = useState<FeedPerson[]>([]);
+  const [meId, setMeId] = useState("");
   const [loaded, setLoaded] = useState(false);
   // Relative times ("1 klst síðan") tick once a minute; 0 until mounted so SSR matches.
   const [now, setNow] = useState(0);
@@ -39,7 +42,7 @@ export default function FeedScreen() {
   const imgRef = useRef<HTMLInputElement | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
-  function reload() { listPosts().then((r) => { if (r.ok) { setPosts(r.posts); setCanPin(r.canPin); setCanPost(r.canPost); setAudiences(r.audiences); setMePhoto(r.mePhoto); } setLoaded(true); }); }
+  function reload() { listPosts().then((r) => { if (r.ok) { setPosts(r.posts); setCanPin(r.canPin); setCanPost(r.canPost); setAudiences(r.audiences); setMePhoto(r.mePhoto); setPeople(r.people ?? []); setMeId(r.meId); } setLoaded(true); }); }
   useEffect(() => { reload(); const iv = setInterval(reload, 10000); return () => clearInterval(iv); }, []);
 
   function pickFile(kind: "image" | "file") {
@@ -103,6 +106,20 @@ export default function FeedScreen() {
     const r = await addPostComment(p.id, body, parentId);
     if (!r.ok) toast(r.error ?? "Villa"); else reload();
   }
+  async function likeComment(p: FeedPost, cmId: string) {
+    const cm = p.comments.find((c) => c.id === cmId);
+    if (!cm) return;
+    const on = !cm.liked;
+    setPosts((ps) => ps.map((x) => (x.id !== p.id ? x : { ...x, comments: x.comments.map((c) => (c.id !== cmId ? c : { ...c, liked: on, likes: Math.max(0, c.likes + (on ? 1 : -1)) })) })));
+    const r = await setCommentLike(cmId, on);
+    if (!r.ok) reload();
+  }
+  // @-merkingar feitletraðar; ef ég var nefnd(ur) fær nafnið bakgrunn.
+  const withTags = (text: string) => (people.length && text.includes("@")
+    ? splitMentions(text, people).map((x, i) => (x.userId ? <span key={i} className={`mtag${x.userId === meId ? " me" : ""}`}>{x.text}</span> : x.text))
+    : text);
+  const tagPeople = people.filter((x) => x.userId !== meId);
+
   function CommentRow({ p, cm, isReply }: { p: FeedPost; cm: FeedComment; isReply: boolean }) {
     const parentId = cm.parentId ?? cm.id;
     return (
@@ -114,8 +131,12 @@ export default function FeedScreen() {
           <span className="avt" style={{ background: cm.color, width: isReply ? 24 : 28, height: isReply ? 24 : 28, fontSize: 10.5 }}>{cm.av}</span>
         )}
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div className="fp-cb"><b>{cm.sender}</b><span className="cm-body">{cm.body}</span></div>
+          <div className="fp-cb-wrap">
+            <div className="fp-cb"><b>{cm.sender}</b><span className="cm-body">{withTags(cm.body)}</span></div>
+            {cm.likes > 0 && <span className="fp-cheart" title={`${cm.likes}`}>❤️{cm.likes > 1 ? <b>{cm.likes}</b> : null}</span>}
+          </div>
           <span className="muted" style={{ fontSize: 10.5, marginLeft: 12 }} title={cm.at}>{ago(cm.atISO, cm.at)}</span>
+          <button className={`fp-reply${cm.liked ? " liked" : ""}`} onClick={() => likeComment(p, cm.id)}>{cm.liked ? t("Líkar") : t("Líka við")}</button>
           <button className="fp-reply" onClick={() => { setReplyFor(replyFor === parentId ? null : parentId); setRVal(""); }}>{t("Svara")}</button>
         </div>
       </div>
@@ -124,6 +145,8 @@ export default function FeedScreen() {
 
   return (
     <>
+      <FeedGlow />
+      <div className="feed-page">
       <PageHeader title="Fréttaveita" subtitle="Fréttir, tilkynningar og stemning fyrirtækisins" />
       <div className="feedwrap">
         {/* composer — FB-style: avatar + pill that grows into a textarea */}
@@ -210,7 +233,7 @@ export default function FeedScreen() {
                   </button>
                 )}
               </div>
-              {p.body && <p className="fp-body">{p.body}</p>}
+              {p.body && <p className="fp-body">{withTags(p.body)}</p>}
               {p.imageUrl && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img className="fp-img full" src={p.imageUrl} alt="" loading="lazy" onClick={() => window.open(p.imageUrl!, "_blank")} />
@@ -274,7 +297,7 @@ export default function FeedScreen() {
                         {replies.map((cm) => <CommentRow key={cm.id} p={p} cm={cm} isReply />)}
                         {replyFor === top.id && (
                           <div className="fp-cin" style={{ marginLeft: 36 }}>
-                            <input autoFocus placeholder={`${t("Svara")} ${top.sender.split(/\s+/)[0]}…`} value={rVal} onChange={(e) => setRVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") reply(p, top.id); if (e.key === "Escape") setReplyFor(null); }} />
+                            <MentionInput autoFocus people={tagPeople} placeholder={`${t("Svara")} ${top.sender.split(/\s+/)[0]}…`} value={rVal} onChange={setRVal} onSubmit={() => reply(p, top.id)} onEscape={() => setReplyFor(null)} />
                             <button className="fp-send" disabled={!rVal.trim()} onClick={() => reply(p, top.id)} aria-label={t("Senda")}>
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
                             </button>
@@ -284,7 +307,7 @@ export default function FeedScreen() {
                     );
                   })}
                   <div className="fp-cin">
-                    <input placeholder={t("Skrifaðu athugasemd…")} value={cVal[p.id] ?? ""} onChange={(e) => setCVal((v) => ({ ...v, [p.id]: e.target.value }))} onKeyDown={(e) => e.key === "Enter" && comment(p)} />
+                    <MentionInput people={tagPeople} placeholder={t("Skrifaðu athugasemd… (@ til að nefna)")} value={cVal[p.id] ?? ""} onChange={(v) => setCVal((cv) => ({ ...cv, [p.id]: v }))} onSubmit={() => comment(p)} />
                     <button className="fp-send" disabled={!(cVal[p.id] ?? "").trim()} onClick={() => comment(p)} aria-label={t("Senda")}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
                     </button>
@@ -295,6 +318,74 @@ export default function FeedScreen() {
           );
         })}
       </div>
+      </div>
     </>
+  );
+}
+
+/** Appelsínugulur bjarmi á bak við fréttaveituna (aðeins tölva). Færist hægt þegar skrunað er
+ * — hvaða skrunsvæði sem er (gluggi eða aðalsvæði) — og stendur kyrr ef notandi vill minni hreyfingu. */
+function FeedGlow() {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    let raf = 0;
+    const onScroll = (e: Event) => {
+      const tgt = e.target as Element | Document;
+      const y = tgt instanceof Element ? tgt.scrollTop : window.scrollY;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => el.style.setProperty("--fy", String(Math.round(y))));
+    };
+    window.addEventListener("scroll", onScroll, { capture: true, passive: true });
+    return () => { window.removeEventListener("scroll", onScroll, { capture: true }); cancelAnimationFrame(raf); };
+  }, []);
+  return <div ref={ref} className="feed-glow" aria-hidden><i /><i /><i /></div>;
+}
+
+/** Innsláttarreitur athugasemdar með @-merkingum: listi yfir fólk birtist við „@“. */
+function MentionInput({ people, value, onChange, onSubmit, onEscape, placeholder, autoFocus }: {
+  people: FeedPerson[]; value: string; onChange: (v: string) => void; onSubmit: () => void; onEscape?: () => void; placeholder: string; autoFocus?: boolean;
+}) {
+  const ref = useRef<HTMLInputElement | null>(null);
+  const [mq, setMq] = useState<{ start: number; q: string } | null>(null);
+  const [idx, setIdx] = useState(0);
+  const list = mq ? filterMentions(people, mq.q, 6) : [];
+  function pick(p: FeedPerson) {
+    const el = ref.current;
+    if (!mq || !el) return;
+    const r = insertMention(value, mq.start, el.selectionStart ?? value.length, p.name);
+    onChange(r.text); setMq(null);
+    requestAnimationFrame(() => { el.focus(); el.setSelectionRange(r.caret, r.caret); });
+  }
+  return (
+    <div className="fp-min">
+      <input ref={ref} autoFocus={autoFocus} placeholder={placeholder} value={value}
+        onChange={(e) => { onChange(e.target.value); const q = mentionQuery(e.target.value, e.target.selectionStart ?? e.target.value.length); setMq(q); if (q?.q !== mq?.q) setIdx(0); }}
+        onBlur={() => setMq(null)}
+        onKeyDown={(e) => {
+          if (list.length) {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); setIdx((i) => (i + (e.key === "ArrowDown" ? 1 : list.length - 1)) % list.length); return; }
+            if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); pick(list[Math.min(idx, list.length - 1)]); return; }
+            if (e.key === "Escape") { e.preventDefault(); setMq(null); return; }
+          }
+          if (e.key === "Enter" && !e.nativeEvent.isComposing) onSubmit();
+          if (e.key === "Escape") onEscape?.();
+        }} />
+      {list.length > 0 && (
+        <div className="mention-pop fp-mpop" role="listbox">
+          {list.map((p, i) => (
+            <button key={p.userId} role="option" aria-selected={i === idx} className={i === idx ? "on" : ""}
+              onPointerDown={(e) => e.preventDefault()} onMouseEnter={() => setIdx(i)} onClick={() => pick(p)}>
+              {p.photo
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img className="avt-img" src={p.photo} alt="" />
+                : <span className="avt" style={{ background: p.color }}>{p.av}</span>}
+              <span>{p.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

@@ -4,13 +4,14 @@ import { notifyEmployee, notifyManagers } from "@/lib/push";
 import { sendLeaveDecisionEmail } from "@/lib/email";
 import { checkNoShows } from "@/lib/noshow.server";
 import { pushChatMessage } from "@/lib/chat-push.server";
+import { pushCommentMentions } from "@/lib/feed-push.server";
 
 // Push/email for actions the mobile app performs directly against Supabase.
 // The app has no server actions, so it calls this after a successful write.
 // Auth: the caller's Supabase access token (Bearer). We verify the caller is a
 // party to the row before notifying anyone — this endpoint never writes data.
 
-type Kind = "leave_request" | "leave_decided" | "swap_request" | "shift_claim" | "punch" | "content_report" | "work_overview" | "chat_message";
+type Kind = "leave_request" | "leave_decided" | "swap_request" | "shift_claim" | "punch" | "content_report" | "work_overview" | "chat_message" | "comment_mention";
 
 export async function POST(req: Request) {
   const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -79,6 +80,13 @@ export async function POST(req: Request) {
     const { data: msg } = await admin.from("messages").select("sender_id, created_at").eq("id", id).maybeSingle();
     if (!msg || msg.sender_id !== uid || Date.now() - new Date(msg.created_at as string).getTime() > 5 * 60_000) return NextResponse.json({ ok: false }, { status: 403 });
     after(() => pushChatMessage(id));
+    return NextResponse.json({ ok: true });
+  }
+
+  if (kind === "comment_mention") {
+    const { data: cm } = await admin.from("post_comments").select("sender_id, created_at").eq("id", id).maybeSingle();
+    if (!cm || cm.sender_id !== uid || Date.now() - new Date(cm.created_at as string).getTime() > 5 * 60_000) return NextResponse.json({ ok: false }, { status: 403 });
+    after(() => pushCommentMentions(id));
     return NextResponse.json({ ok: true });
   }
 

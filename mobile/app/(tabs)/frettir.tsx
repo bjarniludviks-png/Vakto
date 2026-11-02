@@ -2,7 +2,9 @@
 // ný færsla með mynd og „festa efst“ (stjórnendur).
 import React, { useCallback, useEffect, useState } from "react";
 import { tr, trf } from "../../src/lib/i18n";
-import { View, TextInput, Pressable, ScrollView, RefreshControl, Switch, KeyboardAvoidingView, Platform, Alert } from "react-native";
+import { View, Text, TextInput, Pressable, ScrollView, RefreshControl, Switch, KeyboardAvoidingView, Platform, Alert } from "react-native";
+import { mentionQuery, filterMentions, insertMention, splitMentions } from "../../src/lib/mentions";
+import { peopleMap, authUser, type Person } from "../../src/lib/api/chat";
 import { useFocusEffect } from "expo-router";
 import { useSegments } from "expo-router";
 import { Plus, Heart, MessageSquare, Pin, ImagePlus, Send, Trash2, Flag } from "lucide-react-native";
@@ -12,7 +14,7 @@ import { Header, IconBtn } from "../../src/components/screen";
 import { Txt, Muted, Avatar, Sheet, Btn, Empty, useToast, Pill } from "../../src/components/ui";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listPosts, createPost, setPostReaction, addPostComment, setPinned, deletePost, canPin as canPinFn, feedOptions, uploadImage, REACTIONS, type FeedPost, type FeedAudience } from "../../src/lib/api/feed";
+import { listPosts, createPost, setPostReaction, addPostComment, setCommentLike, setPinned, deletePost, canPin as canPinFn, feedOptions, uploadImage, REACTIONS, type FeedPost, type FeedAudience } from "../../src/lib/api/feed";
 import { inputStyle, Field } from "../../src/components/request-sheets";
 import { reportContent, blockUser, blockedUsers } from "../../src/lib/api/moderation";
 
@@ -34,6 +36,42 @@ export default function Frettir() {
   const [busy, setBusy] = useState(false);
   const [commentFor, setCommentFor] = useState<string | null>(null);
   const [comment, setComment] = useState("");
+  // @-merkingar í athugasemdum + hjörtu
+  const [people, setPeople] = useState<Person[]>([]);
+  const [meUid, setMeUid] = useState<string | null>(null);
+  const [mq, setMq] = useState<{ start: number; q: string } | null>(null);
+  const caret = React.useRef(0);
+  useEffect(() => {
+    if (!me) return;
+    let alive = true;
+    Promise.all([peopleMap(me.companyId), authUser()]).then(([m, { data }]) => {
+      if (!alive) return;
+      setPeople([...m.values()].sort((a, b) => a.name.localeCompare(b.name)));
+      setMeUid(data.user?.id ?? null);
+    });
+    return () => { alive = false; };
+  }, [me]);
+  const mqList = mq ? filterMentions(people.filter((x) => x.userId !== meUid), mq.q, 5) : [];
+  function onComment(v: string) {
+    const c = Math.max(0, Math.min(v.length, caret.current + (v.length - comment.length)));
+    caret.current = c; setComment(v); setMq(mentionQuery(v, c));
+  }
+  function pickMention(x: Person) {
+    if (!mq) return;
+    const r = insertMention(comment, mq.start, caret.current, x.name);
+    caret.current = r.caret; setComment(r.text); setMq(null);
+  }
+  const withTags = (text: string) => (people.length && text.includes("@")
+    ? splitMentions(text, people).map((x, i) => (x.userId
+      ? <Text key={i} style={{ fontFamily: font.bold, color: colors.brandDeep, backgroundColor: x.userId === meUid ? "rgba(245,147,49,.2)" : undefined }}>{x.text}</Text>
+      : x.text))
+    : text);
+  async function likeComment(p: FeedPost, cId: string, on: boolean) {
+    if (!me) return;
+    setPosts((ps) => ps?.map((x) => (x.id !== p.id ? x : { ...x, comments: x.comments.map((c) => (c.id !== cId ? c : { ...c, liked: on, likes: Math.max(0, c.likes + (on ? 1 : -1)) })) })) ?? ps);
+    const r = await setCommentLike(me, cId, on);
+    if (!r.ok) load();
+  }
   const [reactFor, setReactFor] = useState<FeedPost | null>(null);
 
   const load = useCallback(async () => {
@@ -86,7 +124,7 @@ export default function Frettir() {
   async function sendComment(p: FeedPost) {
     const body = comment.trim();
     if (!me || !body) return;
-    setComment(""); setCommentFor(null);
+    setComment(""); setCommentFor(null); setMq(null); caret.current = 0;
     await addPostComment(me, p.id, body);
     load();
   }
@@ -119,7 +157,7 @@ export default function Frettir() {
                   <Pressable onPress={async () => { await deletePost(p.id); toast("Færslu eytt"); load(); }} hitSlop={8} style={{ padding: 6 }}><Trash2 color={colors.ink3} size={17} /></Pressable>
                 ) : null}
               </View>
-              <Txt size={14.5} style={{ lineHeight: 21, paddingHorizontal: 14, paddingBottom: 12 }}>{p.body}</Txt>
+              <Txt size={14.5} style={{ lineHeight: 21, paddingHorizontal: 14, paddingBottom: 12 }}>{withTags(p.body)}</Txt>
               {p.imageUrl ? <Image source={{ uri: p.imageUrl }} style={{ width: "100%", height: 200 }} contentFit="cover" /> : null}
               <View style={{ flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 8, borderTopWidth: 1, borderTopColor: p.pinned ? (dark ? "rgba(245,147,49,.25)" : "rgba(207,95,12,.15)") : colors.line2 }}>
                 <Pressable onPress={() => react(p, p.myReaction ?? "❤️")} onLongPress={() => setReactFor(p)} style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 }}>
@@ -139,15 +177,29 @@ export default function Frettir() {
                       <Avatar name={c.sender} size={24} color={c.color} photo={c.photo} />
                       <View style={{ flex: 1, backgroundColor: p.pinned ? (dark ? "rgba(255,255,255,.06)" : "rgba(255,255,255,.6)") : colors.panel2, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 7 }}>
                         <Txt weight="bold" size={12}>{c.sender} <Txt size={11} color={colors.ink3}>· {c.at}</Txt></Txt>
-                        <Txt size={13.5}>{c.body}</Txt>
+                        <Txt size={13.5}>{withTags(c.body)}</Txt>
                       </View>
+                      <Pressable onPress={() => likeComment(p, c.id, !c.liked)} hitSlop={8} accessibilityLabel={c.liked ? tr("Líkar") : tr("Líka við")} style={{ alignItems: "center", paddingTop: 6, minWidth: 22 }}>
+                        <Heart color={c.liked ? "#e0245e" : colors.ink3} fill={c.liked ? "#e0245e" : "transparent"} size={16} />
+                        {c.likes > 0 ? <Txt size={10.5} color={colors.ink3}>{c.likes}</Txt> : null}
+                      </Pressable>
                     </View>
+                  ))}
+                </View>
+              ) : null}
+              {commentFor === p.id && mqList.length > 0 ? (
+                <View style={{ marginHorizontal: 14, marginBottom: 6, borderRadius: 12, backgroundColor: colors.panel2, paddingVertical: 4 }}>
+                  {mqList.map((x) => (
+                    <Pressable key={x.userId} onPress={() => pickMention(x)} style={({ pressed }) => ({ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 12, paddingVertical: 7, opacity: pressed ? 0.6 : 1 })}>
+                      <Avatar name={x.name} size={26} color={x.color} photo={x.photo} />
+                      <Txt size={14}>{x.name}</Txt>
+                    </Pressable>
                   ))}
                 </View>
               ) : null}
               {commentFor === p.id ? (
                 <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-end", paddingHorizontal: 14, paddingBottom: 12 }}>
-                  <TextInput style={[inputStyle(), { flex: 1, paddingVertical: 9, borderRadius: 20 }]} value={comment} onChangeText={setComment} placeholder={tr("Skrifa athugasemd…")} placeholderTextColor={colors.ink3} autoFocus onSubmitEditing={() => sendComment(p)} />
+                  <TextInput style={[inputStyle(), { flex: 1, paddingVertical: 9, borderRadius: 20 }]} value={comment} onChangeText={onComment} onSelectionChange={(e) => { caret.current = e.nativeEvent.selection.end; }} placeholder={tr("Skrifa athugasemd… (@ til að nefna)")} placeholderTextColor={colors.ink3} autoFocus onSubmitEditing={() => sendComment(p)} />
                   <Pressable onPress={() => sendComment(p)} disabled={!comment.trim()} style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: comment.trim() ? colors.brand : colors.line2, alignItems: "center", justifyContent: "center" }}>
                     <Send color={comment.trim() ? "#fff" : colors.ink3} size={16} />
                   </Pressable>
