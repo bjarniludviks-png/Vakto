@@ -8,6 +8,9 @@ import { Fragment, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useLang } from "./lang";
 import { showDemoReadOnly } from "./demo-guard";
+import { Mic, Square } from "lucide-react";
+import { toast } from "./toast";
+import { useDictation } from "./use-dictation";
 import { isNdjson, readNdjson, type AssistantEvent } from "@/lib/ai/stream";
 
 export type AssistantAction = { tool: string; input: Record<string, unknown>; summary: string; state?: "pending" | "busy" | "done" | "error" | "cancelled"; error?: string };
@@ -21,6 +24,7 @@ const KEY_ID = "vakto-assistant-id";
 
 export const ASSISTANT_STRINGS = {
   is: {
+    mic: "Tala inn", micStop: "Hætta að hlusta", micDenied: "Leyfðu aðgang að hljóðnema í stillingum vafrans til að tala inn.", micNone: "Enginn hljóðnemi fannst.", micLang: "Vafrinn styður ekki talgreiningu á þessu tungumáli.", micErr: "Talgreining tókst ekki. Reyndu aftur.",
     name: "VAKTO AI", open: "Opna VAKTO AI", close: "Loka", reset: "Nýtt samtal", history: "Fyrri samtöl", noHistory: "Engin vistuð samtöl enn.", del: "Eyða samtali", back: "Til baka", ph: "Spurðu um reksturinn eða biddu um breytingu…",
     send: "Senda", thinking: "Hugsa…", confirm: "Staðfesta", viewOnly: "Aðeins til skoðunar í demo — tillagan er ekki framkvæmd.", cancel: "Hætta við", all: "Staðfesta allt", done: "Gert", cancelled: "Hætt við",
     hello: "Hæ! Ég get svarað spurningum um laun, tíma og vaktir, sett upp vaktaplan fyrir heila viku og undirbúið breytingar sem þú staðfestir.",
@@ -34,6 +38,7 @@ export const ASSISTANT_STRINGS = {
     signup: "Stofna fyrirtæki — 14 daga frí prufa", left: (n: number, of: number) => `${n} af ${of} spurningum eftir í demo`,
   },
   en: {
+    mic: "Dictate", micStop: "Stop listening", micDenied: "Allow microphone access in your browser settings to dictate.", micNone: "No microphone found.", micLang: "Your browser does not support speech recognition in this language.", micErr: "Speech recognition failed. Try again.",
     name: "VAKTO AI", open: "Open VAKTO AI", close: "Close", reset: "New conversation", history: "Earlier conversations", noHistory: "No saved conversations yet.", del: "Delete conversation", back: "Back", ph: "Ask about the business or request a change…",
     send: "Send", thinking: "Thinking…", confirm: "Confirm", viewOnly: "View only in the demo — the proposal is not carried out.", cancel: "Cancel", all: "Confirm all", done: "Done", cancelled: "Cancelled",
     hello: "Hi! I can answer questions about labor cost, hours and shifts, plan a whole week, and prepare changes for you to confirm.",
@@ -47,6 +52,7 @@ export const ASSISTANT_STRINGS = {
     signup: "Create your company — 14-day free trial", left: (n: number, of: number) => `${n} of ${of} questions left in the demo`,
   },
   pl: {
+    mic: "Dyktuj", micStop: "Zatrzymaj słuchanie", micDenied: "Zezwól na dostęp do mikrofonu w ustawieniach przeglądarki, aby dyktować.", micNone: "Nie znaleziono mikrofonu.", micLang: "Przeglądarka nie obsługuje rozpoznawania mowy w tym języku.", micErr: "Rozpoznawanie mowy nie powiodło się. Spróbuj ponownie.",
     name: "VAKTO AI", open: "Otwórz VAKTO AI", close: "Zamknij", reset: "Nowa rozmowa", history: "Wcześniejsze rozmowy", noHistory: "Brak zapisanych rozmów.", del: "Usuń rozmowę", back: "Wstecz", ph: "Zapytaj o firmę lub poproś o zmianę…",
     send: "Wyślij", thinking: "Myślę…", confirm: "Zatwierdź", viewOnly: "Demo tylko do podglądu — propozycja nie zostanie wykonana.", cancel: "Anuluj", all: "Zatwierdź wszystko", done: "Gotowe", cancelled: "Anulowano",
     hello: "Cześć! Odpowiem na pytania o koszty pracy, godziny i zmiany, ułożę grafik na cały tydzień i przygotuję zmiany do Twojego zatwierdzenia.",
@@ -60,6 +66,7 @@ export const ASSISTANT_STRINGS = {
     signup: "Załóż firmę — 14 dni za darmo", left: (n: number, of: number) => `Pozostało ${n} z ${of} pytań w demo`,
   },
   vi: {
+    mic: "Nói để nhập", micStop: "Dừng nghe", micDenied: "Hãy cho phép truy cập micrô trong cài đặt trình duyệt để nói.", micNone: "Không tìm thấy micrô.", micLang: "Trình duyệt không hỗ trợ nhận dạng giọng nói cho ngôn ngữ này.", micErr: "Nhận dạng giọng nói không thành công. Vui lòng thử lại.",
     name: "VAKTO AI", open: "Mở VAKTO AI", close: "Đóng", reset: "Cuộc trò chuyện mới", history: "Cuộc trò chuyện trước", noHistory: "Chưa có cuộc trò chuyện nào được lưu.", del: "Xóa cuộc trò chuyện", back: "Quay lại", ph: "Hỏi về hoạt động kinh doanh hoặc yêu cầu thay đổi…",
     send: "Gửi", thinking: "Đang suy nghĩ…", confirm: "Xác nhận", viewOnly: "Bản demo chỉ để xem — đề xuất sẽ không được thực hiện.", cancel: "Hủy", all: "Xác nhận tất cả", done: "Xong", cancelled: "Đã hủy",
     hello: "Xin chào! Tôi có thể trả lời câu hỏi về chi phí lương, giờ làm và ca làm, lập lịch cho cả tuần và chuẩn bị các thay đổi để bạn xác nhận.",
@@ -314,16 +321,30 @@ export function AssistantMessages({ chat, onUpgrade, className = "vai-list", hid
   );
 }
 
-/** Innsláttur + fyrirvari (og spurningar eftir í demo). */
+/** Innsláttur + fyrirvari (og spurningar eftir í demo). Hljóðneminn talar inn í reitinn — sendir aldrei sjálfur. */
 export function AssistantComposer({ chat, placeholder }: { chat: AssistantChat; placeholder?: string }) {
   const { s, text, busy, demoLeft, focusKey } = chat;
+  const { lang } = useLang();
   const input = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { if (focusKey) input.current?.focus(); }, [focusKey]);
+  const mic = useDictation({
+    lang,
+    onText: chat.setText,
+    onError: (e) => toast(e === "denied" ? s.micDenied : e === "no-mic" ? s.micNone : e === "lang" ? s.micLang : s.micErr, "error"),
+  });
+  function submit() { mic.stop(); chat.send(text); }
   return (
     <>
-      <form className="vai-in" onSubmit={(e) => { e.preventDefault(); chat.send(text); }}>
-        <textarea ref={input} rows={1} value={text} placeholder={placeholder ?? s.ph} enterKeyHint="send" onChange={(e) => chat.setText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); chat.send(text); } }} />
+      <form className="vai-in" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+        <textarea ref={input} rows={1} value={text} placeholder={placeholder ?? s.ph} enterKeyHint="send"
+          onChange={(e) => { mic.stop(); chat.setText(e.target.value); }}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }} />
+        {mic.supported && (
+          <button type="button" className={`vai-mic${mic.listening ? " on" : ""}`} onClick={() => mic.toggle(text)}
+            aria-label={mic.listening ? s.micStop : s.mic} title={mic.listening ? s.micStop : s.mic} aria-pressed={mic.listening}>
+            {mic.listening ? <Square aria-hidden="true" /> : <Mic aria-hidden="true" />}
+          </button>
+        )}
         <button type="submit" disabled={busy || !text.trim()} aria-label={s.send}><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6" /></svg></button>
       </form>
       <div className="vai-note">{demoLeft ? `${s.left(demoLeft.left, demoLeft.of)} · ` : ""}{s.note}</div>

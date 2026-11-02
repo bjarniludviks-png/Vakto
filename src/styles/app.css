@@ -1465,6 +1465,12 @@ a.db2-who:hover span{color:var(--brand)}
 .vai-in button{flex:none;width:40px;height:40px;border-radius:12px;border:0;background:var(--brand);color:#fff;display:grid;place-items:center;cursor:pointer}
 .vai-in button:disabled{opacity:.4;cursor:default}
 .vai-in button svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.vai-in button.vai-mic{background:transparent;color:var(--ink2);border:1px solid var(--line)}
+.vai-in button.vai-mic:hover{color:var(--brand);border-color:var(--brand)}
+.vai-in button.vai-mic.on{background:var(--bad);border-color:var(--bad);color:#fff;animation:vai-mic-pulse 1.4s ease-out infinite}
+.vai-in button.vai-mic.on svg{width:14px;height:14px;fill:currentColor}
+@keyframes vai-mic-pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--bad) 45%,transparent)}100%{box-shadow:0 0 0 9px transparent}}
+@media (prefers-reduced-motion:reduce){.vai-in button.vai-mic.on{animation:none}}
 .vai-note{font-size:11px;color:var(--ink3);text-align:center;padding:0 12px 10px}
 @media (max-width:600px){
   .vai-fab{right:16px;bottom:calc(16px + env(safe-area-inset-bottom,0px))}
