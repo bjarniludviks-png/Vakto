@@ -1,6 +1,7 @@
 import "server-only";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendPushToUser } from "@/lib/push";
+import { mentionedIds } from "@/lib/mentions";
 
 // Push fyrir ný skilaboð í spjalli — sama fyrir vef (sendChatMessage) og app (/api/app/notify).
 // Hópspjall: titill = nafn hópsins, texti = „Nafn: skilaboð“ (eins og Messenger) svo það sést strax
@@ -23,7 +24,18 @@ export async function pushChatMessage(messageId: string): Promise<void> {
     const payload = group
       ? { title: (ch?.name as string | null) || "Hópspjall", body: `${sender}: ${preview}` }
       : { title: sender, body: preview };
+    // @-merkingar: sá sem var nefndur fær „Jón nefndi þig“ svo það skeri sig úr hinum skilaboðunum.
+    let tagged = new Set<string>();
+    if (group && kind === "text" && String(m.body ?? "").includes("@")) {
+      const ids = (mems ?? []).map((x) => x.user_id as string);
+      const { data: names } = await admin.from("employees").select("user_id, full_name").eq("company_id", m.company_id as string).in("user_id", ids);
+      tagged = new Set(mentionedIds(String(m.body), (names ?? []).filter((n) => n.full_name).map((n) => ({ userId: n.user_id as string, name: n.full_name as string }))));
+    }
+    const groupName = (ch?.name as string | null) || "Hópspjall";
     await Promise.all((mems ?? []).filter((x) => x.user_id !== m.sender_id)
-      .map((x) => sendPushToUser(x.user_id as string, { ...payload, url: "/spjall", appUrl: `/spjall/${channelId}`, tag: `chat-${channelId}` })));
+      .map((x) => sendPushToUser(x.user_id as string, {
+        ...(tagged.has(x.user_id as string) ? { title: `${sender} nefndi þig`, body: `${groupName}: ${preview}` } : payload),
+        url: "/spjall", appUrl: `/spjall/${channelId}`, tag: `chat-${channelId}`,
+      })));
   } catch { /* push is best-effort */ }
 }
