@@ -1,5 +1,6 @@
 // Spjallþráður — realtime, skilaboð flokkuð eftir sendanda, viðbrögð með
 // löngu ýti, „séð af“, svar í þræði, skrifar-vísir.
+import { emojify } from "../../src/lib/emoticons";
 import { presenceLabel, type CoworkerStatus } from "../../src/lib/presence";
 import { coworkerStatus } from "../../src/lib/api/presence";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -352,7 +353,7 @@ export default function Thread() {
   }
 
   async function send() {
-    const body = text.trim();
+    const body = emojify(text.trim());
     if (!me || !id || !body || sending) return;
     if (editing) {
       const m = editing;
