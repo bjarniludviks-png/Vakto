@@ -72,7 +72,7 @@ export async function getMyArea(): Promise<MyArea> {
 
     const [{ data: myShifts }, { data: open }, { data: punches }, { data: openShiftRows }] = await Promise.all([
       supabase.from("shifts").select("date, start_time, end_time")
-        .eq("company_id", company).eq("employee_id", empId)
+        .eq("company_id", company).eq("employee_id", empId).eq("published", true)
         .gte("date", isoOf(mon)).lte("date", isoOf(new Date(today.getFullYear(), today.getMonth(), today.getDate() + 14)))
         .order("date").order("start_time"),
       supabase.from("punches").select("clock_in").eq("employee_id", empId)

@@ -54,7 +54,7 @@ export async function getWhoIsOn(): Promise<{ rows: OnNowRow[]; missing: Missing
     const allPunches = [...(oldOpen ?? []), ...(todayPunches ?? [])];
     // Who has a shift in today's plan — punches without one get flagged.
     const { data: schedShifts } = await supabase
-      .from("shifts").select("employee_id").eq("company_id", company).eq("date", todayISO);
+      .from("shifts").select("employee_id").eq("company_id", company).eq("published", true).eq("date", todayISO);
     const scheduledIds = new Set((schedShifts ?? []).map((x) => x.employee_id as string));
     const rows: OnNowRow[] = allPunches.filter((p) => p.clock_out == null).map((p) => {
       const m = meta.get(p.employee_id as string);
@@ -72,7 +72,7 @@ export async function getWhoIsOn(): Promise<{ rows: OnNowRow[]; missing: Missing
     // Today's plan: earliest shift start per employee not currently on / punched.
     const earliest = new Map<string, string>();
     const { data: shifts } = await supabase
-      .from("shifts").select("employee_id, start_time").eq("company_id", company).eq("date", todayISO);
+      .from("shifts").select("employee_id, start_time").eq("company_id", company).eq("published", true).eq("date", todayISO);
     for (const s of shifts ?? []) {
       const eid = s.employee_id as string | null;
       const st = (s.start_time as string ?? "").slice(0, 5);

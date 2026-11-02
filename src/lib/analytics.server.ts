@@ -24,6 +24,8 @@ export type AttRow = {
   plannedToDate: number; estCostToDate: number;
   /** Lokaðar stimplanir lengri en 14 klst (sama mörk og flaggið „Óvenju löng vakt“) — líklega gleymd útstimplun. */
   longPunches: number;
+  /** Óvirkur starfsmaður — falinn í yfirlitinu nema hann hafi stimplað sig á tímabilinu. */
+  inactive?: boolean;
 };
 export type WeekAttendance = { rows: AttRow[]; live: boolean };
 
@@ -56,8 +58,9 @@ export async function getWeekAttendance(fromISO?: string, toISO?: string): Promi
     if (!company) return { rows: [], live: false };
 
     const [{ data: shifts }, { data: punches }] = await Promise.all([
+      // Aðeins útgefið plan — drög eru ekki plan fyrr en þau eru gefin út.
       allRows((a, b) => supabase.from("shifts").select("id, employee_id, date, start_time, end_time")
-        .eq("company_id", company).gte("date", from).lte("date", to).order("id").range(a, b)),
+        .eq("company_id", company).eq("published", true).gte("date", from).lte("date", to).order("id").range(a, b)),
       allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
         .eq("company_id", company).gte("clock_in", from).lte("clock_in", to + "T23:59:59").order("id").range(a, b)),
     ]);
@@ -97,6 +100,7 @@ export async function getWeekAttendance(fromISO?: string, toISO?: string): Promi
         actCost: Math.round(ac * withLevies),
         plannedToDate: ptd, estCostToDate: Math.round(ptd * withLevies),
         longPunches: longPunches.get(e.id) ?? 0,
+        inactive: e.status === "inactive",
       };
     });
     return { rows, live: true };

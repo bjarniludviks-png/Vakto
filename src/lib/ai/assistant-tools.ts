@@ -149,7 +149,7 @@ export const READ_TOOLS: Anthropic.Tool[] = [
 export const WRITE_TOOLS: Anthropic.Tool[] = [
   {
     name: "set_shift",
-    description: "LEGGJA TIL að setja eða breyta vakt starfsmanns á dagsetningu. Framkvæmist ekki fyrr en notandinn staðfestir.",
+    description: "LEGGJA TIL að setja eða breyta vakt starfsmanns á dagsetningu. Framkvæmist ekki fyrr en notandinn staðfestir. Ný/breytt vakt verður DRÖG sem starfsmaðurinn sér ekki fyrr en stjórnandi smellir á „Gefa út vaktaplan“ í Vaktaplani — segðu notandanum það.",
     input_schema: {
       type: "object",
       properties: { employee: { type: "string", description: "Fornafn starfsmanns eins og það birtist í kerfinu" }, date: DATE, start: TIME, end: TIME, shiftType: { type: "string", description: "Heiti vaktategundar, t.d. Dagvakt (valfrjálst)" } },

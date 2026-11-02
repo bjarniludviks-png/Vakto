@@ -256,7 +256,7 @@ export async function getEmployeePunches(employeeId: string, fromISO: string, to
     const [{ data: emp }, { data: shiftRows }] = await Promise.all([
       supabase.from("employees").select("full_name").eq("id", employeeId).maybeSingle(),
       supabase.from("shifts").select("date, start_time, end_time")
-        .eq("company_id", ctx.company).eq("employee_id", employeeId).gte("date", fromISO).lte("date", toISO),
+        .eq("company_id", ctx.company).eq("employee_id", employeeId).eq("published", true).gte("date", fromISO).lte("date", toISO),
     ]);
     const name = (emp?.full_name as string) ?? "";
     const from = fromISO, to = toISO + "T23:59:59";
@@ -643,7 +643,7 @@ export async function getTimesheetIssues(fromISO: string, toISO: string): Promis
     const [{ data: emps }, shiftsRes, punchesRes] = await Promise.all([
       supabase.from("employees").select("id, full_name, user_id, status, departments(name)").eq("company_id", ctx.company),
       allRows((a, b) => supabase.from("shifts").select("id, employee_id, date, start_time, end_time")
-        .eq("company_id", ctx.company).not("employee_id", "is", null).gte("date", fromISO).lte("date", toISO).order("id").range(a, b)),
+        .eq("company_id", ctx.company).eq("published", true).not("employee_id", "is", null).gte("date", fromISO).lte("date", toISO).order("id").range(a, b)),
       allRows((a, b) => supabase.from("punches").select("id, employee_id, clock_in, clock_out")
         .eq("company_id", ctx.company).gte("clock_in", fromISO).lte("clock_in", toISO + "T23:59:59").order("id").range(a, b)),
     ]);

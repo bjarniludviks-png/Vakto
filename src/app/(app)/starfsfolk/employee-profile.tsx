@@ -105,10 +105,12 @@ export default function EmployeeProfile({ employee, banner, action }: { employee
 
   async function toggleActive() {
     const active = e.status === "inactive";
+    // Óvirkjun: bjóða að taka vaktir fram í tímann af planinu (liðnar vaktir haldast sem saga).
+    const dropFutureShifts = !active && window.confirm(t("Taka líka vaktir starfsmannsins fram í tímann af vaktaplaninu? (Liðnar vaktir og stimplanir haldast.)"));
     setSaving(true);
-    const res = await setEmployeeStatus(e.id, active);
+    const res = await setEmployeeStatus(e.id, active, { dropFutureShifts });
     setSaving(false);
-    toast(res.ok ? (active ? "Starfsmaður virkjaður" : "Starfsmaður óvirkjaður") : (res.error ?? "Villa"));
+    toast(res.ok ? (active ? "Starfsmaður virkjaður" : `${t("Starfsmaður óvirkjaður")}${res.droppedShifts ? ` · ${res.droppedShifts} ${t("vöktum eytt")}` : ""}`) : (res.error ?? "Villa"));
     router.refresh();
   }
 

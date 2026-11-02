@@ -226,8 +226,25 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
   // Starfsmenn án plans og án stimplunar á tímabilinu eru faldir sjálfgefið (yfirlitið verður hreinna).
   const [showEmpty, setShowEmpty] = useState(false);
   const hasData = (r: AttRow) => r.actual > 0 || r.planned > 0;
-  const emptyN = matched.filter((r) => !hasData(r)).length;
-  const shown = showEmpty || search ? matched : matched.filter(hasData);
+  // Faldir: handvalið („Fela úr yfirliti“, munað í þessum vafra) + óvirkir án stimplunar á tímabilinu.
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+  const [showHidden, setShowHidden] = useState(false);
+  useEffect(() => {
+    try { const v = JSON.parse(localStorage.getItem("vakto.att.hidden") ?? "[]"); if (Array.isArray(v) && v.length) requestAnimationFrame(() => setHidden(new Set(v.map(String)))); } catch { /* engin geymsla */ }
+  }, []);
+  function toggleHidden(id: string) {
+    setHidden((h) => {
+      const n = new Set(h);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      try { localStorage.setItem("vakto.att.hidden", JSON.stringify([...n])); } catch { /* engin geymsla */ }
+      return n;
+    });
+  }
+  const isHidden = (r: AttRow) => hidden.has(r.id) || (!!r.inactive && r.actual === 0);
+  const hiddenN = matched.filter(isHidden).length;
+  const unhidden = showHidden || search ? matched : matched.filter((r) => !isHidden(r));
+  const emptyN = unhidden.filter((r) => !hasData(r)).length;
+  const shown = showEmpty || search ? unhidden : unhidden.filter(hasData);
   // Samanburður við plan sem er LOKIÐ: vakt sem stendur yfir (eða er fram undan) telst ekki fyrr en henni lýkur,
   // eins og stimplun telst ekki fyrr en stimplað er út. Á liðnu tímabili er það allt planið.
   const devOf = (r: AttRow) => Math.round((r.actual - r.plannedToDate) * 10) / 10;
@@ -402,7 +419,17 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
                       : r.actual === 0 ? <span className="db2-pill warn">{t("Vantar stimplun")}</span>
                       : <span className="db2-pill good">{t("Á áætlun")}</span>}
                   </td>
-                  <td><svg className="db2-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg></td>
+                  <td>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <button type="button" className="att-hide" title={hidden.has(r.id) ? t("Sýna aftur í yfirliti") : t("Fela úr yfirliti")}
+                        onClick={(e) => { e.stopPropagation(); toggleHidden(r.id); }}>
+                        {hidden.has(r.id)
+                          ? <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+                          : <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3l18 18M10.6 5.1A10.8 10.8 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.8 0 3.4-.5 4.8-1.3M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>}
+                      </button>
+                      <svg className="db2-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6" /></svg>
+                    </span>
+                  </td>
                 </tr>
                 );
               }) : <tr><td colSpan={8} className="db2-muted" style={{ textAlign: "center", padding: 24 }}>{t("Engin gögn á þessu tímabili.")}</td></tr>}
@@ -422,6 +449,11 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
               );
             })()}
           </table>
+          {hiddenN > 0 && !search && (
+            <button type="button" className="db2-more" onClick={() => setShowHidden((v) => !v)}>
+              {showHidden ? t("Fela falda starfsmenn") : `${t("Sýna")} ${hiddenN} ${t("falda starfsmenn (óvirka eða handvalda)")}`}
+            </button>
+          )}
           {emptyN > 0 && !search && (
             <button type="button" className="db2-more" onClick={() => setShowEmpty((v) => !v)}>
               {showEmpty ? t("Fela starfsmenn án skráningar") : `${t("Sýna")} ${emptyN} ${t("starfsmenn án skráningar á tímabilinu")}`}
