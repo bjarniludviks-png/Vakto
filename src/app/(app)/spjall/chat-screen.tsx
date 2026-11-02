@@ -1,5 +1,6 @@
 "use client";
 
+import { emojify } from "@/lib/emoticons";
 import { presenceLabel, type CoworkerStatus } from "@/lib/presence";
 import { getCoworkerStatus } from "./presence-actions";
 import { ProfileModal } from "./profile-modal";
@@ -732,7 +733,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   }
 
   async function send(kind: "text" | "image" | "audio" = "text", url?: string, body?: string) {
-    const text = body ?? val;
+    const text = kind === "text" ? emojify(body ?? val) : (body ?? val);
     if (kind === "text" && !text.trim()) return;
     if (kind === "text" && editing) {
       const m = editing, next = text.trim();
