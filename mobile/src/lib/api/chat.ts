@@ -275,11 +275,14 @@ export async function sendChatMessage(me: Me, channelId: string, body: string, r
   return { ok: true, id: data?.id as string };
 }
 
-export async function setReaction(me: Me, messageId: string, emoji: string | null): Promise<void> {
+export async function setReaction(me: Me, messageId: string, emoji: string | null): Promise<boolean> {
+  if (messageId.startsWith("tmp-")) return false; // skilaboðin eru enn á leiðinni
   const { data: auth } = await authUser();
-  if (!auth.user) return;
-  if (!emoji) await supabase.from("message_reactions").delete().eq("message_id", messageId).eq("user_id", auth.user.id);
-  else await supabase.from("message_reactions").upsert({ message_id: messageId, user_id: auth.user.id, company_id: me.companyId, emoji }, { onConflict: "message_id,user_id" });
+  if (!auth.user) return false;
+  const { error } = !emoji
+    ? await supabase.from("message_reactions").delete().eq("message_id", messageId).eq("user_id", auth.user.id)
+    : await supabase.from("message_reactions").upsert({ message_id: messageId, user_id: auth.user.id, company_id: me.companyId, emoji }, { onConflict: "message_id,user_id" });
+  return !error;
 }
 
 /** Breyta texta eigin skilaboða (0100: aðeins body, edited_at sett í grunninum). */
@@ -335,13 +338,15 @@ export async function getChatTranslate(): Promise<"on" | "off" | null> {
 }
 
 export async function setChatTranslate(v: "on" | "off"): Promise<boolean> {
-  const { data: auth } = await authUser();
-  if (!auth.user) return false;
-  return !(await supabase.from("users").update({ chat_translate: v }).eq("id", auth.user.id)).error;
+  // 0076: innskráðir skrifa ekki beint í users — eigin stilling fer um set_chat_translate (0108).
+  const { data, error } = await supabase.rpc("set_chat_translate", { v });
+  return !error && data === true;
 }
 
-export async function deleteMessage(messageId: string): Promise<void> {
-  await supabase.from("messages").delete().eq("id", messageId);
+export async function deleteMessage(messageId: string): Promise<boolean> {
+  if (messageId.startsWith("tmp-")) return false;
+  const { data, error } = await supabase.from("messages").delete().eq("id", messageId).select("id");
+  return !error && (data ?? []).length > 0;
 }
 
 /** Finna eða stofna einkaspjall við annan notanda. */
@@ -359,7 +364,8 @@ export async function startDM(me: Me, otherUserId: string): Promise<{ ok: boolea
   }
   const { data: ch, error } = await supabase.from("channels").insert({ company_id: me.companyId, name: "", kind: "dm", created_by: myId }).select("id").single();
   if (error || !ch) return { ok: false, error: error?.message ?? "Villa" };
-  await supabase.from("channel_members").insert([{ channel_id: ch.id, user_id: myId }, { channel_id: ch.id, user_id: otherUserId }]);
+  const { error: mErr } = await supabase.from("channel_members").insert([{ channel_id: ch.id, user_id: myId }, { channel_id: ch.id, user_id: otherUserId }]);
+  if (mErr) { await supabase.from("channels").delete().eq("id", ch.id); return { ok: false, error: "Ekki tókst að hefja samtal við þennan aðila." }; }
   return { ok: true, id: ch.id as string };
 }
 
@@ -443,8 +449,17 @@ export async function listAttachments(me: Me, channelId: string): Promise<Attach
 export async function leaveChannel(channelId: string): Promise<{ ok: boolean; error?: string }> {
   const { data: auth } = await authUser();
   if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
-  const { error } = await supabase.from("channel_members").delete().eq("channel_id", channelId).eq("user_id", auth.user.id);
-  return error ? { ok: false, error: error.message } : { ok: true };
+  // .select() skilar eyddum röðum — 0 raðir = ekkert gerðist; þá segjum við það í stað þess að þegja.
+  const { data, error } = await supabase.from("channel_members").delete().eq("channel_id", channelId).eq("user_id", auth.user.id).select("channel_id");
+  if (error) return { ok: false, error: error.message };
+  return data?.length ? { ok: true } : { ok: false, error: "Þú ert ekki í þessu spjalli lengur." };
+}
+
+/** Eyða hóp fyrir ALLA (stofnandi eða stjórnandi — RLS channels_del). Skilaboðin fara með. */
+export async function deleteChannel(channelId: string): Promise<{ ok: boolean; error?: string }> {
+  const { data, error } = await supabase.from("channels").delete().eq("id", channelId).eq("kind", "group").select("id");
+  if (error) return { ok: false, error: error.message };
+  return data?.length ? { ok: true } : { ok: false, error: "Aðeins sá sem stofnaði hópinn getur eytt honum." };
 }
 
 /** Breyta heiti hóps (allir meðlimir — RLS channels_member_update). */
@@ -464,6 +479,6 @@ export async function createGroup(me: Me, name: string, memberUserIds: string[])
   if (error || !ch) return { ok: false, error: error?.message ?? "Villa" };
   const ids = Array.from(new Set([auth.user.id, ...memberUserIds]));
   const { error: mErr } = await supabase.from("channel_members").insert(ids.map((u) => ({ channel_id: ch.id, user_id: u })));
-  if (mErr) return { ok: false, error: mErr.message };
+  if (mErr) { await supabase.from("channels").delete().eq("id", ch.id); return { ok: false, error: "Ekki tókst að bæta öllum í hópinn — reyndu aftur." }; }
   return { ok: true, id: ch.id as string };
 }

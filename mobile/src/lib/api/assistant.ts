@@ -119,8 +119,9 @@ export async function getConversation(id: string): Promise<AiMsg[]> {
   return rows.map((m) => ({ id: m.id, role: m.role, content: m.content, actions: m.actions ?? undefined }));
 }
 
-export async function deleteConversation(id: string): Promise<void> {
-  await call(`/conversations?id=${id}`, { method: "DELETE" });
+export async function deleteConversation(id: string): Promise<boolean> {
+  const r = await call(`/conversations?id=${id}`, { method: "DELETE" });
+  return !!r && r.ok !== false && !r.error;
 }
 
 /** Vistar stöðu tillögu svo hún sé rétt þegar samtalið er opnað aftur. */

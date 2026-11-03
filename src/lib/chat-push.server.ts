@@ -32,7 +32,10 @@ export async function pushChatMessage(messageId: string): Promise<void> {
       tagged = new Set(mentionedIds(String(m.body), (names ?? []).filter((n) => n.full_name).map((n) => ({ userId: n.user_id as string, name: n.full_name as string }))));
     }
     const groupName = (ch?.name as string | null) || "Hópspjall";
-    await Promise.all((mems ?? []).filter((x) => x.user_id !== m.sender_id)
+    // Þaggað spjall (0108): engin push-tilkynning — nema viðkomandi hafi verið @-nefnd(ur).
+    const mutedRes = await admin.from("chat_mutes").select("user_id").eq("channel_id", channelId);
+    const muted = new Set((mutedRes.error ? [] : mutedRes.data ?? []).map((r) => r.user_id as string));
+    await Promise.all((mems ?? []).filter((x) => x.user_id !== m.sender_id && (!muted.has(x.user_id as string) || tagged.has(x.user_id as string)))
       .map((x) => sendPushToUser(x.user_id as string, {
         ...(tagged.has(x.user_id as string) ? { title: `${sender} nefndi þig`, body: `${groupName}: ${preview}` } : payload),
         url: "/spjall", appUrl: `/spjall/${channelId}`, tag: `chat-${channelId}`,

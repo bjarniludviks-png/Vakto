@@ -70,7 +70,7 @@ export default function Frettir() {
     if (!me) return;
     setPosts((ps) => ps?.map((x) => (x.id !== p.id ? x : { ...x, comments: x.comments.map((c) => (c.id !== cId ? c : { ...c, liked: on, likes: Math.max(0, c.likes + (on ? 1 : -1)) })) })) ?? ps);
     const r = await setCommentLike(me, cId, on);
-    if (!r.ok) load();
+    if (!r.ok) { toast("Tókst ekki"); load(); }
   }
   const [reactFor, setReactFor] = useState<FeedPost | null>(null);
 
@@ -89,7 +89,7 @@ export default function Frettir() {
     if (!me) return;
     Alert.alert(tr("Færsla"), p.sender, [
       { text: tr("Tilkynna færslu"), onPress: async () => { const r = await reportContent(me, "post", p.id, p.senderId, p.body); toast(r.ok ? "Tilkynning send til stjórnenda" : (r.error ?? "Tókst ekki")); } },
-      ...(p.senderId ? [{ text: trf("Fela færslur frá {x}", p.sender.split(/\s+/)[0]), style: "destructive" as const, onPress: async () => { if (await blockUser(p.senderId!)) { toast("Falið. Þú getur opnað aftur í Stillingum."); load(); } } }] : []),
+      ...(p.senderId ? [{ text: trf("Fela færslur frá {x}", p.sender.split(/\s+/)[0]), style: "destructive" as const, onPress: async () => { if (await blockUser(p.senderId!)) { toast("Falið. Þú getur opnað aftur í Stillingum."); load(); } else toast("Tókst ekki"); } }] : []),
       { text: tr("Hætta við"), style: "cancel" as const },
     ]);
   }
@@ -118,14 +118,16 @@ export default function Frettir() {
   async function react(p: FeedPost, emoji: string) {
     if (!me) return;
     setReactFor(null);
-    await setPostReaction(me, p.id, p.myReaction === emoji ? null : emoji);
+    const r = await setPostReaction(me, p.id, p.myReaction === emoji ? null : emoji);
+    if (!r.ok) toast("Tókst ekki að vista viðbrögðin");
     load();
   }
   async function sendComment(p: FeedPost) {
     const body = comment.trim();
     if (!me || !body) return;
     setComment(""); setCommentFor(null); setMq(null); caret.current = 0;
-    await addPostComment(me, p.id, body);
+    const r = await addPostComment(me, p.id, body);
+    if (!r.ok) { setComment(body); setCommentFor(p.id); toast("Athugasemdin fór ekki — reyndu aftur"); return; }
     load();
   }
 
@@ -146,7 +148,7 @@ export default function Frettir() {
                   <Muted size={12}>{[p.senderRole, p.at].filter(Boolean).join(" · ")}{p.audience ? ` · ${p.audience}` : ""}</Muted>
                 </View>
                 {canPin ? (
-                  <Pressable onPress={async () => { await setPinned(p.id, !p.pinned); load(); }} hitSlop={8} style={{ padding: 6 }}>
+                  <Pressable onPress={async () => { const r = await setPinned(p.id, !p.pinned); if (!r.ok) toast(r.error ?? "Tókst ekki"); load(); }} hitSlop={8} style={{ padding: 6 }}>
                     <Pin color={p.pinned ? colors.brandDeep : colors.ink3} size={18} fill={p.pinned ? colors.brandDeep : "transparent"} />
                   </Pressable>
                 ) : null}
@@ -154,7 +156,7 @@ export default function Frettir() {
                   <Pressable onPress={() => moderate(p)} hitSlop={8} accessibilityLabel={tr("Tilkynna færslu")} style={{ padding: 6 }}><Flag color={colors.ink3} size={17} /></Pressable>
                 ) : null}
                 {p.me || canPin ? (
-                  <Pressable onPress={async () => { await deletePost(p.id); toast("Færslu eytt"); load(); }} hitSlop={8} style={{ padding: 6 }}><Trash2 color={colors.ink3} size={17} /></Pressable>
+                  <Pressable onPress={() => Alert.alert(tr("Eyða færslu?"), tr("Ekki er hægt að afturkalla það."), [{ text: tr("Hætta við"), style: "cancel" }, { text: tr("Eyða"), style: "destructive", onPress: async () => { const r = await deletePost(p.id); toast(r.ok ? "Færslu eytt" : "Tókst ekki að eyða færslunni"); load(); } }])} hitSlop={8} style={{ padding: 6 }}><Trash2 color={colors.ink3} size={17} /></Pressable>
                 ) : null}
               </View>
               <Txt size={14.5} style={{ lineHeight: 21, paddingHorizontal: 14, paddingBottom: 12 }}>{withTags(p.body)}</Txt>

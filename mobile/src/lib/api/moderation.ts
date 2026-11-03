@@ -9,9 +9,12 @@ export type ReportKind = "message" | "post" | "comment";
 export async function reportContent(me: Me, kind: ReportKind, refId: string, authorId: string | null, excerpt: string): Promise<{ ok: boolean; error?: string }> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false, error: "Ekki innskráð(ur)" };
+  // Venjuleg innsetning: endurtekin tilkynning (sama efni) rekst á einkvæmnina — hún er þegar komin til
+  // stjórnenda, svo það telst í lagi. (Upsert þurfti UPDATE-heimild sem aðeins stjórnendur hafa.)
   const { data, error } = await supabase.from("content_reports")
-    .upsert({ company_id: me.companyId, reporter_id: auth.user.id, kind, ref_id: refId, author_id: authorId, excerpt: excerpt.slice(0, 300) }, { onConflict: "reporter_id,kind,ref_id" })
+    .insert({ company_id: me.companyId, reporter_id: auth.user.id, kind, ref_id: refId, author_id: authorId, excerpt: excerpt.slice(0, 300) })
     .select("id").maybeSingle();
+  if (error && (error.code === "23505" || /duplicate|unique/i.test(error.message))) return { ok: true };
   if (error) return { ok: false, error: "Tókst ekki að senda tilkynningu" };
   if (data?.id) void notifyServer("content_report", data.id as string);
   return { ok: true };

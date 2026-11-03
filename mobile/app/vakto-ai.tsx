@@ -55,6 +55,7 @@ export default function VaktoAi() {
   async function send(q: string) {
     const content = q.trim();
     if (!content || busy) return;
+    if (manager === null) { toast(tr("Augnablik — VAKTO AI er að tengjast")); return; } // hlutverk óljóst enn
     const next: AiMsg[] = [...msgs, { role: "user", content }];
     if (staff) {
       setMsgs(next); setText(""); setBusy(true); setLive({ stage: "think", text: "", plan: 0, actions: [] });
@@ -108,9 +109,10 @@ export default function VaktoAi() {
     setMsgs(m); setConvId(id);
   }
   async function delConv(id: string) {
+    const before = history;
     setHistory((h) => h?.filter((c) => c.id !== id) ?? null);
     if (id === convId) { setMsgs([]); setConvId(null); }
-    await deleteConversation(id);
+    if (!(await deleteConversation(id))) { setHistory(before); toast(tr("Tókst ekki að eyða samtalinu")); }
   }
 
   const liveLabel = live ? (live.stage === "plan" ? trf("Set upp vaktir… {n}", live.plan) : tr(STAGE[live.tool ?? ""] ?? STAGE[live.stage] ?? STAGE.think)) : "";

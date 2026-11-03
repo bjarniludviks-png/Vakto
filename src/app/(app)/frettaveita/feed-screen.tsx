@@ -85,7 +85,8 @@ export default function FeedScreen() {
       if (next) counts.set(next, (counts.get(next) ?? 0) + 1);
       return { ...x, myReaction: next, reactions: [...counts.entries()].filter(([, n]) => n > 0).map(([emoji2, count]) => ({ emoji: emoji2, count })).sort((a, b) => b.count - a.count) };
     }));
-    await setPostReaction(p.id, next);
+    const r = await setPostReaction(p.id, next);
+    if (!r.ok) { toast(t("Tókst ekki að vista viðbrögðin")); reload(); }
   }
 
   async function comment(p: FeedPost) {
@@ -112,7 +113,7 @@ export default function FeedScreen() {
     const on = !cm.liked;
     setPosts((ps) => ps.map((x) => (x.id !== p.id ? x : { ...x, comments: x.comments.map((c) => (c.id !== cmId ? c : { ...c, liked: on, likes: Math.max(0, c.likes + (on ? 1 : -1)) })) })));
     const r = await setCommentLike(cmId, on);
-    if (!r.ok) reload();
+    if (!r.ok) { toast(t("Tókst ekki")); reload(); }
   }
   // @-merkingar feitletraðar; ef ég var nefnd(ur) fær nafnið bakgrunn.
   const withTags = (text: string) => (people.length && text.includes("@")
@@ -206,7 +207,8 @@ export default function FeedScreen() {
 
         {posts.map((p) => {
           const totalReacts = p.reactions.reduce((a, r) => a + r.count, 0);
-          const showC = openC[p.id] || p.comments.length > 0;
+          // Notandinn ræður (smellt) — annars opið ef athugasemdir eru til.
+          const showC = openC[p.id] ?? p.comments.length > 0;
           return (
             <div className={`feed-post fp2${p.pinned ? " pinned" : ""}`} key={p.id} style={{ marginBottom: 14 }}>
               {p.pinned && (
@@ -256,7 +258,7 @@ export default function FeedScreen() {
                   )}
                   <span style={{ flex: 1 }} />
                   {p.comments.length > 0 && (
-                    <button className="lnk" onClick={() => setOpenC((v) => ({ ...v, [p.id]: !v[p.id] }))}>
+                    <button className="lnk" onClick={() => setOpenC((v) => ({ ...v, [p.id]: !(v[p.id] ?? p.comments.length > 0) }))}>
                       {p.comments.length} {t("athugasemdir")}
                     </button>
                   )}
@@ -268,13 +270,17 @@ export default function FeedScreen() {
                 onMouseLeave={() => picker === p.id && setPicker(null)}>
                 <button
                   className={p.myReaction ? "on" : ""}
-                  onMouseEnter={() => setPicker(p.id)}
+                  onPointerEnter={(e) => { if (e.pointerType === "mouse") setPicker(p.id); }}
                   onClick={() => (p.myReaction ? react(p, p.myReaction) : setPicker(picker === p.id ? null : p.id))}
                 >
                   <span style={{ fontSize: 16, lineHeight: 1 }}>{p.myReaction ?? "👍"}</span>
                   {p.myReaction ? t("Þín viðbrögð") : t("Bregðast við")}
                 </button>
-                <button onClick={() => setOpenC((v) => ({ ...v, [p.id]: !v[p.id] }))}>
+                <button onClick={() => {
+                  // „Athugasemd“ opnar reitinn og setur bendilinn í hann (eins og á Facebook).
+                  setOpenC((v) => ({ ...v, [p.id]: true }));
+                  setTimeout(() => (document.querySelector(`[data-cin="${p.id}"] input, [data-cin="${p.id}"] textarea, [data-cin="${p.id}"] [contenteditable]`) as HTMLElement | null)?.focus(), 30);
+                }}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5Z" /></svg>
                   {t("Athugasemd")}
                 </button>
@@ -306,7 +312,7 @@ export default function FeedScreen() {
                       </div>
                     );
                   })}
-                  <div className="fp-cin">
+                  <div className="fp-cin" data-cin={p.id}>
                     <MentionInput people={tagPeople} placeholder={t("Skrifaðu athugasemd… (@ til að nefna)")} value={cVal[p.id] ?? ""} onChange={(v) => setCVal((cv) => ({ ...cv, [p.id]: v }))} onSubmit={() => comment(p)} />
                     <button className="fp-send" disabled={!(cVal[p.id] ?? "").trim()} onClick={() => comment(p)} aria-label={t("Senda")}>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>

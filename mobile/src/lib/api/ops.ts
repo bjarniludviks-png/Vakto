@@ -174,7 +174,23 @@ export function targetGapKr(p: LaborPeriod, target: number): number | null {
 }
 
 /** Samþykkja eða hafna beiðni. Vaktstjórar og eigendur hafa skrifheimild (RLS). */
+const API = (process.env.EXPO_PUBLIC_API_URL ?? "https://www.vakto.is").replace(/\/$/, "");
 export async function decideRequest(r: PendingReq, approve: boolean): Promise<{ ok: boolean; error?: string }> {
+  // Sama ákvörðun og á vefnum (vaktin losnar, starfsfólk fær tilkynningu o.s.frv.) — /api/app/requests/decide.
+  try {
+    const { data } = await supabase.auth.getSession();
+    const t = data.session?.access_token;
+    if (t) {
+      const res = await fetch(`${API}/api/app/requests/decide`, {
+        method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${t}` },
+        body: JSON.stringify({ kind: r.kind === "leave" ? "leave" : "swap", id: r.id, approve }),
+      });
+      if (res.status !== 404) {
+        const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        return j.ok ? { ok: true } : { ok: false, error: j.error ?? "Tókst ekki" };
+      }
+    }
+  } catch { /* fellur á beina uppfærslu hér að neðan */ }
   const table = r.kind === "leave" ? "leave_requests" : "shift_swaps";
   const { error } = await supabase.from(table).update({ status: approve ? "approved" : "rejected" }).eq("id", r.id);
   if (error) return { ok: false, error: error.message };

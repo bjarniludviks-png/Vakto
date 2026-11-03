@@ -1,15 +1,18 @@
-// Ný beiðni — orlof/veikindi/ólaunað, vaktaskipti, aðgengi.
-import React, { useState } from "react";
+// Beiðnir — mínar beiðnir og staða þeirra efst, svo ný beiðni: orlof/veikindi/ólaunað, vaktaskipti, aðgengi.
+import React, { useCallback, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import { tr } from "../src/lib/i18n";
 import { View, TextInput, Pressable } from "react-native";
 import { Screen } from "../src/components/screen";
-import { Card, Txt, Muted, Btn, SectionTitle } from "../src/components/ui";
+import { Card, Txt, Muted, Btn, SectionTitle, useToast } from "../src/components/ui";
 import { colors, radius, font, useTheme } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import {
   submitLeaveRequest,
   requestShiftSwap,
   setAvailability,
+  listMyRequests,
+  type MyRequest,
 } from "../src/lib/api/requests";
 import { iso } from "../src/lib/api/me";
 
@@ -68,7 +71,10 @@ function Seg<T extends string | number>({
 export default function Beidnir() {
   useTheme();
   const { me } = useMe();
-  const [msg, setMsg] = useState<string | null>(null);
+  const toast = useToast();
+  const [mine, setMine] = useState<MyRequest[] | null>(null);
+  const loadMine = useCallback(() => { if (me) listMyRequests(me).then(setMine).catch(() => setMine([])); }, [me]);
+  useFocusEffect(useCallback(() => { loadMine(); }, [loadMine]));
 
   // leave
   const today = iso(new Date());
@@ -85,22 +91,30 @@ export default function Beidnir() {
   const [days, setDays] = useState<number[]>([]);
   const [availBusy, setAvailBusy] = useState(false);
 
-  function flash(t: string) {
-    setMsg(t);
-    setTimeout(() => setMsg(null), 3500);
+  // Svarið birtist alltaf (skilaboð neðst) — áður í korti efst sem gat verið utan skjás.
+  function flash(t: string, ok = true) {
+    toast(t);
+    if (ok) loadMine();
   }
 
   const dateOk = /^\d{4}-\d{2}-\d{2}$/.test(fromDate) && /^\d{4}-\d{2}-\d{2}$/.test(toDate);
 
   return (
-    <Screen title="Ný beiðni" back>
-      {msg ? (
-        <Card style={{ backgroundColor: colors.goodSoft, borderColor: colors.good }}>
-          <Txt color={colors.good} weight="medium" size={13}>
-            {msg}
-          </Txt>
-        </Card>
-      ) : null}
+    <Screen title="Beiðnir" back>
+      <Card style={{ gap: 10 }}>
+        <SectionTitle>Mínar beiðnir</SectionTitle>
+        {mine === null ? <Muted size={13}>Sæki…</Muted> : null}
+        {mine && mine.length === 0 ? <Muted size={13}>Engar beiðnir enn.</Muted> : null}
+        {(mine ?? []).slice(0, 12).map((r) => {
+          const st = r.status === "approved" ? { t: "Samþykkt", c: colors.good, bg: colors.goodSoft } : r.status === "rejected" ? { t: "Hafnað", c: colors.bad, bg: colors.badSoft } : { t: "Í bið", c: colors.ink2, bg: colors.panel2 };
+          return (
+            <View key={`${r.kind}-${r.id}`} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <Txt size={13.5} style={{ flex: 1 }} numberOfLines={2}>{r.label}</Txt>
+              <View style={{ backgroundColor: st.bg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}><Txt size={12} weight="semibold" color={st.c}>{tr(st.t)}</Txt></View>
+            </View>
+          );
+        })}
+      </Card>
 
       <Card style={{ gap: 12 }}>
         <SectionTitle>Leyfisbeiðni</SectionTitle>
@@ -124,7 +138,7 @@ export default function Beidnir() {
             setLeaveBusy(true);
             const r = await submitLeaveRequest(me, { fromDate, toDate, type: leaveType });
             setLeaveBusy(false);
-            flash(r.ok ? "Leyfisbeiðni send — vaktstjóri fer yfir hana." : (r.error ?? "Villa"));
+            flash(r.ok ? "Leyfisbeiðni send — vaktstjóri fer yfir hana." : (r.error ?? "Villa"), r.ok);
           }}
         />
       </Card>
@@ -150,7 +164,7 @@ export default function Beidnir() {
             const r = await requestShiftSwap(me, swapNote.trim());
             setSwapBusy(false);
             if (r.ok) setSwapNote("");
-            flash(r.ok ? "Beiðni um vaktaskipti send." : (r.error ?? "Villa"));
+            flash(r.ok ? "Beiðni um vaktaskipti send." : (r.error ?? "Villa"), r.ok);
           }}
         />
       </Card>
@@ -174,7 +188,7 @@ export default function Beidnir() {
             setAvailBusy(true);
             const r = await setAvailability(me, { weekdays: [...days].sort() });
             setAvailBusy(false);
-            flash(r.ok ? "Aðgengi vistað." : (r.error ?? "Villa"));
+            flash(r.ok ? "Aðgengi vistað." : (r.error ?? "Villa"), r.ok);
           }}
         />
       </Card>

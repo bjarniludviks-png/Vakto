@@ -1,5 +1,6 @@
 // Þöggun spjallrása — geymd í símanum (felur ólesið-merki og hljóð fyrir rásina).
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { supabase } from "./supabase";
 import { tr, trf } from "../../src/lib/i18n";
 
 const KEY = "@vakto-muted";
@@ -18,6 +19,14 @@ export async function toggleMute(id: string): Promise<boolean> {
   const m = await getMuted();
   if (m.has(id)) m.delete(id); else m.add(id);
   await AsyncStorage.setItem(KEY, JSON.stringify([...m])).catch(() => {});
+  // Þjónninn þarf líka að vita (0108 chat_mutes) — annars koma push-tilkynningar áfram.
+  try {
+    const { data: au } = await supabase.auth.getUser();
+    if (au.user) {
+      if (m.has(id)) await supabase.from("chat_mutes").upsert({ user_id: au.user.id, channel_id: id }, { onConflict: "user_id,channel_id", ignoreDuplicates: true });
+      else await supabase.from("chat_mutes").delete().eq("user_id", au.user.id).eq("channel_id", id);
+    }
+  } catch { /* staðbundin þöggun gildir samt */ }
   listeners.forEach((l) => l());
   return m.has(id);
 }

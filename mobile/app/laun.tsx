@@ -150,7 +150,7 @@ export default function Laun() {
           : "Mánaðarlaun. Endanlegur launaseðill kemur úr launakeyrslunni."}
       </Muted>
       {!me?.contractor ? <Btn title="Réttindin mín: orlof og veikindi" variant="ghost" icon={<HeartPulse color={colors.ink} size={17} />} onPress={() => router.push("/rettindi")} /> : null}
-      <Btn title="Launaseðlar og skjöl" variant="ghost" icon={<FolderOpen color={colors.ink} size={17} />} onPress={() => router.push("/skjol")} />
+      <Btn title="Skjölin mín" variant="ghost" icon={<FolderOpen color={colors.ink} size={17} />} onPress={() => router.push("/skjol")} />
     </Screen>
   );
 }

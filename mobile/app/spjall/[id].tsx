@@ -20,7 +20,7 @@ import { Txt, Muted, Avatar, Sheet, Row, useToast, colorFor } from "../../src/co
 import { uploadImage } from "../../src/lib/api/feed";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, editMessage, translateMessage, translateBatch, getChatTranslate, setChatTranslate, subscribeChat, typingChannel, peopleMap, authUser, type ChatMessage, type ChannelRead, type LiveMessage } from "../../src/lib/api/chat";
+import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, deleteChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, editMessage, translateMessage, translateBatch, getChatTranslate, setChatTranslate, subscribeChat, typingChannel, peopleMap, authUser, type ChatMessage, type ChannelRead, type LiveMessage } from "../../src/lib/api/chat";
 import { supabase } from "../../src/lib/supabase";
 import { isMuted, toggleMute } from "../../src/lib/mute";
 import { reportContent, blockUser, blockedUsers } from "../../src/lib/api/moderation";
@@ -114,6 +114,7 @@ export default function Thread() {
   const [muted, setMuted] = useState(false);
   const [memberList, setMemberList] = useState<Person[]>([]);
   const [kind, setKind] = useState<string>("group");
+  const [mine, setMine] = useState(false); // ég stofnaði hópinn → má eyða honum fyrir alla
   // @-merkingar í hópspjalli: meðlimir þráðarins (ekki ég), leitin í gangi og staða bendils.
   const [tagPeople, setTagPeople] = useState<Person[]>([]);
   const [meUid, setMeUid] = useState<string | null>(null);
@@ -164,12 +165,21 @@ export default function Thread() {
     setName(nm); setRenaming(null); toast("Heiti breytt");
   }
 
-  function leave() {
-    if (!id) return;
-    Alert.alert(tr("Yfirgefa spjall"), tr("Þú hættir að fá skilaboð úr þessu spjalli."), [{ text: tr("Hætta við"), style: "cancel" }, { text: tr("Yfirgefa"), style: "destructive", onPress: async () => { const r = await leaveChannel(id); if (!r.ok) { toast(r.error ?? "Tókst ekki"); return; } setInfo(false); router.back(); } }]);
+  // Staðfesting birtist INNI í upplýsingablaðinu (ekki Alert ofan á Modal — það getur týnst á iOS).
+  const [confirm, setConfirm] = useState<null | "leave" | "delete">(null);
+  const [busy, setBusy] = useState(false);
+  async function doConfirm() {
+    if (!id || !confirm) return;
+    setBusy(true);
+    const r = confirm === "delete" ? await deleteChannel(id) : await leaveChannel(id);
+    setBusy(false);
+    if (!r.ok) { toast(r.error ?? "Tókst ekki"); return; }
+    toast(confirm === "delete" ? "Hópnum var eytt" : kind === "dm" ? "Samtali eytt" : "Þú ert farin(n) úr hópnum");
+    setConfirm(null); setInfo(false); router.back();
   }
   async function openInfo() {
     if (!me || !id) return;
+    setConfirm(null);
     setInfo(true);
     const people = await peopleMap(me.companyId);
     const { data: ch } = await supabase.from("channels").select("kind").eq("id", id).maybeSingle();
@@ -267,8 +277,10 @@ export default function Thread() {
     const oldest = msgs.find((m) => !m.id.startsWith("tmp-"));
     if (!me || !id || !oldest || loadingOlder) return;
     setLoadingOlder(true);
-    const [r, blocked] = await Promise.all([listMessages(me, id, { createdAt: oldest.createdAt, id: oldest.id }), blockedUsers()]);
-    setLoadingOlder(false);
+    let r: Awaited<ReturnType<typeof listMessages>>, blocked: Set<string>;
+    try { [r, blocked] = await Promise.all([listMessages(me, id, { createdAt: oldest.createdAt, id: oldest.id }), blockedUsers()]); }
+    catch { toast("Tókst ekki að sækja eldri skilaboð"); return; }
+    finally { setLoadingOlder(false); }
     const older = r.messages.filter((m) => m.me || !blocked.has(m.senderId));
     setMsgs((cur) => { const seen = new Set(cur.map((m) => m.id)); return [...older.filter((m) => !seen.has(m.id)), ...cur]; });
     setMore(r.hasMore);
@@ -291,8 +303,9 @@ export default function Thread() {
   useFocusEffect(useCallback(() => {
     load();
     if (id) isMuted(id).then(setMuted);
-    supabase.from("channels").select("kind, name, photo_url").eq("id", id).maybeSingle().then(async ({ data }) => {
+    supabase.from("channels").select("kind, name, photo_url, created_by").eq("id", id).maybeSingle().then(async ({ data }) => {
       setIsGroup(data?.kind !== "dm"); setKind((data?.kind as string) ?? "group");
+      authUser().then(({ data: au }) => setMine(!!au.user && data?.created_by === au.user.id));
       if (data?.kind === "group" && data.name) setName(data.name as string);
       if (data?.kind === "group") setHead({ photo: (data.photo_url as string | null) ?? null, color: colorFor(id) });
       if (data?.kind === "dm" && me) {
@@ -398,7 +411,7 @@ export default function Thread() {
     setMsgs((cur) => [...cur, tmp]);
     const r = await sendChatMessage(me, id, body, rt?.id ?? null, typingRef.current);
     setSending(false);
-    if (!r.ok) { setMsgs((cur) => cur.filter((m) => m.id !== tmp.id)); setText(body); return; }
+    if (!r.ok) { setMsgs((cur) => cur.filter((m) => m.id !== tmp.id)); setText(body); toast(r.error && /[áðéíóúýþæö]/i.test(r.error) ? r.error : "Skilaboðin fóru ekki — athugaðu nettenginguna og reyndu aftur"); return; }
     setMsgs((cur) => cur.map((m) => (m.id === tmp.id ? { ...m, id: r.id ?? m.id } : m)));
     typingRef.current?.send({ type: "broadcast", event: "typing", payload: { userId: "", name: "", stop: true } });
   }
@@ -444,8 +457,8 @@ export default function Thread() {
           <Muted size={12}>{typing ? trf("{x} skrifar…", typing.name) : isGroup ? (muted ? trf("{n} meðlimir · þaggað", members || "—") : trf("{n} meðlimir", members || "—")) : peerLabel.text ? tr(peerLabel.text) : muted ? "Einkaspjall · þaggað" : "Einkaspjall"}</Muted>
         </View>
         </Pressable>
-        {!isGroup && peerPhone ? <Pressable onPress={() => Linking.openURL(`tel:${peerPhone.replace(/[^\d+]/g, "")}`)} hitSlop={10} accessibilityLabel={tr("Hringja")} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}><Phone color={colors.brand} size={22} /></Pressable> : null}
-        <Pressable onPress={async () => { const next = autoOn ? "off" : "on"; setAutoPref(next); if (next === "off") { setTrans({}); setOrig({}); } toast(next === "on" ? tr("Sjálfvirk þýðing: kveikt") : tr("Sjálfvirk þýðing: slökkt")); await setChatTranslate(next); }} hitSlop={10} accessibilityLabel={tr("Sjálfvirk þýðing")} style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: autoOn ? colors.brandSoft : "transparent" }}><Languages color={autoOn ? colors.brand : colors.ink3} size={21} /></Pressable>
+        {!isGroup && peerPhone ? <Pressable onPress={() => Linking.openURL(`tel:${peerPhone.replace(/[^\d+]/g, "")}`).catch(() => toast("Ekki hægt að hringja úr þessu tæki"))} hitSlop={10} accessibilityLabel={tr("Hringja")} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}><Phone color={colors.brand} size={22} /></Pressable> : null}
+        <Pressable onPress={async () => { const next = autoOn ? "off" : "on"; const prev = autoOn ? "on" : "off"; setAutoPref(next); if (!(await setChatTranslate(next))) { setAutoPref(prev); toast("Tókst ekki að vista stillinguna"); return; } if (next === "off") { setTrans({}); setOrig({}); } toast(next === "on" ? tr("Sjálfvirk þýðing: kveikt") : tr("Sjálfvirk þýðing: slökkt")); }} hitSlop={10} accessibilityLabel={tr("Sjálfvirk þýðing")} style={{ width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", backgroundColor: autoOn ? colors.brandSoft : "transparent" }}><Languages color={autoOn ? colors.brand : colors.ink3} size={21} /></Pressable>
         <Pressable onPress={openInfo} hitSlop={10} accessibilityLabel={tr("Upplýsingar")} style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}><Info color={colors.brand} size={24} /></Pressable>
       </View>
 
@@ -575,7 +588,7 @@ export default function Thread() {
           {EMOJI.map((e) => {
             const mine = sel?.reactions.find((r) => r.emoji === e)?.mine;
             return (
-              <Pressable key={e} onPress={async () => { if (!me || !sel) return; const mid = sel.id; await setReaction(me, mid, mine ? null : e); patchReaction(mid, mine ? null : e); setSel(null); load(); }} style={{ backgroundColor: mine ? colors.brandSoft : colors.panel2, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7 }}>
+              <Pressable key={e} onPress={async () => { if (!me || !sel) return; const mid = sel.id; setSel(null); if (!(await setReaction(me, mid, mine ? null : e))) { toast(mid.startsWith("tmp-") ? "Bíddu þar til skilaboðin eru farin" : "Tókst ekki að vista viðbrögðin"); return; } patchReaction(mid, mine ? null : e); load(); }} style={{ backgroundColor: mine ? colors.brandSoft : colors.panel2, borderRadius: 999, paddingHorizontal: 11, paddingVertical: 7 }}>
                 <Txt size={20}>{e}</Txt>
               </Pressable>
             );
@@ -587,8 +600,8 @@ export default function Thread() {
           {sel && !sel.me && sel.body && sel.kind === "text" ? <Row icon={<Languages color={colors.ink2} size={19} />} title="Þýða" sub="VAKTO AI þýðir á þitt tungumál" onPress={() => { const m = sel; setSel(null); void translate(m); }} chevron={false} /> : null}
           {sel?.me && sel.kind === "text" && !sel.id.startsWith("tmp-") ? <Row icon={<Pencil color={colors.ink2} size={19} />} title="Breyta texta" onPress={() => { const m = sel; setSel(null); setReplyTo(null); setEditing(m); setText(m.body); }} chevron={false} /> : null}
           {sel && !sel.me ? <Row icon={<Flag color={colors.ink2} size={19} />} title="Tilkynna skilaboð" sub="Stjórnendur fá tilkynningu" onPress={async () => { if (!me || !sel) return; const r = await reportContent(me, "message", sel.id, sel.senderId, sel.body || (sel.kind === "image" ? "Mynd" : "Skjal")); setSel(null); toast(r.ok ? "Tilkynning send til stjórnenda" : (r.error ?? "Tókst ekki")); }} chevron={false} /> : null}
-          {sel && !sel.me ? <Row icon={<Ban color={colors.bad} size={19} />} title={trf("Fela skilaboð frá {x}", sel.sender)} danger onPress={() => { const m = sel; setSel(null); Alert.alert(trf("Fela skilaboð frá {x}", m.sender), tr("Þú sérð ekki lengur skilaboð eða færslur frá viðkomandi. Þú getur opnað aftur í Stillingum."), [{ text: tr("Hætta við"), style: "cancel" }, { text: tr("Fela"), style: "destructive", onPress: async () => { if (await blockUser(m.senderId)) load(); } }]); }} chevron={false} last /> : null}
-          {sel?.me ? <Row icon={<Trash2 color={colors.bad} size={19} />} title="Eyða skilaboðum" danger onPress={async () => { if (sel) { await deleteMessage(sel.id); patchMsg(sel.id, () => null); } setSel(null); load(); }} chevron={false} last /> : null}
+          {sel && !sel.me ? <Row icon={<Ban color={colors.bad} size={19} />} title={trf("Fela skilaboð frá {x}", sel.sender)} danger onPress={() => { const m = sel; setSel(null); if (m) setTimeout(() => Alert.alert(trf("Fela skilaboð frá {x}", m.sender), tr("Þú sérð ekki lengur skilaboð eða færslur frá viðkomandi. Þú getur opnað aftur í Stillingum."), [{ text: tr("Hætta við"), style: "cancel" }, { text: tr("Fela"), style: "destructive", onPress: async () => { if (await blockUser(m.senderId)) load(); else toast("Tókst ekki"); } }]), 350); }} chevron={false} last /> : null}
+          {sel?.me ? <Row icon={<Trash2 color={colors.bad} size={19} />} title="Eyða skilaboðum" danger onPress={async () => { const m = sel; setSel(null); if (!m) return; if (!(await deleteMessage(m.id))) { toast(m.id.startsWith("tmp-") ? "Bíddu þar til skilaboðin eru farin" : "Tókst ekki að eyða skilaboðunum"); return; } patchMsg(m.id, () => null); load(); }} chevron={false} last /> : null}
         </View>
       </Sheet>
       {(() => {
@@ -607,7 +620,7 @@ export default function Thread() {
               </View>
             ) : null}
             {rows.map(({ w, emoji }) => (
-              <Pressable key={`${w.userId}-${emoji}`} disabled={!w.me} onPress={async () => { if (!me || !wm) return; const mid = wm.id; setWhoFor(null); await setReaction(me, mid, null); patchReaction(mid, null); load(); }} style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 }}>
+              <Pressable key={`${w.userId}-${emoji}`} disabled={!w.me} onPress={async () => { if (!me || !wm) return; const mid = wm.id; setWhoFor(null); if (!(await setReaction(me, mid, null))) { toast("Tókst ekki að fjarlægja viðbrögðin"); return; } patchReaction(mid, null); load(); }} style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 8 }}>
                 <Avatar name={w.name} size={44} color={w.color} photo={w.photo} />
                 <View style={{ flex: 1 }}>
                   <Txt size={16} weight="semibold">{w.name}</Txt>
@@ -689,8 +702,21 @@ export default function Thread() {
               </View>
             )) : null}
           <Row icon={<Images color={colors.ink2} size={19} />} title="Myndir og skjöl" sub="Allt sem hefur verið sent í spjallinu" onPress={openMedia} last={kind === "general"} />
-          {kind !== "general" ? <Row icon={<LogOut color={colors.bad} size={19} />} title="Yfirgefa spjall" danger chevron={false} onPress={leave} last /> : null}
+          {kind !== "general" ? <Row icon={<LogOut color={colors.bad} size={19} />} title={kind === "dm" ? "Eyða samtali" : "Yfirgefa hóp"} danger chevron={false} onPress={() => setConfirm("leave")} last={!(kind === "group" && mine)} /> : null}
+          {kind === "group" && mine ? <Row icon={<Trash2 color={colors.bad} size={19} />} title="Eyða hópnum fyrir alla" danger chevron={false} onPress={() => setConfirm("delete")} last /> : null}
         </View>
+        {confirm ? (
+          <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, padding: 14, gap: 10 }}>
+            <Txt weight="bold" size={15}>{tr(confirm === "delete" ? "Eyða hópnum fyrir alla?" : kind === "dm" ? "Eyða samtali?" : "Yfirgefa hóp?")}</Txt>
+            <Muted>{tr(confirm === "delete" ? "Öll skilaboð og myndir eyðast hjá öllum. Ekki er hægt að afturkalla það." : kind === "dm" ? "Samtalið hverfur úr listanum þínum. Hinn aðilinn sér það áfram." : "Þú hættir að fá skilaboð úr hópnum og hann hverfur úr listanum þínum.")}</Muted>
+            <View style={{ flexDirection: "row", gap: 8, justifyContent: "flex-end" }}>
+              <Pressable onPress={() => setConfirm(null)} disabled={busy} style={{ paddingHorizontal: 14, paddingVertical: 9 }}><Txt weight="semibold" color={colors.ink2}>{tr("Hætta við")}</Txt></Pressable>
+              <Pressable onPress={doConfirm} disabled={busy} style={{ backgroundColor: colors.bad, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 9, opacity: busy ? 0.6 : 1 }}>
+                <Txt weight="semibold" color="#fff">{tr(busy ? "Augnablik…" : confirm === "delete" ? "Eyða" : kind === "dm" ? "Eyða" : "Yfirgefa")}</Txt>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
         <Txt weight="bold" size={12} color={colors.ink3} style={{ letterSpacing: 0.8, marginTop: 4 }}>{isGroup ? trf("MEÐLIMIR · {n}", memberList.length || members) : tr("ÞÁTTTAKENDUR")}</Txt>
         <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
           {memberList.length === 0 ? <Muted style={{ padding: 14 }}>Sæki…</Muted> : null}

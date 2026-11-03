@@ -103,6 +103,9 @@ export async function getJob(id: string): Promise<Job | null> {
 
 type Res = { ok: boolean; error?: string };
 const fail = (e: { message?: string } | null): Res => (e ? { ok: false, error: e.message ?? "Tókst ekki" } : { ok: true });
+/** Uppfærsla/eyðing sem RLS getur gert að 0 raða aðgerð án villu — þá segjum við það. */
+const failRows = (r: { error: { message?: string } | null; data: unknown[] | null }): Res =>
+  r.error ? fail(r.error) : (r.data ?? []).length ? { ok: true } : { ok: false, error: "Þú hefur ekki heimild til þessa" };
 
 export async function saveClient(me: Me, c: { name: string; email?: string; phone?: string }): Promise<Res & { id?: string }> {
   if (!c.name.trim()) return { ok: false, error: "Sláðu inn nafn" };
@@ -161,7 +164,7 @@ export async function addItem(me: Me, i: { jobId: string; kind: "material" | "ex
   return fail((await supabase.from("job_items").insert({ company_id: me.companyId, job_id: i.jobId, kind: i.kind, description: i.description.trim(), quantity: n(i.quantity) || 1, unit_price: n(i.unitPrice) })).error);
 }
 
-export async function removeItem(id: string): Promise<Res> { return fail((await supabase.from("job_items").delete().eq("id", id)).error); }
+export async function removeItem(id: string): Promise<Res> { return failRows(await supabase.from("job_items").delete().eq("id", id).select("id")); }
 
 /** Hleður mynd úr símanum upp (chat-hólfið, {fyrirtæki}/verk/{verk}/…) og skráir hana á verkið. */
 export async function addPhoto(me: Me, jobId: string, uri: string, caption?: string): Promise<Res> {
@@ -177,7 +180,7 @@ export async function addPhoto(me: Me, jobId: string, uri: string, caption?: str
   }
 }
 
-export async function removePhoto(id: string): Promise<Res> { return fail((await supabase.from("job_photos").delete().eq("id", id)).error); }
+export async function removePhoto(id: string): Promise<Res> { return failRows(await supabase.from("job_photos").delete().eq("id", id).select("id")); }
 
 const hhmm = (iso: string) => new Date(iso).toISOString().slice(11, 16);
 
@@ -209,7 +212,7 @@ export async function setStage(id: string, stage: Stage, invoicedAt: string | nu
     : stage === "done" ? { status: "done", invoiced_at: null, paid_at: null }
     : stage === "invoiced" ? { status: "done", invoiced_at: now, paid_at: null }
     : { status: "done", paid_at: now, invoiced_at: invoicedAt ?? now };
-  return fail((await supabase.from("jobs").update(patch).eq("id", id)).error);
+  return failRows(await supabase.from("jobs").update(patch).eq("id", id).select("id"));
 }
 
 export type QuoteRow = { id: string; number: number; title: string; status: "draft" | "sent" | "accepted" | "declined"; token: string; client: string | null; total: number; jobId: string | null; signedName: string | null; sentAt: string | null };

@@ -98,15 +98,17 @@ export default function EmployeeScreen({ card, my: myProp }: { card?: StaffCard;
   );
 }
 
-function PhotoAvatar({ photo, setPhoto, big, initials = "MÍ" }: { photo: string | null; setPhoto: (s: string) => void; big: boolean; initials?: string }) {
+function PhotoAvatar({ photo, setPhoto, big, initials = "MÍ" }: { photo: string | null; setPhoto: (s: string | null) => void; big: boolean; initials?: string }) {
   function onChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
     const r = new FileReader();
     r.onload = async (ev) => {
       const dataUrl = ev.target?.result as string;
+      const before = photo;
       setPhoto(dataUrl); // optimistic preview
       const res = await uploadPhoto(dataUrl);
+      if (!res.ok) setPhoto(before);
       toast(res.ok ? "Prófílmynd uppfærð" : (res.error ?? "Tókst ekki að hlaða mynd"));
     };
     r.readAsDataURL(f);
@@ -157,6 +159,7 @@ function PunchCard({ live = false, openSince = null, geofence = "off" }: { live?
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [on]);
+  const router = useRouter();
   async function toggle() {
     const next = !on;
     const pos = geofence !== "off" ? await punchPosition() : null;
@@ -169,6 +172,7 @@ function PunchCard({ live = false, openSince = null, geofence = "off" }: { live?
     }
     setOn(next);
     toast(next ? t("Stimplað inn") : t("Stimplað út"));
+    router.refresh(); // tímar og yfirlit uppfærast strax
   }
   return (
     <div className={`punch${on ? "" : " out"}`}>
@@ -328,8 +332,11 @@ function CompanyDocsCardMy() {
   useEffect(() => { listCompanyDocs().then((r) => setDocs(r.docs)).catch(() => {}); }, []);
   if (!docs.length) return null;
   async function open(d: CompanyDoc) {
+    // Glugginn opnaður STRAX við smellinn (Safari/iOS lokar á glugga sem opnast eftir await).
+    const w = window.open("", "_blank");
     const r = await openCompanyDoc(d.id);
-    if (r.ok && r.url) window.open(r.url, "_blank");
+    if (r.ok && r.url) { if (w) w.location.replace(r.url); else window.location.assign(r.url); }
+    else { w?.close(); toast(r.error ?? t("Tókst ekki að opna skjalið")); }
   }
   return (
     <div className="card" style={{ marginTop: 20 }}>
@@ -714,7 +721,7 @@ function Rights({ my }: { my?: MyArea }) {
   );
 }
 
-function Profile({ photo, setPhoto, my, initials }: { photo: string | null; setPhoto: (s: string) => void; my?: MyArea; initials?: string }) {
+function Profile({ photo, setPhoto, my, initials }: { photo: string | null; setPhoto: (s: string | null) => void; my?: MyArea; initials?: string }) {
   const { t } = useLang();
   const p = my?.live ? my.profile : null;
   const [phone, setPhone] = useState(p ? p.phone : "+354 691 2389");
@@ -795,7 +802,8 @@ function ReqModal({ kind, onClose, my }: { kind: ReqKind; onClose: () => void; m
   const [leaveTo, setLeaveTo] = useState(todayISO);
   const [leaveType, setLeaveType] = useState<LeaveType>("orlof");
   const [days, setDays] = useState<boolean[]>([true, true, true, true, true, false, false]);
-  const myShiftOptions = my?.live && my.upcoming.length
+  // Aldrei uppdiktaðar vaktir hjá raunverulegum starfsmanni — demo-gildin eru aðeins fyrir sýnishornið.
+  const myShiftOptions = my?.live
     ? my.upcoming.map((s) => `${s.label} ${s.time}`)
     : ["Laugardagur 12:00–20:00", "Föstudagur 16:00–24:00"];
   const [swapShift, setSwapShift] = useState(myShiftOptions[0]);
@@ -817,7 +825,10 @@ function ReqModal({ kind, onClose, my }: { kind: ReqKind; onClose: () => void; m
     let res: { ok: boolean; error?: string } = { ok: true };
     if (kind === "leave") res = await submitLeaveRequest({ fromDate: leaveFrom, toDate: leaveTo, type: leaveType });
     else if (kind === "avail") res = await setAvailability({ weekdays: days.map((c, i) => (c ? i : -1)).filter((i) => i >= 0) });
-    else if (kind === "swap") res = await requestShiftSwap({ note: swapShift, requesteeName: swapWith });
+    else if (kind === "swap") {
+      if (!swapShift) { toast(t("Þú átt engar vaktir framundan til að skipta á")); return; }
+      res = await requestShiftSwap({ note: swapShift, requesteeName: swapWith });
+    }
     setBusy(false);
     onClose();
     toast(res.ok ? t(done[kind]) : (res.error ?? "Tókst ekki"));

@@ -130,21 +130,23 @@ export async function createPost(me: Me, body: string, opts: { pinned?: boolean;
 }
 
 export async function setPinned(postId: string, pinned: boolean): Promise<{ ok: boolean; error?: string }> {
-  const { error } = await supabase.from("posts").update({ pinned }).eq("id", postId);
-  return error ? { ok: false, error: error.message } : { ok: true };
+  const { data, error } = await supabase.from("posts").update({ pinned }).eq("id", postId).select("id");
+  if (error) return { ok: false, error: error.message };
+  return (data ?? []).length ? { ok: true } : { ok: false, error: "Þú hefur ekki heimild til að festa þessa færslu" };
 }
 
 export async function deletePost(postId: string): Promise<{ ok: boolean }> {
-  const { error } = await supabase.from("posts").delete().eq("id", postId);
-  return { ok: !error };
+  const { data, error } = await supabase.from("posts").delete().eq("id", postId).select("id");
+  return { ok: !error && (data ?? []).length > 0 };
 }
 
 export async function setPostReaction(me: Me, postId: string, emoji: string | null): Promise<{ ok: boolean }> {
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) return { ok: false };
-  if (emoji === null) await supabase.from("post_likes").delete().eq("post_id", postId).eq("user_id", auth.user.id);
-  else await supabase.from("post_likes").upsert({ post_id: postId, user_id: auth.user.id, company_id: me.companyId, reaction: emoji }, { onConflict: "post_id,user_id" });
-  return { ok: true };
+  const { error } = emoji === null
+    ? await supabase.from("post_likes").delete().eq("post_id", postId).eq("user_id", auth.user.id)
+    : await supabase.from("post_likes").upsert({ post_id: postId, user_id: auth.user.id, company_id: me.companyId, reaction: emoji }, { onConflict: "post_id,user_id" });
+  return { ok: !error };
 }
 
 export async function addPostComment(me: Me, postId: string, body: string): Promise<{ ok: boolean }> {

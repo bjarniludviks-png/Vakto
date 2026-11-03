@@ -47,6 +47,7 @@ export default function Starfsmadur() {
     if (!e.userId) { toast(`${e.name.split(/\s+/)[0]} er ekki með aðgang að appinu`); return; }
     const r = await startDM(me, e.userId);
     if (r.ok && r.id) router.push(`/spjall/${r.id}?name=${encodeURIComponent(e.name)}`);
+    else toast(r.error ?? "Tókst ekki að opna samtalið");
   }
 
   return (
@@ -66,7 +67,7 @@ export default function Starfsmadur() {
           </View>
           <View style={{ flexDirection: "row", gap: 10 }}>
             <Btn title="Skilaboð" icon={<MessageCircle color="#fff" size={17} />} style={{ flex: 1 }} onPress={message} />
-            <Btn title="Hringja" variant="ghost" icon={<Phone color={colors.ink} size={17} />} style={{ flex: 1 }} disabled={!e.phone} onPress={() => e.phone && Linking.openURL(`tel:${e.phone}`)} />
+            <Btn title="Hringja" variant="ghost" icon={<Phone color={colors.ink} size={17} />} style={{ flex: 1 }} disabled={!e.phone} onPress={() => e.phone && Linking.openURL(`tel:${e.phone}`).catch(() => toast("Ekki hægt að hringja úr þessu tæki"))} />
           </View>
           <Card style={{ paddingVertical: 8 }}>
             <View style={{ paddingVertical: 6 }}><Eyebrow>Vaktir næstu tvær vikur</Eyebrow></View>
