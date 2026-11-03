@@ -219,6 +219,7 @@ export const DICT: Dict = {
   "ep:tab:Frí": { is: "Frí", en: "Leave", pl: "Urlop" },
   "ep:tab:Samningur": { is: "Samningar", en: "Contracts", pl: "Umowy" },
   "ep:tab:Skjöl": { is: "Skjöl", en: "Documents", pl: "Dokumenty" },
+  "ep:tab:Athugasemdir": { is: "Athugasemdir", en: "Notes", pl: "Notatki" },
   "ep:tab:Persónulegt": { is: "Persónulegt", en: "Personal", pl: "Dane osobowe" },
   "Óvistaðar breytingar": { is: "Óvistaðar breytingar", en: "Unsaved changes", pl: "Niezapisane zmiany" },
   "Vista geymir breytingar á öllum flipum í einu": { is: "Vista geymir breytingar á öllum flipum í einu", en: "Save stores changes on every tab at once", pl: "Zapisz zachowuje zmiany na wszystkich kartach naraz" },

@@ -176,7 +176,7 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
     const res = await copyShifts({ pairs, employeeIds: visibleIds(), overwrite });
     setBusy(false);
     if (!res.ok) { toast(res.error ?? t("Tókst ekki að afrita")); return; }
-    toast(`${res.count ?? 0} ${t("vaktir afritaðar")}${res.skippedLeave ? ` · ${res.skippedLeave} ${t("slepptu vegna frís")}` : ""}`);
+    toast(`${res.count ?? 0} ${t("vaktir afritaðar")}${res.skippedLeave ? ` · ${res.skippedLeave} ${t("slepptu vegna frís")}` : ""}${res.skippedClosed ? ` · ${res.skippedClosed} ${t("slepptu vegna lokaðra daga")}` : ""}`);
     setVer((v) => v + 1);
   }
   async function clearMonth() {

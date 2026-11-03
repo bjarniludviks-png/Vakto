@@ -523,3 +523,19 @@
 - `coworkers`-sýnin sýnir síma aðeins ef `show_phone`. Texti: `src/lib/presence.ts` (`presenceLabel`; afrit í mobile).
 - Vefur: punktur á mynd + staða í haus beinna skilaboða; smellur opnar `spjall/profile-modal.tsx` (engin laun/kt).
   Stillingar í Mitt svæði → Prófíll (`mitt-svaedi/privacy-toggles.tsx`). App: sama í spjalli, `starfsmadur/[id]`, Stillingar.
+
+## Taxtahækkanir, athugasemdir, lokaðir dagar, veikindi utan laun% (3. nóv. 2026, migration 0107 á staging; prod við release)
+- **Taxtahækkanir:** `employees.rate_steps` jsonb — `src/lib/rate-steps.ts` (hreint: `stepDueDate` úr kennitölu/ráðningardegi
+  mínus `prior_service_months`, `normalizeSteps`). Dagleg keyrsla `runRateSteps` (`lib/rate-steps.server.ts`) úr
+  `/api/cron/punch-check`: áminning 7 d fyrr (`notifiedAt`), á gildisdegi `auto` → `employees.rate` + audit, annars tilkynning
+  (`doneAt`); push + einn póstur á fyrirtæki. Þrep >60 d aftur í tímann eru merkt en ekki framkvæmd. UI: Laun-flipinn →
+  `RateStepsCard` (`starfsfolk/extras-ui.tsx`, aðgerðir í `extras-actions.ts`). Launakeyrsla notar taxtann eins og hann er á
+  keyrsludegi — hækkun á miðju tímabili er ekki skipt hlutfallslega.
+- **Athugasemdir stjórnenda:** tafla `employee_notes` (RLS: stjórnendur eingöngu) — EKKI dálkur á employees (starfsmaður les eigin röð).
+  Flipinn „Athugasemdir“ á starfsmannaspjaldi.
+- **Lokaðir dagar:** tafla `closed_days` (fyrirtæki eða `location_id`). Trigger `shifts_closed_day_guard` stöðvar INSERT og færslu vaktar á
+  lokaðan dag (staður = shifts.location_id, annars staður starfsmanns). `publishSchedule`/`copyShifts` sleppa lokuðum dögum FYRIRFRAM
+  (`skippedClosed`), `saveShift`/`createOpenShifts` hafna með skilaboðum. Stillingar → Staðir (`stillingar/closed-days-card.tsx`);
+  Vaktaplan merkir dálka „Lokað“ + borði (`getClosedDays`). Vaktir sem voru til fyrir lokun haldast.
+- **Veikindi utan laun%:** `companies.labor_excl_sick` — `lib/labor.ts` dregur samþykkta veikindadaga mánaðarlaunafólks frá hlutdeild
+  mánaðarlauna (`sickExcluded`). Stillingar → Reglur og laun.

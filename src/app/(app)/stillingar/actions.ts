@@ -998,9 +998,10 @@ export async function setFeedPostPolicy(policy: "everyone" | "managers"): Promis
 }
 
 /** Laun % markmið (0045) og hámark starfsmanna í fríi sama dag (0057, null = ekkert). */
-export async function saveCompanyLimits(input: { laborTarget?: number; leaveCap?: number | null }): Promise<SettingsResult> {
+export async function saveCompanyLimits(input: { laborTarget?: number; leaveCap?: number | null; laborExclSick?: boolean }): Promise<SettingsResult> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
-  const patch: Record<string, number | null> = {};
+  const patch: Record<string, number | boolean | null> = {};
+  if (input.laborExclSick !== undefined) patch.labor_excl_sick = !!input.laborExclSick; // 0107
   if (input.laborTarget !== undefined) {
     const n = Math.round(Number(input.laborTarget) * 10) / 10;
     if (!Number.isFinite(n) || n < 5 || n > 80) return { ok: false, error: "Markmið þarf að vera á milli 5 og 80 %" };
@@ -1021,9 +1022,9 @@ export async function saveCompanyLimits(input: { laborTarget?: number; leaveCap?
     if (error) return dbFail("saveCompanyLimits", error);
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "company.limits", entity: "companies",
-      detail: [patch.labor_target !== undefined ? `Laun% markmið ${patch.labor_target}%` : "", patch.leave_cap !== undefined ? `Hámark í fríi: ${patch.leave_cap ?? "ekkert"}` : ""].filter(Boolean).join(" · "),
+      detail: [patch.labor_target !== undefined ? `Laun% markmið ${patch.labor_target}%` : "", patch.leave_cap !== undefined ? `Hámark í fríi: ${patch.leave_cap ?? "ekkert"}` : "", patch.labor_excl_sick !== undefined ? `Veikindi ${patch.labor_excl_sick ? "utan" : "innan"} launahlutfalls` : ""].filter(Boolean).join(" · "),
     });
-    revalidatePath("/stillingar"); revalidatePath("/maelabord"); revalidatePath("/vaktaplan");
+    revalidatePath("/stillingar"); revalidatePath("/maelabord"); revalidatePath("/vaktaplan"); revalidatePath("/frammistada");
     return { ok: true };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };

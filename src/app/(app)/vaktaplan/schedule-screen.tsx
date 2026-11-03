@@ -5,7 +5,8 @@ import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
 import { nf, dec1, krCompact } from "@/lib/format";
 import { TimeField } from "@/components/app/fields";
-import { publishSchedule, updateLeaveRequest, approveShiftSwap, rejectShiftSwap, saveShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, getWeekBudget, getDraftCount, publishRange, type ShiftInput } from "./actions";
+import { publishSchedule, updateLeaveRequest, approveShiftSwap, rejectShiftSwap, saveShift, deleteShift, getWeekShifts, getShiftsInRange, setStaffingTargets, deleteWeekShifts, getShiftTasks, saveShiftTasks, saveShiftTypes, getWeekBudget, getDraftCount, publishRange, getClosedDays, type ShiftInput } from "./actions";
+import { closuresOn, closedText, type ClosedDay } from "@/lib/closed-days";
 import { offerUndo } from "./undo-delete";
 import { getCompanyDepartments, getDepartmentColors } from "../starfsfolk/actions";
 import { DeptPicker } from "@/components/app/controls";
@@ -238,6 +239,19 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     return Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(d.getDate() + i); return d; });
   }, [cur]);
   const weekMonISO = fmtISO(weekDays[0]);
+  // Lokaðir dagar (0107) á sýnilega tímabilinu — merktir í haus vikunnar og í borða ofan við planið.
+  const [closed, setClosed] = useState<ClosedDay[]>([]);
+  const closedRange = view === "Vika"
+    ? [weekMonISO, fmtISO(weekDays[6])]
+    : view === "Mánuður"
+      ? [fmtISO(new Date(cur.getFullYear(), cur.getMonth(), 1)), fmtISO(new Date(cur.getFullYear(), cur.getMonth() + 1, 0))]
+      : [fmtISO(cur), fmtISO(cur)];
+  useEffect(() => {
+    if (!liveCompany) return;
+    let stop = false;
+    getClosedDays(closedRange[0], closedRange[1]).then((r) => { if (!stop) setClosed(r.ok ? r.days : []); }).catch(() => {});
+    return () => { stop = true; };
+  }, [liveCompany, closedRange[0], closedRange[1]]); // eslint-disable-line react-hooks/exhaustive-deps
   const curCol = (cur.getDay() + 6) % 7; // selected day's column within the week
   const todayCol = weekDays.findIndex((d) => fmtISO(d) === todayISO);
 
@@ -566,7 +580,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       && !window.confirm(`${t("Áætluð laun eru")} ${dec1(planPct)} % ${t("af veltuspá vikunnar — markmiðið er")} ${dec1(laborTarget)} %. ${t("Birta samt?")}`)) return;
     const res = await publishSchedule(buildShiftPayload());
     if (!res.ok) { toast(res.error ?? "Tókst ekki að birta"); return; }
-    toast(res.demo ? `Plan birt (demo — ${res.count} vaktir)` : `Plan birt — ${res.count} vaktir vistaðar`);
+    toast(res.demo ? `Plan birt (demo — ${res.count} vaktir)` : `Plan birt — ${res.count} vaktir vistaðar${res.skippedClosed ? ` · ${res.skippedClosed} ${t("slepptu vegna lokaðra daga")}` : ""}`);
   }
 
   async function runAi(prompt: string) {
@@ -675,7 +689,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     });
     const res = await publishSchedule(payload);
     if (!res.ok) { toast(res.error ?? "Tókst ekki að birta"); return; }
-    toast(res.demo ? `AI-plan sett í grid (${applied} vaktir, demo)` : `AI-plan samþykkt — ${applied} vaktir settar og planið birt`);
+    toast(res.demo ? `AI-plan sett í grid (${applied} vaktir, demo)` : `AI-plan samþykkt — ${res.count ?? applied} vaktir settar og planið birt${res.skippedClosed ? ` · ${res.skippedClosed} ${t("slepptu vegna lokaðra daga")}` : ""}`);
   }
 
   function dropOn(tr: number, tc: number) {
@@ -1043,6 +1057,16 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         );
       })()}
 
+      {closed.length > 0 && (
+        <div className="muted" role="note" style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", fontSize: 12.5, margin: "12px 0 0", padding: "8px 12px", borderRadius: 10, background: "var(--line2)" }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 14, height: 14, flex: "none" }}><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+          <span><b style={{ color: "var(--ink)" }}>{t("Lokað")}:</b> {closed.map((c) => {
+            const a = c.from < closedRange[0] ? closedRange[0] : c.from, b = c.to > closedRange[1] ? closedRange[1] : c.to;
+            const dd = (x: string) => { const [, mo, da] = x.split("-").map(Number); return `${da}.${mo}`; };
+            return `${dd(a)}${b !== a ? `–${dd(b)}` : ""} ${closedText(c)}`;
+          }).join(" · ")} — {t("ekki hægt að setja vaktir á þessa daga")}</span>
+        </div>
+      )}
       {view === "Vika" && (
         <div>
           <div className="week-paint"><PaintTools types={types} tool={paint} setTool={(x) => { setPaint(x); if (x) setClip(null); }} onTypes={() => setModal("types")} /></div>
@@ -1052,7 +1076,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                 <tr>
                   <th>{t("Starfsmaður")}</th>
                   {DAYS.map((d, i) => (
-                    <th key={d} className={i === todayCol ? "tod" : ""}>{t(d)}<span className="dn">{weekDays[i].getDate()}</span></th>
+                    <th key={d} className={i === todayCol ? "tod" : ""} title={closuresOn(closed, fmtISO(weekDays[i])).map(closedText).join(", ") || undefined}>{t(d)}<span className="dn">{weekDays[i].getDate()}</span>{closuresOn(closed, fmtISO(weekDays[i])).length > 0 && <span style={{ display: "block", fontSize: 10.5, fontWeight: 600, color: "var(--bad)" }}>{t("Lokað")}</span>}</th>
                   ))}
                   <th className="r rowsum">Σ {t("klst")}</th>
                 </tr>

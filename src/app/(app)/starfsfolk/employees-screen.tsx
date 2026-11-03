@@ -26,6 +26,7 @@ import type { LeavingInfo } from "@/lib/termination";
 import { Av } from "@/components/app/avatar";
 import { PayslipModal } from "@/components/app/payslip-modal";
 import { PaySettingsCard } from "./pay-settings";
+import { RateStepsCard, NotesTab } from "./extras-ui";
 import { computeLine } from "@/lib/payroll";
 import { ORLOF_DAYS, orlofPctForDays, orlofDaysForPct } from "@/lib/paysettings";
 import { parseStaffSheet } from "@/lib/staff-import";
@@ -54,7 +55,7 @@ function statusBadge(e: Employee) {
   return { cls: "good", bg: "var(--good-soft)", fg: "var(--good)", labelKey: "emp:active" };
 }
 
-export const PROFILE_TABS = ["Laun", "Vinna", "Frí", "Samningur", "Skjöl", "Persónulegt"] as const;
+export const PROFILE_TABS = ["Laun", "Vinna", "Frí", "Samningur", "Skjöl", "Athugasemdir", "Persónulegt"] as const;
 export type ProfileTab = (typeof PROFILE_TABS)[number];
 /** Verktaki á ekki orlof/frí hjá fyrirtækinu → enginn „Frí“-flipi. */
 export const profileTabsFor = (role?: string | null): readonly ProfileTab[] =>
@@ -598,6 +599,8 @@ function LaunTab({ e }: { e: Employee }) {
         Álög og yfirvinna reiknast sem % ofan á tímakaupið ({nf(hourly)} kr/klst). Taxtann slærð þú inn — yfirfarðu hann gegn kjarasamningi.
       </p>
 
+      <RateStepsCard e={e} />
+
       <Sec>Álög & yfirvinna {custom ? "· sérsniðnar reglur" : "· úr kjarasamningi"}</Sec>
       {RULE_FIELDS.map((f) => (
         <div className="statline" key={f.key}>
@@ -909,6 +912,9 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
   }
   if (tab === "Skjöl") {
     return <DocsTab employeeId={e.id} />;
+  }
+  if (tab === "Athugasemdir") {
+    return <NotesTab employeeId={e.id} />;
   }
   if (tab === "Samningur") {
     return <ContractTab employeeId={e.id} contractor={e.role === "contractor"} />;
