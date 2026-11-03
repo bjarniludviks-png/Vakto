@@ -25,7 +25,7 @@ export default function Starfslok() {
         </Muted>
       </Card>
       <View style={{ gap: 10 }}>
-        <Btn title={tr("Launaseðlar og skjöl")} variant="soft" icon={<FileText color={colors.brandDeep} size={18} />} onPress={() => router.push("/skjol")} />
+        <Btn title={tr("Skjölin mín")} variant="soft" icon={<FileText color={colors.brandDeep} size={18} />} onPress={() => router.push("/skjol")} />
         <Btn title={tr("Samningar")} variant="soft" icon={<FileSignature color={colors.brandDeep} size={18} />} onPress={() => router.push("/samningur")} />
         <Btn title={tr("Skrá út")} variant="ghost" icon={<LogOut color={colors.ink} size={18} />} onPress={() => supabase.auth.signOut()} />
       </View>

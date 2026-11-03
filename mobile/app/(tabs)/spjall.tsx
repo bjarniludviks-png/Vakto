@@ -137,13 +137,15 @@ export default function Spjall() {
   async function openNew(mode: "dm" | "group") {
     if (!me) return;
     setNewMode(mode); setSel(new Set()); setGroupName("");
-    setPeople(await listPeople(me));
+    try { setPeople(await listPeople(me)); }
+    catch { setNewMode(null); toast("Tókst ekki að sækja samstarfsfólk — reyndu aftur"); }
   }
   async function dm(p: Person) {
     if (!me) return;
     const r = await startDM(me, p.userId);
     setNewMode(null);
     if (r.ok && r.id) router.push(`/spjall/${r.id}?name=${encodeURIComponent(p.name)}`);
+    else toast(r.error ?? "Tókst ekki að opna samtalið");
   }
   async function makeGroup() {
     // heiti valfrjálst eins og í Messenger: autt → „Anna, Jón og 3 fleiri“

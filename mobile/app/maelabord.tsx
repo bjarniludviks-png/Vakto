@@ -234,7 +234,7 @@ export default function Maelabord() {
                 <Muted size={12}>{tr(r.kind === "message" ? "Skilaboð í spjalli" : r.kind === "post" ? "Færsla í fréttaveitu" : "Athugasemd")}</Muted>
                 <Txt size={14} numberOfLines={4}>{r.excerpt || "—"}</Txt>
                 <View style={{ alignSelf: "flex-start" }}>
-                  <Btn title={tr("Merkja afgreitt")} size="sm" variant="ghost" onPress={async () => { if (await resolveReport(r.id)) setReports((x) => x.filter((y) => y.id !== r.id)); }} />
+                  <Btn title={tr("Merkja afgreitt")} size="sm" variant="ghost" onPress={async () => { if (await resolveReport(r.id)) setReports((x) => x.filter((y) => y.id !== r.id)); else toast("Tókst ekki"); }} />
                 </View>
               </View>
             ))}

@@ -58,9 +58,12 @@ export default function Stillingar() {
     if (!(await setMyPrivacy(me.empId, k === "showPresence" ? { show_presence: next.showPresence } : { show_phone: next.showPhone }))) { setPriv(priv); toast("Tókst ekki að vista"); }
   }
   async function resetPw() {
-    if (!me?.email) { toast("Ekkert netfang skráð"); return; }
-    const { error } = await supabase.auth.resetPasswordForEmail(me.email, { redirectTo: "https://www.vakto.is/nytt-lykilord" });
-    toast(error ? error.message : trf("Póstur sendur á {x}", me.email));
+    // Innskráningarnetfangið (ekki netfangið á starfsmannaspjaldinu, sem má vera annað).
+    const { data: au } = await supabase.auth.getUser();
+    const email = au.user?.email ?? me?.email;
+    if (!email) { toast("Ekkert netfang skráð"); return; }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: "https://www.vakto.is/nytt-lykilord" });
+    toast(error ? "Tókst ekki að senda póst — reyndu aftur" : trf("Póstur sendur á {x}", email));
   }
 
   // Eyða aðgangi (Apple 5.1.1(v)): staðfestingarblað → vefþjónninn lokar aðganginum → útskráning.
@@ -140,7 +143,7 @@ export default function Stillingar() {
       </> : null}
       <Muted style={{ paddingHorizontal: 2 }}>UM VAKTO</Muted>
       <List>
-        <Row icon={<IconBox><LifeBuoy color={colors.ink2} size={19} /></IconBox>} title="Hjálp" sub="hjalp@vakto.is" onPress={() => Linking.openURL("mailto:hjalp@vakto.is")} chevron={false} />
+        <Row icon={<IconBox><LifeBuoy color={colors.ink2} size={19} /></IconBox>} title="Hjálp" sub="hjalp@vakto.is" onPress={() => Linking.openURL("mailto:hjalp@vakto.is").catch(() => toast("Skrifaðu okkur á hjalp@vakto.is"))} chevron={false} />
         <Row icon={<IconBox><FileText color={colors.ink2} size={19} /></IconBox>} title="Persónuvernd og skilmálar" onPress={() => Linking.openURL("https://www.vakto.is/personuvernd")} chevron={false} />
         <Row icon={<IconBox tone="bad"><Trash2 color={colors.bad} size={19} /></IconBox>} title="Eyða aðgangi" danger onPress={openDelete} chevron={false} last />
       </List>

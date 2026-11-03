@@ -305,7 +305,11 @@ export async function startDM(otherUserId: string): Promise<{ ok: boolean; id?: 
     const { data: ch, error } = await supabase.from("channels")
       .insert({ company_id: ctx.company, name: "", kind: "dm", created_by: ctx.userId }).select("id").single();
     if (error || !ch) return { ok: false, error: userError(error, "Villa") };
-    await supabase.from("channel_members").insert([{ channel_id: ch.id, user_id: ctx.userId }, { channel_id: ch.id, user_id: otherUserId }]);
+    const { error: mErr } = await supabase.from("channel_members").insert([{ channel_id: ch.id, user_id: ctx.userId }, { channel_id: ch.id, user_id: otherUserId }]);
+    if (mErr) {
+      await supabase.from("channels").delete().eq("id", ch.id); // engin tóm rás eftir
+      return { ok: false, error: "Ekki tókst að hefja samtal við þennan aðila." };
+    }
     return { ok: true, id: ch.id as string };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
@@ -325,7 +329,11 @@ export async function createGroup(name: string, memberUserIds: string[]): Promis
       .insert({ company_id: ctx.company, name: nm, kind: "group", created_by: ctx.userId }).select("id").single();
     if (error || !ch) return { ok: false, error: userError(error, "Villa") };
     const uniq = Array.from(new Set([ctx.userId, ...memberUserIds]));
-    await supabase.from("channel_members").insert(uniq.map((u) => ({ channel_id: ch.id, user_id: u })));
+    const { error: mErr } = await supabase.from("channel_members").insert(uniq.map((u) => ({ channel_id: ch.id, user_id: u })));
+    if (mErr) {
+      await supabase.from("channels").delete().eq("id", ch.id); // engin tóm grúppa eftir
+      return { ok: false, error: "Ekki tókst að bæta öllum í grúppuna — reyndu aftur." };
+    }
     return { ok: true, id: ch.id as string };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
@@ -395,8 +403,27 @@ export async function leaveChannel(channelId: string): Promise<{ ok: boolean; er
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false, error: ctx.error };
-    const { error } = await supabase.from("channel_members").delete().eq("channel_id", channelId).eq("user_id", ctx.userId);
+    // .select() skilar eyddum röðum — 0 raðir = ekkert gerðist (t.d. RLS), þá segjum við það í stað þess að þegja.
+    const { data, error } = await supabase.from("channel_members").delete().eq("channel_id", channelId).eq("user_id", ctx.userId).select("channel_id");
     if (error) return { ok: false, error: userError(error) };
+    if (!data?.length) return { ok: false, error: "Þú ert ekki í þessu spjalli lengur." };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
+/** Eyða grúppu fyrir ALLA (stofnandi eða stjórnandi — RLS channels_del). Skilaboðin fara með. */
+export async function deleteChannel(channelId: string): Promise<{ ok: boolean; error?: string }> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  if (!isSupabaseConfigured()) return { ok: false, error: "demo" };
+  try {
+    const supabase = await createClient();
+    const ctx = await ctxOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    const { data, error } = await supabase.from("channels").delete().eq("id", channelId).eq("kind", "group").select("id");
+    if (error) return { ok: false, error: userError(error) };
+    if (!data?.length) return { ok: false, error: "Aðeins sá sem stofnaði grúppuna (eða stjórnandi) getur eytt henni." };
     return { ok: true };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
@@ -878,9 +905,10 @@ export async function setPostReaction(postId: string, emoji: string | null): Pro
     const supabase = await createClient();
     const ctx = await ctxOf(supabase);
     if ("error" in ctx) return { ok: false };
-    if (emoji) await supabase.from("post_likes").upsert({ post_id: postId, user_id: ctx.userId, company_id: ctx.company, reaction: emoji });
-    else await supabase.from("post_likes").delete().eq("post_id", postId).eq("user_id", ctx.userId);
-    return { ok: true };
+    const { error } = emoji
+      ? await supabase.from("post_likes").upsert({ post_id: postId, user_id: ctx.userId, company_id: ctx.company, reaction: emoji })
+      : await supabase.from("post_likes").delete().eq("post_id", postId).eq("user_id", ctx.userId);
+    return { ok: !error };
   } catch {
     return { ok: false };
   }
@@ -924,8 +952,10 @@ export async function setChatTranslate(v: "on" | "off"): Promise<{ ok: boolean; 
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return { ok: false, error: "Ekki innskráð(ur)" };
-    const { error } = await supabase.from("users").update({ chat_translate: v }).eq("id", user.id);
-    return error ? { ok: false, error: userError(error) } : { ok: true };
+    // 0076: innskráðir skrifa ekki beint í users — eigin stilling fer um set_chat_translate (0108).
+    const { data, error } = await supabase.rpc("set_chat_translate", { v });
+    if (error) return { ok: false, error: userError(error) };
+    return data ? { ok: true } : { ok: false, error: "Ekki tókst að vista stillinguna" };
   } catch (e) {
     return { ok: false, error: userError(e) };
   }

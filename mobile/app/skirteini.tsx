@@ -1,9 +1,10 @@
 // Starfsmannaskírteini — einfalt kort (eins og frumgerðin) sem opnast með mynd
 // og öllum upplýsingum; Wallet-hnappur eftir stýrikerfi.
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import QRCode from "qrcode";
 import { View, Pressable, Linking, Platform } from "react-native";
 import { Image } from "expo-image";
-import Svg, { Rect, Defs, RadialGradient, Stop, Circle } from "react-native-svg";
+import Svg, { Rect, Path, Defs, RadialGradient, Stop, Circle } from "react-native-svg";
 import { Wallet, ChevronRight } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
 import { VaktoLogo } from "../src/components/vakto-logo";
@@ -12,21 +13,20 @@ import { colors, useTheme } from "../src/theme";
 import { useMe } from "../src/lib/me-context";
 import { supabase } from "../src/lib/supabase";
 
-/** Deterministic QR-like block pattern (visual stand-in until the pass exists). */
+/** Raunverulegur QR-kóði með stimpillykli starfsmannsins (clock_token) — sami kóði og í Wallet-skírteininu,
+ *  kiosk-stimpilklukkan les hann. (Áður var þetta aðeins mynstur til skrauts og ekki hægt að skanna.) */
 function Qr({ seed, size = 76 }: { seed: string; size?: number }) {
-  const n = 21;
-  let h = 7;
-  for (const ch of seed) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  const rnd = () => { h = (h * 1103515245 + 12345) >>> 0; return (h >>> 16) / 65536; };
-  const cells: boolean[] = [];
-  for (let i = 0; i < n * n; i++) cells.push(rnd() > 0.55);
-  const finder = (x: number, y: number) => { for (let dy = 0; dy < 7; dy++) for (let dx = 0; dx < 7; dx++) { const ring = dx === 0 || dy === 0 || dx === 6 || dy === 6; const core = dx >= 2 && dx <= 4 && dy >= 2 && dy <= 4; cells[(y + dy) * n + x + dx] = ring || core; } };
-  finder(0, 0); finder(n - 7, 0); finder(0, n - 7);
-  const c = size / n;
+  const m = useMemo(() => {
+    try { return QRCode.create(seed, { errorCorrectionLevel: "M" }).modules; } catch { return null; }
+  }, [seed]);
+  if (!m) return <View style={{ width: size, height: size, backgroundColor: "#fff" }} />;
+  const n = m.size, q = 2, c = size / (n + q * 2); // 2 eininga hljóðlátt svæði
+  let d = "";
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (m.get(y, x)) d += `M${(x + q) * c},${(y + q) * c}h${c}v${c}h${-c}z`;
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <Rect x={0} y={0} width={size} height={size} fill="#fff" />
-      {cells.map((on, i) => (on ? <Rect key={i} x={(i % n) * c} y={Math.floor(i / n) * c} width={c} height={c} fill="#0b0b0e" /> : null))}
+      <Path d={d} fill="#0b0b0e" />
     </Svg>
   );
 }
@@ -44,7 +44,7 @@ export default function Skirteini() {
 
   useEffect(() => {
     if (!me) return;
-    supabase.from("employees").select("clock_token, hire_date").eq("id", me.empId).maybeSingle().then(({ data }) => { setToken((data?.clock_token as string) ?? me.empId); setHired((data?.hire_date as string) ?? null); });
+    supabase.from("employees").select("clock_token, hire_date").eq("id", me.empId).maybeSingle().then(({ data }) => { setToken((data?.clock_token as string) ?? null); setHired((data?.hire_date as string) ?? null); });
     supabase.from("companies").select("name, kennitala").eq("id", me.companyId).maybeSingle().then(({ data }) => setCompany({ name: (data?.name as string) ?? "", kt: (data?.kennitala as string) ?? null }));
   }, [me]);
 
@@ -101,7 +101,7 @@ export default function Skirteini() {
           <Txt weight="bold" size={16} color={w === "apple" ? "#fff" : colors.ink}>{w === "apple" ? "Bæta í Apple Wallet" : "Bæta í Google Wallet"}</Txt>
         </Pressable>
       ))}
-      <Muted size={12.5} style={{ textAlign: "center", lineHeight: 18 }}>Ýttu á kortið til að sjá mynd og allar upplýsingar. QR-kóðann má skanna í kiosk-stimpilklukkunni. Skírteinið má líka geyma í veskinu í símanum.</Muted>
+      <Muted size={12.5} style={{ textAlign: "center", lineHeight: 18 }}>Ýttu á kortið til að sjá mynd, allar upplýsingar og QR-kóðann í fullri stærð — hann má skanna í kiosk-stimpilklukkunni. Skírteinið má líka geyma í veskinu í símanum.</Muted>
 
       <Sheet open={open} onClose={() => setOpen(false)}>
         {me ? (

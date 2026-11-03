@@ -539,3 +539,16 @@
   Vaktaplan merkir dálka „Lokað“ + borði (`getClosedDays`). Vaktir sem voru til fyrir lokun haldast.
 - **Veikindi utan laun%:** `companies.labor_excl_sick` — `lib/labor.ts` dregur samþykkta veikindadaga mánaðarlaunafólks frá hlutdeild
   mánaðarlauna (`sickExcluded`). Stillingar → Reglur og laun.
+
+## Hnappar sem gerðu ekkert — úttekt + lagfæringar (3. nóv. 2026, migration 0108 á staging; prod við release)
+- **Yfirgefa hóp / eyða samtali:** `channels_read` hleypti stofnanda alltaf að rás (`created_by`), svo sá sem stofnaði hóp og
+  yfirgaf hann sá hann áfram. Nú: aðild ræður (+ stofnandi meðan rás er meðlimalaus, fyrir insert…returning). Trigger
+  `channel_members_drop_empty` eyðir hóp/einkaspjalli þegar síðasti meðlimur fer. „Eyða grúppunni fyrir alla“ = stofnandi
+  (RLS `channels_del`). Appið staðfestir inni í blaðinu (ekki Alert ofan á Modal).
+- **Reglur:** skrif sem RLS getur gert að 0 raða aðgerð skulu nota `.select()` og athuga fjölda raða — aldrei skila ok á 0 röðum.
+  Í appinu sjást toast nú líka ofan á opnu `Sheet` (`ToastView inSheet` í `mobile/src/components/ui.tsx`).
+- **0108 líka:** `set_chat_translate(v)` (users er lokað fyrir skrif síðan 0076), `guard_message_edit` leyfir reply_to → null
+  (eyðing skilaboða sem maður svaraði sjálfur), `can_add_channel_member` tekur `company_members` gilt, `chat_mutes`
+  (þöggun nær nú til push — `lib/chat-push.server.ts`; @-merking nær samt í gegn).
+- **App-ákvarðanir stjórnanda** (Mælaborð → Samþykkja/Hafna) fara um `/api/app/requests/decide` = sömu server-aðgerðir og
+  vefurinn (vakt losnar, push o.s.frv.). Skírteinið sýnir raunverulegan QR (`qrcode`, clock_token) sem kiosk les.

@@ -64,7 +64,8 @@ export default function VaktScreen() {
     if (!sh.empId) {
       const reqs = await listMyRequests(me);
       const d = new Date(sh.date + "T12:00:00");
-      setApplied(reqs.some((r) => r.kind === "swap" && r.status === "pending" && r.label.startsWith("Umsókn um opna vakt") && r.label.includes(`${sh.start}–${sh.end}`) && r.label.includes(`${d.getDate()}.`)));
+      const { data: claim } = await supabase.from("shift_claims").select("id").eq("shift_id", sh.id).eq("employee_id", me.empId).eq("status", "pending").limit(1);
+      setApplied((claim ?? []).length > 0 || reqs.some((r) => r.kind === "swap" && r.status === "pending" && r.label.startsWith("Umsókn um opna vakt") && r.label.includes(`${sh.start}–${sh.end}`) && r.label.includes(`${d.getDate()}.`)));
     }
   }, [id, me]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
@@ -82,7 +83,7 @@ export default function VaktScreen() {
   async function apply() {
     if (!me || applied) return;
     setApplied(true);
-    const r = await applyForShift(me, label);
+    const r = await applyForShift(me, label, sh.id); // shift_claims: stjórnandi getur úthlutað beint
     if (!r.ok) { setApplied(false); toast(r.error ?? "Tókst ekki"); return; }
     toast("Umsókn send — vaktstjóri fær tilkynningu");
   }
@@ -95,10 +96,14 @@ export default function VaktScreen() {
   async function message() {
     if (!me || !sh.empName) return;
     const people = await peopleMap(me.companyId);
-    const other = [...people.values()].find((p) => p.name === sh.empName);
+    // Eftir starfsmanni (ekki nafni — tveir geta heitið það sama).
+    const { data: cw } = sh.empId ? await supabase.from("coworkers").select("user_id").eq("id", sh.empId).maybeSingle() : { data: null };
+    const uid = (cw as { user_id?: string | null } | null)?.user_id;
+    const other = (uid ? people.get(uid) : undefined) ?? [...people.values()].find((p) => p.name === sh.empName);
     if (!other) { toast("Þessi starfsmaður er ekki með aðgang að appinu"); return; }
     const r = await startDM(me, other.userId);
     if (r.ok && r.id) router.push(`/spjall/${r.id}?name=${encodeURIComponent(other.name)}`);
+    else toast(r.error ?? "Tókst ekki að opna samtalið");
   }
 
   return (
@@ -200,7 +205,7 @@ export default function VaktScreen() {
 
       <Sheet open={sheet === "more"} onClose={() => setSheet(null)} scroll={false}>
         <View style={{ backgroundColor: colors.panel, borderRadius: 18, borderWidth: 1, borderColor: colors.line2, overflow: "hidden" }}>
-          <Row icon={<Share2 color={colors.ink2} size={19} />} title="Deila vakt" sub="Senda tíma og stað áfram" chevron={false} onPress={() => { setSheet(null); Share.share({ message: `${tr(DAY_FULL[d.getDay()])} ${d.getDate()}. ${tr(MONTHS[d.getMonth()])} · ${s.start}–${s.end} · ${[s.typeName, s.dept, s.company].filter(Boolean).join(" · ")}` }); }} />
+          <Row icon={<Share2 color={colors.ink2} size={19} />} title="Deila vakt" sub="Senda tíma og stað áfram" chevron={false} onPress={() => { setSheet(null); setTimeout(() => Share.share({ message: `${tr(DAY_FULL[d.getDay()])} ${d.getDate()}. ${tr(MONTHS[d.getMonth()])} · ${s.start}–${s.end} · ${[s.typeName, s.dept, s.company].filter(Boolean).join(" · ")}` }).catch(() => {}), 350); }} />
           {!open && s.empName ? <Row icon={<MessageCircle color={colors.ink2} size={19} />} title={mine ? "Opna spjall" : trf("Skilaboð til {x}", s.empName.split(/\s+/)[0])} chevron={false} last onPress={() => { setSheet(null); if (mine) router.push("/spjall"); else message(); }} /> : null}
         </View>
       </Sheet>

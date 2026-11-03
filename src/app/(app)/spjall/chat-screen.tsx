@@ -17,7 +17,7 @@ import {
 } from "@/components/app/assistant-chat";
 import {
   listConversations, listMessages, sendChatMessage, createGroup, startDM, searchPeople,
-  listMembers, addMembers, removeMember, leaveChannel, uploadChatMedia,
+  listMembers, addMembers, removeMember, leaveChannel, deleteChannel, uploadChatMedia,
   renameChannel, setChannelPhoto, setMessageReaction, deleteMessage, editMessage, listTeamPicks, getChatTranslate, setChatTranslate,
   markChannelRead, listChannelReads, listChatMedia, searchChannelMessages,
   type Conversation, type ChatMessage, type Person, type Members, type TeamPick, type ChannelRead, type ChatMedia, type ChatHit,
@@ -289,10 +289,11 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   }, [msgs, autoOn, lang, trans]);
   async function toggleAuto() {
     const next = autoOn ? "off" : "on";
+    const prev = autoOn ? "on" : "off";
     setAutoPref(next);
     const r = await setChatTranslate(next);
-    if (!r.ok) toast(r.error ?? t("Tókst ekki"));
-    else toast(next === "on" ? t("Sjálfvirk þýðing: kveikt") : t("Sjálfvirk þýðing: slökkt"));
+    if (!r.ok) { setAutoPref(prev); toast(r.error ?? t("Tókst ekki")); return; }
+    toast(next === "on" ? t("Sjálfvirk þýðing: kveikt") : t("Sjálfvirk þýðing: slökkt"));
     if (next === "off") { setTrans({}); setOrig({}); }
   }
   const [reactFor, setReactFor] = useState<string | null>(null);
@@ -1289,7 +1290,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                     if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); inputRef.current?.focus(); }
                   }}
                 />
-                <button className="msgr-send" disabled={!val.trim() && !rec} onPointerDown={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()} onClick={() => { send(); inputRef.current?.focus(); }} aria-label={t("chat:send")}>
+                <button className="msgr-send" disabled={!val.trim() && !rec} onPointerDown={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()} onClick={() => { if (rec && !val.trim()) { void toggleRec(); return; } send(); inputRef.current?.focus(); }} aria-label={t("chat:send")}>
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
                 </button>
                 <input ref={fileRef} type="file" accept="image/*,image/gif" hidden onChange={onFile} />
@@ -1320,9 +1321,20 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                 : active && <ConvDetails key={active.id} conv={active} subtitle={subtitleOf(active)} name={nameOf(active)} version={infoVer} show={sideShown}
                   onManage={() => setModal("info")} onJump={jumpTo} onView={setViewer} dayLabel={dayLabel}
                   onLeave={async () => {
-                    if (!window.confirm(`${t("Hætta í grúppu")}: „${active.name}“?`)) return;
+                    const q = active.dm
+                      ? `${t("Eyða samtali")}? ${t("Það hverfur úr listanum þínum — hinn aðilinn sér það áfram.")}`
+                      : `${t("Hætta í grúppu")}: „${active.name}“? ${t("Þú hættir að fá skilaboð úr henni.")}`;
+                    if (!window.confirm(q)) return;
                     const r = await leaveChannel(active.id);
                     if (!r.ok) { toast(r.error ?? "Villa"); return; }
+                    toast(active.dm ? t("Samtali eytt") : t("Þú ert hætt(ur) í grúppunni"));
+                    closeThread(); reloadConvs();
+                  }}
+                  onDelete={async () => {
+                    if (!window.confirm(`${t("Eyða grúppunni")} „${active.name}“ ${t("fyrir alla? Öll skilaboð og myndir eyðast og ekki er hægt að afturkalla það.")}`)) return;
+                    const r = await deleteChannel(active.id);
+                    if (!r.ok) { toast(r.error ?? "Villa"); return; }
+                    toast(t("Grúppu eytt"));
                     closeThread(); reloadConvs();
                   }} />}
             </aside>
@@ -1376,9 +1388,9 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
 }
 
 /** Details for a channel: big avatar, search in the thread, members, media & files. */
-function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, onView, dayLabel, onLeave }: {
+function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, onView, dayLabel, onLeave, onDelete }: {
   conv: Conversation; name: string; subtitle: string; version: number; show: boolean;
-  onManage: () => void; onJump: (id: string) => void; onView: (url: string) => void; dayLabel: (iso: string) => string; onLeave: () => void;
+  onManage: () => void; onJump: (id: string) => void; onView: (url: string) => void; dayLabel: (iso: string) => string; onLeave: () => void; onDelete: () => void;
 }) {
   const { t } = useLang();
   const [members, setMembers] = useState<Members | null>(null);
@@ -1476,6 +1488,8 @@ function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, on
         <button onClick={() => { setSearching(true); setQ(""); document.querySelector(".msgr-side")?.scrollTo({ top: 0, behavior: "smooth" }); }}>{I.search}<span>{t("Leita í samtali")}</span></button>
         {manageable && <button onClick={onManage}>{I.settings}<span>{t("Stjórna grúppu")}</span></button>}
         {manageable && <button className="danger" onClick={onLeave}>{I.leave}<span>{t("Hætta í grúppu")}</span></button>}
+        {manageable && !!members?.adminId && members.adminId === members.meId && <button className="danger" onClick={onDelete}>{I.leave}<span>{t("Eyða grúppunni fyrir alla")}</span></button>}
+        {conv.dm && <button className="danger" onClick={onLeave}>{I.leave}<span>{t("Eyða samtali")}</span></button>}
       </div>
     </div>
   );
@@ -1600,7 +1614,8 @@ function InfoModal({ conv, onClose, onLeft, onChanged }: { conv: Conversation; o
   const group = conv.kind === "group";
   const kindLabel = t("Grúppa");
   async function remove(p: Person) { const r = await removeMember(conv.id, p.userId); if (r.ok) { reload(); onChanged(); } else toast(r.error ?? "Villa"); }
-  async function leave() { if (!window.confirm(`Hætta í „${conv.name}"?`)) return; const r = await leaveChannel(conv.id); if (r.ok) onLeft(); else toast(r.error ?? "Villa"); }
+  async function leave() { if (!window.confirm(`${t("Hætta í grúppu")}: „${conv.name}“?`)) return; const r = await leaveChannel(conv.id); if (r.ok) { toast(t("Þú ert hætt(ur) í grúppunni")); onLeft(); } else toast(r.error ?? "Villa"); }
+  async function destroy() { if (!window.confirm(`${t("Eyða grúppunni")} „${conv.name}“ ${t("fyrir alla? Öll skilaboð og myndir eyðast og ekki er hægt að afturkalla það.")}`)) return; const r = await deleteChannel(conv.id); if (r.ok) { toast(t("Grúppu eytt")); onLeft(); } else toast(r.error ?? "Villa"); }
   async function add(p: Person) { const r = await addMembers(conv.id, [p.userId]); if (r.ok) { reload(); setAdding(false); onChanged(); } else toast(r.error ?? "Villa"); }
   async function saveName() {
     const r = await renameChannel(conv.id, nameVal);
@@ -1667,7 +1682,10 @@ function InfoModal({ conv, onClose, onLeft, onChanged }: { conv: Conversation; o
                   </div>
                 ))}
               </div>
-              <button className="btn ghost" style={{ marginTop: 14, color: "var(--bad)" }} onClick={leave}>{t("Hætta í grúppu")}</button>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+                <button className="btn ghost" style={{ color: "var(--bad)" }} onClick={leave}>{t("Hætta í grúppu")}</button>
+                {admin && <button className="btn ghost" style={{ color: "var(--bad)" }} onClick={destroy}>{t("Eyða grúppunni fyrir alla")}</button>}
+              </div>
             </>
           )}
         </div>

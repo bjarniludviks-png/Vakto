@@ -32,7 +32,7 @@ function Vaktir() {
   const { me } = useMe();
   const router = useRouter();
   const toast = useToast();
-  const params = useLocalSearchParams<{ seg?: string }>();
+  const params = useLocalSearchParams<{ seg?: string; t?: string }>();
   const todayISO = iso(new Date());
   const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
   const [selDate, setSelDate] = useState(todayISO);
@@ -42,7 +42,8 @@ function Vaktir() {
   const [refreshing, setRefreshing] = useState(false);
   const [sheet, setSheet] = useState<null | "leave">(null);
 
-  useEffect(() => { if (params.seg === "open") setTab("open"); }, [params.seg]);
+  // `t` breytist við hvert smell á „Lausar vaktir“ — svo flipinn skiptir líka í annað sinn.
+  useEffect(() => { if (params.seg === "open") setTab("open"); }, [params.seg, params.t]);
 
   const load = useCallback(async () => {
     if (!me) return;

@@ -222,7 +222,7 @@ export default function HomeScreen() {
 
         {/* flýtihnappar */}
         <View style={{ flexDirection: "row", gap: 10 }}>
-          <Quick icon={<LayoutGrid color={colors.brandDeep} size={18} />} title="Lausar vaktir" sub={home ? trf("{n} í boði", home.openCount) : "…"} onPress={() => router.push("/vaktir?seg=open")} />
+          <Quick icon={<LayoutGrid color={colors.brandDeep} size={18} />} title="Lausar vaktir" sub={home ? trf("{n} í boði", home.openCount) : "…"} onPress={() => router.push(`/vaktir?seg=open&t=${Date.now()}`)} />
           <Quick icon={<CalendarPlus color={colors.brandDeep} size={18} />} title="Biðja um frí" sub="svar frá vaktstjóra" onPress={() => setSheet("leave")} />
         </View>
         <View style={{ flexDirection: "row", gap: 10 }}>
@@ -252,7 +252,7 @@ export default function HomeScreen() {
   );
 
   function go(n: Noti) {
-    if (n.kind === "open") router.push("/vaktir?seg=open");
+    if (n.kind === "open") router.push(`/vaktir?seg=open&t=${Date.now()}`);
     else if (n.kind === "request") router.push("/beidnir");
     else if (n.kind === "post") router.push("/frettir");
     else if (n.kind === "chat") router.push("/spjall");

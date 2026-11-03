@@ -71,10 +71,11 @@ export default function VerkDetail() {
     if (!r.ok || !r.url) { toast(r.error ?? "Tókst ekki"); return; }
     setSheet(null);
     await load();
+    await new Promise((r) => setTimeout(r, 350)); // blaðið (Modal) lokast fyrst — annars hverfur Alert/Share með því á iOS
     const msg = `Verkskýrsla fyrir ${job.title} til samþykktar:\n${r.url}`;
     if (job.client?.email) {
       Alert.alert("Skýrsla tilbúin", "Senda viðskiptavininum?", [
-        { text: "Tölvupóstur", onPress: () => Linking.openURL(`mailto:${job.client!.email}?subject=${encodeURIComponent(`Verkskýrsla: ${job.title}`)}&body=${encodeURIComponent(msg)}`) },
+        { text: "Tölvupóstur", onPress: () => { Linking.openURL(`mailto:${job.client!.email}?subject=${encodeURIComponent(`Verkskýrsla: ${job.title}`)}&body=${encodeURIComponent(msg)}`).catch(() => Share.share({ message: msg })); } },
         { text: "Deila hlekk", onPress: () => Share.share({ message: msg }) },
         { text: "Seinna", style: "cancel" },
       ]);

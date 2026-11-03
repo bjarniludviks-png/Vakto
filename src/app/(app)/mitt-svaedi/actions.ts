@@ -135,12 +135,11 @@ export async function myPunch(into: boolean, pos?: PunchPos | null): Promise<Pun
         .order("clock_in", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (open) {
-        const { error } = await supabase.from("punches")
-          .update({ clock_out: now, ...(pos ? { out_lat: pos.lat, out_lng: pos.lng, out_acc: Math.round(pos.acc) } : {}) })
-          .eq("id", open.id);
-        if (error) return { ok: false, error: punchError(error.message) };
-      }
+      if (!open) return { ok: false, error: "Þú ert ekki stimplaður/stimpluð inn — enginn opinn tími til að loka." };
+      const { error } = await supabase.from("punches")
+        .update({ clock_out: now, ...(pos ? { out_lat: pos.lat, out_lng: pos.lng, out_acc: Math.round(pos.acc) } : {}) })
+        .eq("id", open.id);
+      if (error) return { ok: false, error: punchError(error.message) };
     }
     return { ok: true };
   } catch (e) {
@@ -199,12 +198,16 @@ export async function requestShiftSwap(
     const me = await currentEmployee(supabase);
     if ("error" in me) return { ok: false, error: me.error };
     let requesteeId: string | null = null;
-    if (input.requesteeName) {
+    const typed = input.requesteeName?.trim() ?? "";
+    if (typed) {
       const { data: other } = await supabase
         .from("coworkers").select("id, full_name").eq("company_id", me.company);
-      requesteeId = other?.find((o) =>
-        (o.full_name as string).toLowerCase().startsWith(input.requesteeName!.toLowerCase()))?.id as string ?? null;
+      const q = typed.toLowerCase();
+      const hits = (other ?? []).filter((o) => (o.full_name as string).toLowerCase().split(/\s+/).some((w) => w.startsWith(q)) || (o.full_name as string).toLowerCase().startsWith(q));
+      requesteeId = hits.length === 1 ? (hits[0].id as string) : null;
     }
+    // Nafnið sem var slegið inn fylgir alltaf með, svo stjórnandinn sjái við hvern átti að skipta.
+    if (typed && !requesteeId) input = { ...input, note: `${input.note} · skipta við: ${typed}` };
     const { error } = await supabase.from("shift_swaps").insert({
       company_id: me.company,
       requester_id: me.empId,

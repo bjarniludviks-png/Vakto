@@ -20,7 +20,12 @@ export async function punchPosition(): Promise<PunchPos | null> {
   try {
     const perm = await Location.requestForegroundPermissionsAsync();
     if (perm.status !== "granted") return null;
-    const p = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+    // Innandyra getur nákvæm staðsetning hangið — mest 8 sek., svo síðasta þekkta staðsetning (eða engin).
+    const p = await Promise.race([
+      Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High }),
+      new Promise<null>((r) => setTimeout(() => r(null), 8000)),
+    ]) ?? await Location.getLastKnownPositionAsync();
+    if (!p) return null;
     return { lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy ?? 0) };
   } catch {
     return null;

@@ -1,6 +1,6 @@
 // Shared VAKTO UI primitives — mirror the approved app prototype (cards, rows,
 // pills, sheet, segmented control, hero, toast).
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { colorFor } from "../lib/avatar";
 import {
   Text,
@@ -396,6 +396,7 @@ export function Sheet({
             </Body>
           </Animated.View>
         </View>
+        <ToastView inSheet />
       </View>
     </Modal>
   );
@@ -430,7 +431,23 @@ export function Empty({ icon, title, sub }: { icon?: React.ReactNode; title: str
 }
 
 /* ---------- toast ---------- */
+// Skilaboðin eru teiknuð BÆÐI í rót appsins og inni í hverju opnu blaði (Sheet = RN Modal). Áður
+// lentu þau bak við blaðið: villa í t.d. „Senda beiðni“ sást aldrei og hnappurinn virtist dauður.
 const ToastCtx = createContext<(msg: string) => void>(() => {});
+const ToastViewCtx = createContext<{ msg: string | null; op: Animated.Value } | null>(null);
+function ToastView({ inSheet = false }: { inSheet?: boolean }) {
+  const v = useContext(ToastViewCtx);
+  if (!v?.msg) return null;
+  return (
+    <Animated.View pointerEvents="none" style={{ position: "absolute", left: 20, right: 20, ...(inSheet ? { top: Platform.OS === "ios" ? 64 : 36 } : { bottom: 96 }), alignItems: "center", opacity: v.op, zIndex: 1000, elevation: 30 }}>
+      <View style={{ backgroundColor: colors.ink, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, maxWidth: "100%" }}>
+        <Txt weight="semibold" size={13.5} color="#fff" style={{ textAlign: "center" }}>
+          {v.msg}
+        </Txt>
+      </View>
+    </Animated.View>
+  );
+}
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [msg, setMsg] = useState<string | null>(null);
   const op = useRef(new Animated.Value(0)).current;
@@ -445,18 +462,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     [op]
   );
   useEffect(() => () => { if (t.current) clearTimeout(t.current); }, []);
+  const view = useMemo(() => ({ msg, op }), [msg, op]);
   return (
     <ToastCtx.Provider value={show}>
-      {children}
-      {msg ? (
-        <Animated.View pointerEvents="none" style={{ position: "absolute", left: 20, right: 20, bottom: 96, alignItems: "center", opacity: op }}>
-          <View style={{ backgroundColor: colors.ink, borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, maxWidth: "100%" }}>
-            <Txt weight="semibold" size={13.5} color="#fff" style={{ textAlign: "center" }}>
-              {msg}
-            </Txt>
-          </View>
-        </Animated.View>
-      ) : null}
+      <ToastViewCtx.Provider value={view}>
+        {children}
+        <ToastView />
+      </ToastViewCtx.Provider>
     </ToastCtx.Provider>
   );
 }
