@@ -19,6 +19,10 @@ import "server-only";
 //              fyrirtækið byrjaði í VAKTO áætlaða veltu á móti 0 kr launum (0 %).
 //   pct      = cost / revenue × 100 — or NULL when either side is 0. Never a
 //              placeholder number.
+//   veikindi = companies.labor_excl_sick (0107): samþykktir veikindadagar
+//              (veikindi + veikindi barns) mánaðarlaunafólks teljast ekki í
+//              kostnaði — langtímaveikindi skekkja þá ekki hlutfallið. Tímakaupsfólk
+//              í veikindum stimplar ekki og telst því aldrei með hvort sem er.
 
 import type { createClient } from "@/lib/supabase/server";
 import { computeLine, classifyPay, BURDEN } from "@/lib/payroll";
@@ -62,6 +66,7 @@ export type LaborPeriod = LaborPct & {
   overtimePay: number;    // extra kr from overtime
   premiumPay: number;     // extra kr from premiums
   levies: number;         // launatengd gjöld share of cost
+  sickExcluded: number;   // kr mánaðarlauna sem voru tekin út vegna veikinda (0 ef slökkt)
   coveredDays: number;    // days with a REAL revenue row
   days: number;           // calendar days in the range
   activeDays: number;     // days on/after the company's first activity (0 = engin gögn)
@@ -150,6 +155,21 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
     supabase.from("employees").select("id, end_date").eq("company_id", companyId), // tolerant: villa fyrir migration 0088
   ]);
 
+  // Veikindi utan launahlutfalls (0107) — þolir að dálkurinn vanti.
+  const sickDays = new Map<string, Set<string>>();
+  const exclRes = await supabase.from("companies").select("labor_excl_sick").eq("id", companyId).maybeSingle();
+  if (!exclRes.error && exclRes.data?.labor_excl_sick) {
+    const lr = await allRows((a, b) => supabase.from("leave_requests").select("id, employee_id, type, from_date, to_date")
+      .eq("company_id", companyId).eq("status", "approved").in("type", ["veikindi", "veikindi_barns"])
+      .lte("from_date", spanTo).gte("to_date", spanFrom).order("id").range(a, b));
+    for (const l of lr.data ?? []) {
+      const eid = l.employee_id as string;
+      if (!sickDays.has(eid)) sickDays.set(eid, new Set());
+      const set = sickDays.get(eid)!;
+      for (const d of dateRange(String(l.from_date).slice(0, 10), String(l.to_date).slice(0, 10))) set.add(d);
+    }
+  }
+
   const ruleMap = new Map<string, unknown>();
   if (!ruleRes.error) for (const r of ruleRes.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never) ?? null);
   const endMap = new Map<string, string | null>();
@@ -220,13 +240,18 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
       byEmp.get(p.eid)!.push({ clockIn: p.clockIn, clockOut: p.clockOut });
     }
 
-    let planned = 0, actual = 0, overtime = 0, premium = 0, cost = 0, plannedCost = 0, overtimePay = 0, premiumPay = 0;
+    let planned = 0, actual = 0, overtime = 0, premium = 0, cost = 0, plannedCost = 0, overtimePay = 0, premiumPay = 0, sickExcluded = 0;
     const staff: LaborStaffRow[] = [];
     for (const e of employees) {
       const pl = plannedMap.get(e.id) ?? 0, ac = actualMap.get(e.id) ?? 0;
       // Starfslok (0088): mánaðarlaun teljast til og með síðasta starfsdegi; óvirkur/hættur starfsmaður
       // telst áfram með fyrir tímana sem hann vann á tímabilinu (sagan dettur ekki út).
-      const share = e.endDate ? monthShareOf(liveDays.filter((d) => d <= e.endDate!)) : e.status === "inactive" ? 0 : monthShare;
+      const fullShare = e.endDate ? monthShareOf(liveDays.filter((d) => d <= e.endDate!)) : e.status === "inactive" ? 0 : monthShare;
+      // Veikindadagar mánaðarlaunamanns teknir út (aðeins ef stillingin er á — annars er mengið tómt).
+      const sick = sickDays.get(e.id);
+      const share = sick && fullShare > 0
+        ? monthShareOf(liveDays.filter((d) => (!e.endDate || d <= e.endDate) && !sick.has(d)))
+        : fullShare;
       if (e.status === "inactive" && pl === 0 && ac === 0 && share === 0) continue;
       const cls = e.contractor
         ? { overtime: 0, premium: 0, overtimePay: 0, premiumPay: 0 }
@@ -236,6 +261,7 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
       let mine = 0, minePlanned = 0;
       if (e.payType === "monthly") {
         mine = (monthlyCost.get(e.id) ?? 0) * share; minePlanned = mine;
+        sickExcluded += (monthlyCost.get(e.id) ?? 0) * (fullShare - share);
       } else {
         mine = ac * (eff.get(e.id) ?? 0); minePlanned = pl * (eff.get(e.id) ?? 0);
       }
@@ -275,6 +301,7 @@ export async function getLaborPeriods(supabase: Db, companyId: string, ranges: {
       planned: r1(planned), actual: r1(actual), overtime: r1(overtime), premium: r1(premium),
       plannedCost: Math.round(plannedCost), overtimePay: Math.round(overtimePay), premiumPay: Math.round(premiumPay),
       levies: Math.round(cost * (BURDEN / (1 + BURDEN))),
+      sickExcluded: Math.round(sickExcluded),
       coveredDays: covered.size, days: days.length, activeDays: liveDays.length, staff, series,
     };
   });

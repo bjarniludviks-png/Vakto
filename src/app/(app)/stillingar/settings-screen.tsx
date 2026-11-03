@@ -8,6 +8,7 @@ import { RolePicker, type RoleKey } from "@/components/app/role-picker";
 const ROLE_INVITE_LABEL: Record<RoleKey, string> = { employee: "Starfsmaður", manager: "Vaktstjóri", owner: "Stjórnandi", contractor: "Verktaki" };
 import { PayDefaultsCard } from "./pay-defaults";
 import { MonthlyReportCard } from "./monthly-report";
+import { ClosedDaysCard } from "./closed-days-card";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { IntegrationsPanel } from "./integrations-panel";
@@ -133,6 +134,11 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
                 defaultValue={data.company?.laborTarget ?? 30}
                 onBlur={async (e) => { const v = Number(e.target.value.replace(",", ".")); if (v === (data.company?.laborTarget ?? 30)) return; const r = await saveCompanyLimits({ laborTarget: v }); toast(r.ok ? t("Vistað") : (r.error ?? "Villa")); }} /> %</span>
             </div>
+            <label className="statline" style={{ cursor: "pointer" }}>
+              <span className="k">{t("Veikindi utan launahlutfalls")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("samþykkt veikindi mánaðarlaunafólks teljast ekki í laun % af veltu")}</span></span>
+              <input type="checkbox" defaultChecked={!!data.company?.laborExclSick} style={{ width: 18, height: 18, accentColor: "var(--brand)" }}
+                onChange={async (e) => { const r = await saveCompanyLimits({ laborExclSick: e.target.checked }); toast(r.ok ? t("Vistað") : (r.error ?? "Villa")); }} />
+            </label>
             {data.company?.taktikalAvailable && (
               <div className="statline"><span className="k">{t("Undirritun samninga")}</span>
                 <select className="badge" style={{ border: "1px solid var(--line)", padding: "5px 9px", font: "inherit", fontSize: 12.5 }}
@@ -230,6 +236,8 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
         </div>
         <GeofenceCard mode={data.geofenceMode ?? "off"} locations={data.locations} onEdit={(l) => l.id && setRowEdit({ kind: "location", id: l.id, name: l.name, lat: l.lat ?? null, lng: l.lng ?? null, radius: l.radius ?? 150 })} />
       </div>
+
+      <ClosedDaysCard locations={data.locations} />
 
       <div className="card" style={{ marginTop: 16 }}>
         <div className="ch"><div><div className="ct">{t("Tæki á staðnum")}</div><div className="cs">{t("stimpilklukkan við innganginn og tilkynningar í símann")}</div></div></div>

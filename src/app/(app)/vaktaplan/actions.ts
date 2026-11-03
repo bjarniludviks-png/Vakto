@@ -14,6 +14,7 @@ import { getWeekBudget as laborWeekBudget, type WeekBudget } from "@/lib/labor";
 import { userError } from "@/lib/user-error";
 import { allRows } from "@/lib/supabase/all-rows";
 import { normalizeRules, MAX_RULES, MAX_RULE_LEN, type PlanningRule } from "@/lib/planning-rules";
+import { closedOn, closedText, type ClosedDay } from "@/lib/closed-days";
 
 export type ShiftInput = {
   employeeName: string; // starfsmanns-id (helst) eða nafn eins og það birtist í planinu
@@ -44,9 +45,10 @@ function pickType(types: { id: unknown; name: unknown }[] | null | undefined, na
   return list.find((t) => t.nm === n)?.id ?? list.find((t) => t.nm.startsWith(n))?.id;
 }
 
-export type PublishResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
+export type PublishResult = { ok: boolean; demo?: boolean; count?: number; skippedClosed?: number; error?: string };
 
-export async function publishSchedule(shifts: ShiftInput[]): Promise<PublishResult> {
+export async function publishSchedule(input: ShiftInput[]): Promise<PublishResult> {
+  let shifts = input;
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true, count: shifts.length };
   try {
@@ -67,6 +69,18 @@ export async function publishSchedule(shifts: ShiftInput[]): Promise<PublishResu
       pickEmployee(emps, name);
     const typeId = (name: string) =>
       pickType(types, name);
+
+    // Lokaðir dagar (0107): vaktir á þeim detta út ÁÐUR en nokkru er eytt — annars hyrfi planið ef innsetning félli.
+    let skippedClosed = 0;
+    const allDates = shifts.map((s) => s.date).filter((d) => ISO_RE.test(d)).sort();
+    if (allDates.length) {
+      const cl = await closedCtx(supabase, company, allDates[0], allDates[allDates.length - 1]);
+      if (cl.list.length) {
+        const before = shifts.length;
+        shifts = shifts.filter((s) => !cl.hit(s.date, empId(s.employeeName) ?? null));
+        skippedClosed = before - shifts.length;
+      }
+    }
 
     const dates = [...new Set(shifts.map((s) => s.date))];
     if (dates.length) {
@@ -101,7 +115,7 @@ export async function publishSchedule(shifts: ShiftInput[]): Promise<PublishResu
       if (emp?.email) void sendSchedulePublishedEmail(emp.email as string, emp.full_name as string, companyName);
     }
     revalidatePath("/vaktaplan");
-    return { ok: true, count: rows.length };
+    return { ok: true, count: rows.length, skippedClosed };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
   }
@@ -262,6 +276,11 @@ export async function saveShift(input: Omit<ShiftInput, "date"> & { date?: strin
     if (!employee_id) return { ok: false, error: NO_EMP };
     const shift_type_id = pickType(types, input.shiftTypeName);
     const shiftDate = input.date || new Date().toISOString().slice(0, 10);
+    {
+      const cl = await closedCtx(supabase, ctx.company, shiftDate, shiftDate);
+      const c = cl.hit(shiftDate, employee_id);
+      if (c) return { ok: false, error: closedMsg(c, shiftDate) };
+    }
     // Ný eða breytt vakt er DRÖG — starfsfólk sér hana ekki fyrr en planið er gefið út.
     // Undantekning: aðeins vaktategund (litur/álag) breytt á útgefinni vakt — tímarnir eru þeir sömu.
     // Útgefna vaktin í reitnum helst hjá starfsfólki (pending_delete) þar til nýtt plan er gefið út.
@@ -416,7 +435,7 @@ const ISO_RE = /^\d{4}-\d{2}-\d{2}$/;
 /** Afrita vaktir dag fyrir dag: `pairs` = [frá, til]. Notað fyrir „afrita síðasta mánuð“ og „endurtaka
  * viku út mánuðinn“. overwrite = eyða vöktum sem fyrir eru á markdögum (aðeins hjá `employeeIds` ef gefið);
  * annars bætast vaktir aðeins þar sem starfsmaðurinn er ekki þegar á vakt. Aldrei vakt ofan á samþykkt frí. */
-export async function copyShifts(input: { pairs: [string, string][]; employeeIds?: string[]; overwrite: boolean }): Promise<{ ok: boolean; demo?: boolean; count?: number; skippedLeave?: number; error?: string }> {
+export async function copyShifts(input: { pairs: [string, string][]; employeeIds?: string[]; overwrite: boolean }): Promise<{ ok: boolean; demo?: boolean; count?: number; skippedLeave?: number; skippedClosed?: number; error?: string }> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true, count: 0 };
   const pairs = (input.pairs ?? []).filter(([a, b]) => ISO_RE.test(a) && ISO_RE.test(b) && a !== b).slice(0, 93);
@@ -438,7 +457,9 @@ export async function copyShifts(input: { pairs: [string, string][]; employeeIds
     const taken = new Set((dstRows ?? []).filter((r) => !only || only.has(r.employee_id as string)).map((r) => `${r.employee_id}|${r.date}`));
     const toOf = new Map<string, string[]>();
     for (const [a, b] of pairs) (toOf.get(a) ?? toOf.set(a, []).get(a)!).push(b);
-    let skippedLeave = 0;
+    let skippedLeave = 0, skippedClosed = 0;
+    const sortedDst = [...dst].sort();
+    const cl = await closedCtx(supabase, ctx.company, sortedDst[0], sortedDst[sortedDst.length - 1]);
     const rows: Record<string, unknown>[] = [];
     for (const s of srcRows ?? []) {
       const eid = s.employee_id as string;
@@ -446,6 +467,7 @@ export async function copyShifts(input: { pairs: [string, string][]; employeeIds
       for (const d of toOf.get(s.date as string) ?? []) {
         if (!input.overwrite && taken.has(`${eid}|${d}`)) continue;
         if (onLeave(eid, d)) { skippedLeave++; continue; }
+        if (cl.hit(d, eid)) { skippedClosed++; continue; }
         rows.push({ company_id: ctx.company, employee_id: eid, shift_type_id: s.shift_type_id ?? null, date: d,
           start_time: s.start_time, end_time: s.end_time, status: "draft", published: false }); // drög þar til planið er gefið út
       }
@@ -463,7 +485,7 @@ export async function copyShifts(input: { pairs: [string, string][]; employeeIds
       action: "schedule.copy", entity: "shifts", detail: `Vaktir afritaðar — ${rows.length} vaktir á ${dst.length} daga (${dst[0]}…)`,
     });
     revalidatePath("/vaktaplan");
-    return { ok: true, count: rows.length, skippedLeave };
+    return { ok: true, count: rows.length, skippedLeave, skippedClosed };
   } catch (e) {
     return { ok: false, error: userError(e, "Villa") };
   }
@@ -558,6 +580,11 @@ export async function createOpenShifts(input: { dates: string[]; start: string; 
       const { data: t } = await supabase.from("shift_types").select("id, name").eq("company_id", ctx.company);
       typeId = (t?.find((x) => (x.name as string).toLowerCase() === input.shiftTypeName!.toLowerCase())?.id as string) ?? null;
     }
+    {
+      const cl = await closedCtx(supabase, ctx.company, dates[0], dates[dates.length - 1]);
+      const bad = dates.find((d) => cl.hit(d, null));
+      if (bad) return { ok: false, error: closedMsg(cl.hit(bad, null)!, bad) };
+    }
     const n = Math.min(Math.max(Math.round(input.count ?? 1), 1), 10);
     const note = input.note?.trim().slice(0, 200) || null;
     const rows = dates.flatMap((date) => Array.from({ length: n }, () => ({
@@ -635,6 +662,42 @@ async function companyOf(supabase: Awaited<ReturnType<typeof createClient>>) {
   const company = profile?.company_id as string | undefined;
   if (!company) return { error: "Fyrirtæki fannst ekki" as const };
   return { userId: user.id, company };
+}
+
+/** Lokaðir dagar fyrirtækisins á bili (0107) + staður hvers starfsmanns — tómt ef taflan er ekki til. */
+async function closedCtx(supabase: Awaited<ReturnType<typeof createClient>>, company: string, from: string, to: string) {
+  const { data, error } = await supabase.from("closed_days").select("id, location_id, from_date, to_date, label, locations(name)")
+    .eq("company_id", company).lte("from_date", to).gte("to_date", from);
+  const list: ClosedDay[] = error ? [] : (data ?? []).map((c) => ({
+    id: c.id as string, locationId: (c.location_id as string | null) ?? null, from: String(c.from_date).slice(0, 10), to: String(c.to_date).slice(0, 10),
+    label: (c.label as string | null) ?? null, location: ((Array.isArray(c.locations) ? c.locations[0] : c.locations) as { name?: string } | null)?.name ?? null,
+  }));
+  const locOf = new Map<string, string | null>();
+  if (list.some((c) => c.locationId)) {
+    const { data: emps } = await supabase.from("employees").select("id, location_id").eq("company_id", company);
+    for (const e of emps ?? []) locOf.set(e.id as string, (e.location_id as string | null) ?? null);
+  }
+  const hit = (date: string, employeeId: string | null, locationId?: string | null) =>
+    list.length ? closedOn(list, date, locationId ?? (employeeId ? locOf.get(employeeId) ?? null : null)) : null;
+  return { list, hit };
+}
+const closedMsg = (c: ClosedDay, date: string) => {
+  const [y, m, d] = date.split("-").map(Number);
+  return `Lokað er ${d}.${m}.${y} (${closedText(c)}) — ekki hægt að setja vakt á þann dag.`;
+};
+
+/** Lokaðir dagar á bili — fyrir merkingar í vaktaplani. */
+export async function getClosedDays(fromISO: string, toISO: string): Promise<{ ok: boolean; days: ClosedDay[] }> {
+  if (!isSupabaseConfigured() || !ISO_RE.test(fromISO) || !ISO_RE.test(toISO)) return { ok: false, days: [] };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, days: [] };
+    const { list } = await closedCtx(supabase, ctx.company, fromISO, toISO);
+    return { ok: true, days: list };
+  } catch {
+    return { ok: false, days: [] };
+  }
 }
 
 /** Manager approves or rejects a leave request. */

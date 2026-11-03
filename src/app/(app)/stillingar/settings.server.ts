@@ -21,7 +21,7 @@ export type UserRow = { name: string; initials: string; role: string; email: str
   permissions?: Record<string, boolean> | null;
   /** Starfsmannaprófíll tengdur aðganginum (deildaumsjón stjórnanda). */
   employeeId?: string | null };
-export type CompanyInfo = { name: string; kennitala: string; address: string; postalCode?: string; city?: string; phone: string; email: string; feedPostPolicy?: "everyone" | "managers"; payPeriodStart?: number; plan?: string | null; trialEndsAt?: string | null; billingStatus?: string | null; accessEndsAt?: string | null; laborTarget?: number; leaveCap?: number | null; esignProvider?: "vakto" | "taktikal"; taktikalAvailable?: boolean };
+export type CompanyInfo = { name: string; kennitala: string; address: string; postalCode?: string; city?: string; phone: string; email: string; feedPostPolicy?: "everyone" | "managers"; payPeriodStart?: number; plan?: string | null; trialEndsAt?: string | null; billingStatus?: string | null; accessEndsAt?: string | null; laborTarget?: number; laborExclSick?: boolean; leaveCap?: number | null; esignProvider?: "vakto" | "taktikal"; taktikalAvailable?: boolean };
 export type ApiKeyView = { id: string; name: string; prefix: string; created: string; lastUsed: string | null; revoked: boolean };
 export type DepartmentRow = { id: string; name: string; location: string; staff: number; color: string | null; members: string[] };
 export type CardView = { last4: string | null; brand: string | null; expiry: string | null };
@@ -149,6 +149,9 @@ export async function getSettingsData(): Promise<SettingsData> {
     const lt = Number(limRes.data?.labor_target);
     const laborTarget = !limRes.error && Number.isFinite(lt) && lt > 0 && lt < 100 ? lt : 30;
     const leaveCap = limRes.error ? null : ((limRes.data?.leave_cap as number | null) ?? null);
+    // Veikindi utan launahlutfalls (0107) — tolerant.
+    const sickRes = await supabase.from("companies").select("labor_excl_sick").eq("id", company).maybeSingle();
+    const laborExclSick = !sickRes.error && !!sickRes.data?.labor_excl_sick;
     // Geofence (0055) — mode per company, pin + radius per location. Tolerant.
     const gfRes = await supabase.from("companies").select("geofence_mode").eq("id", company).maybeSingle();
     const geofenceMode = (gfRes.error ? "off" : (gfRes.data?.geofence_mode as GeofenceMode | null) ?? "off");
@@ -229,7 +232,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       companyId: company,
       viewerRole,
       kioskToken, card, invoices, pricing, ai, geofenceMode,
-      company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", postalCode, city, phone: c.phone ?? "", email: c.email ?? "", feedPostPolicy, payPeriodStart: ppd, plan, trialEndsAt, billingStatus, accessEndsAt, laborTarget, leaveCap, esignProvider, taktikalAvailable },
+      company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", postalCode, city, phone: c.phone ?? "", email: c.email ?? "", feedPostPolicy, payPeriodStart: ppd, plan, trialEndsAt, billingStatus, accessEndsAt, laborTarget, laborExclSick, leaveCap, esignProvider, taktikalAvailable },
       live: true,
     };
   } catch {
