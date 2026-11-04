@@ -162,13 +162,21 @@ function weekCodeForStart(start: string | null): string {
  * full_name-ordered employee list (same order the screen renders). Returns
  * both the coarse code grid (for colour) and the real start/end times per cell. */
 /** Veltuspá + launamarkmið vikunnar og kostnaður per klst — fyrir launaáætlunina. */
-export async function getWeekBudget(monISO: string): Promise<WeekBudget | null> {
+/** `depts` (valfrjálst): deildir sem vaktaplanið er síað á → spáin miðast við staði þeirra deilda. */
+export async function getWeekBudget(monISO: string, depts?: string[] | null): Promise<WeekBudget | null> {
   if (!isSupabaseConfigured() || !/^\d{4}-\d{2}-\d{2}$/.test(monISO)) return null;
   try {
     const supabase = await createClient();
     const ctx = await companyOf(supabase);
     if ("error" in ctx) return null;
-    return await laborWeekBudget(supabase, ctx.company, monISO);
+    let locIds: string[] | null = null;
+    const names = (depts ?? []).map((d) => d.trim()).filter(Boolean).slice(0, 50);
+    if (names.length) {
+      const { data } = await supabase.from("departments").select("location_id, locations!inner(company_id)").eq("locations.company_id", ctx.company).in("name", names);
+      locIds = [...new Set((data ?? []).map((r) => r.location_id as string).filter(Boolean))];
+      if (!locIds.length) locIds = null;
+    }
+    return await laborWeekBudget(supabase, ctx.company, monISO, locIds);
   } catch (e) {
     console.error("getWeekBudget", e);
     return null;

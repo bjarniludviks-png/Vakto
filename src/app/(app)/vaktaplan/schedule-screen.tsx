@@ -454,29 +454,54 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   useEffect(() => {
     if (!liveCompany) return;
     let cancelled = false;
-    getWeekBudget(weekMonISO).then((b) => { if (!cancelled) setBudget(b); }).catch(() => {});
+    // síað á deild/stað → spá og markmið fyrir þann stað (deildir eru á stöðum)
+    const scope = depts.length ? depts : scopeDepts;
+    getWeekBudget(weekMonISO, scope.length ? scope : null).then((b) => { if (!cancelled) setBudget(b); }).catch(() => {});
     return () => { cancelled = true; };
-  }, [weekMonISO, liveCompany]);
+  }, [weekMonISO, liveCompany, depts.join("|"), scopeDepts.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
   // kr/klst með launatengdum gjöldum úr launareglum hvers starfsmanns (getWeekBudget); id gengur fyrir nafni.
   const rateOf = (e: Emp): number => (budget && ((e[4] ? budget.ratesById?.[e[4]] : undefined) ?? budget.rates[`${e[0]}|${e[1]}`] ?? budget.avgRate)) || COST_HR;
+  // Síað plan (staður/deild): aðeins sýnilegar raðir og þeirra mánaðarlaun — sama og spáin nær yfir.
+  const scoped = !!budget?.locationIds?.length;
+  const fixedWeek = useMemo(() => {
+    if (!budget) return 0;
+    if (!scoped || !budget.fixedById) return budget.fixed;
+    return vis.reduce((a, r) => a + ((emp[r]?.[4] && budget.fixedById[emp[r][4]!]) || 0), 0);
+  }, [budget, scoped, vis, emp]);
   const planCost = useMemo(() => {
     if (!budget) return null;
-    let c = budget.fixed;
-    emp.forEach((e, r) => {
-      const rate = rateOf(e);
+    let c = fixedWeek;
+    (scoped ? vis : emp.map((_, r) => r)).forEach((r) => {
+      const rate = rateOf(emp[r]);
       grid[r]?.forEach((s, col) => { if (s && s !== "off") c += cellHrs(r, col, s) * rate; });
     });
     return Math.round(c);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budget, emp, grid, cellTimes]);
+  }, [budget, emp, grid, cellTimes, vis, scoped, fixedWeek]);
+  /** Dag fyrir dag: veltuspá × markmið − mánaðarlaun dagsins → leyfðir tímar á meðaltaxta sýnilegra. */
+  const dayPlan = useMemo(() => {
+    if (!budget?.days?.length || !budget.days.some((d) => d.revenue > 0)) return null;
+    const tgt = budget.target ?? 30;
+    const rs = vis.filter((r) => grid[r]?.some((s) => s && s !== "off"));
+    const pool = rs.length ? rs : vis;
+    const avg = pool.length ? pool.reduce((a, r) => a + rateOf(emp[r]), 0) / pool.length : (budget.avgRate || COST_HR);
+    return budget.days.map((d, c) => {
+      let planned = 0;
+      vis.forEach((r) => { const s = grid[r]?.[c]; if (s && s !== "off") planned += cellHrs(r, c, s); });
+      const allowedKr = Math.max(0, (d.revenue * tgt) / 100 - fixedWeek / 7);
+      const allowedHrs = avg > 0 ? allowedKr / avg : 0;
+      return { ...d, planned, allowedHrs };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budget, vis, emp, grid, cellTimes, fixedWeek]);
   // Dagur: sama útreikningur og vikan, aðeins dálkur dagsins (mánaðarlaunafólk = sjöundi hluti vikunnar).
   const dayCost = useMemo(() => {
     if (!budget) return null;
-    let c = budget.fixed / 7;
+    let c = fixedWeek / 7;
     vis.forEach((r) => { const s = grid[r]?.[curCol]; if (s && s !== "off") c += cellHrs(r, curCol, s) * rateOf(emp[r]); });
     return Math.round(c);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budget, vis, emp, grid, cellTimes, curCol]);
+  }, [budget, vis, emp, grid, cellTimes, curCol, fixedWeek]);
   // Mánuður (lifandi fyrirtæki): raunverulegar vaktir mánaðarins — úr töflunni eða dagatalinu — í stað viku × 4,33.
   const monthList = ((): MonthShift[] | null => {
     if (!liveCompany || view !== "Mánuður") return null;
@@ -1151,6 +1176,25 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                   })}
                   <td className="r rowsum">{dec1(vis.reduce((a, r) => a + grid[r].reduce((b, s, c) => (s && s !== "off" ? b + cellHrs(r, c, s) : b), 0), 0))}</td>
                 </tr>
+                {dayPlan && (<>
+                  <tr className="foot fc">
+                    <td style={{ textAlign: "left" }} title={t("Skráð velta, annars meðaltal sama vikudags síðustu 8 vikna")}>{t("Veltuspá")}</td>
+                    {dayPlan.map((d, c) => <td key={c} className={c === todayCol ? "tod" : ""} title={d.estimated ? t("Spá") : t("Skráð velta")}>{d.revenue > 0 ? `${d.estimated ? "≈ " : ""}${krCompact(d.revenue)}` : "—"}</td>)}
+                    <td className="r rowsum">{krCompact(dayPlan.reduce((a, d) => a + d.revenue, 0))}</td>
+                  </tr>
+                  <tr className="foot fc">
+                    <td style={{ textAlign: "left" }} title={`${t("Planaðir tímar / tímar sem launamarkmiðið leyfir")} (${dec1(laborTarget)} %)`}>{t("Klst / svigrúm")} <small style={{ fontWeight: 500, opacity: 0.7 }}>{dec1(laborTarget)} %</small></td>
+                    {dayPlan.map((d, c) => {
+                      const over = d.allowedHrs > 0 && d.planned > d.allowedHrs * 1.03;
+                      const under = d.allowedHrs > 0 && d.planned < d.allowedHrs * 0.85;
+                      return <td key={c} className={c === todayCol ? "tod" : ""} style={{ color: d.revenue <= 0 ? undefined : over ? "var(--bad)" : under ? "var(--warn)" : "var(--good)", fontWeight: 600 }}
+                        title={d.revenue > 0 ? `${dec1(d.planned)} ${t("klst planaðar")} · ${t("markmiðið leyfir")} ${dec1(d.allowedHrs)} ${t("klst")}` : undefined}>
+                        {d.revenue > 0 ? `${Math.round(d.planned)} / ${Math.round(d.allowedHrs)}` : "—"}
+                      </td>;
+                    })}
+                    <td className="r rowsum">{Math.round(dayPlan.reduce((a, d) => a + d.planned, 0))} / {Math.round(dayPlan.reduce((a, d) => a + d.allowedHrs, 0))}</td>
+                  </tr>
+                </>)}
                 <tr className="addrow">
                   <td colSpan={9}>
                     <button className="addemp" onClick={() => (pool.length ? setModal("addEmp") : toast("Allt starfsfólk er þegar á plani"))}>

@@ -5,6 +5,8 @@ export type StaffImportRow = {
   fullName: string; kennitala?: string; email?: string; phone?: string; hireDate?: string; active?: boolean;
   role?: string; position?: string; department?: string; location?: string;
   payType?: string; rate?: string; employmentRatio?: string; union?: string; bankAccount?: string;
+  /** Aðrar deildir (komma á milli) — t.d. fólk sem vinnur á fleiri stöðum. */
+  extraDepartments?: string[];
 };
 type Sheet = { sheet?: string; data: unknown[][] };
 
@@ -65,7 +67,8 @@ export function parseStaffSheet(out: unknown): { rows: StaffImportRow[]; error?:
     active: col(["virkur", "virk", "active"]),
     role: col(["hlutverk", "role"]),
     position: col(["starfsheiti", "staða", "stada", "position", "title"]),
-    department: col(["deild", "department"]),
+    department: col(["deild", "department"], ["auka"]),
+    extra: col(["aukadeildir", "aukadeild", "aðrar deildir", "extra departments"]),
     location: col(["staður", "stadur", "starfsstöð", "location"], ["starfshlutf"]),
     payType: col(["launategund", "launateg", "pay type", "paytype"]),
     rate: col(["taxti", "tímakaup", "timakaup", "mánaðarlaun", "laun", "rate"], ["launateg", "pay type", "paytype"]),
@@ -87,6 +90,7 @@ export function parseStaffSheet(out: unknown): { rows: StaffImportRow[]; error?:
       role: val(r, ci.role) || undefined,
       position: val(r, ci.position) || undefined,
       department: val(r, ci.department) || undefined,
+      extraDepartments: ci.extra >= 0 ? val(r, ci.extra).split(/[,;]/).map((x) => x.trim()).filter(Boolean) : undefined,
       location: val(r, ci.location) || undefined,
       payType: val(r, ci.payType) || undefined,
       rate: val(r, ci.rate) || undefined,
