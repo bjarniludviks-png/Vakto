@@ -370,9 +370,45 @@ export type WeekBudget = {
   rates: Record<string, number>;    // "ÍN|Fornafn" → kr/klst (með launatengdum gjöldum)
   ratesById: Record<string, number>; // starfsmanns-id → kr/klst (nöfn geta verið eins — id gengur fyrir)
   avgRate: number;                  // fyrir raðir sem finnast ekki
+  /** Mánaðarlaunafólk: hlutur vikunnar per starfsmann — svo síaður staður telji aðeins sitt fólk. */
+  fixedById: Record<string, number>;
+  /** Veltuspá hvers dags (mán→sun) fyrir valda staði: rauntala ef skráð, annars spá. */
+  days: { date: string; revenue: number; estimated: boolean }[];
+  /** Staðir sem spáin nær yfir (tómt = allt fyrirtækið). */
+  locationIds: string[];
 };
 
-export async function getWeekBudget(supabase: Db, companyId: string, monISO: string): Promise<WeekBudget> {
+/** Veltuspá dag fyrir dag. Röð: skráð velta → meðaltal sama vikudags síðustu 8 vikna (raunvelta
+ * staðanna) → vikudagsmeðaltal fyrirtækisins (Stillingar; aðeins þegar spáð er fyrir allt fyrirtækið,
+ * því það er heildartala). Dagur án nokkurs af þessu fær 0. */
+async function dailyForecast(supabase: Db, companyId: string, monISO: string, locIds: string[], wholeCompany: boolean): Promise<WeekBudget["days"]> {
+  const [y, m, d] = monISO.split("-").map(Number);
+  const days = dateRange(monISO, isoOf(new Date(y, m - 1, d + 6)));
+  if (!locIds.length) return days.map((date) => ({ date, revenue: 0, estimated: false }));
+  const histFrom = isoOf(new Date(y, m - 1, d - 56));
+  const [revRes, compRes] = await Promise.all([
+    allRows((a, b) => supabase.from("revenue").select("id, amount, date").in("location_id", locIds).gte("date", histFrom).lte("date", days[6]).order("id").range(a, b)),
+    supabase.from("companies").select("weekday_revenue").eq("id", companyId).maybeSingle(),
+  ]);
+  const byDate = new Map<string, number>();
+  for (const r of revRes.data ?? []) {
+    const k = String(r.date).slice(0, 10);
+    byDate.set(k, (byDate.get(k) ?? 0) + Number(r.amount ?? 0));
+  }
+  const weekdayRev = (compRes.data?.weekday_revenue as Record<string, number> | null | undefined) ?? null;
+  return days.map((date) => {
+    if (byDate.has(date)) return { date, revenue: Math.round(byDate.get(date)!), estimated: false };
+    const dow = new Date(date + "T00:00:00").getDay();
+    const hist: number[] = [];
+    for (const [k, v] of byDate) if (k < monISO && new Date(k + "T00:00:00").getDay() === dow && v > 0) hist.push(v);
+    if (hist.length) return { date, revenue: Math.round(hist.reduce((a, b) => a + b, 0) / hist.length), estimated: true };
+    const w = wholeCompany ? Number(weekdayRev?.[String(dow)] ?? 0) : 0;
+    return { date, revenue: Math.round(w), estimated: w > 0 };
+  });
+}
+
+/** `locationIds` (valfrjálst): spá og velta aðeins fyrir þessa staði (vaktaplan síað á stað/deild). */
+export async function getWeekBudget(supabase: Db, companyId: string, monISO: string, locationIds?: string[] | null): Promise<WeekBudget> {
   const [y, m, d] = monISO.split("-").map(Number);
   const sun = isoOf(new Date(y, m - 1, d + 6));
   const [period, target, empRes, ruleRes, endRes] = await Promise.all([
@@ -387,6 +423,12 @@ export async function getWeekBudget(supabase: Db, companyId: string, monISO: str
   const ruleMap = new Map<string, unknown>();
   if (!ruleRes.error) for (const r of ruleRes.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never) ?? null);
   const share = monthShareOf(dateRange(monISO, sun));
+  const { data: allLocs } = await supabase.from("locations").select("id").eq("company_id", companyId);
+  const companyLocs = (allLocs ?? []).map((l) => l.id as string);
+  const scoped = !!locationIds?.length;
+  const locs = scoped ? companyLocs.filter((id) => locationIds!.includes(id)) : companyLocs;
+  const days = await dailyForecast(supabase, companyId, monISO, locs, !scoped);
+  const fixedById: Record<string, number> = {};
   const rates: Record<string, number> = {};
   const ratesById: Record<string, number> = {};
   let fixed = 0, sum = 0, n = 0;
@@ -402,7 +444,7 @@ export async function getWeekBudget(supabase: Db, companyId: string, monISO: str
       union, rules: resolveRuleSet(union, ruleMap.get(r.id as string) as never),
     };
     const l = computeLine(e as never);
-    if (e.payType === "monthly") { fixed += l.cost * (end && end < sun ? monthShareOf(dateRange(monISO, end)) : share); continue; }
+    if (e.payType === "monthly") { const f = l.cost * (end && end < sun ? monthShareOf(dateRange(monISO, end)) : share); fixed += f; fixedById[e.id] = Math.round(f); continue; }
     const per = l.hours > 0 ? l.cost / l.hours : 0;
     if (per > 0) {
       rates[`${initials(e.fullName)}|${e.fullName.split(/\s+/)[0]}`] = Math.round(per);
@@ -410,5 +452,13 @@ export async function getWeekBudget(supabase: Db, companyId: string, monISO: str
       sum += per; n++;
     }
   }
-  return { revenue: period.revenue, revenueSource: period.revenueSource, target, fixed: Math.round(fixed), rates, ratesById, avgRate: n ? Math.round(sum / n) : 0 };
+  // Síað á staði: velta = dagsspá þeirra staða. Allt fyrirtækið: sama tala og annars staðar (getLaborPeriod),
+  // nema rauntölur vanti alveg en saga sé til — þá gildir sagan (betri en 0).
+  const fcTotal = days.reduce((a, x) => a + x.revenue, 0);
+  const fcEst = days.some((x) => x.estimated);
+  const revenue = scoped ? fcTotal : (period.revenue > 0 ? period.revenue : fcTotal);
+  const revenueSource: RevenueSource = scoped || period.revenue <= 0
+    ? (fcTotal <= 0 ? "none" : fcEst ? (days.some((x) => !x.estimated && x.revenue > 0) ? "mixed" : "estimated") : "manual")
+    : period.revenueSource;
+  return { revenue, revenueSource, target, fixed: Math.round(fixed), rates, ratesById, avgRate: n ? Math.round(sum / n) : 0, fixedById, days, locationIds: scoped ? locs : [] };
 }

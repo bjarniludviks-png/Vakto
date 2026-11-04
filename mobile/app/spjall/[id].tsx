@@ -1,3 +1,4 @@
+import { useAndroidKeyboardPad } from "../../src/lib/keyboard";
 // Spjallþráður — realtime, skilaboð flokkuð eftir sendanda, viðbrögð með
 // löngu ýti, „séð af“, svar í þræði, skrifar-vísir.
 import { emojify } from "../../src/lib/emoticons";
@@ -39,6 +40,7 @@ function dayLabel(iso: string): string {
 }
 
 export default function Thread() {
+  const androidKb = useAndroidKeyboardPad();
   useTheme();
   const { id, name: nameParam } = useLocalSearchParams<{ id: string; name?: string }>();
   // Heiti hóps má breyta í upplýsingablaðinu — því staðbundið ástand en ekki bara slóðarbreyta.
@@ -458,7 +460,7 @@ export default function Thread() {
   const lastIsMine = !!lastMine && msgs[msgs.length - 1]?.id === lastMine.id;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.panel }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.panel, paddingBottom: androidKb }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 8, paddingTop: insets.top + 4, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.line2, backgroundColor: colors.panel }}>
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel={tr("Til baka")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }}><ChevronLeft color={colors.brand} size={28} /></Pressable>
         <Pressable onPress={() => { if (!isGroup && peer?.employeeId) router.push(`/starfsmadur/${peer.employeeId}`); else openInfo(); }} style={{ flexDirection: "row", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>

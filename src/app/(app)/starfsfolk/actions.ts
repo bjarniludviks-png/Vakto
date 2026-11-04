@@ -228,6 +228,7 @@ export type ImportRow = {
   fullName: string; kennitala?: string; email?: string; phone?: string; hireDate?: string; active?: boolean;
   role?: string; position?: string; department?: string; location?: string;
   payType?: string; rate?: string; employmentRatio?: string; union?: string; bankAccount?: string;
+  extraDepartments?: string[];
 };
 export type ImportResult = { ok: boolean; demo?: boolean; inserted?: number; skipped?: number; noRate?: number; error?: string };
 
@@ -275,14 +276,19 @@ export async function importEmployees(rows: ImportRow[]): Promise<ImportResult> 
       return defaultLoc;
     };
     const deps = new Map<string, string | null>();
-    for (const r of valid) {
-      const n = r.department?.trim(); if (!n || deps.has(n.toLowerCase())) continue;
+    // Deild sem heitir eins og staður (t.d. „Njarðvík“) fer á þann stað; annars staður línunnar.
+    const ensureDept = async (n: string, rowLoc?: string) => {
+      if (deps.has(n.toLowerCase())) return;
       let id = await lookupId(supabase, "departments", n, company);
       if (!id) {
-        const loc = (r.location?.trim() ? locs.get(r.location.trim().toLowerCase()) : null) ?? await fallbackLoc();
+        const loc = locs.get(n.toLowerCase()) ?? (rowLoc?.trim() ? locs.get(rowLoc.trim().toLowerCase()) : null) ?? await fallbackLoc();
         if (loc) id = ((await supabase.from("departments").insert({ location_id: loc, name: n }).select("id").single()).data?.id as string) ?? null;
       }
       deps.set(n.toLowerCase(), id);
+    };
+    for (const r of valid) {
+      const n = r.department?.trim(); if (n) await ensureDept(n, r.location);
+      for (const x of r.extraDepartments ?? []) { if (x.trim()) { if (!locs.has(x.trim().toLowerCase())) { const lid = await lookupId(supabase, "locations", x.trim(), company); if (lid) locs.set(x.trim().toLowerCase(), lid); } await ensureDept(x.trim(), r.location); } }
     }
     const poss = new Map<string, string | null>();
     for (const n of uniq(valid.map((r) => r.position))) {
@@ -316,6 +322,8 @@ export async function importEmployees(rows: ImportRow[]): Promise<ImportResult> 
         union_agreement: r.union?.trim() || defaultUnion,
         role: roleEnum(r.role ?? "Starfsmaður"),
         status: r.active === false ? "inactive" : "active",
+        // alltaf með (líka tómt): ólíkir lyklar í fjöldainnsetningu yrðu að NULL í not-null dálki
+        extra_departments: [...new Set((r.extraDepartments ?? []).map((x) => x.trim()).filter((x) => x && x.toLowerCase() !== r.department?.trim().toLowerCase()))],
       }));
 
     const dupSkipped = valid.length - toInsert.length;

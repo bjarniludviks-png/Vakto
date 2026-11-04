@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "841112162214",
+    "project_id": "vakto-cab8e",
+    "storage_bucket": "vakto-cab8e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:841112162214:android:604c7af900800930ad4967",
+        "android_client_info": {
+          "package_name": "is.vakto.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAMI8l7piiM2zq6q2IqNxfr3uvCzwE3vZ4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,3 +1,4 @@
+import { useAndroidKeyboardPad } from "../src/lib/keyboard";
 // VAKTO AI — aðstoðarmaður stjórnenda og vaktstjóra (sami bakendi og á vefnum).
 // Svarar spurningum með tölum úr kerfinu og undirbýr breytingar sem notandinn staðfestir.
 // Fyrsta skipti: samþykki fyrir því að gögn fari til Anthropic (App Store 5.1.2(i)).
@@ -25,6 +26,7 @@ const STAGE: Record<string, string> = {
 type Live = { stage: string; tool?: string; text: string; plan: number; actions: AiAction[] };
 
 export default function VaktoAi() {
+  const androidKb = useAndroidKeyboardPad();
   useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -118,7 +120,7 @@ export default function VaktoAi() {
   const liveLabel = live ? (live.stage === "plan" ? trf("Set upp vaktir… {n}", live.plan) : tr(STAGE[live.tool ?? ""] ?? STAGE[live.stage] ?? STAGE.think)) : "";
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.panel }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.panel, paddingBottom: androidKb }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 8, paddingTop: insets.top + 4, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: colors.line2, backgroundColor: colors.panel }}>
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel={tr("Til baka")} style={{ width: 40, height: 44, alignItems: "center", justifyContent: "center" }}><ChevronLeft color={colors.brand} size={28} /></Pressable>
         <AiAvatar />
