@@ -32,7 +32,8 @@ export type ChatMessage = {
   id: string; sender: string; senderId: string; me: boolean; body: string; at: string; kind: string; url: string | null;
   reactions: Reaction[];
   createdAt: string;
-  replyTo: { sender: string; body: string } | null;
+  /** Tilvitnun: id til að hoppa að skilaboðunum, kind/url til að sýna smámynd af mynd. */
+  replyTo: { id?: string; sender: string; body: string; kind?: string; url?: string | null } | null;
   photo: string | null;
   /** Litur upphafsstafa-hrings sendanda (sami og á starfsmannasíðum). */
   color?: string;
@@ -512,7 +513,7 @@ export async function listMessages(channelId: string, before?: MessageCursor | n
         kind: (m.kind as string) ?? "text", url: (m.attachment_url as string) ?? null,
         createdAt: m.created_at as string,
         reactions: (reactByMsg.get(m.id as string) ?? []).sort((a, b) => b.count - a.count),
-        replyTo: rt ? { sender: senderOf(rt), body: rt.kind === "image" ? "📷 Mynd" : rt.kind === "audio" ? "🎤 Talskilaboð" : ((rt.body as string) ?? "") } : null,
+        replyTo: rt ? { id: rt.id as string, sender: senderOf(rt), body: rt.kind === "image" ? ((rt.body as string) || "📷 Mynd") : rt.kind === "audio" ? "🎤 Talskilaboð" : ((rt.body as string) ?? ""), kind: (rt.kind as string) ?? "text", url: (rt.attachment_url as string) ?? null } : null,
         photo: emps.get(m.sender_id as string)?.photo ?? null,
         color: emps.get(m.sender_id as string)?.color,
         edited: !!m.edited_at,

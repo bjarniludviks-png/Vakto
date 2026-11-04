@@ -29,6 +29,11 @@ const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "🔥", "👏", "😅"
 type ChatInitial = { ok: boolean; items: Conversation[]; meId: string; meName?: string; companyId?: string };
 /** Ný skilaboð eins og þau berast — úr postgres_changes (raunveruleg röð) eða beint frá
  * sendanda yfir Realtime broadcast (`message` á `typing:<þráður>`, nafn/mynd fylgja). */
+/** Tilvitnun í skilaboð sem svarað er: id (til að hoppa þangað) og mynd (smámynd í kúlunni). */
+function quoteOf(m: ChatMessage): NonNullable<ChatMessage["replyTo"]> {
+  return { id: m.id.startsWith("tmp-") ? undefined : m.id, sender: m.sender, body: m.kind === "image" ? (m.body || "📷 Mynd") : m.kind === "audio" ? "🎤 Talskilaboð" : m.body, kind: m.kind, url: m.url };
+}
+
 type IncomingRow = { id: string; channel_id?: string; sender_id?: string; body?: string; kind?: string; attachment_url?: string | null; created_at?: string; reply_to?: string | null; name?: string; photo?: string | null; color?: string | null };
 const lastLabel = (kind?: string, body?: string) => (kind === "image" ? "Mynd" : kind === "audio" ? "Talskilaboð" : kind === "file" ? (body || "Skjal") : (body ?? ""));
 type SupabaseBrowser = ReturnType<typeof createBrowserClient>;
@@ -632,7 +637,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
           sender: mine ? "Ég" : (known?.sender ?? (row.name ? firstName(row.name) : conv?.dm ? conv.name.split(/\s+/)[0] : "…")),
           body: row.body ?? "", at: `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
           kind: row.kind ?? "text", url: row.attachment_url ?? null, reactions: [],
-          createdAt: row.created_at ?? d.toISOString(), replyTo: rp ? { sender: rp.sender, body: rp.body } : null,
+          createdAt: row.created_at ?? d.toISOString(), replyTo: rp ? quoteOf(rp) : null,
           photo: known?.photo ?? row.photo ?? null, color: known?.color ?? row.color ?? undefined,
         }];
       });
@@ -810,7 +815,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
       id: `tmp-${now.getTime()}`, sender: "Ég", senderId: initial.meId, me: true,
       body: text, at: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
       kind, url: url ?? null, reactions: [], createdAt: now.toISOString(),
-      replyTo: reply ? { sender: reply.sender, body: reply.body } : null,
+      replyTo: reply ? quoteOf(reply) : null,
       photo: null,
     }]);
     const res = await sendChatMessage(active.id, text, kind, url, reply?.id);
@@ -1122,9 +1127,21 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                     <div className={`mbub ${m.me ? "me" : "them"}${img ? " media" : ""}`} title={phone ? undefined : `${dayLabel(m.createdAt)} ${hhmm(m.createdAt)}`}
                       onPointerDown={(e) => pressStart(m, e)} onPointerMove={pressMove} onPointerUp={pressEnd} onPointerCancel={pressEnd}
                       onContextMenu={(e) => { if (phone) { e.preventDefault(); pressEnd(); setSheetFor(m); } }}>
-                      {m.replyTo && (
-                        <span className="mreply"><b>{m.replyTo.sender}</b><span>{m.replyTo.body}</span></span>
-                      )}
+                      {m.replyTo && (() => {
+                        const q = m.replyTo;
+                        const qImg = !!q.url && isImage(q.kind ?? "text", q.url, q.body);
+                        return (
+                          <span className={`mreply${q.id ? " jump" : ""}`} role={q.id ? "button" : undefined} title={q.id ? t("Sjá skilaboðin") : undefined}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => { if (!q.id) return; e.stopPropagation(); void jumpTo(q.id); }}>
+                            {qImg && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img className="mreply-img" src={q.url!} alt="" />
+                            )}
+                            <span className="mreply-tx"><b>{q.sender}</b><span>{qImg && (!q.body || q.body === "📷 Mynd") ? `📷 ${t("Mynd")}` : q.body}</span></span>
+                          </span>
+                        );
+                      })()}
                       {img
                         // eslint-disable-next-line @next/next/no-img-element
                         ? <a href={m.url!} target="_blank" rel="noreferrer" onClick={(e) => { if (pressRef.current.fired) e.preventDefault(); else openImage(e, m.url!, setViewer); }}><img src={m.url!} alt="" /></a>
