@@ -44,8 +44,14 @@ export type ChatMessage = {
   /** Sendandi breytti textanum (0100). */
   edited?: boolean;
   reactions: Reaction[];
-  replyTo: { sender: string; body: string } | null;
+  /** Tilvitnun: id til að hoppa að skilaboðunum, kind/url til að sýna smámynd af mynd. */
+  replyTo: { id?: string; sender: string; body: string; kind?: ChatMessage["kind"]; url?: string | null } | null;
 };
+
+/** Tilvitnun úr skilaboðum sem eru þegar á skjánum (svar sent / barst í rauntíma). */
+export function quoteOf(m: ChatMessage): NonNullable<ChatMessage["replyTo"]> {
+  return { id: m.id.startsWith("tmp-") ? undefined : m.id, sender: m.sender, body: m.body, kind: m.kind, url: m.url };
+}
 /** Eitt emoji á skilaboðum og hverjir settu það („Viðbrögð“, eins og í Messenger). */
 export type ReactionWho = { userId: string; name: string; color: string | null; photo: string | null; me: boolean };
 export type Reaction = { emoji: string; count: number; mine: boolean; who: ReactionWho[] };
@@ -222,11 +228,11 @@ export async function listMessages(me: Me, channelId: string, before?: MessageCu
   const hasMore = (rows ?? []).length > CHAT_PAGE;
   const msgs = (rows ?? []).slice(0, CHAT_PAGE).reverse();
   const myId = auth.user?.id;
-  const byId = new Map<string, { sender_id: string; body: string | null }>(msgs.map((m) => [m.id, m]));
+  const byId = new Map<string, { id: string; sender_id: string; body: string | null; kind: string | null; attachment_url: string | null }>(msgs.map((m) => [m.id, m]));
   // tilvitnuð skilaboð utan síðunnar: sækja bara þær raðir (eytt → engin tilvitnun)
   const missing = [...new Set(msgs.map((m) => m.reply_to as string | null).filter((x): x is string => !!x && !byId.has(x)))];
   if (missing.length) {
-    const { data: extra } = await supabase.from("messages").select("id, sender_id, body").in("id", missing);
+    const { data: extra } = await supabase.from("messages").select("id, sender_id, body, kind, attachment_url").in("id", missing);
     for (const r of extra ?? []) byId.set(r.id, r);
   }
   const messages: ChatMessage[] = msgs.map((m) => {
@@ -247,7 +253,7 @@ export async function listMessages(me: Me, channelId: string, before?: MessageCu
       me: m.sender_id === myId, body: m.body ?? "", at: new Date(m.created_at).toTimeString().slice(0, 5), createdAt: m.created_at,
       kind: (m.kind ?? "text") as ChatMessage["kind"], url: m.attachment_url, edited: !!m.edited_at,
       reactions: [...counts.values()],
-      replyTo: rt ? { sender: (people.get(rt.sender_id)?.name ?? "Notandi").split(/\s+/)[0], body: rt.body ?? "" } : null,
+      replyTo: rt ? { id: rt.id, sender: (people.get(rt.sender_id)?.name ?? "Notandi").split(/\s+/)[0], body: rt.body ?? "", kind: (rt.kind ?? "text") as ChatMessage["kind"], url: rt.attachment_url } : null,
     };
   });
   const readsOut: ChannelRead[] = (reads ?? []).filter((r) => r.user_id !== myId).map((r) => ({ userId: r.user_id, name: people.get(r.user_id)?.name ?? "", lastReadAt: r.last_read_at, color: people.get(r.user_id)?.color ?? null, photo: people.get(r.user_id)?.photo ?? null }));

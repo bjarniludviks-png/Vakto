@@ -20,7 +20,7 @@ import { Txt, Muted, Avatar, Sheet, Row, useToast, colorFor } from "../../src/co
 import { uploadImage } from "../../src/lib/api/feed";
 import { colors, font, useTheme } from "../../src/theme";
 import { useMe } from "../../src/lib/me-context";
-import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, deleteChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, editMessage, translateMessage, translateBatch, getChatTranslate, setChatTranslate, subscribeChat, typingChannel, peopleMap, authUser, type ChatMessage, type ChannelRead, type LiveMessage } from "../../src/lib/api/chat";
+import { listMessages, sendChatMessage, sendChatImage, sendChatFile, uploadChatFile, listAttachments, leaveChannel, deleteChannel, renameChannel, markChannelRead, type Attachment, setReaction, deleteMessage, editMessage, translateMessage, translateBatch, getChatTranslate, setChatTranslate, subscribeChat, typingChannel, peopleMap, authUser, type ChatMessage, type ChannelRead, type LiveMessage, quoteOf } from "../../src/lib/api/chat";
 import { supabase } from "../../src/lib/supabase";
 import { isMuted, toggleMute } from "../../src/lib/mute";
 import { reportContent, blockUser, blockedUsers } from "../../src/lib/api/moderation";
@@ -187,6 +187,15 @@ export default function Thread() {
     else { const { data: mem } = await supabase.from("channel_members").select("user_id").eq("channel_id", id); setMemberList((mem ?? []).map((m) => people.get(m.user_id)).filter(Boolean).sort((a, b) => a!.name.localeCompare(b!.name)) as Person[]); }
   }
   const list = useRef<FlatList>(null);
+  const [flashId, setFlashId] = useState<string | null>(null);
+  /** Ýtt á tilvitnun → skrolla að skilaboðunum sem var svarað og lýsa þau upp í smástund. */
+  const jumpTo = (mid: string) => {
+    const idx = rowsRef.current.findIndex((r) => r.key === mid);
+    if (idx < 0) { toast(more ? tr("Skilaboðin eru eldri — ýttu á „Sýna eldri skilaboð“") : tr("Skilaboðunum hefur verið eytt")); return; }
+    list.current?.scrollToIndex({ index: idx, viewPosition: 0.5, animated: true });
+    setFlashId(mid);
+    setTimeout(() => setFlashId((f) => (f === mid ? null : f)), 1800);
+  };
   const [viewer, setViewer] = useState<string | null>(null);
   /** Sækir myndina í skyndiminni og opnar deilingarblaðið („Vista mynd“ setur hana í Myndir). */
   // tímastimplar eru faldir hægra megin við skjáinn; strok til vinstri dregur þá inn (eins og í Messenger)
@@ -342,7 +351,7 @@ export default function Thread() {
         return [...cur, {
           id: row.id, senderId: row.sender_id, sender: full.split(/\s+/)[0] || "…", senderFull: full, color: p?.color ?? row.color ?? null, photo: p?.photo ?? row.photo ?? null,
           me: mine, body: row.body ?? "", at: new Date(row.created_at).toTimeString().slice(0, 5), createdAt: row.created_at,
-          kind: (row.kind ?? "text") as ChatMessage["kind"], url: row.attachment_url, reactions: [], replyTo: rp ? { sender: rp.sender, body: rp.body } : null,
+          kind: (row.kind ?? "text") as ChatMessage["kind"], url: row.attachment_url, reactions: [], replyTo: rp ? quoteOf(rp) : null,
         }];
       });
       setTyping(null);
@@ -407,7 +416,7 @@ export default function Thread() {
     atBottom.current = true; // að senda fer alltaf niður á nýjustu skilaboðin
     toBottom();
     // optimistic
-    const tmp: ChatMessage = { id: "tmp-" + Date.now(), senderId: "me", sender: me.fullName.split(/\s+/)[0], senderFull: me.fullName, color: me.avatarColor, photo: me.photoUrl, me: true, body, at: new Date().toTimeString().slice(0, 5), createdAt: new Date().toISOString(), kind: "text", url: null, reactions: [], replyTo: rt ? { sender: rt.sender, body: rt.body } : null };
+    const tmp: ChatMessage = { id: "tmp-" + Date.now(), senderId: "me", sender: me.fullName.split(/\s+/)[0], senderFull: me.fullName, color: me.avatarColor, photo: me.photoUrl, me: true, body, at: new Date().toTimeString().slice(0, 5), createdAt: new Date().toISOString(), kind: "text", url: null, reactions: [], replyTo: rt ? quoteOf(rt) : null };
     setMsgs((cur) => [...cur, tmp]);
     const r = await sendChatMessage(me, id, body, rt?.id ?? null, typingRef.current);
     setSending(false);
@@ -440,6 +449,8 @@ export default function Thread() {
     });
     return out.reverse(); // öfugur listi: nýjast fyrst
   }, [msgs, isGroup, unreadFrom]);
+  const rowsRef = useRef<RowItem[]>([]);
+  useEffect(() => { rowsRef.current = rows; }, [rows]);
 
   // „séð af“: aðrir sem hafa lesið eftir mín síðustu skilaboð
   const lastMine = [...msgs].reverse().find((m) => m.me);
@@ -468,6 +479,11 @@ export default function Thread() {
         data={rows}
         keyExtractor={(r) => r.key}
         inverted
+        onScrollToIndexFailed={(info) => {
+          // raðir sem hafa ekki verið mældar: skrolla nærri og reyna aftur
+          list.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+          setTimeout(() => list.current?.scrollToIndex({ index: info.index, viewPosition: 0.5, animated: true }), 120);
+        }}
         contentContainerStyle={{ padding: 14, paddingTop: 8 }}
         onScroll={(e) => { atBottom.current = e.nativeEvent.contentOffset.y < 80; }}
         scrollEventThrottle={100}
@@ -515,7 +531,7 @@ export default function Thread() {
               <View style={{ width: W - 28 }}><Bubble item={item} onLong={() => setSel(item.m)} onImage={setViewer} onReactions={() => { setWhoTab(null); setWhoFor(item.m.id); }}
                 translated={item.m.id in trans && !orig[item.m.id] ? (trans[item.m.id] ?? "…") : undefined}
                 onToggleOriginal={item.m.id in trans ? () => setOrig((cur) => ({ ...cur, [item.m.id]: !cur[item.m.id] })) : undefined}
-                showingOriginal={!!orig[item.m.id]} tagPeople={tagPeople} meUid={meUid} /></View>
+                showingOriginal={!!orig[item.m.id]} tagPeople={tagPeople} meUid={meUid} onQuote={jumpTo} flash={flashId === item.m.id} /></View>
               <View style={{ width: TIME_W + 14, alignItems: "center", paddingBottom: item.last ? 8 : 2 }}>
                 <Txt size={11} color={colors.ink3} style={{ fontVariant: ["tabular-nums"] }}>{item.m.at}</Txt>
               </View>
@@ -535,7 +551,8 @@ export default function Thread() {
       {replyTo ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 8, backgroundColor: colors.panel, borderTopWidth: 1, borderTopColor: colors.line2 }}>
           <CornerUpLeft color={colors.ink3} size={16} />
-          <View style={{ flex: 1 }}><Txt weight="bold" size={12} color={colors.brandDeep}>{trf("Svara {x}", replyTo.sender)}</Txt><Muted size={12}>{replyTo.body.slice(0, 80)}</Muted></View>
+          {isImage(replyTo) && replyTo.url ? <Image source={{ uri: replyTo.url }} style={{ width: 36, height: 36, borderRadius: 6 }} contentFit="cover" /> : null}
+          <View style={{ flex: 1 }}><Txt weight="bold" size={12} color={colors.brandDeep}>{trf("Svara {x}", replyTo.sender)}</Txt><Txt size={12} color={colors.ink3} numberOfLines={1}>{quoteText(replyTo)}</Txt></View>
           <Pressable onPress={() => setReplyTo(null)} hitSlop={8}><X color={colors.ink3} size={18} /></Pressable>
         </View>
       ) : null}
@@ -737,7 +754,10 @@ const TIME_W = 58;
 
 /** Mynd? Líka skjal með myndarendingu (eldri skilaboð og skrár úr „Skrár“ án MIME-tegundar). */
 const IMG_RE = /\.(jpe?g|png|gif|webp|heic|heif)(\?|$)/i;
-const isImage = (m: ChatMessage) => !!m.url && (m.kind === "image" || (m.kind === "file" && (IMG_RE.test(m.url) || IMG_RE.test(m.body))));
+/** Texti tilvitnunar: mynd/skjal/talskilaboð án texta fá heiti í stað tómrar línu. */
+const quoteText = (q: { body: string; kind?: string; url?: string | null }) =>
+  q.kind === "audio" ? tr("🎤 Talskilaboð") : isImage(q) ? (q.body && !IMG_RE.test(q.body) ? q.body : tr("📷 Mynd")) : q.kind === "file" ? `📄 ${q.body || tr("Skjal")}` : q.body;
+const isImage = (m: { kind?: string; url?: string | null; body: string }) => !!m.url && (m.kind === "image" || (m.kind === "file" && (IMG_RE.test(m.url) || IMG_RE.test(m.body))));
 
 /** „•••“ sem dúar, eins og í Messenger. */
 function TypingDots() {
@@ -764,10 +784,10 @@ function withTags(text: string, people: MentionPerson[], meUid: string | null | 
     : x.text));
 }
 
-function Bubble({ item, onLong, onImage, onReactions, translated, onToggleOriginal, showingOriginal, tagPeople = [], meUid }: {
+function Bubble({ item, onLong, onImage, onReactions, translated, onToggleOriginal, showingOriginal, tagPeople = [], meUid, onQuote, flash }: {
   item: Extract<RowItem, { kind: "msg" }>; onLong: () => void; onImage: (url: string) => void; onReactions: () => void;
   translated?: string; onToggleOriginal?: () => void; showingOriginal?: boolean;
-  tagPeople?: MentionPerson[]; meUid?: string | null;
+  tagPeople?: MentionPerson[]; meUid?: string | null; onQuote?: (id: string) => void; flash?: boolean;
 }) {
   const { m, first, last, showSender } = item;
   const img = isImage(m);
@@ -776,7 +796,7 @@ function Bubble({ item, onLong, onImage, onReactions, translated, onToggleOrigin
     ? { borderTopLeftRadius: r, borderBottomLeftRadius: r, borderTopRightRadius: first ? r : s, borderBottomRightRadius: last ? r : s }
     : { borderTopRightRadius: r, borderBottomRightRadius: r, borderTopLeftRadius: first ? r : s, borderBottomLeftRadius: last ? r : s };
   return (
-    <View style={{ marginBottom: last ? 8 : 2 }}>
+    <View style={{ marginBottom: last ? 8 : 2, borderRadius: 14, backgroundColor: flash ? colors.brandSoft : "transparent" }}>
       {showSender ? <Txt size={12} color={colors.ink3} style={{ marginLeft: 48, marginBottom: 3 }}>{m.senderFull}</Txt> : null}
       {/* „Breytt“ fyrir ofan kúluna, eins og í Messenger */}
       {m.edited ? <Txt size={11.5} color={colors.ink3} style={{ alignSelf: m.me ? "flex-end" : "flex-start", marginLeft: m.me ? 0 : 48, marginRight: m.me ? 6 : 0, marginTop: showSender ? 0 : 4, marginBottom: 2 }}>{tr("Breytt")}</Txt> : null}
@@ -784,10 +804,14 @@ function Bubble({ item, onLong, onImage, onReactions, translated, onToggleOrigin
         {!m.me ? <View style={{ width: 28, opacity: last ? 1 : 0 }}><Avatar name={m.senderFull} size={28} color={m.color} photo={m.photo} /></View> : null}
         <Pressable onLongPress={onLong} delayLongPress={250} style={{ backgroundColor: m.me ? colors.brand : colors.bubbleThem, paddingHorizontal: img ? 4 : 13, paddingVertical: img ? 4 : 9, ...radius, position: "relative", flexShrink: 1 }}>
           {m.replyTo ? (
-            <View style={{ borderLeftWidth: 2, borderLeftColor: m.me ? "rgba(255,255,255,.6)" : colors.brand, paddingLeft: 8, marginBottom: 6 }}>
-              <Txt size={11.5} weight="bold" color={m.me ? "rgba(255,255,255,.9)" : colors.brandDeep}>{m.replyTo.sender}</Txt>
-              <Txt size={12.5} color={m.me ? "rgba(255,255,255,.85)" : colors.ink2} numberOfLines={2}>{m.replyTo.body}</Txt>
-            </View>
+            <Pressable onPress={() => m.replyTo?.id && onQuote?.(m.replyTo.id)} onLongPress={onLong} delayLongPress={250} disabled={!m.replyTo.id} accessibilityRole="button" accessibilityLabel={trf("Svar við {x}", m.replyTo.sender)}
+              style={{ flexDirection: "row", alignItems: "center", gap: 8, borderLeftWidth: 2, borderLeftColor: m.me ? "rgba(255,255,255,.6)" : colors.brand, paddingLeft: 8, marginBottom: 6, marginTop: img ? 4 : 0, marginLeft: img ? 6 : 0 }}>
+              {isImage(m.replyTo) && m.replyTo.url ? <Image source={{ uri: m.replyTo.url }} style={{ width: 40, height: 40, borderRadius: 6 }} contentFit="cover" transition={100} /> : null}
+              <View style={{ flexShrink: 1 }}>
+                <Txt size={11.5} weight="bold" color={m.me ? "rgba(255,255,255,.9)" : colors.brandDeep}>{m.replyTo.sender}</Txt>
+                <Txt size={12.5} color={m.me ? "rgba(255,255,255,.85)" : colors.ink2} numberOfLines={2}>{quoteText(m.replyTo)}</Txt>
+              </View>
+            </Pressable>
           ) : null}
           {img && m.url ? <Pressable onPress={() => m.url && onImage(m.url)} onLongPress={onLong} delayLongPress={250}><Image source={{ uri: m.url }} style={{ width: 230, height: 230, borderRadius: 12, marginBottom: m.kind === "image" && m.body ? 6 : 0 }} contentFit="cover" transition={120} /></Pressable> : null}
           {img ? (m.kind === "image" && m.body ? <Txt size={15} color={m.me ? "#fff" : colors.ink} style={{ lineHeight: 20 }}>{m.body}</Txt> : null) : m.kind === "file" && m.url ? (
