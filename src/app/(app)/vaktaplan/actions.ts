@@ -22,6 +22,8 @@ export type ShiftInput = {
   startTime: string; // HH:MM
   endTime: string; // HH:MM
   shiftTypeName: string;
+  /** Staður vaktarinnar (0109). Vantar → sá sem vaktin hafði, annars staður starfsmanns (trigger). */
+  locationId?: string | null;
 };
 const NO_EMP = "Starfsmaður fannst ekki — eða fleiri en einn með sama nafni. Opnaðu vaktina aftur og reyndu á ný.";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -43,6 +45,12 @@ function pickType(types: { id: unknown; name: unknown }[] | null | undefined, na
   if (!n) return undefined;
   const list = (types ?? []).map((t) => ({ id: t.id as string, nm: ((t.name as string) ?? "").toLowerCase() }));
   return list.find((t) => t.nm === n)?.id ?? list.find((t) => t.nm.startsWith(n))?.id;
+}
+
+/** Staðir fyrirtækisins — staður sem kemur frá vafranum er aðeins notaður ef hann er hér. */
+async function companyLocIds(supabase: Sb, company: string): Promise<Set<string>> {
+  const { data } = await supabase.from("locations").select("id").eq("company_id", company);
+  return new Set((data ?? []).map((l) => l.id as string));
 }
 
 export type PublishResult = { ok: boolean; demo?: boolean; count?: number; skippedClosed?: number; error?: string };
@@ -83,21 +91,34 @@ export async function publishSchedule(input: ShiftInput[]): Promise<PublishResul
     }
 
     const dates = [...new Set(shifts.map((s) => s.date))];
+    // Staður hverrar vaktar helst þótt planið sé skrifað upp á nýtt (0109).
+    const prevLoc = new Map<string, string>();
+    if (dates.length) {
+      const { data: prev } = await supabase.from("shifts").select("employee_id, date, location_id")
+        .eq("company_id", company).in("date", dates).not("employee_id", "is", null).not("location_id", "is", null);
+      for (const p of prev ?? []) prevLoc.set(`${p.employee_id}|${p.date}`, p.location_id as string);
+    }
+    const okLoc = await companyLocIds(supabase, company);
     if (dates.length) {
       // Replace published plan for these dates. Lausar vaktir (án starfsmanns) eru ekki í gridinu og haldast.
       await supabase.from("shifts").delete().eq("company_id", company).in("date", dates).not("employee_id", "is", null);
     }
 
-    const rows = shifts.map((s) => ({
-      company_id: company,
-      employee_id: empId(s.employeeName) ?? null,
-      shift_type_id: typeId(s.shiftTypeName) ?? null,
-      date: s.date,
-      start_time: s.startTime,
-      end_time: s.endTime,
-      status: "published" as const,
-      published: true,
-    })).filter((r) => r.employee_id);
+    const rows = shifts.map((s) => {
+      const employee_id = empId(s.employeeName) ?? null;
+      const loc = (s.locationId && okLoc.has(s.locationId) ? s.locationId : null) ?? prevLoc.get(`${employee_id}|${s.date}`) ?? null;
+      return {
+        company_id: company,
+        employee_id,
+        shift_type_id: typeId(s.shiftTypeName) ?? null,
+        date: s.date,
+        start_time: s.startTime,
+        end_time: s.endTime,
+        status: "published" as const,
+        published: true,
+        ...(loc ? { location_id: loc } : {}),
+      };
+    }).filter((r) => r.employee_id);
 
     if (rows.length) {
       const { error } = await supabase.from("shifts").insert(rows);
@@ -163,7 +184,7 @@ function weekCodeForStart(start: string | null): string {
  * both the coarse code grid (for colour) and the real start/end times per cell. */
 /** Veltuspá + launamarkmið vikunnar og kostnaður per klst — fyrir launaáætlunina. */
 /** `depts` (valfrjálst): deildir sem vaktaplanið er síað á → spáin miðast við staði þeirra deilda. */
-export async function getWeekBudget(monISO: string, depts?: string[] | null): Promise<WeekBudget | null> {
+export async function getWeekBudget(monISO: string, depts?: string[] | null, locationIds?: string[] | null): Promise<WeekBudget | null> {
   if (!isSupabaseConfigured() || !/^\d{4}-\d{2}-\d{2}$/.test(monISO)) return null;
   try {
     const supabase = await createClient();
@@ -171,7 +192,10 @@ export async function getWeekBudget(monISO: string, depts?: string[] | null): Pr
     if ("error" in ctx) return null;
     let locIds: string[] | null = null;
     const names = (depts ?? []).map((d) => d.trim()).filter(Boolean).slice(0, 50);
-    if (names.length) {
+    const picked = (locationIds ?? []).filter((x) => UUID_RE.test(x)).slice(0, 50);
+    if (picked.length) {
+      locIds = picked; // laborWeekBudget heldur aðeins stöðum fyrirtækisins
+    } else if (names.length) {
       const { data } = await supabase.from("departments").select("location_id, locations!inner(company_id)").eq("locations.company_id", ctx.company).in("name", names);
       locIds = [...new Set((data ?? []).map((r) => r.location_id as string).filter(Boolean))];
       if (!locIds.length) locIds = null;
@@ -183,7 +207,7 @@ export async function getWeekBudget(monISO: string, depts?: string[] | null): Pr
   }
 }
 
-export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][]; times: Record<string, { start: string; end: string }>; cellTypes?: Record<string, string>; names?: string[]; inits?: string[]; ids?: string[]; unavail?: Record<string, number[]>; drafts?: string[] }> {
+export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][]; times: Record<string, { start: string; end: string }>; cellTypes?: Record<string, string>; cellLocs?: Record<string, string>; names?: string[]; inits?: string[]; ids?: string[]; unavail?: Record<string, number[]>; drafts?: string[] }> {
   if (!isSupabaseConfigured()) return { ok: false, grid: [], times: {} };
   try {
     const supabase = await createClient();
@@ -198,7 +222,7 @@ export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; gri
       return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
     });
     const { data: shifts } = await allRows((a, b) => supabase
-      .from("shifts").select("id, employee_id, date, start_time, end_time, published, shift_types(name)")
+      .from("shifts").select("id, employee_id, date, start_time, end_time, published, location_id, shift_types(name)")
       .eq("company_id", ctx.company).eq("pending_delete", false).in("date", dates).order("id").range(a, b));
 
     const idIndex = new Map(employees.map((e, i) => [e.id, i]));
@@ -206,6 +230,7 @@ export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; gri
     const times: Record<string, { start: string; end: string }> = {};
     // Vaktategund hverrar vaktar fylgir með (annars tekur gridið tegundir úr vikunni sem var opin → rangir litir).
     const cellTypes: Record<string, string> = {};
+    const cellLocs: Record<string, string> = {}; // staður hverrar vaktar (0109)
     const drafts: string[] = [];
     for (const s of shifts ?? []) {
       const r = idIndex.get(s.employee_id as string);
@@ -216,6 +241,7 @@ export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; gri
         times[`${r}:${c}`] = { start: ((s.start_time as string) ?? "").slice(0, 5), end: ((s.end_time as string) ?? "").slice(0, 5) };
         const tn = (s.shift_types as unknown as { name?: string } | null)?.name;
         if (tn) cellTypes[`${r}:${c}`] = tn;
+        if (s.location_id) cellLocs[`${r}:${c}`] = s.location_id as string;
       }
     }
     // The client's grid rows may be a SUBSET of the full roster (only staff on
@@ -224,7 +250,7 @@ export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; gri
     const inits = employees.map((e) => e.init);
     const ids = employees.map((e) => e.id);
     const unavail = await getWeekUnavail(dates);
-    return { ok: true, grid, times, cellTypes, names, inits, ids, unavail, drafts };
+    return { ok: true, grid, times, cellTypes, cellLocs, names, inits, ids, unavail, drafts };
   } catch {
     return { ok: false, grid: [], times: {} };
   }
@@ -292,8 +318,12 @@ export async function saveShift(input: Omit<ShiftInput, "date"> & { date?: strin
     // Ný eða breytt vakt er DRÖG — starfsfólk sér hana ekki fyrr en planið er gefið út.
     // Undantekning: aðeins vaktategund (litur/álag) breytt á útgefinni vakt — tímarnir eru þeir sömu.
     // Útgefna vaktin í reitnum helst hjá starfsfólki (pending_delete) þar til nýtt plan er gefið út.
-    const { data: cell } = await supabase.from("shifts").select("id, start_time, end_time, published, pending_delete")
+    const { data: cell } = await supabase.from("shifts").select("id, start_time, end_time, published, pending_delete, location_id")
       .eq("company_id", ctx.company).eq("employee_id", employee_id).eq("date", shiftDate);
+    // Staður: sá sem var valinn í planinu, annars sá sem vaktin hafði (trigger setur stað starfsmanns ef hvorugt).
+    const okLoc = await companyLocIds(supabase, ctx.company);
+    const pickedLoc = input.locationId && okLoc.has(input.locationId) ? input.locationId : null;
+    const location_id = pickedLoc ?? ((cell ?? []).find((r) => !r.pending_delete && r.location_id)?.location_id as string | undefined) ?? null;
     const sameTimes = (r: { start_time: unknown; end_time: unknown }) => hm(r.start_time) === hm(input.startTime) && hm(r.end_time) === hm(input.endTime);
     const live = (cell ?? []).filter((r) => !r.pending_delete);
     const livePub = live.find((r) => r.published);
@@ -302,17 +332,18 @@ export async function saveShift(input: Omit<ShiftInput, "date"> & { date?: strin
     let error: { message: string } | null = null;
     if (livePub && sameTimes(livePub)) {
       // Aðeins vaktategund (litur/álag) breytt — vaktin helst útgefin.
-      ({ error } = await supabase.from("shifts").update({ shift_type_id: shift_type_id ?? null }).eq("id", livePub.id as string));
+      ({ error } = await supabase.from("shifts").update({ shift_type_id: shift_type_id ?? null, ...(pickedLoc ? { location_id: pickedLoc } : {}) }).eq("id", livePub.id as string));
     } else if (!livePub && retired) {
       // Breytt aftur í útgefnu útgáfuna — engin drög, útgefna vaktin lifnar við.
       if (liveDrafts.length) await supabase.from("shifts").delete().in("id", liveDrafts);
-      ({ error } = await supabase.from("shifts").update({ pending_delete: false, shift_type_id: shift_type_id ?? null }).eq("id", retired.id as string));
+      ({ error } = await supabase.from("shifts").update({ pending_delete: false, shift_type_id: shift_type_id ?? null, ...(pickedLoc ? { location_id: pickedLoc } : {}) }).eq("id", retired.id as string));
     } else {
       if (livePub) ({ error } = await supabase.from("shifts").update({ pending_delete: true }).eq("id", livePub.id as string));
       if (!error && liveDrafts.length) ({ error } = await supabase.from("shifts").delete().in("id", liveDrafts));
       if (!error) ({ error } = await supabase.from("shifts").insert({
         company_id: ctx.company, employee_id, shift_type_id: shift_type_id ?? null, date: shiftDate,
         start_time: input.startTime, end_time: input.endTime, status: "draft", published: false,
+        ...(location_id ? { location_id } : {}),
       }));
     }
     if (error) return { ok: false, error: userError(error) };
@@ -373,7 +404,7 @@ export async function deleteShift(input: { employeeName: string; dateISO: string
   }
 }
 
-export type ExportRow = { name: string; first: string; dept: string; date: string; start: string; end: string; type?: string; employeeId?: string };
+export type ExportRow = { name: string; first: string; dept: string; date: string; start: string; end: string; type?: string; employeeId?: string; locationId?: string };
 
 /** Real shift rows (with actual times) in a date range — for PDF export. */
 export async function getShiftsInRange(fromISO: string, toISO: string): Promise<{ ok: boolean; rows: ExportRow[] }> {
@@ -386,13 +417,14 @@ export async function getShiftsInRange(fromISO: string, toISO: string): Promise<
     if (!live) return { ok: false, rows: [] };
     const meta = new Map(employees.map((e) => [e.id, { full: e.fullName, first: e.fullName.split(/\s+/)[0], dept: e.department ?? "" }]));
     const { data: shifts } = await allRows((a, b) => supabase
-      .from("shifts").select("id, employee_id, date, start_time, end_time, shift_types(name)")
+      .from("shifts").select("id, employee_id, date, start_time, end_time, location_id, shift_types(name)")
       .eq("company_id", ctx.company).eq("pending_delete", false).gte("date", fromISO).lte("date", toISO)
       .order("date").order("start_time").order("id").range(a, b));
     const rows: ExportRow[] = (shifts ?? []).map((s) => {
       const m = meta.get(s.employee_id as string);
       return {
         name: m?.full ?? "?", first: m?.first ?? "?", dept: m?.dept ?? "", employeeId: (s.employee_id as string | null) ?? undefined,
+        locationId: (s.location_id as string | null) ?? undefined,
         date: s.date as string,
         start: ((s.start_time as string) ?? "").slice(0, 5),
         end: ((s.end_time as string) ?? "").slice(0, 5),
@@ -455,7 +487,7 @@ export async function copyShifts(input: { pairs: [string, string][]; employeeIds
     const only = input.employeeIds?.length ? new Set(input.employeeIds) : null;
     const src = [...new Set(pairs.map((p) => p[0]))], dst = [...new Set(pairs.map((p) => p[1]))];
     const { data: srcRows } = await allRows((a, b) => supabase.from("shifts")
-      .select("employee_id, date, start_time, end_time, shift_type_id")
+      .select("employee_id, date, start_time, end_time, shift_type_id, location_id")
       .eq("company_id", ctx.company).eq("pending_delete", false).not("employee_id", "is", null).in("date", src).order("id").range(a, b));
     const { data: dstRows } = await allRows((a, b) => supabase.from("shifts")
       .select(SNAP_COLS).eq("company_id", ctx.company).eq("pending_delete", false).not("employee_id", "is", null).in("date", dst).order("id").range(a, b));
@@ -477,7 +509,8 @@ export async function copyShifts(input: { pairs: [string, string][]; employeeIds
         if (onLeave(eid, d)) { skippedLeave++; continue; }
         if (cl.hit(d, eid)) { skippedClosed++; continue; }
         rows.push({ company_id: ctx.company, employee_id: eid, shift_type_id: s.shift_type_id ?? null, date: d,
-          start_time: s.start_time, end_time: s.end_time, status: "draft", published: false }); // drög þar til planið er gefið út
+          start_time: s.start_time, end_time: s.end_time, status: "draft", published: false, // drög þar til planið er gefið út
+          ...(s.location_id ? { location_id: s.location_id } : {}) });
       }
     }
     if (input.overwrite) {
@@ -567,14 +600,14 @@ const shiftLabel = (date: string, start: string, end: string) => {
 };
 
 /** Stofnar lausa vakt (eða nokkrar eins) og lætur starfsfólk vita. */
-export async function createOpenShift(input: { date: string; start: string; end: string; shiftTypeName?: string; note?: string; count?: number }): Promise<DecisionResult> {
+export async function createOpenShift(input: { date: string; start: string; end: string; shiftTypeName?: string; note?: string; count?: number; locationId?: string | null }): Promise<DecisionResult> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   return createOpenShifts({ ...input, dates: [input.date] });
 }
 
 /** Lausar vaktir á einum eða fleiri dögum (sama tími) — ein færsla og EIN tilkynning til starfsfólks.
  *  Notað af „Laus vakt“ í vaktaplani og VAKTO AI (create_open_shifts). */
-export async function createOpenShifts(input: { dates: string[]; start: string; end: string; shiftTypeName?: string; note?: string; count?: number }): Promise<DecisionResult> {
+export async function createOpenShifts(input: { dates: string[]; start: string; end: string; shiftTypeName?: string; note?: string; count?: number; locationId?: string | null }): Promise<DecisionResult> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -595,9 +628,12 @@ export async function createOpenShifts(input: { dates: string[]; start: string; 
     }
     const n = Math.min(Math.max(Math.round(input.count ?? 1), 1), 10);
     const note = input.note?.trim().slice(0, 200) || null;
+    const okLoc = await companyLocIds(supabase, ctx.company);
+    const loc = input.locationId && okLoc.has(input.locationId) ? input.locationId : null;
     const rows = dates.flatMap((date) => Array.from({ length: n }, () => ({
       company_id: ctx.company, employee_id: null, shift_type_id: typeId, date,
       start_time: input.start, end_time: input.end, note, status: "published" as const, published: true,
+      ...(loc ? { location_id: loc } : {}),
     })));
     const { error } = await supabase.from("shifts").insert(rows);
     if (error) return { ok: false, error: userError(error) };
@@ -809,7 +845,7 @@ async function decideShiftSwap(id: string, approved: boolean): Promise<DecisionR
 
 /** Wipe ALL shifts for the given dates — the "Eyða öllu / byrja upp á nýtt"
  * button in the schedule. Confirmed in the UI before calling. */
-export async function deleteWeekShifts(dates: string[]): Promise<{ ok: boolean; demo?: boolean; count?: number; deleted?: ShiftSnap[]; error?: string }> {
+export async function deleteWeekShifts(dates: string[], locationIds?: string[]): Promise<{ ok: boolean; demo?: boolean; count?: number; deleted?: ShiftSnap[]; error?: string }> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   if (!dates.length) return { ok: false, error: "Engar dagsetningar" };
@@ -821,8 +857,12 @@ export async function deleteWeekShifts(dates: string[]): Promise<{ ok: boolean; 
     const company = profile?.company_id as string | undefined;
     if (!company) return { ok: false, error: "Fyrirtæki fannst ekki" };
     // Lausar vaktir (employee_id null) haldast — þær eru ekki hluti af planinu sem kemur í staðinn.
-    const { data: rows } = await supabase.from("shifts").select(SNAP_COLS)
+    let q = supabase.from("shifts").select(SNAP_COLS)
       .eq("company_id", company).eq("pending_delete", false).in("date", dates).not("employee_id", "is", null);
+    // Síað á stað (0109): aðeins vaktir valinna staða hreinsaðar.
+    const locs = (locationIds ?? []).filter((x) => UUID_RE.test(x));
+    if (locs.length) q = q.in("location_id", locs);
+    const { data: rows } = await q;
     const { snaps: gone, error } = await retireShifts(supabase, (rows ?? []) as unknown as (ShiftSnap & { id: string })[]);
     if (error) return { ok: false, error };
     await logAudit(supabase, company, user.id, {

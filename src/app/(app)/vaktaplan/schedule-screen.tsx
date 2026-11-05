@@ -115,6 +115,39 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   // A manager scoped to a single department lands on it; otherwise "all" (within scope).
   // Valdar deildir (tómt = allar innan umsjónar). Hægt að velja fleiri en eina, t.d. Eldhús + Sal.
   const [depts, setDepts] = useState<string[]>(scopeDepts.length === 1 ? [scopeDepts[0]] : []);
+  // Staðir (0109): valdir staðir (tómt = allir) og hvort aðeins fólk með vakt sést. Munað í vafranum.
+  const locTree = initial?.locTree ?? { locations: [], deptLocs: {}, empHome: {} };
+  const multiLoc = locTree.locations.length > 1;
+  const locName = useMemo(() => new Map(locTree.locations.map((l) => [l.id, l.name])), [locTree.locations]);
+  const [selLocs, setSelLocs] = useState<string[]>([]);
+  const [onlyShifts, setOnlyShifts] = useState(false);
+  const [cellLocs, setCellLocs] = useState<Record<string, string>>(initial?.cellLocs ?? {});
+  const prefsLoaded = useRef(false);
+  useEffect(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem("vakto-plan-locs") || "[]");
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- vafrageymsla er aðeins til eftir hydration
+      if (Array.isArray(v) && multiLoc) setSelLocs(v.filter((id: unknown) => typeof id === "string" && locName.has(id)));
+      setOnlyShifts(localStorage.getItem("vakto-plan-only") === "1");
+    } catch { /* án vafrageymslu */ }
+    prefsLoaded.current = true;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- aðeins við fyrstu birtingu
+  useEffect(() => {
+    if (!prefsLoaded.current) return;
+    try { localStorage.setItem("vakto-plan-locs", JSON.stringify(selLocs)); localStorage.setItem("vakto-plan-only", onlyShifts ? "1" : "0"); } catch { /* án vafrageymslu */ }
+  }, [selLocs, onlyShifts]);
+  /** Deildir á völdum stöðum (fyrir deildavalið og mánaðartöfluna). */
+  const deptsInLocs = useMemo(() => (selLocs.length
+    ? Object.entries(locTree.deptLocs).filter(([, ls]) => ls.some((l) => selLocs.includes(l))).map(([n]) => n)
+    : null), [selLocs, locTree.deptLocs]);
+  /** Velja staði — deildir utan þeirra detta úr deildavalinu. */
+  const chooseLocs = (ids: string[]) => {
+    setSelLocs(ids);
+    if (ids.length) {
+      const ok = new Set(Object.entries(locTree.deptLocs).filter(([, ls]) => ls.some((l) => ids.includes(l))).map(([n]) => n));
+      setDepts((d) => d.filter((x) => ok.has(x)));
+    }
+  };
   const [monthMode, setMonthMode] = useState<"tafla" | "dagatal">("tafla");
   const [full, setFull] = useState(false);
   type MonthShift = { emp: string; date: string; start: string; end: string };
@@ -166,15 +199,55 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const [aiStage, setAiStage] = useState<AiStage | null>(null); // framvinda á meðan AI vinnur
   const { t, lang } = useLang();
 
+  /** Staðir sem starfsmaður tilheyrir: staður aðaldeildar + staðir annarra deilda hans. */
+  const empLocs = (e: Emp): string[] => {
+    const out = new Set<string>();
+    const home = e[4] ? locTree.empHome[e[4]] : undefined;
+    if (home) out.add(home);
+    for (const d of empDepts(e)) for (const l of locTree.deptLocs[d] ?? []) out.add(l);
+    return [...out];
+  };
+  const homeLoc = (r: number): string | undefined => {
+    const e = emp[r]; if (!e) return undefined;
+    return (e[4] ? locTree.empHome[e[4]] : undefined) ?? locTree.deptLocs[e[2]]?.[0];
+  };
+  /** Staður vaktar í reit: skráður staður, annars staður starfsmannsins. */
+  const locOf = (r: number, c: number): string | undefined => cellLocs[`${r}:${c}`] ?? homeLoc(r);
+  /** Vakt á öðrum stað en þeim sem eru valdir: sést dauf og læst. */
+  const foreign = (r: number, c: number): boolean => {
+    if (!selLocs.length) return false;
+    const s = grid[r]?.[c];
+    if (!s || s === "off") return false;
+    const l = locOf(r, c);
+    return !!l && !selLocs.includes(l);
+  };
+  /** Staður fyrir NÝJA vakt í röð r: einn valinn staður → hann; annars staður starfsmanns ef hann er valinn. */
+  const pickLoc = (r: number): string | undefined => {
+    if (!selLocs.length) return undefined;
+    if (selLocs.length === 1) return selLocs[0];
+    const home = homeLoc(r);
+    if (home && selLocs.includes(home)) return home;
+    return emp[r] ? empLocs(emp[r]).find((l) => selLocs.includes(l)) ?? selLocs[0] : selLocs[0];
+  };
+  /** Gridið eins og það telst á völdum stöðum: vaktir annars staðar = frí (tímar, kostnaður, Σ). */
+  const vg = useMemo(
+    () => grid.map((row, r) => row.map((s, c) => (foreign(r, c) ? "off" : s))),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [grid, cellLocs, selLocs, emp],
+  );
   const vis = useMemo(
     () => emp.map((_, r) => r).filter((r) => {
       const ds = empDepts(emp[r]);
       // Managers only see the departments assigned to them (empty = all).
       const inScope = scopeDepts.length === 0 || ds.some((d) => scopeDepts.includes(d) || scopeDepts.includes(deptOf(d)));
       const inSel = depts.length === 0 || ds.some((d) => depts.includes(d) || depts.includes(deptOf(d)));
-      return inScope && inSel;
+      const hasShift = vg[r]?.some((s) => s && s !== "off");
+      // Staður: fólk staðarins + þeir sem eiga vakt þar þessa viku (t.d. lánaðir af öðrum stað).
+      const inLoc = selLocs.length === 0 || empLocs(emp[r]).some((l) => selLocs.includes(l)) || hasShift;
+      return inScope && inSel && inLoc && (!onlyShifts || hasShift);
     }),
-    [emp, depts, scopeDepts],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [emp, depts, scopeDepts, selLocs, onlyShifts, vg],
   );
   // Real (signed-in) companies start at 0 — BASE_HRS is only demo padding.
   const liveCompany = !!initial;
@@ -225,10 +298,10 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   // rows hidden by the department filter / scope.
   const visHrs = useMemo(() => {
     let h = 0;
-    vis.forEach((r) => grid[r]?.forEach((s, c) => { if (s && s !== "off") h += cellHrs(r, c, s); }));
+    vis.forEach((r) => vg[r]?.forEach((s, c) => { if (s && s !== "off") h += cellHrs(r, c, s); }));
     return h;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vis, grid, cellTimes]);
+  }, [vis, vg, cellTimes]);
   const totalHrs = visHrs + (liveCompany ? 0 : BASE_HRS);
   const cost = totalHrs * COST_HR;
 
@@ -283,9 +356,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
    * different order — remap by (initials, first name) so shifts never land on
    * the wrong employee. Employees with shifts who aren't on the plan yet are
    * pulled in from the pool. */
-  function applyWeek(res: { grid: string[][]; times?: Record<string, { start: string; end: string }>; cellTypes?: Record<string, string>; names?: string[]; inits?: string[]; ids?: string[]; unavail?: Record<string, number[]> }) {
+  function applyWeek(res: { grid: string[][]; times?: Record<string, { start: string; end: string }>; cellTypes?: Record<string, string>; cellLocs?: Record<string, string>; names?: string[]; inits?: string[]; ids?: string[]; unavail?: Record<string, number[]> }) {
     if (res.unavail) setUnavail(res.unavail);
-    if (!res.names || !res.inits) { setGrid(res.grid); setCellTimes(res.times ?? {}); setCellTypes(res.cellTypes ?? {}); return; }
+    if (!res.names || !res.inits) { setGrid(res.grid); setCellTimes(res.times ?? {}); setCellTypes(res.cellTypes ?? {}); setCellLocs(res.cellLocs ?? {}); return; }
     const { names, inits, ids } = res;
     // Parað eftir starfsmanns-id þegar það er til — upphafsstafir+nafn rugla saman tveimur „Jan“.
     const keyOf = (e: Emp) => (e[4] ? e[4] : `${e[0]}|${e[1]}`);
@@ -304,6 +377,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     const g: string[][] = rows.map(() => Array(7).fill("off"));
     const t2: Record<string, { start: string; end: string }> = {};
     const ty2: Record<string, string> = {};
+    const lo2: Record<string, string> = {};
     rows.forEach((e, r) => {
       const j = names.findIndex((_, jj) => srcKey(jj) === keyOf(e));
       if (j >= 0 && res.grid[j]) {
@@ -311,6 +385,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         for (let c = 0; c < 7; c++) {
           const k = `${j}:${c}`; const tt = res.times?.[k]; if (tt) t2[`${r}:${c}`] = tt;
           const tn = res.cellTypes?.[k]; if (tn) ty2[`${r}:${c}`] = tn;
+          const lo = res.cellLocs?.[k]; if (lo) lo2[`${r}:${c}`] = lo;
         }
       }
     });
@@ -321,6 +396,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     setGrid(g);
     setCellTimes(t2);
     setCellTypes(ty2);
+    setCellLocs(lo2);
   }
 
   // Live companies: load the visible week's shifts from the DB when the week
@@ -340,12 +416,18 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   /** "Eyða öllu": wipe the open week (grid + published shifts) to start fresh. */
   async function clearWeek() {
     if (!window.confirm(t("Eyða ÖLLUM vöktum þessarar viku og byrja upp á nýtt? Þetta fjarlægir líka birtar vaktir."))) return;
-    setGrid((g) => g.map((row) => row.map(() => "off")));
-    setCellTimes({});
-    setCellTypes({});
+    if (selLocs.length) {
+      // Aðeins valdir staðir hreinsaðir — vaktir annarra staða haldast.
+      setGrid((g) => g.map((row, r) => row.map((x, c) => (foreign(r, c) ? x : "off"))));
+    } else {
+      setGrid((g) => g.map((row) => row.map(() => "off")));
+      setCellTimes({});
+      setCellTypes({});
+      setCellLocs({});
+    }
     if (liveCompany) {
       const dates = weekDays.map((d) => fmtISO(d));
-      const res = await deleteWeekShifts(dates);
+      const res = await deleteWeekShifts(dates, selLocs.length ? selLocs : undefined);
       if (res.ok && res.deleted?.length) offerUndo(res.deleted, t, reloadWeek);
       else toast(res.ok ? t("Vika hreinsuð") : (res.error ?? "Villa"));
     } else {
@@ -403,7 +485,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   // Per-day hours + shift counts, computed from the actual grid.
   const dayStats = weekDays.map((dd, c) => {
     let h = 0, n = 0;
-    vis.forEach((r) => { const s = grid[r]?.[c]; if (s && s !== "off") { h += cellHrs(r, c, s); n++; } });
+    vis.forEach((r) => { const s = vg[r]?.[c]; if (s && s !== "off") { h += cellHrs(r, c, s); n++; } });
     return [c, dd.getDate(), h, n] as [number, number, number, number];
   });
   const totDayHrs = dayStats.reduce((a, d) => a + d[2], 0);
@@ -411,31 +493,31 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
 
   // KPI tölur fylgja sýninni (vika / dagur / mánuður).
   const dayHrs = useMemo(() => {
-    let h = 0; vis.forEach((r) => { const s = grid[r]?.[curCol]; if (s && s !== "off") h += cellHrs(r, curCol, s); }); return h;
+    let h = 0; vis.forEach((r) => { const s = vg[r]?.[curCol]; if (s && s !== "off") h += cellHrs(r, curCol, s); }); return h;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vis, grid, cellTimes, curCol]);
+  }, [vis, vg, cellTimes, curCol]);
   const weekShifts = useMemo(() => {
-    let n = 0; vis.forEach((r) => grid[r]?.forEach((s) => { if (s && s !== "off") n++; })); return n;
-  }, [vis, grid]);
+    let n = 0; vis.forEach((r) => vg[r]?.forEach((s) => { if (s && s !== "off") n++; })); return n;
+  }, [vis, vg]);
   const dayShiftCount = useMemo(() => {
-    let n = 0; vis.forEach((r) => { const s = grid[r]?.[curCol]; if (s && s !== "off") n++; }); return n;
-  }, [vis, grid, curCol]);
+    let n = 0; vis.forEach((r) => { const s = vg[r]?.[curCol]; if (s && s !== "off") n++; }); return n;
+  }, [vis, vg, curCol]);
   // Estimated premium (álag) + overtime hours from the planned grid.
   const est = useMemo(() => {
     let premium = 0; const rowHrs: number[] = [];
     vis.forEach((r) => {
       let rh = 0;
-      grid[r]?.forEach((s, c) => { if (s && s !== "off") { rh += cellHrs(r, c, s); premium += cellPremiumHrs(r, c, s); } });
+      vg[r]?.forEach((s, c) => { if (s && s !== "off") { rh += cellHrs(r, c, s); premium += cellPremiumHrs(r, c, s); } });
       rowHrs.push(rh);
     });
     const overtime = rowHrs.reduce((a, h) => a + Math.max(0, h - 40), 0); // weekly > 40 klst
     return { premium: Math.round(premium * 10) / 10, overtime: Math.round(overtime * 10) / 10 };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vis, grid, cellTimes]);
+  }, [vis, vg, cellTimes]);
   const dayPremium = useMemo(() => {
-    let p = 0; vis.forEach((r) => { const s = grid[r]?.[curCol]; if (s && s !== "off") p += cellPremiumHrs(r, curCol, s); }); return Math.round(p * 10) / 10;
+    let p = 0; vis.forEach((r) => { const s = vg[r]?.[curCol]; if (s && s !== "off") p += cellPremiumHrs(r, curCol, s); }); return Math.round(p * 10) / 10;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vis, grid, cellTimes, curCol]);
+  }, [vis, vg, cellTimes, curCol]);
   const estHrs = view === "Dagur" ? { premium: dayPremium, overtime: 0 }
     : view === "Mánuður" ? { premium: Math.round(est.premium * 4.33), overtime: Math.round(est.overtime * 4.33) }
       : est;
@@ -456,9 +538,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     let cancelled = false;
     // síað á deild/stað → spá og markmið fyrir þann stað (deildir eru á stöðum)
     const scope = depts.length ? depts : scopeDepts;
-    getWeekBudget(weekMonISO, scope.length ? scope : null).then((b) => { if (!cancelled) setBudget(b); }).catch(() => {});
+    getWeekBudget(weekMonISO, scope.length ? scope : null, selLocs.length && !depts.length ? selLocs : null).then((b) => { if (!cancelled) setBudget(b); }).catch(() => {});
     return () => { cancelled = true; };
-  }, [weekMonISO, liveCompany, depts.join("|"), scopeDepts.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [weekMonISO, liveCompany, depts.join("|"), scopeDepts.join("|"), selLocs.join("|")]); // eslint-disable-line react-hooks/exhaustive-deps
   // kr/klst með launatengdum gjöldum úr launareglum hvers starfsmanns (getWeekBudget); id gengur fyrir nafni.
   const rateOf = (e: Emp): number => (budget && ((e[4] ? budget.ratesById?.[e[4]] : undefined) ?? budget.rates[`${e[0]}|${e[1]}`] ?? budget.avgRate)) || COST_HR;
   // Síað plan (staður/deild): aðeins sýnilegar raðir og þeirra mánaðarlaun — sama og spáin nær yfir.
@@ -466,42 +548,45 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   const fixedWeek = useMemo(() => {
     if (!budget) return 0;
     if (!scoped || !budget.fixedById) return budget.fixed;
-    return vis.reduce((a, r) => a + ((emp[r]?.[4] && budget.fixedById[emp[r][4]!]) || 0), 0);
-  }, [budget, scoped, vis, emp]);
+    // Mánaðarlaun teljast á aðalstað starfsmanns (ekki á hvern stað sem hann vinnur á).
+    return vis.filter((r) => { const h = homeLoc(r); return !selLocs.length || !h || selLocs.includes(h); })
+      .reduce((a, r) => a + ((emp[r]?.[4] && budget.fixedById[emp[r][4]!]) || 0), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [budget, scoped, vis, emp, selLocs]);
   const planCost = useMemo(() => {
     if (!budget) return null;
     let c = fixedWeek;
     (scoped ? vis : emp.map((_, r) => r)).forEach((r) => {
       const rate = rateOf(emp[r]);
-      grid[r]?.forEach((s, col) => { if (s && s !== "off") c += cellHrs(r, col, s) * rate; });
+      vg[r]?.forEach((s, col) => { if (s && s !== "off") c += cellHrs(r, col, s) * rate; });
     });
     return Math.round(c);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budget, emp, grid, cellTimes, vis, scoped, fixedWeek]);
+  }, [budget, emp, vg, cellTimes, vis, scoped, fixedWeek]);
   /** Dag fyrir dag: veltuspá × markmið − mánaðarlaun dagsins → leyfðir tímar á meðaltaxta sýnilegra. */
   const dayPlan = useMemo(() => {
     if (!budget?.days?.length || !budget.days.some((d) => d.revenue > 0)) return null;
     const tgt = budget.target ?? 30;
-    const rs = vis.filter((r) => grid[r]?.some((s) => s && s !== "off"));
+    const rs = vis.filter((r) => vg[r]?.some((s) => s && s !== "off"));
     const pool = rs.length ? rs : vis;
     const avg = pool.length ? pool.reduce((a, r) => a + rateOf(emp[r]), 0) / pool.length : (budget.avgRate || COST_HR);
     return budget.days.map((d, c) => {
       let planned = 0;
-      vis.forEach((r) => { const s = grid[r]?.[c]; if (s && s !== "off") planned += cellHrs(r, c, s); });
+      vis.forEach((r) => { const s = vg[r]?.[c]; if (s && s !== "off") planned += cellHrs(r, c, s); });
       const allowedKr = Math.max(0, (d.revenue * tgt) / 100 - fixedWeek / 7);
       const allowedHrs = avg > 0 ? allowedKr / avg : 0;
       return { ...d, planned, allowedHrs };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budget, vis, emp, grid, cellTimes, fixedWeek]);
+  }, [budget, vis, emp, vg, cellTimes, fixedWeek]);
   // Dagur: sama útreikningur og vikan, aðeins dálkur dagsins (mánaðarlaunafólk = sjöundi hluti vikunnar).
   const dayCost = useMemo(() => {
     if (!budget) return null;
     let c = fixedWeek / 7;
-    vis.forEach((r) => { const s = grid[r]?.[curCol]; if (s && s !== "off") c += cellHrs(r, curCol, s) * rateOf(emp[r]); });
+    vis.forEach((r) => { const s = vg[r]?.[curCol]; if (s && s !== "off") c += cellHrs(r, curCol, s) * rateOf(emp[r]); });
     return Math.round(c);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [budget, vis, emp, grid, cellTimes, curCol, fixedWeek]);
+  }, [budget, vis, emp, vg, cellTimes, curCol, fixedWeek]);
   // Mánuður (lifandi fyrirtæki): raunverulegar vaktir mánaðarins — úr töflunni eða dagatalinu — í stað viku × 4,33.
   const monthList = ((): MonthShift[] | null => {
     if (!liveCompany || view !== "Mánuður") return null;
@@ -568,6 +653,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
             startTime: tt ? tt.start : `${a.padStart(2, "0")}:00`,
             endTime: tt ? tt.end : `${b.padStart(2, "0")}:00`,
             shiftTypeName: cellTypes[ckey(r, c)] || typeGuessFor(tt ? tt.start : `${a.padStart(2, "0")}:00`, tt ? tt.end : `${b.padStart(2, "0")}:00`),
+            locationId: cellLocs[ckey(r, c)] ?? null,
           });
         }
       });
@@ -683,7 +769,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     const ng = grid.map((row) => [...row]);
     const nt = { ...cellTimes };
     const nty = { ...cellTypes };
-    touched.forEach((r) => { ng[r] = ng[r].map(() => "off"); weekDays.forEach((_, c) => { delete nt[ckey(r, c)]; delete nty[ckey(r, c)]; }); });
+    // Vaktir á öðrum stöðum (síað á stað) haldast — AI-tillagan á aðeins við valda staði.
+    touched.forEach((r) => { ng[r] = ng[r].map((x, c) => (foreign(r, c) ? x : "off")); weekDays.forEach((_, c) => { if (!foreign(r, c)) { delete nt[ckey(r, c)]; delete nty[ckey(r, c)]; } }); });
+    const nlo = { ...cellLocs };
     // Dagar með samþykkt frí sem AI reyndi að manna: engin vakt þar, líka ef hún var fyrir í planinu.
     for (const b of blocked) { const r = rowOf(b.employee); if (r >= 0) { ng[r][b.day] = "off"; delete nt[ckey(r, b.day)]; } }
     let applied = 0;
@@ -693,9 +781,10 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       const start = s.start.padStart(5, "0"), end = s.end.padStart(5, "0");
       ng[r][s.day] = codeForStart(start);
       nt[ckey(r, s.day)] = { start, end };
+      const pl = pickLoc(r); if (pl) nlo[ckey(r, s.day)] = pl;
       applied++;
     }
-    setGrid(ng); setCellTimes(nt); setCellTypes(nty);
+    setGrid(ng); setCellTimes(nt); setCellTypes(nty); setCellLocs(nlo);
     // Publish from the NEW grid (state is async — build the payload directly).
     const payload: ShiftInput[] = [];
     emp.forEach((e, r) => {
@@ -709,6 +798,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
           startTime: tt ? tt.start : `${a.padStart(2, "0")}:00`,
           endTime: tt ? tt.end : `${b.padStart(2, "0")}:00`,
           shiftTypeName: nty[ckey(r, c)] || typeGuessFor(tt ? tt.start : `${a.padStart(2, "0")}:00`, tt ? tt.end : `${b.padStart(2, "0")}:00`),
+          locationId: nlo[ckey(r, c)] ?? null,
         });
       });
     });
@@ -719,7 +809,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
 
   function dropOn(tr: number, tc: number) {
     if (!drag) return;
+    if (foreign(drag.r, drag.c) || foreign(tr, tc)) { setDrag(null); toast(t("Vakt á öðrum stað — veldu þann stað til að breyta henni")); return; }
     const from = ckey(drag.r, drag.c), to = ckey(tr, tc);
+    setCellLocs((m) => { const n = { ...m }; const a = n[from], b = n[to]; if (b) n[from] = b; else delete n[from]; if (a) n[to] = a; else delete n[to]; return n; });
     setGrid((g) => {
       const ng = g.map((row) => [...row]);
       const tmp = ng[drag.r][drag.c];
@@ -732,6 +824,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     setDrag(null);
   }
   function cellClick(r: number, c: number) {
+    if (foreign(r, c)) { const l = locOf(r, c); toast(`${t("Vakt á")} ${(l && locName.get(l)) || t("öðrum stað")} — ${t("veldu þann stað til að breyta henni")}`); return; }
     if (paint?.kind === "erase") { if ((grid[r]?.[c] ?? "off") !== "off") delCell(r, c); return; }
     if (paint?.kind === "type") {
       const tt = typeTimes(paint.ty);
@@ -743,7 +836,9 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       if (clip.code !== "off" && clip.start && clip.end) {
         setCellTimes((m) => ({ ...m, [ckey(r, c)]: { start: clip.start!, end: clip.end! } }));
         setCellTypes((m) => { const n = { ...m }; if (clip.type) n[ckey(r, c)] = clip.type; else delete n[ckey(r, c)]; return n; });
-        if (liveCompany) void saveShift({ employeeName: empRef(emp[r]), date: fmtISO(weekDays[c]), startTime: clip.start, endTime: clip.end, shiftTypeName: clip.type ?? "" });
+        const pl = cellLocs[ckey(r, c)] ?? pickLoc(r);
+        if (pl) setCellLocs((m) => ({ ...m, [ckey(r, c)]: pl }));
+        if (liveCompany) void saveShift({ employeeName: empRef(emp[r]), date: fmtISO(weekDays[c]), startTime: clip.start, endTime: clip.end, shiftTypeName: clip.type ?? "", locationId: pl ?? null });
       } else if (clip.code !== "off") {
         setCellTimes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
       }
@@ -764,8 +859,10 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     const known = types.some((x) => x.nm === typeName);
     setCellTypes((m) => { const n = { ...m }; if (known) n[ckey(r, c)] = typeName; else delete n[ckey(r, c)]; return n; });
     setModal(null);
+    const pl = cellLocs[ckey(r, c)] ?? pickLoc(r);
+    if (pl) setCellLocs((m) => ({ ...m, [ckey(r, c)]: pl }));
     if (liveCompany) {
-      saveShift({ employeeName: empRef(emp[r]), date: fmtISO(weekDays[c]), startTime: start, endTime: end, shiftTypeName: typeName })
+      saveShift({ employeeName: empRef(emp[r]), date: fmtISO(weekDays[c]), startTime: start, endTime: end, shiftTypeName: typeName, locationId: pl ?? null })
         .then((res) => toast(res.ok ? "Vakt vistuð" : (res.error ?? "Villa")));
     } else toast("Vakt vistuð (demo)");
   }
@@ -785,6 +882,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     setGrid((g) => { const ng = g.map((x) => [...x]); ng[r][c] = "off"; return ng; });
     setCellTimes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
     setCellTypes((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
+    setCellLocs((m) => { const n = { ...m }; delete n[ckey(r, c)]; return n; });
     setModal(null);
     if (liveCompany) {
       deleteShift({ employeeName: empRef(emp[r]), dateISO: fmtISO(weekDays[c]) })
@@ -803,7 +901,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     // Persist: delete the employee's shifts for the visible week so they don't
     // reappear on refresh (live companies only).
     if (liveCompany) {
-      weekDays.forEach((d, c) => { if (grid[r]?.[c] && grid[r][c] !== "off") void deleteShift({ employeeName: empRef(emp[r]), dateISO: fmtISO(d) }); });
+      weekDays.forEach((d, c) => { if (grid[r]?.[c] && grid[r][c] !== "off" && !foreign(r, c)) void deleteShift({ employeeName: empRef(emp[r]), dateISO: fmtISO(d) }); });
     }
     setPool((p) => [...p, emp[r]]);
     setEmp((e) => e.filter((_, i) => i !== r));
@@ -834,7 +932,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
   function colShifts(c: number) {
     const out: { i: string; n: string; c: string; dep: string; l: string; h: number; type: string; start: number }[] = [];
     emp.forEach((e, r) => {
-      const s = grid[r]?.[c];
+      const s = vg[r]?.[c];
       if (s && s !== "off") {
         const tt = timeOf(r, c);
         out.push({ i: e[0], n: e[1], c: deptColors[e[2]] ?? e[3], dep: e[2], l: cellLabel(r, c, s), h: cellHrs(r, c, s), type: SH[s].c, start: tt ? parseInt(tt.start) : parseInt(SH[s].l) });
@@ -849,7 +947,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         .map((s) => ({ name: s.first, ref: s.ref, tn: s.tn, time: `${s.start.slice(0, 5)}–${s.end.slice(0, 5)}`, hrs: hrsBetween(s.start, s.end), type: SH[codeForStart(s.start)].c }));
     }
     const out: MonthBlock[] = [];
-    vis.forEach((r) => { const s = grid[r]?.[wd]; if (s && s !== "off") { const tt = timeOf(r, wd); out.push({ name: emp[r][1], ref: empRef(emp[r]), tn: cellTypes[ckey(r, wd)], time: tt ? `${tt.start}–${tt.end}` : SH[s].l, hrs: cellHrs(r, wd, s), type: SH[s].c }); } });
+    vis.forEach((r) => { const s = vg[r]?.[wd]; if (s && s !== "off") { const tt = timeOf(r, wd); out.push({ name: emp[r][1], ref: empRef(emp[r]), tn: cellTypes[ckey(r, wd)], time: tt ? `${tt.start}–${tt.end}` : SH[s].l, hrs: cellHrs(r, wd, s), type: SH[s].c }); } });
     return out;
   }
 
@@ -908,6 +1006,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       const okRef = new Set(vis.map((r) => emp[r][4]).filter(Boolean) as string[]);
       if (res.ok) for (const row of res.rows) {
         if ((depts.length || scopeDepts.length) && (!row.employeeId || !okRef.has(row.employeeId))) continue;
+        if (selLocs.length && row.locationId && !selLocs.includes(row.locationId)) continue; // vaktir annarra staða
         (byDate[row.date] ??= []).push({ first: row.first, full: row.name, dept: row.dept, time: `${row.start}–${row.end}`, hours: hrsBetween(row.start, row.end) });
       }
     } else {
@@ -968,14 +1067,31 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
             <button key={v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{t(v)}</button>
           ))}
         </div>
+        {multiLoc && (
+          <DeptPicker
+            values={selLocs.map((id) => locName.get(id) ?? "").filter(Boolean)}
+            onChange={(names) => chooseLocs(locTree.locations.filter((l) => names.includes(l.name)).map((l) => l.id))}
+            options={locTree.locations.map((l) => l.name)}
+            allLabel="Allir staðir"
+            unit="staðir"
+            colors={{}}
+            translate={false}
+          />
+        )}
         <DeptPicker
           values={depts}
           onChange={setDepts}
-          options={scopeDepts.length ? scopeDepts : deptList}
+          options={(scopeDepts.length ? scopeDepts : deptList).filter((d) => !deptsInLocs || deptsInLocs.includes(d))}
           allLabel={scopeDepts.length ? "Allar mínar deildir" : "Allar deildir"}
           colors={deptColors}
           translate={false}
         />
+        {view !== "Mánuður" && (
+          <button className={`ctl${onlyShifts ? " on" : ""}`} aria-pressed={onlyShifts} onClick={() => setOnlyShifts((v) => !v)}
+            title={t("Fela starfsfólk sem er ekki á vakt þessa viku")}>
+            <span className="ctl-lbl">{t("Bara með vaktir")}</span>
+          </button>
+        )}
         {view === "Mánuður" && liveCompany && (
           <div className="seg">
             <button className={monthMode === "tafla" ? "on" : ""} onClick={() => setMonthMode("tafla")}>{t("Tafla")}</button>
@@ -1119,6 +1235,18 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                       </td>
                       {grid[r].map((s, c) => {
                         const isUnav = ((e[4] ? unavail[e[4]] : undefined) ?? unavail[e[1].toLowerCase()] ?? []).includes(c);
+                        if (foreign(r, c)) {
+                          // Vakt á öðrum stað: sést (svo enginn tvíbókar) en er læst hér.
+                          const ln = locName.get(locOf(r, c) ?? "") ?? t("Annar staður");
+                          return (
+                            <td key={c} className={c === todayCol ? "tod" : ""}>
+                              <div className="shift" style={{ cursor: "not-allowed", background: "transparent", border: "1px dashed var(--line2)", color: "var(--ink2)", boxShadow: "none", opacity: 0.8 }}
+                                title={`${t("Vakt á")} ${ln} — ${t("veldu þann stað til að breyta henni")}`} onClick={() => cellClick(r, c)}>
+                                {cellLabel(r, c, s)}<small>{ln}</small>
+                              </div>
+                            </td>
+                          );
+                        }
                         return (
                         <td
                           key={c}
@@ -1163,7 +1291,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                         </td>
                         );
                       })}
-                      <td className="r rowsum">{dec1(grid[r].reduce((a, s, c) => (s && s !== "off" ? a + cellHrs(r, c, s) : a), 0))}</td>
+                      <td className="r rowsum">{dec1(vg[r].reduce((a, s, c) => (s && s !== "off" ? a + cellHrs(r, c, s) : a), 0))}</td>
                     </tr>
                   );
                 })}
@@ -1171,10 +1299,10 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
                   <td style={{ textAlign: "left" }}>{t("Klst þann dag")}</td>
                   {Array.from({ length: 7 }, (_, c) => {
                     let n = 0;
-                    vis.forEach((r) => { const s = grid[r][c]; if (s && s !== "off") n += cellHrs(r, c, s); });
+                    vis.forEach((r) => { const s = vg[r][c]; if (s && s !== "off") n += cellHrs(r, c, s); });
                     return <td key={c} className={c === todayCol ? "tod" : ""}>{dec1(n)}</td>;
                   })}
-                  <td className="r rowsum">{dec1(vis.reduce((a, r) => a + grid[r].reduce((b, s, c) => (s && s !== "off" ? b + cellHrs(r, c, s) : b), 0), 0))}</td>
+                  <td className="r rowsum">{dec1(vis.reduce((a, r) => a + vg[r].reduce((b, s, c) => (s && s !== "off" ? b + cellHrs(r, c, s) : b), 0), 0))}</td>
                 </tr>
                 {dayPlan && (<>
                   <tr className="foot fc">
@@ -1211,7 +1339,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       {view === "Dagur" && <div className="week-paint" style={{ marginTop: 16 }}><PaintTools types={types} tool={paint} setTool={(x) => { setPaint(x); if (x) setClip(null); }} onTypes={() => setModal("types")} /></div>}
       {view === "Dagur" && <DayView day={cur} col={curCol} rows={colShifts(curCol)} need={targets[curCol] ?? 0} onAdd={openNewShift}
         painting={!!paint}
-        idle={vis.filter((r) => (grid[r]?.[curCol] ?? "off") === "off").map((r) => ({ r, i: emp[r][0], n: emp[r][1], c: deptColors[emp[r][2]] ?? emp[r][3], dep: emp[r][2] }))}
+        idle={vis.filter((r) => (vg[r]?.[curCol] ?? "off") === "off").map((r) => ({ r, i: emp[r][0], n: emp[r][1], c: deptColors[emp[r][2]] ?? emp[r][3], dep: emp[r][2] }))}
         onCell={(r) => cellClick(r, curCol)}
         onBar={(x) => { const r = emp.findIndex((e) => e[1] === x.n); if (r >= 0 && paint) { cellClick(r, curCol); return true; } return false; }}
         onEdit={(x) => { const r = emp.findIndex((e) => e[1] === x.n); if (r >= 0) { setSel({ r, c: curCol }); setModal("shift"); } }}
@@ -1234,7 +1362,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
         </div>
       )}
       {view === "Mánuður" && liveCompany && monthMode === "tafla" && (
-        <MonthRoster month={cur} todayISO={todayISO} types={types} deptSel={depts} scopeDepts={scopeDepts}
+        <MonthRoster month={cur} todayISO={todayISO} types={types} deptSel={depts.length ? depts : (deptsInLocs ?? [])} scopeDepts={scopeDepts}
           onOpenDay={(d) => { setCur(d); setView("Dagur"); setFull(false); }} onTotals={setMonthTot}
           full={full} onToggleFull={() => setFull((v) => !v)} onTypes={() => setModal("types")} reloadKey={rosterKey} />
       )}
@@ -1335,7 +1463,7 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
       </div>
       )}
 
-      {liveCompany && <OpenShifts weekDays={weekDays} types={types.map((x) => ({ nm: x.nm, t: x.t }))} todayISO={todayISO} refresh={openVer} />}
+      {liveCompany && <OpenShifts weekDays={weekDays} types={types.map((x) => ({ nm: x.nm, t: x.t }))} todayISO={todayISO} refresh={openVer} locationId={selLocs.length === 1 ? selLocs[0] : null} />}
       </>}
 
       {modal === "staff" && <StaffNeedModal targets={targets} onClose={() => setModal(null)} onSave={(ts) => { setTargets(ts); setModal(null); setStaffingTargets(ts).then((r) => toast(r.ok ? "Mönnunarþörf vistuð" : (r.error ?? "Villa"))); }} />}

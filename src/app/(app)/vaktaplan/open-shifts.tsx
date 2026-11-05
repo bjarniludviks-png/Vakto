@@ -14,7 +14,7 @@ const SHORT = ["sun", "mán", "þri", "mið", "fim", "fös", "lau"];
 const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const label = (dateISO: string) => { const d = new Date(`${dateISO}T12:00:00`); return `${SHORT[d.getDay()]} ${d.getDate()}.${d.getMonth() + 1}`; };
 
-export default function OpenShifts({ weekDays, types, todayISO, refresh = 0 }: { weekDays: Date[]; types: { nm: string; t: string }[]; todayISO: string; /** Hækkar þegar beiðni losar vakt — sækja listann aftur. */ refresh?: number }) {
+export default function OpenShifts({ weekDays, types, todayISO, refresh = 0, locationId = null }: { weekDays: Date[]; types: { nm: string; t: string }[]; todayISO: string; /** Hækkar þegar beiðni losar vakt — sækja listann aftur. */ refresh?: number; /** Valinn staður í planinu (0109) — ný laus vakt fær hann. */ locationId?: string | null }) {
   const { t } = useLang();
   const from = iso(weekDays[0]), to = iso(weekDays[6]);
   const [list, setList] = useState<OpenShift[]>([]);
@@ -67,12 +67,12 @@ export default function OpenShifts({ weekDays, types, todayISO, refresh = 0 }: {
           </div>
         ))}
       </div>
-      {open && <NewOpenShift weekDays={weekDays} types={types} todayISO={todayISO} onClose={() => setOpen(false)} onDone={() => { setOpen(false); void load(); }} />}
+      {open && <NewOpenShift weekDays={weekDays} types={types} todayISO={todayISO} locationId={locationId} onClose={() => setOpen(false)} onDone={() => { setOpen(false); void load(); }} />}
     </div>
   );
 }
 
-function NewOpenShift({ weekDays, types, todayISO, onClose, onDone }: { weekDays: Date[]; types: { nm: string; t: string }[]; todayISO: string; onClose: () => void; onDone: () => void }) {
+function NewOpenShift({ weekDays, types, todayISO, locationId, onClose, onDone }: { weekDays: Date[]; types: { nm: string; t: string }[]; todayISO: string; locationId: string | null; onClose: () => void; onDone: () => void }) {
   const { t } = useLang();
   const firstFuture = Math.max(0, weekDays.findIndex((d) => iso(d) >= todayISO));
   const [day, setDay] = useState(firstFuture);
@@ -115,7 +115,7 @@ function NewOpenShift({ weekDays, types, todayISO, onClose, onDone }: { weekDays
           {past && <div style={{ color: "var(--warn)", fontSize: 12.5, marginTop: 10 }}>{t("Þessi dagur er liðinn.")}</div>}
           <div style={{ display: "flex", gap: 9, marginTop: 16 }}>
             <AsyncButton className="btn" disabled={past} onClick={async () => {
-              const r = await createOpenShift({ date: iso(weekDays[day]), start, end, shiftTypeName: type || undefined, note, count });
+              const r = await createOpenShift({ date: iso(weekDays[day]), start, end, shiftTypeName: type || undefined, note, count, locationId });
               if (r.ok) { toast(count > 1 ? `${count} ${t("lausar vaktir birtar")}` : t("Laus vakt birt")); onDone(); } else toast(r.error ?? "Villa", "error");
             }}>{t("Birta lausa vakt")}</AsyncButton>
             <button className="btn ghost" onClick={onClose}>{t("Hætta við")}</button>

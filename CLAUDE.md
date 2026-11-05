@@ -552,3 +552,18 @@
   (þöggun nær nú til push — `lib/chat-push.server.ts`; @-merking nær samt í gegn).
 - **App-ákvarðanir stjórnanda** (Mælaborð → Samþykkja/Hafna) fara um `/api/app/requests/decide` = sömu server-aðgerðir og
   vefurinn (vakt losnar, push o.s.frv.). Skírteinið sýnir raunverulegan QR (`qrcode`, clock_token) sem kiosk les.
+
+## Staðir í vaktaplani + launagreining í Innsýn (5. nóv. 2026, migration 0109 á staging; prod við release)
+- **Hver vakt veit staðinn sinn:** `shifts.location_id` er nú alltaf fyllt. Trigger `shifts_default_location` setur stað
+  starfsmanns (aðaldeild → staður hennar, annars `employees.location_id`) þegar hann vantar og hafnar stað annars fyrirtækis.
+  `saveShift`/`publishSchedule`/`createOpenShifts` taka `locationId` (staðfest gegn stöðum fyrirtækisins), annars heldur vaktin
+  fyrri stað; `copyShifts` afritar staðinn; `deleteWeekShifts(dates, locationIds?)` hreinsar aðeins valda staði.
+- **Vaktaplan:** staðaval (aðeins ef >1 staður; munað í `localStorage` `vakto-plan-locs`), deildaval innan valinna staða,
+  „Bara með vaktir“ (`vakto-plan-only`). `src/lib/locations.server.ts` `getLocTree` (staðir, deild→staðir, starfsmaður→aðalstaður)
+  kemur með `getSchedule`. Vaktir starfsmanns á öðrum stað sjást daufar og læstar (`foreign()`), `vg` = gridið án þeirra og
+  ALLAR tölur (Σ, KPI, kostnaður, svigrúm) lesa `vg`, ekki `grid`. Ný vakt fær valinn stað (`pickLoc`). Mánaðarlaun teljast á aðalstað.
+- **Innsýn → Rekstur → „Laun % af veltu“** (`innsyn/labor-explorer.tsx`, aðeins eigandi): `getLaborFacts` í `lib/labor.ts`
+  (staður × deild × starfsmaður × dagur + klukkustundafötur) — vafrinn síar/skiptir (stað, deild, starfsmanni, degi, vikudegi,
+  klukkustund), raun/áætlun, frávik frá markmiði, Excel/PDF. Velta er per stað: skráð, annars meðaltal sama vikudags síðustu
+  8 vikna (merkt áætluð). Deild/starfsmaður sýna „% af veltu“ valinna staða. Laun % eftir klukkustund bíður veltu eftir
+  klukkustund (Upsell/kassakerfi).

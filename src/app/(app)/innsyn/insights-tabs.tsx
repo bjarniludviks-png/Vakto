@@ -20,6 +20,7 @@ import { AbsenceCard } from "./absence-card";
 import { RightsCard } from "./rights-card";
 import type { EmployeeRights } from "@/lib/rights.server";
 import { SickRateCard } from "./sickrate-card";
+import { LaborExplorer } from "./labor-explorer";
 import type { SickRate } from "@/lib/sickrate";
 
 export type InnsynProps = {
@@ -52,7 +53,7 @@ export function InsightsTabs({ owner, initialTab, empty, perf, reports, absence,
         )}
       </div>
       {tab === "rekstur" && owner
-        ? <PerformanceScreen embedded empty={empty} live={perf.live} perf={perf.perf} staffing={perf.staffing} history={perf.history} insights={perf.insights} />
+        ? <>{!empty && <LaborExplorer />}<PerformanceScreen embedded empty={empty} live={perf.live} perf={perf.perf} staffing={perf.staffing} history={perf.history} insights={perf.insights} /></>
         : <><ReportsScreen embedded empty={empty} live={reports.live} rows={reports.rows} timebank={reports.timebank} /><AbsenceCard data={absence} /><RightsCard rows={rights} /><SickRateCard initial={sick} /></>}
     </div>
   );
