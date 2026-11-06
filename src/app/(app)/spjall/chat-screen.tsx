@@ -24,6 +24,7 @@ import {
 } from "./actions";
 
 import { REACTIONS } from "@/lib/reactions";
+import { HeicImg } from "@/components/heic-img";
 const EMOJIS = ["👍", "❤️", "😂", "🎉", "🙏", "🔥", "👏", "😅", "😮", "😢", "💪", "✅", "🤝", "☕", "🍕", "🚀"];
 
 type ChatInitial = { ok: boolean; items: Conversation[]; meId: string; meName?: string; companyId?: string };
@@ -91,8 +92,7 @@ function ImageViewer({ url, onClose }: { url: string; onClose: () => void }) {
         <a className="imgview-btn" href={downloadUrl(url)} download aria-label={t("Hlaða niður")} title={t("Hlaða niður")}>{I.download}</a>
         <button type="button" className="imgview-btn" aria-label={t("Loka")} autoFocus onClick={onClose}>{I.close}</button>
       </div>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={url} alt="" onClick={(e) => e.stopPropagation()} />
+      <HeicImg src={url} alt="" onClick={(e) => e.stopPropagation()} />
     </div>
   );
 }
@@ -1135,16 +1135,14 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                             onPointerDown={(e) => e.stopPropagation()}
                             onClick={(e) => { if (!q.id) return; e.stopPropagation(); void jumpTo(q.id); }}>
                             {qImg && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img className="mreply-img" src={q.url!} alt="" />
+                              <HeicImg className="mreply-img" src={q.url!} alt="" />
                             )}
                             <span className="mreply-tx"><b>{q.sender}</b><span>{qImg && (!q.body || q.body === "📷 Mynd") ? `📷 ${t("Mynd")}` : q.body}</span></span>
                           </span>
                         );
                       })()}
                       {img
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <a href={m.url!} target="_blank" rel="noreferrer" onClick={(e) => { if (pressRef.current.fired) e.preventDefault(); else openImage(e, m.url!, setViewer); }}><img src={m.url!} alt="" /></a>
+                        ? <a href={m.url!} target="_blank" rel="noreferrer" onClick={(e) => { if (pressRef.current.fired) e.preventDefault(); else openImage(e, m.url!, setViewer); }}><HeicImg src={m.url!} alt="" /></a>
                         : m.kind === "audio" && m.url ? <audio controls src={m.url} style={{ height: 36 }} />
                           : m.kind === "file" && m.url ? <a className="mfile" href={m.url} target="_blank" rel="noreferrer">{I.file}<span>{m.body || t("Skjal")}</span></a>
                             : withTags(m.id in trans && !orig[m.id] ? (trans[m.id] ?? "…") : m.body)}
@@ -1485,8 +1483,7 @@ function ConvDetails({ conv, name, subtitle, version, show, onManage, onJump, on
               {pics.length > 0 && (
                 <div className="side-grid">
                   {pics.map((m) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <a key={m.id} href={m.url} target="_blank" rel="noreferrer" onClick={(e) => openImage(e, m.url, onView)}><img src={m.url} alt="" loading="lazy" /></a>
+                    <a key={m.id} href={m.url} target="_blank" rel="noreferrer" onClick={(e) => openImage(e, m.url, onView)}><HeicImg src={m.url} alt="" loading="lazy" /></a>
                   ))}
                 </div>
               )}
