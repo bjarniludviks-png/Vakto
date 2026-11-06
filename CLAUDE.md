@@ -567,3 +567,22 @@
   klukkustund), raun/áætlun, frávik frá markmiði, Excel/PDF. Velta er per stað: skráð, annars meðaltal sama vikudags síðustu
   8 vikna (merkt áætluð). Deild/starfsmaður sýna „% af veltu“ valinna staða. Laun % eftir klukkustund bíður veltu eftir
   klukkustund (Upsell/kassakerfi).
+
+## Fleiri vaktir á dag + deild á vakt + DK-deildir + launatímabil í plani (6. nóv. 2026, migration 0110 á staging; prod við release)
+Kveikjan var Gistihúsið (Valdís, bókari): morgunmatur 7–10 og herbergisþrif 10–15 sama dag hjá sama starfsmanni.
+- **`shifts.slot`** (0 = fyrsta vakt dagsins, 1 = önnur …) og **`shifts.department_id`** (tómt = aðaldeild; trigger
+  `shifts_department_guard` hafnar deild annars fyrirtækis). `saveShift`/`deleteShift` vinna á EINU sæti (`slot`); `deleteShift`
+  án `slot` tekur allar vaktir dagsins (gamla hegðunin, t.d. „fjarlægja úr plani“). Eftir eyðingu færast síðari sæti upp um
+  eitt — númerin haldast samfelld. `deptName` í `ShiftInput`: undefined = óbreytt, "" = aðaldeild, heiti = deild (á stað vaktar).
+- **Gridið:** aðalvakt í `grid`/`cellTimes` eins og áður; aðrar vaktir í `extras["r:c"]` (`week-cells.ts` `buildWeekCells`, notað af
+  bæði `getSchedule` og `getWeekShifts`). `cellHrs` = aðalvakt + extras, svo allar samtölur telja þær; `primHrs` = aðeins aðalvakt.
+  Ef aðalvakt er eytt verður fyrsta aukavaktin aðalvakt. `buildShiftPayload`/AI-útgáfa senda extras með (publishSchedule skrifar
+  allt upp á nýtt). Vaktaformið: `SlotTabs` (vaktir dagsins sem flipar + „Önnur vakt sama dag“) og deildaval í `ShiftForm`.
+- **Mánaðartaflan fylgir launatímabili** (`payPeriodOf`, t.d. 21. okt.–20. nóv.) þegar tímabilið er mánaðarlegt og byrjar ekki
+  1.; dagatalssýnin er áfram almanaksmánuður. `MonthRoster` tekur `range` í stað `month`.
+- **DK:** `departments.dk_code` (Stillingar → Tengingar → DK → „Deildir í dk Laun“). `getExportLines` skilar `byDept`
+  (`hourBucketsByKey` — sama flokkun og `hourBuckets`, skipt eftir deild vaktarinnar sem skarast mest við stimplunina) og
+  DK-CSV fær eina línu per deild með númerið í „Deild“.
+- **Tímaskráning → „Fylla út eftir vaktaplani“** (`fillFromSchedule`): búnar, útgefnar vaktir án stimplunar verða ósamþykktar
+  stimplanir með tíma vaktarinnar — fyrir vinnustaði sem eru ekki byrjaðir að stimpla. Laun byggja á samþykktum tímum.
+- Innsýn (`getLaborFacts`) notar deild vaktarinnar bæði fyrir áætlun og raun.

@@ -43,15 +43,22 @@ export function ShiftTypeChips({ types, value, onPick }: { types: ShiftType[]; v
 }
 
 /** Vaktaform — sama í öllum sýnum. `head` = t.d. val á starfsmanni/degi (vika) eða ekkert (fast). */
-export function ShiftForm({ types, initial, isEdit, head, notice, sick, extra, onSave, onDelete, onCopy, onClose, onTypes }: {
+export function ShiftForm({ types, initial, isEdit, head, notice, sick, extra, onSave, onDelete, onCopy, onClose, onTypes, depts, mainDept, otherDepts }: {
   types: ShiftType[];
-  initial: { type: string; start: string; end: string };
+  initial: { type: string; start: string; end: string; dept?: string };
+  /** Deildir starfsmannsins (0110). Fleiri en ein → val á deild vaktarinnar. */
+  depts?: string[];
+  /** Aðaldeild starfsmanns — sjálfgefin deild vaktar. */
+  mainDept?: string;
+  /** Aðrar deildir fyrirtækisins (vakt í deild sem starfsmaðurinn er ekki skráður í, t.d. lánaður). */
+  otherDepts?: string[];
   isEdit: boolean;
   head?: React.ReactNode;
   notice?: string | null;
   sick?: { employeeId: string; name: string; dateISO: string; onDone: () => void } | null;
   extra?: React.ReactNode;
-  onSave: (start: string, end: string, type: string) => void | Promise<void>;
+  /** dept: deild vaktarinnar ("" = aðaldeild). undefined ef starfsmaður er bara í einni deild. */
+  onSave: (start: string, end: string, type: string, dept?: string) => void | Promise<void>;
   onDelete?: () => void;
   onCopy?: () => void;
   onClose: () => void;
@@ -61,6 +68,13 @@ export function ShiftForm({ types, initial, isEdit, head, notice, sick, extra, o
   const [type, setType] = useState(initial.type);
   const [start, setStart] = useState(initial.start);
   const [end, setEnd] = useState(initial.end);
+  const own = depts ?? [];
+  const others = (otherDepts ?? []).filter((d) => !own.includes(d));
+  const startDept = initial.dept || mainDept || own[0] || "";
+  const [dept, setDept] = useState(startDept);
+  // Val á deild sést ef starfsmaður er í fleiri deildum, vaktin er þegar í annarri deild, eða notandinn opnar það.
+  const [showDept, setShowDept] = useState(own.length > 1 || (!!initial.dept && initial.dept !== mainDept));
+  const multi = own.length + others.length > 1;
   function pick(ty: ShiftType) { setType(ty.nm); const tt = typeTimes(ty); if (tt) { setStart(tt[0]); setEnd(tt[1]); } }
   return (
     <>
@@ -76,10 +90,33 @@ export function ShiftForm({ types, initial, isEdit, head, notice, sick, extra, o
         {dec1(shiftHours(start, end))} {t("klst")}{end <= start ? ` · ${t("endar daginn eftir")}` : ""}
         {onTypes && <> · <a onClick={() => { onClose(); onTypes(); }} style={{ color: "var(--brand)", fontWeight: 600, cursor: "pointer" }}>{t("Búa til vaktategund")}</a></>}
       </p>
+      {multi && showDept && (
+        <div style={{ marginBottom: 10 }}>
+          <div className="sf-lbl">{t("Deild vaktarinnar")}</div>
+          <div className="sf-types" role="radiogroup" aria-label={t("Deild")}>
+            {[...own, ...(others.includes(dept) ? [dept] : [])].map((d) => (
+              <button key={d} type="button" role="radio" aria-checked={dept === d} className={`mr-tool${dept === d ? " on" : ""}`} onClick={() => setDept(d)}>
+                {d}{d === mainDept ? <small>{t("aðal")}</small> : null}
+              </button>
+            ))}
+            {others.length > 0 && (
+              <select className="mr-tool" value="" onChange={(e) => e.target.value && setDept(e.target.value)} aria-label={t("Önnur deild")} style={{ minHeight: 34 }}>
+                <option value="">{t("Önnur deild…")}</option>
+                {others.filter((d) => d !== dept).map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            )}
+          </div>
+        </div>
+      )}
+      {multi && !showDept && (
+        <p className="muted" style={{ fontSize: 11.5, margin: "-6px 0 10px" }}>
+          {t("Deild")}: {dept || t("aðaldeild")} · <a onClick={() => setShowDept(true)} style={{ color: "var(--brand)", fontWeight: 600, cursor: "pointer" }}>{t("Breyta deild")}</a>
+        </p>
+      )}
       {extra}
       {isEdit && sick && <SickOnShift employeeId={sick.employeeId} name={sick.name} dateISO={sick.dateISO} onDone={sick.onDone} />}
       <div className="sf-actions">
-        <button className="btn" type="button" onClick={() => { if (start === end) { toast(t("Upphaf og lok mega ekki vera eins")); return; } void onSave(start, end, type); }}>{t("Vista")}</button>
+        <button className="btn" type="button" onClick={() => { if (start === end) { toast(t("Upphaf og lok mega ekki vera eins")); return; } void onSave(start, end, type, multi ? (dept === mainDept ? "" : dept) : undefined); }}>{t("Vista")}</button>
         {isEdit && onCopy && <button className="btn ghost" type="button" onClick={onCopy}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="8" y="8" width="12" height="12" rx="2" /><path d="M4 16V5a1 1 0 0 1 1-1h11" /></svg>{t("Afrita")}
         </button>}
@@ -144,4 +181,26 @@ export function defaultsFor(types: ShiftType[]): { type: string; start: string; 
   const first = types.find((x) => typeTimes(x));
   const tt = typeTimes(first) ?? ["08:00", "16:00"];
   return { type: first?.nm ?? types[0]?.nm ?? "", start: tt[0], end: tt[1] };
+}
+
+/** Vaktir dagsins hjá starfsmanni sem flipar (0110: fleiri en ein vakt á dag): „07–10 · 10–15 · + Önnur vakt“. */
+export function SlotTabs({ items, current, onPick, onAdd }: {
+  items: { slot: number; start: string; end: string; dept?: string | null }[]; current: number;
+  onPick: (slot: number) => void; onAdd?: () => void;
+}) {
+  const { t } = useLang();
+  if (items.length === 0) return null;
+  const isNew = !items.some((x) => x.slot === current);
+  return (
+    <div className="sf-slots" role="tablist" aria-label={t("Vaktir dagsins")}>
+      {items.map((x) => (
+        <button key={x.slot} type="button" role="tab" aria-selected={x.slot === current} className={`sf-slot${x.slot === current ? " on" : ""}`} onClick={() => onPick(x.slot)}>
+          {x.start}–{x.end}{x.dept ? <small>{x.dept}</small> : null}
+        </button>
+      ))}
+      {isNew
+        ? <button type="button" role="tab" aria-selected className="sf-slot on">{t("Ný vakt")}</button>
+        : onAdd && items.length < 4 && <button type="button" className="sf-slot add" onClick={onAdd}>+ {t("Önnur vakt sama dag")}</button>}
+    </div>
+  );
 }

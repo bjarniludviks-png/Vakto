@@ -8,6 +8,7 @@ import { logAudit } from "@/lib/audit";
 import { getWeekAttendance, type AttRow } from "@/lib/analytics.server";
 import { userError } from "@/lib/user-error";
 import { allRows, allRowsIn } from "@/lib/supabase/all-rows";
+import { hasPerm } from "@/lib/access.server";
 
 export type ApproveResult = { ok: boolean; demo?: boolean; count?: number; error?: string };
 
@@ -698,5 +699,59 @@ export async function getTimesheetIssues(fromISO: string, toISO: string): Promis
     return { ok: true, issues };
   } catch (e) {
     return { ok: false, issues: [], error: userError(e, "Villa") };
+  }
+}
+
+/** „Fylla út eftir vaktaplani“: útgefnar vaktir á tímabilinu sem enginn stimplaði á verða tímar (stimplanir)
+ * með tíma vaktarinnar, ÓSAMÞYKKTAR. Fyrir vinnustaði sem eru ekki byrjaðir að stimpla (eða gleymdist): stjórnandi
+ * fer yfir, leiðréttir og samþykkir — þá skila tímarnir sér í launakeyrslu, vinnuyfirlit og DK.
+ * Aðeins vaktir sem eru búnar, og aðeins þar sem engin stimplun skarast við vaktina. */
+export async function fillFromSchedule(fromISO: string, toISO: string): Promise<ApproveResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  if (!isSupabaseConfigured()) return { ok: true, demo: true, count: 0 };
+  if (!ISO_DAY.test(fromISO) || !ISO_DAY.test(toISO) || fromISO > toISO) return { ok: false, error: "Ógilt tímabil" };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyOf(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    if (!(await hasPerm("timaskraning", supabase))) return { ok: false, error: "Þú hefur ekki aðgang að tímaskráningu" };
+    const dayAfter = (d: string) => { const x = new Date(`${d}T12:00:00Z`); x.setUTCDate(x.getUTCDate() + 1); return x.toISOString().slice(0, 10); };
+    const [shiftsRes, punchesRes] = await Promise.all([
+      allRows<{ id: string; employee_id: string; date: string; start_time: string; end_time: string }>((a, b) => supabase.from("shifts")
+        .select("id, employee_id, date, start_time, end_time").eq("company_id", ctx.company).eq("published", true).eq("pending_delete", false)
+        .not("employee_id", "is", null).gte("date", fromISO).lte("date", toISO).order("id").range(a, b)),
+      allRows<{ employee_id: string; clock_in: string; clock_out: string | null }>((a, b) => supabase.from("punches")
+        .select("employee_id, clock_in, clock_out").eq("company_id", ctx.company)
+        .gte("clock_in", `${fromISO}T00:00:00`).lte("clock_in", `${dayAfter(toISO)}T23:59:59`).order("id").range(a, b)),
+    ]);
+    if (shiftsRes.error) return { ok: false, error: userError(shiftsRes.error) };
+    const nowMs = Date.now();
+    const byEmp = new Map<string, { a: number; b: number }[]>();
+    for (const p of punchesRes.data ?? []) {
+      const a = Date.parse(p.clock_in), b = p.clock_out ? Date.parse(p.clock_out) : nowMs;
+      (byEmp.get(p.employee_id) ?? byEmp.set(p.employee_id, []).get(p.employee_id)!).push({ a, b });
+    }
+    const rows: Record<string, unknown>[] = [];
+    for (const s of shiftsRes.data ?? []) {
+      const st = String(s.start_time ?? "").slice(0, 5), en = String(s.end_time ?? "").slice(0, 5);
+      if (!st || !en) continue;
+      const endDate = minsOf(en) <= minsOf(st) ? dayAfter(s.date) : s.date;
+      const a = Date.parse(`${s.date}T${st}:00Z`), b = Date.parse(`${endDate}T${en}:00Z`); // Ísland = UTC
+      if (!(b < nowMs)) continue; // vaktin er ekki búin
+      if ((byEmp.get(s.employee_id) ?? []).some((p) => Math.min(p.b, b) - Math.max(p.a, a) > 0)) continue; // stimplað
+      rows.push({ company_id: ctx.company, employee_id: s.employee_id, shift_id: s.id, clock_in: new Date(a).toISOString(), clock_out: new Date(b).toISOString(), source: "web", approved: false });
+      (byEmp.get(s.employee_id) ?? byEmp.set(s.employee_id, []).get(s.employee_id)!).push({ a, b });
+    }
+    for (let i = 0; i < rows.length; i += 500) {
+      const { error } = await supabase.from("punches").insert(rows.slice(i, i + 500));
+      if (error) return { ok: false, error: userError(error) };
+    }
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "punch.fill_from_schedule", entity: "punches", detail: `Tímar fylltir út eftir vaktaplani — ${rows.length} vaktir (${fromISO}…${toISO})`,
+    });
+    revalidatePath("/timaskraning"); revalidatePath("/launakeyrslur");
+    return { ok: true, count: rows.length };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
   }
 }

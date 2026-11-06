@@ -500,7 +500,7 @@ export async function getLaborFacts(supabase: Db, companyId: string, fromISO: st
     supabase.from("employees").select("id, end_date").eq("company_id", companyId),
     supabase.from("locations").select("id, name").eq("company_id", companyId).order("name"),
     supabase.from("departments").select("name, location_id, locations!inner(company_id)").eq("locations.company_id", companyId),
-    allRows((a, b) => supabase.from("shifts").select("id, employee_id, date, start_time, end_time, location_id")
+    allRows((a, b) => supabase.from("shifts").select("id, employee_id, date, start_time, end_time, location_id, departments(name)")
       .eq("company_id", companyId).eq("pending_delete", false).not("employee_id", "is", null).gte("date", fromISO).lte("date", to).order("id").range(a, b)),
     allRows((a, b) => supabase.from("punches").select("id, employee_id, shift_id, clock_in, clock_out")
       .eq("company_id", companyId).gte("clock_in", fromISO).lte("clock_in", to + "T23:59:59").order("id").range(a, b)),
@@ -553,21 +553,22 @@ export async function getLaborFacts(supabase: Db, companyId: string, fromISO: st
   };
 
   const facts = new Map<string, LaborFact>();
-  const add = (date: string, loc: string, e: E, k: "plannedH" | "actualH", h: number) => {
-    const dept = deptAt(e, loc);
+  // dept: deild vaktarinnar (0110) ef hún er skráð, annars deild starfsmanns á staðnum.
+  const add = (date: string, loc: string, e: E, k: "plannedH" | "actualH", h: number, dep?: string) => {
+    const dept = dep || deptAt(e, loc);
     const key = `${date}|${loc}|${dept}|${e.id}`;
     const f = facts.get(key) ?? facts.set(key, { date, loc, dept, emp: e.id, plannedH: 0, actualH: 0, plannedCost: 0, actualCost: 0 }).get(key)!;
     f[k] += h;
     if (e.payType !== "monthly") { if (k === "plannedH") f.plannedCost += h * e.eff; else f.actualCost += h * e.eff; }
   };
   const hourly = new Map<string, LaborHourFact>();
-  const addHours = (date: string, startHHMM: string, h: number, loc: string, e: E, k: "plannedH" | "actualH") => {
+  const addHours = (date: string, startHHMM: string, h: number, loc: string, e: E, k: "plannedH" | "actualH", dep?: string) => {
     if (e.payType === "monthly" || h <= 0) return;
     const [sh, sm] = startHHMM.split(":").map(Number);
     let x = sh + (sm || 0) / 60;
     const end = x + h;
     const dow = new Date(date + "T12:00:00").getDay();
-    const dept = deptAt(e, loc);
+    const dept = dep || deptAt(e, loc);
     while (x < end - 1e-6) {
       const next = Math.min(end, Math.floor(x) + 1);
       const part = next - x, hour = Math.floor(x) % 24;
@@ -581,15 +582,24 @@ export async function getLaborFacts(supabase: Db, companyId: string, fromISO: st
 
   const shiftLoc = new Map<string, string>(); // shift id → staður
   const dayLoc = new Map<string, string>();   // starfsmaður|dagur → staður fyrstu vaktar
+  // Vaktir dagsins per starfsmann (0110: fleiri en ein) — stimplun fær stað og deild þeirrar sem skarast mest.
+  const dayShifts = new Map<string, { a: number; b: number; loc: string; dept: string }[]>();
   for (const s of shiftRes.data ?? []) {
     const e = emps.get(s.employee_id as string); if (!e) continue;
     const date = String(s.date).slice(0, 10);
     const loc = (s.location_id as string | null) ?? e.home;
+    const dep = ((Array.isArray(s.departments) ? s.departments[0] : s.departments) as { name?: string } | null)?.name ?? "";
     shiftLoc.set(s.id as string, loc);
     if (!dayLoc.has(`${e.id}|${date}`)) dayLoc.set(`${e.id}|${date}`, loc);
     const h = shiftHours(s.start_time as string, s.end_time as string);
-    add(date, loc, e, "plannedH", h);
-    addHours(date, String(s.start_time ?? "00:00").slice(0, 5), h, loc, e, "plannedH");
+    add(date, loc, e, "plannedH", h, dep);
+    addHours(date, String(s.start_time ?? "00:00").slice(0, 5), h, loc, e, "plannedH", dep);
+    const st = String(s.start_time ?? "").slice(0, 5);
+    if (st) {
+      const a = new Date(`${date}T${st}:00`).getTime();
+      const k = `${e.id}|${date}`;
+      (dayShifts.get(k) ?? dayShifts.set(k, []).get(k)!).push({ a, b: a + h * 3600000, loc, dept: dep });
+    }
   }
   for (const p of punchRes.data ?? []) {
     if (!p.clock_out) continue;
@@ -599,9 +609,14 @@ export async function getLaborFacts(supabase: Db, companyId: string, fromISO: st
     if (h <= 0) continue;
     const date = isoOf(ci);
     if (date < fromISO || date > to) continue;
-    const loc = (p.shift_id ? shiftLoc.get(p.shift_id as string) : undefined) ?? dayLoc.get(`${e.id}|${date}`) ?? e.home;
-    add(date, loc, e, "actualH", h);
-    addHours(date, `${String(ci.getHours()).padStart(2, "0")}:${String(ci.getMinutes()).padStart(2, "0")}`, h, loc, e, "actualH");
+    let best: { ov: number; loc: string; dept: string } | null = null;
+    for (const x of dayShifts.get(`${e.id}|${date}`) ?? []) {
+      const ov = Math.min(co.getTime(), x.b) - Math.max(ci.getTime(), x.a);
+      if (ov > 0 && (!best || ov > best.ov)) best = { ov, loc: x.loc, dept: x.dept };
+    }
+    const loc = (p.shift_id ? shiftLoc.get(p.shift_id as string) : undefined) ?? best?.loc ?? dayLoc.get(`${e.id}|${date}`) ?? e.home;
+    add(date, loc, e, "actualH", h, best?.dept);
+    addHours(date, `${String(ci.getHours()).padStart(2, "0")}:${String(ci.getMinutes()).padStart(2, "0")}`, h, loc, e, "actualH", best?.dept);
   }
   // Mánaðarlaun: dagleg hlutdeild á aðalstað/aðaldeild (áætlun = raun).
   for (const e of emps.values()) {

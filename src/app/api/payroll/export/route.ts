@@ -73,15 +73,36 @@ export async function GET(request: Request) {
     for (const p of alagPcts) add(codes.alag?.[String(p)]);
     const num = (n: number) => (Math.round(n * 100) / 100).toString().replace(".", ",");
     const missing = new Set<number>();
-    // Fastlaunafólk er ekki með: DK greiðir mánaðarlaunin sjálft og tímar á dagvinnulið myndu tvígreiða.
-    const dkRows = lines.filter((l) => !got.monthly.has(l.employeeId)).map((l) => {
-      const h = hours.get(l.employeeId) ?? { dagvinna: l.hours, yfirvinna: 0, alag: {} };
+    // Deildarnúmer í dk Laun (0110, Stillingar → Tengingar → DK). Tímar hvers starfsmanns skiptast á deildir eftir
+    // deild vaktanna (morgunmatur / þrif …) — ein lína per deild. Deild án númers → tómur dálkur (DK notar deild starfsmanns).
+    const { data: deps } = me?.company_id
+      ? await supabase.from("departments").select("id, dk_code, locations!inner(company_id)").eq("locations.company_id", me.company_id)
+      : { data: null };
+    const dkDept = new Map((deps ?? []).map((d) => [d.id as string, ((d.dk_code as string | null) ?? "").trim()]));
+    type HB = { dagvinna: number; yfirvinna: number; alag: Record<number, number> };
+    const rowOf = (l: (typeof lines)[number], h: HB, deild: string) => {
       const v = new Map<string, number>();
       const put = (c: string | undefined, n: number) => { if (c && n) v.set(c, (v.get(c) ?? 0) + n); };
       put(codes.dagvinna, h.dagvinna); put(codes.yfirvinna || codes.dagvinna, h.yfirvinna);
       for (const [p, n] of Object.entries(h.alag)) { const c = codes.alag?.[String(Number(p))]; if (c) put(c, n); else if (n) missing.add(Number(p)); }
-      return { name: l.name, row: [(kt[l.employeeId] ?? "").replace(/\D/g, ""), "", l.name, ...cols.map((c) => (v.get(c) ? num(v.get(c)!) : ""))] };
-    }).filter((r) => r.row.slice(3).some(Boolean)).sort((a, b) => a.name.localeCompare(b.name, "is")).map((r) => r.row);
+      return { name: l.name, deild, row: [(kt[l.employeeId] ?? "").replace(/\D/g, ""), deild, l.name, ...cols.map((c) => (v.get(c) ? num(v.get(c)!) : ""))] };
+    };
+    // Fastlaunafólk er ekki með: DK greiðir mánaðarlaunin sjálft og tímar á dagvinnulið myndu tvígreiða.
+    const dkRows = lines.filter((l) => !got.monthly.has(l.employeeId)).flatMap((l) => {
+      const split = got.byDept?.get(l.employeeId);
+      if (split && split.size) {
+        // Deildir með sama DK-númer (eða ekkert) sameinast í eina línu.
+        const merged = new Map<string, HB>();
+        for (const [deptId, h] of split) {
+          const k = dkDept.get(deptId) ?? "";
+          const m = merged.get(k) ?? merged.set(k, { dagvinna: 0, yfirvinna: 0, alag: {} }).get(k)!;
+          m.dagvinna += h.dagvinna; m.yfirvinna += h.yfirvinna;
+          for (const [p, n] of Object.entries(h.alag)) m.alag[Number(p)] = (m.alag[Number(p)] ?? 0) + n;
+        }
+        return [...merged].map(([deild, h]) => rowOf(l, h, deild));
+      }
+      return [rowOf(l, hours.get(l.employeeId) ?? { dagvinna: l.hours, yfirvinna: 0, alag: {} }, "")];
+    }).filter((r) => r.row.slice(3).some(Boolean)).sort((a, b) => a.name.localeCompare(b.name, "is") || a.deild.localeCompare(b.deild)).map((r) => r.row);
     if (missing.size) console.warn("[dk export] álag án launaliðar:", [...missing]);
     const body = "\uFEFF" + [["Kennitala", "Deild", "Nafn", ...cols], ...dkRows].map((r) => r.map(csvCell).join(";")).join("\r\n") + "\r\n";
     const stamp = from && to ? `${from}_${to}` : "timabil";

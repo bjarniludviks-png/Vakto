@@ -17,7 +17,7 @@ import { PunchDateTimeFields } from "./[id]/timesheet-screen";
 import { dec1, krCompact } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
 import type { OnNowRow, RosterRow } from "./attendance.server";
-import { approveAllTimesheets, approveTimesheet, setClockOut, fetchAttendance, managerClockIn, adjustPunch, getEmployeePunches, setPunchApproved, approveEmployeePunches, decideCorrection, type PunchRow, type CorrectionRow } from "./actions";
+import { fillFromSchedule, approveAllTimesheets, approveTimesheet, setClockOut, fetchAttendance, managerClockIn, adjustPunch, getEmployeePunches, setPunchApproved, approveEmployeePunches, decideCorrection, type PunchRow, type CorrectionRow } from "./actions";
 import { Av } from "@/components/app/avatar";
 
 const MONTHS_IS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ágú.", "sep.", "okt.", "nóv.", "des."];
@@ -285,6 +285,12 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
         <div className="db2-period">
           <Link className="btn ghost sm" href="/timaskraning/vinnuyfirlit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M9 14l2 2 4-4" /></svg>{t("Vinnuyfirlit")}</Link>
           <button className="btn ghost sm" onClick={() => setClockInOpen(true)}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg>{t("Stimpla inn starfsmann")}</button>
+          <AsyncButton className="btn ghost sm" title={t("Vaktir sem enginn stimplaði á verða tímar með tíma vaktarinnar — ósamþykktir, svo þú farir yfir þá áður en þeir fara í laun.")} onClick={async () => {
+            if (!window.confirm(`${t("Fylla út tíma eftir vaktaplani")} (${from} – ${to})?\n\n${t("Útgefnar vaktir sem eru búnar og enginn stimplaði á verða tímar með tíma vaktarinnar. Þeir eru ósamþykktir þar til þú samþykkir þá.")}`)) return;
+            const res = await fillFromSchedule(from, to);
+            toast(res.ok ? (res.count ? `${res.count} ${t("vaktir skráðar sem tímar — farðu yfir og samþykktu")}` : t("Engar vaktir án stimplunar á tímabilinu")) : (res.error ?? "Villa"));
+            if (res.ok && res.count) router.refresh();
+          }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="4.5" width="18" height="16" rx="2" /><path d="M3 9.5h18M8 14l2.5 2.5L16 12" /></svg>{t("Fylla út eftir vaktaplani")}</AsyncButton>
           <button className="btn ghost sm" onClick={downloadCsv}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14" /></svg>{t("Sækja CSV")}</button>
         </div>
       </div>

@@ -15,6 +15,7 @@ import { userError } from "@/lib/user-error";
 import { allRows } from "@/lib/supabase/all-rows";
 import { normalizeRules, MAX_RULES, MAX_RULE_LEN, type PlanningRule } from "@/lib/planning-rules";
 import { closedOn, closedText, type ClosedDay } from "@/lib/closed-days";
+import { buildWeekCells, type ExtraShift } from "./week-cells";
 
 export type ShiftInput = {
   employeeName: string; // starfsmanns-id (helst) eða nafn eins og það birtist í planinu
@@ -24,6 +25,10 @@ export type ShiftInput = {
   shiftTypeName: string;
   /** Staður vaktarinnar (0109). Vantar → sá sem vaktin hafði, annars staður starfsmanns (trigger). */
   locationId?: string | null;
+  /** Númer vaktar innan dagsins hjá starfsmanni (0110): 0 = fyrsta vakt, 1 = önnur … */
+  slot?: number;
+  /** Deild vaktarinnar (heiti, 0110). undefined = óbreytt, null/"" = aðaldeild starfsmanns. */
+  deptName?: string | null;
 };
 const NO_EMP = "Starfsmaður fannst ekki — eða fleiri en einn með sama nafni. Opnaðu vaktina aftur og reyndu á ný.";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -52,6 +57,20 @@ async function companyLocIds(supabase: Sb, company: string): Promise<Set<string>
   const { data } = await supabase.from("locations").select("id").eq("company_id", company);
   return new Set((data ?? []).map((l) => l.id as string));
 }
+
+/** Deildir fyrirtækisins: heiti + staður → id. Sama heiti getur verið á fleiri stöðum (Eldhús á tveimur
+ * stöðum) — þá ræður staður vaktarinnar, annars fyrsta deildin með heitinu. */
+async function deptResolver(supabase: Sb, company: string): Promise<(name: string | null | undefined, locId?: string | null) => string | null> {
+  const { data } = await supabase.from("departments").select("id, name, location_id, locations!inner(company_id)").eq("locations.company_id", company);
+  const list = (data ?? []).map((d) => ({ id: d.id as string, nm: ((d.name as string) ?? "").trim().toLowerCase(), loc: d.location_id as string }));
+  return (name, locId) => {
+    const n = (name ?? "").trim().toLowerCase();
+    if (!n) return null;
+    const hits = list.filter((d) => d.nm === n);
+    return (hits.find((d) => d.loc === locId) ?? hits[0])?.id ?? null;
+  };
+}
+const slotOf = (n: unknown) => Math.min(5, Math.max(0, Math.round(Number(n)) || 0));
 
 export type PublishResult = { ok: boolean; demo?: boolean; count?: number; skippedClosed?: number; error?: string };
 
@@ -94,11 +113,12 @@ export async function publishSchedule(input: ShiftInput[]): Promise<PublishResul
     // Staður hverrar vaktar helst þótt planið sé skrifað upp á nýtt (0109).
     const prevLoc = new Map<string, string>();
     if (dates.length) {
-      const { data: prev } = await supabase.from("shifts").select("employee_id, date, location_id")
+      const { data: prev } = await supabase.from("shifts").select("employee_id, date, slot, location_id")
         .eq("company_id", company).in("date", dates).not("employee_id", "is", null).not("location_id", "is", null);
-      for (const p of prev ?? []) prevLoc.set(`${p.employee_id}|${p.date}`, p.location_id as string);
+      for (const p of prev ?? []) prevLoc.set(`${p.employee_id}|${p.date}|${p.slot ?? 0}`, p.location_id as string);
     }
     const okLoc = await companyLocIds(supabase, company);
+    const deptId = await deptResolver(supabase, company);
     if (dates.length) {
       // Replace published plan for these dates. Lausar vaktir (án starfsmanns) eru ekki í gridinu og haldast.
       await supabase.from("shifts").delete().eq("company_id", company).in("date", dates).not("employee_id", "is", null);
@@ -106,10 +126,14 @@ export async function publishSchedule(input: ShiftInput[]): Promise<PublishResul
 
     const rows = shifts.map((s) => {
       const employee_id = empId(s.employeeName) ?? null;
-      const loc = (s.locationId && okLoc.has(s.locationId) ? s.locationId : null) ?? prevLoc.get(`${employee_id}|${s.date}`) ?? null;
+      const slot = slotOf(s.slot);
+      const loc = (s.locationId && okLoc.has(s.locationId) ? s.locationId : null) ?? prevLoc.get(`${employee_id}|${s.date}|${slot}`) ?? null;
+      const department_id = deptId(s.deptName, loc);
       return {
         company_id: company,
         employee_id,
+        slot,
+        ...(department_id ? { department_id } : {}),
         shift_type_id: typeId(s.shiftTypeName) ?? null,
         date: s.date,
         start_time: s.startTime,
@@ -148,10 +172,11 @@ export type DecisionResult = { ok: boolean; demo?: boolean; error?: string };
 export type ShiftSnap = {
   id?: string; employee_id: string | null; date: string; start_time: string | null; end_time: string | null;
   shift_type_id: string | null; status: string; published: boolean; note: string | null; location_id: string | null;
+  slot?: number | null; department_id?: string | null;
   /** Útgefin vakt sem var aðeins merkt til eyðingar — „Afturkalla“ tekur merkið af í stað þess að setja inn. */
   pending?: boolean;
 };
-const SNAP_COLS = "id, employee_id, date, start_time, end_time, shift_type_id, status, published, note, location_id";
+const SNAP_COLS = "id, employee_id, date, start_time, end_time, shift_type_id, status, published, note, location_id, slot, department_id";
 
 type Sb = Awaited<ReturnType<typeof createClient>>;
 /** Taka vaktir úr vinnuplaninu. Drögum er eytt strax; ÚTGEFNAR vaktir fá pending_delete og starfsfólk
@@ -170,14 +195,6 @@ async function retireShifts(supabase: Sb, rows: (ShiftSnap & { id: string })[]):
   return { snaps: rows.map((r) => (r.published ? { ...r, pending: true } : r)) };
 }
 
-function weekCodeForStart(start: string | null): string {
-  const h = parseInt((start ?? "").slice(0, 2), 10);
-  if (h === 7) return "M";
-  if (h === 11) return "Mi";
-  if (h === 14) return "E";
-  if (h === 16) return "L";
-  return "D";
-}
 
 /** Load the grid (employee × 7 days) for a specific week, aligned to the
  * full_name-ordered employee list (same order the screen renders). Returns
@@ -207,7 +224,7 @@ export async function getWeekBudget(monISO: string, depts?: string[] | null, loc
   }
 }
 
-export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][]; times: Record<string, { start: string; end: string }>; cellTypes?: Record<string, string>; cellLocs?: Record<string, string>; names?: string[]; inits?: string[]; ids?: string[]; unavail?: Record<string, number[]>; drafts?: string[] }> {
+export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; grid: string[][]; times: Record<string, { start: string; end: string }>; cellTypes?: Record<string, string>; cellLocs?: Record<string, string>; cellDepts?: Record<string, string>; extras?: Record<string, ExtraShift[]>; names?: string[]; inits?: string[]; ids?: string[]; unavail?: Record<string, number[]>; drafts?: string[] }> {
   if (!isSupabaseConfigured()) return { ok: false, grid: [], times: {} };
   try {
     const supabase = await createClient();
@@ -222,35 +239,19 @@ export async function getWeekShifts(fromISO: string): Promise<{ ok: boolean; gri
       return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
     });
     const { data: shifts } = await allRows((a, b) => supabase
-      .from("shifts").select("id, employee_id, date, start_time, end_time, published, location_id, shift_types(name)")
+      .from("shifts").select("id, employee_id, date, start_time, end_time, published, location_id, slot, shift_types(name), departments(name)")
       .eq("company_id", ctx.company).eq("pending_delete", false).in("date", dates).order("id").range(a, b));
 
     const idIndex = new Map(employees.map((e, i) => [e.id, i]));
-    const grid: string[][] = employees.map(() => Array(7).fill("off"));
-    const times: Record<string, { start: string; end: string }> = {};
-    // Vaktategund hverrar vaktar fylgir með (annars tekur gridið tegundir úr vikunni sem var opin → rangir litir).
-    const cellTypes: Record<string, string> = {};
-    const cellLocs: Record<string, string> = {}; // staður hverrar vaktar (0109)
-    const drafts: string[] = [];
-    for (const s of shifts ?? []) {
-      const r = idIndex.get(s.employee_id as string);
-      const c = dates.indexOf(s.date as string);
-      if (r !== undefined && c >= 0) {
-        if (s.published === false) drafts.push(`${r}:${c}`);
-        grid[r][c] = weekCodeForStart(s.start_time as string);
-        times[`${r}:${c}`] = { start: ((s.start_time as string) ?? "").slice(0, 5), end: ((s.end_time as string) ?? "").slice(0, 5) };
-        const tn = (s.shift_types as unknown as { name?: string } | null)?.name;
-        if (tn) cellTypes[`${r}:${c}`] = tn;
-        if (s.location_id) cellLocs[`${r}:${c}`] = s.location_id as string;
-      }
-    }
+    // Vaktategund + staður + deild hverrar vaktar fylgja (0109/0110); fleiri vaktir sama dag fara í `extras`.
+    const cells = buildWeekCells(shifts ?? [], idIndex, dates, employees.length);
     // The client's grid rows may be a SUBSET of the full roster (only staff on
     // the plan) — return names so it can remap rows instead of assuming order.
     const names = employees.map((e) => e.name);
     const inits = employees.map((e) => e.init);
     const ids = employees.map((e) => e.id);
     const unavail = await getWeekUnavail(dates);
-    return { ok: true, grid, times, cellTypes, cellLocs, names, inits, ids, unavail, drafts };
+    return { ok: true, ...cells, names, inits, ids, unavail };
   } catch {
     return { ok: false, grid: [], times: {} };
   }
@@ -318,12 +319,19 @@ export async function saveShift(input: Omit<ShiftInput, "date"> & { date?: strin
     // Ný eða breytt vakt er DRÖG — starfsfólk sér hana ekki fyrr en planið er gefið út.
     // Undantekning: aðeins vaktategund (litur/álag) breytt á útgefinni vakt — tímarnir eru þeir sömu.
     // Útgefna vaktin í reitnum helst hjá starfsfólki (pending_delete) þar til nýtt plan er gefið út.
-    const { data: cell } = await supabase.from("shifts").select("id, start_time, end_time, published, pending_delete, location_id")
-      .eq("company_id", ctx.company).eq("employee_id", employee_id).eq("date", shiftDate);
+    const slot = slotOf(input.slot);
+    const { data: cell } = await supabase.from("shifts").select("id, start_time, end_time, published, pending_delete, location_id, department_id")
+      .eq("company_id", ctx.company).eq("employee_id", employee_id).eq("date", shiftDate).eq("slot", slot);
     // Staður: sá sem var valinn í planinu, annars sá sem vaktin hafði (trigger setur stað starfsmanns ef hvorugt).
     const okLoc = await companyLocIds(supabase, ctx.company);
     const pickedLoc = input.locationId && okLoc.has(input.locationId) ? input.locationId : null;
     const location_id = pickedLoc ?? ((cell ?? []).find((r) => !r.pending_delete && r.location_id)?.location_id as string | undefined) ?? null;
+    // Deild: valin í planinu (undefined = sú sem vaktin hafði; tómt = aðaldeild starfsmanns).
+    const deptId = await deptResolver(supabase, ctx.company);
+    const department_id = input.deptName === undefined
+      ? (((cell ?? []).find((r) => !r.pending_delete && r.department_id)?.department_id as string | undefined) ?? null)
+      : deptId(input.deptName, location_id);
+    const deptPatch = input.deptName === undefined ? {} : { department_id };
     const sameTimes = (r: { start_time: unknown; end_time: unknown }) => hm(r.start_time) === hm(input.startTime) && hm(r.end_time) === hm(input.endTime);
     const live = (cell ?? []).filter((r) => !r.pending_delete);
     const livePub = live.find((r) => r.published);
@@ -332,18 +340,18 @@ export async function saveShift(input: Omit<ShiftInput, "date"> & { date?: strin
     let error: { message: string } | null = null;
     if (livePub && sameTimes(livePub)) {
       // Aðeins vaktategund (litur/álag) breytt — vaktin helst útgefin.
-      ({ error } = await supabase.from("shifts").update({ shift_type_id: shift_type_id ?? null, ...(pickedLoc ? { location_id: pickedLoc } : {}) }).eq("id", livePub.id as string));
+      ({ error } = await supabase.from("shifts").update({ shift_type_id: shift_type_id ?? null, ...deptPatch, ...(pickedLoc ? { location_id: pickedLoc } : {}) }).eq("id", livePub.id as string));
     } else if (!livePub && retired) {
       // Breytt aftur í útgefnu útgáfuna — engin drög, útgefna vaktin lifnar við.
       if (liveDrafts.length) await supabase.from("shifts").delete().in("id", liveDrafts);
-      ({ error } = await supabase.from("shifts").update({ pending_delete: false, shift_type_id: shift_type_id ?? null, ...(pickedLoc ? { location_id: pickedLoc } : {}) }).eq("id", retired.id as string));
+      ({ error } = await supabase.from("shifts").update({ pending_delete: false, shift_type_id: shift_type_id ?? null, ...deptPatch, ...(pickedLoc ? { location_id: pickedLoc } : {}) }).eq("id", retired.id as string));
     } else {
       if (livePub) ({ error } = await supabase.from("shifts").update({ pending_delete: true }).eq("id", livePub.id as string));
       if (!error && liveDrafts.length) ({ error } = await supabase.from("shifts").delete().in("id", liveDrafts));
       if (!error) ({ error } = await supabase.from("shifts").insert({
         company_id: ctx.company, employee_id, shift_type_id: shift_type_id ?? null, date: shiftDate,
-        start_time: input.startTime, end_time: input.endTime, status: "draft", published: false,
-        ...(location_id ? { location_id } : {}),
+        start_time: input.startTime, end_time: input.endTime, status: "draft", published: false, slot,
+        ...(location_id ? { location_id } : {}), ...(department_id ? { department_id } : {}),
       }));
     }
     if (error) return { ok: false, error: userError(error) };
@@ -379,7 +387,7 @@ export async function setStaffingTargets(targets: number[]): Promise<DecisionRes
 }
 
 /** Delete a single set shift (one employee, one day). */
-export async function deleteShift(input: { employeeName: string; dateISO: string }): Promise<DecisionResult & { deleted?: ShiftSnap[] }> {
+export async function deleteShift(input: { employeeName: string; dateISO: string; slot?: number }): Promise<DecisionResult & { deleted?: ShiftSnap[] }> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
   if (!isSupabaseConfigured()) return { ok: true, demo: true };
   try {
@@ -390,10 +398,20 @@ export async function deleteShift(input: { employeeName: string; dateISO: string
       .from("employees").select("id, full_name").eq("company_id", ctx.company);
     const employee_id = pickEmployee(emps, input.employeeName);
     if (!employee_id) return { ok: false, error: NO_EMP };
-    const { data: cell } = await supabase.from("shifts").select(SNAP_COLS)
+    // slot gefið → aðeins sú vakt; annars allar vaktir dagsins (eldri köll, „fjarlægja úr plani“).
+    let q = supabase.from("shifts").select(SNAP_COLS)
       .eq("company_id", ctx.company).eq("employee_id", employee_id).eq("date", input.dateISO).eq("pending_delete", false);
+    if (input.slot !== undefined) q = q.eq("slot", slotOf(input.slot));
+    const { data: cell } = await q;
     const { snaps: gone, error } = await retireShifts(supabase, (cell ?? []) as unknown as (ShiftSnap & { id: string })[]);
     if (error) return { ok: false, error };
+    if (input.slot !== undefined) {
+      // Vaktirnar á eftir færast upp um eitt sæti — planið heldur númerunum samfelldum (0, 1, …).
+      const { data: later } = await supabase.from("shifts").select("id, slot")
+        .eq("company_id", ctx.company).eq("employee_id", employee_id).eq("date", input.dateISO).eq("pending_delete", false)
+        .gt("slot", slotOf(input.slot)).order("slot");
+      for (const r of later ?? []) await supabase.from("shifts").update({ slot: (Number(r.slot) || 1) - 1 }).eq("id", r.id as string);
+    }
     await logAudit(supabase, ctx.company, ctx.userId, {
       action: "shift.delete", entity: "shift", detail: `Vakt eydd — ${input.employeeName} ${input.dateISO}`,
     });
@@ -404,7 +422,7 @@ export async function deleteShift(input: { employeeName: string; dateISO: string
   }
 }
 
-export type ExportRow = { name: string; first: string; dept: string; date: string; start: string; end: string; type?: string; employeeId?: string; locationId?: string };
+export type ExportRow = { name: string; first: string; dept: string; date: string; start: string; end: string; type?: string; employeeId?: string; locationId?: string; slot?: number };
 
 /** Real shift rows (with actual times) in a date range — for PDF export. */
 export async function getShiftsInRange(fromISO: string, toISO: string): Promise<{ ok: boolean; rows: ExportRow[] }> {
@@ -417,13 +435,15 @@ export async function getShiftsInRange(fromISO: string, toISO: string): Promise<
     if (!live) return { ok: false, rows: [] };
     const meta = new Map(employees.map((e) => [e.id, { full: e.fullName, first: e.fullName.split(/\s+/)[0], dept: e.department ?? "" }]));
     const { data: shifts } = await allRows((a, b) => supabase
-      .from("shifts").select("id, employee_id, date, start_time, end_time, location_id, shift_types(name)")
+      .from("shifts").select("id, employee_id, date, start_time, end_time, location_id, slot, shift_types(name), departments(name)")
       .eq("company_id", ctx.company).eq("pending_delete", false).gte("date", fromISO).lte("date", toISO)
       .order("date").order("start_time").order("id").range(a, b));
     const rows: ExportRow[] = (shifts ?? []).map((s) => {
       const m = meta.get(s.employee_id as string);
       return {
-        name: m?.full ?? "?", first: m?.first ?? "?", dept: m?.dept ?? "", employeeId: (s.employee_id as string | null) ?? undefined,
+        // Deild vaktarinnar (0110) ef hún er skráð, annars aðaldeild starfsmanns.
+        name: m?.full ?? "?", first: m?.first ?? "?", dept: ((s.departments as unknown as { name?: string } | null)?.name) || m?.dept || "", employeeId: (s.employee_id as string | null) ?? undefined,
+        slot: Number(s.slot) || 0,
         locationId: (s.location_id as string | null) ?? undefined,
         date: s.date as string,
         start: ((s.start_time as string) ?? "").slice(0, 5),
@@ -437,7 +457,7 @@ export async function getShiftsInRange(fromISO: string, toISO: string): Promise<
   }
 }
 
-export type PlanShift = { id: string; employeeId: string; date: string; start: string; end: string; type: string | null; draft?: boolean };
+export type PlanShift = { id: string; employeeId: string; date: string; start: string; end: string; type: string | null; draft?: boolean; slot: number; dept?: string | null };
 export type PlanLeave = { employeeId: string; from: string; to: string; type: string };
 
 /** Mánaðarplanið: allt virkt starfsfólk + vaktir og samþykkt frí á tímabilinu, allt eftir id. */
@@ -451,14 +471,15 @@ export async function getPlan(fromISO: string, toISO: string): Promise<{ ok: boo
     const { live, list } = await planEmployees();
     if (!live) return empty;
     const { data: rows } = await allRows((a, b) => supabase
-      .from("shifts").select("id, employee_id, date, start_time, end_time, published, shift_types(name)")
+      .from("shifts").select("id, employee_id, date, start_time, end_time, published, slot, shift_types(name), departments(name)")
       .eq("company_id", ctx.company).eq("pending_delete", false).not("employee_id", "is", null).gte("date", fromISO).lte("date", toISO)
-      .order("date").order("start_time").order("id").range(a, b));
+      .order("date").order("slot").order("start_time").order("id").range(a, b));
     const shifts: PlanShift[] = (rows ?? []).map((s) => ({
       draft: s.published === false,
       id: s.id as string, employeeId: s.employee_id as string, date: s.date as string,
       start: ((s.start_time as string) ?? "").slice(0, 5), end: ((s.end_time as string) ?? "").slice(0, 5),
       type: ((s.shift_types as unknown as { name?: string } | null)?.name) ?? null,
+      slot: Number(s.slot) || 0, dept: ((s.departments as unknown as { name?: string } | null)?.name) ?? null,
     }));
     const { data: lv } = await supabase.from("leave_requests").select("employee_id, from_date, to_date, type")
       .eq("company_id", ctx.company).eq("status", "approved").lte("from_date", toISO).gte("to_date", fromISO);
@@ -487,7 +508,7 @@ export async function copyShifts(input: { pairs: [string, string][]; employeeIds
     const only = input.employeeIds?.length ? new Set(input.employeeIds) : null;
     const src = [...new Set(pairs.map((p) => p[0]))], dst = [...new Set(pairs.map((p) => p[1]))];
     const { data: srcRows } = await allRows((a, b) => supabase.from("shifts")
-      .select("employee_id, date, start_time, end_time, shift_type_id, location_id")
+      .select("employee_id, date, start_time, end_time, shift_type_id, location_id, slot, department_id")
       .eq("company_id", ctx.company).eq("pending_delete", false).not("employee_id", "is", null).in("date", src).order("id").range(a, b));
     const { data: dstRows } = await allRows((a, b) => supabase.from("shifts")
       .select(SNAP_COLS).eq("company_id", ctx.company).eq("pending_delete", false).not("employee_id", "is", null).in("date", dst).order("id").range(a, b));
@@ -510,6 +531,7 @@ export async function copyShifts(input: { pairs: [string, string][]; employeeIds
         if (cl.hit(d, eid)) { skippedClosed++; continue; }
         rows.push({ company_id: ctx.company, employee_id: eid, shift_type_id: s.shift_type_id ?? null, date: d,
           start_time: s.start_time, end_time: s.end_time, status: "draft", published: false, // drög þar til planið er gefið út
+          slot: slotOf(s.slot), ...(s.department_id ? { department_id: s.department_id } : {}),
           ...(s.location_id ? { location_id: s.location_id } : {}) });
       }
     }
@@ -1089,10 +1111,18 @@ export async function restoreShifts(rows: ShiftSnap[]): Promise<{ ok: boolean; d
     const { data: mine } = await supabase.from("employees").select("id").eq("company_id", ctx.company).in("id", empIds);
     const ok = new Set((mine ?? []).map((e) => e.id as string));
     const dates = [...new Set(list.map((r) => r.date))];
-    const { data: taken } = await allRows((a, b) => supabase.from("shifts").select("employee_id, date")
+    const { data: taken } = await allRows((a, b) => supabase.from("shifts").select("employee_id, date, start_time, end_time, slot")
       .eq("company_id", ctx.company).eq("pending_delete", false).in("employee_id", empIds).in("date", dates).order("id").range(a, b));
-    const busy = new Set((taken ?? []).map((t) => `${t.employee_id}|${t.date}`));
-    const free = list.filter((r) => ok.has(r.employee_id as string) && !busy.has(`${r.employee_id}|${r.date}`));
+    // Sama vakt (sami tími) þegar komin aftur → sleppt. Sætið (slot) tekið → næsta lausa (0110: fleiri vaktir á dag).
+    const same = new Set((taken ?? []).map((t) => `${t.employee_id}|${t.date}|${hm(t.start_time)}|${hm(t.end_time)}`));
+    const usedSlots = new Map<string, Set<number>>();
+    for (const t of taken ?? []) { const k = `${t.employee_id}|${t.date}`; (usedSlots.get(k) ?? usedSlots.set(k, new Set()).get(k)!).add(Number(t.slot) || 0); }
+    const slotFor = (r: ShiftSnap) => {
+      const k = `${r.employee_id}|${r.date}`, used = usedSlots.get(k) ?? usedSlots.set(k, new Set()).get(k)!;
+      let n = slotOf(r.slot); while (used.has(n) && n < 5) n++;
+      used.add(n); return n;
+    };
+    const free = list.filter((r) => ok.has(r.employee_id as string) && !same.has(`${r.employee_id}|${r.date}|${hm(r.start_time)}|${hm(r.end_time)}`));
     // Útgefnar vaktir sem voru aðeins merktar: taka merkið af (ef þær eru enn til — annars setja inn).
     const pendIds = free.filter((r) => r.pending && r.id).map((r) => r.id as string);
     const revived = new Set<string>();
@@ -1105,7 +1135,7 @@ export async function restoreShifts(rows: ShiftSnap[]): Promise<{ ok: boolean; d
     const ins = free.filter((r) => !(r.id && revived.has(r.id))).map((r) => ({
       company_id: ctx.company, employee_id: r.employee_id, date: r.date, start_time: r.start_time, end_time: r.end_time,
       shift_type_id: r.shift_type_id, status: r.published ? "published" : "draft", published: !!r.published,
-      note: r.note, location_id: r.location_id,
+      note: r.note, location_id: r.location_id, slot: slotFor(r), department_id: r.department_id ?? null,
     }));
     for (let i = 0; i < ins.length; i += 500) {
       const { error } = await supabase.from("shifts").insert(ins.slice(i, i + 500));
