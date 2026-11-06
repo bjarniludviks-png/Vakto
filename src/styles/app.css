@@ -2104,6 +2104,17 @@ html.dark .mroster .sh{background:#23264a;color:#c7ccff}
 .sf-types{display:flex;flex-wrap:wrap;gap:6px}
 .sf-types .mr-tool{min-height:34px}
 .sf-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:10px}
+.sf-slots{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px;padding-bottom:10px;border-bottom:1px solid var(--line2)}
+.sf-slot{display:inline-flex;flex-direction:column;align-items:flex-start;gap:1px;min-height:34px;padding:5px 11px;border-radius:9px;border:1px solid var(--line);background:var(--card);color:var(--ink2);font:inherit;font-size:13px;font-weight:650;cursor:pointer}
+.sf-slot small{font-size:10.5px;font-weight:500;color:var(--ink3)}
+.sf-slot.on{border-color:var(--brand);background:var(--brand-soft);color:var(--brand)}
+.sf-slot.add{border-style:dashed;color:var(--brand);font-weight:600}
+/* Fleiri vaktir sama dag (0110): hlið við hlið í mánaðartöflu, hver undir annarri í vikugridinu. */
+.mroster td .shs{display:inline-flex;gap:2px}
+.mroster td .shs .sh{min-width:28px;padding:2px 3px}
+.shift-x{margin-top:3px}
+.shift-x .shift{min-height:0}
+.shift .sdept{display:block;font-size:10px;font-weight:600;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sf-tasks{border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin:0 0 10px}
 .sf-tasks summary{cursor:pointer;font-size:13px;font-weight:650;color:var(--ink2)}
 .sf-row{display:flex;align-items:center;gap:8px;width:100%;padding:10px 4px;border:0;border-bottom:1px solid var(--line2);background:none;font:inherit;font-size:13.5px;color:var(--ink);text-align:left;cursor:pointer}

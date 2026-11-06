@@ -462,3 +462,206 @@ export async function getWeekBudget(supabase: Db, companyId: string, monISO: str
     : period.revenueSource;
   return { revenue, revenueSource, target, fixed: Math.round(fixed), rates, ratesById, avgRate: n ? Math.round(sum / n) : 0, fixedById, days, locationIds: scoped ? locs : [] };
 }
+
+// ---------------------------------------------------------------------------------------------
+// Launagreining í Innsýn (0109): sömu reglur og getLaborPeriods, en sundurliðað á stað × deild ×
+// starfsmann × dag svo vafrinn geti síað og skipt eftir hverju sem er án nýrrar fyrirspurnar.
+//   • Áætlað = vaktir (staður vaktarinnar), raun = stimplanir (staður vaktarinnar sem stimplað var á,
+//     annars vakt sama dag, annars aðalstaður starfsmanns).
+//   • Tímakaup: klst × raunkostnaður á klst (computeLine, með launatengdum gjöldum) — eins og getLaborPeriods.
+//   • Mánaðarlaun: 1/dagafjöldi mánaðar á dag, á aðalstað og aðaldeild (bæði í áætlun og raun).
+//   • Velta per stað og dag: skráð velta, annars meðaltal sama vikudags síðustu 8 vikna á staðnum
+//     (merkt áætluð). Fyrirtæki með einn stað: vikudagsmeðaltal úr Stillingum sem síðasta úrræði.
+export type LaborFact = {
+  date: string; loc: string; dept: string; emp: string;
+  plannedH: number; actualH: number; plannedCost: number; actualCost: number;
+};
+export type LaborHourFact = { hour: number; dow: number; loc: string; dept: string; plannedH: number; actualH: number; plannedCost: number; actualCost: number };
+export type LaborRevenue = { date: string; loc: string; amount: number; estimated: boolean };
+export type LaborFacts = {
+  from: string; to: string; target: number;
+  locations: { id: string; name: string }[];
+  employees: { id: string; name: string; dept: string }[];
+  facts: LaborFact[];
+  hours: LaborHourFact[];
+  revenue: LaborRevenue[];
+};
+
+export async function getLaborFacts(supabase: Db, companyId: string, fromISO: string, toISO: string): Promise<LaborFacts> {
+  const days = dateRange(fromISO, toISO);
+  const to = days[days.length - 1] ?? toISO;
+  const [fy, fm, fd] = fromISO.split("-").map(Number);
+  const histFrom = isoOf(new Date(fy, fm - 1, fd - 56));
+  const [empRes, ruleRes, endRes, locRes, depRes, shiftRes, punchRes, compRes, target] = await Promise.all([
+    supabase.from("employees")
+      .select("id, full_name, pay_type, rate, employment_ratio, union_agreement, status, role, location_id, extra_departments, departments(name, location_id)")
+      .eq("company_id", companyId),
+    supabase.from("employees").select("id, pay_rule").eq("company_id", companyId),
+    supabase.from("employees").select("id, end_date").eq("company_id", companyId),
+    supabase.from("locations").select("id, name").eq("company_id", companyId).order("name"),
+    supabase.from("departments").select("name, location_id, locations!inner(company_id)").eq("locations.company_id", companyId),
+    allRows((a, b) => supabase.from("shifts").select("id, employee_id, date, start_time, end_time, location_id, departments(name)")
+      .eq("company_id", companyId).eq("pending_delete", false).not("employee_id", "is", null).gte("date", fromISO).lte("date", to).order("id").range(a, b)),
+    allRows((a, b) => supabase.from("punches").select("id, employee_id, shift_id, clock_in, clock_out")
+      .eq("company_id", companyId).gte("clock_in", fromISO).lte("clock_in", to + "T23:59:59").order("id").range(a, b)),
+    supabase.from("companies").select("weekday_revenue").eq("id", companyId).maybeSingle(),
+    getLaborTarget(supabase, companyId),
+  ]);
+  const locations = (locRes.data ?? []).map((l) => ({ id: l.id as string, name: (l.name as string) ?? "" }));
+  const locIds = locations.map((l) => l.id);
+  const revRes = locIds.length
+    ? await allRows((a, b) => supabase.from("revenue").select("id, location_id, amount, date").in("location_id", locIds).gte("date", histFrom).lte("date", to).order("id").range(a, b))
+    : { data: [] as Record<string, unknown>[] };
+
+  const deptLocs = new Map<string, string[]>();
+  for (const d of depRes.data ?? []) {
+    const n = ((d.name as string) ?? "").trim();
+    if (n && d.location_id) deptLocs.set(n, [...(deptLocs.get(n) ?? []), d.location_id as string]);
+  }
+  const ruleMap = new Map<string, unknown>();
+  if (!ruleRes.error) for (const r of ruleRes.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never) ?? null);
+  const endMap = new Map<string, string | null>();
+  if (!endRes.error) for (const r of endRes.data ?? []) endMap.set(r.id as string, (r.end_date as string | null) ?? null);
+
+  type E = { id: string; name: string; dept: string; depts: string[]; home: string; monthly: number; eff: number; payType: string; status: string; end: string | null };
+  const emps = new Map<string, E>();
+  for (const r of empRes.data ?? []) {
+    const dep = (Array.isArray(r.departments) ? r.departments[0] : r.departments) as { name?: string; location_id?: string } | null;
+    const union = (r.union_agreement as string | null) ?? null;
+    const row: EmpRow = {
+      id: r.id as string, fullName: r.full_name as string,
+      payType: (r.pay_type as "hourly" | "monthly") ?? "hourly",
+      rate: Number(r.rate) || 0, employmentRatio: Number(r.employment_ratio) || 100,
+      union, status: (r.status as string) ?? "active", avatarColor: "", department: dep?.name ?? null,
+      rules: resolveRuleSet(union, ruleMap.get(r.id as string) as never), contractor: r.role === "contractor",
+      endDate: endMap.get(r.id as string) ?? null,
+    };
+    let eff = 0, monthly = 0;
+    if (row.contractor) { eff = row.payType === "hourly" ? row.rate : 0; monthly = row.payType === "monthly" ? row.rate : 0; }
+    else { const l = computeLine(row); eff = l.hours > 0 ? l.cost / l.hours : 0; monthly = l.cost; }
+    const dept = dep?.name ?? "";
+    emps.set(row.id, {
+      id: row.id, name: row.fullName, dept,
+      depts: [...new Set([dept, ...(((r.extra_departments as string[] | null) ?? []))].filter(Boolean))],
+      home: dep?.location_id ?? (r.location_id as string | null) ?? "", monthly, eff, payType: row.payType, status: row.status, end: row.endDate ?? null,
+    });
+  }
+  /** Deild starfsmanns á tilteknum stað: aðaldeild ef hún er þar, annars önnur deild hans á staðnum. */
+  const deptAt = (e: E, loc: string) => {
+    if (!loc || e.home === loc) return e.dept;
+    return e.depts.find((d) => (deptLocs.get(d) ?? []).includes(loc)) ?? e.dept;
+  };
+
+  const facts = new Map<string, LaborFact>();
+  // dept: deild vaktarinnar (0110) ef hún er skráð, annars deild starfsmanns á staðnum.
+  const add = (date: string, loc: string, e: E, k: "plannedH" | "actualH", h: number, dep?: string) => {
+    const dept = dep || deptAt(e, loc);
+    const key = `${date}|${loc}|${dept}|${e.id}`;
+    const f = facts.get(key) ?? facts.set(key, { date, loc, dept, emp: e.id, plannedH: 0, actualH: 0, plannedCost: 0, actualCost: 0 }).get(key)!;
+    f[k] += h;
+    if (e.payType !== "monthly") { if (k === "plannedH") f.plannedCost += h * e.eff; else f.actualCost += h * e.eff; }
+  };
+  const hourly = new Map<string, LaborHourFact>();
+  const addHours = (date: string, startHHMM: string, h: number, loc: string, e: E, k: "plannedH" | "actualH", dep?: string) => {
+    if (e.payType === "monthly" || h <= 0) return;
+    const [sh, sm] = startHHMM.split(":").map(Number);
+    let x = sh + (sm || 0) / 60;
+    const end = x + h;
+    const dow = new Date(date + "T12:00:00").getDay();
+    const dept = dep || deptAt(e, loc);
+    while (x < end - 1e-6) {
+      const next = Math.min(end, Math.floor(x) + 1);
+      const part = next - x, hour = Math.floor(x) % 24;
+      const key = `${hour}|${dow}|${loc}|${dept}`;
+      const b = hourly.get(key) ?? hourly.set(key, { hour, dow, loc, dept, plannedH: 0, actualH: 0, plannedCost: 0, actualCost: 0 }).get(key)!;
+      b[k] += part;
+      if (k === "plannedH") b.plannedCost += part * e.eff; else b.actualCost += part * e.eff;
+      x = next;
+    }
+  };
+
+  const shiftLoc = new Map<string, string>(); // shift id → staður
+  const dayLoc = new Map<string, string>();   // starfsmaður|dagur → staður fyrstu vaktar
+  // Vaktir dagsins per starfsmann (0110: fleiri en ein) — stimplun fær stað og deild þeirrar sem skarast mest.
+  const dayShifts = new Map<string, { a: number; b: number; loc: string; dept: string }[]>();
+  for (const s of shiftRes.data ?? []) {
+    const e = emps.get(s.employee_id as string); if (!e) continue;
+    const date = String(s.date).slice(0, 10);
+    const loc = (s.location_id as string | null) ?? e.home;
+    const dep = ((Array.isArray(s.departments) ? s.departments[0] : s.departments) as { name?: string } | null)?.name ?? "";
+    shiftLoc.set(s.id as string, loc);
+    if (!dayLoc.has(`${e.id}|${date}`)) dayLoc.set(`${e.id}|${date}`, loc);
+    const h = shiftHours(s.start_time as string, s.end_time as string);
+    add(date, loc, e, "plannedH", h, dep);
+    addHours(date, String(s.start_time ?? "00:00").slice(0, 5), h, loc, e, "plannedH", dep);
+    const st = String(s.start_time ?? "").slice(0, 5);
+    if (st) {
+      const a = new Date(`${date}T${st}:00`).getTime();
+      const k = `${e.id}|${date}`;
+      (dayShifts.get(k) ?? dayShifts.set(k, []).get(k)!).push({ a, b: a + h * 3600000, loc, dept: dep });
+    }
+  }
+  for (const p of punchRes.data ?? []) {
+    if (!p.clock_out) continue;
+    const e = emps.get(p.employee_id as string); if (!e) continue;
+    const ci = new Date(p.clock_in as string), co = new Date(p.clock_out as string);
+    const h = (co.getTime() - ci.getTime()) / 3600000;
+    if (h <= 0) continue;
+    const date = isoOf(ci);
+    if (date < fromISO || date > to) continue;
+    let best: { ov: number; loc: string; dept: string } | null = null;
+    for (const x of dayShifts.get(`${e.id}|${date}`) ?? []) {
+      const ov = Math.min(co.getTime(), x.b) - Math.max(ci.getTime(), x.a);
+      if (ov > 0 && (!best || ov > best.ov)) best = { ov, loc: x.loc, dept: x.dept };
+    }
+    const loc = (p.shift_id ? shiftLoc.get(p.shift_id as string) : undefined) ?? best?.loc ?? dayLoc.get(`${e.id}|${date}`) ?? e.home;
+    add(date, loc, e, "actualH", h, best?.dept);
+    addHours(date, `${String(ci.getHours()).padStart(2, "0")}:${String(ci.getMinutes()).padStart(2, "0")}`, h, loc, e, "actualH", best?.dept);
+  }
+  // Mánaðarlaun: dagleg hlutdeild á aðalstað/aðaldeild (áætlun = raun).
+  for (const e of emps.values()) {
+    if (e.payType !== "monthly" || e.monthly <= 0 || e.status === "inactive") continue;
+    for (const d of days) {
+      if (e.end && d > e.end) continue;
+      const [y, m] = d.split("-").map(Number);
+      const c = e.monthly / new Date(y, m, 0).getDate();
+      const key = `${d}|${e.home}|${e.dept}|${e.id}`;
+      const f = facts.get(key) ?? facts.set(key, { date: d, loc: e.home, dept: e.dept, emp: e.id, plannedH: 0, actualH: 0, plannedCost: 0, actualCost: 0 }).get(key)!;
+      f.plannedCost += c; f.actualCost += c;
+    }
+  }
+
+  // Velta per stað og dag.
+  const real = new Map<string, number>(); // loc|date
+  for (const r of revRes.data ?? []) {
+    const k = `${r.location_id}|${String(r.date).slice(0, 10)}`;
+    real.set(k, (real.get(k) ?? 0) + Number(r.amount ?? 0));
+  }
+  const weekdayRev = (compRes.data?.weekday_revenue as Record<string, number> | null | undefined) ?? null;
+  const revenue: LaborRevenue[] = [];
+  for (const loc of locIds) {
+    for (const d of days) {
+      const k = `${loc}|${d}`;
+      if (real.has(k)) { revenue.push({ date: d, loc, amount: Math.round(real.get(k)!), estimated: false }); continue; }
+      const dow = new Date(d + "T12:00:00").getDay();
+      const hist: number[] = [];
+      for (let w = 1; w <= 8; w++) {
+        const [y, m, dd] = d.split("-").map(Number);
+        const v = real.get(`${loc}|${isoOf(new Date(y, m - 1, dd - 7 * w))}`);
+        if (v && v > 0) hist.push(v);
+      }
+      let est = hist.length ? hist.reduce((a, b) => a + b, 0) / hist.length : 0;
+      if (!est && locIds.length === 1 && weekdayRev) est = Number(weekdayRev[String(dow)] ?? 0);
+      if (est > 0) revenue.push({ date: d, loc, amount: Math.round(est), estimated: true });
+    }
+  }
+
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  return {
+    from: fromISO, to, target, locations,
+    employees: [...emps.values()].map((e) => ({ id: e.id, name: e.name, dept: e.dept })),
+    facts: [...facts.values()].map((f) => ({ ...f, plannedH: r2(f.plannedH), actualH: r2(f.actualH), plannedCost: Math.round(f.plannedCost), actualCost: Math.round(f.actualCost) })),
+    hours: [...hourly.values()].map((b) => ({ ...b, plannedH: r2(b.plannedH), actualH: r2(b.actualH), plannedCost: Math.round(b.plannedCost), actualCost: Math.round(b.actualCost) })),
+    revenue,
+  };
+}

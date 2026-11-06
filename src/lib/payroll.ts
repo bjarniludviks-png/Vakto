@@ -327,6 +327,44 @@ export function hourBuckets(punches: { clockIn: string; clockOut: string }[], ru
   return { dagvinna: r2(dagvinna), yfirvinna: r2(yfirvinna), alag };
 }
 
+/** Sama flokkun og hourBuckets, en tímarnir skiptast líka eftir `key` hverrar stimplunar (t.d. deild, 0110).
+ * Yfirvinna reiknast af heildinni í tímaröð og lendir á þeirri stimplun sem er í gangi þegar hún byrjar —
+ * samtala allra lykla = hourBuckets(punches) upp á auranámundun. */
+export function hourBucketsByKey(punches: { clockIn: string; clockOut: string; key: string }[], rules: CustomRules): Map<string, { dagvinna: number; yfirvinna: number; alag: Record<number, number> }> {
+  const otWeekly = rules.otWeekly && rules.otWeekly > 0 ? rules.otWeekly : OT_WEEKLY;
+  const otMonthly = rules.otMonthly && rules.otMonthly > 0 ? rules.otMonthly : Infinity;
+  const otPct = rules.overtime ?? 0;
+  const bands = rules.bands ?? [];
+  const out = new Map<string, { dagvinna: number; yfirvinna: number; alag: Record<number, number> }>();
+  const weekHrs = new Map<string, number>();
+  let monthAcc = 0;
+  const sorted = punches.slice().sort((a, b) => a.clockIn.localeCompare(b.clockIn));
+  for (const p of sorted) {
+    if (!p.clockOut) continue;
+    const b = out.get(p.key) ?? out.set(p.key, { dagvinna: 0, yfirvinna: 0, alag: {} }).get(p.key)!;
+    const end = new Date(p.clockOut).getTime();
+    let t = new Date(p.clockIn).getTime();
+    while (t < end) {
+      const s = Math.min(STEP, (end - t) / 3600000);
+      const dt = new Date(t);
+      const wk = mondayKey(dt);
+      const acc = weekHrs.get(wk) ?? 0;
+      const prem = Math.max(premiumPct(dt, isStorhatid(dt, rules), rules), bandPct(dt, bands));
+      const otActive = acc >= otWeekly || monthAcc >= otMonthly;
+      if (otActive && otPct >= prem) b.yfirvinna += s;
+      else { b.dagvinna += s; if (prem > 0) b.alag[prem] = (b.alag[prem] ?? 0) + s; }
+      monthAcc += s; weekHrs.set(wk, acc + s);
+      t += s * 3600000;
+    }
+  }
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  for (const b of out.values()) {
+    b.dagvinna = r2(b.dagvinna); b.yfirvinna = r2(b.yfirvinna);
+    for (const k of Object.keys(b.alag)) b.alag[Number(k)] = r2(b.alag[Number(k)]);
+  }
+  return out;
+}
+
 export type PayrollTotals = { hours: number; gross: number; withholding: number; pension: number; union: number; net: number; cost: number; insurance: number; employerPension: number; funds: number };
 
 export function totals(lines: PayLine[]): PayrollTotals {

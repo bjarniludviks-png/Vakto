@@ -15,6 +15,7 @@ export function DkModal({ L, locations, onClose, onDone }: { L: Lf; locations: {
   const [day, setDay] = useState(""); const [ot, setOt] = useState("");
   const [alag, setAlag] = useState<Record<string, string>>({});
   const [pcts, setPcts] = useState<number[]>([]);
+  const [deptCodes, setDeptCodes] = useState<Record<string, string>>({});
   const [newPct, setNewPct] = useState("");
   const [token, setToken] = useState("");
   const [loc, setLoc] = useState(locations[0]?.id ?? "");
@@ -25,12 +26,13 @@ export function DkModal({ L, locations, onClose, onDone }: { L: Lf; locations: {
     void getDkSettings().then((r) => {
       if (!r) return;
       setS(r); setDay(r.codes.dagvinna ?? ""); setOt(r.codes.yfirvinna ?? ""); setAlag(r.codes.alag ?? {}); setPcts(r.alagPcts);
+      setDeptCodes(Object.fromEntries(r.depts.map((d) => [d.id, d.code])));
     });
   }, []);
 
   const saveCodes = async () => {
     setBusy("codes"); setErr(null);
-    const r = await saveDkCodes({ dagvinna: day, yfirvinna: ot, alag });
+    const r = await saveDkCodes({ dagvinna: day, yfirvinna: ot, alag, deptCodes });
     setBusy(null);
     if (r.ok) toast(L("Launaliðir vistaðir", "Pay codes saved")); else setErr(r.error ?? "Villa");
   };
@@ -68,7 +70,19 @@ export function DkModal({ L, locations, onClose, onDone }: { L: Lf; locations: {
               <label className="tg-field" style={{ width: 120, margin: 0 }}><input value={newPct} onChange={(e) => setNewPct(e.target.value)} placeholder={L("Álag %", "Premium %")} inputMode="decimal" /></label>
               <button className="btn ghost sm" type="button" onClick={() => { const n = Number(newPct.replace(",", ".")); if (n > 0 && !pcts.includes(n)) setPcts((x) => [...x, n].sort((a, b) => a - b)); setNewPct(""); }}>{L("Bæta við álagi", "Add premium")}</button>
             </div>
-            <button className="btn" disabled={busy !== null} onClick={saveCodes}>{busy === "codes" ? L("Vista…", "Saving…") : L("Vista launaliði", "Save pay codes")}</button>
+            {s.depts.length > 0 && <>
+              <div style={{ fontWeight: 650, marginTop: 4 }}>{L("Deildir í dk Laun", "Departments in dk Laun")}</div>
+              <div className="tg-small">{L(
+                "Settu inn deildarnúmerið úr dk Laun fyrir hverja deild. Tímar skiptast þá á deildir í skránni eftir því í hvaða deild vaktin var, t.d. morgunmatur og herbergisþrif sama dag. Deild án númers fer á deild starfsmannsins í DK.",
+                "Enter the dk Laun department number for each department. Hours are then split by the department of each shift, e.g. breakfast and housekeeping on the same day. A department without a number goes to the employee's DK department.")}</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                {s.depts.map((d) => (
+                  <label className="tg-field" key={d.id}><span>{d.name}{new Set(s.depts.map((x) => x.location)).size > 1 ? <small style={{ color: "var(--ink3)", fontWeight: 500 }}> · {d.location}</small> : null}</span>
+                    <input value={deptCodes[d.id] ?? ""} onChange={(e) => setDeptCodes((m) => ({ ...m, [d.id]: e.target.value }))} placeholder={L("deildarnúmer", "dept. no.")} inputMode="numeric" /></label>
+                ))}
+              </div>
+            </>}
+            <button className="btn" disabled={busy !== null} onClick={saveCodes}>{busy === "codes" ? L("Vista…", "Saving…") : L("Vista launaliði og deildir", "Save pay codes and departments")}</button>
 
             <div style={{ height: 1, background: "var(--line)", margin: "6px 0" }} />
             <div style={{ fontWeight: 650 }}>{L("2. Velta úr DK (valfrjálst)", "2. Revenue from DK (optional)")}</div>

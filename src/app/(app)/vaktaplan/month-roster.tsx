@@ -7,7 +7,7 @@ import { dec1 } from "@/lib/format";
 import { getPlan, saveShift, deleteShift, copyShifts, clearShifts, type PlanShift, type PlanLeave } from "./actions";
 import type { PlanEmp } from "./roster.server";
 import { offerUndo } from "./undo-delete";
-import { ShiftForm, ShiftSheet, PaintTools, typeTimes, defaultsFor, type ShiftType, type PaintTool } from "./shift-form";
+import { ShiftForm, ShiftSheet, PaintTools, SlotTabs, typeTimes, defaultsFor, type ShiftType, type PaintTool } from "./shift-form";
 
 // Mánaðarplan sem starfsmannatafla: starfsfólk í röðum, dagar mánaðarins í dálkum.
 // Allt eftir starfsmanns-id (ekki nafni) og vistast strax. „Mála“-hamur: veldu vaktategund
@@ -27,8 +27,11 @@ const hrs = (a: string, b: string) => {
 };
 const short = (t: string) => (t.endsWith(":00") ? t.slice(0, 2) : t);
 
-export default function MonthRoster({ month, todayISO, types, deptSel, scopeDepts, onOpenDay, onTotals, full, onToggleFull, onTypes, reloadKey = 0 }: {
-  month: Date; todayISO: string; types: ShiftType[]; deptSel: string[]; scopeDepts: string[];
+export default function MonthRoster({ range, todayISO, types, deptSel, scopeDepts, allDepts = [], onOpenDay, onTotals, full, onToggleFull, onTypes, reloadKey = 0 }: {
+  /** Tímabilið sem taflan sýnir — launatímabil fyrirtækisins (t.d. 21. okt.–20. nóv.), annars almanaksmánuður. */
+  range: { from: string; to: string }; todayISO: string;
+  /** Allar deildir fyrirtækisins — vakt má setja í aðra deild en starfsmaðurinn er skráður í (0110). */
+  allDepts?: string[]; types: ShiftType[]; deptSel: string[]; scopeDepts: string[];
   onOpenDay: (d: Date) => void; onTotals: (x: { hrs: number; shifts: number; list: { emp: string; date: string; start: string; end: string }[] }) => void; full: boolean; onToggleFull: () => void;
   /** Opnar vaktategundaglugga Vaktaplansins. */
   onTypes?: () => void;
@@ -36,8 +39,12 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
   reloadKey?: number;
 }) {
   const { t } = useLang();
-  const y = month.getFullYear(), m = month.getMonth();
-  const days = useMemo(() => Array.from({ length: new Date(y, m + 1, 0).getDate() }, (_, i) => new Date(y, m, i + 1)), [y, m]);
+  const days = useMemo(() => {
+    const out: Date[] = [];
+    const d = new Date(`${range.from}T12:00:00`), end = new Date(`${range.to}T12:00:00`);
+    while (d <= end && out.length < 62) { out.push(new Date(d.getFullYear(), d.getMonth(), d.getDate())); d.setDate(d.getDate() + 1); }
+    return out;
+  }, [range.from, range.to]);
   const from = iso(days[0]), to = iso(days[days.length - 1]);
   const [emps, setEmps] = useState<PlanEmp[]>([]);
   const [shifts, setShifts] = useState<PlanShift[]>([]);
@@ -46,11 +53,11 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
   const [loadedKey, setLoadedKey] = useState("");
   const loading = loadedKey !== `${from}|${to}|${ver}`;
   const [tool, setTool] = useState<Tool>(null);
-  const [edit, setEdit] = useState<{ emp: PlanEmp; date: string } | null>(null);
+  const [edit, setEdit] = useState<{ emp: PlanEmp; date: string; slot: number } | null>(null);
   const [menu, setMenu] = useState(false);
   const [busy, setBusy] = useState(false);
   // Draga og sleppa: vakt dregin í annan reit færist (Alt/⌥ eða Ctrl = afrita).
-  const [dragSrc, setDragSrc] = useState<{ emp: PlanEmp; date: string } | null>(null);
+  const [dragSrc, setDragSrc] = useState<{ emp: PlanEmp; date: string; slot: number } | null>(null);
 
   useEffect(() => {
     let gone = false;
@@ -80,11 +87,15 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
   }, [emps, deptSel, scopeDepts]);
   const showGroups = new Set(rows.map((r) => r.g)).size > 1;
 
+  // Allar vaktir dagsins hjá starfsmanni, í röð (0110: fleiri en ein vakt á dag).
   const byCell = useMemo(() => {
-    const map = new Map<string, PlanShift>();
-    for (const s of shifts) map.set(`${s.employeeId}|${s.date}`, s);
+    const map = new Map<string, PlanShift[]>();
+    for (const s of shifts) { const k = `${s.employeeId}|${s.date}`; (map.get(k) ?? map.set(k, []).get(k)!).push(s); }
+    for (const l of map.values()) l.sort((a, b) => a.slot - b.slot || a.start.localeCompare(b.start));
     return map;
   }, [shifts]);
+  const cellOf = (eid: string, d: string) => byCell.get(`${eid}|${d}`) ?? [];
+  const slotOf = (eid: string, d: string, slot: number) => cellOf(eid, d).find((s) => s.slot === slot);
   const leaveOf = (eid: string, d: string) => leave.find((l) => l.employeeId === eid && l.from <= d && l.to >= d);
   const typeStyle = (s: PlanShift) => {
     const ty = types.find((x) => x.nm === s.type) ?? types.find((x) => typeTimes(x)?.[0] === s.start);
@@ -100,21 +111,24 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
   }, [totHrs, visShifts.length, shifts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** Vista eina vakt (bjartsýn uppfærsla, bakfært ef þjónninn hafnar). */
-  const put = useCallback(async (emp: PlanEmp, date: string, start: string, end: string, type: string | null) => {
+  const put = useCallback(async (emp: PlanEmp, date: string, start: string, end: string, type: string | null, slot = 0, dept?: string) => {
     const key = `${emp.id}|${date}`;
     const prev = shifts;
-    const old = shifts.find((s) => `${s.employeeId}|${s.date}` === key);
+    const old = shifts.find((s) => `${s.employeeId}|${s.date}` === key && s.slot === slot);
     const draft = !(old && !old.draft && old.start === start && old.end === end); // sama regla og saveShift
-    setShifts((ss) => [...ss.filter((s) => `${s.employeeId}|${s.date}` !== key), { id: `tmp-${key}`, employeeId: emp.id, date, start, end, type, draft }]);
-    const res = await saveShift({ employeeName: emp.id, date, startTime: start, endTime: end, shiftTypeName: type ?? "" });
+    const nd = dept === undefined ? old?.dept ?? null : dept || null;
+    setShifts((ss) => [...ss.filter((s) => !(`${s.employeeId}|${s.date}` === key && s.slot === slot)), { id: `tmp-${key}-${slot}`, employeeId: emp.id, date, start, end, type, draft, slot, dept: nd }]);
+    const res = await saveShift({ employeeName: emp.id, date, startTime: start, endTime: end, shiftTypeName: type ?? "", slot, ...(dept !== undefined ? { deptName: dept } : {}) });
     if (!res.ok) { setShifts(prev); toast(res.error ?? t("Tókst ekki að vista vaktina")); }
     return res.ok;
   }, [shifts, t]);
-  const drop = useCallback(async (emp: PlanEmp, date: string) => {
+  const drop = useCallback(async (emp: PlanEmp, date: string, slot = 0) => {
     const key = `${emp.id}|${date}`;
     const prev = shifts;
-    setShifts((ss) => ss.filter((s) => `${s.employeeId}|${s.date}` !== key));
-    const res = await deleteShift({ employeeName: emp.id, dateISO: date });
+    // Vaktirnar á eftir færast upp um eitt sæti — eins og þjónninn gerir.
+    setShifts((ss) => ss.filter((s) => !(`${s.employeeId}|${s.date}` === key && s.slot === slot))
+      .map((s) => (`${s.employeeId}|${s.date}` === key && s.slot > slot ? { ...s, slot: s.slot - 1 } : s)));
+    const res = await deleteShift({ employeeName: emp.id, dateISO: date, slot });
     if (!res.ok) { setShifts(prev); toast(res.error ?? t("Tókst ekki að eyða vaktinni")); return; }
     offerUndo(res.deleted, t, () => setVer((v) => v + 1));
   }, [shifts, t]);
@@ -123,34 +137,35 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
     const src = dragSrc;
     setDragSrc(null);
     if (!src || (src.emp.id === emp.id && src.date === date)) return;
-    const s = byCell.get(`${src.emp.id}|${src.date}`);
+    const s = slotOf(src.emp.id, src.date, src.slot);
     if (!s) return;
-    if (byCell.get(`${emp.id}|${date}`) && !window.confirm(t("Það er vakt fyrir í þessum reit. Skipta henni út?"))) return;
-    if (!(await put(emp, date, s.start, s.end, s.type))) return;
+    if (cellOf(emp.id, date).length && !window.confirm(t("Það er vakt fyrir í þessum reit. Skipta henni út?"))) return;
+    if (!(await put(emp, date, s.start, s.end, s.type, 0, s.dept ?? ""))) return;
     if (copy) { toast(t("Vakt afrituð")); return; }
     const key = `${src.emp.id}|${src.date}`;
-    setShifts((ss) => ss.filter((x) => `${x.employeeId}|${x.date}` !== key));
-    const res = await deleteShift({ employeeName: src.emp.id, dateISO: src.date });
+    setShifts((ss) => ss.filter((x) => !(`${x.employeeId}|${x.date}` === key && x.slot === src.slot))
+      .map((x) => (`${x.employeeId}|${x.date}` === key && x.slot > src.slot ? { ...x, slot: x.slot - 1 } : x)));
+    const res = await deleteShift({ employeeName: src.emp.id, dateISO: src.date, slot: src.slot });
     if (!res.ok) { toast(res.error ?? t("Tókst ekki að eyða vaktinni")); setVer((v) => v + 1); return; }
     toast(t("Vakt færð — gefðu planið út svo starfsfólk sjái breytinguna"));
   }
 
   function clickCell(emp: PlanEmp, date: string) {
-    const cur = byCell.get(`${emp.id}|${date}`);
-    if (tool?.kind === "erase") { if (cur) void drop(emp, date); return; }
+    const cur = slotOf(emp.id, date, 0);
+    if (tool?.kind === "erase") { if (cur) void drop(emp, date, 0); return; }
     if (tool?.kind === "clip") { void put(emp, date, tool.start, tool.end, tool.type); return; }
     if (tool?.kind === "type") {
       const tt = typeTimes(tool.ty);
       if (tt) { void put(emp, date, tt[0], tt[1], tool.ty.nm); return; }
       if (cur) { void put(emp, date, cur.start, cur.end, tool.ty.nm); return; } // tegund án fasts tíma: aðeins litur/álag
     }
-    setEdit({ emp, date });
+    setEdit({ emp, date, slot: 0 });
   }
 
   const visibleIds = () => rows.map((r) => r.e.id);
   async function copyLastMonth() {
     // Hver dagur fær sama vikudag úr síðasta mánuði (−28 eða −35 dagar) svo helgar lendi á helgum.
-    const first = new Date(y, m, 1);
+    const first = days[0];
     const pairs: [string, string][] = days.map((d) => {
       const s = new Date(d); s.setDate(s.getDate() - 28);
       while (s >= first) s.setDate(s.getDate() - 7);
@@ -189,9 +204,10 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
     setVer((v) => v + 1);
   }
   // Mánudagar sem byrja viku innan mánaðarins — til að velja „endurtaka viku“.
-  const mondays = days.filter((d) => d.getDay() === 1 && d.getDate() + 6 <= days.length);
+  const mondays = days.filter((d, i) => d.getDay() === 1 && i + 6 < days.length);
 
-  const editShift = edit ? byCell.get(`${edit.emp.id}|${edit.date}`) ?? null : null;
+  const editShift = edit ? slotOf(edit.emp.id, edit.date, edit.slot) ?? null : null;
+  const editDay = edit ? cellOf(edit.emp.id, edit.date) : [];
   let lastGroup: string | null = null;
 
   return (
@@ -261,7 +277,7 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
                     </div>
                   </td>
                   {days.map((d) => {
-                    const ds = iso(d), s = byCell.get(`${e.id}|${ds}`), lv = leaveOf(e.id, ds);
+                    const ds = iso(d), list = cellOf(e.id, ds), s = list[0], lv = leaveOf(e.id, ds);
                     const wd = (d.getDay() + 6) % 7;
                     return (
                       <td key={ds} className={`${wd >= 5 ? "we" : ""}${ds === todayISO ? " tod" : ""}${tool ? " paint" : ""}`} onClick={() => clickCell(e, ds)}
@@ -269,10 +285,13 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
                         onDragLeave={(ev) => ev.currentTarget.classList.remove("cellh")}
                         onDrop={(ev) => { ev.preventDefault(); ev.currentTarget.classList.remove("cellh"); void dropOn(e, ds, ev.altKey || ev.ctrlKey); }}
                         onContextMenu={(ev) => { if (s) { ev.preventDefault(); setTool({ kind: "clip", start: s.start, end: s.end, type: s.type }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } }}
-                        title={s ? `${e.name} · ${s.start}–${s.end}${s.type ? ` · ${t(s.type)}` : ""}` : lv ? t(LEAVE_LBL[lv.type] ?? "Frí") : undefined}>
-                        {s ? <span className={`sh${s.draft ? " draft" : ""}`} style={typeStyle(s)} draggable={!tool}
-                          onDragStart={(ev) => { ev.dataTransfer.effectAllowed = "copyMove"; ev.dataTransfer.setData("text/plain", `${s.start}-${s.end}`); setDragSrc({ emp: e, date: ds }); }}
-                          onDragEnd={() => setDragSrc(null)} title={s.draft ? t("Drög — ekki útgefið") : undefined}>{short(s.start)}<i>{short(s.end)}</i></span>
+                        title={list.length ? `${e.name} · ${list.map((x) => `${x.start}–${x.end}${x.type ? ` ${t(x.type)}` : ""}${x.dept ? ` (${x.dept})` : ""}`).join(" + ")}` : lv ? t(LEAVE_LBL[lv.type] ?? "Frí") : undefined}>
+                        {list.length ? <span className="shs">{list.map((x) => (
+                          <span key={x.slot} className={`sh${x.draft ? " draft" : ""}`} style={typeStyle(x)} draggable={!tool}
+                            onClick={(ev) => { if (!tool && list.length > 1) { ev.stopPropagation(); setEdit({ emp: e, date: ds, slot: x.slot }); } }}
+                            onDragStart={(ev) => { ev.dataTransfer.effectAllowed = "copyMove"; ev.dataTransfer.setData("text/plain", `${x.start}-${x.end}`); setDragSrc({ emp: e, date: ds, slot: x.slot }); }}
+                            onDragEnd={() => setDragSrc(null)} title={x.draft ? t("Drög — ekki útgefið") : undefined}>{short(x.start)}<i>{short(x.end)}</i></span>
+                        ))}</span>
                           : lv ? <span className="lv">{t(LEAVE_LBL[lv.type] ?? "Frí")}</span> : null}
                       </td>
                     );
@@ -287,7 +306,7 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
               <tr>
                 <td className="nm">{t("Á vakt")}</td>
                 {days.map((d) => {
-                  const n = visShifts.filter((s) => s.date === iso(d)).length;
+                  const n = new Set(visShifts.filter((s) => s.date === iso(d)).map((s) => s.employeeId)).size;
                   return <td key={d.getDate()} className={(d.getDay() + 6) % 7 >= 5 ? "we" : ""}>{n || ""}</td>;
                 })}
                 <td className="sum">{dec1(totHrs)}</td>
@@ -300,10 +319,12 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
         {t("Veldu vaktategund og smelltu á reiti til að fylla mánuðinn hratt · dragðu vakt til að færa hana (haltu ⌥/Alt til að afrita) · hægrismelltu á vakt til að afrita hana · smelltu á dag efst til að opna dagsýn.")}
       </div>
       {edit && (
-        <CellEditor emp={edit.emp} date={edit.date} shift={editShift} types={types} leave={leaveOf(edit.emp.id, edit.date)} monthName={t(MONTHS_IS[m])}
+        <CellEditor key={`${edit.emp.id}|${edit.date}|${edit.slot}`} emp={edit.emp} date={edit.date} shift={editShift} day={editDay} slot={edit.slot} allDepts={allDepts}
+          types={types} leave={leaveOf(edit.emp.id, edit.date)} monthName={t(MONTHS_IS[new Date(`${edit.date}T12:00:00`).getMonth()])}
           onClose={() => setEdit(null)}
-          onSave={async (st, en, ty) => { setEdit(null); if (await put(edit.emp, edit.date, st, en, ty)) toast(t("Vakt vistuð")); }}
-          onDelete={async () => { setEdit(null); await drop(edit.emp, edit.date); }}
+          onPickSlot={(sl) => setEdit({ ...edit, slot: sl })}
+          onSave={async (st, en, ty, dp) => { setEdit(null); if (await put(edit.emp, edit.date, st, en, ty, edit.slot, dp)) toast(t("Vakt vistuð")); }}
+          onDelete={async () => { setEdit(null); await drop(edit.emp, edit.date, edit.slot); }}
           onSick={() => { setEdit(null); setVer((v) => v + 1); }}
           onCopy={() => { if (editShift) { setTool({ kind: "clip", start: editShift.start, end: editShift.end, type: editShift.type }); toast(t("Vakt afrituð — smelltu á reiti til að líma")); } setEdit(null); }} />
       )}
@@ -311,21 +332,26 @@ export default function MonthRoster({ month, todayISO, types, deptSel, scopeDept
   );
 }
 
-function CellEditor({ emp, date, shift, types, leave, monthName, onClose, onSave, onDelete, onCopy, onSick }: {
-  emp: PlanEmp; date: string; shift: PlanShift | null; types: ShiftType[]; leave?: PlanLeave; monthName: string;
-  onSick?: () => void;
-  onClose: () => void; onSave: (start: string, end: string, type: string | null) => void; onDelete: () => void; onCopy: () => void;
+function CellEditor({ emp, date, shift, day, slot, allDepts, types, leave, monthName, onClose, onSave, onDelete, onCopy, onSick, onPickSlot }: {
+  emp: PlanEmp; date: string; shift: PlanShift | null; day: PlanShift[]; slot: number; allDepts: string[]; types: ShiftType[]; leave?: PlanLeave; monthName: string;
+  onSick?: () => void; onPickSlot: (slot: number) => void;
+  onClose: () => void; onSave: (start: string, end: string, type: string | null, dept?: string) => void; onDelete: () => void; onCopy: () => void;
 }) {
   const { t } = useLang();
   const d = new Date(`${date}T12:00:00`);
   const DN = ["Sunnudagur", "Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur"];
-  const init = shift ? { type: shift.type ?? "", start: shift.start, end: shift.end } : defaultsFor(types);
+  // Ný aukavakt byrjar þar sem síðasta vakt dagsins endar (morgunmatur 7–10 → þrif frá 10).
+  const last = day[day.length - 1];
+  const init = shift ? { type: shift.type ?? "", start: shift.start, end: shift.end, dept: shift.dept ?? undefined }
+    : last ? { ...defaultsFor(types), type: "", start: last.end, end: `${String((Number(last.end.slice(0, 2)) + 4) % 24).padStart(2, "0")}${last.end.slice(2)}` }
+    : defaultsFor(types);
   return (
     <ShiftSheet title={`${emp.full} · ${t(DN[d.getDay()])} ${d.getDate()}. ${monthName}`} onClose={onClose}>
-      <ShiftForm types={types} initial={init} isEdit={!!shift}
+      <ShiftForm types={types} initial={init} isEdit={!!shift} depts={emp.depts} mainDept={emp.dept} otherDepts={allDepts}
+        head={<SlotTabs items={day} current={slot} onPick={onPickSlot} onAdd={() => onPickSlot(day.length)} />}
         notice={leave ? `${t("ATH: samþykkt frí þennan dag")} (${t(LEAVE_LBL[leave.type] ?? "Frí")})` : null}
         sick={onSick && !leave ? { employeeId: emp.id, name: emp.full, dateISO: date, onDone: onSick } : null}
-        onSave={(st, en, ty) => onSave(st, en, ty || null)} onDelete={onDelete} onCopy={onCopy} onClose={onClose} />
+        onSave={(st, en, ty, dp) => onSave(st, en, ty || null, dp)} onDelete={onDelete} onCopy={onCopy} onClose={onClose} />
     </ShiftSheet>
   );
 }

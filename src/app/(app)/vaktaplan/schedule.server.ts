@@ -6,27 +6,25 @@ import { getEmployees, } from "@/lib/employees.server";
 import { planEmployees } from "./roster.server";
 import { dec1 } from "@/lib/format";
 import { allRows } from "@/lib/supabase/all-rows";
+import { getLocTree, type LocTree } from "@/lib/locations.server";
+import { buildWeekCells, type ExtraShift } from "./week-cells";
+import { companyPaySetup } from "@/lib/pay-period.server";
+import type { PayPeriodCfg } from "@/lib/periods";
 
 // initials, birtingarnafn, aðaldeild, litur, starfsmanns-id, aðrar deildir („A|B“)
 export type Emp4 = [string, string, string, string, string?, string?];
 export type ShiftTypeView = { nm: string; t: string; prem: string; bg: string; bd: string; fg: string };
-export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; cellTypes: Record<string, string>; types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string; todayISO: string; targets: number[]; unavail: Record<string, number[]> };
+export type ScheduleInitial = { emp: Emp4[]; grid: string[][]; times: Record<string, { start: string; end: string }>; cellTypes: Record<string, string>; types: ShiftTypeView[]; pool: Emp4[]; fte: string; company: string; todayISO: string; targets: number[]; unavail: Record<string, number[]>; cellLocs: Record<string, string>; locTree: LocTree;
+  /** 0110: deild hverrar aðalvaktar (ef önnur en aðaldeild) + aukavaktir sama dag. */
+  cellDepts: Record<string, string>; extras: Record<string, ExtraShift[]>;
+  /** Launatímabil fyrirtækisins — mánaðarsýnin fylgir því (ekki almanaksmánuði). */
+  payPeriod: PayPeriodCfg };
 
 const isoOf = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 // 7 ISO dates for the (Mon-start) week containing `ref`.
 function weekDatesOf(ref: Date): string[] {
   const mon = new Date(ref); mon.setHours(0, 0, 0, 0); mon.setDate(mon.getDate() - ((mon.getDay() + 6) % 7));
   return Array.from({ length: 7 }, (_, i) => { const d = new Date(mon); d.setDate(d.getDate() + i); return isoOf(d); });
-}
-
-// Map a shift start hour to the grid's shift code (keys must exist in SH).
-function codeForStart(start: string | null): string {
-  const h = parseInt((start ?? "").slice(0, 2), 10);
-  if (h === 7) return "M";
-  if (h === 11) return "Mi";
-  if (h === 14) return "E";
-  if (h === 16) return "L";
-  return "D";
 }
 
 /** Live schedule: real employees as rows + published shifts mapped into the grid.
@@ -73,25 +71,14 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
       }));
     }
 
-    // published shifts for the demo week → grid[empIndex][dayIndex]
+    // Vaktir vikunnar → grid (fleiri vaktir sama dag í `extras`, deild hverrar vaktar í `cellDepts`, 0110).
     const idById = new Map(employees.map((e, i) => [e.id, i]));
-    const grid: string[][] = employees.map(() => Array(7).fill("off"));
-    const times: Record<string, { start: string; end: string }> = {};
-    const cellTypesMap: Record<string, string> = {};
+    let cells = buildWeekCells([], idById, WEEK_DATES, employees.length);
     if (company) {
       const { data: shifts } = await allRows((a, b) => supabase
-        .from("shifts").select("id, employee_id, date, start_time, end_time, shift_types(name)")
+        .from("shifts").select("id, employee_id, date, start_time, end_time, published, location_id, slot, shift_types(name), departments(name)")
         .eq("company_id", company).eq("pending_delete", false).in("date", WEEK_DATES).order("id").range(a, b));
-      for (const s of shifts ?? []) {
-        const r = idById.get(s.employee_id as string);
-        const c = WEEK_DATES.indexOf(s.date as string);
-        if (r !== undefined && c >= 0) {
-          grid[r][c] = codeForStart(s.start_time as string);
-          times[`${r}:${c}`] = { start: ((s.start_time as string) ?? "").slice(0, 5), end: ((s.end_time as string) ?? "").slice(0, 5) };
-          const tn = (s.shift_types as unknown as { name?: string } | null)?.name;
-          if (tn) cellTypesMap[`${r}:${c}`] = tn;
-        }
-      }
+      cells = buildWeekCells(shifts ?? [], idById, WEEK_DATES, employees.length);
     }
 
     let companyName = "Vaktaplan";
@@ -106,12 +93,13 @@ export async function getSchedule(): Promise<ScheduleInitial | null> {
     // Allt virkt starfsfólk er alltaf í planinu. Áður fóru þeir sem áttu enga vakt í vikunni í
     // „pottinn“ um leið og ein vakt var komin — hjá 44 manna hóteli hvarf þá nánast allt starfsfólkið.
     const emp: Emp4[] = employees.map(rowOf);
-    const gridOut = grid, timesOut = times, cellTypesOut = cellTypesMap;
     const pool: Emp4[] = [];
     const { employees: all } = await getEmployees();
     const fte = dec1(all.filter((e) => e.status !== "inactive").reduce((a, e) => a + e.employmentRatio, 0) / 100);
     const unavail = await getWeekUnavail(WEEK_DATES);
-    return { emp, grid: gridOut, times: timesOut, cellTypes: cellTypesOut, types, pool, fte, company: companyName, todayISO, targets, unavail };
+    const locTree: LocTree = company ? await getLocTree(supabase, company) : { locations: [], deptLocs: {}, empHome: {} };
+    const payPeriod: PayPeriodCfg = company ? (await companyPaySetup(supabase, company)).period : { kind: "month", startDay: 1 };
+    return { emp, grid: cells.grid, times: cells.times, cellTypes: cells.cellTypes, cellDepts: cells.cellDepts, extras: cells.extras, types, pool, fte, company: companyName, todayISO, targets, unavail, cellLocs: cells.cellLocs, locTree, payPeriod };
   } catch {
     return null;
   }
