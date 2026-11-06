@@ -55,7 +55,7 @@ export default function VerkDetail() {
     if (!perm.granted) { toast("Leyfi vantar"); return; }
     const res = camera
       ? await ImagePicker.launchCameraAsync({ quality: 0.6 })
-      : await ImagePicker.launchImageLibraryAsync({ quality: 0.6, mediaTypes: ["images"] });
+      : await ImagePicker.launchImageLibraryAsync({ quality: 0.6, mediaTypes: ["images"], preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible });
     if (res.canceled || !res.assets?.[0]) return;
     setBusy(true);
     const r = await addPhoto(me, job.id, res.assets[0].uri);

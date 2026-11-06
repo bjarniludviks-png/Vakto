@@ -97,7 +97,7 @@ export default function Frettir() {
   }
 
   async function pickImage() {
-    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: false });
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.7, allowsEditing: false, preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible });
     if (!r.canceled && r.assets[0]) setImg(r.assets[0].uri);
   }
   async function publish() {
