@@ -49,7 +49,7 @@ export default function Profill() {
       const perm = await ImagePicker.requestCameraPermissionsAsync();
       if (!perm.granted) { setPhotoMsg(tr("Leyfðu aðgang að myndavél í stillingum símans")); return; }
     }
-    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 0.6 };
+    const opts: ImagePicker.ImagePickerOptions = { mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 0.6, preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible };
     const r = camera ? await ImagePicker.launchCameraAsync(opts) : await ImagePicker.launchImageLibraryAsync(opts);
     const a = r.canceled ? null : r.assets[0];
     if (!a) return;

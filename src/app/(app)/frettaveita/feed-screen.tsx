@@ -4,6 +4,7 @@
 // composer with image/document attach, posts with media, emoji reactions
 // (one per user, pick from a small palette) and comment threads.
 
+import { HeicImg } from "@/components/heic-img";
 import { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/app/page-header";
 import { useLang } from "@/components/app/lang";
@@ -237,8 +238,7 @@ export default function FeedScreen() {
               </div>
               {p.body && <p className="fp-body">{withTags(p.body)}</p>}
               {p.imageUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img className="fp-img full" src={p.imageUrl} alt="" loading="lazy" onClick={() => window.open(p.imageUrl!, "_blank")} />
+                <HeicImg className="fp-img full" src={p.imageUrl} alt="" loading="lazy" onClick={() => window.open(p.imageUrl!, "_blank")} />
               )}
               {p.fileUrl && (
                 <a className="fp-file" href={p.fileUrl} target="_blank" rel="noreferrer">
