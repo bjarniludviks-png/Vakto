@@ -96,9 +96,9 @@ html:has(.ah),html:has(.ah) body,html:has(.ah-auth),html:has(.ah-auth) body{back
   background:linear-gradient(90deg,#9c3f08,#f39a52 45%,#c4540d)}
 .ah-phone-in::before{right:-.85cqw;top:27%;height:14%}
 .ah-phone-in::after{left:-.85cqw;top:19%;height:5%;box-shadow:0 9.5cqw 0 #d0600f,0 19cqw 0 #d0600f}
-.ah-screen{height:100%;border-radius:15.6cqw;overflow:hidden;background:#f5f5f7;
+.ah-screen{height:100%;border-radius:15.6cqw;overflow:hidden;background:#fff;
   border:3.1cqw solid #050506;padding-top:12.5cqw;box-shadow:0 0 0 .3cqw #1c1c1e}
-.ah-phone-dk .ah-screen{background:#0c0c0e}
+.ah-phone-dk .ah-screen{background:#15151a}
 .ah-dark .ah-phone-in{box-shadow:inset 0 0 0 .35cqw rgba(255,214,170,.55),inset 0 0 0 .75cqw rgba(120,45,0,.35),0 8cqw 24cqw -6cqw rgba(233,112,15,.5)}
 .ah-island{position:absolute;top:5.7cqw;left:50%;transform:translateX(-50%);width:30cqw;height:8.8cqw;border-radius:5cqw;background:#000;z-index:2}
 .ah-sb{position:absolute;top:4.7cqw;left:4.7cqw;right:4.7cqw;height:10.8cqw;display:flex;align-items:center;justify-content:space-between;
