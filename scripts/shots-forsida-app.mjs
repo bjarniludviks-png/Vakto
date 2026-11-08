@@ -25,7 +25,7 @@ const SHOTS = (process.env.SHOTS ?? "heim:/,vaktir:/vaktir,frettir:/frettir,spja
 const browser = await chromium.launch();
 try {
   for (const theme of ["light", "dark"]) {
-    const c = await browser.newContext({ locale: LANG === "en" ? "en-GB" : "is-IS", viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, colorScheme: theme });
+    const c = await browser.newContext({ locale: LANG === "en" ? "en-GB" : "is-IS", viewport: { width: 402, height: 874 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, colorScheme: theme });
     await c.addInitScript(({ k, v, lg }) => { try { localStorage.setItem(k, v); localStorage.setItem("@vakto-lang", lg); } catch {} }, { k: storageKey, v: JSON.stringify(auth.session), lg: LANG });
     const p = await c.newPage();
     for (const [name, route] of SHOTS) {

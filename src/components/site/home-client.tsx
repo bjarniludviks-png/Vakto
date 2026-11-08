@@ -121,18 +121,42 @@ function LiveClock() {
   return <span className="ah-live" aria-hidden="true"><span ref={el}>4:36:06</span></span>;
 }
 
-export function Phone({ src, alt, className = "", dark = false, live = false }: { src: string; alt: string; className?: string; dark?: boolean; live?: boolean }) {
+/** Símaumgjörð: appelsínugul málmrammi, svört brún, eyja og stöðustika. Skjárinn er `children`. */
+export function PhoneShell({ className = "", dark = false, screenClass = "", children }: { className?: string; dark?: boolean; screenClass?: string; children: ReactNode }) {
   return (
     <div className={`ah-phone${dark ? " ah-phone-dk" : ""} ${className}`}>
       <div className="ah-phone-in">
-        <div className="ah-scr">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt={alt} width={1170} height={2532} loading="lazy" decoding="async" draggable={false} />
-          {live && <LiveClock />}
-        </div>
+        <div className={`ah-screen ${screenClass}`}>{children}</div>
       </div>
       <span className="ah-island" aria-hidden="true" />
+      <StatusBar />
     </div>
+  );
+}
+
+export function Phone({ src, alt, className = "", dark = false, live = false }: { src: string; alt: string; className?: string; dark?: boolean; live?: boolean }) {
+  return (
+    <PhoneShell className={className} dark={dark}>
+      <div className="ah-scr">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={src} alt={alt} width={1206} height={2622} loading="lazy" decoding="async" draggable={false} />
+        {live && <LiveClock />}
+      </div>
+    </PhoneShell>
+  );
+}
+
+/** Stöðustika eins og á iPhone: klukka vinstra megin, samband, Wi-Fi og rafhlaða hægra megin. */
+export function StatusBar() {
+  return (
+    <span className="ah-sb" aria-hidden="true">
+      <span>9:41</span>
+      <i>
+        <svg viewBox="0 0 18 12"><rect x="0" y="8" width="3" height="4" rx=".8" /><rect x="5" y="5.5" width="3" height="6.5" rx=".8" /><rect x="10" y="3" width="3" height="9" rx=".8" /><rect x="15" y="0" width="3" height="12" rx=".8" /></svg>
+        <svg viewBox="0 0 16 12"><path d="M8 2.3c2.4 0 4.6.9 6.2 2.5l1.3-1.3A10.6 10.6 0 0 0 8 .4 10.6 10.6 0 0 0 .5 3.5l1.3 1.3A8.8 8.8 0 0 1 8 2.3zm0 3.6c1.4 0 2.7.5 3.6 1.4l1.3-1.3A7 7 0 0 0 8 4a7 7 0 0 0-4.9 2l1.3 1.3c.9-.9 2.2-1.4 3.6-1.4zm0 3.5c-.5 0-1 .2-1.3.6L8 11.3l1.3-1.3c-.3-.4-.8-.6-1.3-.6z" /></svg>
+        <svg viewBox="0 0 27 12"><rect x=".5" y=".5" width="23" height="11" rx="3.2" fill="none" stroke="currentColor" strokeOpacity=".4" /><rect x="2" y="2" width="20" height="8" rx="2" /><path d="M25 4v4c.8-.3 1.3-1 1.3-2s-.5-1.7-1.3-2z" fillOpacity=".45" /></svg>
+      </i>
+    </span>
   );
 }
 
@@ -513,7 +537,12 @@ function Wallet() {
   return (
     <section className="ah-sec ah-wallet" ref={ref}>
       <div className="ah-split ah-split-rev">
-        <div className="ah-pass-wrap"><div ref={card}><WalletCard /></div></div>
+        <div className="ah-pass-wrap"><div ref={card}>
+          <PhoneShell className="ah-wallet-ph" screenClass="ah-wscr">
+            <div className="ah-wbar" aria-hidden="true"><span>{t.walDone}</span><span className="ah-wdots"><i /><i /><i /></span></div>
+            <div className="ah-wpass"><WalletCard /></div>
+          </PhoneShell>
+        </div></div>
         <div className="ah-split-tx">
           <h2>{t.walH}</h2>
           <p className="ah-lede">{t.walP}</p>
