@@ -53,12 +53,12 @@
 .tk-tpl .nm{font-weight:700;font-size:14.5px;color:var(--ink)}
 .tk-tpl .rows{display:grid;gap:5px;font-size:12.5px;color:var(--ink2)}
 .tk-tpl .rows div{display:flex;gap:8px}
-.tk-tpl .rows span{color:var(--ink3);min-width:78px}
+.tk-tpl .rows>div>span:first-child{color:var(--ink3);min-width:78px;flex:none}
 .tk-tpl .acts{display:flex;gap:6px;margin-top:auto;flex-wrap:wrap}
 .tk-dot{width:10px;height:10px;border-radius:50%;flex:none;margin-top:5px}
 .tk-resp{margin:0;padding-left:18px;font-size:12.5px;color:var(--ink2);display:grid;gap:3px}
 .tk-avs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:var(--ink2)}
-.tk-avs .db2-av.sm{width:24px;height:24px;font-size:9.5px}
+.tk-avs .db2-av.sm{width:24px;height:24px;font-size:9.5px;flex:none}
 .tk-tree{display:flex;flex-direction:column;gap:10px}
 .tk-node{display:inline-flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:var(--panel);box-shadow:0 0 0 1px var(--line);cursor:pointer;text-align:left;font:inherit;border:0;color:var(--ink);max-width:100%}
 .tk-node:hover{box-shadow:0 0 0 1.5px var(--brand)}
@@ -99,3 +99,8 @@
   .tk-prog{width:84px}
   .tk-row2{grid-template-columns:1fr}
 }
+.tk-wrap .btn{white-space:nowrap}
+.tk-wrap .btn svg.ic{width:16px;height:16px;flex:none}
+.tk-wrap .btn svg{max-width:18px;max-height:18px}
+.field .tk-check{display:flex;font-weight:500;font-size:13.5px;color:var(--ink);margin:0}
+.field .tk-photo{display:flex;margin:0;font-weight:500}

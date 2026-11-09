@@ -213,8 +213,8 @@ export function ListEditor({ list, people, roles, locations, onClose, onSaved }:
   return (
     <Modal title={editing ? t("Breyta lista") : t("Nýr listi")} sub={t("Grunnlisti sem endurtekur sig sjálfkrafa")} onClose={onClose} width={620}>
       <div className="tk-row2">
-        <div className="field"><label>{t("Heiti")}</label><input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t("t.d. Opnunarlisti")} maxLength={80} /></div>
-        <div className="field"><label>{t("Tegund")}</label>
+        <div className="field"><label>{t("tk:Heiti")}</label><input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t("t.d. Opnunarlisti")} maxLength={80} /></div>
+        <div className="field"><label>{t("tk:Tegund")}</label>
           <select value={category} onChange={(e) => setCategory(e.target.value as ListCategory)}>
             {(Object.keys(CATEGORY_LABEL) as ListCategory[]).map((c) => <option key={c} value={c}>{t(CATEGORY_LABEL[c])}</option>)}
           </select>
@@ -318,8 +318,8 @@ export function RoleEditor({ role, people, shiftTypes, onClose, onSaved }: {
   }
   return (
     <Modal title={role ? t("Breyta hlutverki") : t("Nýtt hlutverk")} sub={t("Hlutverk er ekki deild — sama manneskja getur haft mörg")} onClose={onClose} width={600}>
-      <div className="field"><label>{t("Heiti")}</label><input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t("t.d. Bílstjóri")} maxLength={60} /></div>
-      <div className="field"><label>{t("Litur")}</label>
+      <div className="field"><label>{t("tk:Heiti")}</label><input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder={t("t.d. Bílstjóri")} maxLength={60} /></div>
+      <div className="field"><label>{t("tk:Litur")}</label>
         <div className="tk-opts">{ROLE_COLORS.map((c) => <button key={c} type="button" onClick={() => setColor(c)} aria-label={c} style={{ width: 26, height: 26, borderRadius: 8, border: color === c ? "2px solid var(--ink)" : "2px solid transparent", background: c, cursor: "pointer" }} />)}</div>
       </div>
       <div className="field"><label>{t("Lýsing (valfrjálst)")}</label><input value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={400} /></div>

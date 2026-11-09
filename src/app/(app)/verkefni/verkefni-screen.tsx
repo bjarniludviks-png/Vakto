@@ -16,7 +16,7 @@ import {
 import { AdhocModal, HandoverModal, ListEditor, RoleEditor, PersonModal, personAv, isoOf } from "./editors";
 
 type Tab = "dag" | "listar" | "hlutverk" | "skipurit" | "fravik";
-const TABS: [Tab, string][] = [["dag", "Í dag"], ["listar", "Listar"], ["hlutverk", "Hlutverk"], ["skipurit", "Skipurit"], ["fravik", "Frávik"]];
+const TABS: [Tab, string][] = [["dag", "Í dag"], ["listar", "Listar"], ["hlutverk", "Hlutverk"], ["skipurit", "Skipurit"], ["fravik", "tk:Frávik"]];
 const MONTHS = ["jan.", "feb.", "mar.", "apr.", "maí", "jún.", "júl.", "ág.", "sep.", "okt.", "nóv.", "des."];
 const DOW = ["sunnudagur", "mánudagur", "þriðjudagur", "miðvikudagur", "fimmtudagur", "föstudagur", "laugardagur"];
 const INC_LABEL: Record<string, string> = { hitastig: "Hitastig", vara: "Vara vantar", bilun: "Bilun", atvik: "Atvik", verkefni: "Verkefni ekki klárað", annad: "Annað" };
@@ -240,7 +240,7 @@ export default function VerkefniScreen({ initial, initialTab }: { initial: Tasks
           <div className="tk-head"><div><h3>{t("Frávik og atvik")}</h3><div className="sub">{t("Starfsfólk skráir í appinu (⋯ á verkefni). Þú færð tilkynningu strax.")}</div></div></div>
           {data.incidents.length === 0 ? <div className="tk-empty"><b>{t("Engin frávik skráð")}</b>{t("Hitastig, vara sem vantaði, bilanir og atvik birtast hér.")}</div> : (
             <div className="tk-tblwrap"><table className="tk-table">
-              <thead><tr><th>{t("Dagur")}</th><th>{t("Tegund")}</th><th>{t("Lýsing")}</th><th>{t("Skráð af")}</th><th>{t("Staða")}</th><th /></tr></thead>
+              <thead><tr><th>{t("Dagur")}</th><th>{t("tk:Tegund")}</th><th>{t("Lýsing")}</th><th>{t("Skráð af")}</th><th>{t("Staða")}</th><th /></tr></thead>
               <tbody>{data.incidents.map((i) => (
                 <tr key={i.id}>
                   <td style={{ whiteSpace: "nowrap" }}>{i.date.slice(8, 10)}.{i.date.slice(5, 7)}. <span style={{ color: "var(--ink3)" }}>{hm(i.createdAt)}</span></td>
@@ -283,7 +283,7 @@ function PersonRow({ r, open, today, toggle, onTick, onDelete, onHandover, onTas
         <div className="tk-grow" style={{ minWidth: 0 }}>
           <div className="nm">{r.name}</div>
           <div className="meta">
-            {r.on_shift ? <span>{t("Á vakt")}</span> : <span>{t("Ekki á vakt")}</span>}
+            {r.on_shift ? <span>{t("tk:Á vakt")}</span> : <span>{t("tk:Ekki á vakt")}</span>}
             {r.roles.map((x) => <span key={x.id} className={`tk-chip ${x.via}`} title={t(VIA_LABEL[x.via]) + (x.from_name ? ` — ${x.from_name}` : "")}><i style={{ background: x.color ?? undefined }} />{x.name}{x.via === "faert" || x.via === "vara" ? ` · ${t("fyrir")} ${(x.from_name ?? "").split(" ")[0]}` : ""}</span>)}
             {late && <span className="db2-pill bad" style={{ padding: "1px 8px", fontSize: 11 }}>{t("Of seint")}</span>}
           </div>
