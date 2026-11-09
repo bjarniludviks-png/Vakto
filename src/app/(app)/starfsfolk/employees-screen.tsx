@@ -27,6 +27,7 @@ import { Av } from "@/components/app/avatar";
 import { PayslipModal } from "@/components/app/payslip-modal";
 import { PaySettingsCard } from "./pay-settings";
 import { RateStepsCard, NotesTab } from "./extras-ui";
+import { RolesTab } from "./roles-tab";
 import { computeLine } from "@/lib/payroll";
 import { ORLOF_DAYS, orlofPctForDays, orlofDaysForPct } from "@/lib/paysettings";
 import { parseStaffSheet } from "@/lib/staff-import";
@@ -55,7 +56,7 @@ function statusBadge(e: Employee) {
   return { cls: "good", bg: "var(--good-soft)", fg: "var(--good)", labelKey: "emp:active" };
 }
 
-export const PROFILE_TABS = ["Laun", "Vinna", "Frí", "Samningur", "Skjöl", "Athugasemdir", "Persónulegt"] as const;
+export const PROFILE_TABS = ["Laun", "Vinna", "Hlutverk", "Frí", "Samningur", "Skjöl", "Athugasemdir", "Persónulegt"] as const;
 export type ProfileTab = (typeof PROFILE_TABS)[number];
 /** Verktaki á ekki orlof/frí hjá fyrirtækinu → enginn „Frí“-flipi. */
 export const profileTabsFor = (role?: string | null): readonly ProfileTab[] =>
@@ -915,6 +916,9 @@ export function ProfileTabBody({ e, tab }: { e: Employee; tab: ProfileTab }) {
   }
   if (tab === "Athugasemdir") {
     return <NotesTab employeeId={e.id} />;
+  }
+  if (tab === "Hlutverk") {
+    return <RolesTab employeeId={e.id} />;
   }
   if (tab === "Samningur") {
     return <ContractTab employeeId={e.id} contractor={e.role === "contractor"} />;

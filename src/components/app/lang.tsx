@@ -216,6 +216,7 @@ export const DICT: Dict = {
   "starfsmenn án launa á tímabilinu": { is: "starfsmenn án launa á tímabilinu", en: "staff without pay in this period", pl: "pracownicy bez wynagrodzenia w tym okresie" },
   "ep:tab:Laun": { is: "Laun", en: "Pay", pl: "Wynagrodzenie" },
   "ep:tab:Vinna": { is: "Vinna", en: "Work", pl: "Praca" },
+  "ep:tab:Hlutverk": { is: "Hlutverk og ábyrgð", en: "Roles", pl: "Role" },
   "ep:tab:Frí": { is: "Frí", en: "Leave", pl: "Urlop" },
   "ep:tab:Samningur": { is: "Samningar", en: "Contracts", pl: "Umowy" },
   "ep:tab:Skjöl": { is: "Skjöl", en: "Documents", pl: "Dokumenty" },
