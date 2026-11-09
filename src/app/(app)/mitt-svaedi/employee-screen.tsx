@@ -4,6 +4,8 @@ import { PrivacyToggles } from "./privacy-toggles";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "@/components/app/toast";
 import { useRouter } from "next/navigation";
+import { getMyDay, tickTask } from "../verkefni/actions";
+import { counts, VIA_LABEL, type DayTasks } from "@/lib/tasks";
 import { useLang } from "@/components/app/lang";
 import { TimeField, DateField } from "@/components/app/fields";
 import { myPunch, submitLeaveRequest, requestShiftSwap, setAvailability, uploadPhoto, updateMyProfile, applyForShift, getMyPunches, requestCorrection, toggleShiftTask, getMyContract, openMySignedContract, requestContractCode, signContractWithCode, taktikalMyLink, type LeaveType, type MyPunchRow, type MyContract } from "./actions";
@@ -354,27 +356,70 @@ function CompanyDocsCardMy() {
   );
 }
 
+/** Verkefnin mín (0111): listar hlutverksins + stök verkefni — sama regla og appið (tasks_day).
+ * Eldri grunnur án 0111 → gamli listinn (shift_tasks) eins og áður. */
 function TasksCard({ initial }: { initial: { id: string; title: string; done: boolean }[] }) {
   const { t } = useLang();
   const [tasks, setTasks] = useState(initial);
-  const doneCount = tasks.filter((x) => x.done).length;
-  async function tick(id: string, done: boolean) {
+  const [day, setDay] = useState<DayTasks | null>(null);
+  const today = new Date().toISOString().slice(0, 10);
+  useEffect(() => { getMyDay(today).then((r) => { if (r.ok && r.day) setDay(r.day); }); }, [today]);
+  async function tickLegacy(id: string, done: boolean) {
     setTasks((ts) => ts.map((x) => (x.id === id ? { ...x, done } : x)));
     const res = await toggleShiftTask(id, done);
     if (!res.ok) { setTasks((ts) => ts.map((x) => (x.id === id ? { ...x, done: !done } : x))); toast(res.error ?? "Villa"); }
   }
+  async function tick(kind: "item" | "adhoc", id: string, done: boolean) {
+    setDay((d) => d && ({ ...d,
+      lists: d.lists.map((l) => ({ ...l, items: l.items.map((i) => (kind === "item" && i.id === id ? { ...i, done } : i)) })),
+      adhoc: d.adhoc.map((a) => (kind === "adhoc" && a.id === id ? { ...a, done } : a)) }));
+    const res = await tickTask(kind, id, today, done);
+    if (!res.ok) toast(res.error ?? "Villa");
+    const r = await getMyDay(today); if (r.ok && r.day) setDay(r.day);
+  }
+  const row = (key: string, title: string, done: boolean, on: (v: boolean) => void, sub?: string | null) => (
+    <label key={key} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13.5, padding: "6px 0", cursor: "pointer" }}>
+      <input type="checkbox" checked={done} onChange={(e) => on(e.target.checked)} />
+      <span style={done ? { textDecoration: "line-through", color: "var(--ink3)" } : undefined}>{title}{sub ? <span style={{ color: "var(--ink3)" }}> · {sub}</span> : null}</span>
+    </label>
+  );
+  if (day) {
+    const c = counts(day);
+    if (!c.total && !day.roles.length) return null;
+    return (
+      <div className="mini" id="verkefni">
+        <div className="mh" style={{ display: "flex", justifyContent: "space-between" }}>
+          <span>{t("Verkefnin mín í dag")}</span>
+          <span style={{ color: c.total && c.done === c.total ? "var(--good)" : "var(--ink3)" }}>{c.done}/{c.total}</span>
+        </div>
+        {day.roles.filter((r) => r.via !== "fast").map((r) => (
+          <div key={r.id} style={{ fontSize: 12.5, background: "var(--brand-soft)", borderRadius: 10, padding: "7px 10px", margin: "4px 0" }}>
+            <b>{r.name}</b> · {t(VIA_LABEL[r.via])}{r.from_name ? ` — ${r.from_name}` : ""}
+          </div>
+        ))}
+        {day.lists.map((l) => (
+          <div key={l.id} style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ink2)" }}>{l.name}{l.due_time ? ` · ${t("fyrir kl.")} ${l.due_time}` : ""}</div>
+            {l.items.map((i) => row(i.id, i.title, i.done, (v) => tick("item", i.id, v), i.done && l.shared ? (i.done_by_name ?? "").split(" ")[0] : null))}
+          </div>
+        ))}
+        {day.adhoc.length > 0 && <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "var(--ink2)" }}>{t("Stök verkefni")}</div>
+          {day.adhoc.map((a) => row(a.id, a.title, a.done, (v) => tick("adhoc", a.id, v), a.due_time ? `${t("fyrir kl.")} ${a.due_time}` : null))}
+        </div>}
+        {c.total > 0 && c.done === c.total && <div style={{ marginTop: 8, color: "var(--good)", fontWeight: 600, fontSize: 13.5 }}>{t("Allt klárað. Vel gert!")}</div>}
+      </div>
+    );
+  }
+  if (!tasks.length) return null;
+  const doneCount = tasks.filter((x) => x.done).length;
   return (
-    <div className="mini">
+    <div className="mini" id="verkefni">
       <div className="mh" style={{ display: "flex", justifyContent: "space-between" }}>
         <span>{t("Verkefni vaktarinnar")}</span>
         <span style={{ color: doneCount === tasks.length ? "var(--good)" : "var(--ink3)" }}>{doneCount}/{tasks.length}</span>
       </div>
-      {tasks.map((task) => (
-        <label key={task.id} style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13.5, padding: "6px 0", cursor: "pointer" }}>
-          <input type="checkbox" checked={task.done} onChange={(e) => tick(task.id, e.target.checked)} />
-          <span style={task.done ? { textDecoration: "line-through", color: "var(--ink3)" } : undefined}>{task.title}</span>
-        </label>
-      ))}
+      {tasks.map((task) => row(task.id, task.title, task.done, (v) => tickLegacy(task.id, v)))}
     </div>
   );
 }
@@ -473,7 +518,7 @@ function Overview({ onReq, perms, my }: { onReq: (k: ReqKind) => void; perms: Pe
       )}
       {live && <ContractSignCard />}
       {live && <WorkOverviewCard />}
-      {live && my!.tasks.length > 0 && <TasksCard initial={my!.tasks} />}
+      {live && <TasksCard initial={my!.tasks} />}
       <CompanyDocsCardMy />
     </div>
   );

@@ -304,7 +304,7 @@ begin
 
   select coalesce(jsonb_agg(x.j order by x.due nulls last, x.sort, x.name), '[]'::jsonb) into v_lists from (
     select l.due_time as due, l.sort, l.name, jsonb_build_object(
-      'id', l.id, 'name', l.name, 'category', l.category, 'shared', l.shared, 'target', l.target,
+      'id', l.id, 'name', l.name, 'category', l.category, 'shared', l.shared, 'target', l.target, 'remind', l.remind,
       'due_time', to_char(l.due_time, 'HH24:MI'), 'role_id', l.role_id, 'role_name', r.name,
       'from_name', case when l.target = 'employee' and l.employee_id <> p_emp then oe.full_name end,
       'items', (

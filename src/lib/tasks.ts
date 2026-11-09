@@ -13,7 +13,7 @@ export type DayItem = {
   done_at: string | null; done_by_name: string | null; photo_url: string | null; note: string | null;
 };
 export type DayList = {
-  id: string; name: string; category: ListCategory; shared: boolean; target: ListTarget;
+  id: string; name: string; category: ListCategory; shared: boolean; target: ListTarget; remind?: boolean;
   due_time: string | null; role_id: string | null; role_name: string | null; from_name: string | null;
   items: DayItem[];
 };
@@ -21,6 +21,8 @@ export type DayAdhoc = {
   id: string; title: string; due_time: string | null; done: boolean; done_at: string | null; done_by_name: string | null;
   needs_photo: boolean; photo_url: string | null; note: string | null; shared: boolean;
   role_name: string | null; from_name: string | null; created_by_name: string | null;
+  /** Aðeins í appinu: gamall grunnur án 0111 (shift_tasks hakað beint). */
+  legacy?: boolean;
 };
 export type DayTasks = {
   date: string; employee_id: string; on_shift: boolean;
