@@ -1964,6 +1964,7 @@ export const DICT: Dict = {
   "Slepptu myndunum hér": { is: "Slepptu myndunum hér", en: "Drop images here", vi: "Thả ảnh vào đây", pl: "Upuść zdjęcia tutaj" },
   "Bæta við mynd": { is: "Bæta við mynd", en: "Add image", vi: "Thêm ảnh", pl: "Dodaj zdjęcie" },
   "Tókst ekki að hlaða mynd": { is: "Tókst ekki að hlaða mynd", en: "Couldn't upload image", vi: "Không tải được ảnh", pl: "Nie udało się przesłać zdjęcia" },
+  "Sæki tíma…": { is: "Sæki tíma…", en: "Loading hours…", vi: "Đang tải giờ…", pl: "Wczytywanie godzin…" },
   "Mest 10 myndir í einu": { is: "Mest 10 myndir í einu", en: "Up to 10 images at a time", vi: "Tối đa 10 ảnh mỗi lần", pl: "Maksymalnie 10 zdjęć naraz" },
   "Myndir sem bíða sendingar": { is: "Myndir sem bíða sendingar", en: "Images waiting to send", vi: "Ảnh chờ gửi", pl: "Zdjęcia do wysłania" },
   "Aðeins myndir eru studdar": { is: "Aðeins myndir eru studdar", en: "Only images are supported", vi: "Chỉ hỗ trợ hình ảnh", pl: "Obsługiwane są tylko zdjęcia" },
