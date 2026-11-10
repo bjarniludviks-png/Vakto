@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
@@ -30,8 +30,20 @@ export default function EmployeeTimesheet({ id, name, company, initial, initialM
   const [period, setPeriod] = useState<Period>("Mánuður");
   const [from, setFrom] = useState(f0);
   const [to, setTo] = useState(t0);
-  const [rows, setRows] = useState<PunchRow[]>(initial);
-  const [missed, setMissed] = useState<MissedShift[]>(initialMissed);
+  const [rowsRaw, setRows] = useState<PunchRow[]>(initial);
+  const [missedRaw, setMissed] = useState<MissedShift[]>(initialMissed);
+  // Þjónninn sækir alltaf yfirstandandi mánuð; FilterBar setur svo munað tímabil (t.d. síðasta mánuð).
+  // Á meðan sýnum við „Sæki…“ — ekki tíma úr röngu tímabili (sáust áður í ~2 sek. sem ósamþykktir).
+  const [rowsKey, setRowsKey] = useState(`${f0}|${t0}`);
+  const reqRef = useRef(""); // nýjasta beiðni gildir
+  // „ready“ kemur eftir að FilterBar (barn, keyrir sitt effect á undan) hefur sett munað tímabil — fram að því
+  // er óvíst hvort gögn þjónsins séu rétta tímabilið, líka í SSR-HTML-inu.
+  const [ready, setReady] = useState(false);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage-tímabilið er aðeins þekkt eftir hydration
+  useEffect(() => { setReady(true); }, []);
+  const stale = !ready || (!!from && !!to && from <= to && rowsKey !== `${from}|${to}`);
+  const rows = stale ? [] : rowsRaw;
+  const missed = stale ? [] : missedRaw;
   const [onlyDev, setOnlyDev] = useState(false);
   const [mig, setMig] = useState(needsMigration);
   const [loading, setLoading] = useState(false);
@@ -59,8 +71,13 @@ export default function EmployeeTimesheet({ id, name, company, initial, initialM
   }
 
   function reload(fr = from, tt = to) {
+    const key = `${fr}|${tt}`;
+    reqRef.current = key;
     setLoading(true);
-    getEmployeePunches(id, fr, tt).then((r) => { if (r.ok) { setRows(r.rows); setMissed(r.missed); setMig(r.needsMigration); } }).finally(() => setLoading(false));
+    getEmployeePunches(id, fr, tt)
+      .then((r) => { if (reqRef.current !== key) return; if (r.ok) { setRows(r.rows); setMissed(r.missed); setMig(r.needsMigration); } setRowsKey(key); })
+      .catch(() => { if (reqRef.current === key) setRowsKey(key); })
+      .finally(() => { if (reqRef.current === key) setLoading(false); });
   }
   function changePeriod(p: Period) {
     setPeriod(p);
@@ -164,8 +181,10 @@ export default function EmployeeTimesheet({ id, name, company, initial, initialM
             {pending > 0 && selP.size === 0 && <AsyncButton className="btn sm" onClick={approveAll}><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12.5l4 4 10-10" /></svg>{t("Samþykkja allar")}</AsyncButton>}
           </div>
         </div>
-        <div className="cb att" style={{ opacity: loading ? 0.5 : 1 }}>
-          {items.length ? items.map((it) => it.kind === "missed" ? (
+        <div className="cb att" style={{ opacity: loading && !stale ? 0.5 : 1 }}>
+          {stale ? <div className="it" style={{ justifyContent: "center", color: "var(--ink3)", padding: "28px 0" }}>{t("Sæki tíma…")}</div>
+          // eslint-disable-next-line react-hooks/refs -- reqRef er aðeins lesið í reload() (smellir/svar), ekki í render
+          : items.length ? items.map((it) => it.kind === "missed" ? (
             <div className="it" key={`m-${it.m.date}-${it.m.start}`}>
               <div className="tx">
                 <b>{niceISO(it.m.date)}</b>
