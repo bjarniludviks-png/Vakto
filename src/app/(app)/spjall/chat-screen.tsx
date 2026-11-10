@@ -253,6 +253,9 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const [emoji, setEmoji] = useState(false);
   const [rec, setRec] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  // Myndir sem bíða sendingar (dregnar inn / límdar / valdar) — bundnar við þráðinn sem þær voru settar í.
+  const [pendingImgs, setPendingImgs] = useState<{ ch: string; items: { id: string; file: File; preview: string }[] }>({ ch: "", items: [] });
+  const [sendingImgs, setSendingImgs] = useState(false);
   const [modal, setModal] = useState<null | "new" | "group" | "info">(null);
   // „Á vakt“ / virk(ur) hjá viðmælendum í beinum skilaboðum (0099) og léttur prófíll.
   const [presence, setPresence] = useState<Record<string, CoworkerStatus>>({});
@@ -812,8 +815,9 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     atBottomRef.current = true; // sending always jumps to the newest message
     // Optimistic: show the message instantly; the reload reconciles the real row.
     const now = new Date();
+    const tmpId = `tmp-${now.getTime()}-${Math.random().toString(36).slice(2, 7)}`;
     setMsgs((ms) => [...ms, {
-      id: `tmp-${now.getTime()}`, sender: "Ég", senderId: initial.meId, me: true,
+      id: tmpId, sender: "Ég", senderId: initial.meId, me: true,
       body: text, at: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
       kind, url: url ?? null, reactions: [], createdAt: now.toISOString(),
       replyTo: reply ? quoteOf(reply) : null,
@@ -826,7 +830,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     const realId = res.id;
     if (realId) {
       seenRef.current.add(realId);
-      setMsgs((ms) => ms.map((m) => (m.id === `tmp-${now.getTime()}` ? { ...m, id: realId } : m)));
+      setMsgs((ms) => ms.map((m) => (m.id === tmpId ? { ...m, id: realId } : m)));
       // Beint til þeirra sem hafa þráðinn opinn — birtist án þess að bíða eftir gagnagrunnsatburðinum.
       const bc = typingRef.current.ch;
       if (bc) void bc.send({ type: "broadcast", event: "message", payload: {
@@ -863,29 +867,65 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     loadMsgs(active?.id); reloadConvs();
   }
 
-  /** Sendir mynd úr skrá — notað af myndahnappi, myndavél, drag-og-sleppa og líma (Cmd+V). */
-  function sendImageFile(f: File) {
-    if (!active || !f.type.startsWith("image/")) return;
-    const r = new FileReader();
-    r.onload = async () => {
-      const fromName = f.name.includes(".") ? f.name.split(".").pop() : "";
-      let ext = (fromName || f.type.split("/")[1] || "png").toLowerCase().replace("jpeg", "jpg");
-      let data = r.result as string;
-      // Server actions taka max ~1 MB: minnka stórar myndir (retina-skjáskot) í vafranum. GIF óbreytt (hreyfing).
-      if (f.type !== "image/gif") {
-        const small = await shrinkImage(data, 1600).catch(() => null);
-        if (small && small.length < data.length) { data = small; ext = "jpg"; }
-      }
-      const up = await uploadChatMedia(data, ext);
-      if (up.ok && up.url) send("image", up.url, "Mynd"); else toast(up.error ?? "Tókst ekki að hlaða mynd");
-    };
-    r.readAsDataURL(f);
+  const MAX_IMGS = 10;
+  const pending = active && pendingImgs.ch === active.id ? pendingImgs.items : [];
+
+  /** Setur myndir í bakkann við textareitinn (mest 10) — sendast með Senda, á undan textanum. */
+  function addImages(files: File[]) {
+    if (!active || aiOpen) return;
+    const imgs = files.filter((f) => f.type.startsWith("image/"));
+    if (!imgs.length) { if (files.length) toast(t("Aðeins myndir eru studdar")); return; }
+    const room = MAX_IMGS - pending.length;
+    if (room <= 0) { toast(t("Mest 10 myndir í einu")); return; }
+    if (imgs.length > room) toast(t("Mest 10 myndir í einu"));
+    const add = imgs.slice(0, room).map((file) => ({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, file, preview: URL.createObjectURL(file) }));
+    setPendingImgs({ ch: active.id, items: [...pending, ...add] });
+    inputRef.current?.focus();
+  }
+  function removeImage(id: string) {
+    const it = pending.find((x) => x.id === id);
+    if (it) URL.revokeObjectURL(it.preview);
+    setPendingImgs((p) => ({ ...p, items: p.items.filter((x) => x.id !== id) }));
+  }
+
+  /** Les mynd, minnkar ef stór (server actions taka max ~1 MB) og hleður upp. Skilar slóð eða null. */
+  async function uploadImageFile(f: File): Promise<string | null> {
+    const data0 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result as string); r.onerror = rej; r.readAsDataURL(f); });
+    const fromName = f.name.includes(".") ? f.name.split(".").pop() : "";
+    let ext = (fromName || f.type.split("/")[1] || "png").toLowerCase().replace("jpeg", "jpg");
+    let data = data0;
+    if (f.type !== "image/gif") { // GIF óbreytt (hreyfing)
+      const small = await shrinkImage(data0, 1600).catch(() => null);
+      if (small && small.length < data0.length) { data = small; ext = "jpg"; }
+    }
+    const up = await uploadChatMedia(data, ext);
+    if (up.ok && up.url) return up.url;
+    toast(up.error ?? t("Tókst ekki að hlaða mynd"));
+    return null;
+  }
+
+  /** Senda: myndirnar í bakkanum fyrst (í röð), svo textinn. */
+  async function sendAll() {
+    if (sendingImgs) return;
+    if (!pending.length || editing) { send(); return; }
+    const items = pending, text = val;
+    setSendingImgs(true);
+    try {
+      const urls = await Promise.all(items.map((x) => uploadImageFile(x.file).catch(() => null)));
+      // Fjarlægja sendar myndir; þær sem mistókust (og nýjar sem bættust við á meðan) verða eftir.
+      setPendingImgs((p) => ({ ...p, items: p.items.filter((x) => { const i = items.indexOf(x); return i < 0 || !urls[i]; }) }));
+      items.forEach((x, i) => { if (urls[i]) URL.revokeObjectURL(x.preview); });
+      for (const u of urls) if (u) await send("image", u, "Mynd");
+      if (text.trim()) await send("text", undefined, text);
+    } finally {
+      setSendingImgs(false);
+      inputRef.current?.focus();
+    }
   }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]; if (!f || !active) return;
-    e.target.value = ""; // myndasafn eða myndavél (sími)
-    sendImageFile(f);
+    const fs = Array.from(e.target.files ?? []); e.target.value = ""; // myndasafn eða myndavél (sími)
+    addImages(fs);
   }
 
   const dragDepth = useRef(0);
@@ -902,10 +942,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   function onDrop(e: React.DragEvent) {
     if (!hasFiles(e)) return;
     e.preventDefault(); dragDepth.current = 0; setDragOver(false);
-    if (!active || aiOpen) return;
-    const imgs = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
-    if (!imgs.length) { toast(t("Aðeins myndir eru studdar")); return; }
-    imgs.slice(0, 10).forEach(sendImageFile);
+    addImages(Array.from(e.dataTransfer.files));
   }
 
   async function toggleRec() {
@@ -1102,7 +1139,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
           onDragEnter={onDragEnter} onDragLeave={onDragLeave}
           onDragOver={(e) => { if (active && !aiOpen && hasFiles(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } }}
           onDrop={onDrop}>
-          {dragOver && <div className="msgr-drop" aria-hidden="true"><span>{t("Slepptu myndinni til að senda")}</span></div>}
+          {dragOver && <div className="msgr-drop" aria-hidden="true"><span>{t("Slepptu myndunum hér")}</span></div>}
           {aiOpen ? (
             <>
               <div className="msgr-head">
@@ -1300,6 +1337,21 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                   ))}
                 </div>
               )}
+              {pending.length > 0 && (
+                <div className={`msgr-tray${sendingImgs ? " busy" : ""}`} aria-label={t("Myndir sem bíða sendingar")}>
+                  {pending.map((x) => (
+                    <div key={x.id} className="msgr-tray-it">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={x.preview} alt="" />
+                      {!sendingImgs && <button type="button" onClick={() => removeImage(x.id)} aria-label={t("Fjarlægja")}>×</button>}
+                    </div>
+                  ))}
+                  {pending.length < MAX_IMGS && !sendingImgs && (
+                    <button type="button" className="msgr-tray-add" onClick={() => fileRef.current?.click()} aria-label={t("Bæta við mynd")}>+</button>
+                  )}
+                  {sendingImgs && <span className="msgr-tray-busy">{t("Sendi…")}</span>}
+                </div>
+              )}
               <div className={`msgr-input${phone ? " mob" : ""}`}>
                 {phone ? (
                   // Sími: + (tákn) · myndavél · myndasafn · hljóðnemi — falla saman í ör meðan skrifað er.
@@ -1337,7 +1389,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                   onPaste={(e) => {
                     const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith("image/"));
                     if (!imgs.length) return;
-                    e.preventDefault(); imgs.slice(0, 10).forEach(sendImageFile);
+                    e.preventDefault(); addImages(imgs);
                   }}
                   onKeyDown={(e) => {
                     if (mqList.length) {
@@ -1345,13 +1397,13 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                       if ((e.key === "Enter" || e.key === "Tab") && !e.nativeEvent.isComposing) { e.preventDefault(); pickMention(mqList[Math.min(mqIdx, mqList.length - 1)]); return; }
                       if (e.key === "Escape") { e.preventDefault(); setMq(null); return; }
                     }
-                    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); send(); inputRef.current?.focus(); }
+                    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void sendAll(); inputRef.current?.focus(); }
                   }}
                 />
-                <button className="msgr-send" disabled={!val.trim() && !rec} onPointerDown={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()} onClick={() => { if (rec && !val.trim()) { void toggleRec(); return; } send(); inputRef.current?.focus(); }} aria-label={t("chat:send")}>
+                <button className="msgr-send" disabled={(!val.trim() && !rec && !pending.length) || sendingImgs} onPointerDown={(e) => e.preventDefault()} onMouseDown={(e) => e.preventDefault()} onClick={() => { if (rec && !val.trim()) { void toggleRec(); return; } void sendAll(); inputRef.current?.focus(); }} aria-label={t("chat:send")}>
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z" /><path d="M22 2 11 13" /></svg>
                 </button>
-                <input ref={fileRef} type="file" accept="image/*,image/gif" hidden onChange={onFile} />
+                <input ref={fileRef} type="file" accept="image/*,image/gif" multiple hidden onChange={onFile} />
                 <input ref={camRef} type="file" accept="image/*" capture="environment" hidden onChange={onFile} />
               </div>
             </>

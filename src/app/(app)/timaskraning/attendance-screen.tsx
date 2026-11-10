@@ -243,8 +243,10 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
   const isHidden = (r: AttRow) => hidden.has(r.id) || (!!r.inactive && r.actual === 0);
   const hiddenN = matched.filter(isHidden).length;
   const unhidden = showHidden || search ? matched : matched.filter((r) => !isHidden(r));
-  const emptyN = unhidden.filter((r) => !hasData(r)).length;
-  const shown = showEmpty || search ? unhidden : unhidden.filter(hasData);
+  // „Sýna falda“ birtir þá líka þótt þeir séu án plans/stimplunar (óvirkir eru það nær alltaf) — annars gerðist ekkert.
+  const revealed = (r: AttRow) => showHidden && isHidden(r);
+  const emptyN = unhidden.filter((r) => !hasData(r) && !revealed(r)).length;
+  const shown = showEmpty || search ? unhidden : unhidden.filter((r) => hasData(r) || revealed(r));
   // Samanburður við plan sem er LOKIÐ: vakt sem stendur yfir (eða er fram undan) telst ekki fyrr en henni lýkur,
   // eins og stimplun telst ekki fyrr en stimplað er út. Á liðnu tímabili er það allt planið.
   const devOf = (r: AttRow) => Math.round((r.actual - r.plannedToDate) * 10) / 10;
