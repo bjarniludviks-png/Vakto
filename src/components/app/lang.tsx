@@ -1961,6 +1961,8 @@ export const DICT: Dict = {
   "Laun % af veltuspá": { is: "Laun % af veltuspá", en: "Labor % of forecast", vi: "% lương / doanh thu dự báo", pl: "% wynagrodzeń w prognozie obrotu" },
   "markmið": { is: "markmið", en: "target", vi: "mục tiêu", pl: "cel" },
   "svigrúm": { is: "svigrúm", en: "headroom", vi: "còn dư", pl: "zapas" },
+  "Slepptu myndinni til að senda": { is: "Slepptu myndinni til að senda", en: "Drop the image to send", vi: "Thả ảnh để gửi", pl: "Upuść zdjęcie, aby wysłać" },
+  "Aðeins myndir eru studdar": { is: "Aðeins myndir eru studdar", en: "Only images are supported", vi: "Chỉ hỗ trợ hình ảnh", pl: "Obsługiwane są tylko zdjęcia" },
   "Veltuspá byggir á meðalveltu vikudaga þar sem rauntölur vantar": { is: "Veltuspá byggir á meðalveltu vikudaga þar sem rauntölur vantar", en: "Forecast uses weekday averages where actual sales are missing", vi: "Dự báo dùng doanh thu trung bình theo thứ khi thiếu số liệu thực", pl: "Prognoza obrotu opiera się na średnim obrocie dni tygodnia tam, gdzie brakuje danych rzeczywistych" },
   "Laun % af veltu — markmið": { is: "Laun % af veltu — markmið", en: "Labor % of sales — target", vi: "% lương / doanh thu — mục tiêu", pl: "% wynagrodzeń w obrocie — cel" },
   "Hámark í fríi sama dag": { is: "Hámark í fríi sama dag", en: "Max on leave per day", vi: "Tối đa nghỉ cùng ngày", pl: "Maks. osób na urlopie tego samego dnia" },

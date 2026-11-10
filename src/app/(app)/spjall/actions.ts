@@ -713,7 +713,9 @@ export async function uploadChatMedia(dataUrl: string, ext: string): Promise<{ o
     const meta = dataUrl.slice(5, comma); // e.g. image/png;base64
     const contentType = meta.split(";")[0] || "application/octet-stream";
     const buf = Buffer.from(dataUrl.slice(comma + 1), "base64");
-    const path = `${ctx.company}/${ctx.userId}/${Date.now()}.${ext}`;
+    const safeExt = (ext || "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || "bin";
+    // Handahófsviðskeyti: margar myndir sem er sleppt í einu fá ekki sama nafn
+    const path = `${ctx.company}/${ctx.userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExt}`;
     const { error } = await supabase.storage.from("chat").upload(path, buf, { contentType, upsert: false });
     if (error) return { ok: false, error: userError(error) };
     const { data } = supabase.storage.from("chat").getPublicUrl(path);

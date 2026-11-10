@@ -252,6 +252,7 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
   const [search, setSearch] = useState("");
   const [emoji, setEmoji] = useState(false);
   const [rec, setRec] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [modal, setModal] = useState<null | "new" | "group" | "info">(null);
   // „Á vakt“ / virk(ur) hjá viðmælendum í beinum skilaboðum (0099) og léttur prófíll.
   const [presence, setPresence] = useState<Record<string, CoworkerStatus>>({});
@@ -862,16 +863,49 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     loadMsgs(active?.id); reloadConvs();
   }
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]; if (!f || !active) return;
-    e.target.value = ""; // myndasafn eða myndavél (sími)
+  /** Sendir mynd úr skrá — notað af myndahnappi, myndavél, drag-og-sleppa og líma (Cmd+V). */
+  function sendImageFile(f: File) {
+    if (!active || !f.type.startsWith("image/")) return;
     const r = new FileReader();
     r.onload = async () => {
-      const ext = (f.name.split(".").pop() || "png").toLowerCase();
-      const up = await uploadChatMedia(r.result as string, ext);
+      const fromName = f.name.includes(".") ? f.name.split(".").pop() : "";
+      let ext = (fromName || f.type.split("/")[1] || "png").toLowerCase().replace("jpeg", "jpg");
+      let data = r.result as string;
+      // Server actions taka max ~1 MB: minnka stórar myndir (retina-skjáskot) í vafranum. GIF óbreytt (hreyfing).
+      if (f.type !== "image/gif") {
+        const small = await shrinkImage(data, 1600).catch(() => null);
+        if (small && small.length < data.length) { data = small; ext = "jpg"; }
+      }
+      const up = await uploadChatMedia(data, ext);
       if (up.ok && up.url) send("image", up.url, "Mynd"); else toast(up.error ?? "Tókst ekki að hlaða mynd");
     };
     r.readAsDataURL(f);
+  }
+
+  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; if (!f || !active) return;
+    e.target.value = ""; // myndasafn eða myndavél (sími)
+    sendImageFile(f);
+  }
+
+  const dragDepth = useRef(0);
+  const hasFiles = (e: React.DragEvent) => Array.from(e.dataTransfer?.types ?? []).includes("Files");
+  function onDragEnter(e: React.DragEvent) {
+    if (!active || aiOpen || !hasFiles(e)) return;
+    e.preventDefault(); dragDepth.current++; setDragOver(true);
+  }
+  function onDragLeave(e: React.DragEvent) {
+    if (!hasFiles(e)) return;
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (!dragDepth.current) setDragOver(false);
+  }
+  function onDrop(e: React.DragEvent) {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); dragDepth.current = 0; setDragOver(false);
+    if (!active || aiOpen) return;
+    const imgs = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
+    if (!imgs.length) { toast(t("Aðeins myndir eru studdar")); return; }
+    imgs.slice(0, 10).forEach(sendImageFile);
   }
 
   async function toggleRec() {
@@ -1064,7 +1098,11 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
         </div>
 
         {/* (b) thread */}
-        <div className="msgr-thread">
+        <div className={`msgr-thread${dragOver ? " drop" : ""}`}
+          onDragEnter={onDragEnter} onDragLeave={onDragLeave}
+          onDragOver={(e) => { if (active && !aiOpen && hasFiles(e)) { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } }}
+          onDrop={onDrop}>
+          {dragOver && <div className="msgr-drop" aria-hidden="true"><span>{t("Slepptu myndinni til að senda")}</span></div>}
           {aiOpen ? (
             <>
               <div className="msgr-head">
@@ -1296,6 +1334,11 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
                     setMq(q); if (q?.q !== mq?.q) setMqIdx(0);
                   }}
                   onBlur={() => { sendTyping(true); setMq(null); }}
+                  onPaste={(e) => {
+                    const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) => f.type.startsWith("image/"));
+                    if (!imgs.length) return;
+                    e.preventDefault(); imgs.slice(0, 10).forEach(sendImageFile);
+                  }}
                   onKeyDown={(e) => {
                     if (mqList.length) {
                       if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); setMqIdx((i) => (i + (e.key === "ArrowDown" ? 1 : mqList.length - 1)) % mqList.length); return; }
@@ -1718,4 +1761,22 @@ function DemoChat() {
       </div>
     </>
   );
+}
+
+/** Minnkar mynd svo lengri hliðin sé mest `max` px og skilar JPEG-dataURL. */
+function shrinkImage(dataUrl: string, max: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const w = Math.round(img.width * k), h = Math.round(img.height * k);
+      const c = document.createElement("canvas"); c.width = w; c.height = h;
+      const g = c.getContext("2d"); if (!g) { reject(new Error("canvas")); return; }
+      g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); // gegnsæ PNG verða hvít, ekki svört
+      g.drawImage(img, 0, 0, w, h);
+      resolve(c.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => reject(new Error("img"));
+    img.src = dataUrl;
+  });
 }
