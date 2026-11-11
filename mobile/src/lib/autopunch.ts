@@ -7,12 +7,21 @@
 // stýrikerfið ræsir appið í bakgrunni við atburð.
 import { Platform } from "react-native";
 import * as Location from "expo-location";
-import * as TaskManager from "expo-task-manager";
+import type * as TaskManagerT from "expo-task-manager";
 import { supabase } from "./supabase";
 
 export const AUTO_PUNCH_TASK = "vakto-auto-punch";
+// Eldri build (fyrir 0112) hafa ekki native-hluta expo-task-manager. Ef þessi kóði berst þangað með OTA
+// má appið ekki hrynja — þá er sjálfvirk stimplun einfaldlega ekki í boði á þeim síma.
+let TaskManager: typeof TaskManagerT | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  TaskManager = require("expo-task-manager") as typeof TaskManagerT;
+} catch {
+  TaskManager = null;
+}
 const API = (process.env.EXPO_PUBLIC_API_URL ?? "https://www.vakto.is").replace(/\/$/, "");
-const native = Platform.OS === "ios" || Platform.OS === "android";
+const platformOk = Platform.OS === "ios" || Platform.OS === "android";
 
 export type AutoPunchMode = "off" | "suggest" | "auto";
 export type Region = { id: string; name: string; lat: number; lng: number; radius: number };
@@ -48,12 +57,16 @@ async function report(type: "enter" | "exit", region: Location.LocationRegion): 
   await call("POST", { action: "event", type, locationId: region.identifier, ...pos, at: new Date().toISOString() });
 }
 
-if (native && !TaskManager.isTaskDefined(AUTO_PUNCH_TASK)) {
-  TaskManager.defineTask<{ eventType: Location.GeofencingEventType; region: Location.LocationRegion }>(AUTO_PUNCH_TASK, async ({ data, error }) => {
+const native = platformOk && !!TaskManager;
+
+if (native && TaskManager) try {
+  if (!TaskManager.isTaskDefined(AUTO_PUNCH_TASK)) TaskManager.defineTask<{ eventType: Location.GeofencingEventType; region: Location.LocationRegion }>(AUTO_PUNCH_TASK, async ({ data, error }) => {
     if (error || !data?.region) return;
     if (data.eventType === Location.GeofencingEventType.Enter) await report("enter", data.region);
     else if (data.eventType === Location.GeofencingEventType.Exit) await report("exit", data.region);
   });
+} catch (e) {
+  console.warn("auto-punch task", e);
 }
 
 export async function getAutoPunch(): Promise<AutoPunchState | null> {
