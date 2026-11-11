@@ -1,6 +1,9 @@
 // Allur texti verðsíðunnar (/verd) á íslensku og ensku. Tölurnar sjálfar koma úr src/lib/plans.ts
 // og eru settar inn í textann með föllum (m = krónur á tungumáli síðunnar, t.d. „9.990 kr“ / „ISK 9,990“).
-import type { SiteLang } from "./lang";
+import type { SiteLang } from "./i18n";
+import * as da from "./text/da";
+import * as sv from "./text/sv";
+import * as nb from "./text/nb";
 import { AI_PACK, type TeamPlanId } from "@/lib/plans";
 
 type Money = (n: number) => string;
@@ -18,6 +21,8 @@ const is = {
   eyebrow: "Verð",
   h1a: "Vaktaplanið er frítt.", h1b: "Launin reiknast sjálf.",
   lede: "Byrjaðu frítt. Veldu leið eftir stærð og borgaðu aðeins fyrir þá sem unnu í mánuðinum. Engin binding, engin falin gjöld.",
+  /** Athugasemd undir hetju um gjaldmiðil (aðeins utan Íslands): verðin eru í ISK, staðbundið verð eftir samtali. */
+  localNote: null as string | null,
   billing: "Greiðslutímabil", monthly: "Mánaðarlega", yearly: "Árlega", save: "−15%",
   perMo: "kr/mán", vat: "Án VSK",
   yearlyNote: (m: Money, n: number) => `Greitt árlega: ${m(n)} á ári`,
@@ -133,6 +138,7 @@ const en: typeof is = {
   eyebrow: "Pricing",
   h1a: "The schedule is free.", h1b: "Payroll runs itself.",
   lede: "Start free. Pick a plan by size and only pay for the people who worked that month. No commitment, no hidden fees.",
+  localNote: "Prices are in Icelandic krónur (ISK). Outside Iceland? Contact us for pricing in your currency.",
   billing: "Billing period", monthly: "Monthly", yearly: "Yearly", save: "−15%",
   perMo: "ISK/mo", vat: "Excl. VAT",
   yearlyNote: (m: Money, n: number) => `Billed yearly: ${m(n)} a year`,
@@ -241,4 +247,6 @@ const en: typeof is = {
   endOr: "Questions about pricing? ", fine: "All prices are in Icelandic krónur, per month, excl. VAT.",
 };
 
-export const PRICING_TEXT: Record<SiteLang, typeof is> = { is, en };
+export type PricingText = typeof is;
+export type { Money, Inc, Feat, Cell };
+export const PRICING_TEXT: Record<SiteLang, PricingText> = { is, en, da: da.pricing, sv: sv.pricing, nb: nb.pricing };

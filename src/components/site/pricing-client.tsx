@@ -5,10 +5,10 @@
 import { useMemo, useState } from "react";
 import AhFooter from "./ah-footer";
 import SiteNav from "./site-nav";
-import { useSiteLang, type SiteLang } from "./lang";
+import { useSiteLang } from "./lang";
+import { appHref, fmtMoney, fmtNum, type SiteLang } from "./i18n";
 import { Glow } from "./home-client";
 import { PRICING_TEXT } from "./pricing-text";
-import { nf } from "@/lib/format";
 import {
   AI_PACK, ANNUAL_DISCOUNT, ESIGN_PRICE, PLANS, QUOTE_ABOVE_EMPLOYEES,
   annualMonthly, cheapestPlan, planCost, type Plan, type TeamPlanId } from "@/lib/plans";
@@ -17,9 +17,11 @@ const HOT = "voxtur";
 const EMP_MAX = QUOTE_ABOVE_EMPLOYEES;
 const AI_MAX = 500;
 
-/** Þúsundaskil eftir tungumáli: 9.990 / 9,990. */
-const num = (lang: SiteLang, n: number) => (lang === "en" ? nf(n).replace(/\./g, ",") : nf(n));
-const moneyFor = (lang: SiteLang) => (n: number) => (lang === "en" ? `ISK ${num(lang, n)}` : `${num(lang, n)} kr`);
+/** Þúsundaskil og gjaldmiðill eftir tungumáli (i18n.ts): 9.990 kr / ISK 9,990 / 9 990 ISK. */
+const num = (lang: SiteLang, n: number) => fmtNum(lang, n);
+const moneyFor = (lang: SiteLang) => (n: number) => fmtMoney(lang, n);
+/** Hlekkir leiða: nýskráning fær ?lang=en utan íslensku; mailto-hlekkir óbreyttir. */
+const planHref = (lang: SiteLang, href: string) => (href.startsWith("/") ? appHref(lang, href) : href);
 
 /** Fyrsti starfsmannafjöldi þar sem leiðin `id` verður ódýrust (án AI). */
 function crossover(id: Plan["id"]) {
@@ -57,6 +59,7 @@ export default function PricingClient() {
           <p className="ah-eyebrow">{t.eyebrow}</p>
           <h1>{t.h1a}<br /><span>{t.h1b}</span></h1>
           <p className="ah-lede">{t.lede}</p>
+          {t.localNote && <p className="vp-local"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 7.5v.5" /></svg><span>{t.localNote} <a href="mailto:hallo@vakto.is?subject=VAKTO%20pricing">hallo@vakto.is</a></span></p>}
           <div className="vp-toggle" role="group" aria-label={t.billing}>
             <button type="button" aria-pressed={!yearly} onClick={() => setYearly(false)}>{t.monthly}</button>
             <button type="button" aria-pressed={yearly} onClick={() => setYearly(true)}>{t.yearly} <span className="vp-save">{t.save}</span></button>
@@ -75,7 +78,7 @@ export default function PricingClient() {
                 <div className="vp-amt"><b>{num(lang, price(p.base))}</b><span>{t.perMo}</span></div>
                 <p className="vp-inc">{c.inc(m, p.included, price(p.extraPerEmployee ?? 0))}</p>
                 <p className="vp-yr">{yearly && p.base > 0 ? t.yearlyNote(m, price(p.base) * 12) : t.vat}</p>
-                <a className={`ah-btn vp-btn${hot ? "" : " vp-btn-2"}`} href={c.href}>{c.btn}</a>
+                <a className={`ah-btn vp-btn${hot ? "" : " vp-btn-2"}`} href={planHref(lang, c.href)}>{c.btn}</a>
                 <ul className="vp-fl">
                   {c.f.map(([label, ok]) => ok === 2
                     ? <li key={label} className="vp-lead">{label}</li>
@@ -129,7 +132,7 @@ export default function PricingClient() {
               </ul>
               {best.plan.id === "free" && <p className="vp-res-note">{t.freeNote}</p>}
               {emp >= EMP_MAX && <p className="vp-res-note">{t.overQuote(EMP_MAX)}</p>}
-              <a className="ah-btn vp-res-btn" href={t.plans[bestId].href}>{t.plans[bestId].btn}</a>
+              <a className="ah-btn vp-res-btn" href={planHref(lang, t.plans[bestId].href)}>{t.plans[bestId].btn}</a>
             </div>
           </div>
           <p className="vp-cross"><b>{t.crossH}</b> {t.cross(toVoxtur, toRekstur)}</p>
@@ -210,7 +213,7 @@ export default function PricingClient() {
         <section className="vp-end">
           <h2>{t.endH}</h2>
           <p>{t.endP}</p>
-          <a className="ah-btn ah-btn-lg" href="/nyskraning?plan=free">{t.endBtn}</a>
+          <a className="ah-btn ah-btn-lg" href={appHref(lang, "/nyskraning?plan=free")}>{t.endBtn}</a>
           <p className="vp-end-or">{t.endOr}<a href="mailto:hallo@vakto.is">hallo@vakto.is</a></p>
           <p className="vp-fine">{t.fine}</p>
         </section>
