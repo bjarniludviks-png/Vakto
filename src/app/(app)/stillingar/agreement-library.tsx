@@ -202,12 +202,12 @@ function ApplyPanel({ preset, templateId, label, setup, onDone }: { preset?: str
   const current = (e: AgreementSetup["employees"][number]) => (e.custom ? (e.templateName ?? CUSTOM_UNION) : e.used);
   async function go() {
     if (!sel.size && !makeDefault) { toast(t("Veldu starfsfólk eða staðal fyrir nýtt starfsfólk")); return; }
-    if (sel.size && !window.confirm(`${t("lib:laun")} ${sel.size} ${t("starfsmanna reiknast eftir")} „${label}“ ${t("frá og með næstu launakeyrslu. Halda áfram?")}`)) return;
+    if (sel.size && !window.confirm(`${t("lib:laun")} ${sel.size} ${t(one(sel.size) ? "starfsmanns reiknast eftir" : "starfsmanna reiknast eftir")} „${label}“ ${t("frá og með næstu launakeyrslu. Halda áfram?")}`)) return;
     setBusy(true);
     const r = await applyAgreement({ preset, templateId, employeeIds: [...sel], makeDefault });
     setBusy(false);
     if (!r.ok) { toast(r.error ?? t("Tókst ekki")); return; }
-    toast(r.demo ? t("Vistað (demo)") : `${t("Reglan er komin á")}${r.count ? ` ${r.count} ${t("starfsmenn")}` : ""}${makeDefault ? ` · ${t("staðall fyrir nýtt starfsfólk")}` : ""}`);
+    toast(r.demo ? t("Vistað (demo)") : `${t("Reglan er komin á")}${r.count ? ` ${r.count} ${t(one(r.count) ? "starfsmann" : "starfsmenn")}` : ""}${makeDefault ? ` · ${t("staðall fyrir nýtt starfsfólk")}` : ""}`);
     onDone();
   }
   return (
@@ -233,12 +233,22 @@ function ApplyPanel({ preset, templateId, label, setup, onDone }: { preset?: str
         {emps.length === 0 && <p className="muted" style={{ fontSize: 12.5 }}>{t("Ekkert virkt starfsfólk.")}</p>}
       </div>
       <p className="muted" style={{ fontSize: 11.5, margin: "8px 0", lineHeight: 1.5 }}>{t("Aðeins valið starfsfólk breytist. Félagsaðild helst; reglan sem launin reiknast eftir breytist frá og með næstu launakeyrslu. Lokaðar launakeyrslur breytast ekki.")}</p>
-      <button className="btn primary" disabled={busy} onClick={go}>{busy ? t("Vista…") : sel.size ? `${t("Nota á")} ${sel.size} ${t("starfsmenn")}` : t("Vista")}</button>
+      <button className="btn primary" disabled={busy} onClick={go}>{busy ? t("Vista…") : sel.size ? `${t("Nota á")} ${sel.size} ${t(one(sel.size) ? "starfsmann" : "starfsmenn")}` : t("Vista")}</button>
     </div>
   );
 }
 
+/** Íslensk tala: 1, 21, 31 … (ekki 11) taka eintölu — „1 starfsmann“, „21 starfsmanns“. */
+const one = (n: number) => n % 10 === 1 && n % 100 !== 11;
+
 // ============================================================ spyrja AI
+/** AI-svar sem texti: **feitletrun** verður <strong>, fyrirsagnamerki (#) og ` hverfa — enginn hrár markdown. */
+function plainAnswer(a: string) {
+  const clean = a.replace(/^#{1,6}\s+/gm, "").replace(/`/g, "");
+  return clean.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") && part.length > 4 ? <strong key={i}>{part.slice(2, -2)}</strong> : part.replace(/\*\*/g, ""));
+}
+
 function AskPanel({ agreementId, templateId }: { agreementId?: string; templateId?: string }) {
   const { t } = useLang();
   const [q, setQ] = useState("");
@@ -258,7 +268,7 @@ function AskPanel({ agreementId, templateId }: { agreementId?: string; templateI
   return (
     <div className="kjs-panel">
       {hist.map((h, i) => (
-        <div key={i} className="kjs-qa"><div className="q">{h.q}</div><div className="a">{h.a}</div></div>
+        <div key={i} className="kjs-qa"><div className="q">{h.q}</div><div className="a">{plainAnswer(h.a)}</div></div>
       ))}
       <textarea className="lf-ta" rows={2} value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("t.d. Hvað fær starfsmaður fyrir vakt á laugardagskvöldi? Hvenær fær hann 30 daga orlof?")}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void ask(); } }} />

@@ -27,6 +27,8 @@ export const KJARASAMNINGAR_DICT: Record<string, Entry> = Object.fromEntries([
   e("Aðeins eigandi eða stjórnandi með aðgang að launakeyrslum getur breytt launareglum.", "Only the owner or a manager with payroll access can change pay rules."),
   e("Veldu starfsfólk eða staðal fyrir nýtt starfsfólk", "Choose staff or make it the default for new staff"),
   e("starfsmanna reiknast eftir", "employees will be calculated by"),
+  e("starfsmanns reiknast eftir", "employee will be calculated by"),
+  e("starfsmann", "employee"),
   e("frá og með næstu launakeyrslu. Halda áfram?", "from the next payroll run. Continue?"),
   e("Reglan er komin á", "Rule applied to"),
   e("staðall fyrir nýtt starfsfólk", "default for new staff"),

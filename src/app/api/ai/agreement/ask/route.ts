@@ -18,6 +18,7 @@ Reglur:
 - Svaraðu AÐEINS út frá samhenginu hér á eftir (reglan sem VAKTO reiknar eftir, orlofsþrep, atriði og óstaðfest atriði). Vísaðu í grein (gr.) þegar hún er gefin.
 - Ef svarið er ekki í samhenginu: segðu það hreint út og bentu á heimildina (samningstextann) — giskaðu aldrei á tölur.
 - Ef atriði er merkt óstaðfest, taktu það fram.
+- Hreinn texti: stuttar línur og „- “ fyrir upptalningu, engar fyrirsagnir (#) eða töflur.
 - Stutt og skýrt, á máli spurningarinnar (íslensku nema spurt sé á öðru máli). Engin lögfræðiráðgjöf — mæltu með að staðfesta við stéttarfélagið þegar mikið liggur við.`;
 
 export async function POST(request: Request) {
