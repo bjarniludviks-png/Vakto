@@ -317,6 +317,19 @@ export const WRITE_TOOLS: Anthropic.Tool[] = [
     description: "LEGGJA TIL að senda skýrslu úr Skýrslusafninu strax í tölvupósti á netfang notandans sem biður um hana (tafla + Excel). „Sendu mér mætingarskýrslu síðasta mánaðar“ → report attendance, from/to = fyrsti og síðasti dagur síðasta mánaðar. Skýrslur eins og í schedule_report, auk timebank (orlof & tímabanki).",
     input_schema: { type: "object", properties: { report: { type: "string", enum: REPORTS }, from: DATE, to: DATE }, required: ["report", "from", "to"] },
   },
+  {
+    name: "contact_support",
+    description: "LEGGJA TIL beiðni til þjónustuvers VAKTO (manneskja hjá VAKTO svarar í tölvupósti, yfirleitt samdægurs). Notaðu þegar notandinn biður um að tala við VAKTO/manneskju, þegar eitthvað virðist bilað í kerfinu (villa, hnappur virkar ekki, tölur virðast rangar), þegar þig vantar upplýsingar til að hjálpa, eða þegar beðið er um eitthvað sem kerfið getur ekki (sérþarfir, ný tenging, reikningar/áskrift sem þú getur ekki leyst). Skrifaðu summary þannig að starfsmaður VAKTO skilji vandann án þess að spyrja aftur: hvað notandinn ætlaði að gera, hvað gerðist, hvar í kerfinu, dagsetningar/nöfn sem skipta máli og hvað hefur verið reynt. Ekkert er sent fyrr en notandinn ýtir á „Staðfesta“. Samtalið fylgir sjálfkrafa nema notandinn vilji það ekki (includeConversation false).",
+    input_schema: {
+      type: "object",
+      properties: {
+        subject: { type: "string", description: "Stutt fyrirsögn, t.d. „Payday-tenging hafnar launakeyrslu“" },
+        summary: { type: "string", description: "Lýsing á vandanum fyrir þjónustuverið (3–8 setningar)" },
+        includeConversation: { type: "boolean", description: "Láta samtalið við VAKTO AI fylgja (sjálfgefið true)" },
+      },
+      required: ["subject", "summary"],
+    },
+  },
 ];
 
 export const WRITE_NAMES = new Set(WRITE_TOOLS.map((t) => t.name));
@@ -735,6 +748,14 @@ export function describeWrite(name: string, input: In, lang: string): { ok: true
     case "remove_planning_rule":
       if (!str(input.id)) return { ok: false, error: "Vantar id" };
       return { ok: true, summary: `${en ? "Delete planning rule" : "Eyða planreglu"}: ${str(input.label) || str(input.id)}` };
+    case "contact_support": {
+      const subj = str(input.subject), sum = str(input.summary);
+      if (subj.length < 3 || sum.length < 10) return { ok: false, error: "Vantar fyrirsögn eða lýsingu á vandanum" };
+      const convo = input.includeConversation !== false;
+      return { ok: true, summary: en
+        ? `Send a request to VAKTO support: "${subj.slice(0, 120)}"${convo ? " (this conversation is attached)" : ""}. VAKTO replies to your email.`
+        : `Senda beiðni til þjónustuvers VAKTO: „${subj.slice(0, 120)}“${convo ? " (samtalið fylgir)" : ""}. VAKTO svarar á netfangið þitt.` };
+    }
     case "resend_contract":
       if (!who) return { ok: false, error: "Vantar starfsmann" };
       return { ok: true, summary: `${en ? "Resend contract for signature" : "Senda samning aftur til undirritunar"}: ${str(input.label) || who}` };
@@ -835,6 +856,8 @@ export async function executeWrite(name: string, input: In): Promise<{ ok: boole
       return addPlanningRule(str(input.text), "ai");
     case "remove_planning_rule":
       return deletePlanningRule(str(input.id));
+    case "contact_support":
+      return sendSupportRequest(input);
     case "resend_contract": {
       const { employees } = await getEmployees();
       const hits = matchStaff(employees.filter((e) => e.status !== "inactive"), str(input.employee));
@@ -844,4 +867,24 @@ export async function executeWrite(name: string, input: In): Promise<{ ok: boole
     }
   }
   return { ok: false, error: "Óþekkt aðgerð" };
+}
+
+/** Beiðni til þjónustuvers: notandinn og fyrirtækið eru lesin úr innskráningunni (aldrei úr líkaninu). */
+async function sendSupportRequest(input: In): Promise<{ ok: boolean; error?: string }> {
+  const supabase = await createClient();
+  const { assistantUser } = await import("./assistant-auth");
+  const me = await assistantUser(supabase);
+  if ("error" in me) return { ok: false, error: me.error };
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: u } = await supabase.from("users").select("full_name").eq("id", me.userId).maybeSingle();
+  const raw = Array.isArray(input.transcript) ? (input.transcript as { role?: unknown; content?: unknown }[]) : [];
+  const transcript = input.includeConversation === false ? [] : raw
+    .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim())
+    .map((m) => ({ role: m.role as "user" | "assistant", content: String(m.content).slice(0, 2000) }));
+  const { createSupportRequest } = await import("@/lib/support.server");
+  return createSupportRequest({
+    userId: me.userId, name: (u?.full_name as string) || me.name, email: user?.email ?? "", company: me.company, role: me.role,
+    subject: str(input.subject).slice(0, 160), summary: str(input.summary).slice(0, 3000), transcript,
+    page: str(input.page).slice(0, 120), lang: str(input.lang),
+  });
 }

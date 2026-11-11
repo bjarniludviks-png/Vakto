@@ -8,11 +8,11 @@ import { LangToggle, useLangSync } from "./lang";
 import SiteAnalytics from "./analytics";
 
 const N = {
-  is: { product: "Kerfið", contracts: "Samningar", price: "Verð", about: "Um okkur", login: "Innskráning", try: "Prófa frítt", open: "Opna valmynd", close: "Loka valmynd" },
-  en: { product: "Product", contracts: "Contracts", price: "Pricing", about: "About", login: "Sign in", try: "Try free", open: "Open menu", close: "Close menu" },
+  is: { ai: "VAKTO AI", product: "Kerfið", contracts: "Samningar", price: "Verð", about: "Um okkur", login: "Innskráning", try: "Prófa frítt", open: "Opna valmynd", close: "Loka valmynd" },
+  en: { ai: "VAKTO AI", product: "Product", contracts: "Contracts", price: "Pricing", about: "About", login: "Sign in", try: "Try free", open: "Open menu", close: "Close menu" },
 };
 
-export default function SiteNav({ home = false, scrolled = true, dark = false, current }: { home?: boolean; scrolled?: boolean; dark?: boolean; current?: "about" | "price" }) {
+export default function SiteNav({ home = false, scrolled = true, dark = false, current }: { home?: boolean; scrolled?: boolean; dark?: boolean; current?: "about" | "price" | "ai" }) {
   const t = N[useLangSync()];
   const a = home ? "" : "/";
   const [open, setOpen] = useState(false);
@@ -28,7 +28,9 @@ export default function SiteNav({ home = false, scrolled = true, dark = false, c
     <nav className={`ah-nav${scrolled || open ? " sc" : ""}${dark && !open ? " dk" : ""}${open ? " open" : ""}`}>
       <Link href="/" aria-label="VAKTO" onClick={close}><AhLogo /></Link>
       <div className="ah-nav-links">
-        <a href={`${a}#kerfid`}>{t.product}</a><a href={`${a}#samningar`}>{t.contracts}</a>
+        <a href={`${a}#kerfid`}>{t.product}</a>
+        <Link href="/ai" aria-current={current === "ai" ? "page" : undefined}>{t.ai}</Link>
+        <a href={`${a}#samningar`}>{t.contracts}</a>
         <Link href="/verd" aria-current={current === "price" ? "page" : undefined}>{t.price}</Link>
         <Link href="/um-okkur" aria-current={current === "about" ? "page" : undefined}>{t.about}</Link>
       </div>
@@ -43,6 +45,7 @@ export default function SiteNav({ home = false, scrolled = true, dark = false, c
       <SiteAnalytics />
       <div id="ah-menu" className="ah-menu" hidden={!open}>
         <a href={`${a}#kerfid`} onClick={close}>{t.product}</a>
+        <Link href="/ai" onClick={close}>{t.ai}</Link>
         <a href={`${a}#samningar`} onClick={close}>{t.contracts}</a>
         <Link href="/verd" onClick={close}>{t.price}</Link>
         <Link href="/um-okkur" onClick={close}>{t.about}</Link>
