@@ -1055,6 +1055,50 @@ export async function saveGeofenceMode(mode: "off" | "flag" | "block"): Promise<
   }
 }
 
+/** Sjálfvirk stimplun (0112): hamur, stimplun á dögum án vaktar, sjálfvirk útstimplun eftir X klst. */
+export async function saveAutoPunch(input: { mode?: "off" | "suggest" | "auto"; unscheduled?: boolean; clockoutHours?: number | null }): Promise<SettingsResult> {
+  if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar
+  const patch: Record<string, string | number | boolean | null> = {};
+  if (input.mode !== undefined) {
+    if (!["off", "suggest", "auto"].includes(input.mode)) return { ok: false, error: "Ógilt val" };
+    patch.auto_punch_mode = input.mode;
+  }
+  if (input.unscheduled !== undefined) patch.auto_punch_unscheduled = !!input.unscheduled;
+  if (input.clockoutHours !== undefined) {
+    const h = input.clockoutHours == null ? null : Math.round(Number(input.clockoutHours));
+    if (h != null && !(h >= 4 && h <= 24)) return { ok: false, error: "Hámark þarf að vera 4–24 klst." };
+    patch.auto_clockout_hours = h;
+  }
+  if (!Object.keys(patch).length) return { ok: true };
+  if (!isSupabaseConfigured()) return { ok: true, demo: true };
+  try {
+    const supabase = await createClient();
+    const ctx = await companyCtx(supabase);
+    if ("error" in ctx) return { ok: false, error: ctx.error };
+    if (patch.auto_clockout_hours !== undefined) {
+      // Gildir aðeins um stimplanir sem hefjast eftir að kveikt er — eldri opnum stimplunum er ekki lokað.
+      const { data: cur } = await supabase.from("companies").select("auto_clockout_hours").eq("id", ctx.company).maybeSingle();
+      if (patch.auto_clockout_hours == null) patch.auto_clockout_since = null;
+      else if (cur?.auto_clockout_hours == null) patch.auto_clockout_since = new Date().toISOString();
+    }
+    const { error } = await supabase.from("companies").update(patch).eq("id", ctx.company);
+    if (error) return dbFail("saveAutoPunch", error);
+    const modeLabel = { off: "slökkt", suggest: "tillögur", auto: "sjálfvirkt" } as const;
+    await logAudit(supabase, ctx.company, ctx.userId, {
+      action: "company.auto_punch", entity: "companies",
+      detail: [
+        input.mode !== undefined ? `Sjálfvirk stimplun — ${modeLabel[input.mode]}` : "",
+        input.unscheduled !== undefined ? `Á dögum án vaktar: ${input.unscheduled ? "já" : "nei"}` : "",
+        input.clockoutHours !== undefined ? `Sjálfvirk útstimplun: ${input.clockoutHours == null ? "slökkt" : `eftir ${patch.auto_clockout_hours} klst.`}` : "",
+      ].filter(Boolean).join(" · "),
+    });
+    revalidatePath("/stillingar");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: userError(e, "Villa") };
+  }
+}
+
 /** Pin a workplace on the map (null clears the pin) + its radius in metres. */
 export async function saveLocationFence(id: string, input: { lat: number | null; lng: number | null; radius: number }): Promise<SettingsResult> {
   if (await demoBlocked()) return demoResult(); // opið demo: aðeins til skoðunar

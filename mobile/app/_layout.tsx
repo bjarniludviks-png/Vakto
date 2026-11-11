@@ -12,6 +12,8 @@ import { loadLang } from "../src/lib/i18n";
 import { supabase } from "../src/lib/supabase";
 import { appBlockedMsg, getAccessState, markAccessClosed, markAppBlocked, READONLY_ROUTES } from "../src/lib/api/access";
 import { launchRoute, onPushTap } from "../src/lib/push";
+// Skilgreinir bakgrunnsverk sjálfvirkrar stimplunar — verður að hlaðast þegar appið ræsist (líka í bakgrunni).
+import { syncAutoPunch, stopAutoPunchOnDevice } from "../src/lib/autopunch";
 
 function Gate({ children }: { children: React.ReactNode }) {
   const { session, loading } = useAuth();
@@ -58,6 +60,15 @@ function Gate({ children }: { children: React.ReactNode }) {
 
   // Smellt á push (t.d. samningur til undirritunar) → opna þann skjá, bæði við kaldræsingu og í gangi.
   const ready = !!session && access !== null && access !== "closed";
+  // Sjálfvirk stimplun (0112): svæðin uppfærð við innskráningu og þegar appið kemur í forgrunn;
+  // útskráning stöðvar vöktunina á þessum síma. Starfsmaður sem er hættur fær ekki sjálfvirka stimplun.
+  const autoOk = !!session && access === "active";
+  useEffect(() => {
+    if (!autoOk) { if (!loading && !uid) void stopAutoPunchOnDevice(); return; }
+    void syncAutoPunch();
+    const sub = AppState.addEventListener("change", (s) => { if (s === "active") void syncAutoPunch(); });
+    return () => sub.remove();
+  }, [autoOk, uid, loading]);
   useEffect(() => {
     if (!ready) return;
     const go = (url: string) => { router.push(url as never); };

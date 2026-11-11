@@ -1,0 +1,7 @@
+{
+  "ios": {
+    "NSLocationWhenInUseUsageDescription": "VAKTO records your location once when you clock in and out, if your workplace has turned this on. You are not tracked in between.",
+    "NSLocationAlwaysAndWhenInUseUsageDescription": "If you turn on automatic clock-in, your phone tells VAKTO when you arrive at or leave your workplace, even when the app is closed, so you are clocked in and out. Your location is only used at that moment — you are never tracked in between.",
+    "NSLocationAlwaysUsageDescription": "If you turn on automatic clock-in, your phone tells VAKTO when you arrive at or leave your workplace, even when the app is closed, so you are clocked in and out. Your location is only used at that moment — you are never tracked in between."
+  }
+}

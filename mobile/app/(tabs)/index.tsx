@@ -20,6 +20,7 @@ import { LeaveSheet, OfferSheet } from "../../src/components/request-sheets";
 import { ClockOutSheet } from "../../src/components/clock-out-sheet";
 import { AiAvatar } from "../../src/components/ai-avatar";
 import { isManager, myCompanyId, getOps, type Ops, type OnShift } from "../../src/lib/api/ops";
+import { getAutoPunch, type Suggestion } from "../../src/lib/autopunch";
 
 const MONTHS = ["janúar", "febrúar", "mars", "apríl", "maí", "júní", "júlí", "ágúst", "september", "október", "nóvember", "desember"];
 const DAYS = ["Sunnudagur", "Mánudagur", "Þriðjudagur", "Miðvikudagur", "Fimmtudagur", "Föstudagur", "Laugardagur"];
@@ -45,6 +46,8 @@ export default function HomeScreen() {
   const [sheet, setSheet] = useState<null | "leave" | "offer" | "notis">(null);
   const [geofence, setGeofence] = useState<GeofenceMode>("off");
   const [tasks, setTasks] = useState<Task[]>([]);
+  // Sjálfvirk stimplun (0112): tillögur sem bíða staðfestingar
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   // stjórnendur: staðan á vinnustaðnum í dag (sama og efst í Mælaborði)
   const [ops, setOps] = useState<Ops | null>(null);
   const [outFor, setOutFor] = useState<OnShift | null>(null);
@@ -60,6 +63,7 @@ export default function HomeScreen() {
   const load = useCallback(async () => {
     if (!me) return;
     loadOps().catch(() => {});
+    getAutoPunch().then((a) => setSuggestions(a?.pending ?? [])).catch(() => {});
     try {
       const [h, g, tk] = await Promise.all([getHome(me), getGeofenceMode(), getTodayTasks(me)]);
       setHome(h);
@@ -165,6 +169,19 @@ export default function HomeScreen() {
             ) : null}
           </View>
         )}
+
+        {suggestions.length > 0 ? (
+          <Pressable onPress={() => router.push("/stimplun")} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
+            <Card style={{ flexDirection: "row", alignItems: "center", gap: 12, borderColor: colors.brand }}>
+              <MapPin color={colors.brandDeep} size={20} />
+              <View style={{ flex: 1 }}>
+                <Txt weight="bold" size={15}>{suggestions.length === 1 ? tr("Stimplun bíður staðfestingar") : trf("{n} stimplanir bíða staðfestingar", suggestions.length)}</Txt>
+                <Muted size={12.5}>{suggestions[0].kind === "in" ? trf("Komst kl. {x}", new Date(suggestions[0].at).toTimeString().slice(0, 5)) : trf("Fórst kl. {x}", new Date(suggestions[0].at).toTimeString().slice(0, 5))}</Muted>
+              </View>
+              <ChevronRight color={colors.ink3} size={18} />
+            </Card>
+          </Pressable>
+        ) : null}
 
         {ops ? <TodayCard ops={ops} onOpen={() => router.push("/maelabord")} onAsk={() => router.push("/vakto-ai")} onClockOut={setOutFor} /> : null}
 

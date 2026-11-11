@@ -20,12 +20,12 @@ import PushToggle from "@/components/app/push-toggle";
 import { PageHeader } from "@/components/app/page-header";
 import { toast } from "@/components/app/toast";
 import { useLang } from "@/components/app/lang";
-import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, aiContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, saveCompanyLimits, setEsignProvider, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveLocationFence, geocodeAddress, type GeoHit, saveUserAccess, getUserAccess, resendUserAccess, changeUserLoginEmail } from "./actions";
+import { addLocation, updateLocation, deleteLocation, addDepartment, renameDepartment, deleteDepartment, addPosition, updatePosition, deletePosition, inviteUser, addRevenue, savePayRule, setWeekdayRevenue, getWeekdayRevenue, saveCompanyInfo, saveRuleTemplate, deleteRuleTemplate, aiSuggestRules, saveContractTerms, getContractTerms, aiContractTerms, listCompanyDocs, uploadCompanyDoc, deleteCompanyDoc, openCompanyDoc, type CompanyDoc, createApiKey, revokeApiKey, saveCompanyLimits, setEsignProvider, setFeedPostPolicy, ensureKioskToken , saveGeofenceMode, saveAutoPunch, saveLocationFence, geocodeAddress, type GeoHit, saveUserAccess, getUserAccess, resendUserAccess, changeUserLoginEmail } from "./actions";
 import { LoginAccess } from "@/components/app/login-access";
 import { getOverseenDepartments } from "../starfsfolk/actions";
 import { MANAGER_DEFAULTS, resolveAccess, type Area } from "@/lib/user-permissions";
 import dynamic from "next/dynamic";
-import type { SettingsData, CompanyInfo, GeofenceMode, UserRow } from "./settings.server";
+import type { SettingsData, CompanyInfo, GeofenceMode, UserRow, AutoPunchView } from "./settings.server";
 import type { AgreementResult, AgreementSource } from "@/lib/ai/agreement";
 import type { TermsDraft } from "@/lib/ai/terms";
 
@@ -236,6 +236,8 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
         </div>
         <GeofenceCard mode={data.geofenceMode ?? "off"} locations={data.locations} onEdit={(l) => l.id && setRowEdit({ kind: "location", id: l.id, name: l.name, lat: l.lat ?? null, lng: l.lng ?? null, radius: l.radius ?? 150 })} />
       </div>
+
+      {data.autoPunch && <AutoPunchCard view={data.autoPunch} pinned={data.locations.filter((l) => l.lat != null).length} />}
 
       <ClosedDaysCard locations={data.locations} />
 
@@ -1021,6 +1023,58 @@ function GeofenceCard({ mode, locations, onEdit }: { mode: GeofenceMode; locatio
           <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("Enginn staður er kominn á kort — þangað til er staðsetning ekki skoðuð.")}</p>
         )}
         <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("Starfsfólk sér í appinu að staðsetning er skráð við stimplun. Stimpilklukkan (kiosk) á staðnum er ekki skoðuð.")}</p>
+      </div>
+    </div>
+  );
+}
+
+const AUTO_MODES: ["off" | "suggest" | "auto", string, string][] = [
+  ["off", "Slökkt", "starfsfólk stimplar sig sjálft eins og áður"],
+  ["suggest", "Tillögur", "síminn tekur eftir komu og brottför og starfsmaðurinn staðfestir stimplunina"],
+  ["auto", "Sjálfvirkt", "síminn stimplar inn við komu og út við brottför — merkt „sjálfvirk“ í Tímaskráningu"],
+];
+const CLOCKOUT_HOURS = [8, 10, 12, 14, 16, 20, 24];
+
+/** Sjálfvirk stimplun (geofence í appinu) + sjálfvirk útstimplun eftir X klst. (0112). */
+function AutoPunchCard({ view, pinned }: { view: AutoPunchView; pinned: number }) {
+  const { t } = useLang();
+  const [mode, setMode] = useState(view.mode);
+  const [busy, setBusy] = useState(false);
+  async function save(input: Parameters<typeof saveAutoPunch>[0]): Promise<boolean> {
+    setBusy(true);
+    const r = await saveAutoPunch(input);
+    setBusy(false);
+    toast(r.ok ? t("Vistað") : (r.error ?? t("Tókst ekki")));
+    return r.ok;
+  }
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="ch"><div><div className="ct">{t("Sjálfvirk stimplun")}</div><div className="cs">{t("appið stimplar starfsfólk inn við komu á vinnustað og út við brottför")}</div></div></div>
+      <div className="cb att">
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6 }}>
+          {AUTO_MODES.map(([m, label]) => (
+            <button key={m} className={`btn sm${mode === m ? "" : " ghost"}`} disabled={busy} onClick={async () => { if (m !== mode && await save({ mode: m })) setMode(m); }}>{t(label)}</button>
+          ))}
+        </div>
+        <p className="muted" style={{ fontSize: 12.5, margin: "0 0 8px" }}>{t(AUTO_MODES.find(([m]) => m === mode)![2])}</p>
+        {mode !== "off" && <>
+          <div className="it"><div className={`ic ${pinned ? "good" : "warn"}`}><Pin /></div><div className="tx"><b>{pinned ? `${t("Staðir á korti")}: ${pinned}` : t("Enginn staður á korti")}</b><span>{pinned ? t("svæðin eru staðirnir og radíusinn hér að ofan (minnst 150 m)") : t("merktu staðina á korti í „Staðsetning við stimplun“ — annars gerist ekkert")}</span></div></div>
+          <div className="it"><div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><circle cx="9" cy="8" r="3.5" /><path d="M3 20c.8-3.4 3.2-5 6-5s5.2 1.6 6 5M16 11l2 2 4-4" /></svg></div><div className="tx"><b>{t("Kveikt í appinu")}: {view.optedIn}</b><span>{t("hver starfsmaður kveikir sjálfur í appinu og getur slökkt hvenær sem er")}</span></div></div>
+          <label className="statline" style={{ cursor: "pointer" }}>
+            <span className="k">{t("Líka á dögum án vaktar")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("annars aðeins frá 2 klst. fyrir vakt og til loka hennar")}</span></span>
+            <input type="checkbox" defaultChecked={view.unscheduled} disabled={busy} style={{ width: 18, height: 18, accentColor: "var(--brand)" }}
+              onChange={(e) => { void save({ unscheduled: e.target.checked }); }} />
+          </label>
+        </>}
+        <div className="statline"><span className="k">{t("Sjálfvirk útstimplun")} <span className="muted" style={{ fontWeight: 400, fontSize: 11.5 }}>· {t("opin stimplun er lokuð eftir hámarkstíma og merkt til yfirferðar — áminning 4 og 2 klst. fyrr")}</span></span>
+          <select className="badge" style={{ border: "1px solid var(--line)", padding: "5px 9px", font: "inherit", fontSize: 12.5 }} disabled={busy}
+            defaultValue={view.clockoutHours == null ? "" : String(view.clockoutHours)}
+            onChange={(e) => { void save({ clockoutHours: e.target.value ? Number(e.target.value) : null }); }}>
+            <option value="">{t("Slökkt")}</option>
+            {CLOCKOUT_HOURS.map((h) => <option key={h} value={h}>{t("eftir")} {h} {t("klst")}</option>)}
+          </select>
+        </div>
+        <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("Staðsetning er aðeins notuð á stimplunarstund — síminn lætur vita við komu og brottför, engin rakning þess á milli. Sjálfvirk útstimplun gildir um stimplanir sem hefjast eftir að kveikt er.")}</p>
       </div>
     </div>
   );

@@ -12,7 +12,7 @@ import { useLang } from "@/components/app/lang";
 import { TimeField } from "@/components/app/fields";
 import { EmptyState } from "@/components/app/empty-state";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
-import { PunchFlags, spanText } from "./punch-flags";
+import { PunchFlags, sourceText, spanText } from "./punch-flags";
 import { PunchDateTimeFields } from "./[id]/timesheet-screen";
 import { dec1, krCompact } from "@/lib/format";
 import type { AttRow } from "@/lib/analytics.server";
@@ -344,7 +344,7 @@ function LiveAttendance({ onShift, initial, onNow, roster, corrections }: { onSh
                 <div className="db2-it" key={r.punchId}>
                   <Link href={`/timaskraning/${r.employeeId}`} className="db2-itl">
                     <Av id={r.employeeId} c={r.c} av={r.av} />
-                    <span className="db2-tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : ""}</span></span>
+                    <span className="db2-tx"><b>{r.name}</b><span>{t(r.dept)} · {t("inn")} {r.in}{r.source === "web" ? ` · ${t("handvirkt")}` : r.source === "auto" ? ` · ${t("sjálfvirk")}` : ""}</span></span>
                   </Link>
                   {r.unscheduled && <span className="db2-pill warn" title={t("Stimplaði sig inn án þess að vera á vaktaplani dagsins")}>{t("óáætlað")}</span>}
                   <span className={`db2-pill ${long ? "bad" : "good"}`} title={long ? t("Opin stimplun í meira en 12 klst — gleymt að stimpla út?") : undefined}>{nowMs ? durSince(r.since, nowMs, t) : t("á vakt")}{long ? ` · ${t("gleymdist útstimplun?")}` : ""}</span>
@@ -527,7 +527,7 @@ function EmployeePunchesModal({ employeeId, name, from, to, onClose, onChanged }
                 <div className="it" key={p.punchId}>
                   <div className="tx">
                     <b>{niceISO(p.date)}</b>
-                    <span>{spanText(p, t("opin"))}{p.open ? "" : ` · ${dec1(p.hours)} ${t("klst")}`}{p.sched ? ` · ${t("áætl.")} ${p.sched.start}–${p.sched.end}` : ""}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>
+                    <span>{spanText(p, t("opin"))}{p.open ? "" : ` · ${dec1(p.hours)} ${t("klst")}`}{p.sched ? ` · ${t("áætl.")} ${p.sched.start}–${p.sched.end}` : ""}{sourceText(p, t)}</span>
                   </div>
                   <div className="itact">
                     <PunchFlags flags={p.flags} geo={p.geo} />

@@ -205,7 +205,8 @@ export type PunchFlag =
   | { kind: "warn"; code: "over"; n: number }         // n hours over the planned length
   | { kind: "warn"; code: "unscheduled" }             // no shift planned that day
   | { kind: "bad"; code: "off_site"; edge: "in" | "out"; n: number } // punched n m from the nearest workplace (0055)
-  | { kind: "warn"; code: "no_location"; edge: "in" | "out" };      // geofence on but no position came with it
+  | { kind: "warn"; code: "no_location"; edge: "in" | "out" }       // geofence on but no position came with it
+  | { kind: "warn"; code: "auto_out_limit"; n: number };            // closed automatically after n hours (0112) — review
 
 /** Where a punch happened (geofence, 0055) — null when none was recorded. */
 export type PunchEdgeGeo = { lat: number | null; lng: number | null; verdict: "ok" | "outside" | "missing"; dist: number | null };
@@ -219,6 +220,8 @@ export type PunchRow = {
   sched: { start: string; end: string; hours: number } | null;
   flags: PunchFlag[];
   geo?: PunchGeo | null;
+  /** Sjálfvirk útstimplun (0112): 'geofence' = síminn fór af svæðinu, 'limit' = hámarkslengd náð. */
+  autoOut?: "geofence" | "limit" | null;
 };
 /** A planned shift on a past day with no punch at all. */
 export type MissedShift = { date: string; start: string; end: string; hours: number };
@@ -331,6 +334,21 @@ export async function getEmployeePunches(employeeId: string, fromISO: string, to
             if (e?.verdict === "outside") r.flags.push({ kind: "bad", code: "off_site", edge: k, n: e.dist ?? 0 });
             else if (e?.verdict === "missing") r.flags.push({ kind: "warn", code: "no_location", edge: k });
           }
+        }
+      }
+    }
+
+    // Sjálfvirk útstimplun (0112) — sér fyrirspurn sem þolir að dálkinn vanti.
+    if (rows.length) {
+      const autoRes = await allRowsIn(rows.map((r) => r.punchId), (ids, a, b) => supabase.from("punches")
+        .select("id, auto_out").in("id", ids).not("auto_out", "is", null).order("id").range(a, b));
+      if (!autoRes.error) {
+        const byId = new Map((autoRes.data ?? []).map((g) => [g.id as string, g.auto_out as "geofence" | "limit"]));
+        for (const r of rows) {
+          const ao = byId.get(r.punchId);
+          if (!ao) continue;
+          r.autoOut = ao;
+          if (ao === "limit") r.flags.push({ kind: "warn", code: "auto_out_limit", n: Math.round(r.hours) });
         }
       }
     }

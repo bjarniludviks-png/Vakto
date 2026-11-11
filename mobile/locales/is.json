@@ -1,0 +1,7 @@
+{
+  "ios": {
+    "NSLocationWhenInUseUsageDescription": "VAKTO skráir staðsetningu einu sinni þegar þú stimplar þig inn og út, ef vinnustaðurinn hefur kveikt á því. Engin rakning þess á milli.",
+    "NSLocationAlwaysAndWhenInUseUsageDescription": "Ef þú kveikir á sjálfvirkri stimplun lætur síminn VAKTO vita þegar þú kemur á eða ferð af vinnustaðnum, líka þegar appið er lokað, svo þú sért stimplað/ur inn og út. Staðsetning er aðeins notuð á þeirri stundu — engin rakning þess á milli.",
+    "NSLocationAlwaysUsageDescription": "Ef þú kveikir á sjálfvirkri stimplun lætur síminn VAKTO vita þegar þú kemur á eða ferð af vinnustaðnum, líka þegar appið er lokað, svo þú sért stimplað/ur inn og út. Staðsetning er aðeins notuð á þeirri stundu — engin rakning þess á milli."
+  }
+}

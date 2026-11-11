@@ -8,7 +8,7 @@ import { TimeField, DateField } from "@/components/app/fields";
 import { FilterBar, type Period } from "@/components/app/filter-bar";
 import { dec1 } from "@/lib/format";
 import { getEmployeePunches, adjustPunch, deletePunch, setPunchApproved, approveEmployeePunches, approvePunchList, type PunchRow, type MissedShift } from "../actions";
-import { PunchFlags, spanText } from "../punch-flags";
+import { PunchFlags, sourceText, spanText } from "../punch-flags";
 import { exportTimeReportXlsx, exportTimeReportPdf } from "@/lib/export-report";
 import { AsyncButton } from "@/components/app/async-button";
 import { AskCorrectionModal } from "../ask-correction";
@@ -203,7 +203,7 @@ export default function EmployeeTimesheet({ id, name, company, initial, initialM
               )}
               <div className="tx">
                 <b>{niceISO(p.date)}</b>
-                <span>{spanText(p, t("opin"))}{p.open ? ` · ${openElapsed(p)}` : ` · ${dec1(p.hours)} ${t("klst")}`}{p.sched ? ` · ${t("áætl.")} ${p.sched.start}–${p.sched.end}` : ""}{p.source === "web" ? ` · ${t("handvirkt")}` : ""}</span>
+                <span>{spanText(p, t("opin"))}{p.open ? ` · ${openElapsed(p)}` : ` · ${dec1(p.hours)} ${t("klst")}`}{p.sched ? ` · ${t("áætl.")} ${p.sched.start}–${p.sched.end}` : ""}{sourceText(p, t)}</span>
               </div>
               <div className="itact">
                 <PunchFlags flags={p.flags} geo={p.geo} />

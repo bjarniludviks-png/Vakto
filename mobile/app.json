@@ -17,7 +17,9 @@
         "NSPhotoLibraryUsageDescription": "VAKTO notar myndasafnið til að velja prófílmynd og senda myndir í spjalli.",
         "NSCameraUsageDescription": "VAKTO notar myndavélina til að taka prófílmynd og senda myndir í spjalli.",
         "ITSAppUsesNonExemptEncryption": false,
-        "NSLocationWhenInUseUsageDescription": "VAKTO skráir staðsetningu einu sinni þegar þú stimplar þig inn og út, ef vinnustaðurinn hefur kveikt á því. Engin rakning þess á milli."
+        "NSLocationWhenInUseUsageDescription": "VAKTO skráir staðsetningu einu sinni þegar þú stimplar þig inn og út, ef vinnustaðurinn hefur kveikt á því. Engin rakning þess á milli.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Ef þú kveikir á sjálfvirkri stimplun lætur síminn VAKTO vita þegar þú kemur á eða ferð af vinnustaðnum, líka þegar appið er lokað, svo þú sért stimplað/ur inn og út. Staðsetning er aðeins notuð á þeirri stundu — engin rakning þess á milli.",
+        "NSLocationAlwaysUsageDescription": "Ef þú kveikir á sjálfvirkri stimplun lætur síminn VAKTO vita þegar þú kemur á eða ferð af vinnustaðnum, líka þegar appið er lokað, svo þú sért stimplað/ur inn og út. Staðsetning er aðeins notuð á þeirri stundu — engin rakning þess á milli."
       }
     },
     "android": {
@@ -71,8 +73,10 @@
         "expo-location",
         {
           "locationWhenInUsePermission": "VAKTO skráir staðsetningu einu sinni þegar þú stimplar þig inn og út, ef vinnustaðurinn hefur kveikt á því. Engin rakning þess á milli.",
+          "locationAlwaysAndWhenInUsePermission": "Ef þú kveikir á sjálfvirkri stimplun lætur síminn VAKTO vita þegar þú kemur á eða ferð af vinnustaðnum, líka þegar appið er lokað, svo þú sért stimplað/ur inn og út. Staðsetning er aðeins notuð á þeirri stundu — engin rakning þess á milli.",
+          "locationAlwaysPermission": "Ef þú kveikir á sjálfvirkri stimplun lætur síminn VAKTO vita þegar þú kemur á eða ferð af vinnustaðnum, líka þegar appið er lokað, svo þú sért stimplað/ur inn og út. Staðsetning er aðeins notuð á þeirri stundu — engin rakning þess á milli.",
           "isIosBackgroundLocationEnabled": false,
-          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": true,
           "isAndroidForegroundServiceEnabled": false
         }
       ]
@@ -90,6 +94,10 @@
     },
     "runtimeVersion": {
       "policy": "sdkVersion"
+    },
+    "locales": {
+      "is": "./locales/is.json",
+      "en": "./locales/en.json"
     }
   }
 }

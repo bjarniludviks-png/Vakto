@@ -101,7 +101,7 @@ export default function Timar() {
             <View key={p.id} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.line2 }}>
               <View style={{ width: 70 }}>
                 <Txt weight="bold" size={14}>{tr(DAY_L[d.getDay()])} {d.getDate()}.{d.getMonth() + 1}</Txt>
-                <Muted size={11.5}>{p.source === "kiosk" ? "kiosk" : p.source === "app" ? "sími" : p.source}</Muted>
+                <Muted size={11.5}>{p.source === "kiosk" ? "kiosk" : p.source === "app" ? "sími" : p.source === "auto" ? "sjálfvirk" : p.source}</Muted>
               </View>
               <Txt size={14} style={{ flex: 1, fontVariant: ["tabular-nums"] }}>{hm(p.clockIn)}–{p.clockOut ? hm(p.clockOut) : "…"}</Txt>
               {p.clockOut ? <Txt weight="bold" size={14} style={{ fontVariant: ["tabular-nums"] }}>{dec1(hours(p))}</Txt> : <Pill tone="good" label="Á vakt" />}

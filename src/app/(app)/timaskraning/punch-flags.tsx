@@ -26,6 +26,7 @@ export function flagLabel(f: PunchFlag, t: (k: string) => string): string {
     case "unscheduled": return t("óáætluð vakt");
     case "off_site": return `${f.edge === "in" ? t("Inn") : t("Út")} ${t("utan svæðis")} · ${distText(f.n)}`;
     case "no_location": return `${f.edge === "in" ? t("Inn") : t("Út")} ${t("án staðsetningar")}`;
+    case "auto_out_limit": return `${t("Sjálfvirk útstimplun")} · ${f.n} ${t("klst")}`;
   }
 }
 
@@ -92,6 +93,15 @@ function PunchMapModal({ geo, title, onClose }: { geo: PunchGeo; title?: string;
 }
 
 /** "08:00 – 02:15 (+1)" when a shift crossed midnight. */
+/** „· handvirkt“ / „· sjálfvirk“ / „· sjálfvirk útstimplun“ aftan við tímana (0112). */
+export function sourceText(p: { source: string; autoOut?: PunchRow["autoOut"] }, t: (k: string) => string): string {
+  const parts: string[] = [];
+  if (p.source === "web") parts.push(t("handvirkt"));
+  if (p.source === "auto") parts.push(t("sjálfvirk"));
+  if (p.autoOut === "geofence") parts.push(t("sjálfvirk útstimplun"));
+  return parts.length ? ` · ${parts.join(" · ")}` : "";
+}
+
 export function spanText(p: Pick<PunchRow, "in" | "out" | "outDate" | "date">, openWord: string): string {
   const out = p.out ?? openWord;
   if (!p.out || !p.outDate) return `${p.in} – ${out}`;
