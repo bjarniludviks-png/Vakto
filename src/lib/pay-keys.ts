@@ -58,10 +58,16 @@ export function payItems(
   put(clean(rules?.keys?.yfirvinna) || clean(company?.yfirvinna) || opts.yfirvinna || "Yfirvinna", h.yfirvinna);
   put(clean(rules?.keys?.yfirvinna1) || clean(company?.yfirvinna1) || opts.yfirvinna1 || "Yfirvinna 1", h.yfirvinna1 ?? 0);
   const fallback = (pct: number) => (opts.alagFallback ? opts.alagFallback(pct) : alagName(pct));
-  if (h.parts && Object.keys(h.parts).length) {
-    for (const [id, p] of Object.entries(h.parts)) put(partKey(id, rules, company) ?? fallback(p.pct), p.hours);
-  } else {
-    for (const [pct, q] of Object.entries(h.alag)) put(fallback(Number(pct)), q);
+  // Álagstímar með launalykil fara á lykilinn; afgangurinn per prósentu reiknast af `alag` (sömu námundun
+  // og röð og fyrir 0113) — svo útflutningur án lykla er bæti fyrir bæti sá sami og áður.
+  const keyedByPct = new Map<number, number>();
+  for (const [id, p] of Object.entries(h.parts ?? {})) {
+    const k = partKey(id, rules, company);
+    if (k && p.hours > 0) { put(k, p.hours); keyedByPct.set(p.pct, (keyedByPct.get(p.pct) ?? 0) + p.hours); }
+  }
+  for (const [pct, q] of Object.entries(h.alag)) {
+    const rest = Math.round((q - (keyedByPct.get(Number(pct)) ?? 0)) * 100) / 100;
+    if (rest > 0) put(fallback(Number(pct)), rest);
   }
   return [...out].map(([name, quantity]) => ({ name, quantity }));
 }
