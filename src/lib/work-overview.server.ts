@@ -6,7 +6,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getEmployees } from "@/lib/employees.server";
-import { periodPayLine, hourBuckets } from "@/lib/payroll";
+import { periodPayLine, hourBuckets, type Buckets } from "@/lib/payroll";
 import { resolveRuleSet, withOtMode } from "@/lib/payrules";
 import { companyPaySetup } from "@/lib/pay-period.server";
 import { daysIn } from "@/lib/periods";
@@ -96,7 +96,7 @@ export async function buildSnapshots(supabase: SupabaseClient, company: string, 
       const rule = rules.get(e.id) ?? null;
       const line = periodPayLine(e, pp, rule, from, { mode: otMode, to });
       const monthly = e.payType === "monthly";
-      const b = monthly ? { dagvinna: 0, yfirvinna: 0, alag: {} as Record<number, number> } : hourBuckets(pp, withOtMode(resolveRuleSet(e.union, rule), otMode, from, to));
+      const b: Buckets = monthly ? { dagvinna: 0, yfirvinna: 0, alag: {} } : hourBuckets(pp, withOtMode(resolveRuleSet(e.union, rule), otMode, from, to));
       const planned = r2(days.reduce((a, d) => a + d.planned, 0));
       const worked = r2(days.reduce((a, d) => a + d.worked, 0));
       const weekday = (d: string) => { const w = new Date(`${d}T12:00:00Z`).getUTCDay(); return w !== 0 && w !== 6; };
@@ -114,7 +114,7 @@ export async function buildSnapshots(supabase: SupabaseClient, company: string, 
         },
         pay: {
           monthly, rate: e.rate, hours: line.hours,
-          dagvinnaH: b.dagvinna, yfirvinnaH: b.yfirvinna,
+          dagvinnaH: b.dagvinna, yfirvinnaH: Math.round((b.yfirvinna + (b.yfirvinna1 ?? 0)) * 100) / 100,
           alag: Object.entries(b.alag).map(([pct, h]) => ({ pct: Number(pct), h })).sort((x, y) => x.pct - y.pct),
           dayPay: line.dayPay, premiums: line.premiums, overtime: line.overtime, uppbot: line.uppbot,
           orlof: line.orlof, benefits: line.benefits, gross: line.gross,

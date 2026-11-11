@@ -383,13 +383,16 @@ export async function getPaydayItemNames(from: string, to: string): Promise<stri
     const { getExportLines } = await import("@/lib/payroll-export.server");
     const got = await getExportLines(from, to);
     if (!got.live) return [];
-    const names = new Set<string>(["Dagvinna", "Yfirvinna"]);
-    const pcts = new Set<number>();
+    const { payItems } = await import("@/lib/pay-keys");
+    const names = new Set<string>([got.payKeys?.dagvinna || "Dagvinna", got.payKeys?.yfirvinna || "Yfirvinna"]);
+    const extra = new Set<string>();
     for (const l of got.lines) {
       if (got.monthly.has(l.employeeId)) continue;
-      for (const [pct, q] of Object.entries(got.hours.get(l.employeeId)?.alag ?? {})) if (q > 0) pcts.add(Number(pct));
+      const h = got.hours.get(l.employeeId);
+      if (h) for (const it of payItems(h, got.rules?.get(l.employeeId), got.payKeys)) extra.add(it.name);
     }
-    for (const p of [...pcts].sort((a, b) => a - b)) names.add(`Álag ${String(p).replace(".", ",")}%`);
+    const pctOf = (n: string) => { const m = /^Álag ([\d,]+)%$/.exec(n); return m ? Number(m[1].replace(",", ".")) : Infinity; };
+    for (const n of [...extra].sort((a, b) => pctOf(a) - pctOf(b) || a.localeCompare(b, "is"))) names.add(n);
     return [...names];
   } catch {
     return [];
@@ -406,8 +409,8 @@ export async function sendToPayday(from: string, to: string, onlyIds?: string[])
     if ("error" in ctx) return { ok: false, error: ctx.error };
     const { data: integ } = await supabase.from("company_integrations").select("id, secret_enc").eq("company_id", ctx.company).eq("provider", "payday").maybeSingle();
     if (!integ?.secret_enc) return { ok: false, error: "Payday er ekki tengt — tengdu það í Stillingum → Tengingar." };
-    const [{ getExportLines }, { decrypt }, { paydayUploadTimesheet }] = await Promise.all([
-      import("@/lib/payroll-export.server"), import("@/lib/integrations/providers.server"), import("@/lib/integrations/payday.server"),
+    const [{ getExportLines }, { decrypt }, { paydayUploadTimesheet }, { payItems }] = await Promise.all([
+      import("@/lib/payroll-export.server"), import("@/lib/integrations/providers.server"), import("@/lib/integrations/payday.server"), import("@/lib/pay-keys"),
     ]);
     const got = await getExportLines(from, to);
     if (!got.live) return { ok: false, error: "Engin gögn á tímabilinu" };
@@ -417,10 +420,8 @@ export async function sendToPayday(from: string, to: string, onlyIds?: string[])
       .filter((l) => !got.monthly.has(l.employeeId))
       .map((l) => {
         const h = got.hours.get(l.employeeId) ?? { dagvinna: l.hours, yfirvinna: 0, alag: {} };
-        const items = [
-          { name: "Dagvinna", quantity: h.dagvinna }, { name: "Yfirvinna", quantity: h.yfirvinna },
-          ...Object.entries(h.alag).map(([pct, q]) => ({ name: `Álag ${String(pct).replace(".", ",")}%`, quantity: q })),
-        ].filter((i) => i.quantity > 0);
+        // Launaliðir eftir launalyklum (0113); án lykla „Dagvinna“, „Yfirvinna“, „Álag 33%“ eins og áður.
+        const items = payItems(h, got.rules?.get(l.employeeId), got.payKeys);
         return { ssn: (got.kt[l.employeeId] ?? "").replace(/\D/g, ""), name: l.name, items };
       })
       .filter((r) => r.items.length > 0)

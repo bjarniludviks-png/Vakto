@@ -2,7 +2,8 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { computeLine, computeFromPunches, hourBuckets, hourBucketsByKey, computeUppbot, uppbotForMonth, uppbotMonths, type PayLine } from "@/lib/payroll";
-import { resolveRuleSet, withOtMode, resolveUppbot } from "@/lib/payrules";
+import { resolveRuleSet, withOtMode, resolveUppbot, type CustomRules, type PayKeys } from "@/lib/payrules";
+import { normalizePayKeys } from "@/lib/pay-keys";
 import { DEMO_EMPLOYEES, type Employee } from "@/lib/employees";
 import { getEmployees } from "@/lib/employees.server";
 import { allRows } from "@/lib/supabase/all-rows";
@@ -19,12 +20,15 @@ const toEmp = (e: Record<string, unknown>): Employee => ({
 } as Employee);
 
 /** Worked hours split the way Payday's timesheet import wants them. */
-export type HourBuckets = { dagvinna: number; yfirvinna: number; alag: Record<number, number> };
+export type HourBuckets = import("@/lib/payroll").Buckets;
 /** Tímar starfsmanns skiptir á deildir (0110): deildar-id → tímar. "" = engin deild skráð. */
 export type DeptSplit = Map<string, HourBuckets>;
 
-export async function getExportLines(from?: string, to?: string): Promise<{ lines: PayLine[]; kt: Record<string, string>; hours: Map<string, HourBuckets>; monthly: Set<string>; live: boolean; denied?: boolean; byDept?: Map<string, DeptSplit> }> {
+export async function getExportLines(from?: string, to?: string): Promise<{ lines: PayLine[]; kt: Record<string, string>; hours: Map<string, HourBuckets>; monthly: Set<string>; live: boolean; denied?: boolean; byDept?: Map<string, DeptSplit>;
+  /** Reglur hvers starfsmanns (launalyklar í Band.key / keys) og launalyklar fyrirtækisins (0113). */
+  rules?: Map<string, CustomRules>; payKeys?: PayKeys }> {
   const hours = new Map<string, HourBuckets>();
+  const rulesById = new Map<string, CustomRules>();
   const byDept = new Map<string, DeptSplit>();
   const monthly = new Set<string>();
   if (!isSupabaseConfigured()) {
@@ -99,6 +103,9 @@ export async function getExportLines(from?: string, to?: string): Promise<{ line
         byEmp.get(p.employee_id)!.push({ clockIn: p.clock_in, clockOut: p.clock_out });
       }
       const { otMode } = await companyPaySetup(supabase, company);
+      // Launalyklar fyrirtækisins (0113) — fyrir migration: engir lyklar, sömu heiti og áður.
+      const pk = await supabase.from("companies").select("pay_keys").eq("id", company).maybeSingle();
+      const payKeys = pk.error ? {} : normalizePayKeys(pk.data?.pay_keys);
       const ruleMap = new Map<string, never>();
       const pr = await supabase.from("employees").select("id, pay_rule").eq("company_id", company);
       if (!pr.error) for (const r of pr.data ?? []) ruleMap.set(r.id as string, (r.pay_rule as never));
@@ -106,11 +113,12 @@ export async function getExportLines(from?: string, to?: string): Promise<{ line
         .filter((e) => (byEmp.get(e.id as string)?.length ?? 0) > 0 || e.pay_type === "monthly")
         .map((e) => {
           const rules = withOtMode(resolveRuleSet(e.union_agreement as string, ruleMap.get(e.id as string)), otMode, from ?? "", to ?? "");
+          rulesById.set(e.id as string, rules);
           const group = byEmp.get(e.id as string) ?? [];
           // Sama regla og launavélin: dagvinna, yfirvinna og álagstímar per prósentu.
           // Fastlaunafólk fær laun óháð tímum — engir álagsliðir þar.
           const hb = hourBuckets(group, rules);
-          hours.set(e.id as string, e.pay_type === "hourly" ? hb : { dagvinna: Math.round((hb.dagvinna + hb.yfirvinna) * 100) / 100, yfirvinna: 0, alag: {} });
+          hours.set(e.id as string, e.pay_type === "hourly" ? hb : { dagvinna: Math.round((hb.dagvinna + hb.yfirvinna + (hb.yfirvinna1 ?? 0)) * 100) / 100, yfirvinna: 0, alag: {}, parts: {} });
           if (e.pay_type === "hourly" && group.length) byDept.set(e.id as string, hourBucketsByKey(byEmpK.get(e.id as string) ?? [], rules));
           // Desember-/orlofsuppbót í júní/desember — sama regla og launakeyrslan.
           const y = Number(from.slice(0, 4)), uk = uppbotForMonth(Number(from.slice(5, 7)));
@@ -118,7 +126,7 @@ export async function getExportLines(from?: string, to?: string): Promise<{ line
           const ub = uk ? computeUppbot(resolveUppbot(e.union_agreement as string, null, y)[uk], Number(e.employment_ratio), uppbotMonths(uk, y, hire)) : 0;
           return computeFromPunches(toEmpP(e), group, rules, ub, y);
         });
-      return { lines, kt, hours, monthly, live: true, byDept };
+      return { lines, kt, hours, monthly, live: true, byDept, rules: rulesById, payKeys };
     }
 
     const lines = emps.map((e) => computeLine(toEmpP(e)));

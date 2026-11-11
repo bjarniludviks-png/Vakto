@@ -4,6 +4,7 @@
 // Companies build their own (manually or AI-suggested, always approved);
 // Icelandic kjarasamningar ship as OPTIONAL presets, not as the core.
 // ============================================================
+import type { CustomRules } from "@/lib/payrules";
 
 export type RuleSet = {
   /** Overtime: when it kicks in and what it pays. */
@@ -31,6 +32,11 @@ export type RuleSet = {
   wage?: { monthly?: number; dayRate?: number; overtimeRate?: number; scale?: string };
   /** Free-text union/local/company rules the numbers can't capture. */
   notes?: string;
+  /** Nákvæm launaregla (sama form og launavélin les) — eigin reglur úr Kjarasamningasafni eða AI-lestri.
+   *  Þegar hún er til gildir HÚN við úthlutun (templateToPayRule), hinir reitirnir eru samantekt. */
+  engine?: CustomRules;
+  /** Tilvitnanir AI-lesturs (grein/bls. per gildi) — geymt með sniðmátinu til yfirferðar síðar. */
+  sources?: { field: string; value: string; quote: string; location: string }[];
 };
 
 export type RuleTemplate = {
@@ -121,6 +127,16 @@ export const SCHEDULE_PATTERNS: { key: SchedulePattern["kind"]; is: string; en: 
 export function summarizeRules(r: RuleSet, lang: "is" | "en" = "is"): string {
   const parts: string[] = [];
   const t = (is: string, en: string) => (lang === "is" ? is : en);
+  if (r.engine) {
+    const e = r.engine, f = (n: number) => String(n).replace(".", ",");
+    if (e.eve) parts.push(`${t("Kvöld", "Evening")} +${f(e.eve)}%`);
+    if (e.night && e.night !== e.eve) parts.push(`${t("Nætur", "Night")} +${f(e.night)}%`);
+    if (e.weekend) parts.push(`${t("Helgar", "Weekend")} +${f(e.weekend)}%`);
+    if (e.bands?.length) parts.push(`${e.bands.length} ${t("sérálög", "custom premiums")}`);
+    parts.push(`${t("Yfirvinna", "Overtime")} +${f(e.overtime)}%`, `${t("Stórhátíð", "Holiday")} +${f(e.holiday)}%`);
+    if (e.graceMin) parts.push(`${t("Svigrúm", "Grace")} ${e.graceMin} ${t("mín", "min")}`);
+    return parts.join(" · ");
+  }
   if (r.overtime?.pct != null) {
     const thr = r.overtime.afterHoursPerMonth
       ? ` ${t("eftir", "after")} ${r.overtime.afterHoursPerMonth} ${t("klst/mán", "h/mo")}`
@@ -141,11 +157,9 @@ export function summarizeRules(r: RuleSet, lang: "is" | "en" = "is"): string {
 /** Convert a saved rule template into the per-employee pay-rule shape the
  * payroll engine consumes (bands + thresholds). Used when an employee is
  * assigned a template — one conversion path, client and server alike. */
-export function templateToPayRule(r: RuleSet): {
-  eve: number; weekend: number; overtime: number; holiday: number; night: number;
-  otWeekly?: number; otMonthly?: number;
-  bands: { label: string; days: number[]; from: string; to: string; pct: number }[];
-} {
+export function templateToPayRule(r: RuleSet): CustomRules & { bands: NonNullable<CustomRules["bands"]> } {
+  // Nákvæm regla (Kjarasamningasafn / AI) — notuð óbreytt.
+  if (r.engine) return { ...r.engine, bands: r.engine.bands ?? [] };
   // Template premiums use 0=Mon…6=Sun; payroll bands use JS getDay (0=Sun…6=Sat).
   const bands = (r.premiums ?? []).map((p) => ({
     label: p.label || "Álag",
@@ -163,5 +177,29 @@ export function templateToPayRule(r: RuleSet): {
     otWeekly: r.overtime?.afterHoursPerWeek,
     otMonthly: r.overtime?.afterHoursPerMonth,
     bands,
+  };
+}
+
+/** Nákvæm launaregla → reglusniðmát: `engine` gildir, hitt er samantekt fyrir lista og eldri skjái. */
+export function engineToTemplate(e: CustomRules, extra: { notes?: string; vacationDays?: number; vacationPct?: number; sources?: RuleSet["sources"] } = {}): RuleSet {
+  const premiums = (e.bands ?? []).map((b) => ({
+    label: b.label, pct: b.pct, from: b.from, to: b.to,
+    days: b.days.length === 7 ? undefined : b.days.map((d) => (d + 6) % 7).sort((a, c) => a - c),
+  }));
+  return {
+    overtime: {
+      pct: e.overtime,
+      ...(e.otWeekly && e.otWeekly < 1000 ? { afterHoursPerWeek: e.otWeekly } : !e.otMonthly ? { afterHoursPerWeek: 40 } : {}),
+      ...(e.otMonthly ? { afterHoursPerMonth: e.otMonthly } : {}),
+    },
+    weekend: { pct: e.weekend },
+    night: { from: `${String(e.dayEnd ?? 17).padStart(2, "0")}:00`, to: `${String(e.dayStart ?? 8).padStart(2, "0")}:00`, pct: e.eve },
+    holiday: { pct: e.holiday },
+    ...(premiums.length ? { premiums } : {}),
+    rest: { minHoursBetweenShifts: e.restHours ?? 11 },
+    ...(extra.vacationDays ? { vacation: { daysPerYear: extra.vacationDays, accrualPct: extra.vacationPct } } : {}),
+    ...(extra.notes ? { notes: extra.notes } : {}),
+    ...(extra.sources?.length ? { sources: extra.sources } : {}),
+    engine: e,
   };
 }
