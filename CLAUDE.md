@@ -587,6 +587,26 @@ Kveikjan var Gistihúsið (Valdís, bókari): morgunmatur 7–10 og herbergisþr
   stimplanir með tíma vaktarinnar — fyrir vinnustaði sem eru ekki byrjaðir að stimpla. Laun byggja á samþykktum tímum.
 - Innsýn (`getLaborFacts`) notar deild vaktarinnar bæði fyrir áætlun og raun.
 
+## Verkefni og ábyrgð (9. nóv. 2026, migration 0111 á staging; prod við release, grein `verkefni-hlutverk`)
+- **Hugmyndin:** hlutverk (`work_roles`) eru sjálfstæð (ekki deild), MÁ tengja við vaktategund (þá fær hver sem er á þeirri vakt
+  hlutverkið þann dag). Föst hlutverk á fólki í `employee_work_roles` (`backup` = varamaður, tekur sjálfkrafa við ef handhafi er í
+  samþykktu fríi). `role_handovers` = færsla ábyrgðar (eitt hlutverk eða `role_id` tómt = ALLAR ábyrgðir: hlutverk, eigin listar og
+  stök verkefni), óháð vöktum, án veikindaskráningar, endar á `end_date` eða við „Skila“. Skipurit: `employees.reports_to`.
+- **Listar:** `task_lists` (+ `task_list_items`) á hlutverk / manneskju / alla á vakt, vikudagar (ISO 1–7) eða dagur mánaðar (-1 = síðasti),
+  `shared` = eitt hak fyrir alla. Hök í `task_checks` (per dag). Stök verkefni = `shift_tasks` (víkkað: `role_id`, `due_time`, mynd,
+  `employee_id` tómt = hver sem er á vakt). Frávik: `incidents`.
+- **Ein regla í SQL:** `_role_holders` / `_tasks_for` → `tasks_day(date, emp?)`, `tasks_board(date)` (stjórnendur), `tasks_team_progress`,
+  `tick_task(...)` (EINA leiðin til að haka — athugar að verkefnið sé á könnu viðkomandi í dag). Vefur og app kalla sömu föll.
+  Tegundir: `src/lib/tasks.ts` (afrit í `mobile/src/lib/tasks.ts` — breyttu báðum).
+- **Vefur:** `/verkefni` (Í dag · Listar · Hlutverk · Skipurit · Frávik), starfsmannaspjald → „Hlutverk og ábyrgð“ (`starfsfolk/roles-tab.tsx`,
+  vistast strax), Mitt svæði → „Verkefnin mín í dag“. Aðgerðir í `verkefni/actions.ts`. DICT-lyklar með `tk:` þar sem stutt orð
+  rákust á eldri þýðingar („Frávik“ = „Tímafrávik“ annars staðar).
+- **App:** `app/verkefni.tsx` (Mín / Sameiginleg / Liðið, mynd við hak, „⋯“ → frávik, Færa ábyrgð, Vel gert), `app/hlutverk.tsx`, Heim-spjald
+  (`components/today-tasks.tsx`), staðbundnar áminningar (`lib/task-reminders.ts`: listi 30 mín fyrir, stakt verkefni 15 mín). Push úr appinu
+  um `/api/app/notify` (`incident`, `handover`, `task_added`). Eldri grunnur án 0111 → Heim fellur á gömlu `shift_tasks`. OTA nægir (engin ný native eining).
+- **Ekki komið:** tilkynning til yfirmanns þegar listi klárast ekki (`escalate` er vistað en enginn cron les það — Vercel-cron er daglegur),
+  AI-uppsetning hlutverka/lista, þýðingar á verkefnatexta.
+
 ## Sjálfvirk stimplun + sjálfvirk útstimplun (11. nóv. 2026, migration 0112 á staging; prod við release)
 - **Stillingar → Staðir → „Sjálfvirk stimplun“** (`AutoPunchCard`, `saveAutoPunch`): `companies.auto_punch_mode` off | suggest | auto,
   `auto_punch_unscheduled` (annars aðeins frá 2 klst. fyrir útgefna vakt til loka hennar), `auto_clockout_hours` (4–24, null = slökkt)

@@ -1,0 +1,102 @@
+/* Tengingar (/tengingar o.fl.). Byggir á home.css (.ah, .ah-sec, letur, litir) og verd.css (.vp-end, .vp-local).
+   Allt afmarkað með ti- svo ekkert rekist á tg- í kerfinu. */
+.ah-teng .ah-foot{position:relative;z-index:1}
+
+/* ---------- hetja ---------- */
+.ti-hero{text-align:center;padding:calc(env(safe-area-inset-top,0px) + 150px) var(--sx) 40px;position:relative}
+.ti-hero h1{font-size:clamp(38px,6vw,76px)}
+.ti-wall{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin:40px auto 0;max-width:620px}
+.ti-wall .ti-logo{width:60px;height:60px;border-radius:16px}
+.ti-wall .ti-logo img{width:36px;height:36px}
+.ti-region{max-width:640px}
+.ti-jump{display:inline-block;margin-top:26px}
+
+/* ---------- merki ---------- */
+.ti-logo{flex:none;display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:13px;background:#fff;
+  box-shadow:0 0 0 1px var(--line),0 6px 18px -10px rgba(40,25,10,.25)}
+.ti-logo img{width:30px;height:30px;object-fit:contain}
+.ti-mark{font-weight:700;font-size:17px;letter-spacing:-.03em;color:var(--ink2);background:var(--bg2)}
+.ti-ico svg{width:24px;height:24px;fill:none;stroke:var(--brand);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ti-inv{gap:3px;align-items:flex-end;padding-bottom:4px}
+.ti-inv i{display:block;width:6px;border-radius:2px;background:#13935b}
+.ti-inv i:first-child{background:#8fd3a8}.ti-inv i:nth-child(2){background:#3fb377}
+.ti-wall .ti-inv i{width:7px}
+
+/* ---------- forskot ---------- */
+.ti-edge{padding-top:90px;padding-bottom:60px}
+.ti-edge-in{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;background:#1d1d1f;color:#f5f5f7;border-radius:32px;padding:56px}
+.ah .ti-edge h2{font-size:clamp(30px,3.6vw,46px)}
+.ah .ti-edge h2 span{color:#a1a1a6}
+.ti-edge-tx>p:last-child{color:#a1a1a6;font-size:17px;line-height:1.5;margin:20px 0 0}
+.ti-edge-l{list-style:none;margin:0;padding:0;display:grid;gap:18px}
+.ti-edge-l li{display:flex;gap:14px;align-items:flex-start}
+.ti-edge-l svg{flex:none;width:22px;height:22px;margin-top:1px;fill:none;stroke:var(--brand2);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.ti-edge-l b{display:block;font-size:17px;font-weight:650;letter-spacing:-.01em}
+.ti-edge-l span{display:block;color:#a1a1a6;font-size:15px;line-height:1.45;margin-top:3px}
+
+/* ---------- flokkar og spjöld ---------- */
+.ti-cat{padding-top:70px;padding-bottom:10px}
+.ti-cat-h{max-width:720px;margin-bottom:26px}
+.ah .ti-cat-h h2{font-size:clamp(28px,3.4vw,40px)}
+.ti-cat-h p{color:#4a4a4f;font-size:17px;line-height:1.5;margin:12px 0 0}
+.ti-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+.ti-card{background:rgba(255,255,255,.9);border-radius:22px;padding:24px;box-shadow:0 0 0 1px var(--line),0 20px 50px -34px rgba(40,25,10,.3);min-width:0}
+.ti-card header{display:flex;align-items:center;gap:14px}
+.ti-card header>div{flex:1;min-width:0}
+.ti-card h3{font-size:19px;font-weight:650;letter-spacing:-.02em;margin:0;line-height:1.25}
+.ti-card small{display:block;color:var(--ink2);font-size:13.5px;margin-top:2px}
+.ti-pill{flex:none;font-size:12px;font-weight:650;padding:4px 10px;border-radius:999px;white-space:nowrap}
+.ti-pill.live{color:#11804f;background:rgba(31,157,107,.12)}
+.ti-pill.soon{color:var(--ink2);background:var(--bg2)}
+.ti-d{margin:16px 0 0;color:#3a3a3f;font-size:15.5px;line-height:1.5}
+.ti-flow{list-style:none;margin:14px 0 0;padding:12px 14px;border-radius:14px;background:var(--bg2);display:grid;gap:8px;font-size:14px;line-height:1.45;color:#3a3a3f}
+.ti-flow li{display:flex;gap:9px;align-items:flex-start}
+.ti-flow b{font-weight:650;color:var(--ink)}
+.ti-arr{flex:none;width:16px;height:16px;margin-top:2px;fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.ti-arr.out{stroke:var(--brand)}
+.ti-arr.in{stroke:#1f9d6b}
+.ti-how{margin-top:14px;border-top:1px solid var(--line)}
+.ti-how summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 0 2px;font-size:15px;font-weight:650;color:#b85309;min-height:44px}
+.ti-how summary::-webkit-details-marker{display:none}
+.ti-how summary::after{content:"";width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(45deg);margin:-4px 4px 0 0;transition:transform .25s var(--ease)}
+.ti-how[open] summary::after{transform:rotate(-135deg);margin-top:4px}
+.ti-how summary:focus-visible{outline:2px solid var(--brand);outline-offset:2px;border-radius:8px}
+.ti-need{margin:10px 0 0;padding:12px 14px;border-radius:14px;box-shadow:0 0 0 1px var(--line);font-size:14px;line-height:1.45}
+.ti-need b{display:block;font-weight:650;margin-bottom:4px}
+.ti-need ul{margin:0;padding-left:18px;color:#3a3a3f}
+.ti-how ol{margin:14px 0 4px;padding:0;list-style:none;counter-reset:ti;display:grid;gap:10px;font-size:14.5px;line-height:1.5;color:#3a3a3f}
+.ti-how ol li{counter-increment:ti;display:flex;gap:10px;overflow-wrap:anywhere}
+.ti-how ol li::before{content:counter(ti);flex:none;width:22px;height:22px;border-radius:50%;background:var(--brandSoft);color:#b85309;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;margin-top:1px}
+
+/* ---------- á leiðinni ---------- */
+.ti-planned{padding-top:100px;padding-bottom:20px}
+.ti-pgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.ti-pcard{display:flex;gap:14px;align-items:flex-start;padding:18px;border-radius:18px;border:1.5px dashed rgba(0,0,0,.14);background:rgba(255,255,255,.5);min-width:0}
+.ti-pcard>div{flex:1;min-width:0}
+.ti-pcard .ti-logo{width:42px;height:42px;border-radius:12px;box-shadow:0 0 0 1px var(--line);filter:grayscale(1);opacity:.75}
+.ti-pcard .ti-logo img{width:26px;height:26px}
+.ti-pcard h3{font-size:16.5px;font-weight:650;letter-spacing:-.01em;margin:0}
+.ti-pcard small{display:block;color:var(--ink2);font-size:13px;margin-top:1px}
+.ti-pcard p{margin:6px 0 0;color:#4a4a4f;font-size:14px;line-height:1.45}
+.ti-ask{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-top:22px;padding:18px 22px;border-radius:18px;background:var(--brandSoft);font-size:15px;line-height:1.45}
+.ti-ask b{font-weight:650}
+.ti-ask span{color:#4a4a4f}
+
+@media (max-width:900px){
+  .ti-edge-in{grid-template-columns:1fr;gap:32px;padding:36px 28px}
+  .ti-grid{grid-template-columns:1fr}
+}
+@media (max-width:700px){
+  .ti-hero{padding-top:calc(env(safe-area-inset-top,0px) + 108px)}
+  .ti-wall{gap:10px;margin-top:30px}
+  .ti-wall .ti-logo{width:52px;height:52px;border-radius:14px}
+  .ti-wall .ti-logo img{width:30px;height:30px}
+  .ti-edge{padding-top:56px;padding-bottom:30px}
+  .ti-edge-in{border-radius:24px;padding:28px 22px}
+  .ti-cat{padding-top:56px}
+  .ti-card{padding:20px 18px;border-radius:20px}
+  .ti-card header{flex-wrap:wrap}
+  .ti-pgrid{grid-template-columns:1fr}
+  .ti-planned{padding-top:72px}
+}
+@media (prefers-reduced-motion: reduce){.ti-how summary::after{transition:none}}

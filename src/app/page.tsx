@@ -5,6 +5,7 @@ import "@/components/site/home.css";
 import { SITE_URL } from "@/lib/site";
 import { PLANS } from "@/lib/plans";
 import { demoConfigured } from "@/lib/demo.server";
+import { pageMetadata } from "@/components/site/site-meta";
 
 // Forsíða vakto.is (okt. 2026): Apple-leg síða með alvöru skjámyndum úr kerfinu og appinu.
 // Komponentar og stílar síðunnar eru í src/components/site/.
@@ -12,12 +13,8 @@ const DESC = "Vaktakerfi fyrir íslenska vinnustaði: vaktaplan, stimpilklukka, 
 
 // viewport-fit=cover + ljós theme-color fyrir opna vefinn (iOS 26 Safari, sjá components/site/viewport.ts).
 export const viewport = siteViewport;
-export const metadata: Metadata = {
-  title: "VAKTO: vaktakerfi, vaktaplan, stimpilklukka og laun",
-  description: DESC,
-  alternates: { canonical: "/" },
-  openGraph: { url: "/", title: "VAKTO: vaktakerfi, vaktaplan, stimpilklukka og laun", description: DESC },
-};
+// Titill, lýsing, canonical, hreflang (IS/EN/DA/SV/NO) og OG: components/site/site-meta.ts.
+export const metadata: Metadata = pageMetadata("home", "is");
 
 // Skipulögð gögn fyrir Google (fyrirtæki, vefur og hugbúnaðurinn með verði).
 const LD = [
