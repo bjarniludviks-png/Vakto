@@ -108,6 +108,12 @@ const PATHS: Record<string, ReactNode> = {
   ),
   moon: <path d="M20 14a8 8 0 0 1-10-10 8 8 0 1 0 10 10Z" />,
   logout: <path d="M9 5H5v14h4M16 12H9M14 8l4 4-4 4" />,
+  tasks: (
+    <>
+      <rect x="4" y="4" width="16" height="16" rx="3" />
+      <path d="M8 9.5l1.5 1.5L12 8.5M8 15l1.5 1.5L12 14M14.5 10h2.5M14.5 15.5h2.5" />
+    </>
+  ),
 };
 
 export function Icon({
