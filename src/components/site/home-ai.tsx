@@ -21,7 +21,7 @@ function Spark() {
 /** Spilar aðeins þegar skráin er til og myndbandið sést; annars skjámynd af tillögu VAKTO AI. */
 function AiVideo({ alt, shotAlt }: { alt: string; shotAlt: string }) {
   const lang = useSiteLang();
-  const src = `${VIDEO}/ai${lang === "en" ? "-en" : ""}`;
+  const src = `${VIDEO}/ai${lang !== "is" ? "-en" : ""}`;
   const [found, setFound] = useState<string | null>(null); // slóðin sem reyndist til
   const ok = found === src;
   const v = useRef<HTMLVideoElement>(null);
@@ -40,7 +40,7 @@ function AiVideo({ alt, shotAlt }: { alt: string; shotAlt: string }) {
   if (!ok) return (
     <div className="ah-hey-shot">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={`${SHOT}${lang === "en" ? "/en" : ""}/light/ai.jpg`} alt={shotAlt} width={1209} height={1656} loading="lazy" decoding="async" draggable={false} />
+      <img src={`${SHOT}${lang !== "is" ? "/en" : ""}/light/ai.jpg`} alt={shotAlt} width={1209} height={1656} loading="lazy" decoding="async" draggable={false} />
     </div>
   );
   return (

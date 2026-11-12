@@ -22,6 +22,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { slug: "dashboard", href: "/maelabord", label: "Mælaborð", roles: STAFF_MGMT, icon: "dashboard" },
       { slug: "schedule", href: "/vaktaplan", label: "Vaktaplan", roles: STAFF_MGMT, icon: "schedule" },
       { slug: "attendance", href: "/timaskraning", label: "Tímaskráning", roles: STAFF_MGMT, icon: "clock" },
+      { slug: "tasks", href: "/verkefni", label: "Verkefni", roles: STAFF_MGMT, icon: "tasks" },
       { slug: "jobs", href: "/verk", label: "Verk", roles: ["owner", "manager", "contractor"], icon: "briefcase" },
     ],
   },

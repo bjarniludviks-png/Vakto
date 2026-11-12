@@ -133,6 +133,8 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith("/tilbod/") || // tilboð til samþykktar viðskiptavinar (leynitengill, 0104) // verkskýrsla til samþykktar viðskiptavinar (leynitengill, 0102)
     pathname === "/verktakar" || // markaðssíða VAKTO Verk
     pathname === "/ai" || // markaðssíða VAKTO AI
+    pathname === "/tengingar" || // markaðssíða: tengingar
+    /^\/(en|da|sv|no)(\/|$)/.test(pathname) || // markaðssíður á öðrum málum (components/site/i18n.ts)
     // PWA / icon assets must be reachable without auth (home-screen install).
     pathname === "/manifest.webmanifest" ||
     pathname.startsWith("/apple-icon") ||

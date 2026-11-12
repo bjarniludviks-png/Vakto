@@ -6,18 +6,14 @@ import PricingClient from "@/components/site/pricing-client";
 import { PRICING_TEXT } from "@/components/site/pricing-text";
 import { PLANS } from "@/lib/plans";
 import { SITE_URL } from "@/lib/site";
+import { pageMetadata } from "@/components/site/site-meta";
 
 // Verðsíðan (okt. 2026): fjórar leiðir, reiknivél, viðbætur, samanburður og spurningar.
 // Tölur í src/lib/plans.ts, texti í components/site/pricing-text.ts.
 const T = PRICING_TEXT.is;
 
 export const viewport = siteViewport;
-export const metadata: Metadata = {
-  title: T.metaTitle,
-  description: T.metaDesc,
-  alternates: { canonical: "/verd" },
-  openGraph: { url: "/verd", title: T.metaTitle, description: T.metaDesc },
-};
+export const metadata: Metadata = pageMetadata("price", "is");
 
 // Skipulögð gögn: hver leið sem Offer (verð á mánuði án VSK).
 const LD = {

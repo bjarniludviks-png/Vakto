@@ -12,6 +12,7 @@ import HomeChat from "./home-chat";
 import SiteNav from "./site-nav";
 import { useFullLang, useSiteLang } from "./lang";
 import { HOME_TEXT } from "./home-text";
+import { PATHS, appHref } from "./i18n";
 import AhFooter from "./ah-footer";
 import { VaktoLogo } from "@/components/brand/vakto-logo";
 import { HeyVakto, VisitRequest } from "./home-ai";
@@ -21,7 +22,8 @@ const useT = () => HOME_TEXT[useSiteLang()];
 
 const SHOT = "/showcase/forsida";
 // Skjámyndir og myndband á tungumáli síðunnar (enskar útgáfur í /showcase/forsida/en). Skjölin (skjol/) eru sameiginleg.
-const useShot = () => (useSiteLang() === "en" ? `${SHOT}/en` : SHOT);
+// Önnur mál en íslenska (en/da/sv/no) sjá ensku skjámyndirnar.
+const useShot = () => (useSiteLang() !== "is" ? `${SHOT}/en` : SHOT);
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const seg = (p: number, a: number, b: number) => clamp((p - a) / (b - a));
 const ease = (t: number) => 1 - Math.pow(1 - t, 3);
@@ -216,6 +218,7 @@ function DemoButton() {
 }
 
 function HeroVideo({ demo = false }: { demo?: boolean }) {
+  const lang = useSiteLang();
   const base = useShot();
   const t = useT();
   const frame = useRef<HTMLDivElement>(null), head = useRef<HTMLDivElement>(null);
@@ -251,7 +254,7 @@ function HeroVideo({ demo = false }: { demo?: boolean }) {
           <h1>{t.h1a}<br /><span>{t.h1b}</span></h1>
           <p className="ah-lede">{t.lede}</p>
           <div className="ah-ctas">
-            <a className="ah-btn" href="/nyskraning">{t.try}</a>
+            <a className="ah-btn" href={appHref(lang, "/nyskraning")}>{t.try}</a>
             {demo && <DemoButton />}
             <a className="ah-link" href="#kerfid">{t.see}</a>
           </div>
@@ -558,8 +561,35 @@ function Wallet() {
 
 /* ---------- 6. Verð ---------- */
 
+/* ---------- Tengingar: stutt rönd með merkjum, hlekkur á /tengingar ---------- */
+const INT_T = {
+  is: { h: "Tengist kerfunum sem þú notar.", p: "Tímarnir í Payday eða DK, velta úr Shopify, WooCommerce eða Business Central. Og VAKTO reiknar launin sjálft, ekki bara tímana.", go: "Sjá allar tengingar" },
+  en: { h: "Works with the systems you use.", p: "Hours to Payday or DK, revenue from Shopify, WooCommerce or Business Central. And VAKTO calculates the pay itself, not just the hours.", go: "See all integrations" },
+  da: { h: "Spiller sammen med dine systemer.", p: "Timer til Payday eller DK (Island), omsætning fra Shopify, WooCommerce eller Business Central. Og VAKTO beregner selv lønnen, ikke kun timerne.", go: "Se alle integrationer" },
+  sv: { h: "Fungerar med systemen du redan har.", p: "Timmar till Payday eller DK (Island), omsättning från Shopify, WooCommerce eller Business Central. Och VAKTO räknar ut lönen själv, inte bara timmarna.", go: "Se alla integrationer" },
+  nb: { h: "Fungerer med systemene du allerede bruker.", p: "Timer til Payday eller DK (Island), omsetning fra Shopify, WooCommerce eller Business Central. Og VAKTO beregner lønnen selv, ikke bare timene.", go: "Se alle integrasjoner" },
+};
+const INT_LOGOS = ["payday.png", "dk.png", "businesscentral.svg", "shopify.svg", "woocommerce.svg"];
+function HomeIntegrations() {
+  const lang = useSiteLang();
+  const t = INT_T[lang];
+  return (
+    <section className="ah-int" aria-labelledby="ah-int-h">
+      <a href={PATHS[lang].integrations} className="ah-int-in">
+        <span className="ah-int-logos" aria-hidden="true">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          {INT_LOGOS.map((f) => <span key={f}><img src={`/integrations/${f}`} alt="" width={26} height={26} loading="lazy" /></span>)}
+        </span>
+        <span className="ah-int-tx"><b id="ah-int-h">{t.h}</b> {t.p}</span>
+        <span className="ah-int-go">{t.go} →</span>
+      </a>
+    </section>
+  );
+}
+
 function Pricing() {
   const t = useT();
+  const lang = useSiteLang();
   return (
     <section className="ah-sec ah-price" id="verd">
       <div className="ah-head">
@@ -570,8 +600,8 @@ function Pricing() {
         <p>{t.price1}<br />{t.price2}</p>
         <p className="ah-fine">{t.fine}</p>
         <div className="ah-ctas">
-          <a className="ah-btn ah-btn-lg" href="/verd">{t.seePrice}</a>
-          <a className="ah-link" href="/nyskraning">{t.try}</a>
+          <a className="ah-btn ah-btn-lg" href={PATHS[lang].price}>{t.seePrice}</a>
+          <a className="ah-link" href={appHref(lang, "/nyskraning")}>{t.try}</a>
         </div>
       </div>
     </section>
@@ -595,7 +625,8 @@ function Sister() {
 export default function AppleHome({ demo = false }: { demo?: boolean }) {
   const lang = useSiteLang();
   const full = useFullLang();
-  const chatLang = full === "pl" ? "pl" : lang; // spjallið er líka til á pólsku
+  // Spjallið er á IS/EN/PL: norðurlandamálin fá ensku (gervigreindin svarar samt á máli gestsins).
+  const chatLang = lang === "da" || lang === "sv" || lang === "nb" ? "en" : full === "pl" ? "pl" : lang;
   const t = HOME_TEXT[lang];
   const [scrolled, setScrolled] = useState(false);
   const [overDark, setOverDark] = useState(false);
@@ -627,6 +658,7 @@ export default function AppleHome({ demo = false }: { demo?: boolean }) {
         <DarkCompare />
         <Contract />
         <Wallet />
+        <HomeIntegrations />
         <Pricing />
         <VisitRequest />
         <Sister />

@@ -2,11 +2,15 @@
 
 // Markaðssíða VAKTO AI (/ai). Textar í components/site/ai-text.ts (IS/EN), verð úr lib/plans.ts.
 import { useState } from "react";
+import Link from "next/link";
 import AhFooter from "@/components/site/ah-footer";
 import SiteNav from "@/components/site/site-nav";
 import { Glow } from "@/components/site/home-client";
 import { useLangSync } from "@/components/site/lang";
 import { AI_TEXT } from "@/components/site/ai-text";
+
+/** AI-síðan er til á íslensku og ensku; önnur mál fá ensku. */
+const aiLang = (l: string): "is" | "en" => (l === "is" ? "is" : "en");
 import { AI_PACK, PLANS, getPlan } from "@/lib/plans";
 import { FEATURE_MIN } from "@/lib/plan-features";
 import { nf } from "@/lib/format";
@@ -24,7 +28,7 @@ const ICONS = [
 
 /** Spjall-sýnishorn í hetjunni: spurning, svar með tölum og tillaga sem hægt er að „staðfesta“. */
 function ChatMock() {
-  const t = AI_TEXT[useLangSync()].mock;
+  const t = AI_TEXT[aiLang(useLangSync())].mock;
   const [done, setDone] = useState(false);
   return (
     <div className="ai-chat" role="img" aria-label={`${t.q} ${t.intro} ${t.prop}`}>
@@ -48,7 +52,7 @@ function ChatMock() {
 
 export default function AiClient() {
   const lang = useLangSync();
-  const t = AI_TEXT[lang];
+  const t = AI_TEXT[aiLang(lang)];
   const grunnur = getPlan("grunnur");
   const paid = PLANS.filter((p) => p.base > 0);
   const scheduleFrom = PLANS.findIndex((p) => p.id === FEATURE_MIN.ai_schedule);
@@ -64,7 +68,7 @@ export default function AiClient() {
             <h1>{t.hero.h1a}<br /><span>{t.hero.h1b}</span></h1>
             <p className="ai-lede">{t.hero.lede}</p>
             <div className="ai-cta">
-              <a className="ah-btn ah-btn-lg" href="/nyskraning">{t.hero.cta}</a>
+              <Link className="ah-btn ah-btn-lg" href="/nyskraning">{t.hero.cta}</Link>
               <a className="ah-link" href="#daemi">{t.hero.cta2}</a>
             </div>
             <p className="ai-note">{t.hero.note(grunnur.aiQuestions)}</p>
@@ -194,7 +198,7 @@ export default function AiClient() {
               </div>
             ))}
           </div>
-          <p className="ai-price-fine">{t.price.pack(nf(AI_PACK.price), AI_PACK.questions)} {t.price.staff} <a href="/verd">{t.price.link}</a></p>
+          <p className="ai-price-fine">{t.price.pack(nf(AI_PACK.price), AI_PACK.questions)} {t.price.staff} <Link href="/verd">{t.price.link}</Link></p>
         </section>
 
         {/* ---------- spurningar ---------- */}
@@ -207,7 +211,7 @@ export default function AiClient() {
 
         <section className="ai-final">
           <h2>{t.final.h1}<br /><span>{t.final.h2}</span></h2>
-          <a className="ah-btn ah-btn-lg" href="/nyskraning">{t.final.cta}</a>
+          <Link className="ah-btn ah-btn-lg" href="/nyskraning">{t.final.cta}</Link>
         </section>
       </main>
       <AhFooter />

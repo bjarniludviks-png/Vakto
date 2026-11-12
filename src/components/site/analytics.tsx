@@ -6,17 +6,24 @@
 import Script from "next/script";
 import { useEffect, useState } from "react";
 import { useSiteLang } from "./lang";
+import { appHref, type SiteLang } from "./i18n";
+import * as da from "./text/da";
+import * as sv from "./text/sv";
+import * as nb from "./text/nb";
 
 const GA_ID = process.env.NEXT_PUBLIC_GA_ID;
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
 const KEY = "vakto-consent";
-const T = {
+export type ConsentText = { text: string; more: string; no: string; yes: string };
+const T: Record<SiteLang, ConsentText> = {
   is: { text: "Við notum vafrakökur til að mæla hvernig vefurinn er notaður og hvort auglýsingarnar okkar skila sér (Google Analytics og Meta). Ekkert er sett nema þú leyfir það.", more: "Nánar", no: "Hafna", yes: "Leyfa" },
   en: { text: "We use cookies to measure how the website is used and whether our ads work (Google Analytics and Meta). Nothing is set unless you allow it.", more: "Details", no: "Decline", yes: "Allow" },
+  da: da.consent, sv: sv.consent, nb: nb.consent,
 };
 
 export default function SiteAnalytics() {
-  const t = T[useSiteLang()];
+  const lang = useSiteLang();
+  const t = T[lang];
   const [state, setState] = useState<"unknown" | "granted" | "denied" | "loading">("loading");
   useEffect(() => {
     let v: string | null = null;
@@ -39,7 +46,7 @@ export default function SiteAnalytics() {
       )}
       {state === "unknown" && (
         <div className="ah-consent" role="dialog" aria-label="Vafrakökur">
-          <p>{t.text} <a href="/vafrakokur">{t.more}</a></p>
+          <p>{t.text} <a href={appHref(lang, "/vafrakokur")}>{t.more}</a></p>
           <div className="ah-consent-btns">
             <button type="button" onClick={() => choose("denied")}>{t.no}</button>
             <button type="button" className="yes" onClick={() => choose("granted")}>{t.yes}</button>
