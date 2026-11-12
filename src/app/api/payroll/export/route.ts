@@ -1,6 +1,8 @@
 import * as XLSX from "xlsx";
 import type { PayLine } from "@/lib/payroll";
 import { getExportLines, type HourBuckets } from "@/lib/payroll-export.server";
+import { payItems } from "@/lib/pay-keys";
+import type { CustomRules, PayKeys } from "@/lib/payrules";
 import { createClient } from "@/lib/supabase/server";
 
 function csvCell(v: string | number): string {
@@ -10,21 +12,28 @@ function csvCell(v: string | number): string {
 
 /** Payday "Hlaða upp tímaskrá" template: Kennitala · Nafn · Dagvinna · Yfirvinna ·
  * Eftirvinna (+ extra columns named exactly like the launaliður in Payday).
- * See hjalp.payday.is/article/131. Kennitala must stay text (leading zeros). */
-function paydayTimesheetXlsx(lines: PayLine[], kt: Record<string, string>, hours: Map<string, HourBuckets>): Buffer {
+ * See hjalp.payday.is/article/131. Kennitala must stay text (leading zeros).
+ * Dálkaheiti fylgja launalyklum (pay-keys.ts); án lykla eru þau „Dagvinna“, „Yfirvinna“, „Álag 33%“ eins og áður. */
+function paydayTimesheetXlsx(lines: PayLine[], kt: Record<string, string>, hours: Map<string, HourBuckets>, rules?: Map<string, CustomRules>, payKeys?: PayKeys): Buffer {
   // Without punch-based buckets (no period / demo) fall back to the line's total as dagvinna.
   const bucket = (l: PayLine): HourBuckets => hours.get(l.employeeId) ?? { dagvinna: l.hours, yfirvinna: 0, alag: {} };
-  // Einn dálkur per álagsprósentu sem kemur fyrir („Álag 33%“, „Álag 45%“ …) — nöfnin stemma við launaliði í Payday.
-  const pcts = [...new Set(lines.flatMap((l) => Object.entries(bucket(l).alag).filter(([, h]) => h > 0).map(([p]) => Number(p))))].sort((a, b) => a - b);
-  const header = ["Kennitala", "Nafn", "Dagvinna", "Yfirvinna", "Eftirvinna", "Mötuneyti", ...pcts.map((p) => `Álag ${String(p).replace(".", ",")}%`)];
+  const items = new Map(lines.map((l) => [l.employeeId, payItems(bucket(l), rules?.get(l.employeeId), payKeys)]));
+  const dagName = payKeys?.dagvinna || "Dagvinna", yfName = payKeys?.yfirvinna || "Yfirvinna";
+  // Fastir dálkar fyrst (sniðmát Payday), svo einn dálkur per launalið sem kemur fyrir — álag í prósenturöð.
+  const fixed = [dagName, yfName, "Eftirvinna", "Mötuneyti"];
+  const extra = [...new Set([...items.values()].flatMap((xs) => xs.map((x) => x.name)))].filter((n) => !fixed.includes(n));
+  const pctOf = (n: string) => { const m = /^Álag ([\d,]+)%$/.exec(n); return m ? Number(m[1].replace(",", ".")) : Infinity; };
+  extra.sort((a, b) => pctOf(a) - pctOf(b) || a.localeCompare(b, "is"));
+  const cols = [...fixed, ...extra];
+  const header = ["Kennitala", "Nafn", ...cols];
   const rows = lines
     .filter((l) => bucket(l).dagvinna + bucket(l).yfirvinna > 0)
     .sort((a, b) => a.name.localeCompare(b.name, "is"))
-    .map((l) => { const h = bucket(l); return [kt[l.employeeId] ?? "", l.name, h.dagvinna || null, h.yfirvinna || null, null, null, ...pcts.map((p) => h.alag[p] || null)]; });
+    .map((l) => { const m = new Map((items.get(l.employeeId) ?? []).map((x) => [x.name, x.quantity])); return [kt[l.employeeId] ?? "", l.name, ...cols.map((c) => m.get(c) || null)]; });
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
   // Force kennitala cells to text so Excel/Payday never drop a leading zero.
   for (let r = 1; r <= rows.length; r++) { const c = ws[`A${r + 1}`]; if (c) { c.t = "s"; c.v = String(c.v); } }
-  ws["!cols"] = [{ wch: 12 }, { wch: 28 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, ...pcts.map(() => ({ wch: 11 }))];
+  ws["!cols"] = [{ wch: 12 }, { wch: 28 }, ...cols.map((c) => ({ wch: Math.max(10, c.length + 1) }))];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
   return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
@@ -46,7 +55,7 @@ export async function GET(request: Request) {
   if (format === "payday") {
     // Payday imports HOURS per launaliður and prices them itself — so this is a
     // timesheet, not a pay summary. Needs a period (approved punches).
-    const buf = paydayTimesheetXlsx(lines, kt, hours);
+    const buf = paydayTimesheetXlsx(lines, kt, hours, got.rules, got.payKeys);
     const stamp = from && to ? `${from}_${to}` : "timabil";
     return new Response(new Uint8Array(buf), {
       headers: {
@@ -79,13 +88,17 @@ export async function GET(request: Request) {
       ? await supabase.from("departments").select("id, dk_code, locations!inner(company_id)").eq("locations.company_id", me.company_id)
       : { data: null };
     const dkDept = new Map((deps ?? []).map((d) => [d.id as string, ((d.dk_code as string | null) ?? "").trim()]));
-    type HB = { dagvinna: number; yfirvinna: number; alag: Record<number, number> };
+    type HB = HourBuckets;
+    // Launalyklar reglunnar (Band.key / keys, 0113) ganga framar DK-launaliðum eftir prósentu.
     const rowOf = (l: (typeof lines)[number], h: HB, deild: string) => {
       const v = new Map<string, number>();
-      const put = (c: string | undefined, n: number) => { if (c && n) v.set(c, (v.get(c) ?? 0) + n); };
-      put(codes.dagvinna, h.dagvinna); put(codes.yfirvinna || codes.dagvinna, h.yfirvinna);
-      for (const [p, n] of Object.entries(h.alag)) { const c = codes.alag?.[String(Number(p))]; if (c) put(c, n); else if (n) missing.add(Number(p)); }
-      return { name: l.name, deild, row: [(kt[l.employeeId] ?? "").replace(/\D/g, ""), deild, l.name, ...cols.map((c) => (v.get(c) ? num(v.get(c)!) : ""))] };
+      const items = payItems(h, got.rules?.get(l.employeeId), null, {
+        dagvinna: codes.dagvinna, yfirvinna: codes.yfirvinna || codes.dagvinna, yfirvinna1: codes.yfirvinna || codes.dagvinna,
+        alagFallback: (p) => { const c = codes.alag?.[String(Number(p))]; if (!c) missing.add(Number(p)); return c ?? null; },
+      });
+      for (const it of items) { add(it.name); v.set(it.name, (v.get(it.name) ?? 0) + it.quantity); }
+      // Dálkar geta bæst við í síðari línum (lyklar reglu) — línan er því smíðuð eftir á.
+      return { name: l.name, deild, has: [...v.values()].some(Boolean), row: () => [(kt[l.employeeId] ?? "").replace(/\D/g, ""), deild, l.name, ...cols.map((c) => (v.get(c) ? num(v.get(c)!) : ""))] };
     };
     // Fastlaunafólk er ekki með: DK greiðir mánaðarlaunin sjálft og tímar á dagvinnulið myndu tvígreiða.
     const dkRows = lines.filter((l) => !got.monthly.has(l.employeeId)).flatMap((l) => {
@@ -95,14 +108,15 @@ export async function GET(request: Request) {
         const merged = new Map<string, HB>();
         for (const [deptId, h] of split) {
           const k = dkDept.get(deptId) ?? "";
-          const m = merged.get(k) ?? merged.set(k, { dagvinna: 0, yfirvinna: 0, alag: {} }).get(k)!;
-          m.dagvinna += h.dagvinna; m.yfirvinna += h.yfirvinna;
+          const m = merged.get(k) ?? merged.set(k, { dagvinna: 0, yfirvinna: 0, alag: {}, parts: {} }).get(k)!;
+          m.dagvinna += h.dagvinna; m.yfirvinna += h.yfirvinna; if (h.yfirvinna1) m.yfirvinna1 = (m.yfirvinna1 ?? 0) + h.yfirvinna1;
           for (const [p, n] of Object.entries(h.alag)) m.alag[Number(p)] = (m.alag[Number(p)] ?? 0) + n;
+          for (const [id, x] of Object.entries(h.parts ?? {})) { const cur = m.parts![id] ?? (m.parts![id] = { pct: x.pct, hours: 0 }); cur.hours += x.hours; }
         }
         return [...merged].map(([deild, h]) => rowOf(l, h, deild));
       }
       return [rowOf(l, hours.get(l.employeeId) ?? { dagvinna: l.hours, yfirvinna: 0, alag: {} }, "")];
-    }).filter((r) => r.row.slice(3).some(Boolean)).sort((a, b) => a.name.localeCompare(b.name, "is") || a.deild.localeCompare(b.deild)).map((r) => r.row);
+    }).filter((r) => r.has).sort((a, b) => a.name.localeCompare(b.name, "is") || a.deild.localeCompare(b.deild)).map((r) => r.row());
     if (missing.size) console.warn("[dk export] álag án launaliðar:", [...missing]);
     const body = "\uFEFF" + [["Kennitala", "Deild", "Nafn", ...cols], ...dkRows].map((r) => r.map(csvCell).join(";")).join("\r\n") + "\r\n";
     const stamp = from && to ? `${from}_${to}` : "timabil";

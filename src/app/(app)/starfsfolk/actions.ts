@@ -693,7 +693,9 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput): Pr
 
 const DEMO_DEPARTMENTS = ["Eldhús", "Sal", "Stjórnun"];
 
-export type CompanyOptions = { departments: string[]; positions: string[]; locations: string[]; isOwner?: boolean };
+export type CompanyOptions = { departments: string[]; positions: string[]; locations: string[]; isOwner?: boolean;
+  /** Kjarasamningsafbrigði sem er sjálfvalið fyrir nýtt starfsfólk (0113, Kjarasamningasafn). */
+  defaultAgreement?: string | null };
 
 /** Department name → color (for schedule/staff labels). Empty when 0038 hasn't run. */
 export async function getDepartmentColors(): Promise<Record<string, string>> {
@@ -730,8 +732,10 @@ export async function getCompanyOptions(): Promise<CompanyOptions> {
     const uniq = (xs: (string | null)[]) => Array.from(new Set(xs.filter(Boolean))) as string[];
     const { data: { user } } = await supabase.auth.getUser();
     const { data: me } = user ? await supabase.from("users").select("role").eq("id", user.id).maybeSingle() : { data: null };
+    const da = await supabase.from("companies").select("default_agreement").eq("id", company).maybeSingle(); // fyrir 0113: villa → enginn staðall
+    const defaultAgreement = !da.error && da.data?.default_agreement && UNION_PRESETS[da.data.default_agreement as string] ? (da.data.default_agreement as string) : null;
     return {
-      isOwner: me?.role === "owner",
+      isOwner: me?.role === "owner", defaultAgreement,
       departments: uniq((deps.data ?? []).map((d) => d.name as string)),
       positions: uniq((pos.data ?? []).map((d) => d.name as string)),
       locations: uniq((locs.data ?? []).map((d) => d.name as string)),

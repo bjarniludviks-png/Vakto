@@ -6,6 +6,7 @@
 
 import { useLang } from "@/components/app/lang";
 import { CUSTOM_UNION, UNION_PRESETS, agreementFor } from "@/lib/payrules";
+import { AGREEMENTS_LIB, UNION_ORDER, agreementForPreset } from "@/lib/agreements";
 import { AGREEMENTS, addMonths, birthDateFromKennitala, familyFor, isoDate, orlofRight, sickRight } from "@/lib/entitlements";
 
 const pct = (n: number) => String(n).replace(".", ",");
@@ -21,6 +22,7 @@ export function AgreementSummary({ union, agreement, onAgreement, hireDate, prio
   const auto = agreementFor(union, null);
   const used = agreementFor(union, agreement ? { agreement } : null);
   const r = UNION_PRESETS[used];
+  const lib = agreementForPreset(used);
   const fam = familyFor(union) ?? familyFor(used);
   const today = isoDate(new Date());
   const start = hireDate ? addMonths(hireDate, -Math.max(0, priorMonths)) : null;
@@ -31,15 +33,16 @@ export function AgreementSummary({ union, agreement, onAgreement, hireDate, prio
     <div className="agr-sum" style={{ border: "1px solid var(--line)", borderRadius: 12, padding: "12px 14px", background: "var(--panel)", fontSize: 12.5, lineHeight: 1.55, marginTop: 8 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "space-between" }}>
         <b>{t("Reiknað eftir")}: {used}</b>
-        {!isPreset && onAgreement && (
-          <select value={agreement} onChange={(e) => onAgreement(e.target.value)} style={{ border: "1px solid var(--line)", borderRadius: 8, padding: "4px 8px", font: "inherit", fontSize: 12 }} aria-label={t("Samningur sem launin eru reiknuð eftir")}>
-            <option value="">{t("Sjálfvirkt")} ({auto})</option>
-            {Object.keys(UNION_PRESETS).map((k) => <option key={k} value={k}>{k}</option>)}
+        {onAgreement && (
+          <select value={agreement} onChange={(e) => onAgreement(e.target.value)} style={{ border: "1px solid var(--line)", borderRadius: 8, padding: "4px 8px", font: "inherit", fontSize: 12, maxWidth: "100%" }} aria-label={t("Samningur sem launin eru reiknuð eftir")}>
+            <option value="">{isPreset ? union : `${t("Sjálfvirkt")} (${auto})`}</option>
+            <PresetOptions />
           </select>
         )}
       </div>
       <div className="muted">
         {t("Kvöld")} {pct(r.eve)} % · {t("helgar")} {pct(r.weekend)} % · {t("nætur")} {pct(r.night)} % · {t("yfirvinna")} {pct(r.overtime)} % · {t("stórhátíð")} {pct(r.holiday)} %
+        {lib && lib.status !== "verified" ? <span style={{ color: "var(--warn)" }}> · {t(lib.status === "partial" ? "staðfest að hluta" : "óstaðfest")}</span> : null}
       </div>
       {o && s ? (
         <div style={{ marginTop: 6 }}>
@@ -51,5 +54,25 @@ export function AgreementSummary({ union, agreement, onAgreement, hireDate, prio
         <div className="muted" style={{ marginTop: 6 }}>{t("Orlofs- og veikindaréttur fyrir þetta félag er ekki kominn inn í VAKTO — fylgstu með honum handvirkt.")}</div>
       )}
     </div>
+  );
+}
+
+/** Afbrigði kjarasamninga í vali, flokkuð eftir félagi (Kjarasamningasafn) — eldri staðlar VAKTO aftast. */
+export function PresetOptions() {
+  const listed = new Set<string>();
+  const groups = UNION_ORDER.map((u) => {
+    const items = AGREEMENTS_LIB.filter((a) => a.union === u && !a.legacy && !listed.has(a.preset) && (listed.add(a.preset), true));
+    return { u, items };
+  });
+  const legacy = Object.keys(UNION_PRESETS).filter((k) => !listed.has(k));
+  return (
+    <>
+      {groups.filter((g) => g.items.length).map((g) => (
+        <optgroup key={g.u} label={g.u}>
+          {g.items.map((a) => <option key={a.preset} value={a.preset}>{a.preset}</option>)}
+        </optgroup>
+      ))}
+      {legacy.length > 0 && <optgroup label="Eldri staðlar">{legacy.map((k) => <option key={k} value={k}>{k}</option>)}</optgroup>}
+    </>
   );
 }

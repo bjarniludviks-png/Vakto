@@ -4,6 +4,7 @@
 // SGS …) before being used on real pay. The DB (pay_rules) stores per-company
 // overrides + a `confirmed` flag set when a manager verifies a rate.
 import { familyFor } from "./entitlements";
+import { AGREEMENT_PRESETS } from "./agreement-presets";
 
 export type PayRuleKind = "premium" | "overtime" | "holiday";
 export type PayRule = {
@@ -43,6 +44,7 @@ export type RuleSet = {
   // næturálag 00–08, dagvinna 08–17, kvöldálag 17–24. VR: næturvinna 00–07, dagvinna 09–18.
   nightEnd?: number; dayStart?: number; dayEnd?: number;
   verslStor?: boolean; // frídagur verslunarmanna er stórhátíðardagur (VR, gr. 2.3.2)
+  fridagur?: number;
 };
 
 export type RulePctKey = "eve" | "weekend" | "overtime" | "holiday" | "night";
@@ -60,13 +62,34 @@ export const CUSTOM_UNION = "Eigin reglur";
 // A band = "this weekday + time window → this % premium" (e.g. Sun 00:00–24:00 +45%,
 // or 18:00–23:00 +33% weekdays). days: 0=Sun … 6=Sat. from/to "HH:MM" (to may wrap
 // past midnight). Bands stack on top of the base RuleSet — the highest % wins.
-export type Band = { label: string; days: number[]; from: string; to: string; pct: number };
+export type Band = { label: string; days: number[]; from: string; to: string; pct: number; /** launalykill (Payday/DK) */ key?: string };
+
+/** Launalyklar (heiti/númer launaliðar í Payday eða DK) per launaþátt. Tómt = sjálfgefið heiti
+ *  („Dagvinna“, „Yfirvinna“, „Álag 33%“). Fyrirtæki stillir í Stillingum (companies.pay_keys, 0113);
+ *  eigin reglur geta líka haft eigin lykla (CustomRules.keys og Band.key) sem ganga framar. */
+export type PayKeyComp = "dagvinna" | "yfirvinna" | "yfirvinna1" | "eve" | "night" | "weekend" | "holiday";
+export type PayKeys = Partial<Record<PayKeyComp, string>>;
+
 export type CustomRules = RuleSet & {
   otWeekly?: number;  // klst/viku áður en yfirvinna tekur við (default 40)
   otMonthly?: number; // klst/mánuði áður en yfirvinna tekur við (0/ósett = óvirkt)
   bands?: Band[];
   /** Staðall valinn fyrir félag sem er ekki sjálft staðall (sama og vefurinn, employees.pay_rule.agreement). */
   agreement?: string;
+  /** Yfirvinna 1: lægra yfirvinnuþrep frá ot1Weekly klst/viku upp að vikumörkum (Matvís/RSÍ/Samiðn: 56 % frá 36 klst). */
+  ot1Weekly?: number;
+  ot1Pct?: number;
+  /** Vikumörk yfirvinnu sem breytast á gildistíma samnings, t.d. [{from:"2025-01-01",weekly:39.5},{from:"2027-01-01",weekly:39}]. */
+  otSteps?: { from: string; weekly: number }[];
+  /** Launalyklar þessarar reglu (ganga framar lyklum fyrirtækisins). */
+  keys?: PayKeys;
+  /** Svigrúm í mínútum: stimplun innan ± svigrúms frá upphafi/lokum dagvinnu (virka daga) er færð
+   *  á dagvinnumörkin, svo nokkrar mínútur fyrir kl. 8 eða eftir kl. 17 verði ekki að álagi. 0/ósett = óvirkt. */
+  graceMin?: number;
+  /** Lágmarkshvíld milli vakta í klst. (hvíldarmat, sjálfgefið 11). */
+  restHours?: number;
+  /** Heiti sniðmáts (eigin reglur úr Kjarasamningasafni eða reglusniðmáti). */
+  templateName?: string;
 };
 export const DEFAULT_OT_WEEKLY = 40;
 export const DEFAULT_MONTHLY_HOURS = 173.33;
@@ -80,12 +103,13 @@ export const DEFAULT_MONTHLY_HOURS = 173.33;
 //  • Matvís: yfirvinna 1 (fyrstu 4 klst./viku umfram 36, ~56%) er ekki reiknuð sér; yfirvinna 2
 //    (~79,4%) gildir yfir 40 klst. Matreiðslu- og framreiðslumenn: 31% álag á 2% hærri grunn.
 //  • VR: eftirvinna/næturvinna (verslun, deilitala 167,94); skrifstofa er sér.
-export const UNION_PRESETS: Record<string, RuleSet> = {
+export const UNION_PRESETS: Record<string, CustomRules> = {
   "Efling": { eve: 33, weekend: 45, overtime: 80, holiday: 90, night: 45 },
   "Efling – veitingar/SGS": { eve: 33, weekend: 45, overtime: 78.6, holiday: 90, night: 45 },
   "VR": { eve: 38.3, weekend: 38.3, overtime: 74.4, holiday: 130.9, night: 48.2, nightEnd: 7, dayStart: 9, dayEnd: 18, verslStor: true },
   "VR – skrifstofa": { eve: 39.4, weekend: 39.4, overtime: 65.4, holiday: 119, night: 49.3, nightEnd: 7, dayStart: 9, dayEnd: 18, verslStor: true },
   "Matvís": { eve: 33, weekend: 45, overtime: 79.4, holiday: 90, night: 45 },
+  ...AGREEMENT_PRESETS,
 };
 export const ZERO_RULESET: RuleSet = { eve: 0, weekend: 0, overtime: 0, holiday: 0, night: 0 };
 

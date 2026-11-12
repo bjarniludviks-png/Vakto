@@ -16,6 +16,7 @@ import { createEmployee, uploadDocument, getCompanyOptions } from "./actions";
 import { RolePicker, ROLE_CARDS } from "@/components/app/role-picker";
 import { AccessToggles } from "@/components/app/access-toggles";
 import { AgreementSummary } from "@/components/app/agreement-summary";
+import { agreementForPreset } from "@/lib/agreements";
 import { MANAGER_DEFAULTS, type Area } from "@/lib/user-permissions";
 
 type Role = "employee" | "manager" | "owner" | "contractor";
@@ -86,7 +87,11 @@ export default function NewEmployee() {
   const monthly = payType === "Mánaðarlaun";
 
   useEffect(() => {
-    getCompanyOptions().then((o) => { setOpts(o); setPosition(o.positions[0] ?? ""); setDepartment(o.departments[0] ?? ""); }).catch(() => {});
+    getCompanyOptions().then((o) => {
+      setOpts(o); setPosition(o.positions[0] ?? ""); setDepartment(o.departments[0] ?? "");
+      // Staðall fyrirtækisins úr Kjarasamningasafni (Stillingar → Reglur og laun).
+      if (o.defaultAgreement) { setUnion(agreementForPreset(o.defaultAgreement)?.unionName ?? o.defaultAgreement); setAgreement(o.defaultAgreement); }
+    }).catch(() => {});
     listRuleTemplates().then((r) => setTpls(r.templates)).catch(() => {});
   }, []);
 

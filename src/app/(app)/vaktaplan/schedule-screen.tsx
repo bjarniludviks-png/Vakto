@@ -19,6 +19,7 @@ import OpenShifts from "./open-shifts";
 import { ShiftForm, ShiftSheet, PaintTools, SlotTabs, typeTimes, defaultsFor, type PaintTool } from "./shift-form";
 import type { ExtraShift } from "./week-cells";
 import { payPeriodOf } from "@/lib/periods";
+import { restGaps, type RestShift } from "@/lib/rest";
 import { PlanningRules } from "./planning-rules";
 import MonthRoster from "./month-roster";
 import { isNdjson, readNdjson, type ScheduleEvent } from "@/lib/ai/stream";
@@ -722,7 +723,32 @@ export default function ScheduleScreen({ requests = [], initial = null, scopeDep
     return () => { gone = true; clearTimeout(tm); };
   }, [liveCompany, pubFrom, pubTo, grid, cellTimes, cellTypes, monthTot, monthVer, pubVer, extras]);
 
+  /** Hvíldarmat vikunnar (11 klst. á hverjum vinnudegi) — allar vaktir starfsmanns, líka á öðrum stöðum. */
+  function restWarning(): string | null {
+    if (view !== "Vika") return null;
+    const shifts: RestShift[] = [];
+    vis.forEach((r) => {
+      const e = emp[r];
+      weekDays.forEach((d, c) => {
+        const code = grid[r]?.[c];
+        const day = new Date(d); day.setHours(0, 0, 0, 0);
+        const at = (hhmm: string) => { const [h, m] = hhmm.split(":").map(Number); return day.getTime() + ((h || 0) * 60 + (m || 0)) * 60000; };
+        const push = (s: number, en: number) => shifts.push({ who: e[4] ?? String(r), name: e[1], start: s, end: en <= s ? en + 86400000 : en, label: DAYS[c] });
+        if (code && code !== "off") {
+          const span = cellSpan(r, c, code);
+          if (span) push(day.getTime() + span[0] * 3600000, day.getTime() + span[1] * 3600000);
+        }
+        for (const x of extras[ckey(r, c)] ?? []) push(at(x.start), at(x.end));
+      });
+    });
+    const gaps = restGaps(shifts);
+    if (!gaps.length) return null;
+    return `${t("Hvíld undir 11 klst.")}: ${gaps.slice(0, 5).map((g) => `${g.name} (${g.label}, ${dec1(g.hours)} ${t("klst.")})`).join(", ")}${gaps.length > 5 ? ` +${gaps.length - 5}` : ""}. ${t("Frávik veita frítökurétt (1½ klst. fyrir hverja klst. sem vantar).")}`;
+  }
+
   async function publish() {
+    const rest = restWarning();
+    if (rest && !window.confirm(`${rest}\n\n${t("Birta samt?")}`)) return;
     if (liveCompany) {
       if (!drafts) { toast(t("Planið er þegar útgefið — engar óútgefnar breytingar.")); return; }
       if (view === "Vika" && planPct != null && planPct > laborTarget

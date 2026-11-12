@@ -1,6 +1,7 @@
 "use client";
 
 import { PaySetupRows } from "./pay-setup";
+import { AgreementLibraryCard, PayKeysCard } from "./agreement-library";
 import { BrandingCard } from "./branding-card";
 import { AccessToggles } from "@/components/app/access-toggles";
 import { RolePicker, type RoleKey } from "@/components/app/role-picker";
@@ -168,20 +169,22 @@ export default function SettingsScreen({ initialModal = null, initialSection, da
       {section === "tengingar" && <><IntegrationsPanel apiKeys={data.apiKeys} onNewKey={() => setKeyModal(true)} /><AiAppsPanel /></>}
 
       {section === "reglur" && (<>
+      <AgreementLibraryCard templates={ruleTemplates} />
+      <PayKeysCard />
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="ch">
           <div><div className="ct">{t("Reglusniðmát")}</div><div className="cs">{t("þín eigin vinnureglur — fyrir hvaða land, grein eða stéttarfélag sem er")}</div></div>
           <button className="btn sm" onClick={() => setTplModal("new")}>{t("+ Nýtt sniðmát")}</button>
         </div>
         <div className="cb att">
-          {ruleTemplates.map((tp) => (
+          {ruleTemplates.filter((tp) => !tp.rules.engine).map((tp) => (
             <div className="it rowlink" key={tp.id} onClick={() => setTplModal(tp)}>
               <div className="ic info"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style={{ width: 16, height: 16 }}><path d="M9 12h6M9 16h4M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" /></svg></div>
               <div className="tx"><b>{tp.name}</b><span>{summarizeRules(tp.rules)}</span></div>
               <span className={`tag ${tp.source === "ai" ? "info" : "good"}`}>{tp.source === "ai" ? "AI" : tp.source === "preset" ? t("sniðmát") : t("eigin")}</span>
             </div>
           ))}
-          {ruleTemplates.length === 0 && (
+          {ruleTemplates.filter((tp) => !tp.rules.engine).length === 0 && (
             <p className="muted" style={{ fontSize: 12.5 }}>{t("Engin sniðmát enn. Búðu til þitt eigið, byrjaðu á innbyggðu sniðmáti eða láttu AI stinga upp á reglum fyrir þitt land og grein — þú yfirferð og samþykkir alltaf áður en neitt er vistað.")}</p>
           )}
           <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>{t("Sniðmát eru tengd starfsfólki í starfsmannaspjaldinu — yfirvinna, álag, hvíld, orlof og veikindi fylgja sniðmátinu.")}</p>

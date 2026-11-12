@@ -4,7 +4,7 @@ import { readAgreement } from "@/lib/ai/agreement";
 import { demoAiGate } from "@/lib/ai/ai-plan.server";
 import { currentUserIsDemo } from "@/lib/demo.server";
 
-// POST multipart: file (PDF eða .txt), hint (hlutverk/starfsaldur). Aðeins eigandi/
+// POST multipart: file (PDF eða .txt) EÐA text (límdur texti), hint (hlutverk/starfsaldur). Aðeins eigandi/
 // vaktstjóri. Route handler (ekki server action) því kjarasamningar eru oft stærri
 // en 1 MB takmark server actions. Skilar tillögu — vistar ekkert.
 export const maxDuration = 300;
@@ -24,7 +24,14 @@ export async function POST(request: Request) {
   try { form = await request.formData(); } catch { return NextResponse.json({ ok: false, error: "Ógild beiðni" }, { status: 400 }); }
   const file = form.get("file");
   const hint = String(form.get("hint") ?? "").slice(0, 500);
-  if (!(file instanceof File) || file.size === 0) return NextResponse.json({ ok: false, error: "Veldu skjal" }, { status: 400 });
+  // Límdur texti (t.d. kafli úr samningi) í stað skjals.
+  const pasted = String(form.get("text") ?? "").trim();
+  if (!(file instanceof File) && pasted) {
+    if (pasted.length < 200) return NextResponse.json({ ok: false, error: "Límdu inn meiri texta úr samningnum (a.m.k. nokkrar greinar)" }, { status: 400 });
+    const res = await readAgreement({ text: pasted.slice(0, 400_000), hint }, { demo: await currentUserIsDemo() });
+    return NextResponse.json(res, { status: res.ok ? 200 : 502 });
+  }
+  if (!(file instanceof File) || file.size === 0) return NextResponse.json({ ok: false, error: "Veldu skjal eða límdu inn texta" }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ ok: false, error: "Skjalið er stærra en 25 MB" }, { status: 413 });
 
   const buf = Buffer.from(await file.arrayBuffer());

@@ -181,35 +181,82 @@ export function isFridagur(dt: Date): boolean {
 /** Dagsetning (YYYY-MM-DD) sem er stórhátíðardagur að hluta eða öllu leyti. */
 export const STORHATID = { has(iso: string): boolean { const h = holidaysOf(Number(iso.slice(0, 4))); return h.stor.has(iso) || h.half.has(iso); } };
 const OT_WEEKLY = 40; // yfirvinna yfir 40 klst/viku
+
+/** Vikumörk yfirvinnu á gefnum degi — sumir samningar lækka mörkin á gildistímanum (otSteps, t.d. RSÍ 40 → 39,5 → 39). */
+function weeklyAt(r: CustomRules, dt: Date, fallback: number): number {
+  if (!r.otSteps?.length) return fallback;
+  const iso = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+  let w = fallback;
+  for (const st of [...r.otSteps].sort((a, b) => a.from.localeCompare(b.from))) if (st.from <= iso && st.weekly > 0) w = st.weekly;
+  return w;
+}
+/** Yfirvinna á stundinni: tier 2 = yfir viku-/mánaðarmörkum (rules.overtime), tier 1 = yfirvinna 1 milli
+ *  ot1Weekly og vikumarka (t.d. Matvís/RSÍ/Samiðn 56 %), 0 = engin. Án ot1/otSteps sama regla og áður. */
+function otAt(r: CustomRules, dt: Date, acc: number, monthAcc: number, otWeekly: number, otMonthly: number): { active: boolean; pct: number; tier: 0 | 1 | 2 } {
+  if (acc >= weeklyAt(r, dt, otWeekly) || monthAcc >= otMonthly) return { active: true, pct: r.overtime ?? 0, tier: 2 };
+  if (r.ot1Weekly != null && r.ot1Pct != null && r.ot1Weekly > 0 && acc >= r.ot1Weekly) return { active: true, pct: r.ot1Pct, tier: 1 };
+  return { active: false, pct: r.overtime ?? 0, tier: 0 };
+}
 const STEP = 0.25;
 
 function mondayKey(d: Date): string {
   const x = new Date(d); x.setHours(0, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
   return `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
 }
-function premiumPct(dt: Date, holiday: boolean, r: RuleSet): number {
-  if (holiday) return r.holiday;
+/** Launaþáttur álags: grunnþættir eða sérsniðið band (`b<index>` í rules.bands). Notað fyrir launalykla. */
+export type PremComp = "holiday" | "weekend" | "night" | "eve" | "day" | `b${number}`;
+function premiumComp(dt: Date, holiday: boolean, r: RuleSet): { pct: number; comp: PremComp } {
+  if (holiday) return { pct: r.holiday, comp: "holiday" };
   const wd = dt.getDay();
-  if (wd === 0 || wd === 6 || isFridagur(dt)) return r.weekend;
+  if (isFridagur(dt) && r.fridagur != null) return { pct: r.fridagur, comp: "weekend" }; // sumir samningar: helgidagar ≠ helgar
+  if (wd === 0 || wd === 6 || isFridagur(dt)) return { pct: r.weekend, comp: "weekend" };
   const h = dt.getHours();
-  if (h < (r.nightEnd ?? 8)) return r.night;                     // næturálag 00–08 (VR 00–07)
-  if (h < (r.dayStart ?? 8) || h >= (r.dayEnd ?? 17)) return r.eve; // kvöld/eftirvinna
-  return 0; // dagvinna
+  if (h < (r.nightEnd ?? 8)) return { pct: r.night, comp: "night" };                     // næturálag 00–08 (VR 00–07)
+  if (h < (r.dayStart ?? 8) || h >= (r.dayEnd ?? 17)) return { pct: r.eve, comp: "eve" }; // kvöld/eftirvinna
+  return { pct: 0, comp: "day" }; // dagvinna
+}
+/** Hæsta álag á stundinni og þátturinn sem gaf það (grunnþáttur vinnur jafntefli). */
+function premiumAt(dt: Date, rules: CustomRules): { pct: number; comp: PremComp } {
+  const base = premiumComp(dt, isStorhatid(dt, rules), rules);
+  const b = bandHit(dt, rules.bands ?? []);
+  return b && b.pct > base.pct ? { pct: b.pct, comp: `b${b.index}` } : base;
 }
 
-/** Highest matching custom-band premium for a moment (0 if none match). */
-function bandPct(dt: Date, bands: Band[]): number {
+// ---------- svigrúm (grace) ----------
+// Stimplun innan ± graceMin mínútna frá upphafi/lokum dagvinnu á virkum degi (ekki frídegi) færist á mörkin.
+// Dæmi (svigrúm 10 mín, dagvinna 08–17): inn 07:53 → 08:00, út 17:06 → 17:00. Óvirkt nema reglan setji graceMin.
+export function applyGrace<T extends { clockIn: string; clockOut: string }>(punches: T[], rules: Pick<CustomRules, "graceMin" | "dayStart" | "dayEnd">): T[] {
+  const g = rules.graceMin ?? 0;
+  if (!(g > 0)) return punches;
+  const snap = (iso: string, hour: number): string => {
+    const d = new Date(iso);
+    const wd = d.getDay();
+    if (wd === 0 || wd === 6 || isFridagur(d) || isStorhatid(d)) return iso;
+    const mark = new Date(d); mark.setHours(hour, 0, 0, 0);
+    return Math.abs(d.getTime() - mark.getTime()) <= g * 60000 ? mark.toISOString() : iso;
+  };
+  return punches.map((p) => {
+    if (!p.clockOut) return p;
+    const ci = snap(p.clockIn, rules.dayStart ?? 8);
+    const co = snap(p.clockOut, rules.dayEnd ?? 17);
+    return Date.parse(co) > Date.parse(ci) ? { ...p, clockIn: ci, clockOut: co } : p;
+  });
+}
+
+/** Highest matching custom band for a moment (null if none match). */
+function bandHit(dt: Date, bands: Band[]): { pct: number; index: number } | null {
   const mins = dt.getHours() * 60 + dt.getMinutes();
   const wd = dt.getDay();
-  let best = 0;
-  for (const b of bands) {
+  let best: { pct: number; index: number } | null = null;
+  for (let index = 0; index < bands.length; index++) {
+    const b = bands[index];
     if (!b.days?.includes(wd)) continue;
     const [fh, fm] = b.from.split(":").map(Number);
     const [th, tm] = b.to.split(":").map(Number);
     const from = fh * 60 + (fm || 0);
     const to = th * 60 + (tm || 0);
     const inRange = from <= to ? mins >= from && mins < to : mins >= from || mins < to; // wrap past midnight
-    if (inRange && b.pct > best) best = b.pct;
+    if (inRange && b.pct > (best?.pct ?? 0)) best = { pct: b.pct, index };
   }
   return best;
 }
@@ -223,10 +270,9 @@ export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clock
   }
   const otWeekly = rules.otWeekly && rules.otWeekly > 0 ? rules.otWeekly : OT_WEEKLY;
   const otMonthly = rules.otMonthly && rules.otMonthly > 0 ? rules.otMonthly : Infinity;
-  const bands = rules.bands ?? [];
   let hours = 0, gross = 0, monthAcc = 0, base = 0, premExtra = 0, otExtra = 0;
   const weekHrs = new Map<string, number>();
-  const sorted = punches.slice().sort((a, b) => a.clockIn.localeCompare(b.clockIn));
+  const sorted = applyGrace(punches.slice().sort((a, b) => a.clockIn.localeCompare(b.clockIn)), rules);
   for (const p of sorted) {
     const end = new Date(p.clockOut).getTime();
     let t = new Date(p.clockIn).getTime();
@@ -236,10 +282,11 @@ export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clock
       const dt = new Date(t);
       const wk = mondayKey(dt);
       const acc = weekHrs.get(wk) ?? 0;
-      const prem = Math.max(premiumPct(dt, isStorhatid(dt, rules), rules), bandPct(dt, bands));
+      const prem = premiumAt(dt, rules).pct;
       let pct = prem;
-      const isOt = (acc >= otWeekly || monthAcc >= otMonthly) && rules.overtime > prem;
-      if (acc >= otWeekly || monthAcc >= otMonthly) pct = Math.max(pct, rules.overtime); // yfirvinna (viku/mánuði)
+      const ot = otAt(rules, dt, acc, monthAcc, otWeekly, otMonthly);
+      const isOt = ot.active && ot.pct > prem;
+      if (ot.active) pct = Math.max(pct, ot.pct); // yfirvinna (viku/mánuði, yfirvinna 1/2)
       gross += e.rate * s * (1 + pct / 100);
       base += e.rate * s;
       if (isOt) otExtra += e.rate * s * (pct / 100); else premExtra += e.rate * s * (pct / 100);
@@ -261,11 +308,9 @@ export function computeFromPunches(e: EmpPick, punches: { clockIn: string; clock
 export function classifyPay(rate: number, hourly: boolean, punches: { clockIn: string; clockOut: string }[], rules: CustomRules): { total: number; overtime: number; premium: number; overtimePay: number; premiumPay: number } {
   const otWeekly = rules.otWeekly && rules.otWeekly > 0 ? rules.otWeekly : OT_WEEKLY;
   const otMonthly = rules.otMonthly && rules.otMonthly > 0 ? rules.otMonthly : Infinity;
-  const otPct = rules.overtime ?? 0;
-  const bands = rules.bands ?? [];
   let total = 0, overtime = 0, premium = 0, overtimePay = 0, premiumPay = 0, monthAcc = 0;
   const weekHrs = new Map<string, number>();
-  const sorted = punches.slice().sort((a, b) => a.clockIn.localeCompare(b.clockIn));
+  const sorted = applyGrace(punches.slice().sort((a, b) => a.clockIn.localeCompare(b.clockIn)), rules);
   for (const p of sorted) {
     if (!p.clockOut) continue;
     const end = new Date(p.clockOut).getTime();
@@ -276,8 +321,8 @@ export function classifyPay(rate: number, hourly: boolean, punches: { clockIn: s
       const dt = new Date(t);
       const wk = mondayKey(dt);
       const acc = weekHrs.get(wk) ?? 0;
-      const prem = Math.max(premiumPct(dt, isStorhatid(dt, rules), rules), bandPct(dt, bands));
-      const otActive = acc >= otWeekly || monthAcc >= otMonthly;
+      const prem = premiumAt(dt, rules).pct;
+      const ot = otAt(rules, dt, acc, monthAcc, otWeekly, otMonthly), otActive = ot.active, otPct = ot.pct;
       if (prem > 0) premium += s;
       if (otActive) overtime += s;
       if (hourly) {
@@ -297,15 +342,20 @@ export function classifyPay(rate: number, hourly: boolean, punches: { clockIn: s
  * álag[pct] = þeir dagvinnutímar sem bera vaktaálag (greitt OFAN Á dagvinnu, pct % af taxta),
  * yfirvinna = tímar yfir viku-/mánaðarmörkum. Sama regla og computeFromPunches, svo
  * dagvinna×taxti + Σ álag×pct×taxti + yfirvinna×taxti×(1+yfirv.%) = brúttó. */
-export function hourBuckets(punches: { clockIn: string; clockOut: string }[], rules: CustomRules): { dagvinna: number; yfirvinna: number; alag: Record<number, number> } {
+/** Tímar flokkaðir fyrir launakerfi. `parts` = álagstímar eftir launaþætti (eve/night/weekend/holiday/b<i>)
+ *  með prósentu — sama summa og `alag`; notað til að gefa hverjum þætti sinn launalykil (pay-keys.ts). */
+export type Buckets = { dagvinna: number; yfirvinna: number; alag: Record<number, number>; parts?: Record<string, { pct: number; hours: number }>;
+  /** Yfirvinna 1 (lægra yfirvinnuþrep, t.d. Matvís/RSÍ/Samiðn) — aðeins ef reglan hefur ot1. */
+  yfirvinna1?: number };
+
+export function hourBuckets(punches: { clockIn: string; clockOut: string }[], rules: CustomRules): Buckets {
   const otWeekly = rules.otWeekly && rules.otWeekly > 0 ? rules.otWeekly : OT_WEEKLY;
   const otMonthly = rules.otMonthly && rules.otMonthly > 0 ? rules.otMonthly : Infinity;
-  const otPct = rules.overtime ?? 0;
-  const bands = rules.bands ?? [];
-  let dagvinna = 0, yfirvinna = 0, monthAcc = 0;
+  let dagvinna = 0, yfirvinna = 0, yfirvinna1 = 0, monthAcc = 0;
   const alag: Record<number, number> = {};
+  const parts: Record<string, { pct: number; hours: number }> = {};
   const weekHrs = new Map<string, number>();
-  const sorted = punches.slice().sort((a, b) => a.clockIn.localeCompare(b.clockIn));
+  const sorted = applyGrace(punches.slice().sort((a, b) => a.clockIn.localeCompare(b.clockIn)), rules);
   for (const p of sorted) {
     if (!p.clockOut) continue;
     const end = new Date(p.clockOut).getTime();
@@ -315,17 +365,23 @@ export function hourBuckets(punches: { clockIn: string; clockOut: string }[], ru
       const dt = new Date(t);
       const wk = mondayKey(dt);
       const acc = weekHrs.get(wk) ?? 0;
-      const prem = Math.max(premiumPct(dt, isStorhatid(dt, rules), rules), bandPct(dt, bands));
-      const otActive = acc >= otWeekly || monthAcc >= otMonthly;
-      if (otActive && otPct >= prem) yfirvinna += s;
-      else { dagvinna += s; if (prem > 0) alag[prem] = (alag[prem] ?? 0) + s; }
+      const pa = premiumAt(dt, rules), prem = pa.pct;
+      const ot = otAt(rules, dt, acc, monthAcc, otWeekly, otMonthly);
+      if (ot.active && ot.pct >= prem) { if (ot.tier === 1) yfirvinna1 += s; else yfirvinna += s; }
+      else { dagvinna += s; if (prem > 0) { alag[prem] = (alag[prem] ?? 0) + s; addPart(parts, pa.comp, prem, s); } }
       monthAcc += s; weekHrs.set(wk, acc + s);
       t += s * 3600000;
     }
   }
   const r2 = (n: number) => Math.round(n * 100) / 100;
   for (const k of Object.keys(alag)) alag[Number(k)] = r2(alag[Number(k)]);
-  return { dagvinna: r2(dagvinna), yfirvinna: r2(yfirvinna), alag };
+  for (const k of Object.keys(parts)) parts[k].hours = r2(parts[k].hours);
+  return { dagvinna: r2(dagvinna), yfirvinna: r2(yfirvinna), alag, parts, ...(yfirvinna1 > 0 ? { yfirvinna1: r2(yfirvinna1) } : {}) };
+}
+function addPart(parts: Record<string, { pct: number; hours: number }>, comp: string, pct: number, h: number) {
+  const k = `${comp}@${pct}`;
+  const cur = parts[k] ?? (parts[k] = { pct, hours: 0 });
+  cur.hours += h;
 }
 
 export type PayrollTotals = { hours: number; gross: number; withholding: number; pension: number; union: number; net: number; cost: number; insurance: number; employerPension: number; funds: number };
@@ -347,3 +403,4 @@ export function applyGrossAdjustment(l: PayLine, adj: number, e: EmpPick, year =
   const gross = Math.max(0, l.gross - Math.round(adj));
   return deductions(e, { ...l, gross }, year);
 }
+

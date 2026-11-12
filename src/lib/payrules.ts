@@ -1,5 +1,6 @@
 // Pure pay-rule types + defaults — safe to import from Client Components.
 import { familyFor } from "@/lib/entitlements";
+import { AGREEMENT_PRESETS } from "@/lib/agreement-presets";
 // ⚠️ These percentages are the STANDARD Icelandic structure but are UNCONFIRMED
 // placeholders. They MUST be verified against the real agreement (Efling / VR /
 // SGS …) before being used on real pay. The DB (pay_rules) stores per-company
@@ -43,6 +44,8 @@ export type RuleSet = {
   // næturálag 00–08, dagvinna 08–17, kvöldálag 17–24. VR: næturvinna 00–07, dagvinna 09–18.
   nightEnd?: number; dayStart?: number; dayEnd?: number;
   verslStor?: boolean; // frídagur verslunarmanna er stórhátíðardagur (VR, gr. 2.3.2)
+  /** Álag á almennum frídögum (skírdagur, 1. maí …) ef það er annað en helgarálag (t.d. Matvís matreiðsla 45 % vs helgar 31 %). */
+  fridagur?: number;
 };
 
 export type RulePctKey = "eve" | "weekend" | "overtime" | "holiday" | "night";
@@ -60,7 +63,13 @@ export const CUSTOM_UNION = "Eigin reglur";
 // A band = "this weekday + time window → this % premium" (e.g. Sun 00:00–24:00 +45%,
 // or 18:00–23:00 +33% weekdays). days: 0=Sun … 6=Sat. from/to "HH:MM" (to may wrap
 // past midnight). Bands stack on top of the base RuleSet — the highest % wins.
-export type Band = { label: string; days: number[]; from: string; to: string; pct: number };
+export type Band = { label: string; days: number[]; from: string; to: string; pct: number; /** launalykill (Payday/DK) */ key?: string };
+
+/** Launalyklar (heiti/númer launaliðar í Payday eða DK) per launaþátt. Tómt = sjálfgefið heiti
+ *  („Dagvinna“, „Yfirvinna“, „Álag 33%“). Fyrirtæki stillir í Stillingum (companies.pay_keys, 0113);
+ *  eigin reglur geta líka haft eigin lykla (CustomRules.keys og Band.key) sem ganga framar. */
+export type PayKeyComp = "dagvinna" | "yfirvinna" | "yfirvinna1" | "eve" | "night" | "weekend" | "holiday";
+export type PayKeys = Partial<Record<PayKeyComp, string>>;
 export type CustomRules = RuleSet & {
   otWeekly?: number;  // klst/viku áður en yfirvinna tekur við (default 40)
   otMonthly?: number; // klst/mánuði áður en yfirvinna tekur við (0/ósett = óvirkt)
@@ -68,6 +77,20 @@ export type CustomRules = RuleSet & {
   /** Staðall (lykill í UNION_PRESETS) sem stjórnandi valdi fyrir félag sem er ekki sjálft staðall,
    *  t.d. VSFK → „Efling – veitingar/SGS“. Geymt í employees.pay_rule; gildir ekki með „Eigin reglur“. */
   agreement?: string;
+  /** Yfirvinna 1: lægra yfirvinnuþrep frá ot1Weekly klst/viku upp að vikumörkum (Matvís/RSÍ/Samiðn: 56 % frá 36 klst). */
+  ot1Weekly?: number;
+  ot1Pct?: number;
+  /** Vikumörk yfirvinnu sem breytast á gildistíma samnings, t.d. [{from:"2025-01-01",weekly:39.5},{from:"2027-01-01",weekly:39}]. */
+  otSteps?: { from: string; weekly: number }[];
+  /** Launalyklar þessarar reglu (ganga framar lyklum fyrirtækisins). */
+  keys?: PayKeys;
+  /** Svigrúm í mínútum: stimplun innan ± svigrúms frá upphafi/lokum dagvinnu (virka daga) er færð
+   *  á dagvinnumörkin, svo nokkrar mínútur fyrir kl. 8 eða eftir kl. 17 verði ekki að álagi. 0/ósett = óvirkt. */
+  graceMin?: number;
+  /** Lágmarkshvíld milli vakta í klst. (hvíldarmat, sjálfgefið 11). */
+  restHours?: number;
+  /** Heiti sniðmáts (eigin reglur úr Kjarasamningasafni eða reglusniðmáti). */
+  templateName?: string;
 };
 export const DEFAULT_OT_WEEKLY = 40;
 export const DEFAULT_MONTHLY_HOURS = 173.33;
@@ -81,12 +104,14 @@ export const DEFAULT_MONTHLY_HOURS = 173.33;
 //  • Matvís: yfirvinna 1 (fyrstu 4 klst./viku umfram 36, ~56%) er ekki reiknuð sér; yfirvinna 2
 //    (~79,4%) gildir yfir 40 klst. Matreiðslu- og framreiðslumenn: 31% álag á 2% hærri grunn.
 //  • VR: eftirvinna/næturvinna (verslun, deilitala 167,94); skrifstofa er sér.
-export const UNION_PRESETS: Record<string, RuleSet> = {
+export const UNION_PRESETS: Record<string, CustomRules> = {
   "Efling": { eve: 33, weekend: 45, overtime: 80, holiday: 90, night: 45 },
   "Efling – veitingar/SGS": { eve: 33, weekend: 45, overtime: 78.6, holiday: 90, night: 45 },
   "VR": { eve: 38.3, weekend: 38.3, overtime: 74.4, holiday: 130.9, night: 48.2, nightEnd: 7, dayStart: 9, dayEnd: 18, verslStor: true },
   "VR – skrifstofa": { eve: 39.4, weekend: 39.4, overtime: 65.4, holiday: 119, night: 49.3, nightEnd: 7, dayStart: 9, dayEnd: 18, verslStor: true },
   "Matvís": { eve: 33, weekend: 45, overtime: 79.4, holiday: 90, night: 45 },
+  // Fleiri afbrigði úr Kjarasamningasafninu (src/lib/agreements.ts lýsir þeim, heimildum og hvort tölur eru staðfestar).
+  ...AGREEMENT_PRESETS,
 };
 export const ZERO_RULESET: RuleSet = { eve: 0, weekend: 0, overtime: 0, holiday: 0, night: 0 };
 
@@ -129,7 +154,7 @@ export function withOtMode(rules: CustomRules, mode: OtMode | null | undefined, 
   if (!(days > 0)) return rules;
   const weekly = rules.otWeekly && rules.otWeekly > 0 ? rules.otWeekly : DEFAULT_OT_WEEKLY;
   const avg = Math.round(weekly * days / 7 * 100) / 100;
-  return { ...rules, otWeekly: Number.POSITIVE_INFINITY, otMonthly: rules.otMonthly && rules.otMonthly > 0 ? Math.min(rules.otMonthly, avg) : avg };
+  return { ...rules, otSteps: undefined, otWeekly: Number.POSITIVE_INFINITY, otMonthly: rules.otMonthly && rules.otMonthly > 0 ? Math.min(rules.otMonthly, avg) : avg };
 }
 
 // ---------- desember- & orlofsuppbót (kjarasamningsbundnar árlegar greiðslur) ----------
