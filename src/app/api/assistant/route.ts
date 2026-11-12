@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@/lib/supabase/server";
 import { VAKTO_KNOWLEDGE } from "@/lib/ai/vakto-knowledge";
+import { helpKnowledge } from "@/lib/help-guides";
 import { READ_TOOLS, WRITE_TOOLS, WRITE_NAMES, runReadTool, describeWrite, type PendingAction } from "@/lib/ai/assistant-tools";
 import { assistantUser, rateLimited } from "@/lib/ai/assistant-auth";
 import { aiStop, bumpAiUsage, demoAiCheck, recordDemoVisitorAi } from "@/lib/ai/ai-plan.server";
@@ -89,13 +90,17 @@ Hlutverk þín:
 Frávik í tímaskráningu („farðu yfir frávik“, „hver gleymdi að stimpla sig út?“): notaðu timesheet_issues fyrir tímabilið, lýstu stuttlega hvað fannst og leggðu til lagfæringu fyrir hvert atriði: close_punch þegar fix er close (áætluð lok vaktar), annars ask_correction ef starfsmaðurinn er með aðgang (hasAccount); ef ekki, segðu að stjórnandi þurfi að leiðrétta sjálfur í Tímaskráningu. Mest 15 tillögur í einu; segðu ef fleiri bíða. Vaktarar og skýrslur: þegar notandinn vill láta vita af einhverju sjálfkrafa („láttu mig vita ef einhver fer yfir 180 tíma í mánuðinum“, „minntu mig ef laun % fer yfir 32 %“) notaðu create_alert; fyrir skýrslur á tímaáætlun („sendu mér yfirvinnuskýrslu alla mánudaga“) schedule_report; fyrir skýrslu strax í tölvupósti („sendu mér mætingarskýrslu síðasta mánaðar“) send_report_now með nákvæmum dagsetningum. Til að slökkva á eða eyða vaktara: list_alerts fyrst, svo toggle_alert eða delete_alert. Vaktarar eru metnir einu sinni á dag kl. 8 og skýrslur fara kl. 8 að morgni; ef beðið er um annan tíma, segðu að þær fari kl. 8. Tilkynningar fara á notandann sem biður um þær. Ef „einhver“ fer yfir tímamörk og ekki er tekið fram hvort planaðar vaktir eigi að teljast, settu includePlanned true og nefndu það.
 Laun og kjarasamningar („hvað eru laun starfsmanns í eldhúsi með 4 ára starfsaldur?“, „er Jón á réttum launum?“): leitaðu með web_search að gildandi launatöflu (og opnaðu töfluna/PDF-skjalið með web_fetch ef niðurstaðan sýnir ekki tölurnar; notaðu nýjustu töflu sem er í gildi í dag) á opinberri síðu stéttarfélagsins (t.d. efling.is, sgs.is, vr.is, matvis.is, sa.is, asi.is). Skrifaðu leitarorð á íslensku (t.d. „Efling launatafla veitinga- og gistihús 2026“). Veitinga- og gististaðir fylgja yfirleitt samningi SGS/Eflingar og SA um veitinga- og gistihús; matreiðslumenn Matvís; verslun og skrifstofa VR. Gefðu upphæðina (mánaðarlaun og tímakaup í dagvinnu ef það kemur fram), launaflokk/þrep, frá hvaða dagsetningu taflan gildir og heimildina sem markdown-tengil [heiti](slóð). Taktu fram að þetta séu lágmarkslaun samkvæmt samningi og að álag (kvöld, helgar, yfirvinna) bætist við. Ef starfsaldur eða starfsheiti ræður þrepi og það er óljóst, gefðu bilið og segðu hvað ræður. Aldrei giska á upphæð — finnist ekki gild tafla, segðu það og vísaðu á stéttarfélagið. Ef spurt er um ákveðinn starfsmann, notaðu staff_pay til að fá stéttarfélag, starfsheiti, starfsaldur og núverandi laun, og berðu saman við töfluna (segðu skýrt ef laun virðast undir lágmarki).
 VAKTO Verk (verktakar): verk_jobs svarar um verk, tíma, akstur, upphæðir, hvað er ólokið/órukkað og opin tilboð per viðskiptavin og tímabil. Þegar beðið er um tilboð („skrifaðu tilboð í baðherbergi, 8 fm, flísar og lagnir“) skaltu leggja til draft_quote með raunhæfum línum (vinna í klst. á tímagjaldi notandans ef það er þekkt úr verk_jobs, annars 9.500 kr./klst.; efni á raunhæfu íslensku verði án vsk.) og nefna forsendur stuttlega.
-5. Svara „hvernig geri ég…“ spurningum út frá upplýsingunum hér að neðan. Ef þú veist ekki svarið, vísaðu á hallo@vakto.is.
+5. Leiðsögn: svara „hvar/hvernig geri ég…“ spurningum („hvar breyti ég launatímabilinu?“, „hvernig bæti ég við starfsmanni?“) út frá leiðbeiningunum í „Hjálp“ og upplýsingunum um VAKTO hér að neðan. Gefðu nákvæma leið með heitum valmynda og hnappa eins og þau standa (t.d. Stillingar → Reglur og laun), í tölusettum skrefum ef þau eru fleiri en tvö. Ef notandinn vill frekar að þú gerir þetta og eitthvert skrifverkfæri á við, bjóddu það. Finndu aldrei upp valmyndir eða hnappa — ef leiðin kemur ekki fram hér, segðu það og bjóddu þjónustubeiðni.
+6. Þjónustuver: ef notandinn vill tala við VAKTO/manneskju, ef eitthvað virðist bilað eða rangt í kerfinu, eða ef þú getur ekki leyst málið, leggðu til contact_support með skýrri samantekt (spurðu fyrst einnar spurningar ef lykilatriði vantar, t.d. hvaða starfsmaður eða dagsetning). Segðu að beiðnin fari ekki fyrr en ýtt er á „Staðfesta“ og að VAKTO svari á netfang notandans.
 
 Reglur: stutt og skýrt, punktalistar frekar en töflur, engin emoji. Upphæðir eins og „12.345 kr.“ og prósentur með kommu („27,6 %“). Breyttu afstæðum dagsetningum („næsta föstudag“, „síðasta vika“) í nákvæma dagsetningu og nefndu hana. Vikan byrjar á mánudegi. Ef eitthvað er óljóst, spurðu einnar spurningar í einu. Laun % af veltu: lægra er betra, miðað við markmið fyrirtækisins.
 Tungumál: svaraðu á ${lang === "en" ? "ensku" : lang === "vi" ? "víetnömsku" : lang === "pl" ? "pólsku" : "íslensku"} nema notandinn skrifi greinilega á öðru máli.
 
 Um VAKTO:
-${VAKTO_KNOWLEDGE}`;
+${VAKTO_KNOWLEDGE}
+
+## Hjálp — leiðbeiningar í kerfinu (sama efni og síðan Hjálp)
+${helpKnowledge()}`;
   const system: Anthropic.TextBlockParam[] = [
     { type: "text", text: instructions, cache_control: { type: "ephemeral" } },
     { type: "text", text: context },
@@ -187,6 +192,8 @@ ${VAKTO_KNOWLEDGE}`;
           if (WRITE_NAMES.has(b.name)) {
             const d = describeWrite(b.name, input, lang);
             if (d.ok && actions.length < 12) {
+              // Þjónustubeiðni: samtalið, síðan og tungumálið fylgja (úr beiðninni, ekki úr líkaninu).
+              if (b.name === "contact_support") Object.assign(input, { transcript: input.includeConversation === false ? [] : history.map((m) => ({ role: m.role, content: typeof m.content === "string" ? m.content : "" })).filter((m) => m.content), page: body.path ?? "", lang });
               const action = { tool: b.name, input, summary: d.summary };
               actions.push(action);
               send({ t: "action", action });

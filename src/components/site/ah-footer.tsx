@@ -50,7 +50,7 @@ export default function AhFooter() {
   const P = PATHS[lang];
   // Lögfræðisíðurnar eru á íslensku (með enskri athugasemd): önnur mál opna þær með ?lang=en.
   const cols: { h: string; links: [string, string, boolean?][] }[] = [
-    { h: t.product, links: [[`${P.home}#kerfid`, t.features], [`${P.home}#kynning`, t.showcase], [`${P.home}#samningar`, t.contracts], [P.integrations, t.integrations], [P.price, t.price], [P.contractors, t.contractors], [appHref(lang, "/nyskraning"), t.try]] },
+    { h: t.product, links: [[`${P.home}#kerfid`, t.features], ["/ai", "VAKTO AI"], [`${P.home}#kynning`, t.showcase], [`${P.home}#samningar`, t.contracts], [P.integrations, t.integrations], [P.price, t.price], [P.contractors, t.contractors], [appHref(lang, "/nyskraning"), t.try]] },
     { h: t.company, links: [[P.about, t.about], ["mailto:hallo@vakto.is", t.contact], [appHref(lang, "/login"), t.login]] },
     { h: t.legal, links: [[appHref(lang, "/personuvernd"), t.privacy], [appHref(lang, "/skilmalar"), t.terms], [appHref(lang, "/vafrakokur"), t.cookies]] },
     { h: t.follow, links: SOCIAL.map(([u, n]) => [u, n, true]) },

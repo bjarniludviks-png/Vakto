@@ -12,6 +12,9 @@ import * as da from "./text/da";
 import * as sv from "./text/sv";
 import * as nb from "./text/nb";
 
+// VAKTO AI-síðan er enn aðeins á /ai (IS/EN eftir vali) — öll mál vísa þangað þar til da/sv/nb-útgáfur koma.
+const AI_HREF = "/ai";
+
 export type NavText = { product: string; contracts: string; integrations: string; price: string; about: string; login: string; try: string; open: string; close: string };
 const N: Record<SiteLang, NavText> = {
   is: { product: "Kerfið", contracts: "Samningar", integrations: "Tengingar", price: "Verð", about: "Um okkur", login: "Innskráning", try: "Prófa frítt", open: "Opna valmynd", close: "Loka valmynd" },
@@ -19,7 +22,7 @@ const N: Record<SiteLang, NavText> = {
   da: da.nav, sv: sv.nav, nb: nb.nav,
 };
 
-export default function SiteNav({ home = false, scrolled = true, dark = false, current }: { home?: boolean; scrolled?: boolean; dark?: boolean; current?: PageKey }) {
+export default function SiteNav({ home = false, scrolled = true, dark = false, current }: { home?: boolean; scrolled?: boolean; dark?: boolean; current?: PageKey | "ai" }) {
   const lang = useLangSync();
   const t = N[lang];
   const P = PATHS[lang];
@@ -33,12 +36,14 @@ export default function SiteNav({ home = false, scrolled = true, dark = false, c
     return () => { window.removeEventListener("keydown", esc); document.documentElement.style.overflow = ""; };
   }, [open]);
   const close = () => setOpen(false);
-  const cur = (k: PageKey) => (current === k ? "page" as const : undefined);
+  const cur = (k: PageKey | "ai") => (current === k ? "page" as const : undefined);
   return (
     <nav className={`ah-nav${scrolled || open ? " sc" : ""}${dark && !open ? " dk" : ""}${open ? " open" : ""}`}>
       <Link href={P.home} aria-label="VAKTO" onClick={close}><AhLogo /></Link>
       <div className="ah-nav-links">
-        <a href={`${a}#kerfid`}>{t.product}</a><a href={`${a}#samningar`}>{t.contracts}</a>
+        <a href={`${a}#kerfid`}>{t.product}</a>
+        <Link href={AI_HREF} aria-current={cur("ai")}>VAKTO AI</Link>
+        <a href={`${a}#samningar`}>{t.contracts}</a>
         <Link href={P.integrations} aria-current={cur("integrations")}>{t.integrations}</Link>
         <Link href={P.price} aria-current={cur("price")}>{t.price}</Link>
         <Link href={P.about} aria-current={cur("about")}>{t.about}</Link>
@@ -54,6 +59,7 @@ export default function SiteNav({ home = false, scrolled = true, dark = false, c
       <SiteAnalytics />
       <div id="ah-menu" className="ah-menu" hidden={!open}>
         <a href={`${a}#kerfid`} onClick={close}>{t.product}</a>
+        <Link href={AI_HREF} onClick={close}>VAKTO AI</Link>
         <a href={`${a}#samningar`} onClick={close}>{t.contracts}</a>
         <Link href={P.integrations} onClick={close}>{t.integrations}</Link>
         <Link href={P.price} onClick={close}>{t.price}</Link>

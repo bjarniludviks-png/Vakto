@@ -7,12 +7,14 @@ import { companyPlan } from "@/lib/plan.server";
 import { planAllows } from "@/lib/plan-features";
 import { MODEL_HAIKU } from "@/lib/ai/models";
 import { recordAiUsage, addUsage, type AiUsage } from "@/lib/ai/usage.server";
+import { helpKnowledge } from "@/lib/help-guides";
 import { employeeCtx, EMPLOYEE_TOOLS, EMPLOYEE_WRITE, runEmployeeRead, describeEmployeeWrite } from "@/lib/ai/employee-ai.server";
 
 // VAKTO AI fyrir starfsfólk (appið, Bearer um /api/app/employee-ai): eigin vaktir og tímar, hver getur
 // tekið vakt, og tillaga að vaktaskiptum sem starfsmaðurinn staðfestir. Haiku; telst ekki til AI-spurninga
 // fyrirtækisins en virðir kostnaðarþakið.
 export const maxDuration = 60;
+const EMPLOYEE_HELP = helpKnowledge(["mitt-svaedi", "spjall", "homescreen"]);
 const DAYS_IS = ["sunnudagur", "mánudagur", "þriðjudagur", "miðvikudagur", "fimmtudagur", "föstudagur", "laugardagur"];
 
 export async function POST(request: Request) {
@@ -40,7 +42,10 @@ export async function POST(request: Request) {
   const langName = lang === "en" ? "ensku" : lang === "vi" ? "víetnömsku" : lang === "pl" ? "pólsku" : "íslensku";
   const system = `Þú ert VAKTO AI, aðstoðarmaður starfsmanns í vaktakerfinu VAKTO. Notandi: ${me.name}${me.dept ? ` (${me.dept})` : ""}. Í dag er ${DAYS_IS[now.getDay()]} ${today}.
 Þú hjálpar með: hvenær hann er á vakt (my_shifts), hvað hann hefur unnið marga tíma (my_hours) og hver getur tekið vakt hans (my_shifts → who_can_cover). Ef hann vill skipta, leggðu til request_swap (vaktstjóri samþykkir; ekkert er sent fyrr en hann ýtir á „Staðfesta“ — segðu aldrei að beiðnin sé send).
-Þú sérð ALDREI laun, kennitölur eða ástæður annarra (frí, veikindi) — who_can_cover segir bara hverjir eru lausir. Ekki giska á tölur: notaðu verkfærin. Breyttu afstæðum dagsetningum („á laugardaginn“) í nákvæma dagsetningu. Fyrir annað (frí, laun, samning) vísaðu á skjáina í appinu: Beiðnir, Laun, Samningur. Stutt og vingjarnlegt, engin emoji. Svaraðu á ${langName} nema notandinn skrifi greinilega á öðru máli.`;
+Þú sérð ALDREI laun, kennitölur eða ástæður annarra (frí, veikindi) — who_can_cover segir bara hverjir eru lausir. Ekki giska á tölur: notaðu verkfærin. Breyttu afstæðum dagsetningum („á laugardaginn“) í nákvæma dagsetningu. Fyrir annað (frí, laun, samning) vísaðu á skjáina í appinu: Beiðnir, Laun, Samningur. Spurningum um hvar eða hvernig eitthvað er gert í appinu eða Mitt svæði svararðu með nákvæmri leið úr leiðbeiningunum neðst; finndu aldrei upp valmyndir eða hnappa. Ef tímar eða laun virðast röng, bentu á beiðni um leiðréttingu til vaktstjóra; ef appið sjálft virkar ekki (villa, innskráning, tilkynningar), bentu á hjalp@vakto.is. Stutt og vingjarnlegt, engin emoji. Svaraðu á ${langName} nema notandinn skrifi greinilega á öðru máli.
+
+Leiðbeiningar fyrir starfsfólk:
+${EMPLOYEE_HELP}`;
 
   const client = new Anthropic();
   let usage: AiUsage = {};

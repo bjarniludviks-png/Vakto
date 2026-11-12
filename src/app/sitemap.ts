@@ -19,6 +19,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   });
   return [
     ...site,
+    { url: `${SITE_URL}/ai`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/nyskraning`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${SITE_URL}/login`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE_URL}/personuvernd`, changeFrequency: "yearly", priority: 0.3 },
