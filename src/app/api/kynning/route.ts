@@ -21,7 +21,9 @@ function limited(ip: string): boolean {
 export async function POST(req: Request) {
   let p: { name?: string; company?: string; contact?: string; message?: string; website?: string; token?: string; lang?: string } = {};
   try { p = await req.json(); } catch { return NextResponse.json({ ok: false }, { status: 400 }); }
-  const en = p.lang === "en";
+  // Villuboð á ensku fyrir öll mál nema íslensku (danska/sænska/norska forsíðan sendir sitt mál).
+  const en = !!p.lang && p.lang !== "is";
+  const LANGS: Record<string, string> = { is: "íslenska", en: "enska", da: "danska", sv: "sænska", nb: "norska" };
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "?";
   if (limited(ip)) return NextResponse.json({ ok: false, error: en ? "Too many requests — try again later or email hallo@vakto.is." : "Of margar beiðnir — reyndu aftur síðar eða sendu póst á hallo@vakto.is." }, { status: 429 });
   if (p.website) return NextResponse.json({ ok: true }); // gildra: aðeins vélmenni fylla falda sviðið
@@ -39,10 +41,10 @@ export async function POST(req: Request) {
     replyTo: isEmail ? contact : undefined,
     subject: `Beiðni um kynningu: ${company}`,
     html: `<div style="font-family:-apple-system,Segoe UI,sans-serif;font-size:14px;line-height:1.55">
-<p><b>${esc(name)}</b> hjá <b>${esc(company)}</b> vill fá kynningu á VAKTO á vinnustaðinn.</p>
+<p><b>${esc(name)}</b> hjá <b>${esc(company)}</b> vill fá kynningu á VAKTO ${p.lang === "da" || p.lang === "sv" || p.lang === "nb" ? "<b>í fjarfundi</b> (norræna forsíðan býður netkynningu)" : "á vinnustaðinn"}.</p>
 <p>${isEmail ? `Netfang: <a href="mailto:${esc(contact)}">${esc(contact)}</a>` : `Sími: <a href="tel:${esc(contact.replace(/\s/g, ""))}">${esc(contact)}</a>`}</p>
 ${message ? `<p style="white-space:pre-wrap;border-left:3px solid #e9700f;padding-left:10px">${esc(message)}</p>` : ""}
-<p style="color:#888;font-size:12px">Sent af forsíðu vakto.is (${en ? "enska" : "íslenska"}).</p></div>`,
+<p style="color:#888;font-size:12px">Sent af forsíðu vakto.is (${LANGS[p.lang ?? "is"] ?? "íslenska"}).</p></div>`,
   });
   if (!r.ok) {
     console.error("[kynning] email", r.error);

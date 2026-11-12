@@ -1,5 +1,9 @@
-// Allur texti forsíðunnar á íslensku og ensku. Skjámyndirnar sjálfar eru úr íslenska viðmótinu.
-import type { SiteLang } from "./lang";
+// Allur texti forsíðunnar. IS og EN hér; danska, sænska og norska í text/{da,sv,nb}.ts.
+// Skjámyndirnar eru úr íslenska viðmótinu (enskar fyrir önnur mál).
+import type { SiteLang } from "./i18n";
+import * as da from "./text/da";
+import * as sv from "./text/sv";
+import * as nb from "./text/nb";
 import { getPlan } from "@/lib/plans";
 import { nf } from "@/lib/format";
 
@@ -161,4 +165,5 @@ const en: typeof is = {
   fine: "Excl. VAT. You only pay for those who worked that month. 14-day free trial, no commitment.", seePrice: "See pricing",
 };
 
-export const HOME_TEXT: Record<SiteLang, typeof is> = { is, en };
+export type HomeText = typeof is;
+export const HOME_TEXT: Record<SiteLang, HomeText> = { is, en, da: da.home, sv: sv.home, nb: nb.home };

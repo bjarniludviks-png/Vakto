@@ -1,13 +1,17 @@
 "use client";
 
-// Um okkur (IS/EN). Allur texti byggir á orðum Bjarna sjálfs (okt. 2026).
+// Um okkur (IS/EN hér, da/sv/nb í text/). Allur texti byggir á orðum Bjarna sjálfs (okt. 2026).
 import AhFooter from "./ah-footer";
 import SiteNav from "./site-nav";
 import { useSiteLang } from "./lang";
+import { appHref, type SiteLang } from "./i18n";
+import * as da from "./text/da";
+import * as sv from "./text/sv";
+import * as nb from "./text/nb";
 import { Glow } from "./home-client";
 
-const A = {
-  is: {
+export type AboutText = { h1: string; by: string; alt: string; lead1: string; lead2: string; painsAria: string; pains: [string, string][]; quote: string; ctaH: string; ctaP: string; try: string };
+const is: AboutText = {
     h1: "Ég bjó til kerfið sem mig vantaði.", by: "Bjarni Lúðvíksson, stofnandi VAKTO", alt: "Bjarni Lúðvíksson, stofnandi VAKTO",
     lead1: "Ég hef komið að rekstri á mörgum sviðum: veitingastöðum, framleiðslueldhúsi, ferðaþjónustu og gistiheimilum. Í öllum þeim rekstri fann ég aldrei almennilegt kerfi sem hentaði og var einfalt í notkun, bæði fyrir mig og starfsfólkið.",
     lead2: "VAKTO er svarið við því sem fór í taugarnar á mér árum saman.",
@@ -21,7 +25,9 @@ const A = {
     ],
     quote: "„Ég var alltof oft að taka eftir öllum yfirvinnutímunum hjá starfsfólkinu þegar mánuðurinn var gerður upp. Nú er það út sögunni.“",
     ctaH: "Prófaðu VAKTO í þínum rekstri.", ctaP: "14 dagar frítt, engin binding. Eða sendu mér línu á ", try: "Prófa frítt",
-  },
+};
+const A: Record<SiteLang, AboutText> = {
+  is,
   en: {
     h1: "I built the system I needed.", by: "Bjarni Lúðvíksson, founder of VAKTO", alt: "Bjarni Lúðvíksson, founder of VAKTO",
     lead1: "I've run businesses in many fields: restaurants, a production kitchen, tourism and guesthouses. In all of them I never found a proper system that fit and was simple to use, for me and for the staff.",
@@ -37,10 +43,12 @@ const A = {
     quote: "“Far too often I only noticed all the staff overtime when the month was being closed. That's a thing of the past.”",
     ctaH: "Try VAKTO in your business.", ctaP: "14 days free, no commitment. Or drop me a line at ", try: "Try free",
   },
+  da: da.about, sv: sv.about, nb: nb.about,
 };
 
 export default function AboutClient() {
-  const t = A[useSiteLang()];
+  const lang = useSiteLang();
+  const t = A[lang];
   return (
     <div className="ah ah-about">
       <Glow />
@@ -73,7 +81,7 @@ export default function AboutClient() {
         <section className="ab-cta">
           <h2>{t.ctaH}</h2>
           <p>{t.ctaP}<a href="mailto:hallo@vakto.is">hallo@vakto.is</a>.</p>
-          <a className="ah-btn ah-btn-lg" href="/nyskraning">{t.try}</a>
+          <a className="ah-btn ah-btn-lg" href={appHref(lang, "/nyskraning")}>{t.try}</a>
         </section>
       </main>
       <AhFooter />
