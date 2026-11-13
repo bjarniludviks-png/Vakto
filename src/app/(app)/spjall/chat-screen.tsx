@@ -777,6 +777,16 @@ function Messenger({ initial, embedded = false, ai }: { initial: ChatInitial; em
     if (box && a) { anchorRef.current = null; box.scrollTop = box.scrollHeight - a.h + a.top; return; }
     if (atBottomRef.current) endRef.current?.scrollIntoView({ block: "end" });
   }, [msgs, typers]);
+  // Myndir og hljóð hlaðast EFTIR að skrunað var neðst og lengja samtalið, svo það opnaðist ofar en á nýjustu
+  // skilaboðunum. Höldum okkur neðst meðan notandinn hefur ekki skrunað upp sjálfur (onScroll setur atBottomRef).
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box) return;
+    const pin = () => { if (atBottomRef.current && !anchorRef.current) box.scrollTop = box.scrollHeight; };
+    box.addEventListener("load", pin, true);
+    box.addEventListener("loadedmetadata", pin, true);
+    return () => { box.removeEventListener("load", pin, true); box.removeEventListener("loadedmetadata", pin, true); };
+  }, [active?.id]);
 
   async function translate(m: ChatMessage) {
     setOrig((o) => ({ ...o, [m.id]: false }));
