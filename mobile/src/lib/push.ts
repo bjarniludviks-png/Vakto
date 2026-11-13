@@ -80,7 +80,7 @@ export async function pushEnabled(): Promise<boolean> {
 
 /* Smellt á tilkynningu → réttur skjár. Þjónninn setur data.url (t.d. "/samningur?id=…", sjá
  * appUrl í src/lib/push.ts á vefnum). Aðeins leiðir sem eru til í appinu; annað opnar appið bara. */
-const APP_ROUTES = ["samningur", "skjol", "frettaveita", "spjall", "timar", "verkefni", "hlutverk"];
+const APP_ROUTES = ["samningur", "skjol", "frettaveita", "spjall", "timar", "stimplun", "verkefni", "hlutverk"];
 const handled = new Set<string>();
 
 function routeOf(r: Notifications.NotificationResponse | null | undefined): string | null {

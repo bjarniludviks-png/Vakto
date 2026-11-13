@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { tr, trf, useLang, setLang, LANGS } from "../src/lib/i18n";
 import { View, Switch, Linking, Pressable, Alert } from "react-native";
 import { useRouter } from "expo-router";
-import { Bell, BellOff, UserRound, KeyRound, LifeBuoy, FileText, CalendarPlus, Ban, Trash2, Mail, Eye, Phone } from "lucide-react-native";
+import { Bell, BellOff, MapPin, UserRound, KeyRound, LifeBuoy, FileText, CalendarPlus, Ban, Trash2, Mail, Eye, Phone } from "lucide-react-native";
 import { Screen } from "../src/components/screen";
 import { List, Row, IconBox, Muted, useToast, Txt, Seg, Sheet, Btn } from "../src/components/ui";
 import { colors, useTheme, setThemeMode } from "../src/theme";
@@ -14,6 +14,7 @@ import { getDnd, setDnd, dndLabel, onMuteChange } from "../src/lib/mute";
 import { supabase } from "../src/lib/supabase";
 import { blockedUsers, unblockAll } from "../src/lib/api/moderation";
 import { myRole, requestAccountDeletion, markAccountDeleted, OWNER_DELETE_MSG, HELP_EMAIL } from "../src/lib/api/account";
+import { getAutoPunch, type AutoPunchState } from "../src/lib/autopunch";
 
 export default function Stillingar() {
   const { mode, dark } = useTheme();
@@ -46,6 +47,9 @@ export default function Stillingar() {
     if (v) { const t = await registerForPush(me); setPush(!!t); if (!t) toast("Leyfðu tilkynningar í stillingum símans"); }
     else { await unregisterPush(); setPush(false); toast("Slökkt á push-tilkynningum"); }
   }
+  // Sjálfvirk stimplun (0112) — aðeins sýnd ef vinnustaðurinn hefur kveikt á henni.
+  const [auto, setAuto] = useState<AutoPunchState | null>(null);
+  useEffect(() => { getAutoPunch().then(setAuto).catch(() => {}); }, []);
   const [blockedN, setBlockedN] = useState(0);
   useEffect(() => { blockedUsers(true).then((b) => setBlockedN(b.size)).catch(() => {}); }, []);
   // Í spjalli (0099): sýna virkni og símanúmer samstarfsfólki.
@@ -97,6 +101,12 @@ export default function Stillingar() {
       <List>
         <Row icon={<IconBox tone="brand"><Bell color={colors.brandDeep} size={19} /></IconBox>} title="Push-tilkynningar" sub="Skilaboð, nýtt vaktaplan, svör við beiðnum" right={<Switch value={push} onValueChange={togglePush} trackColor={{ true: colors.good, false: colors.line }} thumbColor="#fff" />} last />
       </List>
+      {auto && auto.mode !== "off" ? <>
+        <Muted style={{ paddingHorizontal: 2 }}>{tr("STIMPLUN")}</Muted>
+        <List>
+          <Row icon={<IconBox tone={auto.consent ? "good" : "neutral"}><MapPin color={auto.consent ? colors.good : colors.ink2} size={19} /></IconBox>} title="Sjálfvirk stimplun" sub={auto.consent ? tr("Kveikt — staðsetning aðeins við komu og brottför") : tr("Slökkt — þú ræður hvort þú kveikir")} onPress={() => router.push("/stimplun")} last />
+        </List>
+      </> : null}
       <Muted style={{ paddingHorizontal: 2 }}>EKKI TRUFLA</Muted>
       <List>
         {dnd ? (

@@ -606,3 +606,21 @@ Kveikjan var Gistihúsið (Valdís, bókari): morgunmatur 7–10 og herbergisþr
   um `/api/app/notify` (`incident`, `handover`, `task_added`). Eldri grunnur án 0111 → Heim fellur á gömlu `shift_tasks`. OTA nægir (engin ný native eining).
 - **Ekki komið:** tilkynning til yfirmanns þegar listi klárast ekki (`escalate` er vistað en enginn cron les það — Vercel-cron er daglegur),
   AI-uppsetning hlutverka/lista, þýðingar á verkefnatexta.
+
+## Sjálfvirk stimplun + sjálfvirk útstimplun (11. nóv. 2026, migration 0112 á staging; prod við release)
+- **Stillingar → Staðir → „Sjálfvirk stimplun“** (`AutoPunchCard`, `saveAutoPunch`): `companies.auto_punch_mode` off | suggest | auto,
+  `auto_punch_unscheduled` (annars aðeins frá 2 klst. fyrir útgefna vakt til loka hennar), `auto_clockout_hours` (4–24, null = slökkt)
+  + `auto_clockout_since` (gildir aðeins um stimplanir sem hefjast eftir að kveikt er).
+- **Starfsmaður kveikir sjálfur** í appinu (`mobile/app/stimplun.tsx`) → `auto_punch_consents` (aðeins þjónninn skrifar). Appið notar
+  `expo-location` `startGeofencingAsync` + `expo-task-manager` (`mobile/src/lib/autopunch.ts`, flutt inn efst í `_layout.tsx`); svæði =
+  staðir með pinna (radíus minnst 150 m), uppfærð við innskráningu/forgrunn, stöðvuð við útskráningu. Engin samfelld rakning; iOS fær
+  EKKI `UIBackgroundModes: location` (svæðavöktun þarf aðeins „Always“-leyfi), Android fær `ACCESS_BACKGROUND_LOCATION`.
+- **`/api/app/auto-punch`** (Bearer): GET staða/svæði/tillögur; POST `event` (enter/exit), `consent`, `decide`. Reglurnar í
+  `src/lib/auto-punch.server.ts` (þjónustulykill): tími klemmdur í [nú−15 mín, nú]; við staðfestingu má aðeins STYTTA (inn ≥ koma,
+  út ≤ brottför); út+inn innan 10 mín. opnar stimplunina aftur (GPS-flökt); koma á annan stað með vakt = skipt um stað.
+- `punches.source` = `'auto'` (enum-gildi), `punches.auto_out` = 'geofence' | 'limit', `auto_reminded`. Trigger
+  `punches_auto_fields_guard`: starfsmaður getur ekki skrifað þessa reiti sjálfur. `punches_geofence` metur auto-stimplanir þótt
+  geofence_mode sé off (500 m svigrúm, því atburðurinn sjálfur sannar komu/brottför) og hreinsar out_* þegar stimplun er opnuð aftur.
+- **Cron `/api/cron/auto-clockout`** á 15 mín. fresti: lokar á clock_in + X (`auto_out='limit'`), push X−4 og X−2 klst. fyrr; stjórnendur
+  fá samantekt. Tímaskráning: „· sjálfvirk“, „· sjálfvirk útstimplun“ og frávikið „Sjálfvirk útstimplun · X klst“.
+- Krefst NÝS native builds (task-manager + leyfi) — OTA dugar ekki. Eldri app-útgáfur sýna `source='auto'` sem texta í Tímar.

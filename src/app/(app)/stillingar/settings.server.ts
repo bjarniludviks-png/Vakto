@@ -11,6 +11,8 @@ import { planInvoice } from "@/lib/invoice-calc";
 
 export type LocationRow = { id?: string; name: string; staff: number; timezone: string; lat?: number | null; lng?: number | null; radius?: number };
 export type GeofenceMode = "off" | "flag" | "block";
+/** Sjálfvirk stimplun (0112). */
+export type AutoPunchView = { mode: "off" | "suggest" | "auto"; unscheduled: boolean; clockoutHours: number | null; optedIn: number };
 export type PositionRow = { id?: string; name: string; staff: number; baseRate: string; rawRate?: number };
 export type UserRow = { name: string; initials: string; role: string; email: string;
   /** users.id — Aðgangur-glugginn (aðeins eigandi). */
@@ -31,7 +33,7 @@ export type InvoiceView = { id: string; periodStart: string; periodEnd: string; 
 export type AiView = { used: number; included: number; packs: number; limit: number; packEnabled: boolean; packCap: number };
 /** Áskriftarleið og áætlun (virkir þennan mánuð) fyrir Áskrift-spjaldið. */
 export type PricingView = { plan: PlanId; legacyUntil: string | null; legacyApplies: boolean; units: number; estimateTotal: number; estimateNet: number; interval: BillingInterval; paidYearUntil: string | null; nextDue: string | null; yearFeeTotal: number };
-export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; viewerRole?: string; kioskToken: string | null; company: CompanyInfo | null; live: boolean; geofenceMode?: GeofenceMode; card?: CardView | null; invoices?: InvoiceView[]; pricing?: PricingView | null; ai?: AiView | null };
+export type SettingsData = { departments: DepartmentRow[]; locations: LocationRow[]; positions: PositionRow[]; users: UserRow[]; apiKeys: ApiKeyView[]; companyId: string | null; viewerRole?: string; kioskToken: string | null; company: CompanyInfo | null; live: boolean; geofenceMode?: GeofenceMode; autoPunch?: AutoPunchView | null; card?: CardView | null; invoices?: InvoiceView[]; pricing?: PricingView | null; ai?: AiView | null };
 
 const DEMO: SettingsData = {
   departments: [
@@ -157,6 +159,19 @@ export async function getSettingsData(): Promise<SettingsData> {
     const geofenceMode = (gfRes.error ? "off" : (gfRes.data?.geofence_mode as GeofenceMode | null) ?? "off");
     const pinRes = await supabase.from("locations").select("id, lat, lng, geofence_radius").eq("company_id", company);
     const pins = new Map((pinRes.error ? [] : pinRes.data ?? []).map((l) => [l.id as string, l]));
+    // Sjálfvirk stimplun (0112) — tolerant.
+    const apRes = await supabase.from("companies").select("auto_punch_mode, auto_punch_unscheduled, auto_clockout_hours").eq("id", company).maybeSingle();
+    let autoPunch: AutoPunchView | null = null;
+    if (!apRes.error && apRes.data) {
+      const m = apRes.data.auto_punch_mode as string;
+      const cnt = await supabase.from("auto_punch_consents").select("employee_id", { count: "exact", head: true }).eq("company_id", company);
+      autoPunch = {
+        mode: m === "auto" || m === "suggest" ? m : "off",
+        unscheduled: !!apRes.data.auto_punch_unscheduled,
+        clockoutHours: (apRes.data.auto_clockout_hours as number | null) ?? null,
+        optedIn: cnt.count ?? 0,
+      };
+    }
     // Tolerant of missing 0026 columns — fall back to name+kennitala only.
     const comp = compRes.error
       ? (await supabase.from("companies").select("name, kennitala").eq("id", company).maybeSingle()).data
@@ -231,7 +246,7 @@ export async function getSettingsData(): Promise<SettingsData> {
       apiKeys,
       companyId: company,
       viewerRole,
-      kioskToken, card, invoices, pricing, ai, geofenceMode,
+      kioskToken, card, invoices, pricing, ai, geofenceMode, autoPunch,
       company: { name: c.name ?? "", kennitala: c.kennitala ?? "", address: c.address ?? "", postalCode, city, phone: c.phone ?? "", email: c.email ?? "", feedPostPolicy, payPeriodStart: ppd, plan, trialEndsAt, billingStatus, accessEndsAt, laborTarget, laborExclSick, leaveCap, esignProvider, taktikalAvailable },
       live: true,
     };
